@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /*
@@ -47,4 +48,118 @@ expect()->extend('toBeOne', function () {
 function something()
 {
     // ..
+}
+
+/**
+ * Insert a strategy and return its id.
+ *
+ * The ERD tables have no models or factories yet, so tests arrange their parent
+ * rows through the query builder. Replace these with factories once the models
+ * exist.
+ */
+function insertStrategy(): int
+{
+    return DB::table('strategies')->insertGetId([
+        'name' => 'Country Strategy',
+        'start_year' => 2021,
+        'end_year' => 2025,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+}
+
+/**
+ * Insert a program under the given strategy and manager, and return its id.
+ */
+function insertProgram(int $strategyId, int $managerId, string $name = 'WASH'): int
+{
+    return DB::table('programs')->insertGetId([
+        'name' => $name,
+        'strategy_id' => $strategyId,
+        'manager_id' => $managerId,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+}
+
+/**
+ * Insert a proposal with only its required columns, and return its id.
+ */
+function insertProposal(string $name = 'Emergency WASH Response'): int
+{
+    return DB::table('proposals')->insertGetId([
+        'name' => $name,
+        'planned_date_begin' => '2026-01-01',
+        'planned_date_end' => '2026-12-31',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+}
+
+/**
+ * Insert a city and return its id.
+ *
+ * `cities.name` is unique, so the default name is sequenced to keep a test that
+ * needs several cities from colliding with itself.
+ */
+function insertCity(?string $name = null): int
+{
+    static $sequence = 0;
+
+    $sequence++;
+
+    return DB::table('cities')->insertGetId([
+        'name' => $name ?? "City {$sequence}",
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+}
+
+/**
+ * Insert a project against the given city, program and user, and return its id.
+ */
+function insertProject(int $cityId, int $programId, int $userId): int
+{
+    return DB::table('projects')->insertGetId([
+        'name' => 'Water Network Rehabilitation',
+        'city_id' => $cityId,
+        'program_id' => $programId,
+        'user_id' => $userId,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+}
+
+/**
+ * Insert a donor and return its id.
+ */
+function insertDonor(string $name = 'UNICEF'): int
+{
+    return DB::table('donors')->insertGetId([
+        'name' => $name,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+}
+
+/**
+ * Insert a funding agreement between a donor and a proposal, and return its id.
+ *
+ * Leaving $currency null exercises the column default rather than setting it.
+ */
+function insertDonorProposal(int $donorId, int $proposalId, string $budget = '500000.00', ?string $currency = null): int
+{
+    $agreement = [
+        'donor_id' => $donorId,
+        'proposal_id' => $proposalId,
+        'budget' => $budget,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ];
+
+    if ($currency !== null) {
+        $agreement['currency'] = $currency;
+    }
+
+    return DB::table('donor_proposal')->insertGetId($agreement);
 }
