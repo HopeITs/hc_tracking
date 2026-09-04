@@ -1,5 +1,9 @@
 * text=auto eol=lf
 
+# Windows batch wrappers must keep CRLF line endings
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
 *.blade.php diff=html
 *.css diff=css
 *.html diff=html
