@@ -13,15 +13,26 @@ installed to `C:\php85` and deliberately **kept off the system PATH**.
 Nothing in XAMPP, in `PATH`, or in `C:\composer` was modified. Typing `php`
 anywhere on this machine still gives you 8.4.12, exactly as before.
 
-Inside this project, use the wrappers instead:
+Inside this project, use the wrappers instead.
+
+PowerShell (needs the `.\` prefix - PowerShell never searches the current
+directory):
 
 ```
-php.cmd artisan migrate
-composer.cmd install
+.\php.cmd artisan migrate
+.\composer.cmd install
 ```
 
-Both call `C:\php85\php.exe` explicitly. Override the interpreter with the
-`PHP85` environment variable if PHP 8.5 lives somewhere else.
+cmd.exe:
+
+```
+.php.cmd artisan migrate
+.mposer.cmd install
+```
+
+The `.\` form works in both shells, so prefer it if in doubt. Both wrappers
+call `C:\php85\php.exe` explicitly; override the interpreter with the `PHP85`
+environment variable if PHP 8.5 lives somewhere else.
 
 ### The safety net
 
@@ -52,16 +63,16 @@ resolution always targets the runtime that actually executes the code.
 ## Setup
 
 ```
-composer.cmd install
+.mposer.cmd install
 npm install
-php.cmd artisan migrate
+.php.cmd artisan migrate
 npm run build
 ```
 
 Then:
 
 ```
-php.cmd artisan serve
+.php.cmd artisan serve
 ```
 
 The app is served at <http://localhost:8000>. Apache is **not** used for this
@@ -90,10 +101,10 @@ This is slower than sqlite and that trade is deliberate.
 ## Quality gates
 
 ```
-composer.cmd run test          # config:clear + Pint + PHPStan + Pest
-composer.cmd run lint          # apply Pint formatting
-composer.cmd run lint:check    # verify formatting only
-composer.cmd run types:check   # Larastan / PHPStan
+./composer.cmd run test          # config:clear + Pint + PHPStan + Pest
+./composer.cmd run lint          # apply Pint formatting
+./composer.cmd run lint:check    # verify formatting only
+./composer.cmd run types:check   # Larastan / PHPStan
 ```
 
 Static analysis runs at **PHPStan level 7** (`phpstan.neon`).
@@ -120,7 +131,7 @@ an MCP server.
 Every generated MCP config points at `C:\php85\php.exe` rather than a bare
 `php`. Boost writes `"php"` by default, which resolves to XAMPP's 8.4.12 here
 and is rejected by the platform guard, so the MCP server would never start.
-If you re-run `php.cmd artisan boost:install`, re-check those paths in:
+If you re-run `.\php.cmd artisan boost:install`, re-check those paths in:
 
 ```
 .mcp.json             .cursor/mcp.json
