@@ -55,7 +55,7 @@ resolution always targets the runtime that actually executes the code.
 |---|---|
 | PHP | 8.5.10 at `C:\php85` (NTS, vs17 x64) |
 | Composer | 2.9.5 (`C:\composer\composer.phar`) |
-| Database | MariaDB 10.4.28 via XAMPP (Laravel `mysql` driver) |
+| Database | MariaDB 10.4.28 via XAMPP (Laravel `mysql` driver), utf8mb4 / utf8mb4_unicode_ci |
 | Node | 24.14.0 / npm 11.11.0 |
 
 ---
@@ -90,7 +90,10 @@ project; production hosting is a separate, later decision.
 | `hc_tracking_test_old` | archived test schema - reference only |
 
 The app connects as the `hc_tracking` MariaDB user, **not** `root`. That user is
-granted only on the two live schemas; anything else is denied.
+granted only on the two live schemas; anything else is denied. One consequence:
+`artisan db:show` fails, because it reads `performance_schema`. That is the
+least-privilege design working, not a misconfiguration - do not widen the grants
+to silence it.
 
 Tests run against `hc_tracking_test` on MariaDB rather than the sqlite
 in-memory default, so migrations are verified on the same engine the app uses.
@@ -98,7 +101,45 @@ This is slower than sqlite and that trade is deliberate.
 
 The connection uses Laravel's `mysql` driver. Laravel also ships a `mariadb`
 driver; both work against XAMPP's MariaDB 10.4.28, and `mysql` was chosen for
-portability. Switching is a one-line change in `.env` and `phpunit.xml`.
+portability. Laravel 13 detects MariaDB at runtime
+(`MySqlConnection::isMaria()`), so the schema grammar adapts either way.
+Switching is a one-line change in `.env` and `phpunit.xml`.
+
+### Encoding contract
+
+Every schema, table and column is **`utf8mb4` / `utf8mb4_unicode_ci`**, stored
+on **InnoDB** with **`ROW_FORMAT=DYNAMIC`**. This is pinned in configuration,
+not inherited from the server:
+
+| Where | Setting |
+|---|---|
+| `.env` / `.env.example` | `DB_CHARSET=utf8mb4`, `DB_COLLATION=utf8mb4_unicode_ci` |
+| `config/database.php` | `'engine' => env('DB_ENGINE', 'InnoDB ROW_FORMAT=DYNAMIC')` |
+
+Pinning matters because the **server** default collation is
+`utf8mb4_general_ci`, not `utf8mb4_unicode_ci`. That default lives in `my.ini`,
+which is shared with every other app in `C:\xampp\htdocs` - several of which
+rely on `general_ci` or `utf8mb4_bin` - so it is deliberately **not** changed
+for this project. Consequently a schema created without an explicit `COLLATE`
+would silently drift. Always state it:
+
+```sql
+CREATE DATABASE `hc_tracking`
+    CHARACTER SET utf8mb4
+    COLLATE utf8mb4_unicode_ci;
+```
+
+`ROW_FORMAT=DYNAMIC` guarantees the 3072-byte index prefix that `utf8mb4`
+`string()` columns need.
+
+**One deliberate exception.** `passkeys.credential` is `utf8mb4_bin`, not
+`utf8mb4_unicode_ci`. MariaDB implements Laravel's `$table->json()` as
+`longtext ... COLLATE utf8mb4_bin CHECK (json_valid(...))`. That is correct for
+a JSON column and must not be "fixed".
+
+`tests/Feature/DatabaseEncodingTest.php` enforces all of this - table engine,
+row format, table and column collation, the generated `CREATE TABLE` DDL, and a
+four-byte character round trip. It fails if anything drifts.
 
 ---
 
