@@ -51,3 +51,24 @@ test('one donor may fund the same proposal under several agreements', function (
 
     $this->assertDatabaseCount('donor_proposal', 2);
 });
+
+test('an agreement may be recorded before the donor issues a project number', function () {
+    $id = insertDonorProposal(insertDonor(), insertProposal());
+
+    expect(DB::table('donor_proposal')->find($id)->project_num)->toBeNull();
+});
+
+test('an agreement stores the donor project reference verbatim', function () {
+    $id = insertDonorProposal(insertDonor(), insertProposal(), '500000.00', 'EUR', 'ECHO/SYR/BUD/2026/91008');
+
+    expect(DB::table('donor_proposal')->find($id)->project_num)->toBe('ECHO/SYR/BUD/2026/91008');
+});
+
+test('two agreements may carry the same project number', function () {
+    $proposalId = insertProposal();
+
+    insertDonorProposal(insertDonor(), $proposalId, '500000.00', 'USD', 'SYR-2026-014');
+    insertDonorProposal(insertDonor('WFP'), $proposalId, '120000.00', 'USD', 'SYR-2026-014');
+
+    expect(DB::table('donor_proposal')->where('project_num', 'SYR-2026-014')->count())->toBe(2);
+});

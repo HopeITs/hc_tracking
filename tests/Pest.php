@@ -147,7 +147,7 @@ function insertDonor(string $name = 'UNICEF'): int
  *
  * Leaving $currency null exercises the column default rather than setting it.
  */
-function insertDonorProposal(int $donorId, int $proposalId, string $budget = '500000.00', ?string $currency = null): int
+function insertDonorProposal(int $donorId, int $proposalId, string $budget = '500000.00', ?string $currency = null, ?string $projectNum = null): int
 {
     $agreement = [
         'donor_id' => $donorId,
@@ -159,6 +159,10 @@ function insertDonorProposal(int $donorId, int $proposalId, string $budget = '50
 
     if ($currency !== null) {
         $agreement['currency'] = $currency;
+    }
+
+    if ($projectNum !== null) {
+        $agreement['project_num'] = $projectNum;
     }
 
     return DB::table('donor_proposal')->insertGetId($agreement);
@@ -191,6 +195,82 @@ function insertTask(int $proposalId, int $assignedTo, int $createdBy, ?int $mile
         'title' => $title,
         'assigned_to' => $assignedTo,
         'created_by' => $createdBy,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+}
+
+/**
+ * Insert a logframe result, optionally nested under a parent result and
+ * optionally attached to a program.
+ */
+function insertResult(?int $parentId = null, ?int $programId = null, string $type = 'outcome', string $statement = 'Improved access to safe drinking water.'): int
+{
+    return DB::table('results')->insertGetId([
+        'statement' => $statement,
+        'parent_id' => $parentId,
+        'program_id' => $programId,
+        'type' => $type,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+}
+
+/**
+ * Insert an indicator under the given result, and return its id.
+ */
+function insertIndicator(int $resultId, string $name = 'Number of people reached'): int
+{
+    return DB::table('indicators')->insertGetId([
+        'name' => $name,
+        'result_id' => $resultId,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+}
+
+/**
+ * Insert a planned target for an indicator, and return its id.
+ *
+ * `source_type`/`source_id` are polymorphic and carry no foreign key, so the
+ * caller decides what the target is planned against.
+ */
+function insertPlanIndicator(int $indicatorId, string $sourceType, int $sourceId, ?int $projectId = null, string $target = '12000.00'): int
+{
+    return DB::table('plan_indicators')->insertGetId([
+        'source_type' => $sourceType,
+        'source_id' => $sourceId,
+        'indicator_id' => $indicatorId,
+        'target' => $target,
+        'project_id' => $projectId,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+}
+
+/**
+ * Insert a reported actual against a planned target, and return its id.
+ */
+function insertReport(int $planIndicatorId, int $userId, string $value = '9500.00'): int
+{
+    return DB::table('reports')->insertGetId([
+        'plan_indicator_id' => $planIndicatorId,
+        'user_id' => $userId,
+        'planned_date' => '2026-03-31',
+        'value' => $value,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+}
+
+/**
+ * Insert an organisational bank account, and return its id.
+ */
+function insertAccount(string $name = 'Operations USD'): int
+{
+    return DB::table('accounts')->insertGetId([
+        'name' => $name,
+        'opened_at' => '2024-03-15',
         'created_at' => now(),
         'updated_at' => now(),
     ]);

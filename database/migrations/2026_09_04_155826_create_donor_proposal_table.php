@@ -16,6 +16,7 @@ return new class extends Migration
             $table->foreignId('donor_id')->constrained('donors')->restrictOnDelete();
             $table->decimal('budget', 14, 2);
             $table->string('currency', 10)->default('USD');
+            $table->string('project_num', 50)->nullable();
             $table->foreignId('proposal_id')->constrained('proposals')->cascadeOnDelete();
             $table->timestamps();
         });
