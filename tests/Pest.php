@@ -163,3 +163,35 @@ function insertDonorProposal(int $donorId, int $proposalId, string $budget = '50
 
     return DB::table('donor_proposal')->insertGetId($agreement);
 }
+
+/**
+ * Insert a milestone, optionally nested under a parent milestone.
+ */
+function insertMilestone(int $projectId, int $responsibleUserId, ?int $parentId = null, string $name = 'Baseline assessment'): int
+{
+    return DB::table('milestones')->insertGetId([
+        'project_id' => $projectId,
+        'name' => $name,
+        'planned_date' => '2026-03-31',
+        'responsible_user_id' => $responsibleUserId,
+        'parent_milestone_id' => $parentId,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+}
+
+/**
+ * Insert a task under a proposal, optionally linked to a milestone.
+ */
+function insertTask(int $proposalId, int $assignedTo, int $createdBy, ?int $milestoneId = null, string $title = 'Draft the distribution plan'): int
+{
+    return DB::table('tasks')->insertGetId([
+        'proposal_id' => $proposalId,
+        'milestone_id' => $milestoneId,
+        'title' => $title,
+        'assigned_to' => $assignedTo,
+        'created_by' => $createdBy,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+}

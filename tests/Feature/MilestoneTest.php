@@ -1,0 +1,65 @@
+<?php
+
+use App\Models\User;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
+
+test('a new milestone is pending, first in sequence and carries no weight', function () {
+    $user = User::factory()->create();
+    $projectId = insertProject(insertCity(), insertProgram(insertStrategy(), $user->id), $user->id);
+
+    $milestone = DB::table('milestones')->find(insertMilestone($projectId, $user->id));
+
+    expect($milestone->status)->toBe('pending')
+        ->and((int) $milestone->sequence)->toBe(1)
+        ->and($milestone->weight_percentage)->toBe('0.00')
+        ->and($milestone->actual_date)->toBeNull()
+        ->and($milestone->description)->toBeNull()
+        ->and($milestone->parent_milestone_id)->toBeNull();
+});
+
+test('a milestone can be nested under a parent milestone', function () {
+    $user = User::factory()->create();
+    $projectId = insertProject(insertCity(), insertProgram(insertStrategy(), $user->id), $user->id);
+    $parentId = insertMilestone($projectId, $user->id, name: 'Design phase');
+
+    $childId = insertMilestone($projectId, $user->id, $parentId, 'Technical drawings');
+
+    $this->assertDatabaseHas('milestones', [
+        'id' => $childId,
+        'parent_milestone_id' => $parentId,
+    ]);
+});
+
+test('deleting a parent milestone deletes the milestones nested under it', function () {
+    $user = User::factory()->create();
+    $projectId = insertProject(insertCity(), insertProgram(insertStrategy(), $user->id), $user->id);
+    $parentId = insertMilestone($projectId, $user->id, name: 'Design phase');
+    insertMilestone($projectId, $user->id, $parentId, 'Technical drawings');
+
+    DB::table('milestones')->where('id', $parentId)->delete();
+
+    $this->assertDatabaseCount('milestones', 0);
+});
+
+test('deleting a project deletes its milestones', function () {
+    $user = User::factory()->create();
+    $projectId = insertProject(insertCity(), insertProgram(insertStrategy(), $user->id), $user->id);
+    insertMilestone($projectId, $user->id);
+
+    DB::table('projects')->where('id', $projectId)->delete();
+
+    $this->assertDatabaseCount('milestones', 0);
+});
+
+test('a user is not deletable while responsible for a milestone', function () {
+    $user = User::factory()->create();
+    $responsible = User::factory()->create();
+    $projectId = insertProject(insertCity(), insertProgram(insertStrategy(), $user->id), $user->id);
+    insertMilestone($projectId, $responsible->id);
+
+    expect(fn () => DB::table('users')->where('id', $responsible->id)->delete())
+        ->toThrow(QueryException::class);
+
+    $this->assertDatabaseHas('users', ['id' => $responsible->id]);
+});
