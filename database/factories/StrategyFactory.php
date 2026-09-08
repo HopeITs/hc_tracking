@@ -22,7 +22,7 @@ class StrategyFactory extends Factory
         return [
             'name' => fake()->country().' Strategy',
             'start_year' => $startYear,
-            'end_year' => $startYear + 4,
+            'end_year' => fn (array $attributes): int => (int) $attributes['start_year'] + 4,
         ];
     }
 }

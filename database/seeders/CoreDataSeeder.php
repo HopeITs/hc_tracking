@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\UserRole;
 use App\Models\City;
 use App\Models\Donor;
 use App\Models\Strategy;
@@ -18,9 +19,13 @@ class CoreDataSeeder extends Seeder
      */
     public function run(): void
     {
-        User::factory(12)->create();
+        User::factory(4)->role(UserRole::Manager)->create();
+        User::factory(2)->role(UserRole::Meal)->create();
+        User::factory(6)->role(UserRole::Officer)->create();
 
-        City::factory(8)->create();
+        foreach (['Damascus', 'Aleppo', 'Homs', 'Hama', 'Idlib', 'Latakia', 'Raqqa', 'Deir ez-Zor'] as $city) {
+            City::firstOrCreate(['name' => $city]);
+        }
 
         Strategy::factory()->create([
             'name' => 'Country Strategy 2021-2025',
@@ -35,7 +40,7 @@ class CoreDataSeeder extends Seeder
         ]);
 
         foreach (['UNICEF', 'ECHO', 'GIZ', 'SIDA', 'OCHA'] as $donor) {
-            Donor::factory()->create(['name' => $donor]);
+            Donor::firstOrCreate(['name' => $donor]);
         }
     }
 }

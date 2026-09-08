@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\UserRole;
 use App\Models\Account;
 use App\Models\City;
 use App\Models\Donor;
@@ -21,6 +22,8 @@ use App\Models\TaskAttachment;
 use App\Models\TaskUpdate;
 use App\Models\TransfersTracking;
 use App\Models\User;
+use App\Models\YearlyPlan;
+use Database\Seeders\CoreDataSeeder;
 
 test('the seeders populate every table in the schema', function () {
     $this->seed();
@@ -31,6 +34,7 @@ test('the seeders populate every table in the schema', function () {
         Strategy::class,
         Donor::class,
         Program::class,
+        YearlyPlan::class,
         Project::class,
         Proposal::class,
         DonorProposal::class,
@@ -54,6 +58,69 @@ test('the seeders populate every table in the schema', function () {
     }
 
     $this->assertDatabaseCount('project_proposal', Project::query()->count());
+});
+
+test('demo staff cover every role and programmes have managers', function () {
+    $this->seed();
+
+    expect(User::query()->where('email', 'test@example.com')->firstOrFail()->role)->toBe(UserRole::Admin);
+
+    foreach (UserRole::cases() as $role) {
+        expect(User::query()->where('role', $role)->exists())->toBeTrue();
+    }
+
+    foreach (Program::query()->with('manager', 'projects', 'yearlyPlans')->get() as $program) {
+        expect($program->manager->role)->toBe(UserRole::Manager);
+
+        foreach ($program->projects as $project) {
+            expect($project->name)->toStartWith($program->name.' Community Response ');
+        }
+
+        foreach ($program->yearlyPlans as $plan) {
+            expect($plan->manager_id)->toBe($program->manager_id);
+        }
+    }
+});
+
+test('lookup seeding reuses existing named cities and donors', function () {
+    $city = City::factory()->create(['name' => 'Damascus']);
+    $donor = Donor::factory()->create(['name' => 'UNICEF']);
+
+    $this->seed(CoreDataSeeder::class);
+    $this->seed(CoreDataSeeder::class);
+
+    $this->assertDatabaseCount('cities', 8);
+    $this->assertDatabaseCount('donors', 5);
+    expect(City::query()->where('name', 'Damascus')->sole()->id)->toBe($city->id);
+    expect(Donor::query()->where('name', 'UNICEF')->sole()->id)->toBe($donor->id);
+});
+
+test('demo targets cover annual plans and proposals in the same programme', function () {
+    $this->seed();
+
+    expect(PlanIndicator::query()->where('source_type', 'yearly_plan')->exists())->toBeTrue();
+    $targets = PlanIndicator::query()->where('source_type', 'proposal')
+        ->with('source.projects', 'project', 'indicator.result')->get();
+
+    expect($targets)->not->toBeEmpty();
+
+    foreach ($targets as $target) {
+        expect($target->source)->toBeInstanceOf(Proposal::class)
+            ->and($target->source->projects->contains('id', $target->project_id))->toBeTrue()
+            ->and($target->project->program_id)->toBe($target->indicator->result->program_id);
+    }
+});
+
+test('demo proposal dates fall within their programme strategy', function () {
+    $this->seed();
+
+    foreach (Proposal::query()->with('projects.program.strategy')->get() as $proposal) {
+        $strategy = $proposal->projects->first()->program->strategy;
+
+        expect($proposal->planned_date_begin->year)->toBe($strategy->start_year)
+            ->and($proposal->planned_date_end->toDateString())->toBe($strategy->start_year.'-12-31')
+            ->and($proposal->actual_date_begin->toDateString())->toBe($strategy->start_year.'-01-01');
+    }
 });
 
 test('the seeded graph is navigable end to end', function () {

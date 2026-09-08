@@ -49,7 +49,7 @@ class MealSeeder extends Seeder
                 ]));
 
             $yearlyPlan = $program->yearlyPlans()->first();
-            $project = $program->projects()->first();
+            $project = $program->projects()->with('proposals')->first();
 
             if ($yearlyPlan === null) {
                 return;
@@ -66,12 +66,22 @@ class MealSeeder extends Seeder
      *
      * @param  Collection<int, User>  $users
      */
-    protected function seedTargets(YearlyPlan $yearlyPlan, Indicator $indicator, ?Project $project, $users): void
+    protected function seedTargets(YearlyPlan $yearlyPlan, Indicator $indicator, ?Project $project, Collection $users): void
     {
         $planIndicator = PlanIndicator::factory()->forYearlyPlan($yearlyPlan)->create([
             'indicator_id' => $indicator->id,
             'project_id' => $project?->id,
         ]);
+
+        $proposal = $project?->proposals->first();
+
+        if ($proposal !== null) {
+            PlanIndicator::factory()->forProposal($proposal)->create([
+                'indicator_id' => $indicator->id,
+                'project_id' => $project->id,
+                'target' => $planIndicator->target,
+            ]);
+        }
 
         Report::factory()->approved()->create([
             'plan_indicator_id' => $planIndicator->id,

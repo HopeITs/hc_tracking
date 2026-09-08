@@ -1,11 +1,44 @@
 <?php
 
 use App\Enums\ArStatus;
+use App\Enums\UserRole;
 use App\Models\Account;
 use App\Models\Milestone;
 use App\Models\Proposal;
 use App\Models\Report;
+use App\Models\Strategy;
 use App\Models\TransfersTracking;
+use App\Models\User;
+
+test('a user factory supports every staff role', function (UserRole $role) {
+    $user = User::factory()->role($role)->create()->fresh();
+
+    expect($user->role)->toBe($role);
+})->with(UserRole::cases());
+
+test('a proposal end date follows an overridden start date', function () {
+    $proposal = Proposal::factory()->running()->create(['planned_date_begin' => '2035-04-15'])->fresh();
+
+    expect($proposal->planned_date_end->toDateString())->toBe('2036-04-15')
+        ->and($proposal->actual_date_begin->toDateString())->toBe('2035-04-15');
+});
+
+test('a strategy spans five years from an overridden start year', function () {
+    $strategy = Strategy::factory()->create(['start_year' => 2035])->fresh();
+
+    expect($strategy->end_year)->toBe(2039);
+});
+
+test('factory callers can still supply explicit end dates and years', function () {
+    $proposal = Proposal::factory()->create([
+        'planned_date_begin' => '2035-04-15',
+        'planned_date_end' => '2035-06-30',
+    ])->fresh();
+    $strategy = Strategy::factory()->create(['start_year' => 2035, 'end_year' => 2040])->fresh();
+
+    expect($proposal->planned_date_end->toDateString())->toBe('2035-06-30');
+    expect($strategy->end_year)->toBe(2040);
+});
 
 /**
  * Factory states derive columns from other columns. A plain state closure sees

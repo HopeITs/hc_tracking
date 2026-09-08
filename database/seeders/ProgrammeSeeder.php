@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\UserRole;
 use App\Models\City;
 use App\Models\Donor;
 use App\Models\DonorProposal;
@@ -27,7 +28,7 @@ class ProgrammeSeeder extends Seeder
     public function run(): void
     {
         $strategy = Strategy::query()->latest('id')->firstOrFail();
-        $managers = User::query()->inRandomOrder()->take(4)->get();
+        $managers = User::query()->where('role', UserRole::Manager)->orderBy('id')->get();
         $cities = City::query()->get();
         $donors = Donor::query()->get();
 
@@ -47,6 +48,7 @@ class ProgrammeSeeder extends Seeder
             }
 
             $projects = Project::factory(2)->create([
+                'name' => fn (): string => $name.' Community Response '.fake()->unique()->numerify('###'),
                 'program_id' => $program->id,
                 'city_id' => fn (): int => $cities->random()->id,
                 'user_id' => fn (): int => $managers->random()->id,
@@ -54,6 +56,8 @@ class ProgrammeSeeder extends Seeder
 
             $proposal = Proposal::factory()->running()->create([
                 'name' => $name.' Emergency Response',
+                'planned_date_begin' => $strategy->start_year.'-01-01',
+                'planned_date_end' => $strategy->start_year.'-12-31',
             ]);
 
             $proposal->projects()->attach($projects->pluck('id'));
