@@ -8,6 +8,28 @@ use App\Models\Task;
 use App\Models\TaskUpdate;
 use App\Models\User;
 use App\Models\YearlyPlan;
+use Carbon\CarbonImmutable;
+
+test('user timestamps are immutable and preserve their time', function (string $attribute) {
+    $user = User::factory()->withTwoFactor()->create([
+        $attribute => '2026-09-08 13:24:35',
+    ])->fresh();
+
+    $date = $user->getAttribute($attribute);
+
+    expect($date)->toBeInstanceOf(CarbonImmutable::class);
+    $nextDay = $date->addDay();
+    expect($date->toDateTimeString())->toBe('2026-09-08 13:24:35')
+        ->and($nextDay->toDateTimeString())->toBe('2026-09-09 13:24:35');
+    expect($user->isDirty($attribute))->toBeFalse();
+})->with(['email_verified_at', 'two_factor_confirmed_at', 'created_at', 'updated_at']);
+
+test('unverified user confirmation dates remain null', function () {
+    $user = User::factory()->unverified()->create()->fresh();
+
+    expect($user->email_verified_at)->toBeNull()
+        ->and($user->two_factor_confirmed_at)->toBeNull();
+});
 
 test('a user has the programs and yearly plans they manage', function () {
     $user = User::factory()->create();

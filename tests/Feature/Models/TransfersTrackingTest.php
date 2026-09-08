@@ -42,3 +42,19 @@ test('a tranche casts its money columns and dates', function () {
         ->and($tranche->transfer_date)->toBeNull()
         ->and($tranche->receive_date)->toBeNull();
 });
+
+test('a tranche rounds monetary amounts and exchange rates to their column precision', function () {
+    $tranche = TransfersTracking::factory()->make([
+        'payment_amount' => '123456789012.345',
+        'fees' => '123.455',
+        'amount_received' => '987654321098.765',
+        'net_amount_received' => '987654320975.305',
+        'exchange_rate' => '123456.1234567',
+    ]);
+
+    expect($tranche->payment_amount)->toBe('123456789012.35')
+        ->and($tranche->fees)->toBe('123.46')
+        ->and($tranche->amount_received)->toBe('987654321098.77')
+        ->and($tranche->net_amount_received)->toBe('987654320975.31')
+        ->and($tranche->exchange_rate)->toBe('123456.123457');
+});
