@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\HasTree;
+use App\Observers\MilestoneObserver;
 use Carbon\CarbonImmutable;
 use Database\Factories\MilestoneFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -39,10 +42,29 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'responsible_user_id',
     'parent_milestone_id',
 ])]
+#[ObservedBy(MilestoneObserver::class)]
 class Milestone extends Model
 {
     /** @use HasFactory<MilestoneFactory> */
     use HasFactory;
+
+    use HasTree;
+
+    /**
+     * The column pointing at the milestone this one is nested under.
+     */
+    public static function parentKeyName(): string
+    {
+        return 'parent_milestone_id';
+    }
+
+    /**
+     * Milestones within a project are ordered by their planned sequence.
+     */
+    public static function childrenOrderColumn(): ?string
+    {
+        return 'sequence';
+    }
 
     /**
      * The project this milestone belongs to.
@@ -62,26 +84,6 @@ class Milestone extends Model
     public function responsibleUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'responsible_user_id');
-    }
-
-    /**
-     * The milestone this one is nested under.
-     *
-     * @return BelongsTo<Milestone, $this>
-     */
-    public function parent(): BelongsTo
-    {
-        return $this->belongsTo(Milestone::class, 'parent_milestone_id');
-    }
-
-    /**
-     * The milestones nested under this one.
-     *
-     * @return HasMany<Milestone, $this>
-     */
-    public function children(): HasMany
-    {
-        return $this->hasMany(Milestone::class, 'parent_milestone_id');
     }
 
     /**

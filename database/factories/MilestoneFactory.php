@@ -32,6 +32,21 @@ class MilestoneFactory extends Factory
     }
 
     /**
+     * Nest the milestone under an existing one.
+     *
+     * The parent's project is copied across because milestones.project_id and
+     * parent_milestone_id are independent columns, and MilestoneObserver
+     * rejects a child that sits in a different project.
+     */
+    public function childOf(Milestone $parent): static
+    {
+        return $this->state([
+            'project_id' => $parent->project_id,
+            'parent_milestone_id' => $parent->id,
+        ]);
+    }
+
+    /**
      * Indicate that the milestone was reached on its planned date.
      *
      * The derived column is a closure rather than a value read from

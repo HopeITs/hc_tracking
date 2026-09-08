@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\HasTree;
+use App\Observers\ResultObserver;
 use Carbon\CarbonImmutable;
 use Database\Factories\ResultFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -25,29 +28,20 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable|null $updated_at
  */
 #[Fillable(['statement', 'parent_id', 'program_id', 'type', 'checkout_period'])]
+#[ObservedBy(ResultObserver::class)]
 class Result extends Model
 {
     /** @use HasFactory<ResultFactory> */
     use HasFactory;
 
-    /**
-     * The result this one contributes to.
-     *
-     * @return BelongsTo<Result, $this>
-     */
-    public function parent(): BelongsTo
-    {
-        return $this->belongsTo(Result::class, 'parent_id');
-    }
+    use HasTree;
 
     /**
-     * The results that contribute to this one.
-     *
-     * @return HasMany<Result, $this>
+     * The column pointing at the result this one contributes to.
      */
-    public function children(): HasMany
+    public static function parentKeyName(): string
     {
-        return $this->hasMany(Result::class, 'parent_id');
+        return 'parent_id';
     }
 
     /**

@@ -31,6 +31,16 @@ class ResultFactory extends Factory
     }
 
     /**
+     * Nest the result under an existing one.
+     */
+    public function childOf(Result $parent): static
+    {
+        return $this->state([
+            'parent_id' => $parent->id,
+        ]);
+    }
+
+    /**
      * Indicate the logframe level this result sits at.
      */
     public function type(string $type): static
