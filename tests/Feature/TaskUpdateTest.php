@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\TaskUpdate;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -9,13 +10,11 @@ use Illuminate\Support\Facades\DB;
  */
 function insertTaskUpdate(int $taskId, int $userId, string $comment = 'Distribution list verified with the field team.'): int
 {
-    return DB::table('task_updates')->insertGetId([
+    return TaskUpdate::factory()->create([
         'task_id' => $taskId,
         'user_id' => $userId,
         'comment' => $comment,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    ])->id;
 }
 
 test('a comment is stamped with the moment it was left', function () {

@@ -1,7 +1,20 @@
 <?php
 
+use App\Models\Account;
+use App\Models\City;
+use App\Models\Donor;
+use App\Models\DonorProposal;
+use App\Models\Indicator;
+use App\Models\Milestone;
+use App\Models\PlanIndicator;
+use App\Models\Program;
+use App\Models\Project;
+use App\Models\Proposal;
+use App\Models\Report;
+use App\Models\Result;
+use App\Models\Strategy;
+use App\Models\Task;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /*
@@ -53,19 +66,18 @@ function something()
 /**
  * Insert a strategy and return its id.
  *
- * The ERD tables have no models or factories yet, so tests arrange their parent
- * rows through the query builder. Replace these with factories once the models
- * exist.
+ * These helpers hand back ids rather than models on purpose: the tests around
+ * them assert database-level behaviour (column defaults, foreign key actions,
+ * unique indexes) and read their rows back through the query builder, so an
+ * Eloquent cast must not sit between the assertion and the stored value.
  */
 function insertStrategy(): int
 {
-    return DB::table('strategies')->insertGetId([
+    return Strategy::factory()->create([
         'name' => 'Country Strategy',
         'start_year' => 2021,
         'end_year' => 2025,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    ])->id;
 }
 
 /**
@@ -73,27 +85,26 @@ function insertStrategy(): int
  */
 function insertProgram(int $strategyId, int $managerId, string $name = 'WASH'): int
 {
-    return DB::table('programs')->insertGetId([
+    return Program::factory()->create([
         'name' => $name,
         'strategy_id' => $strategyId,
         'manager_id' => $managerId,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    ])->id;
 }
 
 /**
  * Insert a proposal with only its required columns, and return its id.
+ *
+ * `status`, `phase` and the actual dates are left out so the column defaults
+ * decide them.
  */
 function insertProposal(string $name = 'Emergency WASH Response'): int
 {
-    return DB::table('proposals')->insertGetId([
+    return Proposal::factory()->create([
         'name' => $name,
         'planned_date_begin' => '2026-01-01',
         'planned_date_end' => '2026-12-31',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    ])->id;
 }
 
 /**
@@ -108,11 +119,9 @@ function insertCity(?string $name = null): int
 
     $sequence++;
 
-    return DB::table('cities')->insertGetId([
+    return City::factory()->create([
         'name' => $name ?? "City {$sequence}",
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    ])->id;
 }
 
 /**
@@ -120,14 +129,12 @@ function insertCity(?string $name = null): int
  */
 function insertProject(int $cityId, int $programId, int $userId): int
 {
-    return DB::table('projects')->insertGetId([
+    return Project::factory()->create([
         'name' => 'Water Network Rehabilitation',
         'city_id' => $cityId,
         'program_id' => $programId,
         'user_id' => $userId,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    ])->id;
 }
 
 /**
@@ -135,11 +142,7 @@ function insertProject(int $cityId, int $programId, int $userId): int
  */
 function insertDonor(string $name = 'UNICEF'): int
 {
-    return DB::table('donors')->insertGetId([
-        'name' => $name,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    return Donor::factory()->create(['name' => $name])->id;
 }
 
 /**
@@ -153,8 +156,6 @@ function insertDonorProposal(int $donorId, int $proposalId, string $budget = '50
         'donor_id' => $donorId,
         'proposal_id' => $proposalId,
         'budget' => $budget,
-        'created_at' => now(),
-        'updated_at' => now(),
     ];
 
     if ($currency !== null) {
@@ -165,7 +166,7 @@ function insertDonorProposal(int $donorId, int $proposalId, string $budget = '50
         $agreement['project_num'] = $projectNum;
     }
 
-    return DB::table('donor_proposal')->insertGetId($agreement);
+    return DonorProposal::factory()->create($agreement)->id;
 }
 
 /**
@@ -173,15 +174,14 @@ function insertDonorProposal(int $donorId, int $proposalId, string $budget = '50
  */
 function insertMilestone(int $projectId, int $responsibleUserId, ?int $parentId = null, string $name = 'Baseline assessment'): int
 {
-    return DB::table('milestones')->insertGetId([
+    return Milestone::factory()->create([
         'project_id' => $projectId,
         'name' => $name,
+        'description' => null,
         'planned_date' => '2026-03-31',
         'responsible_user_id' => $responsibleUserId,
         'parent_milestone_id' => $parentId,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    ])->id;
 }
 
 /**
@@ -189,15 +189,14 @@ function insertMilestone(int $projectId, int $responsibleUserId, ?int $parentId 
  */
 function insertTask(int $proposalId, int $assignedTo, int $createdBy, ?int $milestoneId = null, string $title = 'Draft the distribution plan'): int
 {
-    return DB::table('tasks')->insertGetId([
+    return Task::factory()->create([
         'proposal_id' => $proposalId,
         'milestone_id' => $milestoneId,
         'title' => $title,
+        'description' => null,
         'assigned_to' => $assignedTo,
         'created_by' => $createdBy,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    ])->id;
 }
 
 /**
@@ -206,14 +205,12 @@ function insertTask(int $proposalId, int $assignedTo, int $createdBy, ?int $mile
  */
 function insertResult(?int $parentId = null, ?int $programId = null, string $type = 'outcome', string $statement = 'Improved access to safe drinking water.'): int
 {
-    return DB::table('results')->insertGetId([
+    return Result::factory()->create([
         'statement' => $statement,
         'parent_id' => $parentId,
         'program_id' => $programId,
         'type' => $type,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    ])->id;
 }
 
 /**
@@ -221,12 +218,10 @@ function insertResult(?int $parentId = null, ?int $programId = null, string $typ
  */
 function insertIndicator(int $resultId, string $name = 'Number of people reached'): int
 {
-    return DB::table('indicators')->insertGetId([
+    return Indicator::factory()->create([
         'name' => $name,
         'result_id' => $resultId,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    ])->id;
 }
 
 /**
@@ -237,15 +232,13 @@ function insertIndicator(int $resultId, string $name = 'Number of people reached
  */
 function insertPlanIndicator(int $indicatorId, string $sourceType, int $sourceId, ?int $projectId = null, string $target = '12000.00'): int
 {
-    return DB::table('plan_indicators')->insertGetId([
+    return PlanIndicator::factory()->create([
         'source_type' => $sourceType,
         'source_id' => $sourceId,
         'indicator_id' => $indicatorId,
         'target' => $target,
         'project_id' => $projectId,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    ])->id;
 }
 
 /**
@@ -253,14 +246,13 @@ function insertPlanIndicator(int $indicatorId, string $sourceType, int $sourceId
  */
 function insertReport(int $planIndicatorId, int $userId, string $value = '9500.00'): int
 {
-    return DB::table('reports')->insertGetId([
+    return Report::factory()->create([
         'plan_indicator_id' => $planIndicatorId,
         'user_id' => $userId,
         'planned_date' => '2026-03-31',
         'value' => $value,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+        'narrative_report_notes' => null,
+    ])->id;
 }
 
 /**
@@ -268,10 +260,8 @@ function insertReport(int $planIndicatorId, int $userId, string $value = '9500.0
  */
 function insertAccount(string $name = 'Operations USD'): int
 {
-    return DB::table('accounts')->insertGetId([
+    return Account::factory()->create([
         'name' => $name,
         'opened_at' => '2024-03-15',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    ])->id;
 }

@@ -12,14 +12,24 @@ class DatabaseSeeder extends Seeder
 
     /**
      * Seed the application's database.
+     *
+     * The domain seeders run in dependency order: master data, then the
+     * programme layer everything else hangs off, then the three layers that
+     * read from it.
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
         User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',
+        ]);
+
+        $this->call([
+            CoreDataSeeder::class,
+            ProgrammeSeeder::class,
+            DeliverySeeder::class,
+            MealSeeder::class,
+            FinanceSeeder::class,
         ]);
     }
 }

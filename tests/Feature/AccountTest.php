@@ -33,3 +33,14 @@ test('an account cannot be stored without an opening date', function () {
         'updated_at' => now(),
     ]);
 })->throws(QueryException::class);
+
+test('the is_active column defaults to true without the model supplying it', function () {
+    $id = DB::table('accounts')->insertGetId([
+        'name' => 'Raw Insert USD',
+        'opened_at' => '2024-03-15',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    expect((bool) DB::table('accounts')->find($id)->is_active)->toBeTrue();
+});

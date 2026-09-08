@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Models\YearlyPlan;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
@@ -9,12 +10,10 @@ use Illuminate\Support\Facades\DB;
  */
 function insertYearlyPlan(int $programId, int $managerId, int $year = 2026): void
 {
-    DB::table('yearly_plans')->insert([
+    YearlyPlan::factory()->create([
         'program_id' => $programId,
         'manager_id' => $managerId,
         'year' => $year,
-        'created_at' => now(),
-        'updated_at' => now(),
     ]);
 }
 

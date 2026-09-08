@@ -43,7 +43,13 @@ test('deleting a project detaches its targets instead of deleting them', functio
     $this->assertDatabaseHas('plan_indicators', ['id' => $planId, 'project_id' => null]);
 });
 
-test('a target outlives the source it was planned against', function () {
+/**
+ * The observer on YearlyPlan and Proposal covers Eloquent deletes only. A raw
+ * query-builder delete fires no model events, so the orphan is still possible
+ * by that route and no foreign key can stop it. See PlanIndicatorCleanupTest
+ * for the covered paths.
+ */
+test('a target outlives a source deleted through the query builder', function () {
     $user = User::factory()->create();
     $programId = insertProgram(insertStrategy(), $user->id);
     $yearlyPlanId = DB::table('yearly_plans')->insertGetId([

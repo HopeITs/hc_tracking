@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\TransfersTracking;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
@@ -8,16 +9,14 @@ use Illuminate\Support\Facades\DB;
  */
 function insertTransfer(int $donorProposalId, ?int $accountId = null, array $overrides = []): int
 {
-    return DB::table('transfers_tracking')->insertGetId(array_merge([
+    return TransfersTracking::factory()->create(array_merge([
         'donor_proposal_id' => $donorProposalId,
         'account_id' => $accountId,
         'payment_amount' => '250000.00',
         'scheduled_date' => '2026-04-01',
         'amount_received' => '0.00',
         'net_amount_received' => '0.00',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ], $overrides));
+    ], $overrides))->id;
 }
 
 /**

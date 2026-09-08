@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\ReportFile;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -9,13 +10,11 @@ use Illuminate\Support\Facades\DB;
  */
 function insertReportFile(int $reportId, string $path = 'report-files/2026/attendance-sheet.jpg'): int
 {
-    return DB::table('report_files')->insertGetId([
+    return ReportFile::factory()->create([
         'report_id' => $reportId,
         'path' => $path,
         'type' => 'image',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    ])->id;
 }
 
 /**

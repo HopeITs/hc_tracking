@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\TaskAttachment;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -9,13 +10,11 @@ use Illuminate\Support\Facades\DB;
  */
 function insertTaskAttachment(int $taskId, string $path = 'task-attachments/2026/distribution-list.pdf'): int
 {
-    return DB::table('task_attachments')->insertGetId([
+    return TaskAttachment::factory()->create([
         'task_id' => $taskId,
         'path' => $path,
         'type' => 'pdf',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    ])->id;
 }
 
 test('an attachment defaults to the date it was uploaded', function () {

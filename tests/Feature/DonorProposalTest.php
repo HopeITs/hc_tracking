@@ -31,14 +31,32 @@ test('a donor is not deletable while it funds a proposal', function () {
     $this->assertDatabaseHas('donors', ['id' => $donorId]);
 });
 
-test('deleting a proposal deletes its funding agreements but keeps the donor', function () {
+/**
+ * proposal_id restricts rather than cascades so a single proposal delete cannot
+ * reach through donor_proposal into transfers_tracking and erase the record of
+ * money received. Removing the agreement first is a deliberate, separate act.
+ */
+test('a proposal cannot be deleted while a funding agreement points at it', function () {
     $donorId = insertDonor();
     $proposalId = insertProposal();
     insertDonorProposal($donorId, $proposalId);
 
+    expect(fn () => DB::table('proposals')->where('id', $proposalId)->delete())
+        ->toThrow(QueryException::class);
+
+    $this->assertDatabaseHas('proposals', ['id' => $proposalId]);
+    $this->assertDatabaseCount('donor_proposal', 1);
+});
+
+test('a proposal is deletable once its funding agreements are removed', function () {
+    $donorId = insertDonor();
+    $proposalId = insertProposal();
+    $agreementId = insertDonorProposal($donorId, $proposalId);
+
+    DB::table('donor_proposal')->where('id', $agreementId)->delete();
     DB::table('proposals')->where('id', $proposalId)->delete();
 
-    $this->assertDatabaseCount('donor_proposal', 0);
+    $this->assertDatabaseCount('proposals', 0);
     $this->assertDatabaseHas('donors', ['id' => $donorId]);
 });
 

@@ -161,7 +161,9 @@ return [
     */
 
     'features' => [
-        Features::registration(),
+        // Registration is deliberately disabled: this is an internal system and
+        // accounts are created by an administrator with `php artisan user:create`.
+        // Re-enabling it exposes /register to anyone on the internet.
         Features::resetPasswords(),
         Features::emailVerification(),
         Features::twoFactorAuthentication([

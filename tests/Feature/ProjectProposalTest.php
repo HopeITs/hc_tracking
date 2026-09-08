@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Project;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -9,12 +10,7 @@ use Illuminate\Support\Facades\DB;
  */
 function linkProjectToProposal(int $projectId, int $proposalId): void
 {
-    DB::table('project_proposal')->insert([
-        'project_id' => $projectId,
-        'proposal_id' => $proposalId,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    Project::findOrFail($projectId)->proposals()->attach($proposalId);
 }
 
 test('a project is linked to a proposal', function () {

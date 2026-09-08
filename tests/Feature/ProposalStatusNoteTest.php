@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\ProposalStatusNote;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
@@ -8,13 +9,11 @@ use Illuminate\Support\Facades\DB;
  */
 function insertProposalStatusNote(int $proposalId, string $status = 'submitted', string $context = 'Submitted through the donor portal.'): int
 {
-    return DB::table('proposal_status_notes')->insertGetId([
+    return ProposalStatusNote::factory()->create([
         'proposal_id' => $proposalId,
         'status' => $status,
         'context' => $context,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    ])->id;
 }
 
 test('a status note is dated the day it was recorded', function () {
