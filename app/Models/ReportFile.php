@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\FileType;
 use Carbon\CarbonImmutable;
 use Database\Factories\ReportFileFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -16,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $report_id
  * @property string $path
  * @property CarbonImmutable $date
- * @property string $type
+ * @property FileType $type
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
@@ -39,12 +40,13 @@ class ReportFile extends Model
     /**
      * Get the attributes that should be cast.
      *
-     * @return array<string, string>
+     * @return array<string, string|class-string>
      */
     protected function casts(): array
     {
         return [
             'date' => 'date',
+            'type' => FileType::class,
         ];
     }
 }

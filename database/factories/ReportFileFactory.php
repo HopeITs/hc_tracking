@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\FileType;
 use App\Models\Report;
 use App\Models\ReportFile;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -20,11 +21,11 @@ class ReportFileFactory extends Factory
      */
     public function definition(): array
     {
-        $type = fake()->randomElement(['pdf', 'xlsx', 'jpg', 'png']);
+        $type = fake()->randomElement(FileType::cases());
 
         return [
             'report_id' => Report::factory(),
-            'path' => 'report-files/'.fake()->uuid().'.'.$type,
+            'path' => 'report-files/'.fake()->uuid().'.'.$type->value,
             'type' => $type,
         ];
     }

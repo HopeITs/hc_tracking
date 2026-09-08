@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ResultType;
 use App\Exceptions\InvalidParentException;
 use App\Models\Milestone;
 use App\Models\Project;
@@ -13,9 +14,9 @@ test('a result cannot be its own parent', function () {
 });
 
 test('a result cannot be nested under one of its own descendants', function () {
-    $root = Result::factory()->type('impact')->create();
-    $child = Result::factory()->type('outcome')->childOf($root)->create();
-    $grandchild = Result::factory()->type('output')->childOf($child)->create();
+    $root = Result::factory()->type(ResultType::Impact)->create();
+    $child = Result::factory()->type(ResultType::Outcome)->childOf($root)->create();
+    $grandchild = Result::factory()->type(ResultType::Output)->childOf($child)->create();
 
     expect(fn () => $root->update(['parent_id' => $grandchild->id]))
         ->toThrow(InvalidParentException::class);
@@ -58,9 +59,9 @@ test('a new milestone is created under an existing parent without tripping the c
 });
 
 test('a result is moved to a valid new parent', function () {
-    $first = Result::factory()->type('outcome')->create();
-    $second = Result::factory()->type('outcome')->create();
-    $output = Result::factory()->type('output')->childOf($first)->create();
+    $first = Result::factory()->type(ResultType::Outcome)->create();
+    $second = Result::factory()->type(ResultType::Outcome)->create();
+    $output = Result::factory()->type(ResultType::Output)->childOf($first)->create();
 
     $output->update(['parent_id' => $second->id]);
 

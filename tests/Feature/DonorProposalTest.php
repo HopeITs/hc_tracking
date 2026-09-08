@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\Currency;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
@@ -13,7 +14,7 @@ test('a funding agreement defaults to USD', function () {
 });
 
 test('a budget keeps its exact value at the top of the range', function () {
-    $id = insertDonorProposal(insertDonor(), insertProposal(), '999999999999.99', 'EUR');
+    $id = insertDonorProposal(insertDonor(), insertProposal(), '999999999999.99', Currency::Eur);
 
     $agreement = DB::table('donor_proposal')->find($id);
 
@@ -64,8 +65,8 @@ test('one donor may fund the same proposal under several agreements', function (
     $donorId = insertDonor();
     $proposalId = insertProposal();
 
-    insertDonorProposal($donorId, $proposalId, '500000.00', 'USD');
-    insertDonorProposal($donorId, $proposalId, '120000.00', 'EUR');
+    insertDonorProposal($donorId, $proposalId, '500000.00', Currency::Usd);
+    insertDonorProposal($donorId, $proposalId, '120000.00', Currency::Eur);
 
     $this->assertDatabaseCount('donor_proposal', 2);
 });
@@ -77,7 +78,7 @@ test('an agreement may be recorded before the donor issues a project number', fu
 });
 
 test('an agreement stores the donor project reference verbatim', function () {
-    $id = insertDonorProposal(insertDonor(), insertProposal(), '500000.00', 'EUR', 'ECHO/SYR/BUD/2026/91008');
+    $id = insertDonorProposal(insertDonor(), insertProposal(), '500000.00', Currency::Eur, 'ECHO/SYR/BUD/2026/91008');
 
     expect(DB::table('donor_proposal')->find($id)->project_num)->toBe('ECHO/SYR/BUD/2026/91008');
 });
@@ -85,8 +86,8 @@ test('an agreement stores the donor project reference verbatim', function () {
 test('two agreements may carry the same project number', function () {
     $proposalId = insertProposal();
 
-    insertDonorProposal(insertDonor(), $proposalId, '500000.00', 'USD', 'SYR-2026-014');
-    insertDonorProposal(insertDonor('WFP'), $proposalId, '120000.00', 'USD', 'SYR-2026-014');
+    insertDonorProposal(insertDonor(), $proposalId, '500000.00', Currency::Usd, 'SYR-2026-014');
+    insertDonorProposal(insertDonor('WFP'), $proposalId, '120000.00', Currency::Usd, 'SYR-2026-014');
 
     expect(DB::table('donor_proposal')->where('project_num', 'SYR-2026-014')->count())->toBe(2);
 });

@@ -19,7 +19,6 @@ return new class extends Migration
             $table->date('actual_date_begin')->nullable();
             $table->date('actual_date_end')->nullable();
             $table->string('status', 50)->default('concept note');
-            $table->string('phase', 50)->default('planning');
             $table->text('notes')->nullable();
             $table->timestamps();
         });

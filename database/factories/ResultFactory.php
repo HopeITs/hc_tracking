@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\ResultType;
 use App\Models\Result;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -26,7 +27,7 @@ class ResultFactory extends Factory
                 'Increased household resilience to shocks.',
                 'Strengthened community health referral pathways.',
             ]),
-            'type' => fake()->randomElement(['impact', 'outcome', 'output']),
+            'type' => fake()->randomElement(ResultType::cases()),
         ];
     }
 
@@ -43,7 +44,7 @@ class ResultFactory extends Factory
     /**
      * Indicate the logframe level this result sits at.
      */
-    public function type(string $type): static
+    public function type(ResultType $type): static
     {
         return $this->state(fn (array $attributes): array => [
             'type' => $type,

@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\MilestoneStatus;
 use App\Models\Milestone;
 use App\Models\Project;
 use App\Models\User;
@@ -56,7 +57,7 @@ class MilestoneFactory extends Factory
     public function reached(): static
     {
         return $this->state([
-            'status' => 'reached',
+            'status' => MilestoneStatus::Reached,
             'actual_date' => fn (array $attributes): string => $attributes['planned_date'],
         ]);
     }

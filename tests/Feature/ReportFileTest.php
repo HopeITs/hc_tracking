@@ -13,7 +13,7 @@ function insertReportFile(int $reportId, string $path = 'report-files/2026/atten
     return ReportFile::factory()->create([
         'report_id' => $reportId,
         'path' => $path,
-        'type' => 'image',
+        'type' => 'jpg',
     ])->id;
 }
 
@@ -33,7 +33,7 @@ test('a verification file defaults to the date it was uploaded', function () {
 
     expect($file->date)->toBe(DB::scalar('SELECT CURRENT_DATE'))
         ->and($file->path)->toBe('report-files/2026/attendance-sheet.jpg')
-        ->and($file->type)->toBe('image');
+        ->and($file->type)->toBe('jpg');
 });
 
 test('a verification file can be backdated to the document it holds', function () {
@@ -61,7 +61,7 @@ test('deleting a report deletes its verification files', function () {
 test('a verification file cannot be stored without a path', function () {
     DB::table('report_files')->insert([
         'report_id' => insertSubmittedReport(),
-        'type' => 'image',
+        'type' => 'jpg',
         'created_at' => now(),
         'updated_at' => now(),
     ]);

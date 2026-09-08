@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\ProposalStatus;
 use App\Models\Account;
 use App\Models\DonorProposal;
 use App\Models\Proposal;
@@ -42,11 +43,11 @@ class FinanceSeeder extends Seeder
         });
 
         Proposal::query()->each(function (Proposal $proposal): void {
-            foreach (['concept note', 'submitted', 'signed'] as $status) {
+            foreach ([ProposalStatus::ConceptNote, ProposalStatus::Submitted, ProposalStatus::Approved] as $status) {
                 ProposalStatusNote::factory()->create([
                     'proposal_id' => $proposal->id,
                     'status' => $status,
-                    'context' => 'Moved to '.$status.'.',
+                    'context' => 'Moved to '.$status->value.'.',
                 ]);
             }
         });

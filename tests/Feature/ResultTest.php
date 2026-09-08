@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ResultType;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -7,25 +8,25 @@ use Illuminate\Support\Facades\DB;
 test('a new result checks out quarterly and stands on its own', function () {
     $result = DB::table('results')->find(insertResult());
 
-    expect($result->checkout_period)->toBe('quarter')
+    expect($result->checkout_period)->toBe('quarterly')
         ->and($result->parent_id)->toBeNull()
         ->and($result->program_id)->toBeNull();
 });
 
 test('a result nests under a parent result', function () {
-    $goalId = insertResult(type: 'goal', statement: 'Reduced waterborne disease.');
+    $impactId = insertResult(type: ResultType::Impact, statement: 'Reduced waterborne disease.');
 
-    $outcomeId = insertResult($goalId);
+    $outcomeId = insertResult($impactId);
 
-    $this->assertDatabaseHas('results', ['id' => $outcomeId, 'parent_id' => $goalId]);
+    $this->assertDatabaseHas('results', ['id' => $outcomeId, 'parent_id' => $impactId]);
 });
 
 test('deleting a result deletes the results beneath it', function () {
-    $goalId = insertResult(type: 'goal', statement: 'Reduced waterborne disease.');
-    $outcomeId = insertResult($goalId);
-    insertResult($outcomeId, type: 'output', statement: 'Boreholes rehabilitated.');
+    $impactId = insertResult(type: ResultType::Impact, statement: 'Reduced waterborne disease.');
+    $outcomeId = insertResult($impactId);
+    insertResult($outcomeId, type: ResultType::Output, statement: 'Boreholes rehabilitated.');
 
-    DB::table('results')->where('id', $goalId)->delete();
+    DB::table('results')->where('id', $impactId)->delete();
 
     $this->assertDatabaseCount('results', 0);
 });

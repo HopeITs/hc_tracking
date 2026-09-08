@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\TaskPriority;
+use App\Enums\TaskStatus;
 use Carbon\CarbonImmutable;
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -19,8 +21,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $title
  * @property string|null $description
  * @property int $assigned_to
- * @property string $status
- * @property string $priority
+ * @property TaskStatus $status
+ * @property TaskPriority $priority
  * @property CarbonImmutable|null $start_date
  * @property CarbonImmutable|null $due_date
  * @property CarbonImmutable|null $completed_date
@@ -111,11 +113,13 @@ class Task extends Model
     /**
      * Get the attributes that should be cast.
      *
-     * @return array<string, string>
+     * @return array<string, string|class-string>
      */
     protected function casts(): array
     {
         return [
+            'status' => TaskStatus::class,
+            'priority' => TaskPriority::class,
             'start_date' => 'date',
             'due_date' => 'date',
             'completed_date' => 'date',

@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\ArStatus;
 use App\Models\Account;
 use App\Models\DonorProposal;
 use App\Models\TransfersTracking;
@@ -55,7 +56,7 @@ class TransfersTrackingFactory extends Factory
                 2
             ),
             'receive_date' => fn (array $attributes): string => $attributes['scheduled_date'],
-            'ar_status' => 'received',
+            'ar_status' => ArStatus::Received,
         ]);
     }
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Concerns\HasTree;
+use App\Enums\MilestoneStatus;
 use App\Observers\MilestoneObserver;
 use Carbon\CarbonImmutable;
 use Database\Factories\MilestoneFactory;
@@ -22,7 +23,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $description
  * @property CarbonImmutable $planned_date
  * @property CarbonImmutable|null $actual_date
- * @property string $status
+ * @property MilestoneStatus $status
  * @property int $sequence
  * @property string $weight_percentage
  * @property int $responsible_user_id
@@ -99,13 +100,14 @@ class Milestone extends Model
     /**
      * Get the attributes that should be cast.
      *
-     * @return array<string, string>
+     * @return array<string, string|class-string>
      */
     protected function casts(): array
     {
         return [
             'planned_date' => 'date',
             'actual_date' => 'date',
+            'status' => MilestoneStatus::class,
             'sequence' => 'integer',
             'weight_percentage' => 'decimal:2',
         ];

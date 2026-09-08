@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\FileType;
 use App\Models\Task;
 use App\Models\TaskAttachment;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -20,11 +21,11 @@ class TaskAttachmentFactory extends Factory
      */
     public function definition(): array
     {
-        $type = fake()->randomElement(['pdf', 'xlsx', 'docx', 'jpg']);
+        $type = fake()->randomElement(FileType::cases());
 
         return [
             'task_id' => Task::factory(),
-            'path' => 'task-attachments/'.fake()->uuid().'.'.$type,
+            'path' => 'task-attachments/'.fake()->uuid().'.'.$type->value,
             'type' => $type,
         ];
     }

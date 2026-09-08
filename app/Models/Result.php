@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Concerns\HasTree;
+use App\Enums\Period;
+use App\Enums\ResultType;
 use App\Observers\ResultObserver;
 use Carbon\CarbonImmutable;
 use Database\Factories\ResultFactory;
@@ -22,8 +24,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $statement
  * @property int|null $parent_id
  * @property int|null $program_id
- * @property string $type
- * @property string $checkout_period
+ * @property ResultType $type
+ * @property Period $checkout_period
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
@@ -62,5 +64,18 @@ class Result extends Model
     public function indicators(): HasMany
     {
         return $this->hasMany(Indicator::class);
+    }
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string|class-string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'type' => ResultType::class,
+            'checkout_period' => Period::class,
+        ];
     }
 }

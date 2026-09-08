@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\Period;
 use Carbon\CarbonImmutable;
 use Database\Factories\PlanIndicatorFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -22,7 +23,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  * @property int $indicator_id
  * @property string $target
  * @property int|null $project_id
- * @property string $period
+ * @property Period $period
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
@@ -78,12 +79,13 @@ class PlanIndicator extends Model
     /**
      * Get the attributes that should be cast.
      *
-     * @return array<string, string>
+     * @return array<string, string|class-string>
      */
     protected function casts(): array
     {
         return [
             'target' => 'decimal:2',
+            'period' => Period::class,
         ];
     }
 }

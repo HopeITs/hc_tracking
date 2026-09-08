@@ -1,5 +1,7 @@
 <?php
 
+use App\Enums\Currency;
+use App\Enums\ResultType;
 use App\Models\Account;
 use App\Models\City;
 use App\Models\Donor;
@@ -95,8 +97,8 @@ function insertProgram(int $strategyId, int $managerId, string $name = 'WASH'): 
 /**
  * Insert a proposal with only its required columns, and return its id.
  *
- * `status`, `phase` and the actual dates are left out so the column defaults
- * decide them.
+ * `status` and the actual dates are left out so the column defaults decide
+ * them.
  */
 function insertProposal(string $name = 'Emergency WASH Response'): int
 {
@@ -150,7 +152,7 @@ function insertDonor(string $name = 'UNICEF'): int
  *
  * Leaving $currency null exercises the column default rather than setting it.
  */
-function insertDonorProposal(int $donorId, int $proposalId, string $budget = '500000.00', ?string $currency = null, ?string $projectNum = null): int
+function insertDonorProposal(int $donorId, int $proposalId, string $budget = '500000.00', ?Currency $currency = null, ?string $projectNum = null): int
 {
     $agreement = [
         'donor_id' => $donorId,
@@ -203,7 +205,7 @@ function insertTask(int $proposalId, int $assignedTo, int $createdBy, ?int $mile
  * Insert a logframe result, optionally nested under a parent result and
  * optionally attached to a program.
  */
-function insertResult(?int $parentId = null, ?int $programId = null, string $type = 'outcome', string $statement = 'Improved access to safe drinking water.'): int
+function insertResult(?int $parentId = null, ?int $programId = null, ResultType $type = ResultType::Outcome, string $statement = 'Improved access to safe drinking water.'): int
 {
     return Result::factory()->create([
         'statement' => $statement,

@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\ProposalStatus;
 use App\Models\Proposal;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -13,8 +14,8 @@ class ProposalFactory extends Factory
     /**
      * Define the model's default state.
      *
-     * `status`, `phase` and the actual dates are left to the column defaults so
-     * a fresh proposal starts as an unstarted concept note.
+     * `status` and the actual dates are left to the column defaults so a fresh
+     * proposal starts as an unstarted concept note.
      *
      * @return array<string, mixed>
      */
@@ -30,7 +31,7 @@ class ProposalFactory extends Factory
     }
 
     /**
-     * Indicate that the proposal has been signed and is under way.
+     * Indicate that the proposal has been approved and is under way.
      *
      * The derived column is a closure rather than a value read from
      * $attributes directly, so it is resolved after the array passed to
@@ -39,8 +40,7 @@ class ProposalFactory extends Factory
     public function running(): static
     {
         return $this->state([
-            'status' => 'signed',
-            'phase' => 'implementation',
+            'status' => ProposalStatus::Approved,
             'actual_date_begin' => fn (array $attributes): string => $attributes['planned_date_begin'],
         ]);
     }

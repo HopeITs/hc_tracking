@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\ResultType;
 use App\Models\Indicator;
 use App\Models\PlanIndicator;
 use App\Models\Program;
@@ -30,12 +31,12 @@ class MealSeeder extends Seeder
         $users = User::query()->get();
 
         Program::query()->each(function (Program $program) use ($users): void {
-            $outcome = Result::factory()->type('outcome')->create([
+            $outcome = Result::factory()->type(ResultType::Outcome)->create([
                 'program_id' => $program->id,
                 'statement' => 'Improved '.strtolower($program->name).' outcomes for affected populations.',
             ]);
 
-            $output = Result::factory()->type('output')->create([
+            $output = Result::factory()->type(ResultType::Output)->create([
                 'program_id' => $program->id,
                 'parent_id' => $outcome->id,
                 'statement' => 'Services delivered to targeted communities.',

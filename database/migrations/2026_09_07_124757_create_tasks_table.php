@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('title');
             $table->text('description')->nullable();
             $table->foreignId('assigned_to')->constrained('users')->restrictOnDelete();
-            $table->string('status', 50)->default('TODO');
+            $table->string('status', 50)->default('todo');
             $table->string('priority', 50)->default('medium');
             $table->date('start_date')->nullable();
             $table->date('due_date')->nullable();

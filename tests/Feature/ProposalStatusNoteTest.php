@@ -42,7 +42,7 @@ test('a proposal keeps a full history of its transitions', function () {
 
     insertProposalStatusNote($proposalId, 'concept note', 'Drafted.');
     insertProposalStatusNote($proposalId, 'submitted', 'Sent to the donor.');
-    insertProposalStatusNote($proposalId, 'awarded', 'Grant agreement countersigned.');
+    insertProposalStatusNote($proposalId, 'approved', 'Grant agreement countersigned.');
 
     expect(DB::table('proposal_status_notes')->where('proposal_id', $proposalId)->count())->toBe(3);
 });

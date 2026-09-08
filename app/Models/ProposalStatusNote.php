@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\ProposalStatus;
 use Carbon\CarbonImmutable;
 use Database\Factories\ProposalStatusNoteFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -16,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *
  * @property int $id
  * @property int $proposal_id
- * @property string $status
+ * @property ProposalStatus $status
  * @property string $context
  * @property CarbonImmutable $date
  * @property CarbonImmutable|null $created_at
@@ -41,11 +42,12 @@ class ProposalStatusNote extends Model
     /**
      * Get the attributes that should be cast.
      *
-     * @return array<string, string>
+     * @return array<string, string|class-string>
      */
     protected function casts(): array
     {
         return [
+            'status' => ProposalStatus::class,
             'date' => 'date',
         ];
     }

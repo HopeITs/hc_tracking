@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\Currency;
 use Carbon\CarbonImmutable;
 use Database\Factories\DonorProposalFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -21,7 +22,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $id
  * @property int $donor_id
  * @property string $budget
- * @property string $currency
+ * @property Currency $currency
  * @property string|null $project_num
  * @property int $proposal_id
  * @property CarbonImmutable|null $created_at
@@ -73,12 +74,13 @@ class DonorProposal extends Model
     /**
      * Get the attributes that should be cast.
      *
-     * @return array<string, string>
+     * @return array<string, string|class-string>
      */
     protected function casts(): array
     {
         return [
             'budget' => 'decimal:2',
+            'currency' => Currency::class,
         ];
     }
 }

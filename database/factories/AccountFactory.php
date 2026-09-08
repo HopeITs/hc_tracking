@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\Currency;
 use App\Models\Account;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -20,7 +21,7 @@ class AccountFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => 'Operations '.fake()->randomElement(['USD', 'EUR', 'GBP', 'TRY']),
+            'name' => 'Operations '.fake()->randomElement(Currency::values()),
             'opened_at' => fake()->dateTimeBetween('-8 years', '-1 year')->format('Y-m-d'),
         ];
     }

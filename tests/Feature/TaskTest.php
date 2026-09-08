@@ -4,12 +4,12 @@ use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
-test('a new task starts as TODO at medium priority with no progress', function () {
+test('a new task starts as todo at medium priority with no progress', function () {
     $user = User::factory()->create();
 
     $task = DB::table('tasks')->find(insertTask(insertProposal(), $user->id, $user->id));
 
-    expect($task->status)->toBe('TODO')
+    expect($task->status)->toBe('todo')
         ->and($task->priority)->toBe('medium')
         ->and((int) $task->progress_percentage)->toBe(0)
         ->and($task->milestone_id)->toBeNull()

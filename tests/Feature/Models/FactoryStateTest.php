@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ArStatus;
 use App\Models\Account;
 use App\Models\Milestone;
 use App\Models\Proposal;
@@ -21,7 +22,7 @@ test('a received tranche derives its fee and net from the payment actually passe
 
     expect($tranche->fees)->toBe('1000.00')
         ->and($tranche->net_amount_received)->toBe('99000.00')
-        ->and($tranche->ar_status)->toBe('received');
+        ->and($tranche->ar_status)->toBe(ArStatus::Received);
 });
 
 test('a received tranche never nets more than it received', function () {

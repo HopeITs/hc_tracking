@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\ProposalPhase;
+use App\Enums\ProposalStatus;
 use App\Observers\PlanIndicatorSourceObserver;
 use Carbon\CarbonImmutable;
 use Database\Factories\ProposalFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -23,8 +26,8 @@ use Illuminate\Support\Facades\DB;
  * @property CarbonImmutable $planned_date_end
  * @property CarbonImmutable|null $actual_date_begin
  * @property CarbonImmutable|null $actual_date_end
- * @property string $status
- * @property string $phase
+ * @property ProposalStatus $status
+ * @property-read ProposalPhase $phase
  * @property string|null $notes
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
@@ -36,7 +39,6 @@ use Illuminate\Support\Facades\DB;
     'actual_date_begin',
     'actual_date_end',
     'status',
-    'phase',
     'notes',
 ])]
 #[ObservedBy(PlanIndicatorSourceObserver::class)]
@@ -44,6 +46,33 @@ class Proposal extends Model
 {
     /** @use HasFactory<ProposalFactory> */
     use HasFactory;
+
+    /**
+     * Mirror the column default so an unrefreshed model can still report a
+     * phase.
+     *
+     * The factory omits `status` on purpose, so the attribute is unhydrated
+     * until the model is refreshed, and `phase` would fail on a model straight
+     * out of create(). `Account::$is_active` carries the same mirror for the
+     * same reason. The column default is still proven independently by a raw
+     * insert in tests/Feature/ProposalTest.php.
+     *
+     * @var array<string, string>
+     */
+    protected $attributes = [
+        'status' => 'concept note',
+    ];
+
+    /**
+     * `phase` has no column, so it is appended explicitly.
+     *
+     * Without this it would be absent from toArray() and from any JSON an API
+     * resource or Livewire payload builds, even though $proposal->phase reads
+     * fine in PHP.
+     *
+     * @var list<string>
+     */
+    protected $appends = ['phase'];
 
     /**
      * Delete the model inside a transaction.
@@ -123,13 +152,33 @@ class Proposal extends Model
     }
 
     /**
+     * The phase of work this proposal is in.
+     *
+     * Derived from `status`, never stored. There is no `phase` column: it held
+     * a value that could contradict the status sitting next to it.
+     *
+     * Requires `status` to be loaded. A partial select that omits it (e.g.
+     * `Proposal::query()->select('id', 'name')->first()->phase`) throws
+     * "Call to a member function phase() on null" — the `$attributes` mirror
+     * does not help here, because `newFromBuilder` replaces attributes
+     * wholesale rather than merging into it.
+     *
+     * @return Attribute<ProposalPhase, never>
+     */
+    protected function phase(): Attribute
+    {
+        return Attribute::get(fn (): ProposalPhase => $this->status->phase());
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
-     * @return array<string, string>
+     * @return array<string, string|class-string>
      */
     protected function casts(): array
     {
         return [
+            'status' => ProposalStatus::class,
             'planned_date_begin' => 'date',
             'planned_date_end' => 'date',
             'actual_date_begin' => 'date',

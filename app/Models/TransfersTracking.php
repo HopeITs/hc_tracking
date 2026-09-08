@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\ArStatus;
+use App\Enums\Currency;
 use Carbon\CarbonImmutable;
 use Database\Factories\TransfersTrackingFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -18,17 +20,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $donor_proposal_id
  * @property int|null $account_id
  * @property string $payment_amount
- * @property string $amount_transfered_currency
+ * @property Currency $amount_transfered_currency
  * @property CarbonImmutable $scheduled_date
  * @property CarbonImmutable|null $transfer_date
  * @property string $fees
- * @property string $fees_currency
+ * @property Currency $fees_currency
  * @property string $amount_received
  * @property string $exchange_rate
  * @property string $net_amount_received
- * @property string $amount_received_currency
+ * @property Currency $amount_received_currency
  * @property CarbonImmutable|null $receive_date
- * @property string $ar_status
+ * @property ArStatus $ar_status
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
@@ -83,7 +85,7 @@ class TransfersTracking extends Model
     /**
      * Get the attributes that should be cast.
      *
-     * @return array<string, string>
+     * @return array<string, string|class-string>
      */
     protected function casts(): array
     {
@@ -96,6 +98,10 @@ class TransfersTracking extends Model
             'exchange_rate' => 'decimal:6',
             'net_amount_received' => 'decimal:2',
             'receive_date' => 'date',
+            'ar_status' => ArStatus::class,
+            'amount_transfered_currency' => Currency::class,
+            'fees_currency' => Currency::class,
+            'amount_received_currency' => Currency::class,
         ];
     }
 }

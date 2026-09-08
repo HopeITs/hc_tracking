@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ResultType;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
@@ -35,12 +36,12 @@ test('deleting a result deletes its indicators', function () {
     $this->assertDatabaseCount('indicators', 0);
 });
 
-test('deleting a goal deletes the indicators under its child results', function () {
-    $goalId = insertResult(type: 'goal', statement: 'Reduced waterborne disease.');
-    $outcomeId = insertResult($goalId);
+test('deleting an impact deletes the indicators under its child results', function () {
+    $impactId = insertResult(type: ResultType::Impact, statement: 'Reduced waterborne disease.');
+    $outcomeId = insertResult($impactId);
     insertIndicator($outcomeId);
 
-    DB::table('results')->where('id', $goalId)->delete();
+    DB::table('results')->where('id', $impactId)->delete();
 
     $this->assertDatabaseCount('indicators', 0);
 });

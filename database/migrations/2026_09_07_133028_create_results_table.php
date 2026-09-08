@@ -17,7 +17,7 @@ return new class extends Migration
             $table->foreignId('parent_id')->nullable()->constrained('results')->cascadeOnDelete();
             $table->foreignId('program_id')->nullable()->constrained('programs')->nullOnDelete();
             $table->string('type', 50);
-            $table->string('checkout_period', 50)->default('quarter');
+            $table->string('checkout_period', 50)->default('quarterly');
             $table->timestamps();
         });
     }

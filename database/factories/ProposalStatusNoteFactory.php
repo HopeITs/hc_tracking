@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\ProposalStatus;
 use App\Models\Proposal;
 use App\Models\ProposalStatusNote;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -22,7 +23,7 @@ class ProposalStatusNoteFactory extends Factory
     {
         return [
             'proposal_id' => Proposal::factory(),
-            'status' => fake()->randomElement(['concept note', 'submitted', 'signed', 'rejected', 'closed']),
+            'status' => fake()->randomElement(ProposalStatus::cases()),
             'context' => fake()->sentence(),
         ];
     }

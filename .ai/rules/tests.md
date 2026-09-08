@@ -13,3 +13,6 @@ They still return int ids, not models, and the tests still read rows back with D
 The helpers pass the exact attribute set the old raw insert used, and nothing more. Any column with a DB default stays omitted so the default is still what is being tested — this is why the factories omit default-bearing columns in the first place (see .ai/rules/seeders.md). When adding a helper, omit anything you want the database to decide.
 
 tests/Feature/Models/** is the other half: those use models directly and assert relations and casts, where Eloquent IS the thing under test.
+
+## Enum-cast tests live at the tests/Feature root, not under Models/
+`tests/Feature/UserRoleTest.php`, `tests/Feature/EnumCastTest.php` and `tests/Feature/ProposalPhaseTest.php` test a cast, which looks like it belongs under `tests/Feature/Models/**` by the rule above. It doesn't move: all three test an enum's contract with its column (or, for `ProposalPhaseTest.php`, an accessor derived from one) rather than a model's relations, and `UserRoleTest.php` established this location before any other enum existed. Do not "fix" these into query-builder tests reading raw strings, and do not relocate them under `tests/Feature/Models/**`.
