@@ -75,6 +75,23 @@
                 {{ __('Security') }}
             </flux:sidebar.item>
         </flux:sidebar.group>
+
+        @can('viewAny', App\Models\User::class)
+            <flux:sidebar.group
+                :heading="__('Administration')"
+                :class="$navigationGroupClasses"
+            >
+                <flux:sidebar.item
+                    icon="users"
+                    :href="route('admin.users.index')"
+                    :current="request()->routeIs('admin.users.*')"
+                    :class="$navigationItemClasses"
+                    wire:navigate
+                >
+                    {{ __('User directory') }}
+                </flux:sidebar.item>
+            </flux:sidebar.group>
+        @endcan
     </flux:sidebar.nav>
 
     <div class="hidden border-t border-secondary-medium/60 pt-3 lg:block">
