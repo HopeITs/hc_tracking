@@ -8,6 +8,9 @@ Route::view('/', 'welcome')->name('home');
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::view('dashboard', 'dashboard')->name('dashboard');
 
+    Route::livewire('strategies', 'pages::strategies.index')
+        ->name('strategies.index');
+
     Route::livewire('admin/users', 'pages::admin.users')
         ->can('viewAny', User::class)
         ->name('admin.users.index');

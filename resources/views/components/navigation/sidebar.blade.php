@@ -39,6 +39,16 @@
             >
                 {{ __('Dashboard') }}
             </flux:sidebar.item>
+
+            <flux:sidebar.item
+                icon="chart-bar-square"
+                :href="route('strategies.index')"
+                :current="request()->routeIs('strategies.*')"
+                :class="$navigationItemClasses"
+                wire:navigate
+            >
+                {{ __('Strategies') }}
+            </flux:sidebar.item>
         </flux:sidebar.group>
 
         <flux:sidebar.group

@@ -159,8 +159,63 @@ select:focus[data-flux-control] {
     }
 }
 
-.admin-directory dialog::backdrop {
-    background-color: var(--color-secondary-dark) !important;
+/* Keep every Flux modal visually separated from the page beneath it. */
+[data-flux-modal] > dialog::backdrop {
+    background-color: color-mix(in srgb, var(--color-secondary-dark) 72%, transparent) !important;
+    -webkit-backdrop-filter: blur(4px) saturate(75%);
+    backdrop-filter: blur(4px) saturate(75%);
+    transition-duration: 180ms;
+    transition-timing-function: ease-out;
+}
+
+[data-flux-modal] > dialog:not([data-flux-flyout]):not([data-flux-modal-overflow]) {
+    width: calc(100% - 2rem);
+    min-width: 0 !important;
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+[data-flux-modal] > dialog:not(.bg-transparent):not([data-flux-flyout]):not([data-flux-modal-overflow]),
+[data-flux-modal] [data-flux-modal-content]:not(.bg-transparent) {
+    border: 1px solid color-mix(in srgb, var(--color-secondary-light) 55%, transparent) !important;
+    box-shadow:
+        0 2px 8px color-mix(in srgb, var(--color-secondary-dark) 22%, transparent),
+        0 24px 64px color-mix(in srgb, var(--color-secondary-dark) 48%, transparent) !important;
+}
+
+[data-flux-modal] > dialog:not([data-flux-flyout]):not([data-flux-modal-overflow]),
+[data-flux-modal] [data-flux-modal-content] {
+    transform: translateY(0.5rem) scale(0.98);
+    transition-duration: 180ms;
+    transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-flux-modal] > dialog[open]:not([data-flux-flyout]):not([data-flux-modal-overflow]),
+[data-flux-modal] > dialog[open] [data-flux-modal-content] {
+    transform: translateY(0) scale(1);
+}
+
+@starting-style {
+
+    [data-flux-modal] > dialog[open]:not([data-flux-flyout]):not([data-flux-modal-overflow]),
+    [data-flux-modal] > dialog[open] [data-flux-modal-content] {
+        transform: translateY(0.5rem) scale(0.98);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    [data-flux-modal] > dialog,
+    [data-flux-modal] > dialog::backdrop,
+    [data-flux-modal] [data-flux-modal-content] {
+        transition-duration: 0.01ms !important;
+    }
+
+    [data-flux-modal] > dialog:not([data-flux-flyout]),
+    [data-flux-modal] [data-flux-modal-content] {
+        transform: none !important;
+    }
 }
 
 .admin-directory [data-flux-error] {
