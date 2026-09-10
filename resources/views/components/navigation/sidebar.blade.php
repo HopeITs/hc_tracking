@@ -49,6 +49,16 @@
             >
                 {{ __('Strategies') }}
             </flux:sidebar.item>
+
+            <flux:sidebar.item
+                icon="briefcase"
+                :href="route('programs.index')"
+                :current="request()->routeIs('programs.*')"
+                :class="$navigationItemClasses"
+                wire:navigate
+            >
+                {{ __('Programs') }}
+            </flux:sidebar.item>
         </flux:sidebar.group>
 
         <flux:sidebar.group
