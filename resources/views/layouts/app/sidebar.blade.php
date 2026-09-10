@@ -7,8 +7,13 @@
         <x-navigation.sidebar />
 
         <!-- Mobile User Menu -->
-        <flux:header class="lg:hidden">
-            <flux:sidebar.toggle class="lg:hidden" icon="bars-2" inset="left" />
+        <flux:header class="min-h-16 px-3 py-2 lg:hidden">
+            <flux:sidebar.toggle
+                class="size-11! touch-manipulation lg:hidden"
+                icon="bars-2"
+                inset="left"
+                data-mobile-navigation-toggle
+            />
 
             <flux:spacer />
 
@@ -16,6 +21,7 @@
                 <flux:profile
                     :initials="auth()->user()->initials()"
                     icon-trailing="chevron-down"
+                    class="min-h-11 min-w-11 touch-manipulation"
                 />
 
                 <flux:menu>
@@ -38,7 +44,7 @@
                     <flux:menu.separator />
 
                     <flux:menu.radio.group>
-                        <flux:menu.item :href="route('profile.edit')" icon="cog" wire:navigate>
+                        <flux:menu.item class="min-h-11 touch-manipulation" :href="route('profile.edit')" icon="cog" wire:navigate>
                             {{ __('Settings') }}
                         </flux:menu.item>
                     </flux:menu.radio.group>
@@ -51,7 +57,7 @@
                             as="button"
                             type="submit"
                             icon="arrow-right-start-on-rectangle"
-                            class="w-full cursor-pointer"
+                            class="min-h-11 w-full cursor-pointer touch-manipulation"
                             data-test="logout-button"
                         >
                             {{ __('Log out') }}

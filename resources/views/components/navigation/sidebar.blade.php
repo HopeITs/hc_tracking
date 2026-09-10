@@ -1,31 +1,40 @@
+@php
+    $navigationGroupClasses = '[&>div:first-child>div]:text-[11px]! [&>div:first-child>div]:font-semibold! [&>div:first-child>div]:tracking-[0.12em] [&>div:first-child>div]:text-secondary-soft! [&>div:first-child>div]:uppercase';
+    $navigationItemClasses = 'touch-manipulation text-secondary-soft! hover:bg-white/10! hover:text-white! max-lg:h-11! data-current:border-primary! data-current:bg-primary! data-current:text-white! dark:data-current:border-primary! dark:data-current:bg-primary! dark:data-current:text-white!';
+@endphp
+
 <flux:sidebar
     sticky
     collapsible="mobile"
     aria-label="{{ __('Application navigation') }}"
     data-navigation-sidebar
-    class="gap-3! border-e border-secondary-medium bg-secondary-dark p-3! text-white lg:w-[clamp(16rem,18vw,18rem)]!"
+    x-on:keydown.escape.window="if (window.matchMedia('(max-width: 63.999rem)').matches && ! $el.hasAttribute('data-flux-sidebar-collapsed-mobile')) { $dispatch('flux-sidebar-toggle') }"
+    class="gap-3! border-e border-secondary-medium bg-secondary-dark p-3! text-white duration-200 ease-out motion-reduce:duration-0 motion-reduce:transition-none max-lg:w-[min(18rem,calc(100vw_-_2.75rem))]! max-lg:shadow-2xl lg:w-[clamp(16rem,18vw,18rem)]!"
 >
     <flux:sidebar.header class="min-h-11 border-b border-secondary-medium/60 pb-3">
         <x-app-logo
             :sidebar="true"
             :href="route('dashboard')"
-            class="text-white hover:bg-white/10"
+            class="touch-manipulation text-white hover:bg-white/10 max-lg:min-h-11"
             wire:navigate
         />
 
-        <flux:sidebar.collapse class="text-secondary-soft lg:hidden" />
+        <flux:sidebar.collapse
+            class="size-11! touch-manipulation text-secondary-soft lg:hidden"
+            data-mobile-navigation-close
+        />
     </flux:sidebar.header>
 
     <flux:sidebar.nav aria-label="{{ __('Primary navigation') }}" class="min-h-0 flex-1 gap-3 overflow-y-auto">
         <flux:sidebar.group
             :heading="__('Overview')"
-            class="[&>div:first-child>div]:text-[11px]! [&>div:first-child>div]:font-semibold! [&>div:first-child>div]:tracking-[0.12em] [&>div:first-child>div]:text-secondary-soft! [&>div:first-child>div]:uppercase"
+            :class="$navigationGroupClasses"
         >
             <flux:sidebar.item
                 icon="home"
                 :href="route('dashboard')"
                 :current="request()->routeIs('dashboard')"
-                class="text-secondary-soft! hover:bg-white/10! hover:text-white! data-current:border-primary! data-current:bg-primary! data-current:text-white! dark:data-current:border-primary! dark:data-current:bg-primary! dark:data-current:text-white!"
+                :class="$navigationItemClasses"
                 wire:navigate
             >
                 {{ __('Dashboard') }}
@@ -34,13 +43,13 @@
 
         <flux:sidebar.group
             :heading="__('Settings')"
-            class="[&>div:first-child>div]:text-[11px]! [&>div:first-child>div]:font-semibold! [&>div:first-child>div]:tracking-[0.12em] [&>div:first-child>div]:text-secondary-soft! [&>div:first-child>div]:uppercase"
+            :class="$navigationGroupClasses"
         >
             <flux:sidebar.item
                 icon="user-circle"
                 :href="route('profile.edit')"
                 :current="request()->routeIs('profile.edit')"
-                class="text-secondary-soft! hover:bg-white/10! hover:text-white! data-current:border-primary! data-current:bg-primary! data-current:text-white! dark:data-current:border-primary! dark:data-current:bg-primary! dark:data-current:text-white!"
+                :class="$navigationItemClasses"
                 wire:navigate
             >
                 {{ __('Profile') }}
@@ -50,7 +59,7 @@
                 icon="paint-brush"
                 :href="route('appearance.edit')"
                 :current="request()->routeIs('appearance.edit')"
-                class="text-secondary-soft! hover:bg-white/10! hover:text-white! data-current:border-primary! data-current:bg-primary! data-current:text-white! dark:data-current:border-primary! dark:data-current:bg-primary! dark:data-current:text-white!"
+                :class="$navigationItemClasses"
                 wire:navigate
             >
                 {{ __('Appearance') }}
@@ -60,7 +69,7 @@
                 icon="shield-check"
                 :href="route('security.edit')"
                 :current="request()->routeIs('security.edit')"
-                class="text-secondary-soft! hover:bg-white/10! hover:text-white! data-current:border-primary! data-current:bg-primary! data-current:text-white! dark:data-current:border-primary! dark:data-current:bg-primary! dark:data-current:text-white!"
+                :class="$navigationItemClasses"
                 wire:navigate
             >
                 {{ __('Security') }}

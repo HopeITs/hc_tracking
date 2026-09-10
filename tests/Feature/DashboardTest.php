@@ -15,6 +15,8 @@ test('authenticated users see the application navigation on the dashboard', func
 
     $response
         ->assertSee('data-navigation-sidebar', false)
+        ->assertSee('data-mobile-navigation-close', false)
+        ->assertSee('data-mobile-navigation-toggle', false)
         ->assertSeeText('Overview')
         ->assertSeeText('Dashboard')
         ->assertSeeText('Settings')
