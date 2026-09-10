@@ -59,6 +59,16 @@
             >
                 {{ __('Programs') }}
             </flux:sidebar.item>
+
+            <flux:sidebar.item
+                icon="calendar-days"
+                :href="route('yearly-plans.index')"
+                :current="request()->routeIs('yearly-plans.*')"
+                :class="$navigationItemClasses"
+                wire:navigate
+            >
+                {{ __('Annual Plans') }}
+            </flux:sidebar.item>
         </flux:sidebar.group>
 
         <flux:sidebar.group

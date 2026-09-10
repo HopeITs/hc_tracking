@@ -18,3 +18,4 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Providers/** | .ai/rules/providers.md |
 | {database/factories/**,database/seeders/**,tests/Pest.php} | .ai/rules/seeders.md |
 | tests/** | .ai/rules/tests.md |
+| resources/views/pages/yearly-plans/** | .ai/rules/yearly-plans.md |

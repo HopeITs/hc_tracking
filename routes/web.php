@@ -14,6 +14,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('programs', 'pages::programs.index')
         ->name('programs.index');
 
+    Route::livewire('yearly-plans', 'pages::yearly-plans.index')
+        ->name('yearly-plans.index');
+
     Route::livewire('admin/users', 'pages::admin.users')
         ->can('viewAny', User::class)
         ->name('admin.users.index');

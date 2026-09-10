@@ -34,3 +34,29 @@ test('a yearly plan casts its year to an integer', function () {
 
     expect($plan->year)->toBe(2026);
 });
+
+test('the forYears scope keeps only the plans inside an inclusive range', function () {
+    YearlyPlan::factory()->create(['year' => 2023]);
+    YearlyPlan::factory()->create(['year' => 2024]);
+    YearlyPlan::factory()->create(['year' => 2026]);
+    YearlyPlan::factory()->create(['year' => 2027]);
+
+    $years = YearlyPlan::query()->forYears(2024, 2026)->orderBy('year')->pluck('year')->all();
+
+    expect($years)->toBe([2024, 2026]);
+});
+
+test('the forYears scope orders a reversed range instead of returning nothing', function () {
+    YearlyPlan::factory()->create(['year' => 2025]);
+
+    expect(YearlyPlan::query()->forYears(2026, 2024)->count())->toBe(1);
+});
+
+test('the managedBy scope keeps one manager plans and passes a null id through untouched', function () {
+    $manager = User::factory()->create();
+    YearlyPlan::factory()->create(['manager_id' => $manager->id]);
+    YearlyPlan::factory()->create();
+
+    expect(YearlyPlan::query()->managedBy($manager->id)->count())->toBe(1)
+        ->and(YearlyPlan::query()->managedBy(null)->count())->toBe(2);
+});

@@ -9,6 +9,8 @@ use Carbon\CarbonImmutable;
 use Database\Factories\YearlyPlanFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -70,6 +72,36 @@ class YearlyPlan extends Model
     public function planIndicators(): MorphMany
     {
         return $this->morphMany(PlanIndicator::class, 'source');
+    }
+
+    /**
+     * Restrict the query to plans whose fiscal year falls inside an inclusive
+     * range.
+     *
+     * The bounds are ordered here rather than trusted, so a caller that hands
+     * over a reversed range gets the years between them instead of nothing.
+     *
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function forYears(Builder $query, int $from, int $to): void
+    {
+        $query->whereBetween('year', [min($from, $to), max($from, $to)]);
+    }
+
+    /**
+     * Restrict the query to the plans one manager is accountable for.
+     *
+     * A null id means "any manager" and leaves the query untouched, so an
+     * optional filter can be passed straight through without a conditional at
+     * every call site.
+     *
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function managedBy(Builder $query, ?int $managerId): void
+    {
+        $query->when($managerId !== null, fn (Builder $query) => $query->where('manager_id', $managerId));
     }
 
     /**
