@@ -84,23 +84,23 @@ select:focus[data-flux-control] {
     @apply outline-hidden ring-2 ring-accent ring-offset-2 ring-offset-accent-foreground;
 }
 
-/* Keep the administrative directory inside its approved brand palette. */
-.admin-user-directory [data-flux-table],
-.admin-user-directory [data-flux-table] thead,
-.admin-user-directory [data-flux-table] tbody,
-.admin-user-directory [data-flux-table] tr {
+/* Keep administrative directories inside their approved brand palette. */
+.admin-directory [data-flux-table],
+.admin-directory [data-flux-table] thead,
+.admin-directory [data-flux-table] tbody,
+.admin-directory [data-flux-table] tr {
     color: var(--color-secondary-dark) !important;
     outline-color: var(--color-secondary-light) !important;
 }
 
-.dark .admin-user-directory [data-flux-table],
-.dark .admin-user-directory [data-flux-table] thead,
-.dark .admin-user-directory [data-flux-table] tbody,
-.dark .admin-user-directory [data-flux-table] tr {
+.dark .admin-directory [data-flux-table],
+.dark .admin-directory [data-flux-table] thead,
+.dark .admin-directory [data-flux-table] tbody,
+.dark .admin-directory [data-flux-table] tr {
     color: var(--color-white) !important;
 }
 
-.admin-user-directory [data-flux-control] {
+.admin-directory [data-flux-control] {
     background-color: var(--color-white) !important;
     border-color: var(--color-secondary-light) !important;
     box-shadow: none !important;
@@ -108,73 +108,73 @@ select:focus[data-flux-control] {
     outline-color: var(--color-secondary-light) !important;
 }
 
-.dark .admin-user-directory [data-flux-control] {
+.dark .admin-directory [data-flux-control] {
     background-color: var(--color-secondary-medium) !important;
     color: var(--color-white) !important;
 }
 
-.admin-user-directory [data-flux-control]::placeholder,
-.admin-user-directory [data-flux-input]>div,
-.admin-user-directory [data-flux-clear-button],
-.admin-user-directory [data-flux-clear-button] [data-flux-icon] {
+.admin-directory [data-flux-control]::placeholder,
+.admin-directory [data-flux-input]>div,
+.admin-directory [data-flux-clear-button],
+.admin-directory [data-flux-clear-button] [data-flux-icon] {
     color: var(--color-secondary-light) !important;
 }
 
-.admin-user-directory [data-flux-control]:focus,
-.admin-user-directory [data-flux-control]:focus-visible,
-.admin-user-directory [data-flux-button]:focus-visible {
+.admin-directory [data-flux-control]:focus,
+.admin-directory [data-flux-control]:focus-visible,
+.admin-directory [data-flux-button]:focus-visible {
     box-shadow: none !important;
     outline: 2px solid var(--color-primary) !important;
     outline-offset: 2px !important;
 }
 
-.admin-user-directory [data-flux-control][data-invalid] {
+.admin-directory [data-flux-control][data-invalid] {
     border-color: var(--color-primary) !important;
 }
 
-.admin-user-directory [data-flux-button] {
+.admin-directory [data-flux-button] {
     box-shadow: none !important;
 }
 
-.admin-user-directory [data-flux-button][aria-label='Toggle password visibility'],
-.admin-user-directory ui-close [data-flux-button] {
+.admin-directory [data-flux-button][aria-label='Toggle password visibility'],
+.admin-directory ui-close [data-flux-button] {
     color: var(--color-secondary-light) !important;
 }
 
-.admin-user-directory [data-flux-button][aria-label='Toggle password visibility']:hover,
-.admin-user-directory ui-close [data-flux-button]:hover {
+.admin-directory [data-flux-button][aria-label='Toggle password visibility']:hover,
+.admin-directory ui-close [data-flux-button]:hover {
     background-color: var(--color-secondary-soft) !important;
     color: var(--color-secondary-dark) !important;
 }
 
-.dark .admin-user-directory [data-flux-button][aria-label='Toggle password visibility']:hover,
-.dark .admin-user-directory ui-close [data-flux-button]:hover {
+.dark .admin-directory [data-flux-button][aria-label='Toggle password visibility']:hover,
+.dark .admin-directory ui-close [data-flux-button]:hover {
     background-color: var(--color-secondary-medium) !important;
     color: var(--color-white) !important;
 }
 
 @layer base {
-    .admin-user-directory ui-close [data-flux-button] {
+    .admin-directory ui-close [data-flux-button] {
         color: var(--color-secondary-light) !important;
     }
 }
 
-.admin-user-directory dialog::backdrop {
+.admin-directory dialog::backdrop {
     background-color: var(--color-secondary-dark) !important;
 }
 
-.admin-user-directory [data-flux-error] {
+.admin-directory [data-flux-error] {
     color: var(--color-primary) !important;
 }
 
-.admin-user-directory [data-flux-pagination],
-.admin-user-directory [data-flux-pagination]>div {
+.admin-directory [data-flux-pagination],
+.admin-directory [data-flux-pagination]>div {
     border-color: var(--color-secondary-soft) !important;
     color: var(--color-secondary-medium) !important;
 }
 
-.dark .admin-user-directory [data-flux-pagination],
-.dark .admin-user-directory [data-flux-pagination]>div {
+.dark .admin-directory [data-flux-pagination],
+.dark .admin-directory [data-flux-pagination]>div {
     border-color: var(--color-secondary-medium) !important;
     color: var(--color-secondary-soft) !important;
 }

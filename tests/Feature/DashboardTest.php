@@ -14,6 +14,7 @@ test('authenticated users see the application navigation on the dashboard', func
     $response = $this->get(route('dashboard'));
 
     $response
+        ->assertSee('data-app-page-container', false)
         ->assertSee('data-navigation-sidebar', false)
         ->assertSee('data-mobile-navigation-close', false)
         ->assertSee('data-mobile-navigation-toggle', false)

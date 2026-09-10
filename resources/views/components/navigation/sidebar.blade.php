@@ -76,22 +76,34 @@
             </flux:sidebar.item>
         </flux:sidebar.group>
 
-        @can('viewAny', App\Models\User::class)
-            <flux:sidebar.group
-                :heading="__('Administration')"
-                :class="$navigationGroupClasses"
+        <flux:sidebar.group
+            :heading="__('Administration')"
+            :class="$navigationGroupClasses"
+        >
+            <flux:sidebar.item
+                icon="map-pin"
+                :href="route('admin.cities.index')"
+                :current="request()->routeIs('admin.cities.*')"
+                :class="$navigationItemClasses"
+                wire:navigate
             >
-                <flux:sidebar.item
-                    icon="users"
-                    :href="route('admin.users.index')"
-                    :current="request()->routeIs('admin.users.*')"
-                    :class="$navigationItemClasses"
-                    wire:navigate
-                >
-                    {{ __('User directory') }}
-                </flux:sidebar.item>
-            </flux:sidebar.group>
-        @endcan
+                {{ __('Cities') }}
+            </flux:sidebar.item>
+
+            @if (auth()->user()?->getRawOriginal('role') !== null)
+                @can('viewAny', App\Models\User::class)
+                    <flux:sidebar.item
+                        icon="users"
+                        :href="route('admin.users.index')"
+                        :current="request()->routeIs('admin.users.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate
+                    >
+                        {{ __('User directory') }}
+                    </flux:sidebar.item>
+                @endcan
+            @endif
+        </flux:sidebar.group>
     </flux:sidebar.nav>
 
     <div class="hidden border-t border-secondary-medium/60 pt-3 lg:block">

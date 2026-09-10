@@ -11,6 +11,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('admin/users', 'pages::admin.users')
         ->can('viewAny', User::class)
         ->name('admin.users.index');
+
+    Route::livewire('admin/cities', 'pages::admin.cities')
+        ->name('admin.cities.index');
 });
 
 require __DIR__.'/settings.php';
