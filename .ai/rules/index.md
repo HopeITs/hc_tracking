@@ -4,6 +4,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 
 | Applies to | Rule file |
 | --- | --- |
+| resources/views/{components/navigation/**,layouts/app/sidebar.blade.php} | .ai/rules/app.md |
 | app/Concerns/HasTree.php | .ai/rules/concerns.md |
 | {config/database.php,.env.example} | .ai/rules/config.md |
 | resources/css/app.css | .ai/rules/css.md |

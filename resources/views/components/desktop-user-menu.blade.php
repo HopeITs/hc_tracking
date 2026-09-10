@@ -1,4 +1,4 @@
-<flux:dropdown position="bottom" align="start">
+<flux:dropdown position="bottom" align="start" {{ $attributes }}>
     <flux:sidebar.profile
         :name="auth()->user()->name"
         :initials="auth()->user()->initials()"
