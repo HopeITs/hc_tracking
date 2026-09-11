@@ -41,6 +41,16 @@
             </flux:sidebar.item>
 
             <flux:sidebar.item
+                icon="chart-pie"
+                :href="route('executive-summary.index')"
+                :current="request()->routeIs('executive-summary.*')"
+                :class="$navigationItemClasses"
+                wire:navigate
+            >
+                {{ __('Executive Summary') }}
+            </flux:sidebar.item>
+
+            <flux:sidebar.item
                 icon="chart-bar-square"
                 :href="route('strategies.index')"
                 :current="request()->routeIs('strategies.*')"

@@ -8,6 +8,9 @@ Route::view('/', 'welcome')->name('home');
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::view('dashboard', 'dashboard')->name('dashboard');
 
+    Route::livewire('executive-summary', 'pages::executive-summary.index')
+        ->name('executive-summary.index');
+
     Route::livewire('strategies', 'pages::strategies.index')
         ->name('strategies.index');
 
