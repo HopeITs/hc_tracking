@@ -14,11 +14,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('strategies', 'pages::strategies.index')
         ->name('strategies.index');
 
+    Route::livewire('strategies/{strategy}', 'pages::strategies.show')
+        ->name('strategies.show');
+
     Route::livewire('programs', 'pages::programs.index')
         ->name('programs.index');
 
+    Route::livewire('programs/{program}', 'pages::programs.show')
+        ->name('programs.show');
+
     Route::livewire('yearly-plans', 'pages::yearly-plans.index')
         ->name('yearly-plans.index');
+
+    Route::livewire('yearly-plans/{yearlyPlan}', 'pages::yearly-plans.show')
+        ->name('yearly-plans.show');
 
     Route::livewire('admin/users', 'pages::admin.users')
         ->can('viewAny', User::class)

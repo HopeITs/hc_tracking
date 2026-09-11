@@ -380,13 +380,15 @@ new #[Title('Annual Plans')] class extends Component {
                                     @if ($plan === null)
                                         <span class="text-xs text-secondary-medium dark:text-secondary-soft">{{ __('No plan') }}</span>
                                     @else
-                                        <span class="flex min-w-0 items-center gap-2">
-                                            <flux:avatar class="bg-secondary-soft! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" size="xs" :initials="$plan->manager->initials()" />
-                                            <span class="truncate text-xs font-medium text-secondary-dark dark:text-white">{{ $plan->manager->name }}</span>
-                                            <span class="inline-flex min-w-6 shrink-0 items-center justify-center rounded-md border border-secondary-light px-1.5 py-0.5 text-xs font-semibold tabular-nums text-secondary-dark dark:text-white">
-                                                {{ $plan->plan_indicators_count }}
+                                        <a href="{{ route('yearly-plans.show', $plan) }}" wire:navigate class="inline-flex min-h-11 items-center justify-center rounded-md px-2 hover:underline sm:min-h-8">
+                                            <span class="flex min-w-0 items-center gap-2">
+                                                <flux:avatar class="bg-secondary-soft! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" size="xs" :initials="$plan->manager->initials()" />
+                                                <span class="truncate text-xs font-medium text-secondary-dark dark:text-white">{{ $plan->manager->name }}</span>
+                                                <span class="inline-flex min-w-6 shrink-0 items-center justify-center rounded-md border border-secondary-light px-1.5 py-0.5 text-xs font-semibold tabular-nums text-secondary-dark dark:text-white">
+                                                    {{ $plan->plan_indicators_count }}
+                                                </span>
                                             </span>
-                                        </span>
+                                        </a>
                                     @endif
                                 </li>
                             @endforeach
@@ -424,15 +426,17 @@ new #[Title('Annual Plans')] class extends Component {
                                         @if ($plan === null)
                                             <span class="text-secondary-light" aria-label="{{ __(':program, :year, no plan', ['program' => $program->name, 'year' => $year]) }}">—</span>
                                         @else
-                                            <span
-                                                class="inline-flex items-center gap-1.5"
+                                            <a
+                                                href="{{ route('yearly-plans.show', $plan) }}"
+                                                wire:navigate
+                                                class="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md px-2 hover:underline sm:min-h-8"
                                                 aria-label="{{ __(':program, :year, managed by :manager, :count targets', ['program' => $program->name, 'year' => $year, 'manager' => $plan->manager->name, 'count' => $plan->plan_indicators_count]) }}"
                                             >
                                                 <flux:avatar class="bg-secondary-soft! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" size="xs" :initials="$plan->manager->initials()" />
                                                 <span class="inline-flex min-w-6 items-center justify-center rounded-md border border-secondary-light px-1.5 py-0.5 text-xs font-semibold tabular-nums text-secondary-dark dark:text-white">
                                                     {{ $plan->plan_indicators_count }}
                                                 </span>
-                                            </span>
+                                            </a>
                                         @endif
                                     </flux:table.cell>
                                 @endforeach

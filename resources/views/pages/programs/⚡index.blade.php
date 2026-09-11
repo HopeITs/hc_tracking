@@ -280,7 +280,7 @@ new #[Title('Programs')] class extends Component {
                                     <flux:icon.briefcase class="size-4.5" />
                                 </div>
                                 <div class="min-w-0">
-                                    <h2 class="truncate text-sm font-semibold text-secondary-dark dark:text-white">{{ $program->name }}</h2>
+                                    <h2 class="truncate text-sm font-semibold text-secondary-dark dark:text-white"><a href="{{ route('programs.show', $program) }}" wire:navigate class="hover:underline">{{ $program->name }}</a></h2>
                                     <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $program->strategy->name }}</p>
                                 </div>
                             </div>
@@ -324,7 +324,7 @@ new #[Title('Programs')] class extends Component {
                                 <flux:table.cell variant="strong" class="text-secondary-dark! dark:text-white!">
                                     <div class="flex min-w-0 items-center gap-2.5">
                                         <div class="flex size-8 shrink-0 items-center justify-center rounded-md bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white"><flux:icon.briefcase class="size-4" /></div>
-                                        <p class="truncate font-semibold">{{ $program->name }}</p>
+                                        <a href="{{ route('programs.show', $program) }}" wire:navigate class="truncate font-semibold hover:underline">{{ $program->name }}</a>
                                     </div>
                                 </flux:table.cell>
                                 <flux:table.cell>

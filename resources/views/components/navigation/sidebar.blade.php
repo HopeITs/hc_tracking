@@ -49,7 +49,12 @@
             >
                 {{ __('Executive Summary') }}
             </flux:sidebar.item>
+        </flux:sidebar.group>
 
+        <flux:sidebar.group
+            :heading="__('Strategy')"
+            :class="$navigationGroupClasses"
+        >
             <flux:sidebar.item
                 icon="chart-bar-square"
                 :href="route('strategies.index')"
@@ -79,6 +84,35 @@
             >
                 {{ __('Annual Plans') }}
             </flux:sidebar.item>
+        </flux:sidebar.group>
+
+        <flux:sidebar.group
+            :heading="__('Administration')"
+            :class="$navigationGroupClasses"
+        >
+            <flux:sidebar.item
+                icon="map-pin"
+                :href="route('admin.cities.index')"
+                :current="request()->routeIs('admin.cities.*')"
+                :class="$navigationItemClasses"
+                wire:navigate
+            >
+                {{ __('Cities') }}
+            </flux:sidebar.item>
+
+            @if (auth()->user()?->getRawOriginal('role') !== null)
+                @can('viewAny', App\Models\User::class)
+                    <flux:sidebar.item
+                        icon="users"
+                        :href="route('admin.users.index')"
+                        :current="request()->routeIs('admin.users.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate
+                    >
+                        {{ __('User directory') }}
+                    </flux:sidebar.item>
+                @endcan
+            @endif
         </flux:sidebar.group>
 
         <flux:sidebar.group
@@ -114,35 +148,6 @@
             >
                 {{ __('Security') }}
             </flux:sidebar.item>
-        </flux:sidebar.group>
-
-        <flux:sidebar.group
-            :heading="__('Administration')"
-            :class="$navigationGroupClasses"
-        >
-            <flux:sidebar.item
-                icon="map-pin"
-                :href="route('admin.cities.index')"
-                :current="request()->routeIs('admin.cities.*')"
-                :class="$navigationItemClasses"
-                wire:navigate
-            >
-                {{ __('Cities') }}
-            </flux:sidebar.item>
-
-            @if (auth()->user()?->getRawOriginal('role') !== null)
-                @can('viewAny', App\Models\User::class)
-                    <flux:sidebar.item
-                        icon="users"
-                        :href="route('admin.users.index')"
-                        :current="request()->routeIs('admin.users.*')"
-                        :class="$navigationItemClasses"
-                        wire:navigate
-                    >
-                        {{ __('User directory') }}
-                    </flux:sidebar.item>
-                @endcan
-            @endif
         </flux:sidebar.group>
     </flux:sidebar.nav>
 

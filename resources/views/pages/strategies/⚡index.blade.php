@@ -165,7 +165,9 @@ new #[Title('Strategies')] class extends Component {
                                     </div>
 
                                     <div class="min-w-0">
-                                        <h3 class="text-base font-semibold leading-6 text-secondary-dark dark:text-white">{{ $strategy['name'] }}</h3>
+                                        <h3 class="text-base font-semibold leading-6 text-secondary-dark dark:text-white">
+                                            <a href="{{ route('strategies.show', $strategy['id']) }}" wire:navigate class="truncate font-semibold hover:underline">{{ $strategy['name'] }}</a>
+                                        </h3>
                                         <p class="mt-0.5 text-xs text-secondary-medium dark:text-secondary-soft">
                                             {{ __(':count-year strategic period', ['count' => $strategy['duration_years']]) }}
                                         </p>
