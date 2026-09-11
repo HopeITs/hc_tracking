@@ -121,6 +121,32 @@ class User extends Authenticatable implements PasskeyUser
     }
 
     /**
+     * The files this user uploaded.
+     *
+     * `media.uploaded_by` restricts on delete, so a user who has uploaded
+     * anything cannot be removed.
+     *
+     * @return HasMany<Media, $this>
+     */
+    public function uploadedMedia(): HasMany
+    {
+        return $this->hasMany(Media::class, 'uploaded_by');
+    }
+
+    /**
+     * The indicator readings this user recorded.
+     *
+     * `indicator_progress.recorded_by` restricts on delete, matching
+     * reports.user_id and task_updates.user_id.
+     *
+     * @return HasMany<IndicatorProgress, $this>
+     */
+    public function indicatorProgress(): HasMany
+    {
+        return $this->hasMany(IndicatorProgress::class, 'recorded_by');
+    }
+
+    /**
      * Get the user initials.
      */
     public function initials(): string

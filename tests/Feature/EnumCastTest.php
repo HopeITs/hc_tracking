@@ -2,20 +2,28 @@
 
 use App\Enums\ArStatus;
 use App\Enums\Currency;
+use App\Enums\DonorType;
 use App\Enums\FileType;
 use App\Enums\IndicatorMeasure;
+use App\Enums\MediaCollection;
 use App\Enums\MilestoneStatus;
 use App\Enums\Period;
+use App\Enums\ProjectStatus;
 use App\Enums\ProposalStatus;
+use App\Enums\ReportStatus;
 use App\Enums\ResultType;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\Indicator;
+use App\Models\Media;
 use App\Models\Milestone;
 use App\Models\PlanIndicator;
+use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalStatusNote;
+use App\Models\Report;
 use App\Models\ReportFile;
 use App\Models\Result;
 use App\Models\Task;
@@ -127,6 +135,66 @@ function enumColumns(): array
             'stored' => 'percentage',
             'default' => IndicatorMeasure::Numeric,
             'badCasing' => 'Numeric',
+        ]],
+        'indicators.frequency' => [[
+            'model' => Indicator::class,
+            'table' => 'indicators',
+            'column' => 'frequency',
+            'width' => 50,
+            'assign' => Period::Annual,
+            'stored' => 'annual',
+            'default' => Period::Quarterly,
+            'badCasing' => 'Annual',
+        ]],
+        'donors.type' => [[
+            'model' => Donor::class,
+            'table' => 'donors',
+            'column' => 'type',
+            'width' => 50,
+            'assign' => DonorType::Bilateral,
+            'stored' => 'bilateral',
+            'default' => null,
+            'badCasing' => 'Bilateral',
+        ]],
+        'projects.status' => [[
+            'model' => Project::class,
+            'table' => 'projects',
+            'column' => 'status',
+            'width' => 50,
+            'assign' => ProjectStatus::Archived,
+            'stored' => 'archived',
+            'default' => ProjectStatus::Draft,
+            'badCasing' => 'Draft',
+        ]],
+        'reports.status' => [[
+            'model' => Report::class,
+            'table' => 'reports',
+            'column' => 'status',
+            'width' => 50,
+            'assign' => ReportStatus::Reviewed,
+            'stored' => 'reviewed',
+            'default' => ReportStatus::Draft,
+            'badCasing' => 'Draft',
+        ]],
+        'media.collection' => [[
+            'model' => Media::class,
+            'table' => 'media',
+            'column' => 'collection',
+            'width' => 50,
+            'assign' => MediaCollection::Agreement,
+            'stored' => 'agreement',
+            'default' => MediaCollection::Other,
+            'badCasing' => 'Other',
+        ]],
+        'media.type' => [[
+            'model' => Media::class,
+            'table' => 'media',
+            'column' => 'type',
+            'width' => 50,
+            'assign' => FileType::Jpg,
+            'stored' => 'jpg',
+            'default' => null,
+            'badCasing' => 'JPG',
         ]],
         'plan_indicators.period' => [[
             'model' => PlanIndicator::class,

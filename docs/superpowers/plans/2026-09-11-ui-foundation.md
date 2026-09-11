@@ -15,14 +15,66 @@ These apply to every task in this plan and to all three spine plans that follow.
 - **Strict mode is on.** `Model::shouldBeStrict(! app()->isProduction())`. Lazy loading throws. Every relation a Blade view touches must be eager-loaded in the `#[Computed]` query, nested paths included. Never disable the check; eager load instead.
 - **Palette is fixed.** `primary #be1f24`; `secondary-dark #58595b`, `secondary-medium #6d6e71`, `secondary-light #939598`, `secondary-soft #dcddde`. No new colour is introduced. No new `--spacing-*` token is added — unprefixed names collapse Flux modals (`.ai/rules/css.md`).
 - **Morph keys, never class names.** `plan_indicators.source_type` holds `'yearly_plan'` or `'proposal'`. Never `App\Models\YearlyPlan`.
-- **No new morph.** `Relation::enforceMorphMap()` is global; `tests/Feature/Models/MorphMapTest.php` asserts the map holds exactly two entries. Adding a polymorphic relation breaks it.
+- **The morph map holds four entries.** `'yearly_plan' => YearlyPlan::class`, `'proposal' => Proposal::class` (target sources), plus `'project' => Project::class`, `'milestone' => Milestone::class` (media owners, added by the DB schema update below). `Relation::enforceMorphMap()` is global; `tests/Feature/Models/MorphMapTest.php` asserts the map holds exactly these four. Adding a fifth breaks it.
 - **Money is never summed across currencies.** `USD`/`EUR`/`SYP` have no conversion rate anywhere in this system. Totals are always per-currency.
 - **Never compare a pivot currency to a `Currency` case.** `$proposal->donors()->first()->pivot->currency` is the raw string `'USD'`; `DonorProposal::first()->currency` is a `Currency` case. Read funding through `donorProposals()`.
-- **No schema changes.** No migration, model, observer, factory or seeder is modified. If a page cannot be built without one, stop and raise it.
+- **No further schema changes.** The additions in "DB Schema Update (2026-09-11)" below are already migrated, seeded and tested — they precede this plan's execution, not a task within it. No migration, model, observer, factory or seeder is modified while executing these tasks. If a page cannot be built without a further one, stop and raise it.
 - **Table naming.** Entity tables are plural; pivots are singular (`project_proposal`). `TransfersTracking` and `DonorProposal` carry `$table` overrides.
 - **Tests** live at `tests/Feature/<Feature>Test.php`, `tests/Feature/Admin/` for admin pages. No new `tests/Feature/Pages/` directory.
 - **Pint** runs before any task is considered done: `vendor/bin/pint --dirty --format agent`.
 - **Commits** are made only when the user has approved them. Each task's commit step stages files and stops for approval rather than committing unattended.
+
+---
+
+## DB Schema Update (2026-09-11)
+
+Implemented, migrated, seeded and tested (539 tests passing) before any task in
+this plan or the three spine plans runs. This is a record of what changed and
+what it obliges the UI to do — not a task list. Full detail lives in the
+Delivery, Funding and M&E plans' own addenda, scoped to the sections each
+plan builds.
+
+**New enums:** `DonorType` (bilateral, foundation, individual, corporate — nullable),
+`ProjectStatus` (draft → submitted → approved → active → closed → archived,
+NOT NULL, defaults `draft`), `ReportStatus` (draft → reviewed → approved, NOT
+NULL, defaults `draft`), `MediaCollection` (proposal, agreement, mou, photo,
+evidence, other), `RagStatus` (red, amber, green — **derived, no column**,
+exactly like `ProposalPhase`).
+
+**New tables:** `media` (polymorphic file store — `mediable_type`/`mediable_id`,
+owners are `project` and `milestone`), `indicator_progress` (dated readings
+against an indicator — distinct from `reports`, which stays a narrative
+document).
+
+**Columns added to existing tables:**
+- `donors`: `type`, `contact_person`, `email`, `phone`, `country`, `notes` — all nullable.
+- `projects`: `description`, `status`, `start_date`, `end_date`, `target_beneficiaries`, `target_men`, `target_women`, `target_boys`, `target_girls` (five discrete integer columns, not JSON — see `.ai/rules/feature.md` on why).
+- `indicators`: `project_id` (nullable, `nullOnDelete`), `unit`, `baseline`, `target` (the **lifetime** target — distinct from `plan_indicators.target`, a per-period commitment), `frequency` (reuses the `Period` enum).
+- `reports`: `status` replaces the dropped `is_approved`/`approved_date`/`is_editable`/`edited_date` quartet. `is_seen_by_meal` survives unchanged. Five narrative columns added: `period_start`, `period_end`, `executive_summary`, `key_achievements`, `challenges`, `lessons_learned`, `next_period_plans`.
+
+**Morph map widened from two entries to four.** `'project' => Project::class`
+and `'milestone' => Milestone::class` were added alongside the existing
+`'yearly_plan'`/`'proposal'` pair, for the new `media` table. `MediaOwnerObserver`
+handles cleanup exactly as `PlanIndicatorSourceObserver` and `ProgramObserver`
+do for the original pair — including the hop through
+`milestones.project_id`'s and `milestones.parent_milestone_id`'s database
+cascades, which fire no Eloquent events.
+
+**Consequence for `x-ui.enum-badge` (Task 2).** The component's tone-mapping
+`match` should grow arms for `ProjectStatus`, `ReportStatus` and `DonorType` when
+the Delivery/Funding/M&E plans reach the pages that render them, following the
+same rule already used: filled primary = terminal-negative, filled dark =
+active/achieved, outlined = pending/neutral. Not needed for Foundation's own
+three detail pages (Strategy, Program, Annual Plan render none of these new
+enums), so no code in this plan changes — flagging it here so the pattern is
+extended consistently rather than reinvented per spine plan.
+
+**Consequence for `x-ui.money` (Task 2).** No change. The per-currency rule
+already covers every existing and new money column; nothing new was added that
+carries a currency.
+
+**No consequence for Tasks 5–7** (Strategy/Program/Annual Plan detail): none of
+the three touch `donors`, `projects`, `indicators` or `reports` columns directly.
 
 ---
 

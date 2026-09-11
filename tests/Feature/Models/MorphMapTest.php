@@ -1,22 +1,28 @@
 <?php
 
 use App\Models\City;
+use App\Models\Milestone;
+use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\YearlyPlan;
 use Illuminate\Database\ClassMorphViolationException;
 use Illuminate\Database\Eloquent\Relations\Relation;
 
-test('the morph map registers exactly the two plan indicator sources', function () {
+test('the morph map registers exactly the two target sources and the two media owners', function () {
     expect(Relation::morphMap())->toBe([
         'yearly_plan' => YearlyPlan::class,
         'proposal' => Proposal::class,
+        'project' => Project::class,
+        'milestone' => Milestone::class,
     ]);
 });
 
 test('the morph map is enforced so an unmapped model has no morph class', function () {
     expect(Relation::requiresMorphMap())->toBeTrue()
         ->and((new YearlyPlan)->getMorphClass())->toBe('yearly_plan')
-        ->and((new Proposal)->getMorphClass())->toBe('proposal');
+        ->and((new Proposal)->getMorphClass())->toBe('proposal')
+        ->and((new Project)->getMorphClass())->toBe('project')
+        ->and((new Milestone)->getMorphClass())->toBe('milestone');
 
     (new City)->getMorphClass();
 })->throws(ClassMorphViolationException::class);

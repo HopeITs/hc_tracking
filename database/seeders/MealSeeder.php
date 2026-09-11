@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Enums\ResultType;
 use App\Models\Indicator;
+use App\Models\IndicatorProgress;
 use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
@@ -57,8 +58,34 @@ class MealSeeder extends Seeder
 
             foreach ($indicators as $indicator) {
                 $this->seedTargets($yearlyPlan, $indicator, $project, $users);
+                $this->seedProgress($indicator, $users);
             }
         });
+    }
+
+    /**
+     * Record a rising quarterly series against an indicator.
+     *
+     * The values climb from the baseline toward the target rather than being
+     * random, so the trend chart reads as a trend and the RAG rating lands
+     * somewhere meaningful instead of flickering between colours per seed.
+     *
+     * @param  Collection<int, User>  $users
+     */
+    protected function seedProgress(Indicator $indicator, Collection $users): void
+    {
+        $baseline = (float) ($indicator->baseline ?? 0);
+        $target = (float) ($indicator->target ?? 0);
+        $steps = 4;
+
+        for ($quarter = 1; $quarter <= $steps; $quarter++) {
+            IndicatorProgress::factory()->create([
+                'indicator_id' => $indicator->id,
+                'date' => now()->subQuarters($steps - $quarter)->endOfQuarter()->toDateString(),
+                'value' => round($baseline + (($target - $baseline) * ($quarter / ($steps + 1))), 2),
+                'recorded_by' => $users->random()->id,
+            ]);
+        }
     }
 
     /**
@@ -83,7 +110,12 @@ class MealSeeder extends Seeder
             ]);
         }
 
-        Report::factory()->approved()->create([
+        Report::factory()->approved()->withNarrative()->create([
+            'plan_indicator_id' => $planIndicator->id,
+            'user_id' => $users->random()->id,
+        ]);
+
+        Report::factory()->reviewed()->withNarrative()->create([
             'plan_indicator_id' => $planIndicator->id,
             'user_id' => $users->random()->id,
         ]);

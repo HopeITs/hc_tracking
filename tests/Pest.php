@@ -1,12 +1,15 @@
 <?php
 
 use App\Enums\Currency;
+use App\Enums\FileType;
 use App\Enums\ResultType;
 use App\Models\Account;
 use App\Models\City;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\Indicator;
+use App\Models\IndicatorProgress;
+use App\Models\Media;
 use App\Models\Milestone;
 use App\Models\PlanIndicator;
 use App\Models\Program;
@@ -265,5 +268,41 @@ function insertAccount(string $name = 'Operations USD'): int
     return Account::factory()->create([
         'name' => $name,
         'opened_at' => '2024-03-15',
+    ])->id;
+}
+
+/**
+ * Insert a file against a project or a milestone, and return its id.
+ *
+ * `collection`, `disk` and `uploaded_at` are omitted so the column defaults
+ * stay under test. `mediableType` takes the morph map KEY, matching what the
+ * column stores.
+ */
+function insertMedia(string $mediableType, int $mediableId, int $uploadedBy): int
+{
+    return Media::factory()->create([
+        'mediable_type' => $mediableType,
+        'mediable_id' => $mediableId,
+        'uploaded_by' => $uploadedBy,
+        'path' => 'media/fixture.pdf',
+        'original_name' => 'fixture.pdf',
+        'type' => FileType::Pdf,
+        'mime_type' => null,
+        'size' => null,
+    ])->id;
+}
+
+/**
+ * Insert a dated reading against an indicator, and return its id.
+ */
+function insertIndicatorProgress(int $indicatorId, int $recordedBy, string $date = '2026-03-31', string $value = '4200.00'): int
+{
+    return IndicatorProgress::factory()->create([
+        'indicator_id' => $indicatorId,
+        'date' => $date,
+        'value' => $value,
+        'notes' => null,
+        'source_of_verification' => null,
+        'recorded_by' => $recordedBy,
     ])->id;
 }

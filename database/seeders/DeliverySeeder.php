@@ -2,6 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Enums\MediaCollection;
+use App\Models\Media;
 use App\Models\Milestone;
 use App\Models\Project;
 use App\Models\Proposal;
@@ -44,7 +46,7 @@ class DeliverySeeder extends Seeder
                 'weight_percentage' => 30,
             ]);
 
-            Milestone::factory()->reached()->create([
+            $reached = Milestone::factory()->reached()->create([
                 'project_id' => $project->id,
                 'name' => 'Baseline assessment',
                 'responsible_user_id' => $users->random()->id,
@@ -52,6 +54,8 @@ class DeliverySeeder extends Seeder
                 'sequence' => 2,
                 'weight_percentage' => 70,
             ]);
+
+            $this->seedMedia($project, $reached, $users);
 
             $proposal = $project->proposals->first();
 
@@ -61,6 +65,30 @@ class DeliverySeeder extends Seeder
 
             $this->seedTasks($proposal, $parent, $users);
         });
+    }
+
+    /**
+     * Attach a project's paperwork and a milestone's evidence.
+     *
+     * These rows carry no file on disk: no cloud driver is installed and
+     * storage/app is empty, so the paths describe files that do not exist yet.
+     * The UI renders them as metadata and emits no download link.
+     *
+     * @param  Collection<int, User>  $users
+     */
+    protected function seedMedia(Project $project, Milestone $milestone, Collection $users): void
+    {
+        foreach ([MediaCollection::Proposal, MediaCollection::Agreement, MediaCollection::Photo] as $collection) {
+            Media::factory()->inCollection($collection)->create([
+                'mediable_type' => 'project',
+                'mediable_id' => $project->id,
+                'uploaded_by' => $users->random()->id,
+            ]);
+        }
+
+        Media::factory(2)->forMilestone($milestone->id)->create([
+            'uploaded_by' => $users->random()->id,
+        ]);
     }
 
     /**

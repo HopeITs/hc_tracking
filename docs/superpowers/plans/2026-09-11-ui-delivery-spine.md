@@ -16,14 +16,77 @@ Identical to the Foundation plan. Repeated here because a task's implementer may
 
 - **Strict mode is on.** `Model::shouldBeStrict(! app()->isProduction())`. Lazy loading throws. Every relation a Blade view touches is eager-loaded in the `#[Computed]` query, nested paths included.
 - **Palette is fixed:** `primary #be1f24`, `secondary-dark #58595b`, `secondary-medium #6d6e71`, `secondary-light #939598`, `secondary-soft #dcddde`. No green, no amber. Badge tone is palette-only: filled primary = terminal-negative, filled dark = active/achieved, outlined = pending/neutral.
-- **Morph keys, never class names:** `'yearly_plan'`, `'proposal'`.
-- **No new morph.** `MorphMapTest` asserts the map holds exactly two entries.
+- **Morph keys, never class names:** `'yearly_plan'`, `'proposal'`, `'project'`, `'milestone'`.
+- **The morph map holds four entries**, not two — widened by the DB schema update below for the new `media` table. `MorphMapTest` asserts the map holds exactly these four. No fifth is added in this plan.
 - **Money is never summed across currencies.** Not relevant to this spine, but it holds.
-- **No schema changes.** No migration, model, observer, factory or seeder is modified.
+- **No further schema changes.** The additions below (Project lifecycle, demographics, `media`) are already migrated, seeded and tested. No migration, model, observer, factory or seeder is modified while executing these tasks.
 - **Enum values are lower case** (`'todo'`, `'in progress'`), except `Currency` (upper) and `UserRole` (`'MEAL'`). Display capitalisation is the UI's job. A value differing only by case throws `ValueError` on read.
 - **Tests** live at `tests/Feature/<Feature>Test.php`.
 - **Pint** before any task is done: `vendor/bin/pint --dirty --format agent`.
 - **Never commit.** Each task stages files and stops for the user's review.
+
+## DB Schema Update (2026-09-11)
+
+Implemented, migrated, seeded and tested before this plan runs — not a task
+within it. Both changes below land directly in `projects` and `milestones`, so
+Tasks 1–2 (Projects) and Task 4 (Milestones) build against the new columns from
+their first step, not as a later addition.
+
+**`projects` gained a lifecycle and a beneficiary target.** New columns:
+`description` (text, nullable), `status` (`ProjectStatus` enum — draft →
+submitted → approved → active → closed → archived, NOT NULL, defaults
+`draft`), `start_date`/`end_date` (nullable dates), `target_beneficiaries`
+(nullable int, the headline total) and four nullable breakdown columns
+`target_men`/`target_women`/`target_boys`/`target_girls`. The breakdown is
+**five discrete integer columns, not a JSON blob** — MariaDB implements
+`$table->json()` as an unindexable, unsummable longtext (`.ai/rules/feature.md`),
+and donor reporting needs `SUM()` over these routinely. `target_beneficiaries`
+is deliberately **not** a generated column over the four breakdown columns — a
+proposal often commits a total before the disaggregation is agreed, and the
+two are allowed to disagree. `Project::targetDemographicTotal()` sums the four
+and returns `null` (not `0`) when none are set; render an em dash for that
+case, not a zero, since "no breakdown yet" and "targets nobody" are different
+claims. `Project::scopeOpen()` exists for filtering to the first four
+lifecycle states.
+
+**Obligation for Task 1 (Projects index) and Task 2 (Project detail).** The
+create/edit form needs fields for `description`, `status` (a `ProjectStatus`
+select), `start_date`/`end_date`, and the beneficiary targets. The index and
+detail pages should filter/display `status` via `x-ui.enum-badge` (extend its
+tone-match with a `ProjectStatus` arm — filled dark for Active, outlined for
+Draft/Submitted/Approved, filled primary for none since there's no
+terminal-negative state here, or leave outlined throughout since nothing in
+this lifecycle is a failure state; the spec's original write permissions for
+Projects — create/edit, no delete, because cascades reach risks/milestones/
+tasks — are unchanged by this addition). The task's original test list should
+gain a case asserting the demographic-total-vs-headline-total disagreement is
+preserved, not silently reconciled.
+
+**A polymorphic `media` table now exists, attaching files to `projects` and
+`milestones`.** `mediable_type` stores the morph map key (`'project'` /
+`'milestone'`), never a class name. Columns: `collection` (`MediaCollection`
+enum — proposal, agreement, mou, photo, evidence, other), `disk` (defaults
+`local` — no cloud driver is installed), `path`, `original_name`, `mime_type`,
+`size`, `type` (`FileType` — the extension, same enum `task_attachments` and
+`report_files` already use), `uploaded_at`, `uploaded_by` (RESTRICTs). Like
+`task_attachments` and `report_files`, **no file exists on disk** —
+`storage/app` holds nothing but `.gitignore` files, so any UI panel is metadata
+only: filename, type badge, upload date. No download link, no upload control,
+matching the spec's original rule for the two file tables it already covered.
+`MediaOwnerObserver` deletes a project's or milestone's media on Eloquent
+delete, including the hop through cascaded child milestones — `mediable_id`
+carries no foreign key, so nothing at the database level does this, exactly
+the situation `.ai/rules/observers.md` already documents for
+`PlanIndicatorSourceObserver`.
+
+**Obligation for Task 2 (Project detail) and Task 4 (Milestones).** Both
+detail views should add a "Files" panel reading `$project->media` /
+`$milestone->media`, rendered the same metadata-only way as the existing
+Task-detail attachments panel in this same plan (Task 6). This extends the
+spec's page inventory by one panel per page, not a new route — no change to
+the write-permissions table.
+
+---
 
 ## Delete rules governing this spine
 

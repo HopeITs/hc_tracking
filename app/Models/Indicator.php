@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\IndicatorMeasure;
+use App\Enums\Period;
+use App\Enums\RagStatus;
 use Carbon\CarbonImmutable;
 use Database\Factories\IndicatorFactory;
+use DateTimeInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -17,15 +20,36 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $id
  * @property string $name
  * @property int $result_id
+ * @property int|null $project_id
  * @property IndicatorMeasure $measure
+ * @property string|null $unit
+ * @property string|null $baseline
+ * @property string|null $target
+ * @property Period $frequency
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['name', 'result_id', 'measure'])]
+#[Fillable(['name', 'result_id', 'project_id', 'measure', 'unit', 'baseline', 'target', 'frequency'])]
 class Indicator extends Model
 {
     /** @use HasFactory<IndicatorFactory> */
     use HasFactory;
+
+    /**
+     * Mirror the column defaults so an indicator that has not been
+     * round-tripped through the database still reports its measure and
+     * frequency.
+     *
+     * Both columns carry database defaults and IndicatorFactory omits them, so
+     * without this, reading either on a freshly created model raises
+     * MissingAttributeException under strict mode.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'measure' => 'numeric',
+        'frequency' => 'quarterly',
+    ];
 
     /**
      * The result this indicator measures.
@@ -48,7 +72,118 @@ class Indicator extends Model
     }
 
     /**
+     * The project this indicator is scoped to, if any.
+     *
+     * Nullable: most indicators sit at outcome level and belong to no single
+     * project. `result_id` stays required, so an indicator always measures
+     * something.
+     *
+     * @return BelongsTo<Project, $this>
+     */
+    public function project(): BelongsTo
+    {
+        return $this->belongsTo(Project::class);
+    }
+
+    /**
+     * The dated readings recorded against this indicator, oldest first.
+     *
+     * Ordered here rather than at every call site, because a trend series read
+     * out of order is a bug that renders as a scribble rather than an error.
+     *
+     * @return HasMany<IndicatorProgress, $this>
+     */
+    public function progress(): HasMany
+    {
+        return $this->hasMany(IndicatorProgress::class)->orderBy('date')->orderBy('id');
+    }
+
+    /**
+     * The most recent recorded value, or null when nothing has been recorded.
+     *
+     * Answers from a loaded `progress` relation when there is one, so rendering
+     * a list of indicators does not fire a query per row.
+     */
+    public function latestValue(): ?float
+    {
+        if ($this->relationLoaded('progress')) {
+            $latest = $this->getRelation('progress')->last();
+
+            return $latest === null ? null : (float) $latest->value;
+        }
+
+        $value = $this->progress()->reorder()->orderByDesc('date')->orderByDesc('id')->value('value');
+
+        return $value === null ? null : (float) $value;
+    }
+
+    /**
+     * Percent of the lifetime target reached, measured from the baseline.
+     *
+     * Progress is measured as movement from baseline to target, not as a raw
+     * share of the target: an indicator starting at 40 and targeting 80 is half
+     * done at 60, not three quarters done.
+     *
+     * Returns null when there is no target, when the target equals the
+     * baseline (no movement is being asked for), or when nothing has been
+     * recorded — the caller renders an em dash rather than a misleading zero.
+     */
+    public function percentAchieved(): ?float
+    {
+        if ($this->target === null) {
+            return null;
+        }
+
+        $latest = $this->latestValue();
+
+        if ($latest === null) {
+            return null;
+        }
+
+        $baseline = (float) ($this->baseline ?? 0);
+        $span = (float) $this->target - $baseline;
+
+        if ($span === 0.0) {
+            return null;
+        }
+
+        return (($latest - $baseline) / $span) * 100;
+    }
+
+    /**
+     * How this indicator is tracking, given how much of a window has elapsed.
+     *
+     * The window is passed in rather than stored, because the same indicator is
+     * rated against a fiscal year on one page and against a project period on
+     * another. Returns null when achievement cannot be computed.
+     */
+    public function ragStatus(DateTimeInterface $windowStart, DateTimeInterface $windowEnd, ?DateTimeInterface $asOf = null): ?RagStatus
+    {
+        $achieved = $this->percentAchieved();
+
+        if ($achieved === null) {
+            return null;
+        }
+
+        $start = $windowStart->getTimestamp();
+        $end = $windowEnd->getTimestamp();
+        $now = ($asOf ?? now())->getTimestamp();
+
+        if ($end <= $start) {
+            return RagStatus::rate($achieved, 100.0);
+        }
+
+        $elapsed = (($now - $start) / ($end - $start)) * 100;
+
+        return RagStatus::rate($achieved, min(max($elapsed, 0.0), 100.0));
+    }
+
+    /**
      * Get the attributes that should be cast.
+     *
+     * `baseline` and `target` cast to decimal strings rather than floats,
+     * matching plan_indicators.target — money and measurement columns are not
+     * compared as floats anywhere in this schema.
      *
      * @return array<string, string|class-string>
      */
@@ -56,6 +191,9 @@ class Indicator extends Model
     {
         return [
             'measure' => IndicatorMeasure::class,
+            'frequency' => Period::class,
+            'baseline' => 'decimal:2',
+            'target' => 'decimal:2',
         ];
     }
 }

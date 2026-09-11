@@ -18,10 +18,67 @@
 - **Never compare a pivot currency to a `Currency` case.** `$proposal->donors()->first()->pivot->currency` is the raw string `'USD'`; `DonorProposal::first()->currency` is a `Currency` case. All funding UI reads through `donorProposals()`, never `donors()->pivot`.
 - **`Currency` values are UPPER case** — the only enum here that is. `'usd'` throws `ValueError` on read.
 - **`proposals.phase` is derived, never written.** Read `$proposal->phase`; query a phase with `whereIn('status', ProposalPhase::X->statuses())`.
-- **Morph keys, never class names:** a proposal's targets are `source_type = 'proposal'`.
-- **No schema changes.** No migration, model, observer, factory or seeder is modified.
+- **Morph keys, never class names:** a proposal's targets are `source_type = 'proposal'`. The morph map holds four entries as of the schema update below (`'yearly_plan'`, `'proposal'`, `'project'`, `'milestone'`) — the latter two are for `media` and are not touched by this spine.
+- **No further schema changes.** The `donors` profile columns in the addendum below are already migrated, seeded and tested. No migration, model, observer, factory or seeder is modified while executing these tasks.
 - **Tests** live at `tests/Feature/<Feature>Test.php`, `tests/Feature/Admin/` for Accounts.
 - **Pint** before any task is done. **Never commit** — stage and stop.
+
+## DB Schema Update (2026-09-11)
+
+Implemented, migrated, seeded and tested before this plan runs — not a task
+within it.
+
+**`donors` gained a contactable profile.** New columns, all nullable: `type`
+(`DonorType` enum — bilateral, foundation, individual, corporate), `contact_person`,
+`email`, `phone`, `country`, `notes`. Every column is nullable because a
+funder can legitimately be recorded from a grant letter alone with no named
+contact and no classification yet — `donors.name` staying non-unique is
+unchanged, and this addition doesn't touch that decision.
+
+**Obligation for Task 3 (Donor directory and detail) — extends, does not
+replace, the task below.** The create/edit form gains fields for `type` (a
+`DonorType` select, with a "not classified" option since it's nullable),
+`contact_person`, `email`, `phone`, `country`, `notes`. `x-ui.enum-badge`
+should grow a `DonorType` arm rendering it outlined (none of the four values
+is a terminal or achieved state).
+
+**The donor detail page (Task 3's `⚡show.blade.php`) additionally needs four
+stat cards**, requested directly by the user rather than derived from the
+spec:
+
+1. **Total committed** — already computed by Task 3's `budgetByCurrency()`
+   (per currency, never summed across them — the spine's core money rule).
+   No new code; the four cards below are additive to what Task 3 already
+   builds.
+2. **Total disbursed** — the equivalent grouped sum, but read from
+   `transfers_tracking.net_amount_received` across every agreement this donor
+   holds, not from `donor_proposal.budget`. This is a **new** computed
+   property on the detail page: `disbursedByCurrency()`, grouping on
+   `amount_received_currency` (a different column from the transferred
+   currency — a USD payment can land as SYP) exactly as
+   `FundingAgreementTest`'s equivalent method already does for one agreement.
+   Sum only rows where `net_amount_received !== null`.
+3. **Active/closed projects** — the donor has no direct relation to
+   `projects`; the path is `Donor → donorProposals → proposal → projects()`.
+   Add a computed property counting distinct projects via
+   `$this->donor->proposals()->with('projects')` (or a single query joining
+   `donor_proposal` → `project_proposal` → `projects`), split by
+   `ProjectStatus::isOpen()` — open states (draft/submitted/approved/active)
+   in one figure, closed states (closed/archived) in the other. A project
+   funded by two of this donor's proposals must be counted once, not twice —
+   use `distinct()` on the project id.
+4. **Reports submitted** — count of `Report` rows whose `plan_indicator_id`
+   traces back to a target committed under one of this donor's proposals
+   (`plan_indicators.source_type = 'proposal'` and `source_id` in this
+   donor's proposal ids). This is a portfolio-wide count across all of the
+   donor's agreements, not per-agreement like Task 3's existing "transfers"
+   count.
+
+None of this changes Task 3's write permissions (create/edit, guarded delete
+when agreements exist) or its file list — it is one additional test case
+(`'donor detail shows total disbursed and reports submitted separately from
+total committed'`) and roughly forty lines added to the existing
+`⚡show.blade.php`, not a new page.
 
 ## Delete rules governing this spine
 

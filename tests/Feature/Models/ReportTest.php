@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ReportStatus;
 use App\Models\PlanIndicator;
 use App\Models\Report;
 use App\Models\ReportFile;
@@ -30,23 +31,38 @@ test('a report has its means of verification', function () {
         ->and($report->files->first())->toBeInstanceOf(ReportFile::class);
 });
 
-test('a fresh report casts its three flags to booleans', function () {
+test('a fresh report is an editable draft unseen by MEAL', function () {
     $report = Report::factory()->create()->fresh();
 
-    expect($report->is_approved)->toBeFalse()
-        ->and($report->is_editable)->toBeTrue()
+    expect($report->status)->toBe(ReportStatus::Draft)
+        ->and($report->isEditable())->toBeTrue()
         ->and($report->is_seen_by_meal)->toBeFalse();
 });
 
-test('an approved report casts its flags and dates', function () {
+test('an approved report casts its status and is no longer editable', function () {
     $report = Report::factory()->approved()->create(['planned_date' => '2026-03-31'])->fresh();
 
-    expect($report->is_approved)->toBeTrue()
-        ->and($report->is_editable)->toBeFalse()
+    expect($report->status)->toBe(ReportStatus::Approved)
+        ->and($report->isEditable())->toBeFalse()
         ->and($report->is_seen_by_meal)->toBeTrue()
         ->and($report->planned_date)->toBeInstanceOf(CarbonImmutable::class)
-        ->and($report->approved_date->toDateString())->toBe('2026-03-31')
-        ->and($report->edited_date)->toBeNull();
+        ->and($report->submit_date->toDateString())->toBe('2026-03-31');
+});
+
+test('a reviewed report is locked for editing but not yet approved', function () {
+    $report = Report::factory()->reviewed()->create()->fresh();
+
+    expect($report->status)->toBe(ReportStatus::Reviewed)
+        ->and($report->isEditable())->toBeFalse()
+        ->and($report->is_seen_by_meal)->toBeFalse();
+});
+
+test('the approved scope returns only signed off reports', function () {
+    Report::factory()->approved()->create();
+    Report::factory()->reviewed()->create();
+    Report::factory()->create();
+
+    expect(Report::query()->approved()->count())->toBe(1);
 });
 
 test('a report casts its value to two decimal places', function () {

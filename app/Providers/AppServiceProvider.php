@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Models\Milestone;
+use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\YearlyPlan;
 use Carbon\CarbonImmutable;
@@ -32,16 +34,28 @@ class AppServiceProvider extends ServiceProvider
     }
 
     /**
-     * Map the polymorphic sources a plan_indicators row can be committed in.
+     * Map every polymorphic type this application stores.
      *
-     * `plan_indicators.source_type` is VARCHAR(50), so short keys are stored
-     * rather than fully qualified class names.
+     * Both morph columns — `plan_indicators.source_type` and
+     * `media.mediable_type` — are VARCHAR(50), so short keys are stored rather
+     * than fully qualified class names.
+     *
+     * enforceMorphMap() is global: any model on either side of ANY morph must
+     * appear here or getMorphClass() throws ClassMorphViolationException. The
+     * first two entries are the sources a target can be committed in; the last
+     * two are the owners a file can be attached to.
+     *
+     * `User` is still deliberately absent. It uses Notifiable, so the day a
+     * `notifications` table appears, `notifiable_type` will throw until
+     * 'user' => User::class is added — which is the point of enforcing the map.
      */
     protected function configureMorphMap(): void
     {
         Relation::enforceMorphMap([
             'yearly_plan' => YearlyPlan::class,
             'proposal' => Proposal::class,
+            'project' => Project::class,
+            'milestone' => Milestone::class,
         ]);
     }
 

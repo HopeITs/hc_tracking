@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\ProjectStatus;
 use App\Enums\UserRole;
 use App\Models\City;
 use App\Models\Donor;
@@ -47,12 +48,19 @@ class ProgrammeSeeder extends Seeder
                 ]);
             }
 
-            $projects = Project::factory(2)->create([
-                'name' => fn (): string => $name.' Community Response '.fake()->unique()->numerify('###'),
-                'program_id' => $program->id,
-                'city_id' => fn (): int => $cities->random()->id,
-                'user_id' => fn (): int => $managers->random()->id,
-            ]);
+            // One active project and one closed one per program, so every
+            // lifecycle filter in the UI has something on both sides of it.
+            $projects = Project::factory(2)
+                ->sequence(
+                    ['status' => ProjectStatus::Active],
+                    ['status' => ProjectStatus::Closed],
+                )
+                ->create([
+                    'name' => fn (): string => $name.' Community Response '.fake()->unique()->numerify('###'),
+                    'program_id' => $program->id,
+                    'city_id' => fn (): int => $cities->random()->id,
+                    'user_id' => fn (): int => $managers->random()->id,
+                ]);
 
             $proposal = Proposal::factory()->running()->create([
                 'name' => $name.' Emergency Response',

@@ -77,11 +77,17 @@ test('a received tranche takes its transfer dates from the schedule passed in', 
         ->and($tranche->receive_date->toDateString())->toBe('2026-04-01');
 });
 
-test('an approved report takes its trail from the planned date passed in', function () {
+test('an approved report takes its submission date from the planned date passed in', function () {
     $report = Report::factory()->approved()->create(['planned_date' => '2026-03-31'])->fresh();
 
-    expect($report->submit_date->toDateString())->toBe('2026-03-31')
-        ->and($report->approved_date->toDateString())->toBe('2026-03-31');
+    expect($report->submit_date->toDateString())->toBe('2026-03-31');
+});
+
+test('a narrative report bounds its period from the planned date passed in', function () {
+    $report = Report::factory()->withNarrative()->create(['planned_date' => '2026-03-31'])->fresh();
+
+    expect($report->period_end->toDateString())->toBe('2026-03-31')
+        ->and($report->period_start->toDateString())->toBe('2025-12-31');
 });
 
 test('a reached milestone takes its actual date from the planned date passed in', function () {

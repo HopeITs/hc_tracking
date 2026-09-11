@@ -6,6 +6,8 @@ use App\Models\City;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\Indicator;
+use App\Models\IndicatorProgress;
+use App\Models\Media;
 use App\Models\Milestone;
 use App\Models\PlanIndicator;
 use App\Models\Program;
@@ -43,8 +45,10 @@ test('the seeders populate every table in the schema', function () {
         Task::class,
         TaskUpdate::class,
         TaskAttachment::class,
+        Media::class,
         Result::class,
         Indicator::class,
+        IndicatorProgress::class,
         PlanIndicator::class,
         Report::class,
         ReportFile::class,

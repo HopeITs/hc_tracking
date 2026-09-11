@@ -4,7 +4,7 @@
 
 **Goal:** Make `results`, `indicators`, `plan_indicators`, `reports` and `report_files` reachable, readable and writable — and make the polymorphic target source visible as the thing it is.
 
-**Architecture:** Livewire 4 single-file pages built from the `x-ui.*` components. The results logframe is a tree rendered through `HasTree`. Targets (`plan_indicators`) get the only UI in the application that writes a morph, with a two-step source picker that stores the map key. Reports carry three boolean workflow columns, each paired with a date, exposed as three explicit actions rather than checkboxes.
+**Architecture:** Livewire 4 single-file pages built from the `x-ui.*` components. The results logframe is a tree rendered through `HasTree`. Targets (`plan_indicators`) get one of two UIs in the application that write a morph, with a two-step source picker that stores the map key (`media`, added by the schema update below, is the other). ~~Reports carry three boolean workflow columns, each paired with a date, exposed as three explicit actions rather than checkboxes.~~ **Superseded by the DB Schema Update below: those three booleans were dropped and replaced with a single `status` enum before this plan runs. Task 5 is corrected accordingly — read that section before implementing Task 5.**
 
 **Tech Stack:** Laravel 13, PHP 8.5, Livewire 4, Flux 2, Tailwind 4, Pest 5.
 
@@ -14,15 +14,93 @@
 
 - **Strict mode is on.** Lazy loading throws. Eager load every relation the view touches.
 - **Palette is fixed.** Badge tone is palette-only: filled primary = terminal-negative, filled dark = active/achieved, outlined = pending/neutral.
-- **The morph map holds exactly two entries** — `'yearly_plan' => YearlyPlan::class`, `'proposal' => Proposal::class`. `tests/Feature/Models/MorphMapTest.php` asserts that. **Add no new polymorphic relation in this plan.** `Relation::enforceMorphMap()` is global, so any unmapped model on either side of a morph throws `ClassMorphViolationException`.
+- **The morph map holds four entries** — `'yearly_plan' => YearlyPlan::class`, `'proposal' => Proposal::class` (target sources, this plan's concern), plus `'project' => Project::class`, `'milestone' => Milestone::class` (media owners, added by the schema update below, not this plan's concern). `tests/Feature/Models/MorphMapTest.php` asserts the map holds exactly these four. **Add no fifth in this plan.** `Relation::enforceMorphMap()` is global, so any unmapped model on either side of a morph throws `ClassMorphViolationException`.
 - **`source_type` stores the map key, never a class name.** `'yearly_plan'`, not `App\Models\YearlyPlan`. The column is VARCHAR(50) and would not hold much else.
 - **A target can be orphaned.** `plan_indicators.source_id` has no foreign key and cannot have one. A raw query-builder delete of a source leaves the target behind with a dangling id — `.ai/rules/database-migrations.md` records this and a test documents it. Every view that renders a source must handle `$target->source === null`.
-- **`Period` is shared** by `results.checkout_period` and `plan_indicators.period`. One vocabulary: monthly, quarterly, semi-annual, annual.
-- **`FileType` is the file extension**, not a display category. `report_files.path` is built from it. Do not turn it into pdf/image/word categories.
+- **`Period` is shared** by `results.checkout_period`, `plan_indicators.period` and, as of the schema update below, `indicators.frequency`. One vocabulary: monthly, quarterly, semi-annual, annual.
+- **`FileType` is the file extension**, not a display category. `report_files.path` (and `media.path`, added below) is built from it. Do not turn it into pdf/image/word categories.
 - **No file storage.** `storage/app` holds no files. Report files are metadata only: no link, no download, no upload.
-- **No schema changes.** No migration, model, observer, factory or seeder is modified.
+- **`reports.status` (`ReportStatus`) replaces the old three booleans.** `is_approved`/`approved_date`/`is_editable`/`edited_date` no longer exist — see the schema update below. `is_seen_by_meal` is unchanged.
+- **No further schema changes.** Everything in the update below is already migrated, seeded and tested. No migration, model, observer, factory or seeder is modified while executing these tasks.
 - **Tests** live at `tests/Feature/<Feature>Test.php`.
 - **Pint** before any task is done. **Never commit** — stage and stop.
+
+## DB Schema Update (2026-09-11)
+
+Implemented, migrated, seeded and tested before this plan runs — not a task
+within it. Two changes here require a correction to a task already written
+below, not just an addition; both are called out at the affected task.
+
+**`indicators` gained a full logframe row.** New columns: `project_id`
+(nullable, `nullOnDelete` — an indicator always measures a `result`, which
+stays NOT NULL, and may additionally be scoped to one project), `unit`,
+`baseline`, `target` (the **lifetime** target, decimal — a different thing
+from `plan_indicators.target`, which is a per-period commitment made in an
+annual plan or proposal; an indicator has one baseline and one end-of-logframe
+target, and can carry many period targets), `frequency` (reuses `Period`,
+defaults `quarterly`). `Indicator::percentAchieved()` measures movement from
+baseline to target (an indicator starting at 40 and targeting 80 is half done
+at 60, not three-quarters done from a raw share of the target) and returns
+`null` when it cannot be computed — render an em dash, never a zero.
+`Indicator::ragStatus($windowStart, $windowEnd, $asOf = null)` returns a
+`RagStatus` (red/amber/green, **no column — derived**, exactly like
+`ProposalPhase`) rating achievement against how much of the window has
+elapsed, so 40% achieved rates Green in month 3 and Red in month 11.
+
+**A new `indicator_progress` table holds dated readings.** `indicator_id`
+(cascades), `date`, `value`, `notes`, `source_of_verification`, `recorded_by`
+(RESTRICTs). This is **not** a second `reports` table: a report is a narrative
+document for a period; a progress entry is one dated number with the evidence
+it came from. `Indicator::progress()` returns the series ordered oldest-first;
+`Indicator::latestValue()` reads the last entry, answering from a loaded
+relation with no extra query when one is eager-loaded.
+
+**Obligation for Task 2 (Indicator directory) — extends the task below, does
+not replace it.** The create/edit form gains fields for `unit`, `baseline`,
+`target`, `frequency` (a `Period` select) and an optional `project` picker.
+`x-ui.enum-badge` needs a `Period` arm if it doesn't already have one from the
+Targets task. **Beyond the form, this plan's page inventory should gain one
+more panel that was not in the original spec**: a progress log on the
+indicator's row or a lightweight expansion — at minimum, a "Log reading"
+action opening a small form for `date`/`value`/`notes`/`source_of_verification`,
+and a trend indicator (even a plain sparkline of `progress()` values, or the
+latest value plus its RAG badge next to the existing measure badge) satisfying
+the item 6 request for "auto-calculated % achievement + trend chart". Given
+this session's scope was schema-first, the exact chart component is left to
+the implementer's judgement at build time — `Indicator::percentAchieved()` and
+`Indicator::ragStatus()` are the two methods that make it possible; nothing
+further needs to exist in the database for it.
+
+**`reports` replaced three booleans with one status enum, and gained five
+narrative columns — this CORRECTS Task 5 below, not just extends it.**
+`is_approved`, `approved_date`, `is_editable` and `edited_date` **no longer
+exist**. In their place: `status` (`ReportStatus` — draft → reviewed →
+approved, NOT NULL, defaults `draft`). `is_seen_by_meal` is unchanged.
+`Report::isEditable()` derives editability from status
+(`ReportStatus::Draft->isEditable()` is true, the other two are false) rather
+than reading a column. Five narrative columns were added:
+`period_start`/`period_end` (the window the narrative covers — not always the
+same as `planned_date`, the period the figure is *for*), `executive_summary`,
+`key_achievements`, `challenges`, `lessons_learned`, `next_period_plans` — the
+five sections item 7 asked for. `narrative_report_notes` (the pre-existing
+free-text column) is kept as a catch-all alongside them, not replaced.
+
+**Task 5's original methods — `approve()`, `revokeApproval()`,
+`lockEditing()`, `unlockEditing()` — wrote to columns that are now gone and
+must be corrected before that task can run.** The corrected shape:
+
+- `submitForReview()`: `fill(['status' => 'reviewed', 'submit_date' => now()->toDateString()])`. Only valid from `draft`.
+- `approve()`: `fill(['status' => 'approved'])`. Only valid from `reviewed`.
+- `returnToDraft()`: `fill(['status' => 'draft'])` — replaces `revokeApproval()`/`unlockEditing()`, since editability is now derived from status rather than a separate lock. Valid from either `reviewed` or `approved`.
+- `markSeenByMeal()`: unchanged — still a one-way `fill(['is_seen_by_meal' => true])`, still no `markUnseenByMeal()`.
+
+The form for `executive_summary`/`key_achievements`/`challenges`/
+`lessons_learned`/`next_period_plans` belongs on Task 4's create/edit modal
+(Report directory) alongside the existing `narrative_report_notes` field, not
+on Task 5 — Task 5 is the read/workflow page. Both tasks' test files need a
+case each: Task 4 asserting the five narrative fields persist, Task 5
+asserting the three-state transition (`submitForReview` → `approve` /
+`returnToDraft`) instead of the four-boolean assertions originally written.
 
 ## Delete rules governing this spine
 

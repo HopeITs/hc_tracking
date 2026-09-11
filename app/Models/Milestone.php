@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Concerns\HasTree;
 use App\Enums\MilestoneStatus;
+use App\Observers\MediaOwnerObserver;
 use App\Observers\MilestoneObserver;
 use Carbon\CarbonImmutable;
 use Database\Factories\MilestoneFactory;
@@ -15,6 +16,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 /**
  * @property int $id
@@ -43,7 +45,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'responsible_user_id',
     'parent_milestone_id',
 ])]
-#[ObservedBy(MilestoneObserver::class)]
+#[ObservedBy([MilestoneObserver::class, MediaOwnerObserver::class])]
 class Milestone extends Model
 {
     /** @use HasFactory<MilestoneFactory> */
@@ -95,6 +97,16 @@ class Milestone extends Model
     public function tasks(): HasMany
     {
         return $this->hasMany(Task::class);
+    }
+
+    /**
+     * Evidence files attached to this milestone.
+     *
+     * @return MorphMany<Media, $this>
+     */
+    public function media(): MorphMany
+    {
+        return $this->morphMany(Media::class, 'mediable');
     }
 
     /**
