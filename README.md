@@ -194,15 +194,11 @@ second copy loads two instances and breaks reactivity.
 ## Repository
 
 ```
-origin  git@gitlab.com:youss8/hc-tracking-app.git
+origin  git@gitlab.com:hcsyria/hc-tracking.git
 ```
 
-This is a new, separate repository. The month-old project at
-`git@gitlab.com:youss8/HC-Tracking.git` is untouched.
-
-GitLab lowercases project paths, so `HC-Tracking` occupies the path
-`youss8/hc-tracking`. That is why this project is `hc-tracking-app` - the two
-names would otherwise have resolved to the same repository.
+This is the canonical repository for the project. Clone it, branch from
+`main`, and open merge requests against `main`.
 
 ---
 
