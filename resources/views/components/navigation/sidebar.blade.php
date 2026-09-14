@@ -132,9 +132,64 @@
         </flux:sidebar.group>
 
         <flux:sidebar.group
+            :heading="__('Funding')"
+            :class="$navigationGroupClasses"
+        >
+            <flux:sidebar.item
+                icon="document-text"
+                :href="route('proposals.index')"
+                :current="request()->routeIs('proposals.*')"
+                :class="$navigationItemClasses"
+                wire:navigate
+            >
+                {{ __('Proposals') }}
+            </flux:sidebar.item>
+
+            <flux:sidebar.item
+                icon="building-library"
+                :href="route('donors.index')"
+                :current="request()->routeIs('donors.*')"
+                :class="$navigationItemClasses"
+                wire:navigate
+            >
+                {{ __('Donors') }}
+            </flux:sidebar.item>
+
+            <flux:sidebar.item
+                icon="banknotes"
+                :href="route('funding-agreements.index')"
+                :current="request()->routeIs('funding-agreements.*')"
+                :class="$navigationItemClasses"
+                wire:navigate
+            >
+                {{ __('Funding Agreements') }}
+            </flux:sidebar.item>
+
+            <flux:sidebar.item
+                icon="arrow-right-circle"
+                :href="route('transfers.index')"
+                :current="request()->routeIs('transfers.*')"
+                :class="$navigationItemClasses"
+                wire:navigate
+            >
+                {{ __('Transfers') }}
+            </flux:sidebar.item>
+        </flux:sidebar.group>
+
+        <flux:sidebar.group
             :heading="__('Administration')"
             :class="$navigationGroupClasses"
         >
+            <flux:sidebar.item
+                icon="credit-card"
+                :href="route('admin.accounts.index')"
+                :current="request()->routeIs('admin.accounts.*')"
+                :class="$navigationItemClasses"
+                wire:navigate
+            >
+                {{ __('Accounts') }}
+            </flux:sidebar.item>
+
             <flux:sidebar.item
                 icon="map-pin"
                 :href="route('admin.cities.index')"

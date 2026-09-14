@@ -18,8 +18,21 @@ test('the sidebar does not render a group for routes that do not exist yet', fun
     $this->actingAs($user)
         ->get(route('dashboard'))
         ->assertOk()
-        ->assertDontSeeText('Results & Learning')
-        ->assertDontSeeText('Funding');
+        ->assertDontSeeText('Results & Learning');
+});
+
+test('the sidebar carries a funding group once its routes exist', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertSeeText('Funding')
+        ->assertSeeText('Proposals')
+        ->assertSeeText('Donors')
+        ->assertSeeText('Funding Agreements')
+        ->assertSeeText('Transfers')
+        ->assertSeeText('Accounts');
 });
 
 test('every sidebar link resolves to a registered route', function () {

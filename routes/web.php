@@ -47,12 +47,36 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('tasks/{task}', 'pages::tasks.show')
         ->name('tasks.show');
 
+    Route::livewire('proposals', 'pages::proposals.index')
+        ->name('proposals.index');
+
+    Route::livewire('proposals/{proposal}', 'pages::proposals.show')
+        ->name('proposals.show');
+
+    Route::livewire('donors', 'pages::donors.index')
+        ->name('donors.index');
+
+    Route::livewire('donors/{donor}', 'pages::donors.show')
+        ->name('donors.show');
+
+    Route::livewire('funding-agreements', 'pages::funding-agreements.index')
+        ->name('funding-agreements.index');
+
+    Route::livewire('funding-agreements/{donorProposal}', 'pages::funding-agreements.show')
+        ->name('funding-agreements.show');
+
+    Route::livewire('transfers', 'pages::transfers.index')
+        ->name('transfers.index');
+
     Route::livewire('admin/users', 'pages::admin.users')
         ->can('viewAny', User::class)
         ->name('admin.users.index');
 
     Route::livewire('admin/cities', 'pages::admin.cities')
         ->name('admin.cities.index');
+
+    Route::livewire('admin/accounts', 'pages::admin.accounts')
+        ->name('admin.accounts.index');
 });
 
 require __DIR__.'/settings.php';

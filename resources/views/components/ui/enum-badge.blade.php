@@ -39,6 +39,7 @@
             \App\Enums\ResultType::Impact => 'solid',
             default => 'outline',
         },
+        $case instanceof \App\Enums\DonorType => 'outline',
         default => 'outline',
     };
 

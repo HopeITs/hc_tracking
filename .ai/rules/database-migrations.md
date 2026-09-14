@@ -70,3 +70,6 @@ Consequence: a proposal with any funding agreement cannot be deleted. Remove the
 Deleting a donor_proposal DOES still cascade to its transfers_tracking rows. That is intended — acting on the agreement itself is the deliberate act.
 
 Covered by "a proposal cannot be deleted while a funding agreement points at it" in tests/Feature/DonorProposalTest.php and by tests/Feature/Models/TransactionalDeleteTest.php.
+
+## transfers_tracking received amounts and scheduled_date are nullable
+User decision 2026-09-14: migration 2026_09_14_111851_make_transfers_tracking_received_amounts_nullable makes amount_received, net_amount_received and scheduled_date nullable. A pending tranche has received nothing — NULL means "not yet received". Never default blanks to payment_amount or today: that fakes disbursed money. Disbursed totals must sum only non-null net_amount_received. Rollback caveat: down() fails once NULL rows exist.

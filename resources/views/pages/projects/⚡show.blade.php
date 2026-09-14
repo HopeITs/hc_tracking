@@ -321,11 +321,7 @@ new #[Title('Project')] class extends Component {
                     @foreach ($this->attachedProposals as $proposal)
                         <article class="flex flex-wrap items-center gap-3 p-3.5" wire:key="project-proposal-{{ $proposal->id }}">
                             <div class="min-w-0 flex-1">
-                                @if (Route::has('proposals.show'))
-                                    <a href="{{ route('proposals.show', $proposal) }}" wire:navigate class="truncate text-sm font-semibold hover:underline">{{ $proposal->name }}</a>
-                                @else
-                                    <p class="truncate text-sm font-semibold">{{ $proposal->name }}</p>
-                                @endif
+                                <a href="{{ route('proposals.show', $proposal) }}" wire:navigate class="truncate text-sm font-semibold hover:underline">{{ $proposal->name }}</a>
                                 <p class="text-xs text-secondary-medium dark:text-secondary-soft">
                                     {{ $proposal->planned_date_begin?->format('M j, Y') }} – {{ $proposal->planned_date_end?->format('M j, Y') }}
                                 </p>
