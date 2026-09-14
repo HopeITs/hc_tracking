@@ -2,6 +2,7 @@
 
 use App\Enums\Currency;
 use App\Enums\MilestoneStatus;
+use App\Enums\ProjectStatus;
 use App\Enums\TaskStatus;
 use App\Enums\UserRole;
 use App\Models\Result;
@@ -9,7 +10,6 @@ use App\Models\User;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\ViewException;
-use Throwable;
 
 test('the ui input carries the shared control classes', function () {
     $html = Blade::render('<x-ui.input name="search" label="Search" />');
@@ -32,6 +32,27 @@ test('the enum badge tones a terminal negative state with the primary colour', f
     expect($html)->toContain('Missed')
         ->and($html)->toContain('bg-primary');
 });
+
+test('the enum badge renders an active project as a solid dark badge', function () {
+    $html = Blade::render('<x-ui.enum-badge :case="$case" />', ['case' => ProjectStatus::Active]);
+
+    expect($html)->toContain('Active')
+        ->and($html)->toContain('bg-secondary-dark');
+});
+
+test('the enum badge renders other project states as outlined badges', function (ProjectStatus $status) {
+    $html = Blade::render('<x-ui.enum-badge :case="$case" />', ['case' => $status]);
+
+    expect($html)->toContain('border-secondary-light')
+        ->and($html)->not->toContain('bg-secondary-dark')
+        ->and($html)->not->toContain('bg-primary');
+})->with([
+    'draft' => ProjectStatus::Draft,
+    'submitted' => ProjectStatus::Submitted,
+    'approved' => ProjectStatus::Approved,
+    'closed' => ProjectStatus::Closed,
+    'archived' => ProjectStatus::Archived,
+]);
 
 test('the enum badge renders an em dash for a null case', function () {
     $html = Blade::render('<x-ui.enum-badge :case="$case" />', ['case' => null]);

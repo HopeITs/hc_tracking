@@ -29,6 +29,24 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('yearly-plans/{yearlyPlan}', 'pages::yearly-plans.show')
         ->name('yearly-plans.show');
 
+    Route::livewire('projects', 'pages::projects.index')
+        ->name('projects.index');
+
+    Route::livewire('projects/{project}', 'pages::projects.show')
+        ->name('projects.show');
+
+    Route::livewire('risks', 'pages::risks.index')
+        ->name('risks.index');
+
+    Route::livewire('milestones', 'pages::milestones.index')
+        ->name('milestones.index');
+
+    Route::livewire('tasks', 'pages::tasks.index')
+        ->name('tasks.index');
+
+    Route::livewire('tasks/{task}', 'pages::tasks.show')
+        ->name('tasks.show');
+
     Route::livewire('admin/users', 'pages::admin.users')
         ->can('viewAny', User::class)
         ->name('admin.users.index');

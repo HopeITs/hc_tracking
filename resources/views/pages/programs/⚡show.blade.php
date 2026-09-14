@@ -126,11 +126,7 @@ new #[Title('Program')] class extends Component {
                     @foreach ($this->projects as $project)
                         <article class="flex flex-col gap-3 p-3.5 @3xl/detail:flex-row @3xl/detail:items-center" wire:key="program-project-{{ $project->id }}">
                             <div class="min-w-0 @3xl/detail:me-auto">
-                                @if (Route::has('projects.show'))
-                                    <a href="{{ route('projects.show', $project) }}" wire:navigate class="truncate text-sm font-semibold hover:underline">{{ $project->name }}</a>
-                                @else
-                                    <p class="truncate text-sm font-semibold">{{ $project->name }}</p>
-                                @endif
+                                <a href="{{ route('projects.show', $project) }}" wire:navigate class="truncate text-sm font-semibold hover:underline">{{ $project->name }}</a>
                                 <p class="text-xs text-secondary-medium dark:text-secondary-soft">
                                     {{ $project->city->name }}
                                     ·

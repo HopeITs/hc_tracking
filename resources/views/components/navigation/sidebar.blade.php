@@ -87,6 +87,51 @@
         </flux:sidebar.group>
 
         <flux:sidebar.group
+            :heading="__('Delivery')"
+            :class="$navigationGroupClasses"
+        >
+            <flux:sidebar.item
+                icon="rectangle-stack"
+                :href="route('projects.index')"
+                :current="request()->routeIs('projects.*')"
+                :class="$navigationItemClasses"
+                wire:navigate
+            >
+                {{ __('Projects') }}
+            </flux:sidebar.item>
+
+            <flux:sidebar.item
+                icon="flag"
+                :href="route('milestones.index')"
+                :current="request()->routeIs('milestones.*')"
+                :class="$navigationItemClasses"
+                wire:navigate
+            >
+                {{ __('Milestones') }}
+            </flux:sidebar.item>
+
+            <flux:sidebar.item
+                icon="clipboard-document-check"
+                :href="route('tasks.index')"
+                :current="request()->routeIs('tasks.*')"
+                :class="$navigationItemClasses"
+                wire:navigate
+            >
+                {{ __('Tasks') }}
+            </flux:sidebar.item>
+
+            <flux:sidebar.item
+                icon="exclamation-triangle"
+                :href="route('risks.index')"
+                :current="request()->routeIs('risks.*')"
+                :class="$navigationItemClasses"
+                wire:navigate
+            >
+                {{ __('Risks') }}
+            </flux:sidebar.item>
+        </flux:sidebar.group>
+
+        <flux:sidebar.group
             :heading="__('Administration')"
             :class="$navigationGroupClasses"
         >

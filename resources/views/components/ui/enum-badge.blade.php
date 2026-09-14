@@ -21,6 +21,10 @@
             \App\Enums\ProposalStatus::Rejected => 'accent',
             default => 'outline',
         },
+        $case instanceof \App\Enums\ProjectStatus => match ($case) {
+            \App\Enums\ProjectStatus::Active => 'solid',
+            default => 'outline',
+        },
         $case instanceof \App\Enums\ArStatus => match ($case) {
             \App\Enums\ArStatus::Received => 'solid',
             \App\Enums\ArStatus::Failed => 'accent',
