@@ -17,7 +17,7 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('Indicators')] class extends Component {
+new #[Title('titles.indicators')] class extends Component {
     use WithPagination;
 
     #[Url(except: '')]
@@ -168,10 +168,10 @@ new #[Title('Indicators')] class extends Component {
             'frequency' => ['required', new Enum(Period::class)],
             'indicatorProjectId' => ['nullable', 'integer', Rule::exists(Project::class, 'id')],
         ], [
-            'name.required' => __('Enter the indicator name.'),
-            'indicatorResultId.required' => __('Select the result this indicator measures.'),
-            'indicatorMeasure.required' => __('Choose whether this counts or is a percentage.'),
-            'frequency.required' => __('Choose how often this is checked.'),
+            'name.required' => __('indicators.enter_the_indicator_name'),
+            'indicatorResultId.required' => __('indicators.select_the_result_this_indicator_measures'),
+            'indicatorMeasure.required' => __('indicators.choose_whether_this_counts_or_is_a_percentage'),
+            'frequency.required' => __('common.choose_how_often_this_is_checked'),
         ]);
 
         $indicator = $this->editingIndicatorId === null
@@ -199,7 +199,7 @@ new #[Title('Indicators')] class extends Component {
 
         Flux::toast(
             variant: 'success',
-            text: $wasRecentlyCreated ? __('Indicator created.') : __('Indicator updated.'),
+            text: $wasRecentlyCreated ? __('indicators.indicator_created') : __('indicators.indicator_updated'),
         );
     }
 
@@ -219,7 +219,7 @@ new #[Title('Indicators')] class extends Component {
 
             Flux::toast(
                 variant: 'danger',
-                text: __('This indicator carries targets. Remove them first — deleting it would take every report against them.'),
+                text: __('indicators.this_indicator_carries_targets_remove_them_first_deleting_it'),
             );
 
             return;
@@ -230,7 +230,7 @@ new #[Title('Indicators')] class extends Component {
         $this->deletingIndicatorId = null;
         $this->resetPage();
 
-        Flux::toast(variant: 'success', text: __('Indicator deleted.'));
+        Flux::toast(variant: 'success', text: __('indicators.indicator_deleted'));
     }
 
     public function closeIndicatorModal(): void
@@ -258,8 +258,8 @@ new #[Title('Indicators')] class extends Component {
             'progressNotes' => ['nullable', 'string'],
             'progressSourceOfVerification' => ['nullable', 'string', 'max:255'],
         ], [
-            'progressDate.required' => __('Enter the date of this reading.'),
-            'progressValue.required' => __('Enter the value recorded.'),
+            'progressDate.required' => __('indicators.enter_the_date_of_this_reading'),
+            'progressValue.required' => __('indicators.enter_the_value_recorded'),
         ]);
 
         if ($this->progressIndicatorId === null) {
@@ -279,7 +279,7 @@ new #[Title('Indicators')] class extends Component {
         $this->progressIndicatorId = null;
         unset($this->indicators);
 
-        Flux::toast(variant: 'success', text: __('Reading logged.'));
+        Flux::toast(variant: 'success', text: __('indicators.reading_logged'));
     }
 
     public function closeProgressModal(): void
@@ -311,47 +311,47 @@ new #[Title('Indicators')] class extends Component {
 <section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="indicator-directory-heading">
     <x-ui.page-header
         heading-id="indicator-directory-heading"
-        :title="__('Indicators')"
+        :title="__('common.indicators')"
         :count="$this->indicators->total()"
-        :description="__('What each result is measured by.')"
+        :description="__('indicators.what_each_result_is_measured_by')"
     >
         <x-slot:filters>
-            <x-ui.input type="search" icon="magnifying-glass" :label="__('Search indicators')" :placeholder="__('Indicator or result statement')" wire:model.live.debounce.300ms="search" clearable />
+            <x-ui.input type="search" icon="magnifying-glass" :label="__('indicators.search_indicators')" :placeholder="__('indicators.indicator_or_result_statement')" wire:model.live.debounce.300ms="search" clearable />
 
-            <x-ui.select :label="__('Result')" wire:model.live="result">
-                <flux:select.option value="">{{ __('All results') }}</flux:select.option>
+            <x-ui.select :label="__('indicators.result')" wire:model.live="result">
+                <flux:select.option value="">{{ __('indicators.all_results') }}</flux:select.option>
                 @foreach ($this->resultOptions as $resultOption)
                     <flux:select.option :value="$resultOption->id" :wire:key="'ind-result-'.$resultOption->id">{{ Str::limit($resultOption->statement, 50) }}</flux:select.option>
                 @endforeach
             </x-ui.select>
 
-            <x-ui.select :label="__('Measure')" wire:model.live="measure">
-                <flux:select.option value="">{{ __('All measures') }}</flux:select.option>
+            <x-ui.select :label="__('indicators.measure')" wire:model.live="measure">
+                <flux:select.option value="">{{ __('indicators.all_measures') }}</flux:select.option>
                 @foreach (IndicatorMeasure::cases() as $measureCase)
-                    <flux:select.option :value="$measureCase->value" :wire:key="'ind-measure-'.$measureCase->value">{{ Str::title($measureCase->value) }}</flux:select.option>
+                    <flux:select.option :value="$measureCase->value" :wire:key="'ind-measure-'.$measureCase->value">{{ $measureCase->label() }}</flux:select.option>
                 @endforeach
             </x-ui.select>
         </x-slot:filters>
 
         <x-slot:actions>
             <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-indicator-button">
-                {{ __('Add indicator') }}
+                {{ __('indicators.add_indicator') }}
             </x-ui.button>
         </x-slot:actions>
     </x-ui.page-header>
 
-    <x-ui.panel :subtitle="trans_choice('{1} :count matching indicator|[2,*] :count matching indicators', $this->indicators->total(), ['count' => $this->indicators->total()])">
+    <x-ui.panel :subtitle="trans_choice('indicators.count_matching_indicator', $this->indicators->total(), ['count' => $this->indicators->total()])">
         <x-slot:toolbar>
             @if ($filtersAreActive)
-                <flux:button size="sm" variant="ghost" class="text-secondary-medium! dark:text-secondary-soft!" wire:click="clearFilters">{{ __('Reset filters') }}</flux:button>
+                <flux:button size="sm" variant="ghost" class="text-secondary-medium! dark:text-secondary-soft!" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
             @endif
         </x-slot:toolbar>
 
         @if ($this->indicators->isEmpty())
             <x-ui.empty-state
                 icon="chart-bar"
-                :heading="$filtersAreActive ? __('No matching indicators') : __('No indicators yet')"
-                :body="$filtersAreActive ? __('Change the search or filters and try again.') : __('Add the first indicator against a result.')"
+                :heading="$filtersAreActive ? __('indicators.no_matching_indicators') : __('indicators.no_indicators_yet')"
+                :body="$filtersAreActive ? __('common.change_the_search_or_filters_and_try_again') : __('indicators.add_the_first_indicator_against_a_result')"
             />
         @else
             <div class="divide-y divide-secondary-soft dark:divide-secondary-medium">
@@ -366,7 +366,7 @@ new #[Title('Indicators')] class extends Component {
                             <p class="text-sm font-semibold">{{ $indicator->name }}</p>
                             <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">
                                 {{ Str::limit($indicator->result->statement, 70) }}
-                                · {{ $indicator->result->program?->name ?? __('Unassigned') }}
+                                · {{ $indicator->result->program?->name ?? __('common.unassigned') }}
                                 @if ($indicator->project)
                                     · {{ $indicator->project->name }}
                                 @endif
@@ -390,7 +390,7 @@ new #[Title('Indicators')] class extends Component {
                             </svg>
                         @endif
 
-                        <span class="min-w-14 text-right text-xs font-semibold tabular-nums" title="{{ __('Percent achieved') }}">
+                        <span class="min-w-14 text-end text-xs font-semibold tabular-nums" title="{{ __('indicators.percent_achieved') }}">
                             {{ $percentAchieved === null ? '—' : number_format($percentAchieved, 1).'%' }}
                         </span>
 
@@ -398,18 +398,18 @@ new #[Title('Indicators')] class extends Component {
                         <x-ui.enum-badge :case="$indicator->frequency" />
                         <x-ui.enum-badge :case="$indicator->measure" />
 
-                        <span class="inline-flex min-w-6 items-center justify-center rounded-md border border-secondary-light px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-secondary-medium dark:text-secondary-soft" title="{{ __('Targets') }}">
+                        <span class="inline-flex min-w-6 items-center justify-center rounded-md border border-secondary-light px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-secondary-medium dark:text-secondary-soft" title="{{ __('common.targets') }}">
                             {{ $indicator->plan_indicators_count }}
                         </span>
 
-                        <x-ui.button tone="ghost" size="sm" icon="plus-circle" class="size-9!" wire:click="openProgressModal({{ $indicator->id }})" :aria-label="__('Log a reading for :name', ['name' => $indicator->name])" data-test="log-reading-button-{{ $indicator->id }}" />
+                        <x-ui.button tone="ghost" size="sm" icon="plus-circle" class="size-9!" wire:click="openProgressModal({{ $indicator->id }})" :aria-label="__('indicators.log_a_reading_for_name', ['name' => $indicator->name])" data-test="log-reading-button-{{ $indicator->id }}" />
 
-                        <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $indicator->id }})" :aria-label="__('Edit :name', ['name' => $indicator->name])" />
+                        <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $indicator->id }})" :aria-label="__('common.edit_name', ['name' => $indicator->name])" />
 
                         @if ($indicator->plan_indicators_count === 0)
-                            <x-ui.button tone="ghost" size="sm" icon="trash" class="size-9!" wire:click="confirmDelete({{ $indicator->id }})" :aria-label="__('Delete :name', ['name' => $indicator->name])" />
+                            <x-ui.button tone="ghost" size="sm" icon="trash" class="size-9!" wire:click="confirmDelete({{ $indicator->id }})" :aria-label="__('common.delete_name', ['name' => $indicator->name])" />
                         @else
-                            <flux:tooltip :content="__('Indicators carrying targets cannot be deleted.')">
+                            <flux:tooltip :content="__('indicators.indicators_carrying_targets_cannot_be_deleted')">
                                 <span class="inline-flex size-9 cursor-not-allowed items-center justify-center text-secondary-light" aria-disabled="true">
                                     <flux:icon.lock-closed class="size-4" />
                                 </span>
@@ -429,36 +429,36 @@ new #[Title('Indicators')] class extends Component {
         @if ($showIndicatorModal)
         <form wire:submit="saveIndicator" class="space-y-5">
             <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ $editingIndicatorId === null ? __('Add indicator') : __('Edit indicator') }}</flux:heading>
-                <flux:subheading>{{ __('An indicator measures exactly one result.') }}</flux:subheading>
+                <flux:heading size="lg">{{ $editingIndicatorId === null ? __('indicators.add_indicator') : __('indicators.edit_indicator') }}</flux:heading>
+                <flux:subheading>{{ __('indicators.an_indicator_measures_exactly_one_result') }}</flux:subheading>
             </div>
 
-            <x-ui.input wire:model="name" :label="__('Indicator name')" type="text" maxlength="255" required autofocus />
+            <x-ui.input wire:model="name" :label="__('common.indicator_name')" type="text" maxlength="255" required autofocus />
 
             <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.select wire:model="indicatorResultId" :label="__('Result')" required>
-                    <flux:select.option value="">{{ __('Select a result') }}</flux:select.option>
+                <x-ui.select wire:model="indicatorResultId" :label="__('indicators.result')" required>
+                    <flux:select.option value="">{{ __('indicators.select_a_result') }}</flux:select.option>
                     @foreach ($this->resultOptions as $resultOption)
                         <flux:select.option :value="$resultOption->id" :wire:key="'ind-result-option-'.$resultOption->id">{{ Str::limit($resultOption->statement, 60) }}</flux:select.option>
                     @endforeach
                 </x-ui.select>
 
-                <x-ui.select wire:model="indicatorMeasure" :label="__('Measure')" required>
+                <x-ui.select wire:model="indicatorMeasure" :label="__('indicators.measure')" required>
                     @foreach (IndicatorMeasure::cases() as $measureCase)
-                        <flux:select.option :value="$measureCase->value" :wire:key="'ind-measure-option-'.$measureCase->value">{{ Str::title($measureCase->value) }}</flux:select.option>
+                        <flux:select.option :value="$measureCase->value" :wire:key="'ind-measure-option-'.$measureCase->value">{{ $measureCase->label() }}</flux:select.option>
                     @endforeach
                 </x-ui.select>
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.select wire:model="frequency" :label="__('Frequency')" required>
+                <x-ui.select wire:model="frequency" :label="__('indicators.frequency')" required>
                     @foreach (Period::cases() as $periodCase)
-                        <flux:select.option :value="$periodCase->value" :wire:key="'ind-frequency-'.$periodCase->value">{{ Str::title($periodCase->value) }}</flux:select.option>
+                        <flux:select.option :value="$periodCase->value" :wire:key="'ind-frequency-'.$periodCase->value">{{ $periodCase->label() }}</flux:select.option>
                     @endforeach
                 </x-ui.select>
 
-                <x-ui.select wire:model="indicatorProjectId" :label="__('Project')">
-                    <flux:select.option value="">{{ __('Organisation-wide') }}</flux:select.option>
+                <x-ui.select wire:model="indicatorProjectId" :label="__('common.project')">
+                    <flux:select.option value="">{{ __('common.organisation_wide') }}</flux:select.option>
                     @foreach ($this->projectOptions as $projectOption)
                         <flux:select.option :value="$projectOption->id" :wire:key="'ind-project-'.$projectOption->id">{{ $projectOption->name }}</flux:select.option>
                     @endforeach
@@ -466,15 +466,15 @@ new #[Title('Indicators')] class extends Component {
             </div>
 
             <div class="grid gap-4 sm:grid-cols-3">
-                <x-ui.input wire:model="unit" :label="__('Unit')" type="text" maxlength="50" />
-                <x-ui.input wire:model="baseline" :label="__('Baseline')" type="number" step="0.01" />
-                <x-ui.input wire:model="target" :label="__('Lifetime target')" type="number" step="0.01" />
+                <x-ui.input wire:model="unit" :label="__('indicators.unit')" type="text" maxlength="50" />
+                <x-ui.input wire:model="baseline" :label="__('indicators.baseline')" type="number" step="0.01" />
+                <x-ui.input wire:model="target" :label="__('indicators.lifetime_target')" type="number" step="0.01" />
             </div>
 
             <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeIndicatorModal">{{ __('Cancel') }}</x-ui.button>
+                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeIndicatorModal">{{ __('common.cancel') }}</x-ui.button>
                 <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-indicator-button">
-                    {{ $editingIndicatorId === null ? __('Create indicator') : __('Save changes') }}
+                    {{ $editingIndicatorId === null ? __('indicators.create_indicator') : __('common.save_changes') }}
                 </x-ui.button>
             </div>
         </form>
@@ -483,11 +483,11 @@ new #[Title('Indicators')] class extends Component {
 
     <flux:modal :open="$deletingIndicatorId !== null" wire:close="$set('deletingIndicatorId', null)" class="w-full max-w-md border border-secondary-light! bg-white! dark:bg-secondary-dark!">
         <div class="space-y-4">
-            <flux:heading size="lg">{{ __('Delete this indicator?') }}</flux:heading>
-            <flux:subheading>{{ __('Only an indicator carrying no targets can be deleted.') }}</flux:subheading>
+            <flux:heading size="lg">{{ __('indicators.delete_this_indicator') }}</flux:heading>
+            <flux:subheading>{{ __('indicators.only_an_indicator_carrying_no_targets_can_be_deleted') }}</flux:subheading>
             <div class="flex justify-end gap-2 border-t border-secondary-soft pt-4 dark:border-secondary-medium">
-                <x-ui.button type="button" wire:click="$set('deletingIndicatorId', null)">{{ __('Cancel') }}</x-ui.button>
-                <x-ui.button type="button" tone="primary" wire:click="deleteIndicator" data-test="confirm-delete-indicator">{{ __('Delete indicator') }}</x-ui.button>
+                <x-ui.button type="button" wire:click="$set('deletingIndicatorId', null)">{{ __('common.cancel') }}</x-ui.button>
+                <x-ui.button type="button" tone="primary" wire:click="deleteIndicator" data-test="confirm-delete-indicator">{{ __('indicators.delete_indicator') }}</x-ui.button>
             </div>
         </div>
     </flux:modal>
@@ -496,23 +496,23 @@ new #[Title('Indicators')] class extends Component {
         @if ($showProgressModal)
         <form wire:submit="saveProgress" class="space-y-5">
             <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ __('Log a reading') }}</flux:heading>
-                <flux:subheading>{{ __('One dated number with the evidence it came from.') }}</flux:subheading>
+                <flux:heading size="lg">{{ __('indicators.log_a_reading') }}</flux:heading>
+                <flux:subheading>{{ __('indicators.one_dated_number_with_the_evidence_it_came_from') }}</flux:subheading>
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.input wire:model="progressDate" :label="__('Date')" type="date" required />
-                <x-ui.input wire:model="progressValue" :label="__('Value')" type="number" step="0.01" required />
+                <x-ui.input wire:model="progressDate" :label="__('indicators.date')" type="date" required />
+                <x-ui.input wire:model="progressValue" :label="__('indicators.value')" type="number" step="0.01" required />
             </div>
 
-            <x-ui.input wire:model="progressSourceOfVerification" :label="__('Source of verification')" type="text" maxlength="255" />
+            <x-ui.input wire:model="progressSourceOfVerification" :label="__('indicators.source_of_verification')" type="text" maxlength="255" />
 
-            <flux:textarea wire:model="progressNotes" :label="__('Notes')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
+            <flux:textarea wire:model="progressNotes" :label="__('common.notes')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
 
             <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeProgressModal">{{ __('Cancel') }}</x-ui.button>
+                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeProgressModal">{{ __('common.cancel') }}</x-ui.button>
                 <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-progress-button">
-                    {{ __('Log reading') }}
+                    {{ __('indicators.log_reading') }}
                 </x-ui.button>
             </div>
         </form>

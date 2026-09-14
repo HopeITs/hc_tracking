@@ -10,7 +10,7 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('Donors')] class extends Component {
+new #[Title('titles.donors')] class extends Component {
     use WithPagination;
 
     #[Url(except: '')]
@@ -115,7 +115,7 @@ new #[Title('Donors')] class extends Component {
             'country' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ], [
-            'name.required' => __('Enter a donor name.'),
+            'name.required' => __('donors.enter_a_donor_name'),
         ]);
 
         $donor = $this->editingDonorId === null
@@ -140,7 +140,7 @@ new #[Title('Donors')] class extends Component {
 
         Flux::toast(
             variant: 'success',
-            text: $wasRecentlyCreated ? __('Donor created.') : __('Donor updated.'),
+            text: $wasRecentlyCreated ? __('donors.donor_created') : __('donors.donor_updated'),
         );
     }
 
@@ -160,7 +160,7 @@ new #[Title('Donors')] class extends Component {
 
             Flux::toast(
                 variant: 'danger',
-                text: __('This donor has signed a funding agreement and cannot be deleted.'),
+                text: __('donors.this_donor_has_signed_a_funding_agreement_and_cannot_be_dele'),
             );
 
             return;
@@ -171,7 +171,7 @@ new #[Title('Donors')] class extends Component {
         $this->deletingDonorId = null;
         $this->resetPage();
 
-        Flux::toast(variant: 'success', text: __('Donor deleted.'));
+        Flux::toast(variant: 'success', text: __('donors.donor_deleted'));
     }
 
     public function closeDonorModal(): void
@@ -198,27 +198,27 @@ new #[Title('Donors')] class extends Component {
 <section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="donor-directory-heading">
     <x-ui.page-header
         heading-id="donor-directory-heading"
-        :title="__('Donors')"
+        :title="__('common.donors')"
         :count="$this->donors->total()"
-        :description="__('Funders and the agreements they hold.')"
+        :description="__('donors.funders_and_the_agreements_they_hold')"
     >
         <x-slot:filters>
-            <x-ui.input type="search" icon="magnifying-glass" :label="__('Search donors')" :placeholder="__('Donor name')" wire:model.live.debounce.300ms="search" clearable />
+            <x-ui.input type="search" icon="magnifying-glass" :label="__('donors.search_donors')" :placeholder="__('donors.donor_name')" wire:model.live.debounce.300ms="search" clearable />
         </x-slot:filters>
 
         <x-slot:actions>
             <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-donor-button">
-                {{ __('Add donor') }}
+                {{ __('donors.add_donor') }}
             </x-ui.button>
         </x-slot:actions>
     </x-ui.page-header>
 
-    <x-ui.panel :subtitle="trans_choice('{1} :count matching donor|[2,*] :count matching donors', $this->donors->total(), ['count' => $this->donors->total()])">
+    <x-ui.panel :subtitle="trans_choice('donors.count_matching_donor', $this->donors->total(), ['count' => $this->donors->total()])">
         @if ($this->donors->isEmpty())
             <x-ui.empty-state
                 icon="building-library"
-                :heading="$search !== '' ? __('No matching donors') : __('No donors yet')"
-                :body="$search !== '' ? __('Change the search and try again.') : __('Add the first donor.')"
+                :heading="$search !== '' ? __('donors.no_matching_donors') : __('donors.no_donors_yet')"
+                :body="$search !== '' ? __('common.change_the_search_and_try_again') : __('donors.add_the_first_donor')"
             />
         @else
             <div class="divide-y divide-secondary-soft dark:divide-secondary-medium">
@@ -227,18 +227,18 @@ new #[Title('Donors')] class extends Component {
                         <div class="min-w-0 me-auto">
                             <a href="{{ route('donors.show', $donor) }}" wire:navigate class="text-sm font-semibold hover:underline">{{ $donor->name }}</a>
                             <p class="text-xs text-secondary-medium dark:text-secondary-soft">
-                                {{ trans_choice(':count agreement|:count agreements', $donor->donor_proposals_count, ['count' => $donor->donor_proposals_count]) }}
+                                {{ trans_choice('common.count_agreement', $donor->donor_proposals_count, ['count' => $donor->donor_proposals_count]) }}
                             </p>
                         </div>
 
                         <x-ui.enum-badge :case="$donor->type" />
 
-                        <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $donor->id }})" :aria-label="__('Edit :name', ['name' => $donor->name])" />
+                        <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $donor->id }})" :aria-label="__('common.edit_name', ['name' => $donor->name])" />
 
                         @if ($donor->donor_proposals_count === 0)
-                            <x-ui.button tone="ghost" size="sm" icon="trash" class="size-9!" wire:click="confirmDelete({{ $donor->id }})" :aria-label="__('Delete :name', ['name' => $donor->name])" />
+                            <x-ui.button tone="ghost" size="sm" icon="trash" class="size-9!" wire:click="confirmDelete({{ $donor->id }})" :aria-label="__('common.delete_name', ['name' => $donor->name])" />
                         @else
-                            <flux:tooltip :content="__('Donors holding an agreement cannot be deleted.')">
+                            <flux:tooltip :content="__('donors.donors_holding_an_agreement_cannot_be_deleted')">
                                 <span class="inline-flex size-9 cursor-not-allowed items-center justify-center text-secondary-light" aria-disabled="true">
                                     <flux:icon.lock-closed class="size-4" />
                                 </span>
@@ -257,34 +257,34 @@ new #[Title('Donors')] class extends Component {
     <flux:modal wire:model="showDonorModal" class="w-full max-w-lg border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
         <form wire:submit="saveDonor" class="space-y-5">
             <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ $editingDonorId === null ? __('Add donor') : __('Edit donor') }}</flux:heading>
-                <flux:subheading>{{ __('Donor names need not be unique — two country offices may share one.') }}</flux:subheading>
+                <flux:heading size="lg">{{ $editingDonorId === null ? __('donors.add_donor') : __('donors.edit_donor') }}</flux:heading>
+                <flux:subheading>{{ __('donors.donor_names_need_not_be_unique_two_country_offices_may_share') }}</flux:subheading>
             </div>
 
-            <x-ui.input wire:model="name" :label="__('Donor name')" type="text" maxlength="255" required autofocus />
+            <x-ui.input wire:model="name" :label="__('donors.donor_name')" type="text" maxlength="255" required autofocus />
 
             <div class="grid gap-4 sm:grid-cols-2">
-                <flux:select wire:model="type" :label="__('Type')">
-                    <flux:select.option value="">{{ __('Not classified') }}</flux:select.option>
+                <flux:select wire:model="type" :label="__('common.type')">
+                    <flux:select.option value="">{{ __('donors.not_classified') }}</flux:select.option>
                     @foreach ($this->donorTypeOptions as $donorTypeOption)
                         <flux:select.option :value="$donorTypeOption->value" :wire:key="'donor-type-'.$donorTypeOption->value">
-                            {{ \Illuminate\Support\Str::title($donorTypeOption->value) }}
+                            {{ $donorTypeOption->label() }}
                         </flux:select.option>
                     @endforeach
                 </flux:select>
 
-                <x-ui.input wire:model="contactPerson" :label="__('Contact person')" type="text" maxlength="255" />
-                <x-ui.input wire:model="email" :label="__('Email')" type="email" maxlength="255" />
-                <x-ui.input wire:model="phone" :label="__('Phone')" type="text" maxlength="50" />
-                <x-ui.input wire:model="country" :label="__('Country')" type="text" maxlength="255" class="sm:col-span-2" />
+                <x-ui.input wire:model="contactPerson" :label="__('donors.contact_person')" type="text" maxlength="255" />
+                <x-ui.input wire:model="email" :label="__('common.email')" type="email" maxlength="255" />
+                <x-ui.input wire:model="phone" :label="__('donors.phone')" type="text" maxlength="50" />
+                <x-ui.input wire:model="country" :label="__('donors.country')" type="text" maxlength="255" class="sm:col-span-2" />
             </div>
 
-            <flux:textarea wire:model="notes" :label="__('Notes')" rows="3" maxlength="2000" />
+            <flux:textarea wire:model="notes" :label="__('common.notes')" rows="3" maxlength="2000" />
 
             <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeDonorModal">{{ __('Cancel') }}</x-ui.button>
+                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeDonorModal">{{ __('common.cancel') }}</x-ui.button>
                 <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-donor-button">
-                    {{ $editingDonorId === null ? __('Create donor') : __('Save changes') }}
+                    {{ $editingDonorId === null ? __('donors.create_donor') : __('common.save_changes') }}
                 </x-ui.button>
             </div>
         </form>
@@ -292,11 +292,11 @@ new #[Title('Donors')] class extends Component {
 
     <flux:modal :open="$deletingDonorId !== null" wire:close="$set('deletingDonorId', null)" class="w-full max-w-md border border-secondary-light! bg-white! dark:bg-secondary-dark!">
         <div class="space-y-4">
-            <flux:heading size="lg">{{ __('Delete this donor?') }}</flux:heading>
-            <flux:subheading>{{ __('Only a donor holding no funding agreement can be deleted.') }}</flux:subheading>
+            <flux:heading size="lg">{{ __('donors.delete_this_donor') }}</flux:heading>
+            <flux:subheading>{{ __('donors.only_a_donor_holding_no_funding_agreement_can_be_deleted') }}</flux:subheading>
             <div class="flex justify-end gap-2 border-t border-secondary-soft pt-4 dark:border-secondary-medium">
-                <x-ui.button type="button" wire:click="$set('deletingDonorId', null)">{{ __('Cancel') }}</x-ui.button>
-                <x-ui.button type="button" tone="primary" wire:click="deleteDonor" data-test="confirm-delete-donor">{{ __('Delete donor') }}</x-ui.button>
+                <x-ui.button type="button" wire:click="$set('deletingDonorId', null)">{{ __('common.cancel') }}</x-ui.button>
+                <x-ui.button type="button" tone="primary" wire:click="deleteDonor" data-test="confirm-delete-donor">{{ __('donors.delete_donor') }}</x-ui.button>
             </div>
         </div>
     </flux:modal>

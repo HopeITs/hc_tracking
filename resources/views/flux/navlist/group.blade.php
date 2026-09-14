@@ -17,7 +17,7 @@
     >
         <div class="ps-3 pe-4">
             <flux:icon.chevron-down class="hidden size-3! group-data-open/disclosure-button:block" />
-            <flux:icon.chevron-right class="block size-3! group-data-open/disclosure-button:hidden" />
+            <flux:icon.chevron-right class="block size-3! group-data-open/disclosure-button:hidden rtl:-scale-x-100" />
         </div>
 
         <span class="text-sm font-medium leading-none">{{ $heading }}</span>

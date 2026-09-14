@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Enums\Concerns\HasTranslatedLabel;
+
 /**
  * Whether a milestone was reached, and if not, why it is no longer pending.
  *
@@ -12,6 +14,8 @@ namespace App\Enums;
  */
 enum MilestoneStatus: string
 {
+    use HasTranslatedLabel;
+
     case Pending = 'pending';
     case Reached = 'reached';
     case Missed = 'missed';

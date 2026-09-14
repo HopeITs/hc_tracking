@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Enums\Concerns\HasTranslatedLabel;
+
 /**
  * How urgently a task needs to be picked up.
  *
@@ -12,6 +14,8 @@ namespace App\Enums;
  */
 enum TaskPriority: string
 {
+    use HasTranslatedLabel;
+
     case Low = 'low';
     case Medium = 'medium';
     case High = 'high';

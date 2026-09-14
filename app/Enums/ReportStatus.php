@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Enums\Concerns\HasTranslatedLabel;
+
 /**
  * The review states a narrative report moves through.
  *
@@ -23,6 +25,8 @@ namespace App\Enums;
  */
 enum ReportStatus: string
 {
+    use HasTranslatedLabel;
+
     case Draft = 'draft';
     case Reviewed = 'reviewed';
     case Approved = 'approved';

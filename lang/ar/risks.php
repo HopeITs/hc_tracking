@@ -1,0 +1,26 @@
+<?php
+
+return [
+    'all_risks' => 'كل المخاطر',
+    'count_matching_risk' => '{0} لا توجد مخاطر مطابقة|{1} خطر واحد مطابق|{2} خطران مطابقان|[3,10] :count مخاطر مطابقة|[11,*] :count خطرًا مطابقًا',
+    'delete_risk' => 'حذف الخطر',
+    'delete_this_risk' => 'حذف هذا الخطر؟',
+    'describe_what_happens_if_this_risk_materialises' => 'صف ما يحدث إذا تحقق هذا الخطر.',
+    'edit_risk' => 'تعديل الخطر',
+    'enter_a_short_risk_name' => 'أدخل اسمًا قصيرًا للخطر.',
+    'log_risk' => 'تسجيل خطر',
+    'log_the_first_risk_against_a_project' => 'سجّل أول خطر على مشروع.',
+    'no_matching_risks' => 'لا توجد مخاطر مطابقة',
+    'record_what_could_go_wrong_what_it_would_cost_and_how_it_is' => 'سجّل ما قد يسوء، وتكلفته، وكيفية التخفيف منه.',
+    'risk_deleted' => 'تم حذف الخطر.',
+    'risk_impact_or_project' => 'الخطر أو الأثر أو المشروع',
+    'risk_logged' => 'تم تسجيل الخطر.',
+    'risk_name' => 'اسم الخطر',
+    'risk_updated' => 'تم تحديث الخطر.',
+    'risks_logged_against_delivery_projects_materialised_first' => 'المخاطر المسجلة على مشاريع التنفيذ، والمتحققة منها أولًا.',
+    'search_risks' => 'البحث في المخاطر',
+    'select_the_project_this_risk_affects' => 'اختر المشروع الذي يؤثر عليه هذا الخطر.',
+    'the_risk_and_its_mitigation_notes_are_removed_nothing_else_i' => 'سيُحذف الخطر وملاحظات التخفيف الخاصة به. لن يتأثر أي شيء آخر.',
+    'the_selected_project_is_no_longer_available' => 'المشروع المحدد لم يعد متاحًا.',
+    'this_risk_has_materialised' => 'تحقق هذا الخطر',
+];

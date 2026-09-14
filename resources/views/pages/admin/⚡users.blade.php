@@ -15,7 +15,7 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('User directory')] class extends Component {
+new #[Title('titles.user_directory')] class extends Component {
     use WithPagination;
 
     #[Url(except: '')]
@@ -150,8 +150,8 @@ new #[Title('User directory')] class extends Component {
             $validated = $this->validate([
                 'selectedRole' => ['required', Rule::enum(UserRole::class)],
             ], [
-                'selectedRole.required' => __('Select a role.'),
-                'selectedRole.enum' => __('Select a valid role.'),
+                'selectedRole.required' => __('users.select_a_role'),
+                'selectedRole.enum' => __('users.select_a_valid_role'),
             ]);
 
             $user->forceFill(['role' => UserRole::from($validated['selectedRole'])])->save();
@@ -159,7 +159,7 @@ new #[Title('User directory')] class extends Component {
             $this->showUserModal = false;
             $this->resetUserForm();
 
-            Flux::toast(variant: 'success', text: __('User updated.'));
+            Flux::toast(variant: 'success', text: __('users.user_updated'));
 
             return;
         }
@@ -170,16 +170,16 @@ new #[Title('User directory')] class extends Component {
             'hrUserId' => ['required', 'integer', Rule::exists(HrUser::class, 'id')],
             'selectedRole' => ['required', Rule::enum(UserRole::class)],
         ], [
-            'hrUserId.required' => __('Select an HR account.'),
-            'hrUserId.exists' => __('The selected HR account is no longer available.'),
-            'selectedRole.required' => __('Select a role.'),
-            'selectedRole.enum' => __('Select a valid role.'),
+            'hrUserId.required' => __('users.select_an_hr_account_2'),
+            'hrUserId.exists' => __('users.the_selected_hr_account_is_no_longer_available'),
+            'selectedRole.required' => __('users.select_a_role'),
+            'selectedRole.enum' => __('users.select_a_valid_role'),
         ]);
 
         $hrUser = HrUser::query()->with('employee')->findOrFail((int) $validated['hrUserId']);
 
         if (User::query()->where('email', $hrUser->email)->exists()) {
-            $this->addError('hrUserId', __('This HR account already has access.'));
+            $this->addError('hrUserId', __('users.this_hr_account_already_has_access'));
 
             return;
         }
@@ -189,7 +189,7 @@ new #[Title('User directory')] class extends Component {
         $this->showUserModal = false;
         $this->resetUserForm();
 
-        Flux::toast(variant: 'success', text: __('User created.'));
+        Flux::toast(variant: 'success', text: __('users.user_created'));
     }
 
     public function confirmUserDeletion(int $userId): void
@@ -217,7 +217,7 @@ new #[Title('User directory')] class extends Component {
                 throw $exception;
             }
 
-            $this->deleteError = __('This user is linked to operational records and cannot be deleted. Reassign those records first.');
+            $this->deleteError = __('users.this_user_is_linked_to_operational_records_and_cannot_be_del');
 
             return;
         }
@@ -227,7 +227,7 @@ new #[Title('User directory')] class extends Component {
         $this->deletingUserName = '';
         $this->deleteError = null;
 
-        Flux::toast(variant: 'success', text: __('User deleted.'));
+        Flux::toast(variant: 'success', text: __('users.user_deleted'));
     }
 
     public function closeUserModal(): void
@@ -277,28 +277,28 @@ new #[Title('User directory')] class extends Component {
     <div class="flex flex-col gap-3 border-b border-secondary-soft pb-4 dark:border-secondary-medium @4xl/directory:flex-row @4xl/directory:items-end">
         <div class="min-w-40 @4xl/directory:me-auto">
             <div class="flex items-center gap-2">
-                <flux:heading id="user-directory-heading" size="lg">{{ __('Users') }}</flux:heading>
+                <flux:heading id="user-directory-heading" size="lg">{{ __('users.users') }}</flux:heading>
                 <span class="inline-flex min-w-7 items-center justify-center rounded-md border border-secondary-light px-2 py-0.5 text-xs font-semibold text-secondary-medium dark:border-secondary-light dark:text-secondary-soft">
                     {{ $this->users->total() }}
                 </span>
             </div>
-            <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('Manage staff accounts and access roles.') }}</p>
+            <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('users.manage_staff_accounts_and_access_roles') }}</p>
         </div>
 
         <div class="grid w-full gap-2 @sm/directory:grid-cols-[minmax(12rem,1fr)_minmax(9rem,11rem)_auto] @4xl/directory:max-w-[46rem]">
             <flux:input
                 type="search"
                 icon="magnifying-glass"
-                :label="__('Search users')"
-                :placeholder="__('Name or email')"
+                :label="__('users.search_users')"
+                :placeholder="__('users.name_or_email')"
                 :class="$controlClasses"
                 wire:model.live.debounce.300ms="search"
                 clearable
             />
 
-            <flux:select :label="__('Role')" :class="$controlClasses" wire:model.live="role">
+            <flux:select :label="__('users.role')" :class="$controlClasses" wire:model.live="role">
                 <flux:select.option value="" class="text-secondary-dark! hover:bg-secondary-soft! dark:bg-secondary-dark! dark:text-white! dark:hover:bg-secondary-medium!">
-                    {{ __('All roles') }}
+                    {{ __('users.all_roles') }}
                 </flux:select.option>
                 @foreach ($this->roleOptions as $roleOption)
                     <flux:select.option
@@ -306,7 +306,7 @@ new #[Title('User directory')] class extends Component {
                         :wire:key="'role-filter-'.$roleOption->value"
                         class="text-secondary-dark! hover:bg-secondary-soft! dark:bg-secondary-dark! dark:text-white! dark:hover:bg-secondary-medium!"
                     >
-                        {{ $roleOption->value }}
+                        {{ $roleOption->label() }}
                     </flux:select.option>
                 @endforeach
             </flux:select>
@@ -318,7 +318,7 @@ new #[Title('User directory')] class extends Component {
                 wire:click="openCreateModal"
                 data-test="create-user-button"
             >
-                {{ __('Add user') }}
+                {{ __('users.add_user') }}
             </flux:button>
         </div>
     </div>
@@ -326,13 +326,13 @@ new #[Title('User directory')] class extends Component {
     <div class="overflow-hidden rounded-lg border border-secondary-light bg-white dark:border-secondary-medium dark:bg-secondary-dark">
         <div class="flex min-h-10 flex-wrap items-center justify-between gap-2 border-b border-secondary-soft bg-white px-3.5 py-2 dark:border-secondary-medium dark:bg-secondary-dark">
             <p class="text-xs font-semibold text-secondary-medium dark:text-secondary-soft">
-                {{ trans_choice('{1} :count matching user|[2,*] :count matching users', $this->users->total(), ['count' => $this->users->total()]) }}
+                {{ trans_choice('users.count_matching_user', $this->users->total(), ['count' => $this->users->total()]) }}
             </p>
 
             <div class="flex items-center gap-2">
                 <span wire:loading.delay.flex wire:target="search,role,clearFilters" class="hidden items-center gap-1.5 text-xs text-secondary-medium dark:text-secondary-soft">
                     <flux:icon.arrow-path class="size-3.5 animate-spin" />
-                    {{ __('Updating') }}
+                    {{ __('common.updating') }}
                 </span>
 
                 @if ($search !== '' || $role !== '')
@@ -342,7 +342,7 @@ new #[Title('User directory')] class extends Component {
                         class="text-secondary-medium! hover:bg-secondary-soft! hover:text-secondary-dark! dark:text-secondary-soft! dark:hover:bg-secondary-medium! dark:hover:text-white!"
                         wire:click="clearFilters"
                     >
-                        {{ __('Reset filters') }}
+                        {{ __('common.reset_filters') }}
                     </flux:button>
                 @endif
             </div>
@@ -354,11 +354,11 @@ new #[Title('User directory')] class extends Component {
                     <flux:icon.users class="size-5" />
                 </div>
                 <div class="space-y-1">
-                    <flux:heading size="base">{{ __('No matching users') }}</flux:heading>
-                    <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('Change the search or role filter and try again.') }}</p>
+                    <flux:heading size="base">{{ __('users.no_matching_users') }}</flux:heading>
+                    <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('users.change_the_search_or_role_filter_and_try_again') }}</p>
                 </div>
                 <flux:button size="sm" :class="$secondaryButtonClasses" wire:click="clearFilters">
-                    {{ __('Reset filters') }}
+                    {{ __('common.reset_filters') }}
                 </flux:button>
             </div>
         @else
@@ -375,16 +375,16 @@ new #[Title('User directory')] class extends Component {
                             </div>
 
                             <span class="inline-flex shrink-0 rounded-md border px-2 py-1 text-xs font-semibold {{ $roleBadgeClasses($user->role) }}">
-                                {{ $user->role->value }}
+                                {{ $user->role->label() }}
                             </span>
                         </div>
 
                         <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-secondary-medium dark:text-secondary-soft">
                             <span class="inline-flex items-center gap-1.5">
                                 <span class="size-1.5 rounded-full {{ $user->email_verified_at ? 'bg-primary' : 'bg-secondary-light' }}"></span>
-                                {{ $user->email_verified_at ? __('Verified') : __('Pending verification') }}
+                                {{ $user->email_verified_at ? __('users.verified') : __('users.pending_verification') }}
                             </span>
-                            <span>{{ __('Joined :date', ['date' => $user->created_at?->format('M j, Y')]) }}</span>
+                            <span>{{ __('users.joined_date', ['date' => $user->created_at?->translatedFormat(__('formats.date'))]) }}</span>
                         </div>
 
                         <div class="flex min-h-11 items-center justify-end gap-2 border-t border-secondary-soft pt-2.5 dark:border-secondary-medium">
@@ -395,7 +395,7 @@ new #[Title('User directory')] class extends Component {
                                         icon="pencil-square"
                                         :class="$editButtonClasses.' size-11! touch-manipulation'"
                                         wire:click="openEditModal({{ $user->id }})"
-                                        :aria-label="__('Edit :name', ['name' => $user->name])"
+                                        :aria-label="__('common.edit_name', ['name' => $user->name])"
                                     />
                                 @endcan
 
@@ -405,12 +405,12 @@ new #[Title('User directory')] class extends Component {
                                         icon="trash"
                                         :class="$deleteButtonClasses.' size-11! touch-manipulation'"
                                         wire:click="confirmUserDeletion({{ $user->id }})"
-                                        :aria-label="__('Delete :name', ['name' => $user->name])"
+                                        :aria-label="__('common.delete_name', ['name' => $user->name])"
                                     />
                                 @endcan
                             @else
                                 <span class="rounded-md border border-secondary-light bg-secondary-soft px-2 py-1 text-xs font-medium text-secondary-dark">
-                                    {{ __('Current account') }}
+                                    {{ __('users.current_account') }}
                                 </span>
                             @endcanany
                         </div>
@@ -421,11 +421,11 @@ new #[Title('User directory')] class extends Component {
             <div class="hidden @4xl/directory:block">
                 <flux:table class="table-fixed [&_[data-flux-cell]]:px-3.5! [&_[data-flux-cell]]:py-2! [&_[data-flux-column]]:px-3.5! [&_[data-flux-column]]:py-2.5! [&_tbody_tr]:transition-colors [&_tbody_tr]:hover:bg-secondary-soft dark:[&_tbody_tr]:hover:bg-secondary-medium">
                     <flux:table.columns class="bg-secondary-soft text-xs font-semibold dark:bg-secondary-medium">
-                        <flux:table.column class="w-[40%]">{{ __('User') }}</flux:table.column>
-                        <flux:table.column class="w-[15%]" align="center">{{ __('Role') }}</flux:table.column>
-                        <flux:table.column class="w-[15%]" align="center">{{ __('Access') }}</flux:table.column>
-                        <flux:table.column class="w-[18%]" align="center">{{ __('Joined') }}</flux:table.column>
-                        <flux:table.column class="w-[12%]" align="center">{{ __('Actions') }}</flux:table.column>
+                        <flux:table.column class="w-[40%]">{{ __('users.user') }}</flux:table.column>
+                        <flux:table.column class="w-[15%]" align="center">{{ __('users.role') }}</flux:table.column>
+                        <flux:table.column class="w-[15%]" align="center">{{ __('users.access') }}</flux:table.column>
+                        <flux:table.column class="w-[18%]" align="center">{{ __('users.joined') }}</flux:table.column>
+                        <flux:table.column class="w-[12%]" align="center">{{ __('common.actions') }}</flux:table.column>
                     </flux:table.columns>
 
                     <flux:table.rows>
@@ -442,16 +442,16 @@ new #[Title('User directory')] class extends Component {
                                 </flux:table.cell>
                                 <flux:table.cell align="center">
                                     <span class="inline-flex rounded-md border px-2 py-1 text-xs font-semibold {{ $roleBadgeClasses($user->role) }}">
-                                        {{ $user->role->value }}
+                                        {{ $user->role->label() }}
                                     </span>
                                 </flux:table.cell>
                                 <flux:table.cell align="center">
                                     <span class="inline-flex items-center gap-1.5 text-xs font-medium text-secondary-medium dark:text-secondary-soft">
                                         <span class="size-1.5 rounded-full {{ $user->email_verified_at ? 'bg-primary' : 'bg-secondary-light' }}"></span>
-                                        {{ $user->email_verified_at ? __('Verified') : __('Pending') }}
+                                        {{ $user->email_verified_at ? __('users.verified') : __('users.pending') }}
                                     </span>
                                 </flux:table.cell>
-                                <flux:table.cell align="center">{{ $user->created_at?->format('M j, Y') }}</flux:table.cell>
+                                <flux:table.cell align="center">{{ $user->created_at?->translatedFormat(__('formats.date')) }}</flux:table.cell>
                                 <flux:table.cell align="center">
                                     @canany(['update', 'delete'], $user)
                                         <div class="inline-flex items-center justify-center gap-1">
@@ -461,7 +461,7 @@ new #[Title('User directory')] class extends Component {
                                                     icon="pencil-square"
                                                     :class="$editButtonClasses.' size-8!'"
                                                     wire:click="openEditModal({{ $user->id }})"
-                                                    :aria-label="__('Edit :name', ['name' => $user->name])"
+                                                    :aria-label="__('common.edit_name', ['name' => $user->name])"
                                                 />
                                             @endcan
 
@@ -471,13 +471,13 @@ new #[Title('User directory')] class extends Component {
                                                     icon="trash"
                                                     :class="$deleteButtonClasses.' size-8!'"
                                                     wire:click="confirmUserDeletion({{ $user->id }})"
-                                                    :aria-label="__('Delete :name', ['name' => $user->name])"
+                                                    :aria-label="__('common.delete_name', ['name' => $user->name])"
                                                 />
                                             @endcan
                                         </div>
                                     @else
                                         <span class="rounded-md border border-secondary-light bg-secondary-soft px-2 py-1 text-xs font-medium text-secondary-dark">
-                                            {{ __('Current account') }}
+                                            {{ __('users.current_account') }}
                                         </span>
                                     @endcanany
                                 </flux:table.cell>
@@ -504,50 +504,50 @@ new #[Title('User directory')] class extends Component {
         <form wire:submit="saveUser" class="space-y-5">
             <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
                 <flux:heading size="lg">
-                    {{ $editingUserId === null ? __('Add user') : __('Edit user') }}
+                    {{ $editingUserId === null ? __('users.add_user') : __('users.edit_user') }}
                 </flux:heading>
                 <flux:subheading>
                     {{ $editingUserId === null
-                        ? __('Give an HR system account access and choose its role. People log in with their HR password.')
-                        : __('Change this person\'s access role. Name, email and password are managed in the HR system.') }}
+                        ? __('users.give_an_hr_system_account_access_and_choose_its_role_people')
+                        : __('users.change_this_person_s_access_role_name_email_and_password_are') }}
                 </flux:subheading>
             </div>
 
             <div class="grid gap-4 @md/directory:grid-cols-2">
                 @if ($editingUserId === null)
                     <div class="@md/directory:col-span-2">
-                        <flux:select wire:model="hrUserId" :class="$controlClasses" :label="__('HR account')" required>
-                            <flux:select.option value="">{{ __('Select an HR account') }}</flux:select.option>
+                        <flux:select wire:model="hrUserId" :class="$controlClasses" :label="__('users.hr_account')" required>
+                            <flux:select.option value="">{{ __('users.select_an_hr_account') }}</flux:select.option>
                             @foreach ($this->hrAccountOptions as $hrAccountOption)
                                 <flux:select.option :value="$hrAccountOption->id" :wire:key="'hr-account-option-'.$hrAccountOption->id">
-                                    {{ $hrAccountOption->email }}@if ($hrAccountOption->employee) · {{ $hrAccountOption->employee->name_en }} · {{ $hrAccountOption->employee->name_ar }}@endif
+                                    {{ $hrAccountOption->email }}@if ($hrAccountOption->employee) · {{ $hrAccountOption->employee->name }} · {{ $hrAccountOption->employee->secondary_name }}@endif
                                 </flux:select.option>
                             @endforeach
                         </flux:select>
                     </div>
                 @else
-                    <flux:input wire:model="editingUserName" :class="$controlClasses" :label="__('Name')" type="text" readonly />
-                    <flux:input wire:model="editingUserEmail" :class="$controlClasses" :label="__('Email')" type="email" readonly />
+                    <flux:input wire:model="editingUserName" :class="$controlClasses" :label="__('common.name')" type="text" readonly />
+                    <flux:input wire:model="editingUserEmail" :class="$controlClasses" :label="__('common.email')" type="email" readonly />
                 @endif
 
                 <div class="@md/directory:col-span-2">
-                    <flux:select wire:model="selectedRole" :class="$controlClasses" :label="__('Role')" required>
+                    <flux:select wire:model="selectedRole" :class="$controlClasses" :label="__('users.role')" required>
                         @foreach ($this->roleOptions as $roleOption)
                             <flux:select.option
                                 :value="$roleOption->value"
                                 :wire:key="'role-option-'.$roleOption->value"
                                 class="text-secondary-dark! hover:bg-secondary-soft! dark:bg-secondary-dark! dark:text-white! dark:hover:bg-secondary-medium!"
                             >
-                                {{ $roleOption->value }}
+                                {{ $roleOption->label() }}
                             </flux:select.option>
                         @endforeach
                     </flux:select>
                     <p class="pt-1.5 text-xs text-secondary-medium dark:text-secondary-soft">
                         {{ match (UserRole::tryFrom($selectedRole)) {
-                            UserRole::Admin => __('Full administrative access, including user management.'),
-                            UserRole::Manager => __('Management access for programmes, plans, and delivery oversight.'),
-                            UserRole::Meal => __('Monitoring, evaluation, accountability, and learning access.'),
-                            default => __('Operational access for assigned projects, tasks, and reports.'),
+                            UserRole::Admin => __('users.full_administrative_access_including_user_management'),
+                            UserRole::Manager => __('users.management_access_for_programmes_plans_and_delivery_oversigh'),
+                            UserRole::Meal => __('users.monitoring_evaluation_accountability_and_learning_access'),
+                            default => __('users.operational_access_for_assigned_projects_tasks_and_reports'),
                         } }}
                     </p>
                 </div>
@@ -556,10 +556,10 @@ new #[Title('User directory')] class extends Component {
 
             <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
                 <flux:button type="button" variant="filled" :class="$secondaryButtonClasses.' min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto'" wire:click="closeUserModal">
-                    {{ __('Cancel') }}
+                    {{ __('common.cancel') }}
                 </flux:button>
                 <flux:button type="submit" variant="primary" :class="$primaryButtonClasses.' min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto'" data-test="save-user-button">
-                    {{ $editingUserId === null ? __('Create user') : __('Save changes') }}
+                    {{ $editingUserId === null ? __('users.create_user') : __('common.save_changes') }}
                 </flux:button>
             </div>
         </form>
@@ -575,26 +575,26 @@ new #[Title('User directory')] class extends Component {
                     <flux:icon.trash class="size-5" />
                 </div>
                 <div>
-                    <flux:heading size="lg">{{ __('Delete user?') }}</flux:heading>
+                    <flux:heading size="lg">{{ __('users.delete_user_2') }}</flux:heading>
                     <flux:subheading>
-                        {{ __('Permanently delete :name. This action cannot be undone.', ['name' => $deletingUserName]) }}
+                        {{ __('users.permanently_delete_name_this_action_cannot_be_undone', ['name' => $deletingUserName]) }}
                     </flux:subheading>
                 </div>
             </div>
 
             @if ($deleteError)
                 <div class="rounded-lg border border-primary bg-white p-3 text-sm text-primary dark:bg-primary dark:text-white" role="alert">
-                    <p class="font-semibold">{{ __('Unable to delete user') }}</p>
+                    <p class="font-semibold">{{ __('users.unable_to_delete_user') }}</p>
                     <p>{{ $deleteError }}</p>
                 </div>
             @endif
 
             <div class="grid grid-cols-2 gap-2 sm:flex sm:justify-end">
                 <flux:button type="button" variant="filled" :class="$secondaryButtonClasses.' min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto'" wire:click="closeDeleteModal">
-                    {{ __('Cancel') }}
+                    {{ __('common.cancel') }}
                 </flux:button>
                 <flux:button type="submit" :class="$primaryButtonClasses.' min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto'" data-test="confirm-delete-user-button">
-                    {{ __('Delete user') }}
+                    {{ __('users.delete_user') }}
                 </flux:button>
             </div>
         </form>

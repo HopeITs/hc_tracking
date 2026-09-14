@@ -62,9 +62,9 @@
 @endphp
 
 @if ($case === null)
-    <span {{ $attributes->class('text-secondary-light') }} aria-label="{{ __('Not set') }}">—</span>
+    <span {{ $attributes->class('text-secondary-light') }} aria-label="{{ __('ui.not_set') }}">—</span>
 @else
     <span {{ $attributes->class('inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold whitespace-nowrap '.$toneClasses) }}>
-        {{ \Illuminate\Support\Str::title($case->value) }}
+        {{ $case->label() }}
     </span>
 @endif

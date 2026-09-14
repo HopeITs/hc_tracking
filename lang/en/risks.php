@@ -1,0 +1,26 @@
+<?php
+
+return [
+    'all_risks' => 'All risks',
+    'count_matching_risk' => '{1} :count matching risk|[2,*] :count matching risks',
+    'delete_risk' => 'Delete risk',
+    'delete_this_risk' => 'Delete this risk?',
+    'describe_what_happens_if_this_risk_materialises' => 'Describe what happens if this risk materialises.',
+    'edit_risk' => 'Edit risk',
+    'enter_a_short_risk_name' => 'Enter a short risk name.',
+    'log_risk' => 'Log risk',
+    'log_the_first_risk_against_a_project' => 'Log the first risk against a project.',
+    'no_matching_risks' => 'No matching risks',
+    'record_what_could_go_wrong_what_it_would_cost_and_how_it_is' => 'Record what could go wrong, what it would cost, and how it is mitigated.',
+    'risk_deleted' => 'Risk deleted.',
+    'risk_impact_or_project' => 'Risk, impact, or project',
+    'risk_logged' => 'Risk logged.',
+    'risk_name' => 'Risk name',
+    'risk_updated' => 'Risk updated.',
+    'risks_logged_against_delivery_projects_materialised_first' => 'Risks logged against delivery projects, materialised first.',
+    'search_risks' => 'Search risks',
+    'select_the_project_this_risk_affects' => 'Select the project this risk affects.',
+    'the_risk_and_its_mitigation_notes_are_removed_nothing_else_i' => 'The risk and its mitigation notes are removed. Nothing else is affected.',
+    'the_selected_project_is_no_longer_available' => 'The selected project is no longer available.',
+    'this_risk_has_materialised' => 'This risk has materialised',
+];

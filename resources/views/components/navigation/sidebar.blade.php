@@ -6,7 +6,7 @@
 <flux:sidebar
     sticky
     collapsible="mobile"
-    aria-label="{{ __('Application navigation') }}"
+    aria-label="{{ __('navigation.application_navigation') }}"
     data-navigation-sidebar
     x-on:keydown.escape.window="if (window.matchMedia('(max-width: 63.999rem)').matches && ! $el.hasAttribute('data-flux-sidebar-collapsed-mobile')) { $dispatch('flux-sidebar-toggle') }"
     class="gap-3! border-e border-secondary-medium bg-secondary-dark p-3! text-white duration-200 ease-out motion-reduce:duration-0 motion-reduce:transition-none max-lg:w-[min(18rem,calc(100vw_-_2.75rem))]! max-lg:shadow-2xl lg:w-[clamp(16rem,18vw,18rem)]!"
@@ -19,15 +19,50 @@
             wire:navigate
         />
 
+        <div class="ms-auto flex shrink-0 items-center gap-1" data-sidebar-preferences>
+            <flux:button
+                x-data
+                x-on:click="$flux.dark = ! $flux.dark"
+                variant="ghost"
+                size="sm"
+                square
+                class="size-9! touch-manipulation text-secondary-soft! hover:bg-white/10! hover:text-white! max-lg:size-11!"
+                :aria-label="__('navigation.toggle_theme')"
+                :tooltip="__('navigation.toggle_theme')"
+                data-theme-toggle
+            >
+                <flux:icon.moon x-show="! $flux.dark" variant="mini" />
+                <flux:icon.sun x-show="$flux.dark" x-cloak variant="mini" />
+            </flux:button>
+
+            @php($otherLocale = \App\Enums\Locale::current()->other())
+            <form method="POST" action="{{ route('locale.update') }}" class="contents">
+                @csrf
+                <input type="hidden" name="locale" value="{{ $otherLocale->value }}">
+                <flux:button
+                    type="submit"
+                    variant="ghost"
+                    size="sm"
+                    square
+                    class="size-9! touch-manipulation text-sm! font-semibold! text-secondary-soft! hover:bg-white/10! hover:text-white! max-lg:size-11!"
+                    :aria-label="__('navigation.switch_language')"
+                    :tooltip="__('navigation.switch_language')"
+                    data-locale-toggle
+                >
+                    <span lang="{{ $otherLocale->value }}">{{ $otherLocale === \App\Enums\Locale::Arabic ? 'ع' : 'EN' }}</span>
+                </flux:button>
+            </form>
+        </div>
+
         <flux:sidebar.collapse
             class="size-11! touch-manipulation text-secondary-soft lg:hidden"
             data-mobile-navigation-close
         />
     </flux:sidebar.header>
 
-    <flux:sidebar.nav aria-label="{{ __('Primary navigation') }}" class="min-h-0 flex-1 gap-3 overflow-y-auto">
+    <flux:sidebar.nav aria-label="{{ __('navigation.primary_navigation') }}" class="min-h-0 flex-1 gap-3 overflow-y-auto">
         <flux:sidebar.group
-            :heading="__('Overview')"
+            :heading="__('navigation.overview')"
             :class="$navigationGroupClasses"
         >
             <flux:sidebar.item
@@ -37,7 +72,7 @@
                 :class="$navigationItemClasses"
                 wire:navigate
             >
-                {{ __('Dashboard') }}
+                {{ __('common.dashboard') }}
             </flux:sidebar.item>
 
             <flux:sidebar.item
@@ -47,12 +82,12 @@
                 :class="$navigationItemClasses"
                 wire:navigate
             >
-                {{ __('Executive Summary') }}
+                {{ __('common.executive_summary') }}
             </flux:sidebar.item>
         </flux:sidebar.group>
 
         <flux:sidebar.group
-            :heading="__('Strategy')"
+            :heading="__('common.strategy')"
             :class="$navigationGroupClasses"
         >
             <flux:sidebar.item
@@ -62,7 +97,7 @@
                 :class="$navigationItemClasses"
                 wire:navigate
             >
-                {{ __('Strategies') }}
+                {{ __('common.strategies') }}
             </flux:sidebar.item>
 
             <flux:sidebar.item
@@ -72,7 +107,7 @@
                 :class="$navigationItemClasses"
                 wire:navigate
             >
-                {{ __('Programs') }}
+                {{ __('common.programs') }}
             </flux:sidebar.item>
 
             <flux:sidebar.item
@@ -82,12 +117,12 @@
                 :class="$navigationItemClasses"
                 wire:navigate
             >
-                {{ __('Annual Plans') }}
+                {{ __('common.annual_plans') }}
             </flux:sidebar.item>
         </flux:sidebar.group>
 
         <flux:sidebar.group
-            :heading="__('Delivery')"
+            :heading="__('common.delivery')"
             :class="$navigationGroupClasses"
         >
             <flux:sidebar.item
@@ -97,7 +132,7 @@
                 :class="$navigationItemClasses"
                 wire:navigate
             >
-                {{ __('Projects') }}
+                {{ __('common.projects') }}
             </flux:sidebar.item>
 
             <flux:sidebar.item
@@ -107,7 +142,7 @@
                 :class="$navigationItemClasses"
                 wire:navigate
             >
-                {{ __('Milestones') }}
+                {{ __('common.milestones') }}
             </flux:sidebar.item>
 
             <flux:sidebar.item
@@ -117,7 +152,7 @@
                 :class="$navigationItemClasses"
                 wire:navigate
             >
-                {{ __('Tasks') }}
+                {{ __('common.tasks') }}
             </flux:sidebar.item>
 
             <flux:sidebar.item
@@ -127,12 +162,12 @@
                 :class="$navigationItemClasses"
                 wire:navigate
             >
-                {{ __('Risks') }}
+                {{ __('common.risks') }}
             </flux:sidebar.item>
         </flux:sidebar.group>
 
         <flux:sidebar.group
-            :heading="__('Results & Learning')"
+            :heading="__('navigation.results_learning')"
             :class="$navigationGroupClasses"
         >
             <flux:sidebar.item
@@ -142,7 +177,7 @@
                 :class="$navigationItemClasses"
                 wire:navigate
             >
-                {{ __('Results Framework') }}
+                {{ __('common.results_framework') }}
             </flux:sidebar.item>
 
             <flux:sidebar.item
@@ -152,7 +187,7 @@
                 :class="$navigationItemClasses"
                 wire:navigate
             >
-                {{ __('Indicators') }}
+                {{ __('common.indicators') }}
             </flux:sidebar.item>
 
             <flux:sidebar.item
@@ -162,7 +197,7 @@
                 :class="$navigationItemClasses"
                 wire:navigate
             >
-                {{ __('Targets') }}
+                {{ __('common.targets') }}
             </flux:sidebar.item>
 
             <flux:sidebar.item
@@ -172,12 +207,12 @@
                 :class="$navigationItemClasses"
                 wire:navigate
             >
-                {{ __('Reports') }}
+                {{ __('common.reports') }}
             </flux:sidebar.item>
         </flux:sidebar.group>
 
         <flux:sidebar.group
-            :heading="__('Funding')"
+            :heading="__('common.funding')"
             :class="$navigationGroupClasses"
         >
             <flux:sidebar.item
@@ -187,7 +222,7 @@
                 :class="$navigationItemClasses"
                 wire:navigate
             >
-                {{ __('Proposals') }}
+                {{ __('common.proposals') }}
             </flux:sidebar.item>
 
             <flux:sidebar.item
@@ -197,7 +232,7 @@
                 :class="$navigationItemClasses"
                 wire:navigate
             >
-                {{ __('Donors') }}
+                {{ __('common.donors') }}
             </flux:sidebar.item>
 
             <flux:sidebar.item
@@ -207,22 +242,22 @@
                 :class="$navigationItemClasses"
                 wire:navigate
             >
-                {{ __('Funding Agreements') }}
+                {{ __('common.funding_agreements') }}
             </flux:sidebar.item>
 
             <flux:sidebar.item
                 icon="arrow-right-circle"
                 :href="route('transfers.index')"
                 :current="request()->routeIs('transfers.*')"
-                :class="$navigationItemClasses"
+                :class="$navigationItemClasses.' rtl:[&_svg]:-scale-x-100'"
                 wire:navigate
             >
-                {{ __('Transfers') }}
+                {{ __('common.transfers') }}
             </flux:sidebar.item>
         </flux:sidebar.group>
 
         <flux:sidebar.group
-            :heading="__('Administration')"
+            :heading="__('navigation.administration')"
             :class="$navigationGroupClasses"
         >
             <flux:sidebar.item
@@ -232,7 +267,7 @@
                 :class="$navigationItemClasses"
                 wire:navigate
             >
-                {{ __('Accounts') }}
+                {{ __('common.accounts') }}
             </flux:sidebar.item>
 
             <flux:sidebar.item
@@ -242,7 +277,7 @@
                 :class="$navigationItemClasses"
                 wire:navigate
             >
-                {{ __('Cities') }}
+                {{ __('common.cities') }}
             </flux:sidebar.item>
 
             @if (auth()->user()?->getRawOriginal('role') !== null)
@@ -254,14 +289,14 @@
                         :class="$navigationItemClasses"
                         wire:navigate
                     >
-                        {{ __('User directory') }}
+                        {{ __('navigation.user_directory') }}
                     </flux:sidebar.item>
                 @endcan
             @endif
         </flux:sidebar.group>
 
         <flux:sidebar.group
-            :heading="__('Settings')"
+            :heading="__('common.settings')"
             :class="$navigationGroupClasses"
         >
             <flux:sidebar.item
@@ -271,7 +306,7 @@
                 :class="$navigationItemClasses"
                 wire:navigate
             >
-                {{ __('Profile') }}
+                {{ __('common.profile') }}
             </flux:sidebar.item>
 
             <flux:sidebar.item
@@ -281,7 +316,7 @@
                 :class="$navigationItemClasses"
                 wire:navigate
             >
-                {{ __('Appearance') }}
+                {{ __('common.appearance') }}
             </flux:sidebar.item>
 
             <flux:sidebar.item
@@ -291,7 +326,7 @@
                 :class="$navigationItemClasses"
                 wire:navigate
             >
-                {{ __('Security') }}
+                {{ __('common.security') }}
             </flux:sidebar.item>
         </flux:sidebar.group>
     </flux:sidebar.nav>

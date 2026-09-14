@@ -6,7 +6,7 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
-new #[Title('Strategies')] class extends Component {
+new #[Title('titles.strategies')] class extends Component {
     /**
      * @return array{
      *     strategies: Collection<int, array{id: int, name: string, start_year: int, end_year: int, duration_years: int, status: string}>,
@@ -72,61 +72,61 @@ new #[Title('Strategies')] class extends Component {
     <header class="flex flex-col gap-3 border-b border-secondary-soft pb-5 dark:border-secondary-medium @3xl/strategies:flex-row @3xl/strategies:items-end @3xl/strategies:justify-between">
         <div class="max-w-3xl">
             <div class="flex items-center gap-2.5">
-                <flux:heading id="strategies-heading" size="xl">{{ __('Strategies') }}</flux:heading>
+                <flux:heading id="strategies-heading" size="xl">{{ __('common.strategies') }}</flux:heading>
                 <span class="inline-flex min-w-7 items-center justify-center rounded-md border border-secondary-light px-2 py-0.5 text-xs font-semibold text-secondary-medium dark:text-secondary-soft">
                     {{ $portfolio['total'] }}
                 </span>
             </div>
             <p class="mt-1 text-sm leading-6 text-secondary-medium dark:text-secondary-soft">
-                {{ __('A complete view of the strategic planning cycles that guide programme delivery.') }}
+                {{ __('strategies.a_complete_view_of_the_strategic_planning_cycles_that_guide') }}
             </p>
         </div>
 
         <div class="inline-flex w-fit items-center gap-2 rounded-md border border-secondary-soft px-3 py-2 text-xs font-semibold text-secondary-medium dark:border-secondary-medium dark:text-secondary-soft">
             <flux:icon.calendar class="size-4" />
-            {{ __('Planning year :year', ['year' => $portfolio['current_year']]) }}
+            {{ __('strategies.planning_year_year', ['year' => $portfolio['current_year']]) }}
         </div>
     </header>
 
-    <div class="grid grid-cols-2 gap-3 @3xl/strategies:grid-cols-4" aria-label="{{ __('Strategy portfolio summary') }}">
+    <div class="grid grid-cols-2 gap-3 @3xl/strategies:grid-cols-4" aria-label="{{ __('strategies.strategy_portfolio_summary') }}">
         <article class="rounded-lg border border-secondary-soft bg-white p-4 dark:border-secondary-medium dark:bg-secondary-dark">
-            <p class="text-xs font-semibold tracking-wide text-secondary-medium uppercase dark:text-secondary-soft">{{ __('Strategic periods') }}</p>
+            <p class="text-xs font-semibold tracking-wide text-secondary-medium uppercase dark:text-secondary-soft">{{ __('strategies.strategic_periods') }}</p>
             <p class="mt-2 text-2xl font-semibold tabular-nums text-secondary-dark dark:text-white">{{ $portfolio['total'] }}</p>
-            <p class="mt-1 text-xs text-secondary-medium dark:text-secondary-soft">{{ __('Complete portfolio') }}</p>
+            <p class="mt-1 text-xs text-secondary-medium dark:text-secondary-soft">{{ __('strategies.complete_portfolio') }}</p>
         </article>
 
         <article class="rounded-lg border border-secondary-soft bg-white p-4 dark:border-secondary-medium dark:bg-secondary-dark">
-            <p class="text-xs font-semibold tracking-wide text-secondary-medium uppercase dark:text-secondary-soft">{{ __('Active now') }}</p>
+            <p class="text-xs font-semibold tracking-wide text-secondary-medium uppercase dark:text-secondary-soft">{{ __('strategies.active_now') }}</p>
             <p class="mt-2 text-2xl font-semibold tabular-nums text-primary">{{ $portfolio['active_count'] }}</p>
             <p class="mt-1 text-xs text-secondary-medium dark:text-secondary-soft">
-                {{ trans_choice(':count current period|:count current periods', $portfolio['active_count'], ['count' => $portfolio['active_count']]) }}
+                {{ trans_choice('strategies.count_current_period', $portfolio['active_count'], ['count' => $portfolio['active_count']]) }}
             </p>
         </article>
 
         <article class="rounded-lg border border-secondary-soft bg-white p-4 dark:border-secondary-medium dark:bg-secondary-dark">
-            <p class="text-xs font-semibold tracking-wide text-secondary-medium uppercase dark:text-secondary-soft">{{ __('First period') }}</p>
+            <p class="text-xs font-semibold tracking-wide text-secondary-medium uppercase dark:text-secondary-soft">{{ __('strategies.first_period') }}</p>
             <p class="mt-2 text-2xl font-semibold tabular-nums text-secondary-dark dark:text-white">{{ $portfolio['first_year'] ?? '—' }}</p>
-            <p class="mt-1 text-xs text-secondary-medium dark:text-secondary-soft">{{ __('Portfolio starting year') }}</p>
+            <p class="mt-1 text-xs text-secondary-medium dark:text-secondary-soft">{{ __('strategies.portfolio_starting_year') }}</p>
         </article>
 
         <article class="rounded-lg border border-secondary-soft bg-white p-4 dark:border-secondary-medium dark:bg-secondary-dark">
-            <p class="text-xs font-semibold tracking-wide text-secondary-medium uppercase dark:text-secondary-soft">{{ __('Planning horizon') }}</p>
+            <p class="text-xs font-semibold tracking-wide text-secondary-medium uppercase dark:text-secondary-soft">{{ __('strategies.planning_horizon') }}</p>
             <p class="mt-2 text-2xl font-semibold tabular-nums text-secondary-dark dark:text-white">{{ $portfolio['last_year'] ?? '—' }}</p>
-            <p class="mt-1 text-xs text-secondary-medium dark:text-secondary-soft">{{ __('Latest ending year') }}</p>
+            <p class="mt-1 text-xs text-secondary-medium dark:text-secondary-soft">{{ __('strategies.latest_ending_year') }}</p>
         </article>
     </div>
 
     <div class="flex flex-1 flex-col gap-3">
         <div class="flex flex-col gap-1 @xl/strategies:flex-row @xl/strategies:items-end @xl/strategies:justify-between">
             <div>
-                <flux:heading size="lg">{{ __('Strategic planning cycles') }}</flux:heading>
-                <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('Active periods are shown first, followed by upcoming and completed cycles.') }}</p>
+                <flux:heading size="lg">{{ __('strategies.strategic_planning_cycles') }}</flux:heading>
+                <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('strategies.active_periods_are_shown_first_followed_by_upcoming_and_comp') }}</p>
             </div>
 
             @if ($portfolio['total'] > 0 && $portfolio['active_count'] === 0)
                 <div class="mt-2 inline-flex w-fit items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary @xl/strategies:mt-0" role="status">
                     <flux:icon.clock class="size-4" />
-                    {{ __('No strategy currently covers :year.', ['year' => $portfolio['current_year']]) }}
+                    {{ __('strategies.no_strategy_currently_covers_year', ['year' => $portfolio['current_year']]) }}
                 </div>
             @endif
         </div>
@@ -137,8 +137,8 @@ new #[Title('Strategies')] class extends Component {
                     <flux:icon.flag class="size-5" />
                 </div>
                 <div class="max-w-sm">
-                    <flux:heading size="base">{{ __('No strategic periods yet') }}</flux:heading>
-                    <p class="mt-1 text-sm text-secondary-medium dark:text-secondary-soft">{{ __('Strategy records will appear here once planning cycles are defined.') }}</p>
+                    <flux:heading size="base">{{ __('strategies.no_strategic_periods_yet') }}</flux:heading>
+                    <p class="mt-1 text-sm text-secondary-medium dark:text-secondary-soft">{{ __('strategies.strategy_records_will_appear_here_once_planning_cycles_are_d') }}</p>
                 </div>
             </div>
         @else
@@ -169,7 +169,7 @@ new #[Title('Strategies')] class extends Component {
                                             <a href="{{ route('strategies.show', $strategy['id']) }}" wire:navigate class="truncate font-semibold hover:underline">{{ $strategy['name'] }}</a>
                                         </h3>
                                         <p class="mt-0.5 text-xs text-secondary-medium dark:text-secondary-soft">
-                                            {{ __(':count-year strategic period', ['count' => $strategy['duration_years']]) }}
+                                            {{ __('strategies.count_year_strategic_period', ['count' => $strategy['duration_years']]) }}
                                         </p>
                                     </div>
                                 </div>
@@ -181,16 +181,16 @@ new #[Title('Strategies')] class extends Component {
                                     'bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white' => $strategy['status'] === 'completed',
                                 ])>
                                     {{ match ($strategy['status']) {
-                                        'active' => __('Active'),
-                                        'upcoming' => __('Upcoming'),
-                                        default => __('Completed'),
+                                        'active' => __('common.active'),
+                                        'upcoming' => __('strategies.upcoming'),
+                                        default => __('common.completed'),
                                     } }}
                                 </span>
                             </div>
 
-                            <div class="mt-auto grid grid-cols-[auto_1fr_auto] items-center gap-3" aria-label="{{ __('Period :start to :end', ['start' => $strategy['start_year'], 'end' => $strategy['end_year']]) }}">
+                            <div class="mt-auto grid grid-cols-[auto_1fr_auto] items-center gap-3" aria-label="{{ __('strategies.period_start_to_end', ['start' => $strategy['start_year'], 'end' => $strategy['end_year']]) }}">
                                 <div>
-                                    <p class="text-[11px] font-semibold tracking-wide text-secondary-medium uppercase dark:text-secondary-soft">{{ __('Start') }}</p>
+                                    <p class="text-[11px] font-semibold tracking-wide text-secondary-medium uppercase dark:text-secondary-soft">{{ __('common.start') }}</p>
                                     <p class="mt-0.5 text-lg font-semibold tabular-nums text-secondary-dark dark:text-white">{{ $strategy['start_year'] }}</p>
                                 </div>
 
@@ -216,7 +216,7 @@ new #[Title('Strategies')] class extends Component {
                                 </div>
 
                                 <div class="text-end">
-                                    <p class="text-[11px] font-semibold tracking-wide text-secondary-medium uppercase dark:text-secondary-soft">{{ __('End') }}</p>
+                                    <p class="text-[11px] font-semibold tracking-wide text-secondary-medium uppercase dark:text-secondary-soft">{{ __('strategies.end') }}</p>
                                     <p class="mt-0.5 text-lg font-semibold tabular-nums text-secondary-dark dark:text-white">{{ $strategy['end_year'] }}</p>
                                 </div>
                             </div>

@@ -16,8 +16,8 @@
                     <x-ui.enum-badge :case="$milestone->status" />
                 </div>
                 <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-secondary-medium dark:text-secondary-soft">
-                    <span>{{ __('Planned :date', ['date' => $milestone->planned_date->format('M j, Y')]) }}</span>
-                    <span>{{ __('Weight :weight%', ['weight' => $milestone->weight_percentage]) }}</span>
+                    <span>{{ __('milestones.planned_date', ['date' => $milestone->planned_date->translatedFormat(__('formats.date'))]) }}</span>
+                    <span>{{ __('milestones.weight_weight', ['weight' => $milestone->weight_percentage]) }}</span>
                     <x-ui.employee-chip :employee="$milestone->responsibleUser" compact />
                 </div>
                 @if ($milestone->description !== null)
@@ -27,21 +27,21 @@
         </div>
 
         <div class="flex shrink-0 items-center gap-1 self-end @lg/directory:self-start">
-            <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation @sm/directory:size-9!" wire:click="openEditModal({{ $milestone->id }})" :aria-label="__('Edit :name', ['name' => $milestone->name])" />
+            <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation @sm/directory:size-9!" wire:click="openEditModal({{ $milestone->id }})" :aria-label="__('common.edit_name', ['name' => $milestone->name])" />
             @if ($milestone->children_count === 0 && $milestone->tasks_count === 0)
-                <x-ui.button tone="ghost" size="sm" icon="trash" class="size-11! touch-manipulation @sm/directory:size-9!" wire:click="confirmDelete({{ $milestone->id }})" :aria-label="__('Delete :name', ['name' => $milestone->name])" />
+                <x-ui.button tone="ghost" size="sm" icon="trash" class="size-11! touch-manipulation @sm/directory:size-9!" wire:click="confirmDelete({{ $milestone->id }})" :aria-label="__('common.delete_name', ['name' => $milestone->name])" />
             @else
-                <span class="inline-flex size-11 items-center justify-center text-secondary-light @sm/directory:size-9" aria-label="{{ __('Delete unavailable for :name', ['name' => $milestone->name]) }}"><flux:icon.lock-closed class="size-4" /></span>
+                <span class="inline-flex size-11 items-center justify-center text-secondary-light @sm/directory:size-9" aria-label="{{ __('milestones.delete_unavailable_for_name', ['name' => $milestone->name]) }}"><flux:icon.lock-closed class="size-4" /></span>
             @endif
         </div>
     </div>
 
     <details class="rounded-md border border-secondary-soft bg-white dark:border-secondary-medium dark:bg-secondary-dark">
         <summary class="cursor-pointer px-3 py-2 text-xs font-semibold text-secondary-medium marker:text-secondary-light dark:text-secondary-soft">
-            {{ trans_choice('{0} Files|{1} Files · :count record|[2,*] Files · :count records', $milestone->media->count(), ['count' => $milestone->media->count()]) }}
+            {{ trans_choice('milestones.files', $milestone->media->count(), ['count' => $milestone->media->count()]) }}
         </summary>
         @if ($milestone->media->isEmpty())
-            <p class="border-t border-secondary-soft px-3 py-2 text-xs italic text-secondary-medium dark:border-secondary-medium dark:text-secondary-soft">{{ __('No files recorded') }}</p>
+            <p class="border-t border-secondary-soft px-3 py-2 text-xs italic text-secondary-medium dark:border-secondary-medium dark:text-secondary-soft">{{ __('common.no_files_recorded') }}</p>
         @else
             <ul class="divide-y divide-secondary-soft border-t border-secondary-soft dark:divide-secondary-medium dark:border-secondary-medium">
                 @foreach ($milestone->media as $media)
@@ -50,9 +50,9 @@
                         <div class="min-w-0 flex-1">
                             <p class="truncate text-sm font-medium">{{ $media->original_name }}</p>
                             <p class="flex flex-wrap items-center gap-x-2 text-xs text-secondary-medium dark:text-secondary-soft">
-                                <span>{{ Str::title($media->collection->value) }}</span>
+                                <span>{{ $media->collection->label() }}</span>
                                 <span aria-hidden="true">·</span>
-                                <time datetime="{{ $media->uploaded_at?->toDateString() }}">{{ $media->uploaded_at?->format('M j, Y') ?? '—' }}</time>
+                                <time datetime="{{ $media->uploaded_at?->toDateString() }}">{{ $media->uploaded_at?->translatedFormat(__('formats.date')) ?? '—' }}</time>
                             </p>
                         </div>
                     </li>

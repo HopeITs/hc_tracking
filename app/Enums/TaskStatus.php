@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Enums\Concerns\HasTranslatedLabel;
+
 /**
  * Where a task sits on its board.
  *
@@ -14,6 +16,8 @@ namespace App\Enums;
  */
 enum TaskStatus: string
 {
+    use HasTranslatedLabel;
+
     case Todo = 'todo';
     case InProgress = 'in progress';
     case UnderReview = 'under review';

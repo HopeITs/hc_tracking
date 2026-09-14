@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Enums\Concerns\HasTranslatedLabel;
+
 /**
  * How an indicator is tracking against its target, given how much of the
  * reporting window has elapsed.
@@ -21,6 +23,8 @@ namespace App\Enums;
  */
 enum RagStatus: string
 {
+    use HasTranslatedLabel;
+
     case Red = 'red';
     case Amber = 'amber';
     case Green = 'green';

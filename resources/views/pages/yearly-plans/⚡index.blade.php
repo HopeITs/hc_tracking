@@ -12,7 +12,7 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('Annual Plans')] class extends Component {
+new #[Title('titles.annual_plans')] class extends Component {
     use WithPagination;
 
     /**
@@ -146,8 +146,8 @@ new #[Title('Annual Plans')] class extends Component {
         return HrEmployee::query()
             ->select(HrEmployee::NameColumns)
             ->whereIn('id', YearlyPlan::query()->distinct()->pluck('manager_id'))
-            ->orderBy('first_name_en')
-            ->orderBy('last_name_en')
+            ->orderBy(\App\Enums\Locale::current() === \App\Enums\Locale::Arabic ? 'first_name_ar' : 'first_name_en')
+            ->orderBy(\App\Enums\Locale::current() === \App\Enums\Locale::Arabic ? 'last_name_ar' : 'last_name_en')
             ->orderBy('id')
             ->get();
     }
@@ -264,7 +264,7 @@ new #[Title('Annual Plans')] class extends Component {
 @php
     $controlClasses = 'border-secondary-light! bg-white! text-secondary-dark! placeholder:text-secondary-light! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!';
     $secondaryButtonClasses = 'border-secondary-light! bg-white! text-secondary-dark! hover:bg-secondary-soft! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white! dark:hover:bg-secondary-medium!';
-    $stickyCellClasses = 'sticky left-0 z-10 bg-white group-hover:bg-secondary-soft dark:bg-secondary-dark dark:group-hover:bg-secondary-medium';
+    $stickyCellClasses = 'sticky start-0 z-10 bg-white group-hover:bg-secondary-soft dark:bg-secondary-dark dark:group-hover:bg-secondary-medium';
     $yearColumns = $this->yearColumns;
     $yearRange = $this->yearRange;
     $columnTotals = $this->columnTotals;
@@ -278,34 +278,34 @@ new #[Title('Annual Plans')] class extends Component {
     <header class="flex flex-col gap-3 border-b border-secondary-soft pb-4 dark:border-secondary-medium @6xl/matrix:flex-row @6xl/matrix:items-end">
         <div class="min-w-48 @6xl/matrix:me-auto">
             <div class="flex items-center gap-2">
-                <flux:heading id="yearly-plan-matrix-heading" size="lg">{{ __('Annual Plans') }}</flux:heading>
+                <flux:heading id="yearly-plan-matrix-heading" size="lg">{{ __('common.annual_plans') }}</flux:heading>
                 <span class="inline-flex min-w-7 items-center justify-center rounded-md border border-secondary-light px-2 py-0.5 text-xs font-semibold text-secondary-medium dark:text-secondary-soft">
                     {{ $this->programRows->total() }}
                 </span>
             </div>
-            <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('Annual plan coverage across every program, fiscal year by fiscal year.') }}</p>
+            <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('yearly_plans.annual_plan_coverage_across_every_program_fiscal_year_by_fis') }}</p>
         </div>
 
         <div class="grid w-full gap-2 @sm/matrix:grid-cols-2 @3xl/matrix:grid-cols-[minmax(8rem,0.6fr)_minmax(8rem,0.6fr)_minmax(11rem,1fr)] @6xl/matrix:max-w-[46rem]">
-            <flux:select :label="__('From fiscal year')" :class="$controlClasses" wire:model.live="yearFrom">
-                <flux:select.option value="">{{ __('Earliest') }}</flux:select.option>
+            <flux:select :label="__('yearly_plans.from_fiscal_year')" :class="$controlClasses" wire:model.live="yearFrom">
+                <flux:select.option value="">{{ __('yearly_plans.earliest') }}</flux:select.option>
                 @foreach ($this->yearOptions as $yearOption)
                     <flux:select.option :value="$yearOption" :wire:key="'year-from-'.$yearOption">{{ $yearOption }}</flux:select.option>
                 @endforeach
             </flux:select>
 
-            <flux:select :label="__('To fiscal year')" :class="$controlClasses" wire:model.live="yearTo">
-                <flux:select.option value="">{{ __('Latest') }}</flux:select.option>
+            <flux:select :label="__('yearly_plans.to_fiscal_year')" :class="$controlClasses" wire:model.live="yearTo">
+                <flux:select.option value="">{{ __('yearly_plans.latest') }}</flux:select.option>
                 @foreach ($this->yearOptions as $yearOption)
                     <flux:select.option :value="$yearOption" :wire:key="'year-to-'.$yearOption">{{ $yearOption }}</flux:select.option>
                 @endforeach
             </flux:select>
 
-            <flux:select :label="__('Assigned manager')" :class="$controlClasses" wire:model.live="manager">
-                <flux:select.option value="">{{ __('All managers') }}</flux:select.option>
+            <flux:select :label="__('yearly_plans.assigned_manager')" :class="$controlClasses" wire:model.live="manager">
+                <flux:select.option value="">{{ __('common.all_managers') }}</flux:select.option>
                 @foreach ($this->managerOptions as $managerOption)
                     <flux:select.option :value="$managerOption->id" :wire:key="'manager-filter-'.$managerOption->id">
-                        {{ $managerOption->name_en }} · {{ $managerOption->name_ar }}
+                        {{ $managerOption->name }} · {{ $managerOption->secondary_name }}
                     </flux:select.option>
                 @endforeach
             </flux:select>
@@ -316,21 +316,21 @@ new #[Title('Annual Plans')] class extends Component {
         <div class="flex min-h-10 flex-wrap items-center justify-between gap-2 border-b border-secondary-soft px-3.5 py-2 dark:border-secondary-medium">
             <p class="text-xs font-semibold text-secondary-medium dark:text-secondary-soft">
                 @if ($yearRange === null)
-                    {{ __('No fiscal years to show') }}
+                    {{ __('yearly_plans.no_fiscal_years_to_show') }}
                 @else
-                    {{ __('Fiscal years :from–:to', ['from' => $yearRange['from'], 'to' => $yearRange['to']]) }}
+                    {{ __('yearly_plans.fiscal_years_from_to', ['from' => $yearRange['from'], 'to' => $yearRange['to']]) }}
                     @if ($yearRange['clamped'])
-                        <span class="font-normal">· {{ __('narrowed to :count columns', ['count' => count($yearColumns)]) }}</span>
+                        <span class="font-normal">· {{ __('yearly_plans.narrowed_to_count_columns', ['count' => count($yearColumns)]) }}</span>
                     @endif
                 @endif
             </p>
             <div class="flex items-center gap-2">
                 <span wire:loading.delay.flex wire:target="yearFrom,yearTo,manager,clearFilters" class="hidden items-center gap-1.5 text-xs text-secondary-medium dark:text-secondary-soft">
-                    <flux:icon.arrow-path class="size-3.5 animate-spin" /> {{ __('Updating') }}
+                    <flux:icon.arrow-path class="size-3.5 animate-spin" /> {{ __('common.updating') }}
                 </span>
                 @if ($filtersAreActive)
                     <flux:button size="sm" variant="ghost" class="text-secondary-medium! hover:bg-secondary-soft! hover:text-secondary-dark! dark:text-secondary-soft! dark:hover:bg-secondary-medium! dark:hover:text-white!" wire:click="clearFilters">
-                        {{ __('Reset filters') }}
+                        {{ __('common.reset_filters') }}
                     </flux:button>
                 @endif
             </div>
@@ -342,8 +342,8 @@ new #[Title('Annual Plans')] class extends Component {
                     <flux:icon.calendar-days class="size-5" />
                 </div>
                 <div class="max-w-sm space-y-1">
-                    <flux:heading size="base">{{ __('No annual plans yet') }}</flux:heading>
-                    <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('Once a program has an annual plan, its fiscal years appear here as columns.') }}</p>
+                    <flux:heading size="base">{{ __('common.no_annual_plans_yet') }}</flux:heading>
+                    <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('yearly_plans.once_a_program_has_an_annual_plan_its_fiscal_years_appear_he') }}</p>
                 </div>
             </div>
         @elseif ($this->programRows->isEmpty())
@@ -352,13 +352,13 @@ new #[Title('Annual Plans')] class extends Component {
                     <flux:icon.calendar-days class="size-5" />
                 </div>
                 <div class="max-w-sm space-y-1">
-                    <flux:heading size="base">{{ $filtersAreActive ? __('No matching annual plans') : __('No programs yet') }}</flux:heading>
+                    <flux:heading size="base">{{ $filtersAreActive ? __('yearly_plans.no_matching_annual_plans') : __('common.no_programs_yet') }}</flux:heading>
                     <p class="text-sm text-secondary-medium dark:text-secondary-soft">
-                        {{ $filtersAreActive ? __('Change the fiscal years or the manager and try again.') : __('Add a program before planning its year.') }}
+                        {{ $filtersAreActive ? __('yearly_plans.change_the_fiscal_years_or_the_manager_and_try_again') : __('yearly_plans.add_a_program_before_planning_its_year') }}
                     </p>
                 </div>
                 @if ($filtersAreActive)
-                    <flux:button size="sm" :class="$secondaryButtonClasses" wire:click="clearFilters">{{ __('Reset filters') }}</flux:button>
+                    <flux:button size="sm" :class="$secondaryButtonClasses" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
                 @endif
             </div>
         @else
@@ -371,7 +371,7 @@ new #[Title('Annual Plans')] class extends Component {
                             </div>
                             <div class="min-w-0">
                                 <h2 class="truncate text-sm font-semibold text-secondary-dark dark:text-white">{{ $program->name }}</h2>
-                                <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $program->strategy?->name ?? __('Strategy not assigned') }}</p>
+                                <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $program->strategy?->name ?? __('common.strategy_not_assigned') }}</p>
                             </div>
                         </div>
 
@@ -381,12 +381,12 @@ new #[Title('Annual Plans')] class extends Component {
                                 <li class="flex min-h-11 items-center justify-between gap-3 rounded-lg border border-secondary-soft px-2.5 py-2 dark:border-secondary-medium" wire:key="mobile-cell-{{ $program->id }}-{{ $year }}">
                                     <span class="text-xs font-semibold tabular-nums text-secondary-dark dark:text-white">{{ $year }}</span>
                                     @if ($plan === null)
-                                        <span class="text-xs text-secondary-medium dark:text-secondary-soft">{{ __('No plan') }}</span>
+                                        <span class="text-xs text-secondary-medium dark:text-secondary-soft">{{ __('yearly_plans.no_plan') }}</span>
                                     @else
                                         <a href="{{ route('yearly-plans.show', $plan) }}" wire:navigate class="inline-flex min-h-11 items-center justify-center rounded-md px-2 hover:underline sm:min-h-8">
                                             <span class="flex min-w-0 items-center gap-2">
                                                 <flux:avatar class="bg-secondary-soft! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" size="xs" :initials="$plan->manager?->initials() ?? '?'" />
-                                                <span class="truncate text-xs font-medium text-secondary-dark dark:text-white">{{ $plan->manager?->name ?? __('Not assigned') }}</span>
+                                                <span class="truncate text-xs font-medium text-secondary-dark dark:text-white">{{ $plan->manager?->name ?? __('common.not_assigned') }}</span>
                                                 <span class="inline-flex min-w-6 shrink-0 items-center justify-center rounded-md border border-secondary-light px-1.5 py-0.5 text-xs font-semibold tabular-nums text-secondary-dark dark:text-white">
                                                     {{ $plan->plan_indicators_count }}
                                                 </span>
@@ -403,7 +403,7 @@ new #[Title('Annual Plans')] class extends Component {
             <div class="hidden overflow-x-auto @5xl/matrix:block">
                 <flux:table class="[&_[data-flux-cell]]:px-3.5! [&_[data-flux-cell]]:py-2.5! [&_[data-flux-column]]:px-3.5! [&_[data-flux-column]]:py-2.5! [&_tbody_tr]:transition-colors [&_tbody_tr]:hover:bg-secondary-soft dark:[&_tbody_tr]:hover:bg-secondary-medium">
                     <flux:table.columns class="bg-secondary-soft text-xs font-semibold dark:bg-secondary-medium">
-                        <flux:table.column class="sticky left-0 z-20 min-w-56 bg-secondary-soft dark:bg-secondary-medium">{{ __('Program') }}</flux:table.column>
+                        <flux:table.column class="sticky start-0 z-20 min-w-56 bg-secondary-soft dark:bg-secondary-medium">{{ __('common.program') }}</flux:table.column>
                         @foreach ($yearColumns as $year)
                             <flux:table.column class="min-w-28" align="center" :key="'year-column-'.$year">
                                 <span class="tabular-nums">{{ $year }}</span>
@@ -419,7 +419,7 @@ new #[Title('Annual Plans')] class extends Component {
                                         <div class="flex size-8 shrink-0 items-center justify-center rounded-md bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white"><flux:icon.briefcase class="size-4" /></div>
                                         <div class="min-w-0">
                                             <p class="truncate font-semibold">{{ $program->name }}</p>
-                                            <p class="truncate text-xs font-normal text-secondary-medium dark:text-secondary-soft">{{ $program->strategy?->name ?? __('Strategy not assigned') }}</p>
+                                            <p class="truncate text-xs font-normal text-secondary-medium dark:text-secondary-soft">{{ $program->strategy?->name ?? __('common.strategy_not_assigned') }}</p>
                                         </div>
                                     </div>
                                 </flux:table.cell>
@@ -427,13 +427,13 @@ new #[Title('Annual Plans')] class extends Component {
                                     @php($plan = $this->planFor($program->id, $year))
                                     <flux:table.cell align="center" :key="'cell-'.$program->id.'-'.$year">
                                         @if ($plan === null)
-                                            <span class="text-secondary-light" aria-label="{{ __(':program, :year, no plan', ['program' => $program->name, 'year' => $year]) }}">—</span>
+                                            <span class="text-secondary-light" aria-label="{{ __('yearly_plans.program_year_no_plan', ['program' => $program->name, 'year' => $year]) }}">—</span>
                                         @else
                                             <a
                                                 href="{{ route('yearly-plans.show', $plan) }}"
                                                 wire:navigate
                                                 class="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md px-2 hover:underline sm:min-h-8"
-                                                aria-label="{{ __(':program, :year, managed by :manager, :count targets', ['program' => $program->name, 'year' => $year, 'manager' => $plan->manager?->name ?? __('Not assigned'), 'count' => $plan->plan_indicators_count]) }}"
+                                                aria-label="{{ __('yearly_plans.program_year_managed_by_manager_count_targets', ['program' => $program->name, 'year' => $year, 'manager' => $plan->manager?->name ?? __('common.not_assigned'), 'count' => $plan->plan_indicators_count]) }}"
                                             >
                                                 <flux:avatar class="bg-secondary-soft! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" size="xs" :initials="$plan->manager?->initials() ?? '?'" />
                                                 <span class="inline-flex min-w-6 items-center justify-center rounded-md border border-secondary-light px-1.5 py-0.5 text-xs font-semibold tabular-nums text-secondary-dark dark:text-white">

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Enums\Concerns\HasTranslatedLabel;
+
 /**
  * How often progress is checked against a target.
  *
@@ -17,6 +19,8 @@ namespace App\Enums;
  */
 enum Period: string
 {
+    use HasTranslatedLabel;
+
     case Monthly = 'monthly';
     case Quarterly = 'quarterly';
     case SemiAnnual = 'semi-annual';

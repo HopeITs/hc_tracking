@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Enums\Concerns\HasTranslatedLabel;
+
 /**
  * The phase of work a proposal is in.
  *
@@ -13,6 +15,8 @@ namespace App\Enums;
  */
 enum ProposalPhase: string
 {
+    use HasTranslatedLabel;
+
     case Planning = 'planning';
     case Implementation = 'implementation';
     case Monitoring = 'monitoring';

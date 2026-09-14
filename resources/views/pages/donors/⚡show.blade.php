@@ -9,7 +9,7 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
-new #[Title('Donor')] class extends Component {
+new #[Title('titles.donor')] class extends Component {
     public int $donorId;
 
     public function mount(Donor $donor): void
@@ -127,34 +127,34 @@ new #[Title('Donor')] class extends Component {
 <section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white">
     <x-ui.detail-header
         :breadcrumbs="[
-            ['label' => __('Donors'), 'url' => route('donors.index')],
+            ['label' => __('common.donors'), 'url' => route('donors.index')],
             ['label' => $this->donor->name],
         ]"
         :title="$this->donor->name"
     >
         <x-slot:meta>
             <x-ui.enum-badge :case="$this->donor->type" />
-            <span>{{ trans_choice(':count agreement|:count agreements', $this->donor->donor_proposals_count, ['count' => $this->donor->donor_proposals_count]) }}</span>
+            <span>{{ trans_choice('common.count_agreement', $this->donor->donor_proposals_count, ['count' => $this->donor->donor_proposals_count]) }}</span>
         </x-slot:meta>
     </x-ui.detail-header>
 
     <div class="grid gap-3 @2xl/detail:grid-cols-3">
         @foreach ($this->budgetByCurrency as $currencyCode => $total)
-            <x-ui.stat-tile :label="__('Committed')" :value="number_format($total, 2)" :unit="$currencyCode" :scope="$currencyCode" wire:key="donor-committed-{{ $currencyCode }}" />
+            <x-ui.stat-tile :label="__('common.committed')" :value="number_format($total, 2)" :unit="$currencyCode" :scope="$currencyCode" wire:key="donor-committed-{{ $currencyCode }}" />
         @endforeach
 
         @foreach ($this->disbursedByCurrency as $currencyCode => $total)
-            <x-ui.stat-tile :label="__('Disbursed')" :value="number_format($total, 2)" :unit="$currencyCode" :scope="$currencyCode" wire:key="donor-disbursed-{{ $currencyCode }}" />
+            <x-ui.stat-tile :label="__('donors.disbursed')" :value="number_format($total, 2)" :unit="$currencyCode" :scope="$currencyCode" wire:key="donor-disbursed-{{ $currencyCode }}" />
         @endforeach
 
-        <x-ui.stat-tile :label="__('Active projects')" :value="$this->projectCounts['open']" wire:key="donor-projects-open" />
-        <x-ui.stat-tile :label="__('Closed projects')" :value="$this->projectCounts['closed']" wire:key="donor-projects-closed" />
-        <x-ui.stat-tile :label="__('Reports submitted')" :value="$this->reportsSubmittedCount" wire:key="donor-reports-submitted" />
+        <x-ui.stat-tile :label="__('donors.active_projects')" :value="$this->projectCounts['open']" wire:key="donor-projects-open" />
+        <x-ui.stat-tile :label="__('donors.closed_projects')" :value="$this->projectCounts['closed']" wire:key="donor-projects-closed" />
+        <x-ui.stat-tile :label="__('donors.reports_submitted')" :value="$this->reportsSubmittedCount" wire:key="donor-reports-submitted" />
     </div>
 
-    <x-ui.panel :title="__('Funding agreements')" :count="$this->agreements->count()" :subtitle="__('Budgets are shown per currency and never added together.')">
+    <x-ui.panel :title="__('common.funding_agreements_2')" :count="$this->agreements->count()" :subtitle="__('donors.budgets_are_shown_per_currency_and_never_added_together')">
         @if ($this->agreements->isEmpty())
-            <x-ui.empty-state icon="banknotes" :heading="__('No agreements yet')" :body="__('Agreements signed by this donor will appear here.')" />
+            <x-ui.empty-state icon="banknotes" :heading="__('common.no_agreements_yet')" :body="__('donors.agreements_signed_by_this_donor_will_appear_here')" />
         @else
             <div class="divide-y divide-secondary-soft dark:divide-secondary-medium">
                 @foreach ($this->agreements as $agreement)
@@ -162,8 +162,8 @@ new #[Title('Donor')] class extends Component {
                         <div class="min-w-0 @3xl/detail:me-auto">
                             <a href="{{ route('funding-agreements.show', $agreement) }}" wire:navigate class="text-sm font-semibold hover:underline">{{ $agreement->proposal->name }}</a>
                             <p class="text-xs text-secondary-medium dark:text-secondary-soft">
-                                {{ $agreement->project_num ?? __('No donor reference') }}
-                                · {{ trans_choice(':count tranche|:count tranches', $agreement->transfers_count, ['count' => $agreement->transfers_count]) }}
+                                {{ $agreement->project_num ?? __('common.no_donor_reference') }}
+                                · {{ trans_choice('common.count_tranche', $agreement->transfers_count, ['count' => $agreement->transfers_count]) }}
                             </p>
                         </div>
                         <x-ui.enum-badge :case="$agreement->proposal->status" />

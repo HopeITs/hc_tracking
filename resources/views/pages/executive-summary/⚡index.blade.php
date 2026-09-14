@@ -11,7 +11,7 @@ use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
-new #[Title('Executive Summary')] class extends Component {
+new #[Title('titles.executive_summary')] class extends Component {
     #[Url(except: '')]
     public string $year = '';
 
@@ -53,54 +53,54 @@ new #[Title('Executive Summary')] class extends Component {
     public function coverageMetrics(): array
     {
         $year = $this->selectedYear();
-        $fiscalScope = __('FY :year', ['year' => $year]);
+        $fiscalScope = __('common.fy_year', ['year' => $year]);
 
         return [
             [
                 'key' => 'annual-plan-coverage',
-                'label' => __('Annual plan coverage'),
+                'label' => __('executive_summary.annual_plan_coverage'),
                 'icon' => 'calendar-days',
                 // yearly_plans is unique on (program_id, year), so a count of
                 // this year's plans is exactly a count of programs planned.
                 'covered' => YearlyPlan::query()->where('year', $year)->count(),
                 'total' => Program::query()->count(),
-                'unit' => __('programs'),
+                'unit' => __('executive_summary.programs'),
                 'scope' => $fiscalScope,
-                'description' => __('Programs holding an annual plan for this fiscal year.'),
+                'description' => __('executive_summary.programs_holding_an_annual_plan_for_this_fiscal_year'),
             ],
             [
                 'key' => 'indicators-targeted',
-                'label' => __('Indicators targeted'),
+                'label' => __('executive_summary.indicators_targeted'),
                 'icon' => 'chart-bar',
                 'covered' => Indicator::query()->whereHas('planIndicators', $this->committedThisYear($year))->count(),
                 'total' => Indicator::query()->count(),
-                'unit' => __('indicators'),
+                'unit' => __('executive_summary.indicators'),
                 'scope' => $fiscalScope,
-                'description' => __('Indicators carrying a target committed in an annual plan.'),
+                'description' => __('executive_summary.indicators_carrying_a_target_committed_in_an_annual_plan'),
             ],
             [
                 'key' => 'projects-targeted',
-                'label' => __('Projects carrying a target'),
+                'label' => __('executive_summary.projects_carrying_a_target'),
                 'icon' => 'rectangle-stack',
                 'covered' => Project::query()->whereHas('planIndicators', $this->committedThisYear($year))->count(),
                 'total' => Project::query()->count(),
-                'unit' => __('projects'),
+                'unit' => __('executive_summary.projects'),
                 'scope' => $fiscalScope,
-                'description' => __('Projects named by a target in this year\'s annual plans.'),
+                'description' => __('executive_summary.projects_named_by_a_target_in_this_year_s_annual_plans'),
             ],
             [
                 'key' => 'geographic-reach',
-                'label' => __('Geographic reach'),
+                'label' => __('executive_summary.geographic_reach'),
                 'icon' => 'map-pin',
                 // Cities live in the HR database, so the covered count cannot
                 // be a whereHas() across connections.
                 'covered' => HrCity::query()->whereIn('id', Project::query()->distinct()->pluck('city_id'))->count(),
                 'total' => HrCity::query()->count(),
-                'unit' => __('cities'),
+                'unit' => __('executive_summary.cities'),
                 // Projects carry no year, so this one measures the portfolio
                 // rather than the fiscal year, and says so on the card.
-                'scope' => __('Portfolio'),
-                'description' => __('Cities reached by at least one project.'),
+                'scope' => __('executive_summary.portfolio'),
+                'description' => __('executive_summary.cities_reached_by_at_least_one_project'),
             ],
         ];
     }
@@ -163,12 +163,12 @@ new #[Title('Executive Summary')] class extends Component {
 >
     <header class="flex flex-col gap-3 border-b border-secondary-soft pb-4 dark:border-secondary-medium @3xl/summary:flex-row @3xl/summary:items-end">
         <div class="min-w-48 @3xl/summary:me-auto">
-            <flux:heading id="executive-summary-heading" size="lg">{{ __('Executive Summary') }}</flux:heading>
-            <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('How much of the portfolio is planned, targeted and reached.') }}</p>
+            <flux:heading id="executive-summary-heading" size="lg">{{ __('common.executive_summary') }}</flux:heading>
+            <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('executive_summary.how_much_of_the_portfolio_is_planned_targeted_and_reached') }}</p>
         </div>
 
         <div class="w-full @3xl/summary:max-w-56">
-            <flux:select :label="__('Fiscal year')" :class="$controlClasses" wire:model.live="year">
+            <flux:select :label="__('executive_summary.fiscal_year')" :class="$controlClasses" wire:model.live="year">
                 @foreach ($this->yearOptions as $yearOption)
                     <flux:select.option :value="$yearOption" :wire:key="'summary-year-'.$yearOption">{{ $yearOption }}</flux:select.option>
                 @endforeach
@@ -178,7 +178,7 @@ new #[Title('Executive Summary')] class extends Component {
 
     <div class="flex items-center justify-end">
         <span wire:loading.delay.flex wire:target="year" class="hidden items-center gap-1.5 text-xs text-secondary-medium dark:text-secondary-soft">
-            <flux:icon.arrow-path class="size-3.5 animate-spin" /> {{ __('Updating') }}
+            <flux:icon.arrow-path class="size-3.5 animate-spin" /> {{ __('common.updating') }}
         </span>
     </div>
 
@@ -208,7 +208,7 @@ new #[Title('Executive Summary')] class extends Component {
                         {{ $percentage === null ? '—' : $percentage.'%' }}
                     </p>
                     <p class="text-xs font-medium tabular-nums text-secondary-medium dark:text-secondary-soft">
-                        {{ __(':covered of :total :unit', ['covered' => $metric['covered'], 'total' => $metric['total'], 'unit' => $metric['unit']]) }}
+                        {{ __('executive_summary.covered_of_total_unit', ['covered' => $metric['covered'], 'total' => $metric['total'], 'unit' => $metric['unit']]) }}
                     </p>
                 </div>
 

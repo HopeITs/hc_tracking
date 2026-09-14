@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Enums\Concerns\HasTranslatedLabel;
+
 /**
  * The accounts-receivable state of a scheduled payment tranche.
  *
@@ -13,6 +15,8 @@ namespace App\Enums;
  */
 enum ArStatus: string
 {
+    use HasTranslatedLabel;
+
     case Pending = 'pending';
     case Received = 'received';
     case Failed = 'failed';

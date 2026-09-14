@@ -15,7 +15,7 @@ use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
-new #[Title('Milestones')] class extends Component {
+new #[Title('titles.milestones')] class extends Component {
     #[Url(except: '')]
     public string $project = '';
 
@@ -68,7 +68,7 @@ new #[Title('Milestones')] class extends Component {
             ->select(['id', 'name', 'city_id'])
             ->when($this->project !== '', fn (Builder $query) => $query->whereKey((int) $this->project))
             ->with([
-                'city:id,name_en',
+                'city:id,name_en,name_ar',
                 'milestones' => fn ($query) => $query
                     ->select([
                         'id',
@@ -239,14 +239,14 @@ new #[Title('Milestones')] class extends Component {
                 Rule::notIn($invalidParentIds),
             ],
         ], [
-            'name.required' => __('Enter a milestone name.'),
-            'plannedDate.required' => __('Set the planned date.'),
-            'responsibleUserId.required' => __('Select the responsible staff member.'),
-            'milestoneProjectId.required' => __('Select the project.'),
-            'milestoneProjectId.in' => __('A milestone cannot be moved to another project.'),
-            'parentMilestoneId.exists' => __('Select a milestone from this project.'),
-            'parentMilestoneId.not_in' => __('A milestone cannot be nested under itself or its descendants.'),
-            'weightPercentage.max' => __('Weight cannot exceed 100 percent.'),
+            'name.required' => __('milestones.enter_a_milestone_name'),
+            'plannedDate.required' => __('milestones.set_the_planned_date'),
+            'responsibleUserId.required' => __('milestones.select_the_responsible_staff_member'),
+            'milestoneProjectId.required' => __('milestones.select_the_project'),
+            'milestoneProjectId.in' => __('milestones.a_milestone_cannot_be_moved_to_another_project'),
+            'parentMilestoneId.exists' => __('milestones.select_a_milestone_from_this_project'),
+            'parentMilestoneId.not_in' => __('milestones.a_milestone_cannot_be_nested_under_itself_or_its_descendants'),
+            'weightPercentage.max' => __('milestones.weight_cannot_exceed_100_percent'),
         ]);
 
         $milestone = $existingMilestone ?? new Milestone;
@@ -277,7 +277,7 @@ new #[Title('Milestones')] class extends Component {
 
         Flux::toast(
             variant: 'success',
-            text: $wasRecentlyCreated ? __('Milestone created.') : __('Milestone updated.'),
+            text: $wasRecentlyCreated ? __('milestones.milestone_created') : __('milestones.milestone_updated'),
         );
     }
 
@@ -309,13 +309,13 @@ new #[Title('Milestones')] class extends Component {
         if (! $deleted) {
             Flux::toast(
                 variant: 'danger',
-                text: __('This milestone still has nested milestones or tasks. Move or remove those first.'),
+                text: __('milestones.this_milestone_still_has_nested_milestones_or_tasks_move_or'),
             );
 
             return;
         }
 
-        Flux::toast(variant: 'success', text: __('Milestone deleted.'));
+        Flux::toast(variant: 'success', text: __('milestones.milestone_deleted'));
     }
 
     public function closeMilestoneModal(): void
@@ -382,52 +382,52 @@ new #[Title('Milestones')] class extends Component {
 @endphp
 
 <section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="milestone-directory-heading">
-    <x-ui.page-header heading-id="milestone-directory-heading" :title="__('Milestones')" :description="__('Delivery gates grouped by project, with every dependency visible in context.')">
+    <x-ui.page-header heading-id="milestone-directory-heading" :title="__('common.milestones')" :description="__('milestones.delivery_gates_grouped_by_project_with_every_dependency_visi')">
         <x-slot:filters>
-            <x-ui.select :label="__('Project')" wire:model.live="project">
-                <flux:select.option value="">{{ __('All projects') }}</flux:select.option>
+            <x-ui.select :label="__('common.project')" wire:model.live="project">
+                <flux:select.option value="">{{ __('common.all_projects') }}</flux:select.option>
                 @foreach ($this->projectOptions as $projectOption)
                     <flux:select.option :value="$projectOption->id" :wire:key="'milestone-project-filter-'.$projectOption->id">{{ $projectOption->name }}</flux:select.option>
                 @endforeach
             </x-ui.select>
 
-            <x-ui.select :label="__('Status')" wire:model.live="status">
-                <flux:select.option value="">{{ __('All statuses') }}</flux:select.option>
+            <x-ui.select :label="__('common.status')" wire:model.live="status">
+                <flux:select.option value="">{{ __('common.all_statuses') }}</flux:select.option>
                 @foreach (MilestoneStatus::cases() as $statusCase)
-                    <flux:select.option :value="$statusCase->value" :wire:key="'milestone-status-filter-'.$statusCase->value">{{ Str::title($statusCase->value) }}</flux:select.option>
+                    <flux:select.option :value="$statusCase->value" :wire:key="'milestone-status-filter-'.$statusCase->value">{{ $statusCase->label() }}</flux:select.option>
                 @endforeach
             </x-ui.select>
 
-            <x-ui.select :label="__('Responsible')" wire:model.live="responsible">
-                <flux:select.option value="">{{ __('Anyone') }}</flux:select.option>
+            <x-ui.select :label="__('milestones.responsible')" wire:model.live="responsible">
+                <flux:select.option value="">{{ __('common.anyone') }}</flux:select.option>
                 @foreach ($this->userOptions as $userOption)
-                    <flux:select.option :value="$userOption->id" :wire:key="'milestone-user-filter-'.$userOption->id">{{ $userOption->name_en }} · {{ $userOption->name_ar }}</flux:select.option>
+                    <flux:select.option :value="$userOption->id" :wire:key="'milestone-user-filter-'.$userOption->id">{{ $userOption->name }} · {{ $userOption->secondary_name }}</flux:select.option>
                 @endforeach
             </x-ui.select>
         </x-slot:filters>
 
         <x-slot:actions>
-            <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-milestone-button">{{ __('Add milestone') }}</x-ui.button>
+            <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-milestone-button">{{ __('milestones.add_milestone') }}</x-ui.button>
         </x-slot:actions>
     </x-ui.page-header>
 
     @if ($this->projectsWithMilestones->isEmpty())
         <x-ui.panel>
-            <x-ui.empty-state icon="flag" :heading="$filtersAreActive ? __('No matching milestones') : __('No milestones yet')" :body="$filtersAreActive ? __('Change the filters and try again.') : __('Add the first milestone to a project.')">
+            <x-ui.empty-state icon="flag" :heading="$filtersAreActive ? __('milestones.no_matching_milestones') : __('common.no_milestones_yet')" :body="$filtersAreActive ? __('common.change_the_filters_and_try_again') : __('milestones.add_the_first_milestone_to_a_project')">
                 <x-slot:action>
                     @if ($filtersAreActive)
-                        <x-ui.button size="sm" wire:click="clearFilters">{{ __('Reset filters') }}</x-ui.button>
+                        <x-ui.button size="sm" wire:click="clearFilters">{{ __('common.reset_filters') }}</x-ui.button>
                     @else
-                        <x-ui.button size="sm" tone="primary" icon="plus" wire:click="openCreateModal">{{ __('Add milestone') }}</x-ui.button>
+                        <x-ui.button size="sm" tone="primary" icon="plus" wire:click="openCreateModal">{{ __('milestones.add_milestone') }}</x-ui.button>
                     @endif
                 </x-slot:action>
             </x-ui.empty-state>
         </x-ui.panel>
     @else
         @foreach ($this->projectsWithMilestones as $projectRow)
-            <x-ui.panel :title="$projectRow->name" :subtitle="$projectRow->city?->name_en ?? __('Unknown city')" :count="$projectRow->milestones->count()" wire:key="milestone-project-{{ $projectRow->id }}">
+            <x-ui.panel :title="$projectRow->name" :subtitle="$projectRow->city?->name ?? __('common.unknown_city')" :count="$projectRow->milestones->count()" wire:key="milestone-project-{{ $projectRow->id }}">
                 <x-slot:toolbar>
-                    <a href="{{ route('projects.show', $projectRow) }}" wire:navigate class="text-xs font-semibold text-secondary-medium hover:underline dark:text-secondary-soft">{{ __('Open project') }}</a>
+                    <a href="{{ route('projects.show', $projectRow) }}" wire:navigate class="text-xs font-semibold text-secondary-medium hover:underline dark:text-secondary-soft">{{ __('milestones.open_project') }}</a>
                 </x-slot:toolbar>
 
                 <div class="divide-y divide-secondary-soft dark:divide-secondary-medium">
@@ -442,23 +442,23 @@ new #[Title('Milestones')] class extends Component {
     <flux:modal wire:model="showMilestoneModal" class="w-full max-w-3xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
         <form wire:submit="saveMilestone" class="flex flex-col gap-5">
             <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ $editingMilestoneId === null ? __('Add milestone') : __('Edit milestone') }}</flux:heading>
-                <flux:subheading>{{ __('A milestone may nest only within its project. Project ownership is fixed after creation.') }}</flux:subheading>
+                <flux:heading size="lg">{{ $editingMilestoneId === null ? __('milestones.add_milestone') : __('milestones.edit_milestone') }}</flux:heading>
+                <flux:subheading>{{ __('milestones.a_milestone_may_nest_only_within_its_project_project_ownersh') }}</flux:subheading>
             </div>
 
-            <x-ui.input wire:model="name" :label="__('Milestone name')" type="text" maxlength="255" required autofocus />
-            <flux:textarea wire:model="description" :label="__('Description')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!" />
+            <x-ui.input wire:model="name" :label="__('milestones.milestone_name')" type="text" maxlength="255" required autofocus />
+            <flux:textarea wire:model="description" :label="__('common.description')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!" />
 
             <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.select wire:model.live="milestoneProjectId" :label="__('Project')" :disabled="$editingMilestoneId !== null" required>
-                    <flux:select.option value="">{{ __('Select a project') }}</flux:select.option>
+                <x-ui.select wire:model.live="milestoneProjectId" :label="__('common.project')" :disabled="$editingMilestoneId !== null" required>
+                    <flux:select.option value="">{{ __('common.select_a_project') }}</flux:select.option>
                     @foreach ($this->projectOptions as $projectOption)
                         <flux:select.option :value="$projectOption->id" :wire:key="'milestone-project-option-'.$projectOption->id">{{ $projectOption->name }}</flux:select.option>
                     @endforeach
                 </x-ui.select>
 
-                <x-ui.select wire:model="parentMilestoneId" :label="__('Nest under')">
-                    <flux:select.option value="">{{ __('Top level') }}</flux:select.option>
+                <x-ui.select wire:model="parentMilestoneId" :label="__('milestones.nest_under')">
+                    <flux:select.option value="">{{ __('common.top_level') }}</flux:select.option>
                     @foreach ($this->parentOptions as $parentOption)
                         <flux:select.option :value="$parentOption->id" :wire:key="'milestone-parent-option-'.$parentOption->id">{{ $parentOption->name }}</flux:select.option>
                     @endforeach
@@ -466,40 +466,40 @@ new #[Title('Milestones')] class extends Component {
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.input wire:model="plannedDate" :label="__('Planned date')" type="date" required />
-                <x-ui.input wire:model="actualDate" :label="__('Actual date')" type="date" />
+                <x-ui.input wire:model="plannedDate" :label="__('milestones.planned_date_2')" type="date" required />
+                <x-ui.input wire:model="actualDate" :label="__('milestones.actual_date')" type="date" />
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2 @2xl/directory:grid-cols-4">
-                <x-ui.select wire:model="milestoneStatus" :label="__('Status')" required>
+                <x-ui.select wire:model="milestoneStatus" :label="__('common.status')" required>
                     @foreach (MilestoneStatus::cases() as $statusCase)
-                        <flux:select.option :value="$statusCase->value" :wire:key="'milestone-status-option-'.$statusCase->value">{{ Str::title($statusCase->value) }}</flux:select.option>
+                        <flux:select.option :value="$statusCase->value" :wire:key="'milestone-status-option-'.$statusCase->value">{{ $statusCase->label() }}</flux:select.option>
                     @endforeach
                 </x-ui.select>
-                <x-ui.input wire:model="sequence" :label="__('Sequence')" type="number" min="0" required />
-                <x-ui.input wire:model="weightPercentage" :label="__('Weight %')" type="number" min="0" max="100" step="0.01" required />
-                <x-ui.select wire:model="responsibleUserId" :label="__('Responsible')" required>
-                    <flux:select.option value="">{{ __('Select') }}</flux:select.option>
+                <x-ui.input wire:model="sequence" :label="__('milestones.sequence')" type="number" min="0" required />
+                <x-ui.input wire:model="weightPercentage" :label="__('milestones.weight')" type="number" min="0" max="100" step="0.01" required />
+                <x-ui.select wire:model="responsibleUserId" :label="__('milestones.responsible')" required>
+                    <flux:select.option value="">{{ __('common.select') }}</flux:select.option>
                     @foreach ($this->userOptions as $userOption)
-                        <flux:select.option :value="$userOption->id" :wire:key="'milestone-responsible-option-'.$userOption->id">{{ $userOption->name_en }} · {{ $userOption->name_ar }}</flux:select.option>
+                        <flux:select.option :value="$userOption->id" :wire:key="'milestone-responsible-option-'.$userOption->id">{{ $userOption->name }} · {{ $userOption->secondary_name }}</flux:select.option>
                     @endforeach
                 </x-ui.select>
             </div>
 
             <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="closeMilestoneModal">{{ __('Cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" data-test="save-milestone-button">{{ $editingMilestoneId === null ? __('Create milestone') : __('Save changes') }}</x-ui.button>
+                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="closeMilestoneModal">{{ __('common.cancel') }}</x-ui.button>
+                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" data-test="save-milestone-button">{{ $editingMilestoneId === null ? __('milestones.create_milestone') : __('common.save_changes') }}</x-ui.button>
             </div>
         </form>
     </flux:modal>
 
     <flux:modal :open="$deletingMilestoneId !== null" wire:close="$set('deletingMilestoneId', null)" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
         <div class="flex flex-col gap-4">
-            <flux:heading size="lg">{{ __('Delete this milestone?') }}</flux:heading>
-            <flux:subheading>{{ __('Only a milestone with no nested milestones and no tasks can be deleted.') }}</flux:subheading>
+            <flux:heading size="lg">{{ __('milestones.delete_this_milestone') }}</flux:heading>
+            <flux:subheading>{{ __('milestones.only_a_milestone_with_no_nested_milestones_and_no_tasks_can') }}</flux:subheading>
             <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="$set('deletingMilestoneId', null)">{{ __('Cancel') }}</x-ui.button>
-                <x-ui.button type="button" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="deleteMilestone" data-test="confirm-delete-milestone">{{ __('Delete milestone') }}</x-ui.button>
+                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="$set('deletingMilestoneId', null)">{{ __('common.cancel') }}</x-ui.button>
+                <x-ui.button type="button" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="deleteMilestone" data-test="confirm-delete-milestone">{{ __('milestones.delete_milestone') }}</x-ui.button>
             </div>
         </div>
     </flux:modal>

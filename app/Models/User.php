@@ -34,6 +34,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property int|null $hr_user_id
  * @property int|null $employee_id
  * @property UserRole $role
+ * @property string|null $locale
  * @property CarbonImmutable|null $email_verified_at
  * @property string|null $password
  * @property string|null $two_factor_secret
@@ -49,6 +50,16 @@ class User extends Authenticatable implements PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
+
+    /**
+     * Mirror the nullable locale column so a user that has not been round-tripped
+     * through the database still reports "no language chosen" under strict mode.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'locale' => null,
+    ];
 
     /**
      * The tasks this user raised.

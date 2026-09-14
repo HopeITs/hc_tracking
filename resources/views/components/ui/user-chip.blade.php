@@ -2,7 +2,7 @@
 
 @if ($user === null)
     <div {{ $attributes->class('flex min-w-0 items-center gap-2.5') }}>
-        <p class="truncate text-sm text-secondary-medium dark:text-secondary-soft">{{ __('Not assigned') }}</p>
+        <p class="truncate text-sm text-secondary-medium dark:text-secondary-soft">{{ __('common.not_assigned') }}</p>
     </div>
 @else
     <div {{ $attributes->class('flex min-w-0 items-center gap-2.5') }}>
@@ -15,7 +15,7 @@
             <p class="truncate text-sm font-medium text-secondary-dark dark:text-white">{{ $user->name }}</p>
             @unless ($compact)
                 <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">
-                    {{ $user->role->value }} · {{ $user->email }}
+                    {{ $user->role->label() }} · {{ $user->email }}
                 </p>
             @endunless
         </div>

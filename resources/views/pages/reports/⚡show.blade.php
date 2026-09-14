@@ -9,7 +9,7 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
-new #[Title('Report')] class extends Component {
+new #[Title('titles.report')] class extends Component {
     public int $reportId;
 
     public function mount(Report $report): void
@@ -88,7 +88,7 @@ new #[Title('Report')] class extends Component {
 
         unset($this->report);
 
-        Flux::toast(variant: 'success', text: __('Report submitted for review.'));
+        Flux::toast(variant: 'success', text: __('reports.report_submitted_for_review'));
     }
 
     /**
@@ -108,7 +108,7 @@ new #[Title('Report')] class extends Component {
 
         unset($this->report);
 
-        Flux::toast(variant: 'success', text: __('Report approved.'));
+        Flux::toast(variant: 'success', text: __('reports.report_approved'));
     }
 
     /**
@@ -130,7 +130,7 @@ new #[Title('Report')] class extends Component {
 
         unset($this->report);
 
-        Flux::toast(variant: 'success', text: __('Report returned to draft.'));
+        Flux::toast(variant: 'success', text: __('reports.report_returned_to_draft'));
     }
 
     /**
@@ -146,7 +146,7 @@ new #[Title('Report')] class extends Component {
 
         unset($this->report);
 
-        Flux::toast(variant: 'success', text: __('Marked as seen by MEAL.'));
+        Flux::toast(variant: 'success', text: __('reports.marked_as_seen_by_meal'));
     }
 };
 ?>
@@ -154,25 +154,25 @@ new #[Title('Report')] class extends Component {
 <section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white">
     <x-ui.detail-header
         :breadcrumbs="[
-            ['label' => __('Reports'), 'url' => route('reports.index')],
+            ['label' => __('common.reports'), 'url' => route('reports.index')],
             ['label' => $this->report->planIndicator->indicator->name],
         ]"
         :title="$this->report->planIndicator->indicator->name"
         :subtitle="$this->report->planIndicator->indicator->result->statement"
     >
         <x-slot:meta>
-            <span class="tabular-nums">{{ __('Period to :date', ['date' => $this->report->planned_date?->format('M j, Y')]) }}</span>
-            <span>{{ $this->report->planIndicator->project?->name ?? __('Organisation-wide') }}</span>
+            <span class="tabular-nums">{{ __('reports.period_to_date', ['date' => $this->report->planned_date?->translatedFormat(__('formats.date'))]) }}</span>
+            <span>{{ $this->report->planIndicator->project?->name ?? __('common.organisation_wide') }}</span>
             <span>
                 @if ($this->report->planIndicator->source === null)
-                    {{ __('Source no longer exists') }}
+                    {{ __('reports.source_no_longer_exists') }}
                 @elseif ($this->report->planIndicator->source_type === 'yearly_plan')
-                    {{ __('Committed in an annual plan') }}
+                    {{ __('reports.committed_in_an_annual_plan') }}
                 @elseif (Route::has('proposals.show'))
-                    {{ __('Committed in a proposal:') }}
+                    {{ __('reports.committed_in_a_proposal_2') }}
                     <a href="{{ route('proposals.show', $this->report->planIndicator->source_id) }}" wire:navigate class="hover:underline">{{ $this->report->planIndicator->source->name }}</a>
                 @else
-                    {{ __('Committed in a proposal') }}
+                    {{ __('reports.committed_in_a_proposal') }}
                 @endif
             </span>
         </x-slot:meta>
@@ -183,56 +183,56 @@ new #[Title('Report')] class extends Component {
     </x-ui.detail-header>
 
     <div class="grid gap-3 @2xl/detail:grid-cols-4">
-        <x-ui.stat-tile :label="__('Reported')" :value="number_format((float) $this->report->value, 2)" />
-        <x-ui.stat-tile :label="__('Target')" :value="number_format((float) $this->report->planIndicator->target, 2)" />
-        <x-ui.stat-tile :label="__('Achievement')" :value="$this->achievement === null ? '—' : $this->achievement.'%'" />
-        <x-ui.stat-tile :label="__('Period')" :value="Str::title($this->report->planIndicator->period->value)" />
+        <x-ui.stat-tile :label="__('reports.reported')" :value="number_format((float) $this->report->value, 2)" />
+        <x-ui.stat-tile :label="__('reports.target')" :value="number_format((float) $this->report->planIndicator->target, 2)" />
+        <x-ui.stat-tile :label="__('reports.achievement')" :value="$this->achievement === null ? '—' : $this->achievement.'%'" />
+        <x-ui.stat-tile :label="__('common.period')" :value="$this->report->planIndicator->period->label()" />
     </div>
 
-    <x-ui.panel :title="__('Workflow')" :subtitle="__('Each action moves the report through draft, reviewed and approved. Editing is only possible while a report is a draft.')">
+    <x-ui.panel :title="__('reports.workflow')" :subtitle="__('reports.each_action_moves_the_report_through_draft_reviewed_and_appr')">
         <div class="flex flex-wrap items-center gap-3 p-3.5">
             <div class="flex flex-wrap items-center gap-2 me-auto">
                 <x-ui.enum-badge :case="$this->report->status" />
 
                 @if ($this->report->submit_date !== null)
                     <span class="rounded-md border border-secondary-light px-2 py-0.5 text-xs font-semibold text-secondary-medium dark:text-secondary-soft">
-                        {{ __('Submitted :date', ['date' => $this->report->submit_date->format('M j, Y')]) }}
+                        {{ __('reports.submitted_date', ['date' => $this->report->submit_date->translatedFormat(__('formats.date'))]) }}
                     </span>
                 @endif
 
                 @if ($this->report->is_seen_by_meal)
-                    <span class="rounded-md border border-secondary-light px-2 py-0.5 text-xs font-semibold text-secondary-medium dark:text-secondary-soft">{{ __('Seen by MEAL') }}</span>
+                    <span class="rounded-md border border-secondary-light px-2 py-0.5 text-xs font-semibold text-secondary-medium dark:text-secondary-soft">{{ __('reports.seen_by_meal') }}</span>
                 @endif
 
                 @unless ($this->report->isEditable())
-                    <span class="rounded-md border border-primary bg-primary px-2 py-0.5 text-xs font-semibold text-white">{{ __('Locked') }}</span>
+                    <span class="rounded-md border border-primary bg-primary px-2 py-0.5 text-xs font-semibold text-white">{{ __('reports.locked') }}</span>
                 @endunless
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
                 @if ($this->report->status === ReportStatus::Draft)
-                    <x-ui.button size="sm" tone="primary" icon="paper-airplane" wire:click="submitForReview" data-test="submit-for-review-button">{{ __('Submit for review') }}</x-ui.button>
+                    <x-ui.button size="sm" tone="primary" icon="paper-airplane" wire:click="submitForReview" data-test="submit-for-review-button">{{ __('reports.submit_for_review') }}</x-ui.button>
                 @endif
 
                 @if ($this->report->status === ReportStatus::Reviewed)
-                    <x-ui.button size="sm" tone="primary" icon="check" wire:click="approve" data-test="approve-button">{{ __('Approve') }}</x-ui.button>
+                    <x-ui.button size="sm" tone="primary" icon="check" wire:click="approve" data-test="approve-button">{{ __('reports.approve') }}</x-ui.button>
                 @endif
 
                 @if (in_array($this->report->status, [ReportStatus::Reviewed, ReportStatus::Approved], true))
-                    <x-ui.button size="sm" icon="arrow-uturn-left" wire:click="returnToDraft" data-test="return-to-draft-button">{{ __('Return to draft') }}</x-ui.button>
+                    <x-ui.button size="sm" icon="arrow-uturn-left" class="rtl:[&_svg]:-scale-x-100" wire:click="returnToDraft" data-test="return-to-draft-button">{{ __('reports.return_to_draft') }}</x-ui.button>
                 @endif
 
                 @unless ($this->report->is_seen_by_meal)
-                    <x-ui.button size="sm" icon="eye" wire:click="markSeenByMeal" data-test="mark-seen-button">{{ __('Mark seen by MEAL') }}</x-ui.button>
+                    <x-ui.button size="sm" icon="eye" wire:click="markSeenByMeal" data-test="mark-seen-button">{{ __('reports.mark_seen_by_meal') }}</x-ui.button>
                 @endunless
             </div>
         </div>
     </x-ui.panel>
 
-    <x-ui.panel :title="__('Narrative window')">
+    <x-ui.panel :title="__('reports.narrative_window')">
         <div class="grid gap-3 p-3.5 @lg/detail:grid-cols-2">
-            <x-ui.stat-tile :label="__('Window start')" :value="$this->report->period_start?->format('M j, Y') ?? '—'" />
-            <x-ui.stat-tile :label="__('Window end')" :value="$this->report->period_end?->format('M j, Y') ?? '—'" />
+            <x-ui.stat-tile :label="__('reports.window_start')" :value="$this->report->period_start?->translatedFormat(__('formats.date')) ?? '—'" />
+            <x-ui.stat-tile :label="__('reports.window_end')" :value="$this->report->period_end?->translatedFormat(__('formats.date')) ?? '—'" />
         </div>
 
         @if ($this->report->narrative_report_notes !== null)
@@ -242,11 +242,11 @@ new #[Title('Report')] class extends Component {
 
     @php
         $narrativeSections = [
-            'executive_summary' => __('Executive summary'),
-            'key_achievements' => __('Key achievements'),
-            'challenges' => __('Challenges'),
-            'lessons_learned' => __('Lessons learned'),
-            'next_period_plans' => __('Next period plans'),
+            'executive_summary' => __('reports.executive_summary'),
+            'key_achievements' => __('reports.key_achievements'),
+            'challenges' => __('reports.challenges'),
+            'lessons_learned' => __('reports.lessons_learned'),
+            'next_period_plans' => __('reports.next_period_plans'),
         ];
     @endphp
 
@@ -258,9 +258,9 @@ new #[Title('Report')] class extends Component {
         @endif
     @endforeach
 
-    <x-ui.panel :title="__('Supporting files')" :count="$this->files->count()" :subtitle="__('File records only. The files themselves are not stored in this system yet.')">
+    <x-ui.panel :title="__('reports.supporting_files')" :count="$this->files->count()" :subtitle="__('common.file_records_only_the_files_themselves_are_not_stored_in_thi')">
         @if ($this->files->isEmpty())
-            <x-ui.empty-state icon="paper-clip" :heading="__('No files recorded')" :body="__('Supporting file records for this report will appear here.')" />
+            <x-ui.empty-state icon="paper-clip" :heading="__('common.no_files_recorded')" :body="__('reports.supporting_file_records_for_this_report_will_appear_here')" />
         @else
             <ul class="divide-y divide-secondary-soft dark:divide-secondary-medium">
                 @foreach ($this->files as $file)
@@ -271,7 +271,7 @@ new #[Title('Report')] class extends Component {
                         </span>
                         <div class="min-w-0 flex-1">
                             <p class="truncate text-sm font-medium">{{ basename($file->path) }}</p>
-                            <p class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $file->date?->format('M j, Y') }}</p>
+                            <p class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $file->date?->translatedFormat(__('formats.date')) }}</p>
                         </div>
                     </li>
                 @endforeach

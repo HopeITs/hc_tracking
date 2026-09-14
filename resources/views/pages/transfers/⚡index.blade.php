@@ -16,7 +16,7 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('Transfers')] class extends Component {
+new #[Title('titles.transfers')] class extends Component {
     use WithPagination;
 
     #[Url(except: '')]
@@ -186,11 +186,11 @@ new #[Title('Transfers')] class extends Component {
             'receiveDate' => ['nullable', 'date'],
             'transferArStatus' => ['required', new Enum(ArStatus::class)],
         ], [
-            'transferAgreementId.required' => __('Select the funding agreement this tranche belongs to.'),
-            'paymentAmount.required' => __('Enter the payment amount.'),
-            'paymentAmount.min' => __('A payment amount cannot be negative.'),
-            'fees.min' => __('Fees cannot be negative.'),
-            'exchangeRate.min' => __('An exchange rate cannot be negative.'),
+            'transferAgreementId.required' => __('transfers.select_the_funding_agreement_this_tranche_belongs_to'),
+            'paymentAmount.required' => __('transfers.enter_the_payment_amount'),
+            'paymentAmount.min' => __('transfers.a_payment_amount_cannot_be_negative'),
+            'fees.min' => __('transfers.fees_cannot_be_negative'),
+            'exchangeRate.min' => __('transfers.an_exchange_rate_cannot_be_negative'),
         ]);
 
         $transfer = $this->editingTransferId === null
@@ -224,7 +224,7 @@ new #[Title('Transfers')] class extends Component {
 
         Flux::toast(
             variant: 'success',
-            text: $wasRecentlyCreated ? __('Transfer recorded.') : __('Transfer updated.'),
+            text: $wasRecentlyCreated ? __('transfers.transfer_recorded') : __('transfers.transfer_updated'),
         );
     }
 
@@ -263,25 +263,25 @@ new #[Title('Transfers')] class extends Component {
 <section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="transfer-directory-heading">
     <x-ui.page-header
         heading-id="transfer-directory-heading"
-        :title="__('Transfers')"
+        :title="__('common.transfers')"
         :count="$this->transfers->total()"
-        :description="__('Every tranche, what was sent, what landed, and in which currency.')"
+        :description="__('transfers.every_tranche_what_was_sent_what_landed_and_in_which_currenc')"
     >
         <x-slot:filters>
-            <x-ui.input type="search" icon="magnifying-glass" :label="__('Search transfers')" :placeholder="__('Reference, donor, or proposal')" wire:model.live.debounce.300ms="search" clearable />
+            <x-ui.input type="search" icon="magnifying-glass" :label="__('transfers.search_transfers')" :placeholder="__('common.reference_donor_or_proposal')" wire:model.live.debounce.300ms="search" clearable />
 
-            <x-ui.select :label="__('Receipt status')" wire:model.live="arStatus">
-                <flux:select.option value="">{{ __('All statuses') }}</flux:select.option>
+            <x-ui.select :label="__('transfers.receipt_status')" wire:model.live="arStatus">
+                <flux:select.option value="">{{ __('common.all_statuses') }}</flux:select.option>
                 @foreach (ArStatus::cases() as $statusCase)
-                    <flux:select.option :value="$statusCase->value" :wire:key="'ar-'.$statusCase->value">{{ Str::title($statusCase->value) }}</flux:select.option>
+                    <flux:select.option :value="$statusCase->value" :wire:key="'ar-'.$statusCase->value">{{ $statusCase->label() }}</flux:select.option>
                 @endforeach
             </x-ui.select>
 
-            <x-ui.select :label="__('Account')" wire:model.live="account">
-                <flux:select.option value="">{{ __('All accounts') }}</flux:select.option>
+            <x-ui.select :label="__('transfers.account')" wire:model.live="account">
+                <flux:select.option value="">{{ __('common.all_accounts') }}</flux:select.option>
                 @foreach ($this->accountOptions as $accountOption)
                     <flux:select.option :value="$accountOption->id" :wire:key="'tr-account-'.$accountOption->id">
-                        {{ $accountOption->name }}@unless ($accountOption->is_active) · {{ __('closed') }}@endunless
+                        {{ $accountOption->name }}@unless ($accountOption->is_active) · {{ __('common.closed') }}@endunless
                     </flux:select.option>
                 @endforeach
             </x-ui.select>
@@ -289,7 +289,7 @@ new #[Title('Transfers')] class extends Component {
 
         <x-slot:actions>
             <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-transfer-button">
-                {{ __('Record transfer') }}
+                {{ __('transfers.record_transfer') }}
             </x-ui.button>
         </x-slot:actions>
     </x-ui.page-header>
@@ -297,23 +297,24 @@ new #[Title('Transfers')] class extends Component {
     @if ($this->paymentByCurrency !== [])
         <div class="grid gap-3 @2xl/directory:grid-cols-3">
             @foreach ($this->paymentByCurrency as $currencyCode => $total)
-                <x-ui.stat-tile :label="__('Sent on this page')" :value="number_format($total, 2)" :unit="$currencyCode" :scope="$currencyCode" wire:key="tr-total-{{ $currencyCode }}" />
+                <x-ui.stat-tile :label="__('transfers.sent_on_this_page')" :value="number_format($total, 2)" :unit="$currencyCode" :scope="$currencyCode" wire:key="tr-total-{{ $currencyCode }}" />
             @endforeach
         </div>
     @endif
 
-    <x-ui.panel :subtitle="trans_choice('{1} :count matching transfer|[2,*] :count matching transfers', $this->transfers->total(), ['count' => $this->transfers->total()])">
+    <x-ui.panel :subtitle="trans_choice('transfers.count_matching_transfer', $this->transfers->total(), ['count' => $this->transfers->total()])">
         <x-slot:toolbar>
             @if ($filtersAreActive)
-                <flux:button size="sm" variant="ghost" class="text-secondary-medium! dark:text-secondary-soft!" wire:click="clearFilters">{{ __('Reset filters') }}</flux:button>
+                <flux:button size="sm" variant="ghost" class="text-secondary-medium! dark:text-secondary-soft!" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
             @endif
         </x-slot:toolbar>
 
         @if ($this->transfers->isEmpty())
             <x-ui.empty-state
+                class="rtl:[&_svg]:-scale-x-100"
                 icon="arrow-right-circle"
-                :heading="$filtersAreActive ? __('No matching transfers') : __('No transfers recorded')"
-                :body="$filtersAreActive ? __('Change the search or filters and try again.') : __('Record the first tranche against a funding agreement.')"
+                :heading="$filtersAreActive ? __('transfers.no_matching_transfers') : __('transfers.no_transfers_recorded')"
+                :body="$filtersAreActive ? __('common.change_the_search_or_filters_and_try_again') : __('transfers.record_the_first_tranche_against_a_funding_agreement')"
             />
         @else
             <div class="divide-y divide-secondary-soft dark:divide-secondary-medium">
@@ -324,10 +325,10 @@ new #[Title('Transfers')] class extends Component {
                                 {{ $transfer->donorProposal->donor->name }} · {{ $transfer->donorProposal->proposal->name }}
                             </a>
                             <p class="text-xs text-secondary-medium dark:text-secondary-soft">
-                                {{ $transfer->scheduled_date?->format('M j, Y') ?? __('Unscheduled') }}
+                                {{ $transfer->scheduled_date?->translatedFormat(__('formats.date')) ?? __('common.unscheduled') }}
                                 ·
                                 @if ($transfer->account === null)
-                                    <span class="italic">{{ __('No account') }}</span>
+                                    <span class="italic">{{ __('transfers.no_account') }}</span>
                                 @else
                                     {{ $transfer->account->name }}
                                 @endif
@@ -335,17 +336,17 @@ new #[Title('Transfers')] class extends Component {
                         </div>
 
                         <div class="text-xs">
-                            <p class="text-secondary-medium dark:text-secondary-soft">{{ __('Sent') }}</p>
+                            <p class="text-secondary-medium dark:text-secondary-soft">{{ __('transfers.sent') }}</p>
                             <x-ui.money :amount="$transfer->payment_amount" :currency="$transfer->amount_transfered_currency" />
                         </div>
 
                         <div class="text-xs">
-                            <p class="text-secondary-medium dark:text-secondary-soft">{{ __('Fees') }}</p>
+                            <p class="text-secondary-medium dark:text-secondary-soft">{{ __('transfers.fees') }}</p>
                             <x-ui.money :amount="$transfer->fees" :currency="$transfer->fees_currency" />
                         </div>
 
                         <div class="text-xs">
-                            <p class="text-secondary-medium dark:text-secondary-soft">{{ __('Net received') }}</p>
+                            <p class="text-secondary-medium dark:text-secondary-soft">{{ __('common.net_received') }}</p>
                             @if ($transfer->net_amount_received === null)
                                 <span class="text-secondary-light">—</span>
                             @else
@@ -356,7 +357,7 @@ new #[Title('Transfers')] class extends Component {
                         <div class="flex items-center gap-1.5">
                             <x-ui.enum-badge :case="$transfer->ar_status" />
                             {{-- No delete: a money record never disappears. --}}
-                            <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $transfer->id }})" :aria-label="__('Edit transfer')" />
+                            <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $transfer->id }})" :aria-label="__('transfers.edit_transfer')" />
                         </div>
                     </article>
                 @endforeach
@@ -371,13 +372,13 @@ new #[Title('Transfers')] class extends Component {
     <flux:modal wire:model="showTransferModal" class="w-full max-w-4xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
         <form wire:submit="saveTransfer" class="space-y-5">
             <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ $editingTransferId === null ? __('Record transfer') : __('Edit transfer') }}</flux:heading>
-                <flux:subheading>{{ __('Sent, fees and received each carry their own currency. They are recorded separately and never combined.') }}</flux:subheading>
+                <flux:heading size="lg">{{ $editingTransferId === null ? __('transfers.record_transfer') : __('transfers.edit_transfer') }}</flux:heading>
+                <flux:subheading>{{ __('transfers.sent_fees_and_received_each_carry_their_own_currency_they_ar') }}</flux:subheading>
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.select wire:model="transferAgreementId" :label="__('Funding agreement')" required>
-                    <flux:select.option value="">{{ __('Select an agreement') }}</flux:select.option>
+                <x-ui.select wire:model="transferAgreementId" :label="__('transfers.funding_agreement')" required>
+                    <flux:select.option value="">{{ __('transfers.select_an_agreement') }}</flux:select.option>
                     @foreach ($this->agreementOptions as $agreementOption)
                         <flux:select.option :value="$agreementOption->id" :wire:key="'tr-agr-'.$agreementOption->id">
                             {{ $agreementOption->donor->name }} · {{ $agreementOption->proposal->name }}
@@ -385,32 +386,32 @@ new #[Title('Transfers')] class extends Component {
                     @endforeach
                 </x-ui.select>
 
-                <x-ui.select wire:model="transferAccountId" :label="__('Account')">
-                    <flux:select.option value="">{{ __('Not yet assigned') }}</flux:select.option>
+                <x-ui.select wire:model="transferAccountId" :label="__('transfers.account')">
+                    <flux:select.option value="">{{ __('transfers.not_yet_assigned') }}</flux:select.option>
                     @foreach ($this->accountOptions as $accountOption)
                         <flux:select.option :value="$accountOption->id" :wire:key="'tr-account-option-'.$accountOption->id">
-                            {{ $accountOption->name }}@unless ($accountOption->is_active) · {{ __('closed') }}@endunless
+                            {{ $accountOption->name }}@unless ($accountOption->is_active) · {{ __('common.closed') }}@endunless
                         </flux:select.option>
                     @endforeach
                 </x-ui.select>
             </div>
 
             <fieldset class="grid gap-4 rounded-lg border border-secondary-soft p-3 sm:grid-cols-4 dark:border-secondary-medium">
-                <legend class="px-1 text-xs font-semibold text-secondary-medium uppercase dark:text-secondary-soft">{{ __('Sent') }}</legend>
-                <x-ui.input wire:model="paymentAmount" :label="__('Payment amount')" type="number" step="0.01" min="0" required />
-                <x-ui.select wire:model="transferredCurrency" :label="__('Currency')" required>
+                <legend class="px-1 text-xs font-semibold text-secondary-medium uppercase dark:text-secondary-soft">{{ __('transfers.sent') }}</legend>
+                <x-ui.input wire:model="paymentAmount" :label="__('transfers.payment_amount')" type="number" step="0.01" min="0" required />
+                <x-ui.select wire:model="transferredCurrency" :label="__('common.currency')" required>
                     @foreach (Currency::cases() as $currencyCase)
                         <flux:select.option :value="$currencyCase->value" :wire:key="'tr-sent-'.$currencyCase->value">{{ $currencyCase->value }}</flux:select.option>
                     @endforeach
                 </x-ui.select>
-                <x-ui.input wire:model="scheduledDate" :label="__('Scheduled')" type="date" />
-                <x-ui.input wire:model="transferDate" :label="__('Sent on')" type="date" />
+                <x-ui.input wire:model="scheduledDate" :label="__('transfers.scheduled')" type="date" />
+                <x-ui.input wire:model="transferDate" :label="__('transfers.sent_on')" type="date" />
             </fieldset>
 
             <fieldset class="grid gap-4 rounded-lg border border-secondary-soft p-3 sm:grid-cols-2 dark:border-secondary-medium">
-                <legend class="px-1 text-xs font-semibold text-secondary-medium uppercase dark:text-secondary-soft">{{ __('Fees') }}</legend>
-                <x-ui.input wire:model="fees" :label="__('Fees')" type="number" step="0.01" min="0" required />
-                <x-ui.select wire:model="feesCurrency" :label="__('Fees currency')" required>
+                <legend class="px-1 text-xs font-semibold text-secondary-medium uppercase dark:text-secondary-soft">{{ __('transfers.fees') }}</legend>
+                <x-ui.input wire:model="fees" :label="__('transfers.fees')" type="number" step="0.01" min="0" required />
+                <x-ui.select wire:model="feesCurrency" :label="__('transfers.fees_currency')" required>
                     @foreach (Currency::cases() as $currencyCase)
                         <flux:select.option :value="$currencyCase->value" :wire:key="'tr-fees-'.$currencyCase->value">{{ $currencyCase->value }}</flux:select.option>
                     @endforeach
@@ -418,28 +419,28 @@ new #[Title('Transfers')] class extends Component {
             </fieldset>
 
             <fieldset class="grid gap-4 rounded-lg border border-secondary-soft p-3 sm:grid-cols-5 dark:border-secondary-medium">
-                <legend class="px-1 text-xs font-semibold text-secondary-medium uppercase dark:text-secondary-soft">{{ __('Received') }}</legend>
-                <x-ui.input wire:model="amountReceived" :label="__('Amount received')" type="number" step="0.01" min="0" />
-                <x-ui.input wire:model="netAmountReceived" :label="__('Net received')" type="number" step="0.01" min="0" />
-                <x-ui.select wire:model="receivedCurrency" :label="__('Currency')" required>
+                <legend class="px-1 text-xs font-semibold text-secondary-medium uppercase dark:text-secondary-soft">{{ __('transfers.received') }}</legend>
+                <x-ui.input wire:model="amountReceived" :label="__('transfers.amount_received')" type="number" step="0.01" min="0" />
+                <x-ui.input wire:model="netAmountReceived" :label="__('common.net_received')" type="number" step="0.01" min="0" />
+                <x-ui.select wire:model="receivedCurrency" :label="__('common.currency')" required>
                     @foreach (Currency::cases() as $currencyCase)
                         <flux:select.option :value="$currencyCase->value" :wire:key="'tr-recv-'.$currencyCase->value">{{ $currencyCase->value }}</flux:select.option>
                     @endforeach
                 </x-ui.select>
-                <x-ui.input wire:model="exchangeRate" :label="__('Exchange rate')" type="number" step="0.000001" min="0" required />
-                <x-ui.input wire:model="receiveDate" :label="__('Received on')" type="date" />
+                <x-ui.input wire:model="exchangeRate" :label="__('transfers.exchange_rate')" type="number" step="0.000001" min="0" required />
+                <x-ui.input wire:model="receiveDate" :label="__('transfers.received_on')" type="date" />
             </fieldset>
 
-            <x-ui.select wire:model="transferArStatus" :label="__('Receipt status')" required>
+            <x-ui.select wire:model="transferArStatus" :label="__('transfers.receipt_status')" required>
                 @foreach (ArStatus::cases() as $statusCase)
-                    <flux:select.option :value="$statusCase->value" :wire:key="'tr-ar-'.$statusCase->value">{{ Str::title($statusCase->value) }}</flux:select.option>
+                    <flux:select.option :value="$statusCase->value" :wire:key="'tr-ar-'.$statusCase->value">{{ $statusCase->label() }}</flux:select.option>
                 @endforeach
             </x-ui.select>
 
             <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeTransferModal">{{ __('Cancel') }}</x-ui.button>
+                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeTransferModal">{{ __('common.cancel') }}</x-ui.button>
                 <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-transfer-button">
-                    {{ $editingTransferId === null ? __('Record transfer') : __('Save changes') }}
+                    {{ $editingTransferId === null ? __('transfers.record_transfer') : __('common.save_changes') }}
                 </x-ui.button>
             </div>
         </form>

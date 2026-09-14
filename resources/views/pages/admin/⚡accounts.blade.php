@@ -9,7 +9,7 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('Accounts')] class extends Component {
+new #[Title('titles.accounts')] class extends Component {
     use WithPagination;
 
     #[Url(except: '')]
@@ -84,8 +84,8 @@ new #[Title('Accounts')] class extends Component {
             'name' => ['required', 'string', 'max:255'],
             'openedAt' => ['required', 'date'],
         ], [
-            'name.required' => __('Enter an account name.'),
-            'openedAt.required' => __('Set the date this account opened.'),
+            'name.required' => __('accounts.enter_an_account_name'),
+            'openedAt.required' => __('accounts.set_the_date_this_account_opened'),
         ]);
 
         $account = $this->editingAccountId === null
@@ -107,7 +107,7 @@ new #[Title('Accounts')] class extends Component {
 
         Flux::toast(
             variant: 'success',
-            text: $wasRecentlyCreated ? __('Account opened.') : __('Account updated.'),
+            text: $wasRecentlyCreated ? __('accounts.account_opened') : __('accounts.account_updated'),
         );
     }
 
@@ -135,7 +135,7 @@ new #[Title('Accounts')] class extends Component {
         $this->closingAccountId = null;
         $this->resetPage();
 
-        Flux::toast(variant: 'success', text: __('Account closed.'));
+        Flux::toast(variant: 'success', text: __('accounts.account_closed'));
     }
 
     public function closeAccountModal(): void
@@ -157,33 +157,33 @@ new #[Title('Accounts')] class extends Component {
 <section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="account-directory-heading">
     <x-ui.page-header
         heading-id="account-directory-heading"
-        :title="__('Accounts')"
+        :title="__('common.accounts')"
         :count="$this->accounts->total()"
-        :description="__('Bank accounts money is received into. Accounts close; they are never deleted.')"
+        :description="__('accounts.bank_accounts_money_is_received_into_accounts_close_they_are')"
     >
         <x-slot:filters>
-            <x-ui.input type="search" icon="magnifying-glass" :label="__('Search accounts')" :placeholder="__('Account name')" wire:model.live.debounce.300ms="search" clearable />
+            <x-ui.input type="search" icon="magnifying-glass" :label="__('accounts.search_accounts')" :placeholder="__('accounts.account_name')" wire:model.live.debounce.300ms="search" clearable />
 
-            <x-ui.select :label="__('State')" wire:model.live="state">
-                <flux:select.option value="">{{ __('All accounts') }}</flux:select.option>
-                <flux:select.option value="active">{{ __('Open') }}</flux:select.option>
-                <flux:select.option value="closed">{{ __('Closed') }}</flux:select.option>
+            <x-ui.select :label="__('common.state')" wire:model.live="state">
+                <flux:select.option value="">{{ __('common.all_accounts') }}</flux:select.option>
+                <flux:select.option value="active">{{ __('accounts.open') }}</flux:select.option>
+                <flux:select.option value="closed">{{ __('accounts.closed') }}</flux:select.option>
             </x-ui.select>
         </x-slot:filters>
 
         <x-slot:actions>
             <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-account-button">
-                {{ __('Open account') }}
+                {{ __('accounts.open_account') }}
             </x-ui.button>
         </x-slot:actions>
     </x-ui.page-header>
 
-    <x-ui.panel :subtitle="trans_choice('{1} :count matching account|[2,*] :count matching accounts', $this->accounts->total(), ['count' => $this->accounts->total()])">
+    <x-ui.panel :subtitle="trans_choice('accounts.count_matching_account', $this->accounts->total(), ['count' => $this->accounts->total()])">
         @if ($this->accounts->isEmpty())
             <x-ui.empty-state
                 icon="building-library"
-                :heading="$search !== '' || $state !== '' ? __('No matching accounts') : __('No accounts yet')"
-                :body="$search !== '' || $state !== '' ? __('Change the search or filters and try again.') : __('Open the first account.')"
+                :heading="$search !== '' || $state !== '' ? __('accounts.no_matching_accounts') : __('accounts.no_accounts_yet')"
+                :body="$search !== '' || $state !== '' ? __('common.change_the_search_or_filters_and_try_again') : __('accounts.open_the_first_account')"
             />
         @else
             <div class="divide-y divide-secondary-soft dark:divide-secondary-medium">
@@ -192,25 +192,25 @@ new #[Title('Accounts')] class extends Component {
                         <div class="min-w-0 me-auto">
                             <p class="text-sm font-semibold">{{ $account->name }}</p>
                             <p class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">
-                                {{ __('Opened :date', ['date' => $account->opened_at?->format('M j, Y')]) }}
+                                {{ __('accounts.opened_date', ['date' => $account->opened_at?->translatedFormat(__('formats.date'))]) }}
                                 @if ($account->closed_at !== null)
-                                    · {{ __('closed :date', ['date' => $account->closed_at->format('M j, Y')]) }}
+                                    · {{ __('accounts.closed_date', ['date' => $account->closed_at->translatedFormat(__('formats.date'))]) }}
                                 @endif
-                                · {{ trans_choice(':count transfer|:count transfers', $account->transfers_count, ['count' => $account->transfers_count]) }}
+                                · {{ trans_choice('accounts.count_transfer', $account->transfers_count, ['count' => $account->transfers_count]) }}
                             </p>
                         </div>
 
                         @if ($account->is_active)
-                            <span class="rounded-md border border-secondary-dark bg-secondary-dark px-2 py-0.5 text-xs font-semibold text-white dark:border-secondary-medium dark:bg-secondary-medium">{{ __('Open') }}</span>
+                            <span class="rounded-md border border-secondary-dark bg-secondary-dark px-2 py-0.5 text-xs font-semibold text-white dark:border-secondary-medium dark:bg-secondary-medium">{{ __('accounts.open') }}</span>
                         @else
-                            <span class="rounded-md border border-secondary-light px-2 py-0.5 text-xs font-semibold text-secondary-medium dark:text-secondary-soft">{{ __('Closed') }}</span>
+                            <span class="rounded-md border border-secondary-light px-2 py-0.5 text-xs font-semibold text-secondary-medium dark:text-secondary-soft">{{ __('accounts.closed') }}</span>
                         @endif
 
-                        <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $account->id }})" :aria-label="__('Edit :name', ['name' => $account->name])" />
+                        <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $account->id }})" :aria-label="__('common.edit_name', ['name' => $account->name])" />
 
                         {{-- No delete anywhere: transfers_tracking.account_id RESTRICTs. --}}
                         @if ($account->is_active)
-                            <x-ui.button tone="ghost" size="sm" icon="lock-closed" class="size-9!" wire:click="confirmClose({{ $account->id }})" :aria-label="__('Close :name', ['name' => $account->name])" />
+                            <x-ui.button tone="ghost" size="sm" icon="lock-closed" class="size-9!" wire:click="confirmClose({{ $account->id }})" :aria-label="__('accounts.close_name', ['name' => $account->name])" />
                         @endif
                     </article>
                 @endforeach
@@ -225,17 +225,17 @@ new #[Title('Accounts')] class extends Component {
     <flux:modal wire:model="showAccountModal" class="w-full max-w-lg border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
         <form wire:submit="saveAccount" class="space-y-5">
             <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ $editingAccountId === null ? __('Open account') : __('Edit account') }}</flux:heading>
-                <flux:subheading>{{ __('A new account is usable immediately. To stop it receiving transfers, close it.') }}</flux:subheading>
+                <flux:heading size="lg">{{ $editingAccountId === null ? __('accounts.open_account') : __('accounts.edit_account') }}</flux:heading>
+                <flux:subheading>{{ __('accounts.a_new_account_is_usable_immediately_to_stop_it_receiving_tra') }}</flux:subheading>
             </div>
 
-            <x-ui.input wire:model="name" :label="__('Account name')" type="text" maxlength="255" required autofocus />
-            <x-ui.input wire:model="openedAt" :label="__('Opened on')" type="date" required />
+            <x-ui.input wire:model="name" :label="__('accounts.account_name')" type="text" maxlength="255" required autofocus />
+            <x-ui.input wire:model="openedAt" :label="__('accounts.opened_on')" type="date" required />
 
             <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeAccountModal">{{ __('Cancel') }}</x-ui.button>
+                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeAccountModal">{{ __('common.cancel') }}</x-ui.button>
                 <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-account-button">
-                    {{ $editingAccountId === null ? __('Open account') : __('Save changes') }}
+                    {{ $editingAccountId === null ? __('accounts.open_account') : __('common.save_changes') }}
                 </x-ui.button>
             </div>
         </form>
@@ -243,11 +243,11 @@ new #[Title('Accounts')] class extends Component {
 
     <flux:modal :open="$closingAccountId !== null" wire:close="$set('closingAccountId', null)" class="w-full max-w-md border border-secondary-light! bg-white! dark:bg-secondary-dark!">
         <div class="space-y-4">
-            <flux:heading size="lg">{{ __('Close this account?') }}</flux:heading>
-            <flux:subheading>{{ __('It stops accepting new transfers. Existing transfer records are kept — an account money has passed through is never deleted.') }}</flux:subheading>
+            <flux:heading size="lg">{{ __('accounts.close_this_account') }}</flux:heading>
+            <flux:subheading>{{ __('accounts.it_stops_accepting_new_transfers_existing_transfer_records_a') }}</flux:subheading>
             <div class="flex justify-end gap-2 border-t border-secondary-soft pt-4 dark:border-secondary-medium">
-                <x-ui.button type="button" wire:click="$set('closingAccountId', null)">{{ __('Cancel') }}</x-ui.button>
-                <x-ui.button type="button" tone="primary" wire:click="closeAccount" data-test="confirm-close-account">{{ __('Close account') }}</x-ui.button>
+                <x-ui.button type="button" wire:click="$set('closingAccountId', null)">{{ __('common.cancel') }}</x-ui.button>
+                <x-ui.button type="button" tone="primary" wire:click="closeAccount" data-test="confirm-close-account">{{ __('accounts.close_account') }}</x-ui.button>
             </div>
         </div>
     </flux:modal>

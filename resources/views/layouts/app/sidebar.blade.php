@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="dark">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ \App\Enums\Locale::current()->direction() }}" class="dark">
     <head>
         @include('partials.head')
     </head>
@@ -45,7 +45,7 @@
 
                     <flux:menu.radio.group>
                         <flux:menu.item class="min-h-11 touch-manipulation" :href="route('profile.edit')" icon="cog" wire:navigate>
-                            {{ __('Settings') }}
+                            {{ __('common.settings') }}
                         </flux:menu.item>
                     </flux:menu.radio.group>
 
@@ -57,10 +57,10 @@
                             as="button"
                             type="submit"
                             icon="arrow-right-start-on-rectangle"
-                            class="min-h-11 w-full cursor-pointer touch-manipulation"
+                            class="min-h-11 w-full cursor-pointer touch-manipulation rtl:[&_svg]:-scale-x-100"
                             data-test="logout-button"
                         >
-                            {{ __('Log out') }}
+                            {{ __('common.log_out') }}
                         </flux:menu.item>
                     </form>
                 </flux:menu>

@@ -9,9 +9,14 @@ use App\Models\Result;
 use App\Models\User;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\View;
+use Illuminate\Support\ViewErrorBag;
 use Illuminate\View\ViewException;
 
 test('the ui input carries the shared control classes', function () {
+    // Rendered outside a request, so share the empty error bag the web middleware normally provides.
+    View::share('errors', new ViewErrorBag);
+
     $html = Blade::render('<x-ui.input name="search" label="Search" />');
 
     expect($html)->toContain('border-secondary-light!')

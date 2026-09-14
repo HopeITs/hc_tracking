@@ -10,7 +10,7 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('City directory')] class extends Component {
+new #[Title('titles.city_directory')] class extends Component {
     use WithPagination;
 
     #[Url(except: '')]
@@ -43,7 +43,7 @@ new #[Title('City directory')] class extends Component {
             ->when($search !== '', fn ($query) => $query->where(fn ($query) => $query
                 ->where('name_en', 'like', '%'.$search.'%')
                 ->orWhere('name_ar', 'like', '%'.$search.'%')))
-            ->orderBy('name_en')
+            ->orderBy(HrCity::nameColumn())
             ->orderBy('id')
             ->paginate(15);
     }
@@ -81,20 +81,20 @@ new #[Title('City directory')] class extends Component {
     <div class="flex flex-col gap-3 border-b border-secondary-soft pb-4 dark:border-secondary-medium @3xl/directory:flex-row @3xl/directory:items-end">
         <div class="min-w-40 @3xl/directory:me-auto">
             <div class="flex items-center gap-2">
-                <flux:heading id="city-directory-heading" size="lg">{{ __('Cities') }}</flux:heading>
+                <flux:heading id="city-directory-heading" size="lg">{{ __('common.cities') }}</flux:heading>
                 <span class="inline-flex min-w-7 items-center justify-center rounded-md border border-secondary-light px-2 py-0.5 text-xs font-semibold text-secondary-medium dark:text-secondary-soft">
                     {{ $this->cities->total() }}
                 </span>
             </div>
-            <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('Cities are managed in the HR system and shown here read-only.') }}</p>
+            <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('cities.cities_are_managed_in_the_hr_system_and_shown_here_read_only') }}</p>
         </div>
 
         <div class="w-full @3xl/directory:max-w-[24rem]">
             <flux:input
                 type="search"
                 icon="magnifying-glass"
-                :label="__('Search cities')"
-                :placeholder="__('City name')"
+                :label="__('cities.search_cities')"
+                :placeholder="__('cities.city_name')"
                 :class="$controlClasses"
                 wire:model.live.debounce.300ms="search"
                 clearable
@@ -105,13 +105,13 @@ new #[Title('City directory')] class extends Component {
     <div class="overflow-hidden rounded-lg border border-secondary-light bg-white dark:border-secondary-medium dark:bg-secondary-dark">
         <div class="flex min-h-10 flex-wrap items-center justify-between gap-2 border-b border-secondary-soft bg-white px-3.5 py-2 dark:border-secondary-medium dark:bg-secondary-dark">
             <p class="text-xs font-semibold text-secondary-medium dark:text-secondary-soft">
-                {{ trans_choice('{0} :count matching cities|{1} :count matching city|[2,*] :count matching cities', $this->cities->total(), ['count' => $this->cities->total()]) }}
+                {{ trans_choice('cities.count_matching_cities', $this->cities->total(), ['count' => $this->cities->total()]) }}
             </p>
 
             <div class="flex items-center gap-2">
                 <span wire:loading.delay.flex wire:target="search,clearSearch" class="hidden items-center gap-1.5 text-xs text-secondary-medium dark:text-secondary-soft">
                     <flux:icon.arrow-path class="size-3.5 animate-spin" />
-                    {{ __('Updating') }}
+                    {{ __('common.updating') }}
                 </span>
 
                 @if ($search !== '')
@@ -121,7 +121,7 @@ new #[Title('City directory')] class extends Component {
                         class="text-secondary-medium! hover:bg-secondary-soft! hover:text-secondary-dark! dark:text-secondary-soft! dark:hover:bg-secondary-medium! dark:hover:text-white!"
                         wire:click="clearSearch"
                     >
-                        {{ __('Clear search') }}
+                        {{ __('cities.clear_search') }}
                     </flux:button>
                 @endif
             </div>
@@ -133,11 +133,11 @@ new #[Title('City directory')] class extends Component {
                     <flux:icon.map-pin class="size-5" />
                 </div>
                 <div class="space-y-1">
-                    <flux:heading size="base">{{ __('No matching cities') }}</flux:heading>
-                    <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('Change the search and try again.') }}</p>
+                    <flux:heading size="base">{{ __('cities.no_matching_cities') }}</flux:heading>
+                    <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('common.change_the_search_and_try_again') }}</p>
                 </div>
                 <flux:button size="sm" :class="$secondaryButtonClasses" wire:click="clearSearch">
-                    {{ __('Clear search') }}
+                    {{ __('cities.clear_search') }}
                 </flux:button>
             </div>
         @else
@@ -151,18 +151,18 @@ new #[Title('City directory')] class extends Component {
                                     <flux:icon.map-pin class="size-4.5" />
                                 </div>
                                 <div class="min-w-0">
-                                    <p class="truncate text-sm font-semibold text-secondary-dark dark:text-white">{{ $city->name_en }}</p>
-                                    <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft" dir="rtl" lang="ar">{{ $city->name_ar }}</p>
+                                    <p class="truncate text-sm font-semibold text-secondary-dark dark:text-white">{{ $city->name }}</p>
+                                    <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft" dir="auto">{{ $city->secondary_name }}</p>
                                 </div>
                             </div>
 
                             <span class="inline-flex shrink-0 rounded-md bg-secondary-soft px-2 py-1 text-xs font-semibold text-secondary-dark dark:bg-secondary-medium dark:text-white">
-                                {{ trans_choice(':count project|:count projects', $projectsCount, ['count' => $projectsCount]) }}
+                                {{ trans_choice('common.count_project', $projectsCount, ['count' => $projectsCount]) }}
                             </span>
                         </div>
 
                         <p class="text-xs text-secondary-medium dark:text-secondary-soft">
-                            {{ $city->is_active ? __('Active') : __('Inactive') }}
+                            {{ $city->is_active ? __('common.active') : __('cities.inactive') }}
                         </p>
                     </article>
                 @endforeach
@@ -171,10 +171,10 @@ new #[Title('City directory')] class extends Component {
             <div class="hidden @3xl/directory:block">
                 <flux:table class="table-fixed [&_[data-flux-cell]]:px-3.5! [&_[data-flux-cell]]:py-2! [&_[data-flux-column]]:px-3.5! [&_[data-flux-column]]:py-2.5! [&_tbody_tr]:transition-colors [&_tbody_tr]:hover:bg-secondary-soft dark:[&_tbody_tr]:hover:bg-secondary-medium">
                     <flux:table.columns class="bg-secondary-soft text-xs font-semibold dark:bg-secondary-medium">
-                        <flux:table.column class="w-[36%]">{{ __('City') }}</flux:table.column>
-                        <flux:table.column class="w-[32%]">{{ __('Arabic name') }}</flux:table.column>
-                        <flux:table.column class="w-[16%]" align="center">{{ __('Projects') }}</flux:table.column>
-                        <flux:table.column class="w-[16%]" align="center">{{ __('Status') }}</flux:table.column>
+                        <flux:table.column class="w-[36%]">{{ __('common.city') }}</flux:table.column>
+                        <flux:table.column class="w-[32%]">{{ \App\Enums\Locale::current() === \App\Enums\Locale::Arabic ? __('cities.english_name') : __('cities.arabic_name') }}</flux:table.column>
+                        <flux:table.column class="w-[16%]" align="center">{{ __('common.projects') }}</flux:table.column>
+                        <flux:table.column class="w-[16%]" align="center">{{ __('common.status') }}</flux:table.column>
                     </flux:table.columns>
 
                     <flux:table.rows>
@@ -185,11 +185,11 @@ new #[Title('City directory')] class extends Component {
                                         <div class="flex size-8 shrink-0 items-center justify-center rounded-md bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white">
                                             <flux:icon.map-pin class="size-4" />
                                         </div>
-                                        <p class="truncate font-semibold">{{ $city->name_en }}</p>
+                                        <p class="truncate font-semibold">{{ $city->name }}</p>
                                     </div>
                                 </flux:table.cell>
                                 <flux:table.cell>
-                                    <p class="truncate" dir="rtl" lang="ar">{{ $city->name_ar }}</p>
+                                    <p class="truncate" dir="auto">{{ $city->secondary_name }}</p>
                                 </flux:table.cell>
                                 <flux:table.cell align="center">
                                     <span class="inline-flex min-w-8 items-center justify-center rounded-md bg-secondary-soft px-2 py-1 text-xs font-semibold text-secondary-dark dark:bg-secondary-medium dark:text-white">
@@ -197,7 +197,7 @@ new #[Title('City directory')] class extends Component {
                                     </span>
                                 </flux:table.cell>
                                 <flux:table.cell align="center">
-                                    {{ $city->is_active ? __('Active') : __('Inactive') }}
+                                    {{ $city->is_active ? __('common.active') : __('cities.inactive') }}
                                 </flux:table.cell>
                             </flux:table.row>
                         @endforeach

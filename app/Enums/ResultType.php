@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Enums\Concerns\HasTranslatedLabel;
+
 /**
  * The level a result sits at in the results chain.
  *
@@ -20,6 +22,8 @@ namespace App\Enums;
  */
 enum ResultType: string
 {
+    use HasTranslatedLabel;
+
     case Impact = 'impact';
     case Outcome = 'outcome';
     case Output = 'output';

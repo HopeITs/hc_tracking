@@ -1,9 +1,9 @@
 @props(['employee', 'compact' => false])
 
-{{-- An HR employee shown by English name with the Arabic name beside it. --}}
+{{-- An HR employee shown by name in the interface language, with the other language beside it. --}}
 @if ($employee === null)
     <div {{ $attributes->class('flex min-w-0 items-center gap-2.5') }}>
-        <p class="truncate text-sm text-secondary-medium dark:text-secondary-soft">{{ __('Not assigned') }}</p>
+        <p class="truncate text-sm text-secondary-medium dark:text-secondary-soft">{{ __('common.not_assigned') }}</p>
     </div>
 @else
     <div {{ $attributes->class('flex min-w-0 items-center gap-2.5') }}>
@@ -13,9 +13,9 @@
             :initials="$employee->initials()"
         />
         <div class="min-w-0">
-            <p class="truncate text-sm font-medium text-secondary-dark dark:text-white">{{ $employee->name_en }}</p>
+            <p class="truncate text-sm font-medium text-secondary-dark dark:text-white">{{ $employee->name }}</p>
             @unless ($compact)
-                <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft" dir="rtl" lang="ar">{{ $employee->name_ar }}</p>
+                <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft" dir="auto" lang="{{ \App\Enums\Locale::current()->other()->value }}">{{ $employee->secondary_name }}</p>
             @endunless
         </div>
     </div>

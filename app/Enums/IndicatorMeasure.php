@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Enums\Concerns\HasTranslatedLabel;
+
 /**
  * How an indicator's value is expressed.
  *
@@ -16,6 +18,8 @@ namespace App\Enums;
  */
 enum IndicatorMeasure: string
 {
+    use HasTranslatedLabel;
+
     case Numeric = 'numeric';
     case Percentage = 'percentage';
 

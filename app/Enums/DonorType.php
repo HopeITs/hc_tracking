@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Enums\Concerns\HasTranslatedLabel;
+
 /**
  * The kind of funder a donor is.
  *
@@ -15,6 +17,8 @@ namespace App\Enums;
  */
 enum DonorType: string
 {
+    use HasTranslatedLabel;
+
     case Bilateral = 'bilateral';
     case Foundation = 'foundation';
     case Individual = 'individual';

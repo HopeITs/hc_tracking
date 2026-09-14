@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Enums\Concerns\HasTranslatedLabel;
+
 /**
  * What a stored file is, as distinct from its format.
  *
@@ -15,6 +17,8 @@ namespace App\Enums;
  */
 enum MediaCollection: string
 {
+    use HasTranslatedLabel;
+
     case Proposal = 'proposal';
     case Agreement = 'agreement';
     case Mou = 'mou';

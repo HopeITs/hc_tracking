@@ -9,7 +9,7 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
-new #[Title('Profile settings')] class extends Component {
+new #[Title('titles.profile_settings')] class extends Component {
     public string $name = '';
     public string $email = '';
 
@@ -60,29 +60,29 @@ new #[Title('Profile settings')] class extends Component {
 <section class="w-full">
     @include('partials.settings-heading')
 
-    <flux:heading level="2" class="sr-only">{{ __('Profile settings') }}</flux:heading>
+    <flux:heading level="2" class="sr-only">{{ __('settings.profile_settings') }}</flux:heading>
 
-    <x-pages::settings.layout :heading="__('Profile')" :subheading="__('Your name and email come from the HR system')">
+    <x-pages::settings.layout :heading="__('common.profile')" :subheading="__('settings.your_name_and_email_come_from_the_hr_system')">
         <div class="my-6 w-full space-y-6">
-            <flux:input wire:model="name" :label="__('Name')" type="text" readonly />
+            <flux:input wire:model="name" :label="__('common.name')" type="text" readonly />
 
             <div>
-                <flux:input wire:model="email" :label="__('Email')" type="email" readonly />
+                <flux:input wire:model="email" :label="__('common.email')" type="email" readonly />
 
                 {{-- @chisel-email-verification --}}
                 @if ($this->hasUnverifiedEmail)
                     <div>
                         <flux:text class="mt-4">
-                            {{ __('Your email address is unverified.') }}
+                            {{ __('settings.your_email_address_is_unverified') }}
 
                             <flux:link class="text-sm cursor-pointer" wire:click.prevent="resendVerificationNotification">
-                                {{ __('Click here to re-send the verification email.') }}
+                                {{ __('settings.click_here_to_re_send_the_verification_email') }}
                             </flux:link>
                         </flux:text>
 
                         @if (session('status') === 'verification-link-sent')
                             <flux:text class="mt-2 font-medium !dark:text-green-400 !text-green-600">
-                                {{ __('A new verification link has been sent to your email address.') }}
+                                {{ __('settings.a_new_verification_link_has_been_sent_to_your_email_address') }}
                             </flux:text>
                         @endif
                     </div>
@@ -91,7 +91,7 @@ new #[Title('Profile settings')] class extends Component {
             </div>
 
             <flux:text data-test="hr-profile-notice">
-                {{ __('To change your name or email, update your record in the HR system. Your name here refreshes each time you log in.') }}
+                {{ __('settings.to_change_your_name_or_email_update_your_record_in_the_hr_sy') }}
             </flux:text>
         </div>
 

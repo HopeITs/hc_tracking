@@ -7,7 +7,7 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
-new #[Title('Strategy')] class extends Component {
+new #[Title('titles.strategy')] class extends Component {
     public int $strategyId;
 
     public function mount(Strategy $strategy): void
@@ -43,30 +43,30 @@ new #[Title('Strategy')] class extends Component {
 <section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white">
     <x-ui.detail-header
         :breadcrumbs="[
-            ['label' => __('Strategies'), 'url' => route('strategies.index')],
+            ['label' => __('common.strategies'), 'url' => route('strategies.index')],
             ['label' => $this->strategy->name],
         ]"
         :title="$this->strategy->name"
-        :subtitle="__('Strategic period :start to :end', ['start' => $this->strategy->start_year, 'end' => $this->strategy->end_year])"
+        :subtitle="__('strategies.strategic_period_start_to_end', ['start' => $this->strategy->start_year, 'end' => $this->strategy->end_year])"
     >
         <x-slot:meta>
-            <span>{{ trans_choice(':count program|:count programs', $this->strategy->programs_count, ['count' => $this->strategy->programs_count]) }}</span>
-            <span>{{ __('Updated :date', ['date' => $this->strategy->updated_at?->format('M j, Y')]) }}</span>
+            <span>{{ trans_choice('strategies.count_program', $this->strategy->programs_count, ['count' => $this->strategy->programs_count]) }}</span>
+            <span>{{ __('common.updated_date', ['date' => $this->strategy->updated_at?->translatedFormat(__('formats.date'))]) }}</span>
         </x-slot:meta>
     </x-ui.detail-header>
 
     <div class="grid gap-3 @2xl/detail:grid-cols-3">
-        <x-ui.stat-tile :label="__('Period start')" :value="$this->strategy->start_year" />
-        <x-ui.stat-tile :label="__('Period end')" :value="$this->strategy->end_year" />
-        <x-ui.stat-tile :label="__('Programs')" :value="$this->strategy->programs_count" :unit="__('total')" />
+        <x-ui.stat-tile :label="__('strategies.period_start')" :value="$this->strategy->start_year" />
+        <x-ui.stat-tile :label="__('strategies.period_end')" :value="$this->strategy->end_year" />
+        <x-ui.stat-tile :label="__('common.programs')" :value="$this->strategy->programs_count" :unit="__('strategies.total')" />
     </div>
 
-    <x-ui.panel :title="__('Programs')" :count="$this->programs->count()" :subtitle="__('Delivery programs carried by this strategy.')">
+    <x-ui.panel :title="__('common.programs')" :count="$this->programs->count()" :subtitle="__('strategies.delivery_programs_carried_by_this_strategy')">
         @if ($this->programs->isEmpty())
             <x-ui.empty-state
                 icon="briefcase"
-                :heading="__('No programs yet')"
-                :body="__('Programs linked to this strategy will appear here.')"
+                :heading="__('common.no_programs_yet')"
+                :body="__('strategies.programs_linked_to_this_strategy_will_appear_here')"
             />
         @else
             <div class="divide-y divide-secondary-soft dark:divide-secondary-medium">
@@ -81,9 +81,9 @@ new #[Title('Strategy')] class extends Component {
                                 <p class="truncate text-sm font-semibold text-secondary-dark dark:text-white">{{ $program->name }}</p>
                             @endif
                             <p class="text-xs text-secondary-medium dark:text-secondary-soft">
-                                {{ trans_choice(':count project|:count projects', $program->projects_count, ['count' => $program->projects_count]) }}
+                                {{ trans_choice('common.count_project', $program->projects_count, ['count' => $program->projects_count]) }}
                                 ·
-                                {{ trans_choice(':count annual plan|:count annual plans', $program->yearly_plans_count, ['count' => $program->yearly_plans_count]) }}
+                                {{ trans_choice('common.count_annual_plan', $program->yearly_plans_count, ['count' => $program->yearly_plans_count]) }}
                             </p>
                         </div>
                         <x-ui.employee-chip :employee="$program->manager" class="@3xl/detail:w-64" />

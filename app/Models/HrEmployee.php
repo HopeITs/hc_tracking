@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\Locale;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -28,6 +29,7 @@ use Illuminate\Support\Str;
  * @property string $username
  * @property bool $is_active
  * @property-read string $name
+ * @property-read string $secondary_name
  * @property-read string $name_en
  * @property-read string $name_ar
  * @property CarbonImmutable|null $created_at
@@ -89,10 +91,12 @@ class HrEmployee extends HrModel
      */
     public static function pickerOptions(): Collection
     {
+        $suffix = Locale::current() === Locale::Arabic ? 'ar' : 'en';
+
         return static::query()
             ->select(self::NameColumns)
-            ->orderBy('first_name_en')
-            ->orderBy('last_name_en')
+            ->orderBy('first_name_'.$suffix)
+            ->orderBy('last_name_'.$suffix)
             ->orderBy('id')
             ->get();
     }
@@ -110,13 +114,27 @@ class HrEmployee extends HrModel
     }
 
     /**
-     * The employee's display name: the full English name.
+     * The employee's name in the interface language: Arabic when the site is
+     * in Arabic (falling back to English when HR has no Arabic name), English
+     * otherwise.
      *
      * @return Attribute<string, never>
      */
     protected function name(): Attribute
     {
-        return Attribute::get(fn (): string => $this->name_en);
+        return Attribute::get(fn (): string => Locale::current() === Locale::Arabic
+            ? ($this->name_ar !== '' ? $this->name_ar : $this->name_en)
+            : $this->name_en);
+    }
+
+    /**
+     * The employee's name in the other language, shown beside the main name.
+     *
+     * @return Attribute<string, never>
+     */
+    protected function secondaryName(): Attribute
+    {
+        return Attribute::get(fn (): string => Locale::current() === Locale::Arabic ? $this->name_en : $this->name_ar);
     }
 
     /**

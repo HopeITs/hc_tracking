@@ -17,7 +17,7 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('Targets')] class extends Component {
+new #[Title('titles.targets')] class extends Component {
     use WithPagination;
 
     /**
@@ -105,7 +105,7 @@ new #[Title('Targets')] class extends Component {
                 'indicator:id,name,result_id,measure',
                 'indicator.result:id,statement,type',
                 'project:id,name,city_id',
-                'project.city:id,name_en',
+                'project.city:id,name_en,name_ar',
             ])
             ->withCount('reports')
             ->when($search !== '', function ($query) use ($search): void {
@@ -146,7 +146,7 @@ new #[Title('Targets')] class extends Component {
             ->get()
             ->map(fn (YearlyPlan $plan): array => [
                 'id' => $plan->id,
-                'label' => __('FY :year · :program', ['year' => $plan->year, 'program' => $plan->program->name]),
+                'label' => __('common.fy_year_program', ['year' => $plan->year, 'program' => $plan->program->name]),
             ])
             ->all();
     }
@@ -195,7 +195,7 @@ new #[Title('Targets')] class extends Component {
         }
 
         if ($source instanceof YearlyPlan) {
-            return __('FY :year', ['year' => $source->year]);
+            return __('common.fy_year', ['year' => $source->year]);
         }
 
         if ($source instanceof Proposal) {
@@ -238,13 +238,13 @@ new #[Title('Targets')] class extends Component {
             'targetProjectId' => ['nullable', 'integer', Rule::exists(Project::class, 'id')],
             'targetPeriod' => ['required', new Enum(Period::class)],
         ], [
-            'targetSourceType.required' => __('Choose where this target was committed.'),
-            'targetSourceType.in' => __('A target can only be committed in an annual plan or a proposal.'),
-            'targetSourceId.required' => __('Select the annual plan or proposal.'),
-            'targetIndicatorId.required' => __('Select the indicator being targeted.'),
-            'targetValue.required' => __('Enter the target value.'),
-            'targetValue.min' => __('A target cannot be negative.'),
-            'targetValue.max' => __('The target value is too large to record.'),
+            'targetSourceType.required' => __('targets.choose_where_this_target_was_committed'),
+            'targetSourceType.in' => __('targets.a_target_can_only_be_committed_in_an_annual_plan_or_a_propos'),
+            'targetSourceId.required' => __('targets.select_the_annual_plan_or_proposal'),
+            'targetIndicatorId.required' => __('targets.select_the_indicator_being_targeted'),
+            'targetValue.required' => __('targets.enter_the_target_value'),
+            'targetValue.min' => __('targets.a_target_cannot_be_negative'),
+            'targetValue.max' => __('targets.the_target_value_is_too_large_to_record'),
         ]);
 
         // The chosen source must actually exist under the chosen type. A single
@@ -254,7 +254,7 @@ new #[Title('Targets')] class extends Component {
             : YearlyPlan::query()->whereKey((int) $validated['targetSourceId'])->exists();
 
         if (! $sourceExists) {
-            $this->addError('targetSourceId', __('The selected source is no longer available.'));
+            $this->addError('targetSourceId', __('targets.the_selected_source_is_no_longer_available'));
 
             return;
         }
@@ -283,7 +283,7 @@ new #[Title('Targets')] class extends Component {
 
         Flux::toast(
             variant: 'success',
-            text: $wasRecentlyCreated ? __('Target committed.') : __('Target updated.'),
+            text: $wasRecentlyCreated ? __('targets.target_committed') : __('targets.target_updated'),
         );
     }
 
@@ -303,7 +303,7 @@ new #[Title('Targets')] class extends Component {
 
             Flux::toast(
                 variant: 'danger',
-                text: __('This target has been reported against. Deleting it would remove those measurements.'),
+                text: __('targets.this_target_has_been_reported_against_deleting_it_would_remo'),
             );
 
             return;
@@ -314,7 +314,7 @@ new #[Title('Targets')] class extends Component {
         $this->deletingTargetId = null;
         $this->resetPage();
 
-        Flux::toast(variant: 'success', text: __('Target deleted.'));
+        Flux::toast(variant: 'success', text: __('targets.target_deleted'));
     }
 
     public function closeTargetModal(): void
@@ -339,61 +339,61 @@ new #[Title('Targets')] class extends Component {
 
 @php
     $filtersAreActive = $search !== '' || $sourceType !== '' || $project !== '' || $period !== '';
-    $sourceTypeLabels = ['yearly_plan' => __('Annual plan'), 'proposal' => __('Proposal')];
+    $sourceTypeLabels = ['yearly_plan' => __('common.annual_plan'), 'proposal' => __('common.proposal')];
 @endphp
 
 <section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="target-directory-heading">
     <x-ui.page-header
         heading-id="target-directory-heading"
-        :title="__('Targets')"
+        :title="__('common.targets')"
         :count="$this->targets->total()"
-        :description="__('What was committed, where it was committed, and against which project.')"
+        :description="__('targets.what_was_committed_where_it_was_committed_and_against_which')"
     >
         <x-slot:filters>
-            <x-ui.input type="search" icon="magnifying-glass" :label="__('Search targets')" :placeholder="__('Indicator name')" wire:model.live.debounce.300ms="search" clearable />
+            <x-ui.input type="search" icon="magnifying-glass" :label="__('targets.search_targets')" :placeholder="__('common.indicator_name')" wire:model.live.debounce.300ms="search" clearable />
 
-            <x-ui.select :label="__('Committed in')" wire:model.live="sourceType">
-                <flux:select.option value="">{{ __('Any source') }}</flux:select.option>
+            <x-ui.select :label="__('targets.committed_in')" wire:model.live="sourceType">
+                <flux:select.option value="">{{ __('targets.any_source') }}</flux:select.option>
                 @foreach ($sourceTypeLabels as $sourceKey => $sourceLabel)
                     <flux:select.option :value="$sourceKey" :wire:key="'tgt-source-'.$sourceKey">{{ $sourceLabel }}</flux:select.option>
                 @endforeach
             </x-ui.select>
 
-            <x-ui.select :label="__('Project')" wire:model.live="project">
-                <flux:select.option value="">{{ __('Any project') }}</flux:select.option>
-                <flux:select.option value="none">{{ __('Organisation-wide') }}</flux:select.option>
+            <x-ui.select :label="__('common.project')" wire:model.live="project">
+                <flux:select.option value="">{{ __('targets.any_project') }}</flux:select.option>
+                <flux:select.option value="none">{{ __('common.organisation_wide') }}</flux:select.option>
                 @foreach ($this->projectOptions as $projectOption)
                     <flux:select.option :value="$projectOption->id" :wire:key="'tgt-project-'.$projectOption->id">{{ $projectOption->name }}</flux:select.option>
                 @endforeach
             </x-ui.select>
 
-            <x-ui.select :label="__('Period')" wire:model.live="period">
-                <flux:select.option value="">{{ __('All periods') }}</flux:select.option>
+            <x-ui.select :label="__('common.period')" wire:model.live="period">
+                <flux:select.option value="">{{ __('targets.all_periods') }}</flux:select.option>
                 @foreach (Period::cases() as $periodCase)
-                    <flux:select.option :value="$periodCase->value" :wire:key="'tgt-period-'.$periodCase->value">{{ Str::title($periodCase->value) }}</flux:select.option>
+                    <flux:select.option :value="$periodCase->value" :wire:key="'tgt-period-'.$periodCase->value">{{ $periodCase->label() }}</flux:select.option>
                 @endforeach
             </x-ui.select>
         </x-slot:filters>
 
         <x-slot:actions>
             <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-target-button">
-                {{ __('Commit target') }}
+                {{ __('targets.commit_target') }}
             </x-ui.button>
         </x-slot:actions>
     </x-ui.page-header>
 
-    <x-ui.panel :subtitle="trans_choice('{1} :count matching target|[2,*] :count matching targets', $this->targets->total(), ['count' => $this->targets->total()])">
+    <x-ui.panel :subtitle="trans_choice('targets.count_matching_target', $this->targets->total(), ['count' => $this->targets->total()])">
         <x-slot:toolbar>
             @if ($filtersAreActive)
-                <flux:button size="sm" variant="ghost" class="text-secondary-medium! dark:text-secondary-soft!" wire:click="clearFilters">{{ __('Reset filters') }}</flux:button>
+                <flux:button size="sm" variant="ghost" class="text-secondary-medium! dark:text-secondary-soft!" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
             @endif
         </x-slot:toolbar>
 
         @if ($this->targets->isEmpty())
             <x-ui.empty-state
                 icon="chart-bar"
-                :heading="$filtersAreActive ? __('No matching targets') : __('No targets yet')"
-                :body="$filtersAreActive ? __('Change the search or filters and try again.') : __('Commit the first target in an annual plan or a proposal.')"
+                :heading="$filtersAreActive ? __('targets.no_matching_targets') : __('common.no_targets_yet')"
+                :body="$filtersAreActive ? __('common.change_the_search_or_filters_and_try_again') : __('targets.commit_the_first_target_in_an_annual_plan_or_a_proposal')"
             />
         @else
             <div class="divide-y divide-secondary-soft dark:divide-secondary-medium">
@@ -406,9 +406,9 @@ new #[Title('Targets')] class extends Component {
                                 {{ Str::limit($target->indicator->result->statement, 60) }}
                                 ·
                                 @if ($target->project === null)
-                                    {{ __('Organisation-wide') }}
+                                    {{ __('common.organisation_wide') }}
                                 @else
-                                    {{ $target->project->name }} · {{ $target->project->city?->name_en ?? __('Unknown city') }}
+                                    {{ $target->project->name }} · {{ $target->project->city?->name ?? __('common.unknown_city') }}
                                 @endif
                             </p>
                         </div>
@@ -423,7 +423,7 @@ new #[Title('Targets')] class extends Component {
                                 {{-- source_id has no foreign key: the plan or proposal can be
                                      removed out from under this row. --}}
                                 <span class="rounded-md border border-primary px-2 py-0.5 text-[11px] font-semibold text-primary">
-                                    {{ __('Source no longer available') }}
+                                    {{ __('targets.source_no_longer_available') }}
                                 </span>
                             @else
                                 <span class="text-xs font-medium">{{ $sourceLabel }}</span>
@@ -433,16 +433,16 @@ new #[Title('Targets')] class extends Component {
                         <x-ui.enum-badge :case="$target->period" />
                         <span class="text-sm font-semibold tabular-nums">{{ number_format((float) $target->target, 2) }}</span>
 
-                        <span class="inline-flex min-w-6 items-center justify-center rounded-md border border-secondary-light px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-secondary-medium dark:text-secondary-soft" title="{{ __('Reports') }}">
+                        <span class="inline-flex min-w-6 items-center justify-center rounded-md border border-secondary-light px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-secondary-medium dark:text-secondary-soft" title="{{ __('common.reports') }}">
                             {{ $target->reports_count }}
                         </span>
 
-                        <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $target->id }})" :aria-label="__('Edit target')" />
+                        <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $target->id }})" :aria-label="__('targets.edit_target')" />
 
                         @if ($target->reports_count === 0)
-                            <x-ui.button tone="ghost" size="sm" icon="trash" class="size-9!" wire:click="confirmDelete({{ $target->id }})" :aria-label="__('Delete target')" />
+                            <x-ui.button tone="ghost" size="sm" icon="trash" class="size-9!" wire:click="confirmDelete({{ $target->id }})" :aria-label="__('targets.delete_target')" />
                         @else
-                            <flux:tooltip :content="__('Targets that have been reported against cannot be deleted.')">
+                            <flux:tooltip :content="__('targets.targets_that_have_been_reported_against_cannot_be_deleted')">
                                 <span class="inline-flex size-9 cursor-not-allowed items-center justify-center text-secondary-light" aria-disabled="true">
                                     <flux:icon.lock-closed class="size-4" />
                                 </span>
@@ -462,19 +462,19 @@ new #[Title('Targets')] class extends Component {
         @if ($showTargetModal)
         <form wire:submit="saveTarget" class="space-y-5">
             <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ $editingTargetId === null ? __('Commit target') : __('Edit target') }}</flux:heading>
-                <flux:subheading>{{ __('A target is committed either in an annual operational plan or in a donor proposal.') }}</flux:subheading>
+                <flux:heading size="lg">{{ $editingTargetId === null ? __('targets.commit_target') : __('targets.edit_target') }}</flux:heading>
+                <flux:subheading>{{ __('targets.a_target_is_committed_either_in_an_annual_operational_plan_o') }}</flux:subheading>
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.select wire:model.live="targetSourceType" :label="__('Committed in')" required>
+                <x-ui.select wire:model.live="targetSourceType" :label="__('targets.committed_in')" required>
                     @foreach ($sourceTypeLabels as $sourceKey => $sourceLabel)
                         <flux:select.option :value="$sourceKey" :wire:key="'tgt-source-option-'.$sourceKey">{{ $sourceLabel }}</flux:select.option>
                     @endforeach
                 </x-ui.select>
 
-                <x-ui.select wire:model="targetSourceId" :label="$targetSourceType === 'proposal' ? __('Proposal') : __('Annual plan')" required>
-                    <flux:select.option value="">{{ __('Select a source') }}</flux:select.option>
+                <x-ui.select wire:model="targetSourceId" :label="$targetSourceType === 'proposal' ? __('common.proposal') : __('common.annual_plan')" required>
+                    <flux:select.option value="">{{ __('targets.select_a_source') }}</flux:select.option>
                     @foreach ($this->sourceOptions as $sourceOption)
                         <flux:select.option :value="$sourceOption['id']" :wire:key="'tgt-src-'.$targetSourceType.'-'.$sourceOption['id']">
                             {{ $sourceOption['label'] }}
@@ -483,24 +483,24 @@ new #[Title('Targets')] class extends Component {
                 </x-ui.select>
             </div>
 
-            <x-ui.select wire:model="targetIndicatorId" :label="__('Indicator')" required>
-                <flux:select.option value="">{{ __('Select an indicator') }}</flux:select.option>
+            <x-ui.select wire:model="targetIndicatorId" :label="__('targets.indicator')" required>
+                <flux:select.option value="">{{ __('targets.select_an_indicator') }}</flux:select.option>
                 @foreach ($this->indicatorOptions as $indicatorOption)
                     <flux:select.option :value="$indicatorOption->id" :wire:key="'tgt-indicator-'.$indicatorOption->id">{{ $indicatorOption->name }}</flux:select.option>
                 @endforeach
             </x-ui.select>
 
             <div class="grid gap-4 sm:grid-cols-3">
-                <x-ui.input wire:model="targetValue" :label="__('Target value')" type="number" step="0.01" min="0" required />
+                <x-ui.input wire:model="targetValue" :label="__('targets.target_value')" type="number" step="0.01" min="0" required />
 
-                <x-ui.select wire:model="targetPeriod" :label="__('Reporting period')" required>
+                <x-ui.select wire:model="targetPeriod" :label="__('targets.reporting_period')" required>
                     @foreach (Period::cases() as $periodCase)
-                        <flux:select.option :value="$periodCase->value" :wire:key="'tgt-period-option-'.$periodCase->value">{{ Str::title($periodCase->value) }}</flux:select.option>
+                        <flux:select.option :value="$periodCase->value" :wire:key="'tgt-period-option-'.$periodCase->value">{{ $periodCase->label() }}</flux:select.option>
                     @endforeach
                 </x-ui.select>
 
-                <x-ui.select wire:model="targetProjectId" :label="__('Project')">
-                    <flux:select.option value="">{{ __('Organisation-wide') }}</flux:select.option>
+                <x-ui.select wire:model="targetProjectId" :label="__('common.project')">
+                    <flux:select.option value="">{{ __('common.organisation_wide') }}</flux:select.option>
                     @foreach ($this->projectOptions as $projectOption)
                         <flux:select.option :value="$projectOption->id" :wire:key="'tgt-project-option-'.$projectOption->id">{{ $projectOption->name }}</flux:select.option>
                     @endforeach
@@ -508,9 +508,9 @@ new #[Title('Targets')] class extends Component {
             </div>
 
             <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeTargetModal">{{ __('Cancel') }}</x-ui.button>
+                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeTargetModal">{{ __('common.cancel') }}</x-ui.button>
                 <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-target-button">
-                    {{ $editingTargetId === null ? __('Commit target') : __('Save changes') }}
+                    {{ $editingTargetId === null ? __('targets.commit_target') : __('common.save_changes') }}
                 </x-ui.button>
             </div>
         </form>
@@ -520,11 +520,11 @@ new #[Title('Targets')] class extends Component {
     <flux:modal :open="$deletingTargetId !== null" wire:close="$set('deletingTargetId', null)" class="w-full max-w-md border border-secondary-light! bg-white! dark:bg-secondary-dark!">
         @if ($deletingTargetId !== null)
         <div class="space-y-4">
-            <flux:heading size="lg">{{ __('Delete this target?') }}</flux:heading>
-            <flux:subheading>{{ __('Only a target with no reports can be deleted. Otherwise every measurement recorded against it would go too.') }}</flux:subheading>
+            <flux:heading size="lg">{{ __('targets.delete_this_target') }}</flux:heading>
+            <flux:subheading>{{ __('targets.only_a_target_with_no_reports_can_be_deleted_otherwise_every') }}</flux:subheading>
             <div class="flex justify-end gap-2 border-t border-secondary-soft pt-4 dark:border-secondary-medium">
-                <x-ui.button type="button" wire:click="$set('deletingTargetId', null)">{{ __('Cancel') }}</x-ui.button>
-                <x-ui.button type="button" tone="primary" wire:click="deleteTarget" data-test="confirm-delete-target">{{ __('Delete target') }}</x-ui.button>
+                <x-ui.button type="button" wire:click="$set('deletingTargetId', null)">{{ __('common.cancel') }}</x-ui.button>
+                <x-ui.button type="button" tone="primary" wire:click="deleteTarget" data-test="confirm-delete-target">{{ __('targets.delete_target') }}</x-ui.button>
             </div>
         </div>
         @endif

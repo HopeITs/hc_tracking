@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Enums\Concerns\HasTranslatedLabel;
+
 /**
  * The states a project moves through from first draft to archive.
  *
@@ -18,6 +20,8 @@ namespace App\Enums;
  */
 enum ProjectStatus: string
 {
+    use HasTranslatedLabel;
+
     case Draft = 'draft';
     case Submitted = 'submitted';
     case Approved = 'approved';

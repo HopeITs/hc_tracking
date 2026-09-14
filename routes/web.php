@@ -1,9 +1,12 @@
 <?php
 
+use App\Http\Controllers\SwitchLocaleController;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
+
+Route::post('locale', SwitchLocaleController::class)->name('locale.update');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::view('dashboard', 'dashboard')->name('dashboard');

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Enums\Concerns\HasTranslatedLabel;
+
 /**
  * The states a proposal moves through, from first concept to archive.
  *
@@ -14,6 +16,8 @@ namespace App\Enums;
  */
 enum ProposalStatus: string
 {
+    use HasTranslatedLabel;
+
     case ConceptNote = 'concept note';
     case ProposalDraft = 'proposal draft';
     case Submitted = 'submitted';

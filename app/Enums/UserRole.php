@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Enums\Concerns\HasTranslatedLabel;
+
 /**
  * The roles a user can hold.
  *
@@ -14,6 +16,8 @@ namespace App\Enums;
  */
 enum UserRole: string
 {
+    use HasTranslatedLabel;
+
     case Officer = 'Officer';
     case Manager = 'Manager';
     case Meal = 'MEAL';

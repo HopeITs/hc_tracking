@@ -14,7 +14,7 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('Reports')] class extends Component {
+new #[Title('titles.reports')] class extends Component {
     use WithPagination;
 
     #[Url(except: '')]
@@ -145,7 +145,7 @@ new #[Title('Reports')] class extends Component {
         if (! $report->isEditable()) {
             Flux::toast(
                 variant: 'danger',
-                text: __('Only draft reports can be edited. Return it to draft on the report page first.'),
+                text: __('reports.only_draft_reports_can_be_edited_return_it_to_draft_on_the_r'),
             );
 
             return;
@@ -189,7 +189,7 @@ new #[Title('Reports')] class extends Component {
 
             Flux::toast(
                 variant: 'danger',
-                text: __('Only draft reports can be edited. Return it to draft on the report page first.'),
+                text: __('reports.only_draft_reports_can_be_edited_return_it_to_draft_on_the_r'),
             );
 
             return;
@@ -219,12 +219,12 @@ new #[Title('Reports')] class extends Component {
             'nextPeriodPlans' => ['nullable', 'string'],
             'submitDate' => ['nullable', 'date'],
         ], [
-            'reportTargetId.required' => __('Select the target this reports against.'),
-            'plannedDate.required' => __('Set the period this figure covers.'),
-            'value.required' => __('Enter the reported value.'),
-            'value.min' => __('A reported value cannot be negative.'),
-            'value.max' => __('The reported value is too large to record.'),
-            'periodEnd.after_or_equal' => __('The narrative window end cannot be before its start.'),
+            'reportTargetId.required' => __('reports.select_the_target_this_reports_against'),
+            'plannedDate.required' => __('reports.set_the_period_this_figure_covers'),
+            'value.required' => __('reports.enter_the_reported_value'),
+            'value.min' => __('reports.a_reported_value_cannot_be_negative'),
+            'value.max' => __('reports.the_reported_value_is_too_large_to_record'),
+            'periodEnd.after_or_equal' => __('reports.the_narrative_window_end_cannot_be_before_its_start'),
         ]);
 
         $attributes = [
@@ -259,7 +259,7 @@ new #[Title('Reports')] class extends Component {
 
         Flux::toast(
             variant: 'success',
-            text: $isCreate ? __('Report recorded.') : __('Report updated.'),
+            text: $isCreate ? __('reports.report_recorded') : __('reports.report_updated'),
         );
     }
 
@@ -296,28 +296,28 @@ new #[Title('Reports')] class extends Component {
 <section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="report-directory-heading">
     <x-ui.page-header
         heading-id="report-directory-heading"
-        :title="__('Reports')"
+        :title="__('common.reports')"
         :count="$this->reports->total()"
-        :description="__('Reported figures against committed targets, newest period first.')"
+        :description="__('reports.reported_figures_against_committed_targets_newest_period_fir')"
     >
         <x-slot:filters>
-            <x-ui.input type="search" icon="magnifying-glass" :label="__('Search reports')" :placeholder="__('Indicator or narrative')" wire:model.live.debounce.300ms="search" clearable />
+            <x-ui.input type="search" icon="magnifying-glass" :label="__('reports.search_reports')" :placeholder="__('reports.indicator_or_narrative')" wire:model.live.debounce.300ms="search" clearable />
 
-            <x-ui.select :label="__('Status')" wire:model.live="status">
-                <flux:select.option value="">{{ __('All reports') }}</flux:select.option>
+            <x-ui.select :label="__('common.status')" wire:model.live="status">
+                <flux:select.option value="">{{ __('reports.all_reports') }}</flux:select.option>
                 @foreach (ReportStatus::cases() as $statusCase)
-                    <flux:select.option :value="$statusCase->value" :wire:key="'rpt-status-'.$statusCase->value">{{ Str::title($statusCase->value) }}</flux:select.option>
+                    <flux:select.option :value="$statusCase->value" :wire:key="'rpt-status-'.$statusCase->value">{{ $statusCase->label() }}</flux:select.option>
                 @endforeach
             </x-ui.select>
 
-            <x-ui.select :label="__('MEAL review')" wire:model.live="seenByMeal">
-                <flux:select.option value="">{{ __('Any') }}</flux:select.option>
-                <flux:select.option value="seen">{{ __('Seen by MEAL') }}</flux:select.option>
-                <flux:select.option value="unseen">{{ __('Not yet seen') }}</flux:select.option>
+            <x-ui.select :label="__('reports.meal_review')" wire:model.live="seenByMeal">
+                <flux:select.option value="">{{ __('reports.any') }}</flux:select.option>
+                <flux:select.option value="seen">{{ __('reports.seen_by_meal') }}</flux:select.option>
+                <flux:select.option value="unseen">{{ __('reports.not_yet_seen') }}</flux:select.option>
             </x-ui.select>
 
-            <x-ui.select :label="__('Reported by')" wire:model.live="author">
-                <flux:select.option value="">{{ __('Anyone') }}</flux:select.option>
+            <x-ui.select :label="__('reports.reported_by')" wire:model.live="author">
+                <flux:select.option value="">{{ __('common.anyone') }}</flux:select.option>
                 @foreach ($this->authorOptions as $authorOption)
                     <flux:select.option :value="$authorOption->id" :wire:key="'rpt-author-'.$authorOption->id">{{ $authorOption->name }}</flux:select.option>
                 @endforeach
@@ -326,23 +326,23 @@ new #[Title('Reports')] class extends Component {
 
         <x-slot:actions>
             <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-report-button">
-                {{ __('Record report') }}
+                {{ __('reports.record_report') }}
             </x-ui.button>
         </x-slot:actions>
     </x-ui.page-header>
 
-    <x-ui.panel :subtitle="trans_choice('{1} :count matching report|[2,*] :count matching reports', $this->reports->total(), ['count' => $this->reports->total()])">
+    <x-ui.panel :subtitle="trans_choice('reports.count_matching_report', $this->reports->total(), ['count' => $this->reports->total()])">
         <x-slot:toolbar>
             @if ($filtersAreActive)
-                <flux:button size="sm" variant="ghost" class="text-secondary-medium! dark:text-secondary-soft!" wire:click="clearFilters">{{ __('Reset filters') }}</flux:button>
+                <flux:button size="sm" variant="ghost" class="text-secondary-medium! dark:text-secondary-soft!" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
             @endif
         </x-slot:toolbar>
 
         @if ($this->reports->isEmpty())
             <x-ui.empty-state
                 icon="document-chart-bar"
-                :heading="$filtersAreActive ? __('No matching reports') : __('No reports yet')"
-                :body="$filtersAreActive ? __('Change the search or filters and try again.') : __('Record the first figure against a target.')"
+                :heading="$filtersAreActive ? __('reports.no_matching_reports') : __('reports.no_reports_yet')"
+                :body="$filtersAreActive ? __('common.change_the_search_or_filters_and_try_again') : __('reports.record_the_first_figure_against_a_target')"
             />
         @else
             <div class="divide-y divide-secondary-soft dark:divide-secondary-medium">
@@ -353,16 +353,16 @@ new #[Title('Reports')] class extends Component {
                                 {{ $report->planIndicator->indicator->name }}
                             </a>
                             <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">
-                                {{ $report->planned_date?->format('M j, Y') }}
-                                · {{ $report->planIndicator->project?->name ?? __('Organisation-wide') }}
-                                · {{ trans_choice(':count file|:count files', $report->files_count, ['count' => $report->files_count]) }}
+                                {{ $report->planned_date?->translatedFormat(__('formats.date')) }}
+                                · {{ $report->planIndicator->project?->name ?? __('common.organisation_wide') }}
+                                · {{ trans_choice('reports.count_file', $report->files_count, ['count' => $report->files_count]) }}
                             </p>
                         </div>
 
-                        <div class="text-right">
+                        <div class="text-end">
                             <p class="text-sm font-semibold tabular-nums">{{ number_format((float) $report->value, 2) }}</p>
                             <p class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">
-                                {{ __('of :target', ['target' => number_format((float) $report->planIndicator->target, 2)]) }}
+                                {{ __('reports.of_target', ['target' => number_format((float) $report->planIndicator->target, 2)]) }}
                             </p>
                         </div>
 
@@ -370,7 +370,7 @@ new #[Title('Reports')] class extends Component {
                             <x-ui.enum-badge :case="$report->status" />
 
                             @if ($report->is_seen_by_meal)
-                                <span class="rounded-md border border-secondary-light px-2 py-0.5 text-[11px] font-semibold text-secondary-medium dark:text-secondary-soft">{{ __('MEAL') }}</span>
+                                <span class="rounded-md border border-secondary-light px-2 py-0.5 text-[11px] font-semibold text-secondary-medium dark:text-secondary-soft">{{ __('reports.meal') }}</span>
                             @endif
                         </div>
 
@@ -378,9 +378,9 @@ new #[Title('Reports')] class extends Component {
 
                         {{-- No delete: a measurement is the record. --}}
                         @if ($report->isEditable())
-                            <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $report->id }})" :aria-label="__('Edit report')" />
+                            <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $report->id }})" :aria-label="__('reports.edit_report')" />
                         @else
-                            <flux:tooltip :content="__('Only draft reports can be edited.')">
+                            <flux:tooltip :content="__('reports.only_draft_reports_can_be_edited')">
                                 <span class="inline-flex size-9 cursor-not-allowed items-center justify-center text-secondary-light" aria-disabled="true">
                                     <flux:icon.lock-closed class="size-4" />
                                 </span>
@@ -400,12 +400,12 @@ new #[Title('Reports')] class extends Component {
         @if ($showReportModal)
         <form wire:submit="saveReport" class="space-y-5">
             <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ $editingReportId === null ? __('Record report') : __('Edit report') }}</flux:heading>
-                <flux:subheading>{{ __('Status and MEAL review are recorded on the report page, not here.') }}</flux:subheading>
+                <flux:heading size="lg">{{ $editingReportId === null ? __('reports.record_report') : __('reports.edit_report') }}</flux:heading>
+                <flux:subheading>{{ __('reports.status_and_meal_review_are_recorded_on_the_report_page_not_h') }}</flux:subheading>
             </div>
 
-            <x-ui.select wire:model="reportTargetId" :label="__('Target')" required>
-                <flux:select.option value="">{{ __('Select a target') }}</flux:select.option>
+            <x-ui.select wire:model="reportTargetId" :label="__('reports.target')" required>
+                <flux:select.option value="">{{ __('reports.select_a_target') }}</flux:select.option>
                 @foreach ($this->targetOptions as $targetOption)
                     <flux:select.option :value="$targetOption->id" :wire:key="'rpt-target-'.$targetOption->id">
                         {{ $targetOption->indicator->name }} — {{ number_format((float) $targetOption->target, 2) }}
@@ -414,28 +414,28 @@ new #[Title('Reports')] class extends Component {
             </x-ui.select>
 
             <div class="grid gap-4 sm:grid-cols-3">
-                <x-ui.input wire:model="plannedDate" :label="__('Period covered')" type="date" required />
-                <x-ui.input wire:model="value" :label="__('Reported value')" type="number" step="0.01" required />
-                <x-ui.input wire:model="submitDate" :label="__('Submitted on')" type="date" />
+                <x-ui.input wire:model="plannedDate" :label="__('reports.period_covered')" type="date" required />
+                <x-ui.input wire:model="value" :label="__('reports.reported_value')" type="number" step="0.01" required />
+                <x-ui.input wire:model="submitDate" :label="__('reports.submitted_on')" type="date" />
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.input wire:model="periodStart" :label="__('Narrative window start')" type="date" />
-                <x-ui.input wire:model="periodEnd" :label="__('Narrative window end')" type="date" />
+                <x-ui.input wire:model="periodStart" :label="__('reports.narrative_window_start')" type="date" />
+                <x-ui.input wire:model="periodEnd" :label="__('reports.narrative_window_end')" type="date" />
             </div>
 
-            <flux:textarea wire:model="narrativeNotes" :label="__('Narrative notes')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
+            <flux:textarea wire:model="narrativeNotes" :label="__('reports.narrative_notes')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
 
-            <flux:textarea wire:model="executiveSummary" :label="__('Executive summary')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
-            <flux:textarea wire:model="keyAchievements" :label="__('Key achievements')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
-            <flux:textarea wire:model="challenges" :label="__('Challenges')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
-            <flux:textarea wire:model="lessonsLearned" :label="__('Lessons learned')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
-            <flux:textarea wire:model="nextPeriodPlans" :label="__('Next period plans')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
+            <flux:textarea wire:model="executiveSummary" :label="__('reports.executive_summary')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
+            <flux:textarea wire:model="keyAchievements" :label="__('reports.key_achievements')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
+            <flux:textarea wire:model="challenges" :label="__('reports.challenges')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
+            <flux:textarea wire:model="lessonsLearned" :label="__('reports.lessons_learned')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
+            <flux:textarea wire:model="nextPeriodPlans" :label="__('reports.next_period_plans')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
 
             <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeReportModal">{{ __('Cancel') }}</x-ui.button>
+                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeReportModal">{{ __('common.cancel') }}</x-ui.button>
                 <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-report-button">
-                    {{ $editingReportId === null ? __('Record report') : __('Save changes') }}
+                    {{ $editingReportId === null ? __('reports.record_report') : __('common.save_changes') }}
                 </x-ui.button>
             </div>
         </form>

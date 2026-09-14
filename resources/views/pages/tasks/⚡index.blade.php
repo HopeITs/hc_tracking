@@ -18,7 +18,7 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('Tasks')] class extends Component {
+new #[Title('titles.tasks')] class extends Component {
     use WithPagination;
 
     #[Url(except: '')]
@@ -189,15 +189,15 @@ new #[Title('Tasks')] class extends Component {
             'taskProposalId' => ['required', 'integer', Rule::exists(Proposal::class, 'id')],
             'taskMilestoneId' => ['nullable', 'integer', Rule::exists(Milestone::class, 'id')],
         ], [
-            'title.required' => __('Enter a task title.'),
-            'assignedTo.required' => __('Assign this task to someone.'),
-            'assignedTo.exists' => __('The selected assignee is no longer available.'),
-            'taskProposalId.required' => __('Select the proposal this task delivers against.'),
-            'taskProposalId.exists' => __('The selected proposal is no longer available.'),
-            'taskMilestoneId.exists' => __('The selected milestone is no longer available.'),
-            'dueDate.after_or_equal' => __('The due date cannot fall before the start date.'),
-            'progressPercentage.min' => __('Progress cannot be negative.'),
-            'progressPercentage.max' => __('Progress cannot exceed 100 percent.'),
+            'title.required' => __('tasks.enter_a_task_title'),
+            'assignedTo.required' => __('tasks.assign_this_task_to_someone'),
+            'assignedTo.exists' => __('tasks.the_selected_assignee_is_no_longer_available'),
+            'taskProposalId.required' => __('tasks.select_the_proposal_this_task_delivers_against'),
+            'taskProposalId.exists' => __('common.the_selected_proposal_is_no_longer_available'),
+            'taskMilestoneId.exists' => __('tasks.the_selected_milestone_is_no_longer_available'),
+            'dueDate.after_or_equal' => __('tasks.the_due_date_cannot_fall_before_the_start_date'),
+            'progressPercentage.min' => __('tasks.progress_cannot_be_negative'),
+            'progressPercentage.max' => __('tasks.progress_cannot_exceed_100_percent'),
         ]);
 
         $isCreate = $this->editingTaskId === null;
@@ -225,7 +225,7 @@ new #[Title('Tasks')] class extends Component {
         $this->resetTaskForm();
         $this->resetPage();
 
-        Flux::toast(variant: 'success', text: $isCreate ? __('Task created.') : __('Task updated.'));
+        Flux::toast(variant: 'success', text: $isCreate ? __('tasks.task_created') : __('tasks.task_updated'));
     }
 
     public function confirmDelete(int $taskId): void
@@ -242,7 +242,7 @@ new #[Title('Tasks')] class extends Component {
         Task::query()->findOrFail($this->deletingTaskId)->delete();
         $this->deletingTaskId = null;
         $this->resetPage();
-        Flux::toast(variant: 'success', text: __('Task deleted.'));
+        Flux::toast(variant: 'success', text: __('tasks.task_deleted'));
     }
 
     public function closeTaskModal(): void
@@ -282,54 +282,54 @@ new #[Title('Tasks')] class extends Component {
 @endphp
 
 <section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="task-directory-heading">
-    <x-ui.page-header heading-id="task-directory-heading" :title="__('Tasks')" :count="$this->tasks->total()" :description="__('Work items across every proposal, ordered by the nearest due date.')">
+    <x-ui.page-header heading-id="task-directory-heading" :title="__('common.tasks')" :count="$this->tasks->total()" :description="__('tasks.work_items_across_every_proposal_ordered_by_the_nearest_due')">
         <x-slot:filters>
-            <x-ui.input type="search" icon="magnifying-glass" :label="__('Search tasks')" :placeholder="__('Title, description, or assignee')" wire:model.live.debounce.300ms="search" clearable />
-            <x-ui.select :label="__('Status')" wire:model.live="status">
-                <flux:select.option value="">{{ __('All statuses') }}</flux:select.option>
+            <x-ui.input type="search" icon="magnifying-glass" :label="__('tasks.search_tasks')" :placeholder="__('tasks.title_description_or_assignee')" wire:model.live.debounce.300ms="search" clearable />
+            <x-ui.select :label="__('common.status')" wire:model.live="status">
+                <flux:select.option value="">{{ __('common.all_statuses') }}</flux:select.option>
                 @foreach (TaskStatus::cases() as $statusCase)
-                    <flux:select.option :value="$statusCase->value" :wire:key="'task-status-filter-'.$statusCase->value">{{ Str::title($statusCase->value) }}</flux:select.option>
+                    <flux:select.option :value="$statusCase->value" :wire:key="'task-status-filter-'.$statusCase->value">{{ $statusCase->label() }}</flux:select.option>
                 @endforeach
             </x-ui.select>
-            <x-ui.select :label="__('Priority')" wire:model.live="priority">
-                <flux:select.option value="">{{ __('All priorities') }}</flux:select.option>
+            <x-ui.select :label="__('tasks.priority')" wire:model.live="priority">
+                <flux:select.option value="">{{ __('tasks.all_priorities') }}</flux:select.option>
                 @foreach (TaskPriority::cases() as $priorityCase)
-                    <flux:select.option :value="$priorityCase->value" :wire:key="'task-priority-filter-'.$priorityCase->value">{{ Str::title($priorityCase->value) }}</flux:select.option>
+                    <flux:select.option :value="$priorityCase->value" :wire:key="'task-priority-filter-'.$priorityCase->value">{{ $priorityCase->label() }}</flux:select.option>
                 @endforeach
             </x-ui.select>
-            <x-ui.select :label="__('Assignee')" wire:model.live="assignee">
-                <flux:select.option value="">{{ __('Anyone') }}</flux:select.option>
+            <x-ui.select :label="__('tasks.assignee')" wire:model.live="assignee">
+                <flux:select.option value="">{{ __('common.anyone') }}</flux:select.option>
                 @foreach ($this->userOptions as $userOption)
-                    <flux:select.option :value="$userOption->id" :wire:key="'task-assignee-filter-'.$userOption->id">{{ $userOption->name_en }} · {{ $userOption->name_ar }}</flux:select.option>
+                    <flux:select.option :value="$userOption->id" :wire:key="'task-assignee-filter-'.$userOption->id">{{ $userOption->name }} · {{ $userOption->secondary_name }}</flux:select.option>
                 @endforeach
             </x-ui.select>
-            <x-ui.select :label="__('Milestone')" wire:model.live="milestone">
-                <flux:select.option value="">{{ __('Any milestone') }}</flux:select.option>
-                <flux:select.option value="none">{{ __('No milestone') }}</flux:select.option>
+            <x-ui.select :label="__('tasks.milestone')" wire:model.live="milestone">
+                <flux:select.option value="">{{ __('tasks.any_milestone') }}</flux:select.option>
+                <flux:select.option value="none">{{ __('tasks.no_milestone') }}</flux:select.option>
                 @foreach ($this->milestoneOptions as $milestoneOption)
                     <flux:select.option :value="$milestoneOption->id" :wire:key="'task-milestone-filter-'.$milestoneOption->id">{{ $milestoneOption->name }} · {{ $milestoneOption->project->name }}</flux:select.option>
                 @endforeach
             </x-ui.select>
         </x-slot:filters>
         <x-slot:actions>
-            <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-task-button">{{ __('Add task') }}</x-ui.button>
+            <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-task-button">{{ __('tasks.add_task') }}</x-ui.button>
         </x-slot:actions>
     </x-ui.page-header>
 
-    <x-ui.panel :subtitle="trans_choice('{1} :count matching task|[2,*] :count matching tasks', $this->tasks->total(), ['count' => $this->tasks->total()])">
+    <x-ui.panel :subtitle="trans_choice('tasks.count_matching_task', $this->tasks->total(), ['count' => $this->tasks->total()])">
         <x-slot:toolbar>
             @if ($filtersAreActive)
-                <flux:button size="sm" variant="ghost" class="text-secondary-medium! hover:bg-secondary-soft! dark:text-secondary-soft!" wire:click="clearFilters">{{ __('Reset filters') }}</flux:button>
+                <flux:button size="sm" variant="ghost" class="text-secondary-medium! hover:bg-secondary-soft! dark:text-secondary-soft!" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
             @endif
         </x-slot:toolbar>
 
         @if ($this->tasks->isEmpty())
-            <x-ui.empty-state icon="clipboard-document-check" :heading="$filtersAreActive ? __('No matching tasks') : __('No tasks yet')" :body="$filtersAreActive ? __('Change the search or filters and try again.') : __('Add the first task against a proposal.')">
+            <x-ui.empty-state icon="clipboard-document-check" :heading="$filtersAreActive ? __('tasks.no_matching_tasks') : __('common.no_tasks_yet')" :body="$filtersAreActive ? __('common.change_the_search_or_filters_and_try_again') : __('tasks.add_the_first_task_against_a_proposal')">
                 <x-slot:action>
                     @if ($filtersAreActive)
-                        <x-ui.button size="sm" wire:click="clearFilters">{{ __('Reset filters') }}</x-ui.button>
+                        <x-ui.button size="sm" wire:click="clearFilters">{{ __('common.reset_filters') }}</x-ui.button>
                     @else
-                        <x-ui.button size="sm" tone="primary" icon="plus" wire:click="openCreateModal">{{ __('Add task') }}</x-ui.button>
+                        <x-ui.button size="sm" tone="primary" icon="plus" wire:click="openCreateModal">{{ __('tasks.add_task') }}</x-ui.button>
                     @endif
                 </x-slot:action>
             </x-ui.empty-state>
@@ -341,7 +341,7 @@ new #[Title('Tasks')] class extends Component {
                             <a href="{{ route('tasks.show', $task) }}" wire:navigate class="text-sm font-semibold hover:underline">{{ $task->title }}</a>
                             <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">
                                 @if ($task->milestone === null)
-                                    <span class="italic">{{ __('No milestone') }}</span>
+                                    <span class="italic">{{ __('tasks.no_milestone') }}</span>
                                 @else
                                     {{ $task->milestone->name }} · {{ $task->milestone->project->name }}
                                 @endif
@@ -353,13 +353,13 @@ new #[Title('Tasks')] class extends Component {
                             <x-ui.enum-badge :case="$task->priority" />
                             <span class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $task->progress_percentage }}%</span>
                             @if ($task->due_date !== null)
-                                <span class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">{{ __('Due :date', ['date' => $task->due_date->format('M j')]) }}</span>
+                                <span class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">{{ __('tasks.due_date', ['date' => $task->due_date->translatedFormat(__('formats.date_short'))]) }}</span>
                             @endif
                         </div>
                         <x-ui.employee-chip :employee="$task->assignee" compact class="@4xl/directory:w-44" />
                         <div class="flex shrink-0 items-center gap-1">
-                            <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation @sm/directory:size-9!" wire:click="openEditModal({{ $task->id }})" :aria-label="__('Edit :title', ['title' => $task->title])" />
-                            <x-ui.button tone="ghost" size="sm" icon="trash" class="size-11! touch-manipulation @sm/directory:size-9!" wire:click="confirmDelete({{ $task->id }})" :aria-label="__('Delete :title', ['title' => $task->title])" />
+                            <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation @sm/directory:size-9!" wire:click="openEditModal({{ $task->id }})" :aria-label="__('tasks.edit_title', ['title' => $task->title])" />
+                            <x-ui.button tone="ghost" size="sm" icon="trash" class="size-11! touch-manipulation @sm/directory:size-9!" wire:click="confirmDelete({{ $task->id }})" :aria-label="__('tasks.delete_title', ['title' => $task->title])" />
                         </div>
                     </article>
                 @endforeach
@@ -374,63 +374,63 @@ new #[Title('Tasks')] class extends Component {
     <flux:modal wire:model="showTaskModal" class="w-full max-w-3xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
         <form wire:submit="saveTask" class="flex flex-col gap-5">
             <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ $editingTaskId === null ? __('Add task') : __('Edit task') }}</flux:heading>
-                <flux:subheading>{{ __('Every task delivers against a proposal. A milestone is optional.') }}</flux:subheading>
+                <flux:heading size="lg">{{ $editingTaskId === null ? __('tasks.add_task') : __('tasks.edit_task') }}</flux:heading>
+                <flux:subheading>{{ __('tasks.every_task_delivers_against_a_proposal_a_milestone_is_option') }}</flux:subheading>
             </div>
-            <x-ui.input wire:model="title" :label="__('Task title')" type="text" maxlength="255" required autofocus />
-            <flux:textarea wire:model="description" :label="__('Description')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!" />
+            <x-ui.input wire:model="title" :label="__('tasks.task_title')" type="text" maxlength="255" required autofocus />
+            <flux:textarea wire:model="description" :label="__('common.description')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!" />
             <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.select wire:model="taskProposalId" :label="__('Proposal')" required>
-                    <flux:select.option value="">{{ __('Select a proposal') }}</flux:select.option>
+                <x-ui.select wire:model="taskProposalId" :label="__('common.proposal')" required>
+                    <flux:select.option value="">{{ __('common.select_a_proposal') }}</flux:select.option>
                     @foreach ($this->proposalOptions as $proposalOption)
                         <flux:select.option :value="$proposalOption->id" :wire:key="'task-proposal-option-'.$proposalOption->id">{{ $proposalOption->name }}</flux:select.option>
                     @endforeach
                 </x-ui.select>
-                <x-ui.select wire:model="taskMilestoneId" :label="__('Milestone')">
-                    <flux:select.option value="">{{ __('No milestone') }}</flux:select.option>
+                <x-ui.select wire:model="taskMilestoneId" :label="__('tasks.milestone')">
+                    <flux:select.option value="">{{ __('tasks.no_milestone') }}</flux:select.option>
                     @foreach ($this->milestoneOptions as $milestoneOption)
                         <flux:select.option :value="$milestoneOption->id" :wire:key="'task-milestone-option-'.$milestoneOption->id">{{ $milestoneOption->name }} · {{ $milestoneOption->project->name }}</flux:select.option>
                     @endforeach
                 </x-ui.select>
             </div>
             <div class="grid gap-4 sm:grid-cols-2 @2xl/directory:grid-cols-4">
-                <x-ui.select wire:model="taskStatus" :label="__('Status')" required>
+                <x-ui.select wire:model="taskStatus" :label="__('common.status')" required>
                     @foreach (TaskStatus::cases() as $statusCase)
-                        <flux:select.option :value="$statusCase->value" :wire:key="'task-status-option-'.$statusCase->value">{{ Str::title($statusCase->value) }}</flux:select.option>
+                        <flux:select.option :value="$statusCase->value" :wire:key="'task-status-option-'.$statusCase->value">{{ $statusCase->label() }}</flux:select.option>
                     @endforeach
                 </x-ui.select>
-                <x-ui.select wire:model="taskPriority" :label="__('Priority')" required>
+                <x-ui.select wire:model="taskPriority" :label="__('tasks.priority')" required>
                     @foreach (TaskPriority::cases() as $priorityCase)
-                        <flux:select.option :value="$priorityCase->value" :wire:key="'task-priority-option-'.$priorityCase->value">{{ Str::title($priorityCase->value) }}</flux:select.option>
+                        <flux:select.option :value="$priorityCase->value" :wire:key="'task-priority-option-'.$priorityCase->value">{{ $priorityCase->label() }}</flux:select.option>
                     @endforeach
                 </x-ui.select>
-                <x-ui.input wire:model="progressPercentage" :label="__('Progress %')" type="number" min="0" max="100" required />
-                <x-ui.select wire:model="assignedTo" :label="__('Assignee')" required>
-                    <flux:select.option value="">{{ __('Select') }}</flux:select.option>
+                <x-ui.input wire:model="progressPercentage" :label="__('tasks.progress_2')" type="number" min="0" max="100" required />
+                <x-ui.select wire:model="assignedTo" :label="__('tasks.assignee')" required>
+                    <flux:select.option value="">{{ __('common.select') }}</flux:select.option>
                     @foreach ($this->userOptions as $userOption)
-                        <flux:select.option :value="$userOption->id" :wire:key="'task-assignee-option-'.$userOption->id">{{ $userOption->name_en }} · {{ $userOption->name_ar }}</flux:select.option>
+                        <flux:select.option :value="$userOption->id" :wire:key="'task-assignee-option-'.$userOption->id">{{ $userOption->name }} · {{ $userOption->secondary_name }}</flux:select.option>
                     @endforeach
                 </x-ui.select>
             </div>
             <div class="grid gap-4 sm:grid-cols-3">
-                <x-ui.input wire:model="startDate" :label="__('Start date')" type="date" />
-                <x-ui.input wire:model="dueDate" :label="__('Due date')" type="date" />
-                <x-ui.input wire:model="completedDate" :label="__('Completed date')" type="date" />
+                <x-ui.input wire:model="startDate" :label="__('common.start_date')" type="date" />
+                <x-ui.input wire:model="dueDate" :label="__('tasks.due_date_2')" type="date" />
+                <x-ui.input wire:model="completedDate" :label="__('tasks.completed_date')" type="date" />
             </div>
             <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="closeTaskModal">{{ __('Cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" data-test="save-task-button">{{ $editingTaskId === null ? __('Create task') : __('Save changes') }}</x-ui.button>
+                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="closeTaskModal">{{ __('common.cancel') }}</x-ui.button>
+                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" data-test="save-task-button">{{ $editingTaskId === null ? __('tasks.create_task') : __('common.save_changes') }}</x-ui.button>
             </div>
         </form>
     </flux:modal>
 
     <flux:modal :open="$deletingTaskId !== null" wire:close="$set('deletingTaskId', null)" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
         <div class="flex flex-col gap-4">
-            <flux:heading size="lg">{{ __('Delete this task?') }}</flux:heading>
-            <flux:subheading>{{ __('Its comments and attachment records are removed with it. Nothing outside the task is affected.') }}</flux:subheading>
+            <flux:heading size="lg">{{ __('tasks.delete_this_task') }}</flux:heading>
+            <flux:subheading>{{ __('tasks.its_comments_and_attachment_records_are_removed_with_it_noth') }}</flux:subheading>
             <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="$set('deletingTaskId', null)">{{ __('Cancel') }}</x-ui.button>
-                <x-ui.button type="button" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="deleteTask" data-test="confirm-delete-task">{{ __('Delete task') }}</x-ui.button>
+                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="$set('deletingTaskId', null)">{{ __('common.cancel') }}</x-ui.button>
+                <x-ui.button type="button" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="deleteTask" data-test="confirm-delete-task">{{ __('tasks.delete_task') }}</x-ui.button>
             </div>
         </div>
     </flux:modal>

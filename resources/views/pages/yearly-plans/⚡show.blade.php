@@ -7,7 +7,7 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
-new #[Title('Annual Plan')] class extends Component {
+new #[Title('titles.annual_plan')] class extends Component {
     public int $yearlyPlanId;
 
     public function mount(YearlyPlan $yearlyPlan): void
@@ -48,7 +48,7 @@ new #[Title('Annual Plan')] class extends Component {
                 'indicator:id,name,result_id,measure',
                 'indicator.result:id,statement,type',
                 'project:id,name,city_id',
-                'project.city:id,name_en',
+                'project.city:id,name_en,name_ar',
             ])
             ->withCount('reports')
             ->get();
@@ -59,11 +59,11 @@ new #[Title('Annual Plan')] class extends Component {
 <section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white">
     <x-ui.detail-header
         :breadcrumbs="[
-            ['label' => __('Annual Plans'), 'url' => route('yearly-plans.index')],
-            ['label' => __('FY :year', ['year' => $this->plan->year])],
+            ['label' => __('common.annual_plans'), 'url' => route('yearly-plans.index')],
+            ['label' => __('common.fy_year', ['year' => $this->plan->year])],
         ]"
-        :title="__('FY :year · :program', ['year' => $this->plan->year, 'program' => $this->plan->program->name])"
-        :subtitle="$this->plan->program->strategy?->name ?? __('Strategy not assigned')"
+        :title="__('common.fy_year_program', ['year' => $this->plan->year, 'program' => $this->plan->program->name])"
+        :subtitle="$this->plan->program->strategy?->name ?? __('common.strategy_not_assigned')"
     >
         <x-slot:meta>
             @if (Route::has('programs.show'))
@@ -73,7 +73,7 @@ new #[Title('Annual Plan')] class extends Component {
             @else
                 <span class="font-medium">{{ $this->plan->program->name }}</span>
             @endif
-            <span>{{ trans_choice(':count target|:count targets', $this->plan->plan_indicators_count, ['count' => $this->plan->plan_indicators_count]) }}</span>
+            <span>{{ trans_choice('common.count_target', $this->plan->plan_indicators_count, ['count' => $this->plan->plan_indicators_count]) }}</span>
         </x-slot:meta>
 
         <x-slot:actions>
@@ -81,15 +81,15 @@ new #[Title('Annual Plan')] class extends Component {
         </x-slot:actions>
     </x-ui.detail-header>
 
-    <x-ui.panel :title="__('Committed targets')" :count="$this->targets->count()" :subtitle="__('Indicator targets this plan is accountable for.')">
+    <x-ui.panel :title="__('yearly_plans.committed_targets')" :count="$this->targets->count()" :subtitle="__('yearly_plans.indicator_targets_this_plan_is_accountable_for')">
         <x-slot:toolbar>
             <a href="{{ route('targets.index', ['sourceType' => 'yearly_plan']) }}" wire:navigate class="text-xs font-semibold text-secondary-medium hover:underline dark:text-secondary-soft">
-                {{ __('All annual plan targets') }}
+                {{ __('yearly_plans.all_annual_plan_targets') }}
             </a>
         </x-slot:toolbar>
 
         @if ($this->targets->isEmpty())
-            <x-ui.empty-state icon="chart-bar" :heading="__('No targets yet')" :body="__('Indicator targets committed in this plan will appear here.')" />
+            <x-ui.empty-state icon="chart-bar" :heading="__('common.no_targets_yet')" :body="__('yearly_plans.indicator_targets_committed_in_this_plan_will_appear_here')" />
         @else
             <div class="divide-y divide-secondary-soft dark:divide-secondary-medium">
                 @foreach ($this->targets as $target)
@@ -104,9 +104,9 @@ new #[Title('Annual Plan')] class extends Component {
                         <div class="flex flex-wrap items-center gap-2 @3xl/detail:justify-end">
                             <span class="text-xs text-secondary-medium dark:text-secondary-soft">
                                 @if ($target->project === null)
-                                    {{ __('Organisation-wide') }}
+                                    {{ __('common.organisation_wide') }}
                                 @else
-                                    {{ $target->project->name }} · {{ $target->project->city?->name_en ?? __('Unknown city') }}
+                                    {{ $target->project->name }} · {{ $target->project->city?->name ?? __('common.unknown_city') }}
                                 @endif
                             </span>
                             <x-ui.enum-badge :case="$target->period" />

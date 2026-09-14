@@ -15,7 +15,7 @@ use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
-new #[Title('Proposal')] class extends Component {
+new #[Title('titles.proposal')] class extends Component {
     public int $proposalId;
 
     #[Url(except: 'status')]
@@ -96,7 +96,7 @@ new #[Title('Proposal')] class extends Component {
     {
         return $this->proposal->projects()
             ->select(['projects.id', 'projects.name', 'projects.city_id', 'projects.program_id'])
-            ->with(['city:id,name_en', 'program:id,name'])
+            ->with(['city:id,name_en,name_ar', 'program:id,name'])
             ->orderBy('projects.name')
             ->get();
     }
@@ -136,11 +136,11 @@ new #[Title('Proposal')] class extends Component {
     public function tabs(): array
     {
         return [
-            ['key' => 'status', 'label' => __('Status history'), 'count' => $this->proposal->status_notes_count],
-            ['key' => 'funding', 'label' => __('Funding'), 'count' => $this->proposal->donor_proposals_count],
-            ['key' => 'projects', 'label' => __('Projects'), 'count' => $this->proposal->projects_count],
-            ['key' => 'tasks', 'label' => __('Tasks'), 'count' => $this->proposal->tasks_count],
-            ['key' => 'targets', 'label' => __('Targets'), 'count' => $this->proposal->plan_indicators_count],
+            ['key' => 'status', 'label' => __('proposals.status_history'), 'count' => $this->proposal->status_notes_count],
+            ['key' => 'funding', 'label' => __('common.funding'), 'count' => $this->proposal->donor_proposals_count],
+            ['key' => 'projects', 'label' => __('common.projects'), 'count' => $this->proposal->projects_count],
+            ['key' => 'tasks', 'label' => __('common.tasks'), 'count' => $this->proposal->tasks_count],
+            ['key' => 'targets', 'label' => __('common.targets'), 'count' => $this->proposal->plan_indicators_count],
         ];
     }
 
@@ -169,9 +169,9 @@ new #[Title('Proposal')] class extends Component {
             'statusContext' => ['required', 'string'],
             'statusDate' => ['required', 'date'],
         ], [
-            'newStatus.required' => __('Choose the new status.'),
-            'statusContext.required' => __('Record why the status changed.'),
-            'statusDate.required' => __('Set the date this change took effect.'),
+            'newStatus.required' => __('proposals.choose_the_new_status'),
+            'statusContext.required' => __('proposals.record_why_the_status_changed'),
+            'statusDate.required' => __('proposals.set_the_date_this_change_took_effect'),
         ]);
 
         DB::transaction(function () use ($validated): void {
@@ -190,7 +190,7 @@ new #[Title('Proposal')] class extends Component {
         $this->statusContext = '';
         unset($this->proposal, $this->statusNotes);
 
-        Flux::toast(variant: 'success', text: __('Status changed and recorded.'));
+        Flux::toast(variant: 'success', text: __('proposals.status_changed_and_recorded'));
     }
 };
 ?>
@@ -198,15 +198,15 @@ new #[Title('Proposal')] class extends Component {
 <section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white">
     <x-ui.detail-header
         :breadcrumbs="[
-            ['label' => __('Proposals'), 'url' => route('proposals.index')],
+            ['label' => __('common.proposals'), 'url' => route('proposals.index')],
             ['label' => $this->proposal->name],
         ]"
         :title="$this->proposal->name"
     >
         <x-slot:meta>
-            <span class="tabular-nums">{{ $this->proposal->planned_date_begin?->format('M j, Y') }} – {{ $this->proposal->planned_date_end?->format('M j, Y') }}</span>
+            <span class="tabular-nums">{{ $this->proposal->planned_date_begin?->translatedFormat(__('formats.date')) }} – {{ $this->proposal->planned_date_end?->translatedFormat(__('formats.date')) }}</span>
             @if ($this->proposal->actual_date_begin !== null)
-                <span class="tabular-nums">{{ __('Actual: :begin', ['begin' => $this->proposal->actual_date_begin->format('M j, Y')]) }}</span>
+                <span class="tabular-nums">{{ __('proposals.actual_begin', ['begin' => $this->proposal->actual_date_begin->translatedFormat(__('formats.date'))]) }}</span>
             @endif
         </x-slot:meta>
 
@@ -214,9 +214,9 @@ new #[Title('Proposal')] class extends Component {
             <div class="flex flex-wrap items-center gap-2">
                 <x-ui.enum-badge :case="$this->proposal->status" />
                 <span class="rounded-md border border-secondary-light px-2 py-0.5 text-[11px] font-semibold text-secondary-medium dark:text-secondary-soft">
-                    {{ Str::title($this->proposal->phase->value) }}
+                    {{ $this->proposal->phase->label() }}
                 </span>
-                <x-ui.button tone="primary" size="sm" icon="arrow-path" wire:click="openStatusModal" data-test="open-status-modal">{{ __('Change status') }}</x-ui.button>
+                <x-ui.button tone="primary" size="sm" icon="arrow-path" wire:click="openStatusModal" data-test="open-status-modal">{{ __('proposals.change_status') }}</x-ui.button>
             </div>
         </x-slot:actions>
     </x-ui.detail-header>
@@ -225,7 +225,7 @@ new #[Title('Proposal')] class extends Component {
         <div class="grid gap-3 @2xl/detail:grid-cols-3">
             @foreach ($this->budgetByCurrency as $currencyCode => $total)
                 <x-ui.stat-tile
-                    :label="__('Committed budget')"
+                    :label="__('proposals.committed_budget')"
                     :value="number_format($total, 2)"
                     :unit="$currencyCode"
                     :scope="$currencyCode"
@@ -238,16 +238,16 @@ new #[Title('Proposal')] class extends Component {
     <x-ui.relation-tabs :tabs="$this->tabs" :active="$tab" wire-target="tab" />
 
     @if ($tab === 'status')
-        <x-ui.panel :title="__('Status history')" :count="$this->statusNotes->count()" :subtitle="__('The audit trail for this proposal\'s status, newest first.')">
+        <x-ui.panel :title="__('proposals.status_history')" :count="$this->statusNotes->count()" :subtitle="__('proposals.the_audit_trail_for_this_proposal_s_status_newest_first')">
             @if ($this->statusNotes->isEmpty())
-                <x-ui.empty-state icon="clock" :heading="__('No status history yet')" :body="__('Use Change status to record the first movement and why it happened.')" />
+                <x-ui.empty-state icon="clock" :heading="__('proposals.no_status_history_yet')" :body="__('proposals.use_change_status_to_record_the_first_movement_and_why_it_ha')" />
             @else
                 <ol class="divide-y divide-secondary-soft dark:divide-secondary-medium">
                     @foreach ($this->statusNotes as $note)
                         <li class="flex flex-col gap-1.5 p-3.5" wire:key="status-note-{{ $note->id }}">
                             <div class="flex items-center justify-between gap-3">
                                 <x-ui.enum-badge :case="$note->status" />
-                                <time datetime="{{ $note->date?->toDateString() }}" class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $note->date?->format('M j, Y') }}</time>
+                                <time datetime="{{ $note->date?->toDateString() }}" class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $note->date?->translatedFormat(__('formats.date')) }}</time>
                             </div>
                             @if ($note->context !== null)
                                 <p class="text-sm text-secondary-dark dark:text-white">{{ $note->context }}</p>
@@ -258,9 +258,9 @@ new #[Title('Proposal')] class extends Component {
             @endif
         </x-ui.panel>
     @elseif ($tab === 'funding')
-        <x-ui.panel :title="__('Funding agreements')" :count="$this->agreements->count()" :subtitle="__('Budgets are shown per currency. They are never added together.')">
+        <x-ui.panel :title="__('common.funding_agreements_2')" :count="$this->agreements->count()" :subtitle="__('proposals.budgets_are_shown_per_currency_they_are_never_added_together')">
             @if ($this->agreements->isEmpty())
-                <x-ui.empty-state icon="banknotes" :heading="__('No funding agreements')" :body="__('Agreements signed against this proposal will appear here.')" />
+                <x-ui.empty-state icon="banknotes" :heading="__('proposals.no_funding_agreements')" :body="__('proposals.agreements_signed_against_this_proposal_will_appear_here')" />
             @else
                 <div class="divide-y divide-secondary-soft dark:divide-secondary-medium">
                     @foreach ($this->agreements as $agreement)
@@ -268,8 +268,8 @@ new #[Title('Proposal')] class extends Component {
                             <div class="min-w-0 @3xl/detail:me-auto">
                                 <a href="{{ route('funding-agreements.show', $agreement) }}" wire:navigate class="text-sm font-semibold hover:underline">{{ $agreement->donor->name }}</a>
                                 <p class="text-xs text-secondary-medium dark:text-secondary-soft">
-                                    {{ $agreement->project_num ?? __('No donor reference') }}
-                                    · {{ trans_choice(':count tranche|:count tranches', $agreement->transfers_count, ['count' => $agreement->transfers_count]) }}
+                                    {{ $agreement->project_num ?? __('common.no_donor_reference') }}
+                                    · {{ trans_choice('common.count_tranche', $agreement->transfers_count, ['count' => $agreement->transfers_count]) }}
                                 </p>
                             </div>
                             <x-ui.money :amount="$agreement->budget" :currency="$agreement->currency" />
@@ -279,16 +279,16 @@ new #[Title('Proposal')] class extends Component {
             @endif
         </x-ui.panel>
     @elseif ($tab === 'projects')
-        <x-ui.panel :title="__('Projects covered')" :count="$this->projects->count()" :subtitle="__('Manage these links from the project page.')">
+        <x-ui.panel :title="__('proposals.projects_covered')" :count="$this->projects->count()" :subtitle="__('proposals.manage_these_links_from_the_project_page')">
             @if ($this->projects->isEmpty())
-                <x-ui.empty-state icon="rectangle-stack" :heading="__('No projects linked')" :body="__('Projects this proposal funds will appear here.')" />
+                <x-ui.empty-state icon="rectangle-stack" :heading="__('proposals.no_projects_linked')" :body="__('proposals.projects_this_proposal_funds_will_appear_here')" />
             @else
                 <div class="divide-y divide-secondary-soft dark:divide-secondary-medium">
                     @foreach ($this->projects as $project)
                         <article class="flex items-center gap-3 p-3.5" wire:key="proposal-project-{{ $project->id }}">
                             <div class="min-w-0 me-auto">
                                 <a href="{{ route('projects.show', $project) }}" wire:navigate class="text-sm font-semibold hover:underline">{{ $project->name }}</a>
-                                <p class="text-xs text-secondary-medium dark:text-secondary-soft">{{ $project->city?->name_en ?? __('Unknown city') }} · {{ $project->program->name }}</p>
+                                <p class="text-xs text-secondary-medium dark:text-secondary-soft">{{ $project->city?->name ?? __('common.unknown_city') }} · {{ $project->program->name }}</p>
                             </div>
                         </article>
                     @endforeach
@@ -296,16 +296,16 @@ new #[Title('Proposal')] class extends Component {
             @endif
         </x-ui.panel>
     @elseif ($tab === 'tasks')
-        <x-ui.panel :title="__('Tasks')" :count="$this->tasks->count()">
+        <x-ui.panel :title="__('common.tasks')" :count="$this->tasks->count()">
             @if ($this->tasks->isEmpty())
-                <x-ui.empty-state icon="clipboard-document-check" :heading="__('No tasks yet')" :body="__('Tasks delivering against this proposal will appear here.')" />
+                <x-ui.empty-state icon="clipboard-document-check" :heading="__('common.no_tasks_yet')" :body="__('proposals.tasks_delivering_against_this_proposal_will_appear_here')" />
             @else
                 <div class="divide-y divide-secondary-soft dark:divide-secondary-medium">
                     @foreach ($this->tasks as $task)
                         <article class="flex flex-wrap items-center gap-3 p-3.5" wire:key="proposal-task-{{ $task->id }}">
                             <div class="min-w-0 me-auto">
                                 <a href="{{ route('tasks.show', $task) }}" wire:navigate class="text-sm font-semibold hover:underline">{{ $task->title }}</a>
-                                <p class="text-xs text-secondary-medium dark:text-secondary-soft">{{ $task->assignee?->name ?? __('Not assigned') }}</p>
+                                <p class="text-xs text-secondary-medium dark:text-secondary-soft">{{ $task->assignee?->name ?? __('common.not_assigned') }}</p>
                             </div>
                             <x-ui.enum-badge :case="$task->status" />
                             <span class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $task->progress_percentage }}%</span>
@@ -315,9 +315,9 @@ new #[Title('Proposal')] class extends Component {
             @endif
         </x-ui.panel>
     @else
-        <x-ui.panel :title="__('Targets committed here')" :count="$this->targets->count()">
+        <x-ui.panel :title="__('proposals.targets_committed_here')" :count="$this->targets->count()">
             @if ($this->targets->isEmpty())
-                <x-ui.empty-state icon="chart-bar" :heading="__('No targets yet')" :body="__('Indicator targets committed in this proposal will appear here.')" />
+                <x-ui.empty-state icon="chart-bar" :heading="__('common.no_targets_yet')" :body="__('proposals.indicator_targets_committed_in_this_proposal_will_appear_her')" />
             @else
                 <div class="divide-y divide-secondary-soft dark:divide-secondary-medium">
                     @foreach ($this->targets as $target)
@@ -325,7 +325,7 @@ new #[Title('Proposal')] class extends Component {
                             <div class="min-w-0 me-auto">
                                 <p class="text-sm font-semibold">{{ $target->indicator->name }}</p>
                                 <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">
-                                    {{ $target->project?->name ?? __('Organisation-wide') }}
+                                    {{ $target->project?->name ?? __('common.organisation_wide') }}
                                 </p>
                             </div>
                             <x-ui.enum-badge :case="$target->period" />
@@ -340,25 +340,25 @@ new #[Title('Proposal')] class extends Component {
     <flux:modal wire:model="showStatusModal" class="w-full max-w-xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
         <form wire:submit="changeStatus" class="space-y-5">
             <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ __('Change status') }}</flux:heading>
-                <flux:subheading>{{ __('The new status and your reason are recorded together, as one entry in the audit trail.') }}</flux:subheading>
+                <flux:heading size="lg">{{ __('proposals.change_status') }}</flux:heading>
+                <flux:subheading>{{ __('proposals.the_new_status_and_your_reason_are_recorded_together_as_one') }}</flux:subheading>
             </div>
 
-            <x-ui.select wire:model="newStatus" :label="__('New status')" required>
+            <x-ui.select wire:model="newStatus" :label="__('proposals.new_status')" required>
                 @foreach (ProposalStatus::cases() as $statusCase)
                     <flux:select.option :value="$statusCase->value" :wire:key="'change-status-'.$statusCase->value">
-                        {{ Str::title($statusCase->value) }} — {{ Str::title($statusCase->phase()->value) }}
+                        {{ $statusCase->label() }} — {{ $statusCase->phase()->label() }}
                     </flux:select.option>
                 @endforeach
             </x-ui.select>
 
-            <flux:textarea wire:model="statusContext" :label="__('Why did it change?')" rows="3" required class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
+            <flux:textarea wire:model="statusContext" :label="__('proposals.why_did_it_change')" rows="3" required class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
 
-            <x-ui.input wire:model="statusDate" :label="__('Effective date')" type="date" required />
+            <x-ui.input wire:model="statusDate" :label="__('proposals.effective_date')" type="date" required />
 
             <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="$set('showStatusModal', false)">{{ __('Cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-status-button">{{ __('Record change') }}</x-ui.button>
+                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="$set('showStatusModal', false)">{{ __('common.cancel') }}</x-ui.button>
+                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-status-button">{{ __('proposals.record_change') }}</x-ui.button>
             </div>
         </form>
     </flux:modal>
