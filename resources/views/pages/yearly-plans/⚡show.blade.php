@@ -82,6 +82,12 @@ new #[Title('Annual Plan')] class extends Component {
     </x-ui.detail-header>
 
     <x-ui.panel :title="__('Committed targets')" :count="$this->targets->count()" :subtitle="__('Indicator targets this plan is accountable for.')">
+        <x-slot:toolbar>
+            <a href="{{ route('targets.index', ['sourceType' => 'yearly_plan']) }}" wire:navigate class="text-xs font-semibold text-secondary-medium hover:underline dark:text-secondary-soft">
+                {{ __('All annual plan targets') }}
+            </a>
+        </x-slot:toolbar>
+
         @if ($this->targets->isEmpty())
             <x-ui.empty-state icon="chart-bar" :heading="__('No targets yet')" :body="__('Indicator targets committed in this plan will appear here.')" />
         @else

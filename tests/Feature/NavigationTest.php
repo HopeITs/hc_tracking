@@ -12,15 +12,6 @@ test('the sidebar groups navigation in the application workflow order', function
         ->assertSeeTextInOrder(['Overview', 'Strategy', 'Delivery', 'Administration', 'Settings']);
 });
 
-test('the sidebar does not render a group for routes that do not exist yet', function () {
-    $user = User::factory()->create();
-
-    $this->actingAs($user)
-        ->get(route('dashboard'))
-        ->assertOk()
-        ->assertDontSeeText('Results & Learning');
-});
-
 test('the sidebar carries a funding group once its routes exist', function () {
     $user = User::factory()->create();
 
@@ -33,6 +24,19 @@ test('the sidebar carries a funding group once its routes exist', function () {
         ->assertSeeText('Funding Agreements')
         ->assertSeeText('Transfers')
         ->assertSeeText('Accounts');
+});
+
+test('the sidebar carries a results and learning group once its routes exist', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertSeeText('Results & Learning')
+        ->assertSeeText('Results Framework')
+        ->assertSeeText('Indicators')
+        ->assertSeeText('Targets')
+        ->assertSeeText('Reports');
 });
 
 test('every sidebar link resolves to a registered route', function () {

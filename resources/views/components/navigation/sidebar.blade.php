@@ -132,6 +132,51 @@
         </flux:sidebar.group>
 
         <flux:sidebar.group
+            :heading="__('Results & Learning')"
+            :class="$navigationGroupClasses"
+        >
+            <flux:sidebar.item
+                icon="chart-bar"
+                :href="route('results.index')"
+                :current="request()->routeIs('results.*')"
+                :class="$navigationItemClasses"
+                wire:navigate
+            >
+                {{ __('Results Framework') }}
+            </flux:sidebar.item>
+
+            <flux:sidebar.item
+                icon="variable"
+                :href="route('indicators.index')"
+                :current="request()->routeIs('indicators.*')"
+                :class="$navigationItemClasses"
+                wire:navigate
+            >
+                {{ __('Indicators') }}
+            </flux:sidebar.item>
+
+            <flux:sidebar.item
+                icon="flag"
+                :href="route('targets.index')"
+                :current="request()->routeIs('targets.*')"
+                :class="$navigationItemClasses"
+                wire:navigate
+            >
+                {{ __('Targets') }}
+            </flux:sidebar.item>
+
+            <flux:sidebar.item
+                icon="document-chart-bar"
+                :href="route('reports.index')"
+                :current="request()->routeIs('reports.*')"
+                :class="$navigationItemClasses"
+                wire:navigate
+            >
+                {{ __('Reports') }}
+            </flux:sidebar.item>
+        </flux:sidebar.group>
+
+        <flux:sidebar.group
             :heading="__('Funding')"
             :class="$navigationGroupClasses"
         >

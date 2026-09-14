@@ -41,6 +41,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('milestones', 'pages::milestones.index')
         ->name('milestones.index');
 
+    Route::livewire('results', 'pages::results.index')
+        ->name('results.index');
+
+    Route::livewire('indicators', 'pages::indicators.index')
+        ->name('indicators.index');
+
+    Route::livewire('targets', 'pages::targets.index')
+        ->name('targets.index');
+
     Route::livewire('tasks', 'pages::tasks.index')
         ->name('tasks.index');
 
@@ -67,6 +76,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::livewire('transfers', 'pages::transfers.index')
         ->name('transfers.index');
+
+    Route::livewire('reports', 'pages::reports.index')
+        ->name('reports.index');
+
+    Route::livewire('reports/{report}', 'pages::reports.show')
+        ->name('reports.show');
 
     Route::livewire('admin/users', 'pages::admin.users')
         ->can('viewAny', User::class)

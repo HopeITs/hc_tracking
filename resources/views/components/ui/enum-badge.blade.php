@@ -40,6 +40,16 @@
             default => 'outline',
         },
         $case instanceof \App\Enums\DonorType => 'outline',
+        $case instanceof \App\Enums\RagStatus => match ($case) {
+            \App\Enums\RagStatus::Green => 'solid',
+            \App\Enums\RagStatus::Amber => 'outline',
+            \App\Enums\RagStatus::Red => 'accent',
+        },
+        $case instanceof \App\Enums\Period => 'outline',
+        $case instanceof \App\Enums\ReportStatus => match ($case) {
+            \App\Enums\ReportStatus::Approved => 'solid',
+            \App\Enums\ReportStatus::Draft, \App\Enums\ReportStatus::Reviewed => 'outline',
+        },
         default => 'outline',
     };
 
