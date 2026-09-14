@@ -1,7 +1,6 @@
 <?php
 
 use App\Enums\UserRole;
-use App\Models\City;
 use App\Models\Project;
 use App\Models\User;
 use Livewire\Livewire;
@@ -10,7 +9,7 @@ test('guests are redirected from the city directory', function () {
     $this->get(route('admin.cities.index'))->assertRedirect(route('login'));
 });
 
-test('all authenticated roles can access city management while permissions are deferred', function (UserRole $role) {
+test('all authenticated roles can view the city directory', function (UserRole $role) {
     $user = User::factory()->role($role)->create();
 
     $this->actingAs($user)
@@ -25,140 +24,59 @@ test('all authenticated roles can access city management while permissions are d
     'admin' => UserRole::Admin,
 ]);
 
-test('authenticated users can search and clear the city directory', function () {
-    $user = User::factory()->create();
-    City::factory()->create(['name' => 'Damascus']);
-    City::factory()->create(['name' => 'Aleppo']);
+test('the directory lists every hr city in english and arabic, active or not', function () {
+    insertHrCity('Damascus', 'دمشق');
+    insertHrCity('Tartus', 'طرطوس', isActive: false);
 
-    Livewire::actingAs($user)
+    Livewire::actingAs(User::factory()->create())
         ->test('pages::admin.cities')
         ->assertSee('Damascus')
-        ->assertSee('Aleppo')
+        ->assertSee('دمشق')
+        ->assertSee('Tartus')
+        ->assertSee('Inactive');
+});
+
+test('the directory searches english and arabic names and clears the search', function () {
+    insertHrCity('Damascus', 'دمشق');
+    insertHrCity('Aleppo', 'حلب');
+
+    Livewire::actingAs(User::factory()->create())
+        ->test('pages::admin.cities')
         ->set('search', 'Damas')
         ->assertSee('Damascus')
         ->assertDontSee('Aleppo')
+        ->set('search', 'حلب')
+        ->assertSee('Aleppo')
+        ->assertDontSee('Damascus')
         ->call('clearSearch')
         ->assertSet('search', '')
-        ->assertSee('Aleppo');
+        ->assertSee('Damascus');
+});
+
+test('each city shows how many projects run in it', function () {
+    $aleppo = insertHrCity('Aleppo');
+    insertHrCity('Homs');
+    Project::factory(2)->create(['city_id' => $aleppo]);
+
+    Livewire::actingAs(User::factory()->create())
+        ->test('pages::admin.cities')
+        ->assertSee('2 projects')
+        ->assertSee('0 projects');
 });
 
 test('city names are escaped in the directory', function () {
-    $user = User::factory()->create();
     $unsafeName = '<script>alert("city")</script>';
-    City::factory()->create(['name' => $unsafeName]);
+    insertHrCity($unsafeName);
 
-    Livewire::actingAs($user)
+    Livewire::actingAs(User::factory()->create())
         ->test('pages::admin.cities')
         ->assertSee($unsafeName)
         ->assertDontSee($unsafeName, false);
 });
 
-test('authenticated users can create a trimmed city record', function () {
-    $user = User::factory()->create();
-
-    Livewire::actingAs($user)
+test('the directory offers no way to change hr cities', function () {
+    Livewire::actingAs(User::factory()->create())
         ->test('pages::admin.cities')
-        ->call('openCreateModal')
-        ->set('name', '  Homs  ')
-        ->call('saveCity')
-        ->assertHasNoErrors()
-        ->assertSet('showCityModal', false);
-
-    $city = City::query()->where('name', 'Homs')->sole();
-
-    expect($city->name)->toBe('Homs');
-});
-
-test('city names must be present and no longer than 100 characters', function (string $name) {
-    $user = User::factory()->create();
-
-    Livewire::actingAs($user)
-        ->test('pages::admin.cities')
-        ->call('openCreateModal')
-        ->set('name', $name)
-        ->call('saveCity')
-        ->assertHasErrors(['name']);
-
-    expect(City::query()->count())->toBe(0);
-})->with([
-    'empty' => '',
-    'too long' => str_repeat('A', 101),
-]);
-
-test('city names are unique regardless of letter case', function () {
-    $user = User::factory()->create();
-    City::factory()->create(['name' => 'Latakia']);
-
-    Livewire::actingAs($user)
-        ->test('pages::admin.cities')
-        ->call('openCreateModal')
-        ->set('name', 'latakia')
-        ->call('saveCity')
-        ->assertHasErrors(['name' => 'unique'])
-        ->assertSee('A city with this name already exists.');
-
-    expect(City::query()->count())->toBe(1);
-});
-
-test('authenticated users can update a city with the same or a new unique name', function () {
-    $user = User::factory()->create();
-    $city = City::factory()->create(['name' => 'Tartus']);
-
-    Livewire::actingAs($user)
-        ->test('pages::admin.cities')
-        ->call('openEditModal', $city->id)
-        ->assertSet('name', 'Tartus')
-        ->call('saveCity')
-        ->assertHasNoErrors()
-        ->call('openEditModal', $city->id)
-        ->set('name', 'Tartous')
-        ->call('saveCity')
-        ->assertHasNoErrors();
-
-    expect($city->refresh()->name)->toBe('Tartous');
-});
-
-test('a city cannot be renamed to another existing city name', function () {
-    $user = User::factory()->create();
-    $city = City::factory()->create(['name' => 'Idlib']);
-    City::factory()->create(['name' => 'Daraa']);
-
-    Livewire::actingAs($user)
-        ->test('pages::admin.cities')
-        ->call('openEditModal', $city->id)
-        ->set('name', 'Daraa')
-        ->call('saveCity')
-        ->assertHasErrors(['name' => 'unique']);
-
-    expect($city->refresh()->name)->toBe('Idlib');
-});
-
-test('authenticated users can delete an unreferenced city', function () {
-    $user = User::factory()->create();
-    $city = City::factory()->create();
-
-    Livewire::actingAs($user)
-        ->test('pages::admin.cities')
-        ->call('confirmCityDeletion', $city->id)
-        ->assertSet('deleteError', null)
-        ->call('deleteCity')
-        ->assertSet('showDeleteModal', false);
-
-    $this->assertModelMissing($city);
-});
-
-test('referenced cities remain and explain why deletion is unavailable', function () {
-    $user = User::factory()->create();
-    $city = City::factory()->create();
-    Project::factory()->for($city)->create();
-
-    Livewire::actingAs($user)
-        ->test('pages::admin.cities')
-        ->call('confirmCityDeletion', $city->id)
-        ->assertSet('showDeleteModal', true)
-        ->assertSee('This city is assigned to 1 project and cannot be deleted.')
-        ->call('deleteCity')
-        ->assertSet('showDeleteModal', true);
-
-    $this->assertModelExists($city);
+        ->assertDontSee('Add city')
+        ->assertDontSee('data-test="create-city-button"', false);
 });

@@ -5,7 +5,7 @@ namespace Database\Factories;
 use App\Enums\MilestoneStatus;
 use App\Models\Milestone;
 use App\Models\Project;
-use App\Models\User;
+use Database\Factories\Concerns\CreatesHrRecords;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\Factories\Factory;
  */
 class MilestoneFactory extends Factory
 {
+    use CreatesHrRecords;
+
     /**
      * Define the model's default state.
      *
@@ -28,7 +30,7 @@ class MilestoneFactory extends Factory
             'name' => fake()->randomElement(['Baseline assessment', 'Community mobilisation', 'Works handover', 'Endline survey']),
             'description' => fake()->sentence(),
             'planned_date' => fake()->dateTimeBetween('-1 year', '+1 year')->format('Y-m-d'),
-            'responsible_user_id' => User::factory(),
+            'responsible_user_id' => fn (): int => $this->createHrEmployee(),
         ];
     }
 

@@ -99,7 +99,7 @@ test('a matching child remains visible with its necessary ancestors for status a
 test('a milestone can be created under a parent in the same project', function () {
     $user = User::factory()->create();
     $project = Project::factory()->create();
-    $responsible = User::factory()->create();
+    $responsible = insertHrEmployee();
     $parent = Milestone::factory()->create(['project_id' => $project->id]);
 
     Livewire::actingAs($user)
@@ -107,7 +107,7 @@ test('a milestone can be created under a parent in the same project', function (
         ->call('openCreateModal')
         ->set('milestoneProjectId', (string) $project->id)
         ->set('name', '  Water quality testing  ')
-        ->set('responsibleUserId', (string) $responsible->id)
+        ->set('responsibleUserId', (string) $responsible)
         ->set('parentMilestoneId', (string) $parent->id)
         ->set('milestoneStatus', MilestoneStatus::Pending->value)
         ->set('plannedDate', '2026-06-30')
@@ -118,7 +118,8 @@ test('a milestone can be created under a parent in the same project', function (
     $milestone = Milestone::query()->where('name', 'Water quality testing')->sole();
 
     expect($milestone->parent_milestone_id)->toBe($parent->id)
-        ->and($milestone->project_id)->toBe($project->id);
+        ->and($milestone->project_id)->toBe($project->id)
+        ->and($milestone->responsible_user_id)->toBe($responsible);
 });
 
 test('changing the project while creating clears the selected parent', function () {

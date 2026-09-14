@@ -2,14 +2,14 @@
 
 use App\Enums\UserRole;
 use App\Models\User;
-use Illuminate\Support\Facades\Hash;
 
-test('the command creates a verified user with the given role', function () {
+test('the command gives an hr account access with the given role', function () {
+    $employeeId = insertHrEmployee(firstNameEn: 'Amina', lastNameEn: 'Haddad');
+    $hrUserId = insertHrUser($employeeId, 'amina@example.org');
+
     $this->artisan('user:create', [
-        '--name' => 'Amina Haddad',
         '--email' => 'amina@example.org',
         '--role' => 'MEAL',
-        '--password' => 'correct-horse-battery-staple',
         '--no-interaction' => true,
     ])->assertSuccessful();
 
@@ -17,26 +17,17 @@ test('the command creates a verified user with the given role', function () {
 
     expect($user->name)->toBe('Amina Haddad')
         ->and($user->role)->toBe(UserRole::Meal)
-        ->and($user->email_verified_at)->not->toBeNull()
-        ->and($user->password)->not->toBe('correct-horse-battery-staple');
-});
-
-test('the password is hashed rather than stored in the clear', function () {
-    $this->artisan('user:create', [
-        '--name' => 'Sam Okoro',
-        '--email' => 'sam@example.org',
-        '--password' => 'correct-horse-battery-staple',
-        '--no-interaction' => true,
-    ])->assertSuccessful();
-
-    expect(Hash::check('correct-horse-battery-staple', User::query()->sole()->password))->toBeTrue();
+        ->and($user->hr_user_id)->toBe($hrUserId)
+        ->and($user->employee_id)->toBe($employeeId)
+        ->and($user->password)->toBeNull()
+        ->and($user->email_verified_at)->not->toBeNull();
 });
 
 test('a user defaults to Officer when no role is given', function () {
+    insertHrUser(insertHrEmployee(), 'dana@example.org');
+
     $this->artisan('user:create', [
-        '--name' => 'Dana Reyes',
         '--email' => 'dana@example.org',
-        '--password' => 'correct-horse-battery-staple',
         '--no-interaction' => true,
     ])->assertSuccessful();
 
@@ -44,10 +35,10 @@ test('a user defaults to Officer when no role is given', function () {
 });
 
 test('the unverified flag leaves the address unverified', function () {
+    insertHrUser(insertHrEmployee(), 'dana@example.org');
+
     $this->artisan('user:create', [
-        '--name' => 'Dana Reyes',
         '--email' => 'dana@example.org',
-        '--password' => 'correct-horse-battery-staple',
         '--unverified' => true,
         '--no-interaction' => true,
     ])->assertSuccessful();
@@ -55,12 +46,21 @@ test('the unverified flag leaves the address unverified', function () {
     expect(User::query()->sole()->email_verified_at)->toBeNull();
 });
 
-test('an unknown role is rejected', function () {
+test('an email with no hr account is rejected', function () {
     $this->artisan('user:create', [
-        '--name' => 'Dana Reyes',
+        '--email' => 'nobody@example.org',
+        '--no-interaction' => true,
+    ])->assertFailed();
+
+    $this->assertDatabaseCount('users', 0);
+});
+
+test('an unknown role is rejected', function () {
+    insertHrUser(insertHrEmployee(), 'dana@example.org');
+
+    $this->artisan('user:create', [
         '--email' => 'dana@example.org',
         '--role' => 'meal',
-        '--password' => 'correct-horse-battery-staple',
         '--no-interaction' => true,
     ])->assertFailed();
 
@@ -69,23 +69,18 @@ test('an unknown role is rejected', function () {
 
 test('a duplicate email is rejected', function () {
     User::factory()->create(['email' => 'taken@example.org']);
+    insertHrUser(insertHrEmployee(), 'taken@example.org');
 
     $this->artisan('user:create', [
-        '--name' => 'Dana Reyes',
         '--email' => 'taken@example.org',
-        '--password' => 'correct-horse-battery-staple',
         '--no-interaction' => true,
     ])->assertFailed();
 
     $this->assertDatabaseCount('users', 1);
 });
 
-test('a missing password is rejected rather than creating a passwordless user', function () {
-    $this->artisan('user:create', [
-        '--name' => 'Dana Reyes',
-        '--email' => 'dana@example.org',
-        '--no-interaction' => true,
-    ])->assertFailed();
+test('a missing email is rejected', function () {
+    $this->artisan('user:create', ['--no-interaction' => true])->assertFailed();
 
     $this->assertDatabaseCount('users', 0);
 });

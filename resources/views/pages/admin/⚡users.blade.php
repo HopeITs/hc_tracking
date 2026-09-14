@@ -1,15 +1,14 @@
 <?php
 
-use App\Concerns\PasswordValidationRules;
-use App\Concerns\ProfileValidationRules;
 use App\Enums\UserRole;
+use App\Models\HrUser;
 use App\Models\User;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Password;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -17,8 +16,6 @@ use Livewire\Component;
 use Livewire\WithPagination;
 
 new #[Title('User directory')] class extends Component {
-    use PasswordValidationRules;
-    use ProfileValidationRules;
     use WithPagination;
 
     #[Url(except: '')]
@@ -31,11 +28,10 @@ new #[Title('User directory')] class extends Component {
     public bool $showDeleteModal = false;
     public ?int $editingUserId = null;
     public ?int $deletingUserId = null;
-    public string $name = '';
-    public string $email = '';
+    public string $hrUserId = '';
+    public string $editingUserName = '';
+    public string $editingUserEmail = '';
     public string $selectedRole = UserRole::Officer->value;
-    public string $password = '';
-    public string $password_confirmation = '';
     public string $deletingUserName = '';
     public ?string $deleteError = null;
 
@@ -95,6 +91,27 @@ new #[Title('User directory')] class extends Component {
         return UserRole::cases();
     }
 
+    /**
+     * HR login accounts that do not have a tracking user yet.
+     *
+     * @return Collection<int, HrUser>
+     */
+    #[Computed]
+    public function hrAccountOptions(): Collection
+    {
+        Gate::authorize('create', User::class);
+
+        $existingEmails = User::query()->pluck('email')->map(fn (string $email): string => mb_strtolower($email))->flip();
+
+        return HrUser::query()
+            ->select(['id', 'employee_id', 'email'])
+            ->with('employee:id,first_name_en,last_name_en,first_name_ar,last_name_ar')
+            ->orderBy('email')
+            ->get()
+            ->reject(fn (HrUser $hrUser): bool => $existingEmails->has(mb_strtolower($hrUser->email)))
+            ->values();
+    }
+
     public function openCreateModal(): void
     {
         Gate::authorize('create', User::class);
@@ -111,56 +128,68 @@ new #[Title('User directory')] class extends Component {
 
         $this->resetValidation();
         $this->editingUserId = $user->id;
-        $this->name = $user->name;
-        $this->email = $user->email;
+        $this->editingUserName = $user->name;
+        $this->editingUserEmail = $user->email;
         $this->selectedRole = $user->role->value;
-        $this->password = '';
-        $this->password_confirmation = '';
         $this->showUserModal = true;
     }
 
+    /**
+     * Give an HR account access, or change an existing user's role.
+     *
+     * Name, email and password belong to HR, so the role is the only thing an
+     * administrator sets here.
+     */
     public function saveUser(): void
     {
-        $user = $this->editingUserId === null
-            ? new User
-            : User::query()->findOrFail($this->editingUserId);
+        if ($this->editingUserId !== null) {
+            $user = User::query()->findOrFail($this->editingUserId);
 
-        Gate::authorize($user->exists ? 'update' : 'create', $user->exists ? $user : User::class);
+            Gate::authorize('update', $user);
+
+            $validated = $this->validate([
+                'selectedRole' => ['required', Rule::enum(UserRole::class)],
+            ], [
+                'selectedRole.required' => __('Select a role.'),
+                'selectedRole.enum' => __('Select a valid role.'),
+            ]);
+
+            $user->forceFill(['role' => UserRole::from($validated['selectedRole'])])->save();
+
+            $this->showUserModal = false;
+            $this->resetUserForm();
+
+            Flux::toast(variant: 'success', text: __('User updated.'));
+
+            return;
+        }
+
+        Gate::authorize('create', User::class);
 
         $validated = $this->validate([
-            ...$this->profileRules($user->exists ? $user->id : null),
+            'hrUserId' => ['required', 'integer', Rule::exists(HrUser::class, 'id')],
             'selectedRole' => ['required', Rule::enum(UserRole::class)],
-            'password' => $user->exists
-                ? ['nullable', 'string', Password::default(), 'confirmed']
-                : $this->passwordRules(),
         ], [
+            'hrUserId.required' => __('Select an HR account.'),
+            'hrUserId.exists' => __('The selected HR account is no longer available.'),
             'selectedRole.required' => __('Select a role.'),
             'selectedRole.enum' => __('Select a valid role.'),
         ]);
 
-        $attributes = [
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'role' => UserRole::from($validated['selectedRole']),
-        ];
+        $hrUser = HrUser::query()->with('employee')->findOrFail((int) $validated['hrUserId']);
 
-        if (! $user->exists) {
-            $attributes['email_verified_at'] = now();
+        if (User::query()->where('email', $hrUser->email)->exists()) {
+            $this->addError('hrUserId', __('This HR account already has access.'));
+
+            return;
         }
 
-        if ($this->password !== '') {
-            $attributes['password'] = $validated['password'];
-        }
-
-        $user->forceFill($attributes)->save();
+        User::createFromHrAccount($hrUser, UserRole::from($validated['selectedRole']));
 
         $this->showUserModal = false;
         $this->resetUserForm();
 
-        Flux::toast(
-            variant: 'success',
-            text: $user->wasRecentlyCreated ? __('User created.') : __('User updated.'),
-        );
+        Flux::toast(variant: 'success', text: __('User created.'));
     }
 
     public function confirmUserDeletion(int $userId): void
@@ -219,11 +248,10 @@ new #[Title('User directory')] class extends Component {
     {
         $this->resetValidation();
         $this->editingUserId = null;
-        $this->name = '';
-        $this->email = '';
+        $this->hrUserId = '';
+        $this->editingUserName = '';
+        $this->editingUserEmail = '';
         $this->selectedRole = UserRole::Officer->value;
-        $this->password = '';
-        $this->password_confirmation = '';
     }
 };
 ?>
@@ -480,14 +508,27 @@ new #[Title('User directory')] class extends Component {
                 </flux:heading>
                 <flux:subheading>
                     {{ $editingUserId === null
-                        ? __('Create an account and assign its access role.')
-                        : __('Update account details or set a new password.') }}
+                        ? __('Give an HR system account access and choose its role. People log in with their HR password.')
+                        : __('Change this person\'s access role. Name, email and password are managed in the HR system.') }}
                 </flux:subheading>
             </div>
 
             <div class="grid gap-4 @md/directory:grid-cols-2">
-                <flux:input wire:model="name" :class="$controlClasses" :label="__('Name')" type="text" autocomplete="name" required autofocus />
-                <flux:input wire:model="email" :class="$controlClasses" :label="__('Email')" type="email" autocomplete="email" required />
+                @if ($editingUserId === null)
+                    <div class="@md/directory:col-span-2">
+                        <flux:select wire:model="hrUserId" :class="$controlClasses" :label="__('HR account')" required>
+                            <flux:select.option value="">{{ __('Select an HR account') }}</flux:select.option>
+                            @foreach ($this->hrAccountOptions as $hrAccountOption)
+                                <flux:select.option :value="$hrAccountOption->id" :wire:key="'hr-account-option-'.$hrAccountOption->id">
+                                    {{ $hrAccountOption->email }}@if ($hrAccountOption->employee) · {{ $hrAccountOption->employee->name_en }} · {{ $hrAccountOption->employee->name_ar }}@endif
+                                </flux:select.option>
+                            @endforeach
+                        </flux:select>
+                    </div>
+                @else
+                    <flux:input wire:model="editingUserName" :class="$controlClasses" :label="__('Name')" type="text" readonly />
+                    <flux:input wire:model="editingUserEmail" :class="$controlClasses" :label="__('Email')" type="email" readonly />
+                @endif
 
                 <div class="@md/directory:col-span-2">
                     <flux:select wire:model="selectedRole" :class="$controlClasses" :label="__('Role')" required>
@@ -511,24 +552,6 @@ new #[Title('User directory')] class extends Component {
                     </p>
                 </div>
 
-                <flux:input
-                    wire:model="password"
-                    :class="$controlClasses"
-                    :label="$editingUserId === null ? __('Password') : __('New password')"
-                    type="password"
-                    autocomplete="new-password"
-                    viewable
-                    :required="$editingUserId === null"
-                />
-                <flux:input
-                    wire:model="password_confirmation"
-                    :class="$controlClasses"
-                    :label="__('Confirm password')"
-                    type="password"
-                    autocomplete="new-password"
-                    viewable
-                    :required="$editingUserId === null"
-                />
             </div>
 
             <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">

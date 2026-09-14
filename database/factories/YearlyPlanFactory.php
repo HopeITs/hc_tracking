@@ -3,8 +3,8 @@
 namespace Database\Factories;
 
 use App\Models\Program;
-use App\Models\User;
 use App\Models\YearlyPlan;
+use Database\Factories\Concerns\CreatesHrRecords;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -12,6 +12,8 @@ use Illuminate\Database\Eloquent\Factories\Factory;
  */
 class YearlyPlanFactory extends Factory
 {
+    use CreatesHrRecords;
+
     /**
      * Define the model's default state.
      *
@@ -21,7 +23,7 @@ class YearlyPlanFactory extends Factory
     {
         return [
             'program_id' => Program::factory(),
-            'manager_id' => User::factory(),
+            'manager_id' => fn (): int => $this->createHrEmployee(),
             'year' => fake()->numberBetween(2021, 2030),
         ];
     }

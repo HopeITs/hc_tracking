@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Enums\UserRole;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
@@ -35,6 +36,22 @@ class UserFactory extends Factory
             'two_factor_recovery_codes' => null,
             'two_factor_confirmed_at' => null,
         ];
+    }
+
+    /**
+     * Give the user an HR login account with the same email and password.
+     *
+     * Only works against the test suite's in-memory HR database; the real `hr`
+     * connection is READ ONLY.
+     */
+    public function withHrAccount(string $password = 'password'): static
+    {
+        return $this->afterCreating(function (User $user) use ($password): void {
+            DB::connection('hr')->table('users')->insert([
+                'email' => $user->email,
+                'password' => Hash::make($password),
+            ]);
+        });
     }
 
     /**

@@ -2,10 +2,10 @@
 
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Models\HrEmployee;
 use App\Models\Milestone;
 use App\Models\Proposal;
 use App\Models\Task;
-use App\Models\User;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -99,13 +99,13 @@ new #[Title('Tasks')] class extends Component {
                 'milestone:id,name,project_id',
                 'milestone.project:id,name',
                 'proposal:id,name',
-                'assignee:id,name',
+                'assignee:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
             ])
             ->when($search !== '', function (Builder $query) use ($search): void {
                 $query->where(function (Builder $query) use ($search): void {
                     $query->where('title', 'like', '%'.$search.'%')
                         ->orWhere('description', 'like', '%'.$search.'%')
-                        ->orWhereHas('assignee', fn (Builder $query) => $query->where('name', 'like', '%'.$search.'%'));
+                        ->orWhereIn('assigned_to', HrEmployee::idsMatchingName($search));
                 });
             })
             ->when($this->status !== '', fn (Builder $query) => $query->where('status', $this->status))
@@ -118,11 +118,11 @@ new #[Title('Tasks')] class extends Component {
             ->paginate(15);
     }
 
-    /** @return Collection<int, User> */
+    /** @return Collection<int, HrEmployee> */
     #[Computed]
     public function userOptions(): Collection
     {
-        return User::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get();
+        return HrEmployee::pickerOptions();
     }
 
     /** @return Collection<int, Proposal> */
@@ -185,7 +185,7 @@ new #[Title('Tasks')] class extends Component {
             'dueDate' => ['nullable', 'date', Rule::when($this->startDate !== '', ['after_or_equal:startDate'])],
             'completedDate' => ['nullable', 'date'],
             'progressPercentage' => ['required', 'integer', 'min:0', 'max:100'],
-            'assignedTo' => ['required', 'integer', Rule::exists(User::class, 'id')],
+            'assignedTo' => ['required', 'integer', Rule::exists(HrEmployee::class, 'id')],
             'taskProposalId' => ['required', 'integer', Rule::exists(Proposal::class, 'id')],
             'taskMilestoneId' => ['nullable', 'integer', Rule::exists(Milestone::class, 'id')],
         ], [
@@ -300,7 +300,7 @@ new #[Title('Tasks')] class extends Component {
             <x-ui.select :label="__('Assignee')" wire:model.live="assignee">
                 <flux:select.option value="">{{ __('Anyone') }}</flux:select.option>
                 @foreach ($this->userOptions as $userOption)
-                    <flux:select.option :value="$userOption->id" :wire:key="'task-assignee-filter-'.$userOption->id">{{ $userOption->name }}</flux:select.option>
+                    <flux:select.option :value="$userOption->id" :wire:key="'task-assignee-filter-'.$userOption->id">{{ $userOption->name_en }} · {{ $userOption->name_ar }}</flux:select.option>
                 @endforeach
             </x-ui.select>
             <x-ui.select :label="__('Milestone')" wire:model.live="milestone">
@@ -356,7 +356,7 @@ new #[Title('Tasks')] class extends Component {
                                 <span class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">{{ __('Due :date', ['date' => $task->due_date->format('M j')]) }}</span>
                             @endif
                         </div>
-                        <x-ui.user-chip :user="$task->assignee" compact class="@4xl/directory:w-44" />
+                        <x-ui.employee-chip :employee="$task->assignee" compact class="@4xl/directory:w-44" />
                         <div class="flex shrink-0 items-center gap-1">
                             <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation @sm/directory:size-9!" wire:click="openEditModal({{ $task->id }})" :aria-label="__('Edit :title', ['title' => $task->title])" />
                             <x-ui.button tone="ghost" size="sm" icon="trash" class="size-11! touch-manipulation @sm/directory:size-9!" wire:click="confirmDelete({{ $task->id }})" :aria-label="__('Delete :title', ['title' => $task->title])" />
@@ -408,7 +408,7 @@ new #[Title('Tasks')] class extends Component {
                 <x-ui.select wire:model="assignedTo" :label="__('Assignee')" required>
                     <flux:select.option value="">{{ __('Select') }}</flux:select.option>
                     @foreach ($this->userOptions as $userOption)
-                        <flux:select.option :value="$userOption->id" :wire:key="'task-assignee-option-'.$userOption->id">{{ $userOption->name }}</flux:select.option>
+                        <flux:select.option :value="$userOption->id" :wire:key="'task-assignee-option-'.$userOption->id">{{ $userOption->name_en }} · {{ $userOption->name_ar }}</flux:select.option>
                     @endforeach
                 </x-ui.select>
             </div>

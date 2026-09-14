@@ -71,7 +71,7 @@ new #[Title('Risks')] class extends Component {
 
         return Risk::query()
             ->select(['id', 'name', 'impact', 'solution', 'happened', 'project_id', 'updated_at'])
-            ->with(['project:id,name,city_id', 'project.city:id,name'])
+            ->with(['project:id,name,city_id', 'project.city:id,name_en'])
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($query) use ($search): void {
                     $query
@@ -271,7 +271,7 @@ new #[Title('Risks')] class extends Component {
                             <div class="min-w-0">
                                 <p class="text-sm font-semibold">{{ $risk->name }}</p>
                                 <a href="{{ route('projects.show', $risk->project) }}" wire:navigate class="text-xs text-secondary-medium hover:underline dark:text-secondary-soft">
-                                    {{ $risk->project->name }} · {{ $risk->project->city->name }}
+                                    {{ $risk->project->name }} · {{ $risk->project->city?->name_en ?? __('Unknown city') }}
                                 </a>
                             </div>
                             <div class="flex shrink-0 items-center gap-1.5">

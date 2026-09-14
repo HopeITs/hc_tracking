@@ -2,9 +2,9 @@
 
 use App\Enums\UserRole;
 use App\Models\Account;
-use App\Models\City;
 use App\Models\Donor;
 use App\Models\DonorProposal;
+use App\Models\HrEmployee;
 use App\Models\Indicator;
 use App\Models\IndicatorProgress;
 use App\Models\Media;
@@ -26,13 +26,13 @@ use App\Models\TransfersTracking;
 use App\Models\User;
 use App\Models\YearlyPlan;
 use Database\Seeders\CoreDataSeeder;
+use Illuminate\Support\Facades\DB;
 
 test('the seeders populate every table in the schema', function () {
     $this->seed();
 
     $models = [
         User::class,
-        City::class,
         Strategy::class,
         Donor::class,
         Program::class,
@@ -64,17 +64,24 @@ test('the seeders populate every table in the schema', function () {
     $this->assertDatabaseCount('project_proposal', Project::query()->count());
 });
 
-test('demo staff cover every role and programmes have managers', function () {
+test('seeded projects are placed in existing hr cities and seeding writes no cities', function () {
+    $cityIds = [insertHrCity('Aleppo'), insertHrCity('Homs')];
+
     $this->seed();
 
-    expect(User::query()->where('email', 'test@example.com')->firstOrFail()->role)->toBe(UserRole::Admin);
+    expect(Project::query()->pluck('city_id')->unique()->diff($cityIds))->toBeEmpty()
+        ->and(DB::connection('hr')->table('cities')->count())->toBe(2);
+});
 
-    foreach (UserRole::cases() as $role) {
-        expect(User::query()->where('role', $role)->exists())->toBeTrue();
-    }
+test('staff are the hr accounts and assigned programmes have hr employee managers', function () {
+    $this->seed();
 
-    foreach (Program::query()->with('manager', 'projects', 'yearlyPlans')->get() as $program) {
-        expect($program->manager->role)->toBe(UserRole::Manager);
+    expect(User::query()->pluck('email')->sort()->values()->all())
+        ->toBe(DB::connection('hr')->table('users')->pluck('email')->sort()->values()->all())
+        ->and(User::query()->where('role', '!=', UserRole::Officer)->exists())->toBeFalse();
+
+    foreach (Program::query()->whereNotNull('manager_id')->with('manager', 'projects', 'yearlyPlans')->get() as $program) {
+        expect($program->manager)->toBeInstanceOf(HrEmployee::class);
 
         foreach ($program->projects as $project) {
             expect($project->name)->toStartWith($program->name.' Community Response ');
@@ -86,16 +93,13 @@ test('demo staff cover every role and programmes have managers', function () {
     }
 });
 
-test('lookup seeding reuses existing named cities and donors', function () {
-    $city = City::factory()->create(['name' => 'Damascus']);
+test('lookup seeding reuses existing named donors', function () {
     $donor = Donor::factory()->create(['name' => 'UNICEF']);
 
     $this->seed(CoreDataSeeder::class);
     $this->seed(CoreDataSeeder::class);
 
-    $this->assertDatabaseCount('cities', 8);
     $this->assertDatabaseCount('donors', 5);
-    expect(City::query()->where('name', 'Damascus')->sole()->id)->toBe($city->id);
     expect(Donor::query()->where('name', 'UNICEF')->sole()->id)->toBe($donor->id);
 });
 

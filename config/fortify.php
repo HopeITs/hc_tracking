@@ -164,7 +164,9 @@ return [
         // Registration is deliberately disabled: this is an internal system and
         // accounts are created by an administrator with `php artisan user:create`.
         // Re-enabling it exposes /register to anyone on the internet.
-        Features::resetPasswords(),
+        //
+        // Password reset is disabled too: passwords belong to the HR system and
+        // are changed there, so a tracking reset link could never change them.
         Features::emailVerification(),
         Features::twoFactorAuthentication([
             'confirm' => true,

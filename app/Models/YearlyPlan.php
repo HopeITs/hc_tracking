@@ -55,13 +55,13 @@ class YearlyPlan extends Model
     }
 
     /**
-     * The user accountable for this plan.
+     * The HR employee accountable for this plan.
      *
-     * @return BelongsTo<User, $this>
+     * @return BelongsTo<HrEmployee, $this>
      */
     public function manager(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'manager_id');
+        return $this->belongsTo(HrEmployee::class, 'manager_id');
     }
 
     /**

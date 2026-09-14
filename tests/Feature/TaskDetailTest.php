@@ -25,7 +25,7 @@ test('missing tasks return not found from task detail', function () {
 
 test('task detail shows the task proposal milestone assignee and creator', function () {
     $user = User::factory()->create();
-    $assignee = User::factory()->create(['name' => 'Alice Nadir']);
+    $assignee = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
     $creator = User::factory()->create(['name' => 'Bob Rahman']);
     $project = Project::factory()->create(['name' => 'Winter Support']);
     $milestone = Milestone::factory()->create([
@@ -37,7 +37,7 @@ test('task detail shows the task proposal milestone assignee and creator', funct
         'milestone_id' => $milestone->id,
         'proposal_id' => $proposal->id,
         'title' => 'Draft distribution plan',
-        'assigned_to' => $assignee->id,
+        'assigned_to' => $assignee,
         'created_by' => $creator->id,
         'start_date' => '2026-09-01',
         'due_date' => '2026-09-30',
@@ -182,13 +182,13 @@ test('attachments are listed as metadata without exposing storage or controls', 
 
 test('task detail escapes all user controlled content', function () {
     $user = User::factory()->create();
-    $assignee = User::factory()->create(['name' => '<script>assignee()</script>']);
+    $assignee = insertHrEmployee(firstNameEn: '<script>assignee()</script>', lastNameEn: '');
     $creator = User::factory()->create(['name' => '<img src=x onerror=creator()>']);
     $proposal = Proposal::factory()->create(['name' => '<svg onload=proposal()>']);
     $task = Task::factory()->create([
         'title' => '<script>task()</script>',
         'description' => '<img src=x onerror=description()>',
-        'assigned_to' => $assignee->id,
+        'assigned_to' => $assignee,
         'created_by' => $creator->id,
         'proposal_id' => $proposal->id,
     ]);

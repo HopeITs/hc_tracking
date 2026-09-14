@@ -17,12 +17,12 @@ test('guests are redirected from program detail', function () {
 
 test('program detail shows the program its strategy and its manager', function () {
     $user = User::factory()->create();
-    $manager = User::factory()->create(['name' => 'Layla Haddad']);
+    $manager = insertHrEmployee(firstNameEn: 'Layla', lastNameEn: 'Haddad', firstNameAr: 'ليلى', lastNameAr: 'حداد');
     $strategy = Strategy::factory()->create(['name' => 'Country Strategy']);
     $program = Program::factory()->create([
         'name' => 'Water Security',
         'strategy_id' => $strategy->id,
-        'manager_id' => $manager->id,
+        'manager_id' => $manager,
     ]);
 
     $this->actingAs($user)
@@ -30,7 +30,8 @@ test('program detail shows the program its strategy and its manager', function (
         ->assertOk()
         ->assertSeeText('Water Security')
         ->assertSeeText('Country Strategy')
-        ->assertSeeText('Layla Haddad');
+        ->assertSeeText('Layla Haddad')
+        ->assertSeeText('ليلى حداد');
 });
 
 test('program detail lists only its own projects', function () {

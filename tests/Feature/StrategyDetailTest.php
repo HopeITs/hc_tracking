@@ -12,7 +12,7 @@ test('guests are redirected from strategy detail', function () {
 
 test('strategy detail shows the strategy its period and its programs', function () {
     $user = User::factory()->create();
-    $manager = User::factory()->create(['name' => 'Layla Haddad']);
+    $manager = insertHrEmployee(firstNameEn: 'Layla', lastNameEn: 'Haddad');
     $strategy = Strategy::factory()->create([
         'name' => 'Country Strategy',
         'start_year' => 2026,
@@ -21,7 +21,7 @@ test('strategy detail shows the strategy its period and its programs', function 
     Program::factory()->create([
         'name' => 'Water Security',
         'strategy_id' => $strategy->id,
-        'manager_id' => $manager->id,
+        'manager_id' => $manager,
     ]);
 
     $this->actingAs($user)

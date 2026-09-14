@@ -3,10 +3,9 @@
 namespace Database\Factories;
 
 use App\Enums\ProjectStatus;
-use App\Models\City;
 use App\Models\Program;
 use App\Models\Project;
-use App\Models\User;
+use Database\Factories\Concerns\CreatesHrRecords;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -14,6 +13,8 @@ use Illuminate\Database\Eloquent\Factories\Factory;
  */
 class ProjectFactory extends Factory
 {
+    use CreatesHrRecords;
+
     /**
      * Define the model's default state.
      *
@@ -45,9 +46,9 @@ class ProjectFactory extends Factory
             'target_women' => $women,
             'target_boys' => $boys,
             'target_girls' => $girls,
-            'city_id' => City::factory(),
+            'city_id' => fn (): int => $this->createHrCity(),
             'program_id' => Program::factory(),
-            'user_id' => User::factory(),
+            'user_id' => fn (): int => $this->createHrEmployee(),
         ];
     }
 

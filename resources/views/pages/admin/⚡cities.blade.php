@@ -1,10 +1,9 @@
 <?php
 
-use App\Models\City;
-use Flux\Flux;
+use App\Models\HrCity;
+use App\Models\Project;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Database\QueryException;
-use Illuminate\Validation\Rule;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -16,14 +15,6 @@ new #[Title('City directory')] class extends Component {
 
     #[Url(except: '')]
     public string $search = '';
-
-    public bool $showCityModal = false;
-    public bool $showDeleteModal = false;
-    public ?int $editingCityId = null;
-    public ?int $deletingCityId = null;
-    public string $name = '';
-    public string $deletingCityName = '';
-    public ?string $deleteError = null;
 
     public function updatedSearch(): void
     {
@@ -37,173 +28,50 @@ new #[Title('City directory')] class extends Component {
     }
 
     /**
-     * @return LengthAwarePaginator<int, City>
+     * Cities come from the HR database and are read-only here; every city is
+     * listed, active or not, exactly as HR holds it.
+     *
+     * @return LengthAwarePaginator<int, HrCity>
      */
     #[Computed]
     public function cities(): LengthAwarePaginator
     {
         $search = trim($this->search);
 
-        return City::query()
-            ->select(['id', 'name', 'created_at', 'updated_at'])
-            ->withCount('projects')
-            ->when($search !== '', fn ($query) => $query->where('name', 'like', '%'.$search.'%'))
-            ->orderBy('name')
+        return HrCity::query()
+            ->select(['id', 'name_en', 'name_ar', 'is_active'])
+            ->when($search !== '', fn ($query) => $query->where(fn ($query) => $query
+                ->where('name_en', 'like', '%'.$search.'%')
+                ->orWhere('name_ar', 'like', '%'.$search.'%')))
+            ->orderBy('name_en')
             ->orderBy('id')
             ->paginate(15);
     }
 
-    public function openCreateModal(): void
+    /**
+     * Project counts for the cities on this page, keyed by HR city id.
+     *
+     * Projects live in a different database from cities, so the count cannot
+     * be a withCount() subquery.
+     *
+     * @return Collection<int, int>
+     */
+    #[Computed]
+    public function projectCounts(): Collection
     {
-        $this->resetCityForm();
-        $this->showCityModal = true;
-    }
-
-    public function openEditModal(int $cityId): void
-    {
-        $city = City::query()->findOrFail($cityId);
-
-        $this->resetValidation();
-        $this->editingCityId = $city->id;
-        $this->name = $city->name;
-        $this->showCityModal = true;
-    }
-
-    public function saveCity(): void
-    {
-        $city = $this->editingCityId === null
-            ? new City
-            : City::query()->findOrFail($this->editingCityId);
-
-        $this->name = trim($this->name);
-
-        $validated = $this->validate([
-            'name' => [
-                'required',
-                'string',
-                'max:100',
-                Rule::unique(City::class)->ignore($city->exists ? $city : null),
-            ],
-        ], [
-            'name.required' => __('Enter a city name.'),
-            'name.max' => __('City names may not exceed 100 characters.'),
-            'name.unique' => __('A city with this name already exists.'),
-        ]);
-
-        try {
-            $city->fill(['name' => $validated['name']])->save();
-        } catch (QueryException $exception) {
-            if ((string) $exception->getCode() !== '23000') {
-                throw $exception;
-            }
-
-            $this->addError('name', __('A city with this name already exists.'));
-
-            return;
-        }
-
-        $wasRecentlyCreated = $city->wasRecentlyCreated;
-
-        $this->showCityModal = false;
-        $this->resetCityForm();
-        $this->resetPage();
-
-        Flux::toast(
-            variant: 'success',
-            text: $wasRecentlyCreated ? __('City created.') : __('City updated.'),
-        );
-    }
-
-    public function confirmCityDeletion(int $cityId): void
-    {
-        $city = City::query()->withCount('projects')->findOrFail($cityId);
-
-        $this->deletingCityId = $city->id;
-        $this->deletingCityName = $city->name;
-        $this->deleteError = $city->projects_count > 0
-            ? trans_choice(
-                'This city is assigned to :count project and cannot be deleted.|This city is assigned to :count projects and cannot be deleted.',
-                $city->projects_count,
-                ['count' => $city->projects_count],
-            )
-            : null;
-        $this->showDeleteModal = true;
-    }
-
-    public function deleteCity(): void
-    {
-        $city = City::query()->findOrFail($this->deletingCityId);
-
-        if ($city->projects()->exists()) {
-            $this->setReferencedCityDeleteError($city);
-
-            return;
-        }
-
-        try {
-            $city->delete();
-        } catch (QueryException $exception) {
-            if ((string) $exception->getCode() !== '23000') {
-                throw $exception;
-            }
-
-            $this->setReferencedCityDeleteError($city);
-
-            return;
-        }
-
-        $this->showDeleteModal = false;
-        $this->resetDeleteState();
-        $this->resetPage();
-
-        Flux::toast(variant: 'success', text: __('City deleted.'));
-    }
-
-    public function closeCityModal(): void
-    {
-        $this->showCityModal = false;
-        $this->resetCityForm();
-    }
-
-    public function closeDeleteModal(): void
-    {
-        $this->showDeleteModal = false;
-        $this->resetDeleteState();
-    }
-
-    protected function resetCityForm(): void
-    {
-        $this->resetValidation();
-        $this->editingCityId = null;
-        $this->name = '';
-    }
-
-    protected function resetDeleteState(): void
-    {
-        $this->deletingCityId = null;
-        $this->deletingCityName = '';
-        $this->deleteError = null;
-    }
-
-    protected function setReferencedCityDeleteError(City $city): void
-    {
-        $projectsCount = $city->projects()->count();
-
-        $this->deleteError = trans_choice(
-            'This city is assigned to :count project and cannot be deleted.|This city is assigned to :count projects and cannot be deleted.',
-            $projectsCount,
-            ['count' => $projectsCount],
-        );
+        return Project::query()
+            ->whereIn('city_id', $this->cities->pluck('id'))
+            ->selectRaw('city_id, count(*) as aggregate')
+            ->groupBy('city_id')
+            ->pluck('aggregate', 'city_id')
+            ->map(fn ($count): int => (int) $count);
     }
 };
 ?>
 
 @php
     $controlClasses = 'border-secondary-light! bg-white! text-secondary-dark! placeholder:text-secondary-light! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!';
-    $primaryButtonClasses = 'border-primary! bg-primary! text-white! hover:border-primary! hover:bg-primary!';
     $secondaryButtonClasses = 'border-secondary-light! bg-white! text-secondary-dark! hover:bg-secondary-soft! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white! dark:hover:bg-secondary-medium!';
-    $editButtonClasses = 'border-0! bg-transparent! text-secondary-dark! hover:bg-secondary-soft! dark:text-white! dark:hover:bg-secondary-medium!';
-    $deleteButtonClasses = 'border-0! bg-transparent! text-primary! hover:bg-primary! hover:text-white!';
 @endphp
 
 <section
@@ -218,10 +86,10 @@ new #[Title('City directory')] class extends Component {
                     {{ $this->cities->total() }}
                 </span>
             </div>
-            <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('Manage the city records used by projects.') }}</p>
+            <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('Cities are managed in the HR system and shown here read-only.') }}</p>
         </div>
 
-        <div class="grid w-full gap-2 @sm/directory:grid-cols-[minmax(12rem,1fr)_auto] @3xl/directory:max-w-[32rem]">
+        <div class="w-full @3xl/directory:max-w-[24rem]">
             <flux:input
                 type="search"
                 icon="magnifying-glass"
@@ -231,23 +99,13 @@ new #[Title('City directory')] class extends Component {
                 wire:model.live.debounce.300ms="search"
                 clearable
             />
-
-            <flux:button
-                variant="primary"
-                icon="plus"
-                :class="$primaryButtonClasses.' min-h-11 self-end touch-manipulation @sm/directory:min-h-10'"
-                wire:click="openCreateModal"
-                data-test="create-city-button"
-            >
-                {{ __('Add city') }}
-            </flux:button>
         </div>
     </div>
 
     <div class="overflow-hidden rounded-lg border border-secondary-light bg-white dark:border-secondary-medium dark:bg-secondary-dark">
         <div class="flex min-h-10 flex-wrap items-center justify-between gap-2 border-b border-secondary-soft bg-white px-3.5 py-2 dark:border-secondary-medium dark:bg-secondary-dark">
             <p class="text-xs font-semibold text-secondary-medium dark:text-secondary-soft">
-                {{ trans_choice('{1} :count matching city|[2,*] :count matching cities', $this->cities->total(), ['count' => $this->cities->total()]) }}
+                {{ trans_choice('{0} :count matching cities|{1} :count matching city|[2,*] :count matching cities', $this->cities->total(), ['count' => $this->cities->total()]) }}
             </p>
 
             <div class="flex items-center gap-2">
@@ -285,42 +143,27 @@ new #[Title('City directory')] class extends Component {
         @else
             <div class="divide-y divide-secondary-soft dark:divide-secondary-medium @3xl/directory:hidden">
                 @foreach ($this->cities as $city)
-                    <article class="flex flex-col gap-3 p-3.5" wire:key="mobile-city-{{ $city->id }}">
+                    @php($projectsCount = $this->projectCounts->get($city->id, 0))
+                    <article class="flex flex-col gap-2 p-3.5" wire:key="mobile-city-{{ $city->id }}">
                         <div class="flex min-w-0 items-center justify-between gap-3">
                             <div class="flex min-w-0 items-center gap-2.5">
                                 <div class="flex size-9 shrink-0 items-center justify-center rounded-md bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white">
                                     <flux:icon.map-pin class="size-4.5" />
                                 </div>
-                                <p class="truncate text-sm font-semibold text-secondary-dark dark:text-white">{{ $city->name }}</p>
+                                <div class="min-w-0">
+                                    <p class="truncate text-sm font-semibold text-secondary-dark dark:text-white">{{ $city->name_en }}</p>
+                                    <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft" dir="rtl" lang="ar">{{ $city->name_ar }}</p>
+                                </div>
                             </div>
 
                             <span class="inline-flex shrink-0 rounded-md bg-secondary-soft px-2 py-1 text-xs font-semibold text-secondary-dark dark:bg-secondary-medium dark:text-white">
-                                {{ trans_choice(':count project|:count projects', $city->projects_count, ['count' => $city->projects_count]) }}
+                                {{ trans_choice(':count project|:count projects', $projectsCount, ['count' => $projectsCount]) }}
                             </span>
                         </div>
 
-                        <div class="flex min-h-11 items-center justify-between gap-3 border-t border-secondary-soft pt-2.5 dark:border-secondary-medium">
-                            <span class="text-xs text-secondary-medium dark:text-secondary-soft">
-                                {{ __('Updated :date', ['date' => $city->updated_at?->format('M j, Y')]) }}
-                            </span>
-
-                            <div class="flex items-center justify-end gap-1">
-                                <flux:button
-                                    size="sm"
-                                    icon="pencil-square"
-                                    :class="$editButtonClasses.' size-11! touch-manipulation'"
-                                    wire:click="openEditModal({{ $city->id }})"
-                                    :aria-label="__('Edit :name', ['name' => $city->name])"
-                                />
-                                <flux:button
-                                    size="sm"
-                                    icon="trash"
-                                    :class="$deleteButtonClasses.' size-11! touch-manipulation'"
-                                    wire:click="confirmCityDeletion({{ $city->id }})"
-                                    :aria-label="__('Delete :name', ['name' => $city->name])"
-                                />
-                            </div>
-                        </div>
+                        <p class="text-xs text-secondary-medium dark:text-secondary-soft">
+                            {{ $city->is_active ? __('Active') : __('Inactive') }}
+                        </p>
                     </article>
                 @endforeach
             </div>
@@ -328,10 +171,10 @@ new #[Title('City directory')] class extends Component {
             <div class="hidden @3xl/directory:block">
                 <flux:table class="table-fixed [&_[data-flux-cell]]:px-3.5! [&_[data-flux-cell]]:py-2! [&_[data-flux-column]]:px-3.5! [&_[data-flux-column]]:py-2.5! [&_tbody_tr]:transition-colors [&_tbody_tr]:hover:bg-secondary-soft dark:[&_tbody_tr]:hover:bg-secondary-medium">
                     <flux:table.columns class="bg-secondary-soft text-xs font-semibold dark:bg-secondary-medium">
-                        <flux:table.column class="w-[50%]">{{ __('City') }}</flux:table.column>
+                        <flux:table.column class="w-[36%]">{{ __('City') }}</flux:table.column>
+                        <flux:table.column class="w-[32%]">{{ __('Arabic name') }}</flux:table.column>
                         <flux:table.column class="w-[16%]" align="center">{{ __('Projects') }}</flux:table.column>
-                        <flux:table.column class="w-[22%]" align="center">{{ __('Last updated') }}</flux:table.column>
-                        <flux:table.column class="w-[12%]" align="center">{{ __('Actions') }}</flux:table.column>
+                        <flux:table.column class="w-[16%]" align="center">{{ __('Status') }}</flux:table.column>
                     </flux:table.columns>
 
                     <flux:table.rows>
@@ -342,34 +185,19 @@ new #[Title('City directory')] class extends Component {
                                         <div class="flex size-8 shrink-0 items-center justify-center rounded-md bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white">
                                             <flux:icon.map-pin class="size-4" />
                                         </div>
-                                        <p class="truncate font-semibold">{{ $city->name }}</p>
+                                        <p class="truncate font-semibold">{{ $city->name_en }}</p>
                                     </div>
+                                </flux:table.cell>
+                                <flux:table.cell>
+                                    <p class="truncate" dir="rtl" lang="ar">{{ $city->name_ar }}</p>
                                 </flux:table.cell>
                                 <flux:table.cell align="center">
                                     <span class="inline-flex min-w-8 items-center justify-center rounded-md bg-secondary-soft px-2 py-1 text-xs font-semibold text-secondary-dark dark:bg-secondary-medium dark:text-white">
-                                        {{ $city->projects_count }}
+                                        {{ $this->projectCounts->get($city->id, 0) }}
                                     </span>
                                 </flux:table.cell>
                                 <flux:table.cell align="center">
-                                    <time datetime="{{ $city->updated_at?->toDateString() }}">{{ $city->updated_at?->format('M j, Y') }}</time>
-                                </flux:table.cell>
-                                <flux:table.cell align="center">
-                                    <div class="inline-flex items-center justify-center gap-1">
-                                        <flux:button
-                                            size="sm"
-                                            icon="pencil-square"
-                                            :class="$editButtonClasses.' size-8!'"
-                                            wire:click="openEditModal({{ $city->id }})"
-                                            :aria-label="__('Edit :name', ['name' => $city->name])"
-                                        />
-                                        <flux:button
-                                            size="sm"
-                                            icon="trash"
-                                            :class="$deleteButtonClasses.' size-8!'"
-                                            wire:click="confirmCityDeletion({{ $city->id }})"
-                                            :aria-label="__('Delete :name', ['name' => $city->name])"
-                                        />
-                                    </div>
+                                    {{ $city->is_active ? __('Active') : __('Inactive') }}
                                 </flux:table.cell>
                             </flux:table.row>
                         @endforeach
@@ -386,83 +214,4 @@ new #[Title('City directory')] class extends Component {
             </div>
         @endif
     </div>
-
-    <flux:modal
-        wire:model="showCityModal"
-        class="w-full max-w-lg border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!"
-    >
-        <form wire:submit="saveCity" class="space-y-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">
-                    {{ $editingCityId === null ? __('Add city') : __('Edit city') }}
-                </flux:heading>
-                <flux:subheading>
-                    {{ $editingCityId === null
-                        ? __('Create a city record for project assignment.')
-                        : __('Update this city record.') }}
-                </flux:subheading>
-            </div>
-
-            <flux:input
-                wire:model="name"
-                :class="$controlClasses"
-                :label="__('City name')"
-                type="text"
-                autocomplete="address-level2"
-                maxlength="100"
-                required
-                autofocus
-            />
-
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <flux:button type="button" variant="filled" :class="$secondaryButtonClasses.' min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto'" wire:click="closeCityModal">
-                    {{ __('Cancel') }}
-                </flux:button>
-                <flux:button type="submit" variant="primary" :class="$primaryButtonClasses.' min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto'" data-test="save-city-button">
-                    {{ $editingCityId === null ? __('Create city') : __('Save changes') }}
-                </flux:button>
-            </div>
-        </form>
-    </flux:modal>
-
-    <flux:modal
-        wire:model="showDeleteModal"
-        class="w-full max-w-lg border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!"
-    >
-        <form wire:submit="deleteCity" class="space-y-5">
-            <div class="flex items-start gap-3">
-                <div class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary text-white">
-                    <flux:icon.trash class="size-5" />
-                </div>
-                <div>
-                    <flux:heading size="lg">
-                        {{ $deleteError ? __('City cannot be deleted') : __('Delete city?') }}
-                    </flux:heading>
-                    <flux:subheading>
-                        {{ $deleteError
-                            ? __('Resolve the linked project records before deleting :name.', ['name' => $deletingCityName])
-                            : __('Permanently delete :name. This action cannot be undone.', ['name' => $deletingCityName]) }}
-                    </flux:subheading>
-                </div>
-            </div>
-
-            @if ($deleteError)
-                <div class="rounded-lg border border-primary bg-white p-3 text-sm text-primary dark:bg-primary dark:text-white" role="alert">
-                    <p class="font-semibold">{{ __('Unable to delete city') }}</p>
-                    <p>{{ $deleteError }}</p>
-                </div>
-            @endif
-
-            <div class="grid gap-2 {{ $deleteError ? 'grid-cols-1' : 'grid-cols-2' }} sm:flex sm:justify-end">
-                <flux:button type="button" variant="filled" :class="$secondaryButtonClasses.' min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto'" wire:click="closeDeleteModal">
-                    {{ $deleteError ? __('Close') : __('Cancel') }}
-                </flux:button>
-                @if (! $deleteError)
-                    <flux:button type="submit" :class="$primaryButtonClasses.' min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto'" data-test="confirm-delete-city-button">
-                        {{ __('Delete city') }}
-                    </flux:button>
-                @endif
-            </div>
-        </form>
-    </flux:modal>
 </section>

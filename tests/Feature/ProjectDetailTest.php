@@ -23,14 +23,14 @@ test('guests are redirected from project detail', function () {
 
 test('project detail shows the project its city program and owner', function () {
     $user = User::factory()->create();
-    $owner = User::factory()->create(['name' => 'Rana Darwish']);
-    $project = Project::factory()->create(['name' => 'Aleppo Wells', 'user_id' => $owner->id]);
+    $owner = insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Darwish');
+    $project = Project::factory()->create(['name' => 'Aleppo Wells', 'user_id' => $owner]);
 
     $this->actingAs($user)
         ->get(route('projects.show', $project))
         ->assertOk()
         ->assertSeeText('Aleppo Wells')
-        ->assertSeeText($project->city->name)
+        ->assertSeeText($project->city->name_en)
         ->assertSeeText($project->program->name)
         ->assertSeeText('Rana Darwish');
 });

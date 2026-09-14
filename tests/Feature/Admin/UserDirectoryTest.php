@@ -1,9 +1,8 @@
 <?php
 
 use App\Enums\UserRole;
-use App\Models\Project;
+use App\Models\Task;
 use App\Models\User;
-use Illuminate\Support\Facades\Hash;
 use Livewire\Livewire;
 
 test('guests are redirected from the user directory', function () {
@@ -81,26 +80,28 @@ test('user names are escaped in the directory', function () {
         ->assertDontSee($unsafeName, false);
 });
 
-test('administrators can create a verified user with any role', function (UserRole $role) {
+test('administrators can give an hr account access with any role', function (UserRole $role) {
     $admin = User::factory()->role(UserRole::Admin)->create();
+    $employeeId = insertHrEmployee(firstNameEn: 'Amina', lastNameEn: 'Haddad');
+    $hrUserId = insertHrUser($employeeId, 'amina@example.org');
 
     Livewire::actingAs($admin)
         ->test('pages::admin.users')
         ->call('openCreateModal')
-        ->set('name', 'New Staff Member')
-        ->set('email', 'new.staff@example.com')
+        ->assertSee('amina@example.org')
+        ->set('hrUserId', (string) $hrUserId)
         ->set('selectedRole', $role->value)
-        ->set('password', 'correct-password')
-        ->set('password_confirmation', 'correct-password')
         ->call('saveUser')
         ->assertHasNoErrors();
 
-    $user = User::query()->where('email', 'new.staff@example.com')->sole();
+    $user = User::query()->where('email', 'amina@example.org')->sole();
 
-    expect($user->name)->toBe('New Staff Member')
+    expect($user->name)->toBe('Amina Haddad')
         ->and($user->role)->toBe($role)
-        ->and($user->email_verified_at)->not->toBeNull()
-        ->and(Hash::check('correct-password', $user->password))->toBeTrue();
+        ->and($user->hr_user_id)->toBe($hrUserId)
+        ->and($user->employee_id)->toBe($employeeId)
+        ->and($user->password)->toBeNull()
+        ->and($user->email_verified_at)->not->toBeNull();
 })->with([
     'officer' => UserRole::Officer,
     'manager' => UserRole::Manager,
@@ -108,59 +109,66 @@ test('administrators can create a verified user with any role', function (UserRo
     'admin' => UserRole::Admin,
 ]);
 
-test('new user details are validated', function () {
+test('hr accounts that already have access are not offered again', function () {
     $admin = User::factory()->role(UserRole::Admin)->create();
-    $existingUser = User::factory()->create();
+    User::factory()->create(['email' => 'taken@example.org']);
+    insertHrUser(insertHrEmployee(), 'taken@example.org');
+    insertHrUser(insertHrEmployee(), 'free@example.org');
+
+    $component = Livewire::actingAs($admin)
+        ->test('pages::admin.users')
+        ->call('openCreateModal');
+
+    expect($component->instance()->hrAccountOptions->pluck('email')->all())->toBe(['free@example.org']);
+});
+
+test('a new user must name an available hr account and a valid role', function () {
+    $admin = User::factory()->role(UserRole::Admin)->create();
 
     Livewire::actingAs($admin)
         ->test('pages::admin.users')
         ->call('openCreateModal')
-        ->set('email', $existingUser->email)
+        ->set('hrUserId', '999999')
         ->set('selectedRole', 'Super Admin')
-        ->set('password', 'short')
-        ->set('password_confirmation', 'different')
         ->call('saveUser')
-        ->assertHasErrors(['name', 'email', 'selectedRole', 'password']);
+        ->assertHasErrors(['hrUserId' => 'exists', 'selectedRole']);
 
-    expect(User::query()->count())->toBe(2);
+    expect(User::query()->count())->toBe(1);
 });
 
-test('administrators can update another users details role and password', function () {
+test('an hr account that already has access cannot be added twice', function () {
     $admin = User::factory()->role(UserRole::Admin)->create();
-    $user = User::factory()->role(UserRole::Officer)->create();
+    User::factory()->create(['email' => 'taken@example.org']);
+    $hrUserId = insertHrUser(insertHrEmployee(), 'taken@example.org');
+
+    Livewire::actingAs($admin)
+        ->test('pages::admin.users')
+        ->call('openCreateModal')
+        ->set('hrUserId', (string) $hrUserId)
+        ->call('saveUser')
+        ->assertHasErrors(['hrUserId']);
+
+    expect(User::query()->where('email', 'taken@example.org')->count())->toBe(1);
+});
+
+test('administrators can change another users role but not their hr details', function () {
+    $admin = User::factory()->role(UserRole::Admin)->create();
+    $user = User::factory()->role(UserRole::Officer)->create(['name' => 'Rana Darwish', 'email' => 'rana@example.org']);
 
     Livewire::actingAs($admin)
         ->test('pages::admin.users')
         ->call('openEditModal', $user->id)
-        ->set('name', 'Updated Manager')
-        ->set('email', 'updated.manager@example.com')
+        ->assertSet('editingUserName', 'Rana Darwish')
+        ->assertSet('editingUserEmail', 'rana@example.org')
+        ->assertDontSee('New password')
         ->set('selectedRole', UserRole::Manager->value)
-        ->set('password', 'updated-password')
-        ->set('password_confirmation', 'updated-password')
         ->call('saveUser')
         ->assertHasNoErrors();
 
-    $user->refresh();
-
-    expect($user->name)->toBe('Updated Manager')
-        ->and($user->email)->toBe('updated.manager@example.com')
-        ->and($user->role)->toBe(UserRole::Manager)
-        ->and(Hash::check('updated-password', $user->password))->toBeTrue();
-});
-
-test('editing a user without a new password preserves the current password', function () {
-    $admin = User::factory()->role(UserRole::Admin)->create();
-    $user = User::factory()->create();
-    $originalPassword = $user->password;
-
-    Livewire::actingAs($admin)
-        ->test('pages::admin.users')
-        ->call('openEditModal', $user->id)
-        ->set('name', 'Name Only Update')
-        ->call('saveUser')
-        ->assertHasNoErrors();
-
-    expect($user->refresh()->password)->toBe($originalPassword);
+    expect($user->refresh())
+        ->role->toBe(UserRole::Manager)
+        ->name->toBe('Rana Darwish')
+        ->email->toBe('rana@example.org');
 });
 
 test('administrators cannot edit or delete themselves through the directory', function () {
@@ -195,7 +203,7 @@ test('administrators can delete an unreferenced user', function () {
 test('referenced users remain when the database prevents deletion', function () {
     $admin = User::factory()->role(UserRole::Admin)->create();
     $user = User::factory()->create();
-    Project::factory()->create(['user_id' => $user->id]);
+    Task::factory()->create(['created_by' => $user->id]);
 
     Livewire::actingAs($admin)
         ->test('pages::admin.users')

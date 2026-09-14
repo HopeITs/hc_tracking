@@ -5,6 +5,8 @@ Before planning or editing, find the row whose globs match the file's path and r
 | Applies to | Rule file |
 | --- | --- |
 | resources/views/{components/navigation/**,layouts/app/sidebar.blade.php} | .ai/rules/app.md |
+| {app/Actions/Fortify/**,app/Console/Commands/**,config/auth.php,database/seeders/**} | .ai/rules/commands-seeders.md |
+| {app/Actions/Fortify/**,app/Console/Commands/**,config/fortify.php} | .ai/rules/commands.md |
 | app/Concerns/HasTree.php | .ai/rules/concerns.md |
 | {config/database.php,.env.example} | .ai/rules/config.md |
 | resources/css/app.css | .ai/rules/css.md |
@@ -14,7 +16,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | database/factories/** | .ai/rules/factories.md |
 | {database/migrations/**,tests/Feature/DatabaseEncodingTest.php} | .ai/rules/feature.md |
 | {config/database.php,.env.example,database/migrations/**} | .ai/rules/migrations.md |
-| app/Models/**, app/Models/Account.php | .ai/rules/models.md |
+| app/Models/**, app/Models/Account.php, app/Models/Hr*.php, app/Models/Program.php | .ai/rules/models.md |
 | app/Observers/**, app/Observers/{MilestoneObserver,ResultObserver}.php | .ai/rules/observers.md |
 | app/Providers/** | .ai/rules/providers.md |
 | {database/factories/**,database/seeders/**,tests/Pest.php} | .ai/rules/seeders.md |

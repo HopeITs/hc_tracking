@@ -31,7 +31,7 @@ new #[Title('Strategy')] class extends Component {
         return Program::query()
             ->select(['id', 'name', 'strategy_id', 'manager_id'])
             ->where('strategy_id', $this->strategyId)
-            ->with(['manager:id,name,email,role'])
+            ->with(['manager:id,first_name_en,last_name_en,first_name_ar,last_name_ar'])
             ->withCount(['projects', 'yearlyPlans'])
             ->orderBy('name')
             ->orderBy('id')
@@ -86,7 +86,7 @@ new #[Title('Strategy')] class extends Component {
                                 {{ trans_choice(':count annual plan|:count annual plans', $program->yearly_plans_count, ['count' => $program->yearly_plans_count]) }}
                             </p>
                         </div>
-                        <x-ui.user-chip :user="$program->manager" class="@3xl/detail:w-64" />
+                        <x-ui.employee-chip :employee="$program->manager" class="@3xl/detail:w-64" />
                     </article>
                 @endforeach
             </div>

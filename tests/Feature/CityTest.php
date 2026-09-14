@@ -1,28 +1,18 @@
 <?php
 
-use Illuminate\Database\QueryException;
-use Illuminate\Support\Facades\DB;
+use App\Models\Project;
 
-test('a city is stored with its name', function () {
-    DB::table('cities')->insert([
-        'name' => 'Deir ez-Zor',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+test('a project resolves its city from the hr database', function () {
+    $cityId = insertHrCity('Deir Az-zor', 'دير الزور');
 
-    $this->assertDatabaseHas('cities', ['name' => 'Deir ez-Zor']);
+    $project = Project::factory()->create(['city_id' => $cityId]);
+
+    expect($project->city->name_en)->toBe('Deir Az-zor')
+        ->and($project->city->name_ar)->toBe('دير الزور');
 });
 
-test('the same city name cannot be stored twice', function () {
-    DB::table('cities')->insert([
-        'name' => 'Aleppo',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+test('a project whose hr city no longer exists has no city rather than failing', function () {
+    $project = Project::factory()->create(['city_id' => 999999]);
 
-    DB::table('cities')->insert([
-        'name' => 'Aleppo',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
-})->throws(QueryException::class);
+    expect($project->fresh()->city)->toBeNull();
+});

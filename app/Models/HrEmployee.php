@@ -1,0 +1,223 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models;
+
+use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Str;
+
+/**
+ * An employee from the HR database (hchr_employees).
+ *
+ * Only the columns hc-tracking needs are documented; personal fields exist in
+ * the table but are hidden from serialization.
+ *
+ * @property int $id
+ * @property int|null $city_id
+ * @property string $first_name_en
+ * @property string $first_name_ar
+ * @property string $last_name_en
+ * @property string $last_name_ar
+ * @property string $username
+ * @property bool $is_active
+ * @property-read string $name
+ * @property-read string $name_en
+ * @property-read string $name_ar
+ * @property CarbonImmutable|null $created_at
+ * @property CarbonImmutable|null $updated_at
+ */
+#[Hidden([
+    'national_number', 'national_number_index', 'actual_dob', 'dob', 'civil_registry_office',
+    'civil_registry_number', 'personal_phone', 'personal_email', 'address_en', 'address_ar',
+    'digital_id_token',
+])]
+class HrEmployee extends HrModel
+{
+    /**
+     * The columns needed to show an employee by name, for eager loads and pickers.
+     *
+     * @var list<string>
+     */
+    public const NameColumns = ['id', 'first_name_en', 'last_name_en', 'first_name_ar', 'last_name_ar'];
+
+    protected $table = 'employees';
+
+    /**
+     * The ids of employees whose English or Arabic name matches the search.
+     *
+     * Every word of the search must appear in one of the name columns, so both
+     * "Sami" and "Sami Haddad" find Sami Haddad. Employees live in the HR
+     * database, so a tracking query searching by a person's name filters on
+     * these ids instead of a whereHas() across connections.
+     *
+     * @return list<int>
+     */
+    public static function idsMatchingName(string $search): array
+    {
+        $words = preg_split('/\s+/u', trim($search), -1, PREG_SPLIT_NO_EMPTY);
+
+        if ($words === false || $words === []) {
+            return [];
+        }
+
+        $query = static::query();
+
+        foreach ($words as $word) {
+            $query->where(fn ($query) => $query
+                ->where('first_name_en', 'like', '%'.$word.'%')
+                ->orWhere('last_name_en', 'like', '%'.$word.'%')
+                ->orWhere('first_name_ar', 'like', '%'.$word.'%')
+                ->orWhere('last_name_ar', 'like', '%'.$word.'%'));
+        }
+
+        return $query->pluck('id')->all();
+    }
+
+    /**
+     * Employees ordered for a picker, with only the columns a picker shows.
+     *
+     * Every employee is offered, active or not, exactly as HR holds them.
+     *
+     * @return Collection<int, static>
+     */
+    public static function pickerOptions(): Collection
+    {
+        return static::query()
+            ->select(self::NameColumns)
+            ->orderBy('first_name_en')
+            ->orderBy('last_name_en')
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'is_active' => 'boolean',
+        ];
+    }
+
+    /**
+     * The employee's display name: the full English name.
+     *
+     * @return Attribute<string, never>
+     */
+    protected function name(): Attribute
+    {
+        return Attribute::get(fn (): string => $this->name_en);
+    }
+
+    /**
+     * Initials from the English name, matching User::initials().
+     */
+    public function initials(): string
+    {
+        $initials = Str::initials($this->name_en, true);
+
+        return Str::length($initials) > 1
+            ? Str::substr($initials, 0, 1).Str::substr($initials, -1)
+            : $initials;
+    }
+
+    /**
+     * The programs this employee manages.
+     *
+     * @return HasMany<Program, $this>
+     */
+    public function managedPrograms(): HasMany
+    {
+        return $this->hasMany(Program::class, 'manager_id');
+    }
+
+    /**
+     * The annual plans this employee manages.
+     *
+     * @return HasMany<YearlyPlan, $this>
+     */
+    public function managedYearlyPlans(): HasMany
+    {
+        return $this->hasMany(YearlyPlan::class, 'manager_id');
+    }
+
+    /**
+     * The projects this employee is responsible for.
+     *
+     * @return HasMany<Project, $this>
+     */
+    public function projects(): HasMany
+    {
+        return $this->hasMany(Project::class, 'user_id');
+    }
+
+    /**
+     * The milestones this employee is accountable for.
+     *
+     * @return HasMany<Milestone, $this>
+     */
+    public function responsibleMilestones(): HasMany
+    {
+        return $this->hasMany(Milestone::class, 'responsible_user_id');
+    }
+
+    /**
+     * The tasks assigned to this employee.
+     *
+     * @return HasMany<Task, $this>
+     */
+    public function assignedTasks(): HasMany
+    {
+        return $this->hasMany(Task::class, 'assigned_to');
+    }
+
+    /**
+     * The employee's full English name.
+     *
+     * @return Attribute<string, never>
+     */
+    protected function nameEn(): Attribute
+    {
+        return Attribute::get(fn (): string => trim($this->first_name_en.' '.$this->last_name_en));
+    }
+
+    /**
+     * The employee's full Arabic name.
+     *
+     * @return Attribute<string, never>
+     */
+    protected function nameAr(): Attribute
+    {
+        return Attribute::get(fn (): string => trim($this->first_name_ar.' '.$this->last_name_ar));
+    }
+
+    /**
+     * The city the employee lives in.
+     *
+     * @return BelongsTo<HrCity, $this>
+     */
+    public function city(): BelongsTo
+    {
+        return $this->belongsTo(HrCity::class, 'city_id');
+    }
+
+    /**
+     * The HR login account of this employee.
+     *
+     * @return HasOne<HrUser, $this>
+     */
+    public function user(): HasOne
+    {
+        return $this->hasOne(HrUser::class, 'employee_id');
+    }
+}

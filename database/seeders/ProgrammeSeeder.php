@@ -3,41 +3,48 @@
 namespace Database\Seeders;
 
 use App\Enums\ProjectStatus;
-use App\Enums\UserRole;
-use App\Models\City;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Strategy;
-use App\Models\User;
 use App\Models\YearlyPlan;
+use Database\Seeders\Concerns\PicksHrRecords;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Seeder;
 
 /**
- * The programme layer: programs, annual plans, projects, proposals and the
- * links between them.
+ * The programme layer: program assignments, annual plans, projects, proposals
+ * and the links between them.
+ *
+ * Programs are never created here. They are mirrored from HR and the first four
+ * are linked to a strategy and manager; the rest stay unassigned.
  *
  * Depends on CoreDataSeeder.
  */
 class ProgrammeSeeder extends Seeder
 {
+    use PicksHrRecords;
+
     /**
      * Seed the programme tables.
      */
     public function run(): void
     {
         $strategy = Strategy::query()->latest('id')->firstOrFail();
-        $managers = User::query()->where('role', UserRole::Manager)->orderBy('id')->get();
-        $cities = City::query()->get();
+        $employeeIds = $this->hrEmployeeIds();
+        $cityIds = $this->hrCityIds();
         $donors = Donor::query()->get();
 
-        foreach (['WASH', 'Shelter', 'Protection', 'Livelihoods'] as $index => $name) {
-            $program = Program::factory()->create([
-                'name' => $name,
+        Program::syncFromHr();
+
+        foreach ($this->programsToAssign() as $index => $program) {
+            $name = $program->name;
+
+            $program->update([
                 'strategy_id' => $strategy->id,
-                'manager_id' => $managers[$index % $managers->count()]->id,
+                'manager_id' => $employeeIds[$index % $employeeIds->count()],
             ]);
 
             foreach ([$strategy->start_year, $strategy->start_year + 1] as $year) {
@@ -58,8 +65,8 @@ class ProgrammeSeeder extends Seeder
                 ->create([
                     'name' => fn (): string => $name.' Community Response '.fake()->unique()->numerify('###'),
                     'program_id' => $program->id,
-                    'city_id' => fn (): int => $cities->random()->id,
-                    'user_id' => fn (): int => $managers->random()->id,
+                    'city_id' => fn (): int => $cityIds->random(),
+                    'user_id' => fn (): int => $employeeIds->random(),
                 ]);
 
             $proposal = Proposal::factory()->running()->create([
@@ -76,5 +83,27 @@ class ProgrammeSeeder extends Seeder
                 'project_num' => 'PRJ-'.str_pad((string) ($index + 1), 4, '0', STR_PAD_LEFT),
             ]);
         }
+    }
+
+    /**
+     * The mirrored HR programs to build demo delivery under.
+     *
+     * An empty HR database only happens in the test suite, whose in-memory HR
+     * connection accepts the factory's HR insert.
+     *
+     * @return Collection<int, Program>
+     */
+    protected function programsToAssign(): Collection
+    {
+        $programs = Program::query()->orderBy('id')->limit(4)->get();
+
+        return $programs->isNotEmpty()
+            ? $programs
+            : Program::factory()->unassigned()->count(4)->sequence(
+                ['name' => 'WASH'],
+                ['name' => 'Shelter'],
+                ['name' => 'Protection'],
+                ['name' => 'Livelihoods'],
+            )->create();
     }
 }

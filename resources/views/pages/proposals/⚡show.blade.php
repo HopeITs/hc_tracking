@@ -96,7 +96,7 @@ new #[Title('Proposal')] class extends Component {
     {
         return $this->proposal->projects()
             ->select(['projects.id', 'projects.name', 'projects.city_id', 'projects.program_id'])
-            ->with(['city:id,name', 'program:id,name'])
+            ->with(['city:id,name_en', 'program:id,name'])
             ->orderBy('projects.name')
             ->get();
     }
@@ -108,7 +108,7 @@ new #[Title('Proposal')] class extends Component {
         return Task::query()
             ->select(['id', 'proposal_id', 'milestone_id', 'title', 'status', 'priority', 'due_date', 'assigned_to', 'progress_percentage'])
             ->where('proposal_id', $this->proposalId)
-            ->with('assignee:id,name,email,role')
+            ->with('assignee:id,first_name_en,last_name_en,first_name_ar,last_name_ar')
             ->orderByRaw('due_date is null, due_date')
             ->get();
     }
@@ -288,7 +288,7 @@ new #[Title('Proposal')] class extends Component {
                         <article class="flex items-center gap-3 p-3.5" wire:key="proposal-project-{{ $project->id }}">
                             <div class="min-w-0 me-auto">
                                 <a href="{{ route('projects.show', $project) }}" wire:navigate class="text-sm font-semibold hover:underline">{{ $project->name }}</a>
-                                <p class="text-xs text-secondary-medium dark:text-secondary-soft">{{ $project->city->name }} · {{ $project->program->name }}</p>
+                                <p class="text-xs text-secondary-medium dark:text-secondary-soft">{{ $project->city?->name_en ?? __('Unknown city') }} · {{ $project->program->name }}</p>
                             </div>
                         </article>
                     @endforeach
@@ -305,7 +305,7 @@ new #[Title('Proposal')] class extends Component {
                         <article class="flex flex-wrap items-center gap-3 p-3.5" wire:key="proposal-task-{{ $task->id }}">
                             <div class="min-w-0 me-auto">
                                 <a href="{{ route('tasks.show', $task) }}" wire:navigate class="text-sm font-semibold hover:underline">{{ $task->title }}</a>
-                                <p class="text-xs text-secondary-medium dark:text-secondary-soft">{{ $task->assignee->name }}</p>
+                                <p class="text-xs text-secondary-medium dark:text-secondary-soft">{{ $task->assignee?->name ?? __('Not assigned') }}</p>
                             </div>
                             <x-ui.enum-badge :case="$task->status" />
                             <span class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $task->progress_percentage }}%</span>

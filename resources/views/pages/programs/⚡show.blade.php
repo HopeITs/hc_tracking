@@ -28,7 +28,7 @@ new #[Title('Program')] class extends Component {
             ->select(['id', 'name', 'strategy_id', 'manager_id', 'updated_at'])
             ->with([
                 'strategy:id,name,start_year,end_year',
-                'manager:id,name,email,role',
+                'manager:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
             ])
             ->withCount(['projects', 'yearlyPlans', 'results'])
             ->findOrFail($this->programId);
@@ -41,7 +41,7 @@ new #[Title('Program')] class extends Component {
         return Project::query()
             ->select(['id', 'name', 'city_id', 'program_id', 'user_id'])
             ->where('program_id', $this->programId)
-            ->with(['city:id,name', 'user:id,name,email,role'])
+            ->with(['city:id,name_en', 'user:id,first_name_en,last_name_en,first_name_ar,last_name_ar'])
             ->withCount(['risks', 'milestones'])
             ->orderBy('name')
             ->orderBy('id')
@@ -55,7 +55,7 @@ new #[Title('Program')] class extends Component {
         return YearlyPlan::query()
             ->select(['id', 'program_id', 'manager_id', 'year'])
             ->where('program_id', $this->programId)
-            ->with(['manager:id,name,email,role'])
+            ->with(['manager:id,first_name_en,last_name_en,first_name_ar,last_name_ar'])
             ->withCount('planIndicators')
             ->orderByDesc('year')
             ->get();
@@ -103,15 +103,19 @@ new #[Title('Program')] class extends Component {
         :title="$this->program->name"
     >
         <x-slot:meta>
-            <a href="{{ route('strategies.show', $this->program->strategy) }}" wire:navigate class="font-medium hover:text-secondary-dark hover:underline dark:hover:text-white">
-                {{ $this->program->strategy->name }}
-                ({{ $this->program->strategy->start_year }}–{{ $this->program->strategy->end_year }})
-            </a>
+            @if ($this->program->strategy)
+                <a href="{{ route('strategies.show', $this->program->strategy) }}" wire:navigate class="font-medium hover:text-secondary-dark hover:underline dark:hover:text-white">
+                    {{ $this->program->strategy->name }}
+                    ({{ $this->program->strategy->start_year }}–{{ $this->program->strategy->end_year }})
+                </a>
+            @else
+                <span>{{ __('Strategy not assigned') }}</span>
+            @endif
             <span>{{ __('Updated :date', ['date' => $this->program->updated_at?->format('M j, Y')]) }}</span>
         </x-slot:meta>
 
         <x-slot:actions>
-            <x-ui.user-chip :user="$this->program->manager" class="rounded-lg border border-secondary-soft p-2.5 dark:border-secondary-medium" />
+            <x-ui.employee-chip :employee="$this->program->manager" class="rounded-lg border border-secondary-soft p-2.5 dark:border-secondary-medium" />
         </x-slot:actions>
     </x-ui.detail-header>
 
@@ -128,14 +132,14 @@ new #[Title('Program')] class extends Component {
                             <div class="min-w-0 @3xl/detail:me-auto">
                                 <a href="{{ route('projects.show', $project) }}" wire:navigate class="truncate text-sm font-semibold hover:underline">{{ $project->name }}</a>
                                 <p class="text-xs text-secondary-medium dark:text-secondary-soft">
-                                    {{ $project->city->name }}
+                                    {{ $project->city?->name_en ?? __('Unknown city') }}
                                     ·
                                     {{ trans_choice(':count risk|:count risks', $project->risks_count, ['count' => $project->risks_count]) }}
                                     ·
                                     {{ trans_choice(':count milestone|:count milestones', $project->milestones_count, ['count' => $project->milestones_count]) }}
                                 </p>
                             </div>
-                            <x-ui.user-chip :user="$project->user" class="@3xl/detail:w-64" />
+                            <x-ui.employee-chip :employee="$project->user" class="@3xl/detail:w-64" />
                         </article>
                     @endforeach
                 </div>
@@ -159,7 +163,7 @@ new #[Title('Program')] class extends Component {
                                     {{ trans_choice(':count target|:count targets', $plan->plan_indicators_count, ['count' => $plan->plan_indicators_count]) }}
                                 </p>
                             </div>
-                            <x-ui.user-chip :user="$plan->manager" class="@3xl/detail:w-64" />
+                            <x-ui.employee-chip :employee="$plan->manager" class="@3xl/detail:w-64" />
                         </article>
                     @endforeach
                 </div>

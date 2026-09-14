@@ -23,7 +23,7 @@ new #[Title('Annual Plan')] class extends Component {
             ->with([
                 'program:id,name,strategy_id',
                 'program.strategy:id,name',
-                'manager:id,name,email,role',
+                'manager:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
             ])
             ->withCount('planIndicators')
             ->findOrFail($this->yearlyPlanId);
@@ -48,7 +48,7 @@ new #[Title('Annual Plan')] class extends Component {
                 'indicator:id,name,result_id,measure',
                 'indicator.result:id,statement,type',
                 'project:id,name,city_id',
-                'project.city:id,name',
+                'project.city:id,name_en',
             ])
             ->withCount('reports')
             ->get();
@@ -63,7 +63,7 @@ new #[Title('Annual Plan')] class extends Component {
             ['label' => __('FY :year', ['year' => $this->plan->year])],
         ]"
         :title="__('FY :year · :program', ['year' => $this->plan->year, 'program' => $this->plan->program->name])"
-        :subtitle="$this->plan->program->strategy->name"
+        :subtitle="$this->plan->program->strategy?->name ?? __('Strategy not assigned')"
     >
         <x-slot:meta>
             @if (Route::has('programs.show'))
@@ -77,7 +77,7 @@ new #[Title('Annual Plan')] class extends Component {
         </x-slot:meta>
 
         <x-slot:actions>
-            <x-ui.user-chip :user="$this->plan->manager" class="rounded-lg border border-secondary-soft p-2.5 dark:border-secondary-medium" />
+            <x-ui.employee-chip :employee="$this->plan->manager" class="rounded-lg border border-secondary-soft p-2.5 dark:border-secondary-medium" />
         </x-slot:actions>
     </x-ui.detail-header>
 
@@ -106,7 +106,7 @@ new #[Title('Annual Plan')] class extends Component {
                                 @if ($target->project === null)
                                     {{ __('Organisation-wide') }}
                                 @else
-                                    {{ $target->project->name }} · {{ $target->project->city->name }}
+                                    {{ $target->project->name }} · {{ $target->project->city?->name_en ?? __('Unknown city') }}
                                 @endif
                             </span>
                             <x-ui.enum-badge :case="$target->period" />

@@ -71,13 +71,13 @@ class Task extends Model
     }
 
     /**
-     * The user this task is assigned to.
+     * The HR employee this task is assigned to.
      *
-     * @return BelongsTo<User, $this>
+     * @return BelongsTo<HrEmployee, $this>
      */
     public function assignee(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'assigned_to');
+        return $this->belongsTo(HrEmployee::class, 'assigned_to');
     }
 
     /**

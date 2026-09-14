@@ -1,10 +1,10 @@
 <?php
 
 use App\Enums\ProjectStatus;
-use App\Models\City;
+use App\Models\HrCity;
+use App\Models\HrEmployee;
 use App\Models\Program;
 use App\Models\Project;
-use App\Models\User;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
@@ -104,6 +104,14 @@ new #[Title('Projects')] class extends Component {
     {
         $search = trim($this->search);
 
+        // Cities are in the HR database, so a city-name search resolves to ids
+        // first instead of a whereHas() across connections.
+        $matchingCityIds = $search === '' ? [] : HrCity::query()
+            ->where('name_en', 'like', '%'.$search.'%')
+            ->orWhere('name_ar', 'like', '%'.$search.'%')
+            ->pluck('id')
+            ->all();
+
         return Project::query()
             ->select([
                 'id',
@@ -122,22 +130,18 @@ new #[Title('Projects')] class extends Component {
                 'updated_at',
             ])
             ->with([
-                'city:id,name',
+                'city:id,name_en',
                 'program:id,name',
-                'user:id,name,email,role',
+                'user:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
             ])
             ->withCount(['risks', 'milestones', 'planIndicators', 'proposals'])
-            ->when($search !== '', function ($query) use ($search): void {
-                $query->where(function ($query) use ($search): void {
+            ->when($search !== '', function ($query) use ($search, $matchingCityIds): void {
+                $query->where(function ($query) use ($search, $matchingCityIds): void {
                     $query
                         ->where('name', 'like', '%'.$search.'%')
-                        ->orWhereHas('city', fn ($query) => $query->where('name', 'like', '%'.$search.'%'))
+                        ->orWhereIn('city_id', $matchingCityIds)
                         ->orWhereHas('program', fn ($query) => $query->where('name', 'like', '%'.$search.'%'))
-                        ->orWhereHas('user', function ($query) use ($search): void {
-                            $query
-                                ->where('name', 'like', '%'.$search.'%')
-                                ->orWhere('email', 'like', '%'.$search.'%');
-                        });
+                        ->orWhereIn('user_id', HrEmployee::idsMatchingName($search));
                 });
             })
             ->when($this->city !== '', fn ($query) => $query->where('city_id', (int) $this->city))
@@ -149,11 +153,11 @@ new #[Title('Projects')] class extends Component {
             ->paginate(15);
     }
 
-    /** @return Collection<int, City> */
+    /** @return Collection<int, HrCity> */
     #[Computed]
     public function cityOptions(): Collection
     {
-        return City::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get();
+        return HrCity::query()->select(['id', 'name_en', 'name_ar'])->orderBy('name_en')->orderBy('id')->get();
     }
 
     /** @return Collection<int, Program> */
@@ -163,11 +167,11 @@ new #[Title('Projects')] class extends Component {
         return Program::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get();
     }
 
-    /** @return Collection<int, User> */
+    /** @return Collection<int, HrEmployee> */
     #[Computed]
     public function userOptions(): Collection
     {
-        return User::query()->select(['id', 'name', 'email', 'role'])->orderBy('name')->orderBy('id')->get();
+        return HrEmployee::pickerOptions();
     }
 
     public function openCreateModal(): void
@@ -235,9 +239,9 @@ new #[Title('Projects')] class extends Component {
             'targetWomen' => ['nullable', 'integer', 'min:0', 'max:4294967295'],
             'targetBoys' => ['nullable', 'integer', 'min:0', 'max:4294967295'],
             'targetGirls' => ['nullable', 'integer', 'min:0', 'max:4294967295'],
-            'cityId' => ['required', 'integer', Rule::exists(City::class, 'id')],
+            'cityId' => ['required', 'integer', Rule::exists(HrCity::class, 'id')],
             'programId' => ['required', 'integer', Rule::exists(Program::class, 'id')],
-            'userId' => ['required', 'integer', Rule::exists(User::class, 'id')],
+            'userId' => ['required', 'integer', Rule::exists(HrEmployee::class, 'id')],
         ], [
             'name.required' => __('Enter a project name.'),
             'cityId.required' => __('Select a city.'),
@@ -340,7 +344,7 @@ new #[Title('Projects')] class extends Component {
             <x-ui.select :label="__('City')" wire:model.live="city">
                 <flux:select.option value="">{{ __('All cities') }}</flux:select.option>
                 @foreach ($this->cityOptions as $cityOption)
-                    <flux:select.option :value="$cityOption->id" :wire:key="'city-filter-'.$cityOption->id">{{ $cityOption->name }}</flux:select.option>
+                    <flux:select.option :value="$cityOption->id" :wire:key="'city-filter-'.$cityOption->id">{{ $cityOption->name_en }} · {{ $cityOption->name_ar }}</flux:select.option>
                 @endforeach
             </x-ui.select>
 
@@ -354,7 +358,7 @@ new #[Title('Projects')] class extends Component {
             <x-ui.select :label="__('Owner')" wire:model.live="owner">
                 <flux:select.option value="">{{ __('All owners') }}</flux:select.option>
                 @foreach ($this->userOptions as $userOption)
-                    <flux:select.option :value="$userOption->id" :wire:key="'owner-filter-'.$userOption->id">{{ $userOption->name }} · {{ $userOption->role->value }}</flux:select.option>
+                    <flux:select.option :value="$userOption->id" :wire:key="'owner-filter-'.$userOption->id">{{ $userOption->name_en }} · {{ $userOption->name_ar }}</flux:select.option>
                 @endforeach
             </x-ui.select>
 
@@ -404,7 +408,7 @@ new #[Title('Projects')] class extends Component {
                                 <x-ui.enum-badge :case="$project->status" />
                             </div>
                             <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">
-                                {{ $project->city->name }} · {{ $project->program->name }}
+                                {{ $project->city?->name_en ?? __('Unknown city') }} · {{ $project->program->name }}
                             </p>
                             <p class="mt-1 text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">
                                 {{ $project->start_date?->format('M j, Y') ?? '—' }} → {{ $project->end_date?->format('M j, Y') ?? '—' }}
@@ -420,7 +424,7 @@ new #[Title('Projects')] class extends Component {
                             <span>{{ trans_choice(':count proposal|:count proposals', $project->proposals_count, ['count' => $project->proposals_count]) }}</span>
                         </div>
 
-                        <x-ui.user-chip :user="$project->user" />
+                        <x-ui.employee-chip :employee="$project->user" />
 
                         <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="openEditModal({{ $project->id }})" :aria-label="__('Edit :name', ['name' => $project->name])" />
                     </article>
@@ -456,7 +460,7 @@ new #[Title('Projects')] class extends Component {
                 <x-ui.select wire:model="cityId" :label="__('City')" required>
                     <flux:select.option value="">{{ __('Select a city') }}</flux:select.option>
                     @foreach ($this->cityOptions as $cityOption)
-                        <flux:select.option :value="$cityOption->id" :wire:key="'city-option-'.$cityOption->id">{{ $cityOption->name }}</flux:select.option>
+                        <flux:select.option :value="$cityOption->id" :wire:key="'city-option-'.$cityOption->id">{{ $cityOption->name_en }} · {{ $cityOption->name_ar }}</flux:select.option>
                     @endforeach
                 </x-ui.select>
 
@@ -470,7 +474,7 @@ new #[Title('Projects')] class extends Component {
                 <x-ui.select wire:model="userId" :label="__('Owner')" required>
                     <flux:select.option value="">{{ __('Select an owner') }}</flux:select.option>
                     @foreach ($this->userOptions as $userOption)
-                        <flux:select.option :value="$userOption->id" :wire:key="'owner-option-'.$userOption->id">{{ $userOption->name }} · {{ $userOption->role->value }}</flux:select.option>
+                        <flux:select.option :value="$userOption->id" :wire:key="'owner-option-'.$userOption->id">{{ $userOption->name_en }} · {{ $userOption->name_ar }}</flux:select.option>
                     @endforeach
                 </x-ui.select>
             </div>

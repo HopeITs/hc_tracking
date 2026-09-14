@@ -18,7 +18,7 @@
                 <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-secondary-medium dark:text-secondary-soft">
                     <span>{{ __('Planned :date', ['date' => $milestone->planned_date->format('M j, Y')]) }}</span>
                     <span>{{ __('Weight :weight%', ['weight' => $milestone->weight_percentage]) }}</span>
-                    <x-ui.user-chip :user="$milestone->responsibleUser" compact />
+                    <x-ui.employee-chip :employee="$milestone->responsibleUser" compact />
                 </div>
                 @if ($milestone->description !== null)
                     <p class="mt-2 text-sm leading-5 text-secondary-medium dark:text-secondary-soft">{{ $milestone->description }}</p>

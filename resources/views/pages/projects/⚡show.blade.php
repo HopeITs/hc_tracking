@@ -48,10 +48,10 @@ new #[Title('Project')] class extends Component {
                 'updated_at',
             ])
             ->with([
-                'city:id,name',
+                'city:id,name_en',
                 'program:id,name,strategy_id',
                 'program.strategy:id,name',
-                'user:id,name,email,role',
+                'user:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
                 'media' => fn ($query) => $query
                     ->select(['id', 'mediable_type', 'mediable_id', 'collection', 'original_name', 'type', 'uploaded_at'])
                     ->orderByDesc('uploaded_at')
@@ -169,18 +169,18 @@ new #[Title('Project')] class extends Component {
             ['label' => $this->project->name],
         ]"
         :title="$this->project->name"
-        :subtitle="$this->project->city->name"
+        :subtitle="$this->project->city?->name_en ?? __('Unknown city')"
     >
         <x-slot:meta>
             <a href="{{ route('programs.show', $this->project->program) }}" wire:navigate class="font-medium hover:underline">{{ $this->project->program->name }}</a>
-            <span>{{ $this->project->program->strategy->name }}</span>
+            <span>{{ $this->project->program->strategy?->name ?? __('Strategy not assigned') }}</span>
             <span>{{ __('Updated :date', ['date' => $this->project->updated_at?->format('M j, Y')]) }}</span>
         </x-slot:meta>
 
         <x-slot:actions>
             <div class="flex flex-wrap items-center gap-2">
                 <x-ui.enum-badge :case="$this->project->status" />
-                <x-ui.user-chip :user="$this->project->user" class="rounded-lg border border-secondary-soft p-2.5 dark:border-secondary-medium" />
+                <x-ui.employee-chip :employee="$this->project->user" class="rounded-lg border border-secondary-soft p-2.5 dark:border-secondary-medium" />
             </div>
         </x-slot:actions>
     </x-ui.detail-header>

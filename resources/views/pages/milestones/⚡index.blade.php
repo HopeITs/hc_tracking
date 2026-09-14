@@ -1,9 +1,9 @@
 <?php
 
 use App\Enums\MilestoneStatus;
+use App\Models\HrEmployee;
 use App\Models\Milestone;
 use App\Models\Project;
-use App\Models\User;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -68,7 +68,7 @@ new #[Title('Milestones')] class extends Component {
             ->select(['id', 'name', 'city_id'])
             ->when($this->project !== '', fn (Builder $query) => $query->whereKey((int) $this->project))
             ->with([
-                'city:id,name',
+                'city:id,name_en',
                 'milestones' => fn ($query) => $query
                     ->select([
                         'id',
@@ -84,7 +84,7 @@ new #[Title('Milestones')] class extends Component {
                         'parent_milestone_id',
                     ])
                     ->with([
-                        'responsibleUser:id,name,email,role',
+                        'responsibleUser:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
                         'media' => fn ($query) => $query
                             ->select(['id', 'mediable_type', 'mediable_id', 'collection', 'original_name', 'type', 'uploaded_at'])
                             ->orderByDesc('uploaded_at')
@@ -138,11 +138,11 @@ new #[Title('Milestones')] class extends Component {
         return Project::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get();
     }
 
-    /** @return Collection<int, User> */
+    /** @return Collection<int, HrEmployee> */
     #[Computed]
     public function userOptions(): Collection
     {
-        return User::query()->select(['id', 'name', 'email', 'role'])->orderBy('name')->orderBy('id')->get();
+        return HrEmployee::pickerOptions();
     }
 
     /** @return Collection<int, Milestone> */
@@ -223,7 +223,7 @@ new #[Title('Milestones')] class extends Component {
             'milestoneStatus' => ['required', new Enum(MilestoneStatus::class)],
             'sequence' => ['required', 'integer', 'min:0'],
             'weightPercentage' => ['required', 'numeric', 'min:0', 'max:100'],
-            'responsibleUserId' => ['required', 'integer', Rule::exists(User::class, 'id')],
+            'responsibleUserId' => ['required', 'integer', Rule::exists(HrEmployee::class, 'id')],
             'milestoneProjectId' => [
                 'required',
                 'integer',
@@ -401,7 +401,7 @@ new #[Title('Milestones')] class extends Component {
             <x-ui.select :label="__('Responsible')" wire:model.live="responsible">
                 <flux:select.option value="">{{ __('Anyone') }}</flux:select.option>
                 @foreach ($this->userOptions as $userOption)
-                    <flux:select.option :value="$userOption->id" :wire:key="'milestone-user-filter-'.$userOption->id">{{ $userOption->name }}</flux:select.option>
+                    <flux:select.option :value="$userOption->id" :wire:key="'milestone-user-filter-'.$userOption->id">{{ $userOption->name_en }} · {{ $userOption->name_ar }}</flux:select.option>
                 @endforeach
             </x-ui.select>
         </x-slot:filters>
@@ -425,7 +425,7 @@ new #[Title('Milestones')] class extends Component {
         </x-ui.panel>
     @else
         @foreach ($this->projectsWithMilestones as $projectRow)
-            <x-ui.panel :title="$projectRow->name" :subtitle="$projectRow->city->name" :count="$projectRow->milestones->count()" wire:key="milestone-project-{{ $projectRow->id }}">
+            <x-ui.panel :title="$projectRow->name" :subtitle="$projectRow->city?->name_en ?? __('Unknown city')" :count="$projectRow->milestones->count()" wire:key="milestone-project-{{ $projectRow->id }}">
                 <x-slot:toolbar>
                     <a href="{{ route('projects.show', $projectRow) }}" wire:navigate class="text-xs font-semibold text-secondary-medium hover:underline dark:text-secondary-soft">{{ __('Open project') }}</a>
                 </x-slot:toolbar>
@@ -481,7 +481,7 @@ new #[Title('Milestones')] class extends Component {
                 <x-ui.select wire:model="responsibleUserId" :label="__('Responsible')" required>
                     <flux:select.option value="">{{ __('Select') }}</flux:select.option>
                     @foreach ($this->userOptions as $userOption)
-                        <flux:select.option :value="$userOption->id" :wire:key="'milestone-responsible-option-'.$userOption->id">{{ $userOption->name }}</flux:select.option>
+                        <flux:select.option :value="$userOption->id" :wire:key="'milestone-responsible-option-'.$userOption->id">{{ $userOption->name_en }} · {{ $userOption->name_ar }}</flux:select.option>
                     @endforeach
                 </x-ui.select>
             </div>

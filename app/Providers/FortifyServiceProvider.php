@@ -2,8 +2,10 @@
 
 namespace App\Providers;
 
+use App\Actions\Fortify\AuthenticateWithHrAccount;
 use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
+use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -38,6 +40,12 @@ class FortifyServiceProvider extends ServiceProvider
     {
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
         Fortify::createUsersUsing(CreateNewUser::class);
+
+        // Passwords live in the HR system: log in and confirm against HR.
+        Fortify::authenticateUsing(new AuthenticateWithHrAccount);
+        Fortify::confirmPasswordsUsing(
+            fn (User $user, ?string $password): bool => AuthenticateWithHrAccount::confirmsPassword($user, $password),
+        );
     }
 
     /**

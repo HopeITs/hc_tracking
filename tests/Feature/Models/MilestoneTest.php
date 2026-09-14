@@ -1,23 +1,23 @@
 <?php
 
+use App\Models\HrEmployee;
 use App\Models\Milestone;
 use App\Models\Project;
 use App\Models\Task;
-use App\Models\User;
 use Carbon\CarbonImmutable;
 
-test('a milestone belongs to a project and a responsible user', function () {
+test('a milestone belongs to a project and a responsible hr employee', function () {
     $project = Project::factory()->create();
-    $user = User::factory()->create();
+    $employeeId = insertHrEmployee();
 
     $milestone = Milestone::factory()->create([
         'project_id' => $project->id,
-        'responsible_user_id' => $user->id,
+        'responsible_user_id' => $employeeId,
     ]);
 
     expect($milestone->project->id)->toBe($project->id)
-        ->and($milestone->responsibleUser)->toBeInstanceOf(User::class)
-        ->and($milestone->responsibleUser->id)->toBe($user->id);
+        ->and($milestone->responsibleUser)->toBeInstanceOf(HrEmployee::class)
+        ->and($milestone->responsibleUser->id)->toBe($employeeId);
 });
 
 test('a milestone nests under a parent milestone', function () {

@@ -1,7 +1,6 @@
 <?php
 
 use App\Enums\UserRole;
-use App\Models\City;
 use App\Models\Indicator;
 use App\Models\PlanIndicator;
 use App\Models\Program;
@@ -97,9 +96,9 @@ test('projects carrying a target counts the projects named by this year plans', 
 test('geographic reach counts the cities holding a project across the whole portfolio', function () {
     $user = User::factory()->create();
     $program = Program::factory()->create();
-    $cities = City::factory(3)->create();
+    $cities = [insertHrCity('Aleppo'), insertHrCity('Homs'), insertHrCity('Hama')];
 
-    Project::factory()->create(['city_id' => $cities[0]->id, 'program_id' => $program->id]);
+    Project::factory()->create(['city_id' => $cities[0], 'program_id' => $program->id]);
 
     Livewire::actingAs($user)
         ->test('pages::executive-summary.index')
@@ -110,12 +109,12 @@ test('geographic reach counts the cities holding a project across the whole port
 test('changing the fiscal year moves the year scoped cards but leaves geographic reach alone', function () {
     $user = User::factory()->create();
     $programs = Program::factory(3)->create();
-    $cities = City::factory(2)->create();
+    $cities = [insertHrCity('Aleppo'), insertHrCity('Homs')];
 
     YearlyPlan::factory()->create(['program_id' => $programs[0]->id, 'year' => currentFiscalYear()]);
     YearlyPlan::factory()->create(['program_id' => $programs[1]->id, 'year' => currentFiscalYear()]);
     YearlyPlan::factory()->create(['program_id' => $programs[2]->id, 'year' => currentFiscalYear() - 1]);
-    Project::factory()->create(['city_id' => $cities[0]->id, 'program_id' => $programs[0]->id]);
+    Project::factory()->create(['city_id' => $cities[0], 'program_id' => $programs[0]->id]);
 
     Livewire::actingAs($user)
         ->test('pages::executive-summary.index')

@@ -1,9 +1,9 @@
 <?php
 
-use App\Models\City;
 use App\Models\Milestone;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\Strategy;
 use App\Models\YearlyPlan;
 use Illuminate\Database\ClassMorphViolationException;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -24,7 +24,7 @@ test('the morph map is enforced so an unmapped model has no morph class', functi
         ->and((new Project)->getMorphClass())->toBe('project')
         ->and((new Milestone)->getMorphClass())->toBe('milestone');
 
-    (new City)->getMorphClass();
+    (new Strategy)->getMorphClass();
 })->throws(ClassMorphViolationException::class);
 
 test('each mapped key fits the fifty character source_type column', function () {

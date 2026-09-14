@@ -4,6 +4,7 @@ use App\Models\User;
 use App\Models\YearlyPlan;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Insert a yearly plan for the given program, manager and year.
@@ -40,15 +41,10 @@ test('deleting a program deletes the yearly plans beneath it', function () {
     $this->assertDatabaseCount('yearly_plans', 0);
 });
 
-test('a user is not deletable while they manage a yearly plan', function () {
-    $manager = User::factory()->create();
-    $programId = insertProgram(insertStrategy(), $manager->id);
-    insertYearlyPlan($programId, $manager->id);
+test('a yearly plan stores its manager hr employee id with no foreign key to users', function () {
+    $foreignKeyColumns = collect(Schema::getForeignKeys('yearly_plans'))->pluck('columns')->flatten();
 
-    expect(fn () => DB::table('users')->where('id', $manager->id)->delete())
-        ->toThrow(QueryException::class);
-
-    $this->assertDatabaseHas('users', ['id' => $manager->id]);
+    expect($foreignKeyColumns)->not->toContain('manager_id');
 });
 
 test('a program cannot hold two plans for the same year', function () {

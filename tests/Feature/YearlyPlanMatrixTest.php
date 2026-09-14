@@ -56,12 +56,12 @@ test('renders one row per program and one column per fiscal year in the span', f
 
 test('a planned cell names its manager and target count while an unplanned cell is marked empty', function () {
     $user = User::factory()->create();
-    $manager = User::factory()->create(['name' => 'Layla Haddad']);
+    $manager = insertHrEmployee(firstNameEn: 'Layla', lastNameEn: 'Haddad');
     $water = matrixProgram('Water Security');
 
     $plan = YearlyPlan::factory()->create([
         'program_id' => $water->id,
-        'manager_id' => $manager->id,
+        'manager_id' => $manager,
         'year' => 2026,
     ]);
     PlanIndicator::factory(3)->forYearlyPlan($plan)->create();
@@ -76,30 +76,30 @@ test('a planned cell names its manager and target count while an unplanned cell 
 
 test('filtering by assigned manager keeps only the plans that manager owns', function () {
     $user = User::factory()->create();
-    $layla = User::factory()->create(['name' => 'Layla Haddad']);
-    $omar = User::factory()->create(['name' => 'Omar Khalil']);
+    $layla = insertHrEmployee(firstNameEn: 'Layla', lastNameEn: 'Haddad');
+    $omar = insertHrEmployee(firstNameEn: 'Omar', lastNameEn: 'Khalil');
     $water = matrixProgram('Water Security');
     $shelter = matrixProgram('Safe Shelter');
 
-    YearlyPlan::factory()->create(['program_id' => $water->id, 'manager_id' => $layla->id, 'year' => 2026]);
-    YearlyPlan::factory()->create(['program_id' => $water->id, 'manager_id' => $omar->id, 'year' => 2025]);
-    YearlyPlan::factory()->create(['program_id' => $shelter->id, 'manager_id' => $omar->id, 'year' => 2026]);
+    YearlyPlan::factory()->create(['program_id' => $water->id, 'manager_id' => $layla, 'year' => 2026]);
+    YearlyPlan::factory()->create(['program_id' => $water->id, 'manager_id' => $omar, 'year' => 2025]);
+    YearlyPlan::factory()->create(['program_id' => $shelter->id, 'manager_id' => $omar, 'year' => 2026]);
 
     Livewire::actingAs($user)
         ->test('pages::yearly-plans.index')
-        ->set('manager', (string) $layla->id)
+        ->set('manager', (string) $layla)
         ->assertSee('Water Security')
         ->assertDontSee('Safe Shelter')
         ->assertSee('Water Security, 2026, managed by Layla Haddad, 0 targets')
         ->assertSee('Water Security, 2025, no plan');
 });
 
-test('the manager filter only offers users who are accountable for a plan', function () {
+test('the manager filter only offers hr employees who are accountable for a plan', function () {
     $user = User::factory()->create();
-    $planned = User::factory()->create(['name' => 'Layla Haddad']);
-    User::factory()->create(['name' => 'Unassigned Person']);
+    $planned = insertHrEmployee(firstNameEn: 'Layla', lastNameEn: 'Haddad');
+    insertHrEmployee(firstNameEn: 'Unassigned', lastNameEn: 'Person');
 
-    YearlyPlan::factory()->create(['manager_id' => $planned->id]);
+    YearlyPlan::factory()->create(['manager_id' => $planned]);
 
     Livewire::actingAs($user)
         ->test('pages::yearly-plans.index')

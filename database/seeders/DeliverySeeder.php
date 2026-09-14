@@ -12,6 +12,7 @@ use App\Models\Task;
 use App\Models\TaskAttachment;
 use App\Models\TaskUpdate;
 use App\Models\User;
+use Database\Seeders\Concerns\PicksHrRecords;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection;
 
@@ -22,14 +23,17 @@ use Illuminate\Support\Collection;
  */
 class DeliverySeeder extends Seeder
 {
+    use PicksHrRecords;
+
     /**
      * Seed the delivery tables.
      */
     public function run(): void
     {
         $users = User::query()->get();
+        $employeeIds = $this->hrEmployeeIds();
 
-        Project::query()->with('proposals')->each(function (Project $project) use ($users): void {
+        Project::query()->with('proposals')->each(function (Project $project) use ($users, $employeeIds): void {
             Risk::factory(2)->create([
                 'project_id' => $project->id,
             ]);
@@ -41,7 +45,7 @@ class DeliverySeeder extends Seeder
             $parent = Milestone::factory()->create([
                 'project_id' => $project->id,
                 'name' => 'Inception phase',
-                'responsible_user_id' => $users->random()->id,
+                'responsible_user_id' => $employeeIds->random(),
                 'sequence' => 1,
                 'weight_percentage' => 30,
             ]);
@@ -49,7 +53,7 @@ class DeliverySeeder extends Seeder
             $reached = Milestone::factory()->reached()->create([
                 'project_id' => $project->id,
                 'name' => 'Baseline assessment',
-                'responsible_user_id' => $users->random()->id,
+                'responsible_user_id' => $employeeIds->random(),
                 'parent_milestone_id' => $parent->id,
                 'sequence' => 2,
                 'weight_percentage' => 70,
@@ -63,7 +67,7 @@ class DeliverySeeder extends Seeder
                 return;
             }
 
-            $this->seedTasks($proposal, $parent, $users);
+            $this->seedTasks($proposal, $parent, $users, $employeeIds);
         });
     }
 
@@ -95,20 +99,21 @@ class DeliverySeeder extends Seeder
      * Seed a small board of tasks under one proposal milestone.
      *
      * @param  Collection<int, User>  $users
+     * @param  Collection<int, int>  $employeeIds
      */
-    protected function seedTasks(Proposal $proposal, Milestone $milestone, $users): void
+    protected function seedTasks(Proposal $proposal, Milestone $milestone, $users, Collection $employeeIds): void
     {
         $open = Task::factory(2)->create([
             'proposal_id' => $proposal->id,
             'milestone_id' => $milestone->id,
-            'assigned_to' => fn (): int => $users->random()->id,
+            'assigned_to' => fn (): int => $employeeIds->random(),
             'created_by' => fn (): int => $users->random()->id,
         ]);
 
         $done = Task::factory()->completed()->create([
             'proposal_id' => $proposal->id,
             'milestone_id' => $milestone->id,
-            'assigned_to' => $users->random()->id,
+            'assigned_to' => $employeeIds->random(),
             'created_by' => $users->random()->id,
         ]);
 

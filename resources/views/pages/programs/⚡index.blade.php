@@ -1,8 +1,8 @@
 <?php
 
+use App\Models\HrEmployee;
 use App\Models\Program;
 use App\Models\Strategy;
-use App\Models\User;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
@@ -27,7 +27,7 @@ new #[Title('Programs')] class extends Component {
 
     public bool $showProgramModal = false;
     public ?int $editingProgramId = null;
-    public string $name = '';
+    public string $editingProgramName = '';
     public string $strategyId = '';
     public string $managerId = '';
 
@@ -64,7 +64,7 @@ new #[Title('Programs')] class extends Component {
             ->select(['id', 'name', 'strategy_id', 'manager_id', 'updated_at'])
             ->with([
                 'strategy:id,name,start_year,end_year',
-                'manager:id,name,email,role',
+                'manager:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
             ])
             ->withCount(['projects', 'yearlyPlans'])
             ->when($search !== '', function ($query) use ($search): void {
@@ -72,11 +72,7 @@ new #[Title('Programs')] class extends Component {
                     $query
                         ->where('name', 'like', '%'.$search.'%')
                         ->orWhereHas('strategy', fn ($query) => $query->where('name', 'like', '%'.$search.'%'))
-                        ->orWhereHas('manager', function ($query) use ($search): void {
-                            $query
-                                ->where('name', 'like', '%'.$search.'%')
-                                ->orWhere('email', 'like', '%'.$search.'%');
-                        });
+                        ->orWhereIn('manager_id', HrEmployee::idsMatchingName($search));
                 });
             })
             ->when($this->strategy !== '', fn ($query) => $query->where('strategy_id', (int) $this->strategy))
@@ -99,21 +95,11 @@ new #[Title('Programs')] class extends Component {
             ->get();
     }
 
-    /** @return Collection<int, User> */
+    /** @return Collection<int, HrEmployee> */
     #[Computed]
     public function managerOptions(): Collection
     {
-        return User::query()
-            ->select(['id', 'name', 'email', 'role'])
-            ->orderBy('name')
-            ->orderBy('id')
-            ->get();
-    }
-
-    public function openCreateModal(): void
-    {
-        $this->resetProgramForm();
-        $this->showProgramModal = true;
+        return HrEmployee::pickerOptions();
     }
 
     public function openEditModal(int $programId): void
@@ -124,49 +110,37 @@ new #[Title('Programs')] class extends Component {
 
         $this->resetValidation();
         $this->editingProgramId = $program->id;
-        $this->name = $program->name;
+        $this->editingProgramName = $program->name;
         $this->strategyId = (string) $program->strategy_id;
         $this->managerId = (string) $program->manager_id;
         $this->showProgramModal = true;
     }
 
+    /**
+     * Link an HR program to a strategy and manager.
+     *
+     * The program itself (its name, whether it exists) belongs to HR, so only
+     * the two tracking-side links are editable, and either may be left empty.
+     */
     public function saveProgram(): void
     {
-        $this->name = trim($this->name);
-
         $validated = $this->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'strategyId' => ['required', 'integer', Rule::exists(Strategy::class, 'id')],
-            'managerId' => ['required', 'integer', Rule::exists(User::class, 'id')],
+            'strategyId' => ['nullable', 'integer', Rule::exists(Strategy::class, 'id')],
+            'managerId' => ['nullable', 'integer', Rule::exists(HrEmployee::class, 'id')],
         ], [
-            'name.required' => __('Enter a program name.'),
-            'name.max' => __('Program names may not exceed 255 characters.'),
-            'strategyId.required' => __('Select a strategy.'),
             'strategyId.exists' => __('The selected strategy is no longer available.'),
-            'managerId.required' => __('Select a manager.'),
             'managerId.exists' => __('The selected manager is no longer available.'),
         ]);
 
-        $program = $this->editingProgramId === null
-            ? new Program
-            : Program::query()->findOrFail($this->editingProgramId);
-
-        $program->fill([
-            'name' => $validated['name'],
-            'strategy_id' => (int) $validated['strategyId'],
-            'manager_id' => (int) $validated['managerId'],
-        ])->save();
-
-        $wasRecentlyCreated = $program->wasRecentlyCreated;
+        Program::query()->findOrFail($this->editingProgramId)->update([
+            'strategy_id' => blank($validated['strategyId']) ? null : (int) $validated['strategyId'],
+            'manager_id' => blank($validated['managerId']) ? null : (int) $validated['managerId'],
+        ]);
 
         $this->showProgramModal = false;
         $this->resetProgramForm();
-        $this->resetPage();
 
-        Flux::toast(
-            variant: 'success',
-            text: $wasRecentlyCreated ? __('Program created.') : __('Program updated.'),
-        );
+        Flux::toast(variant: 'success', text: __('Program assignment updated.'));
     }
 
     public function closeProgramModal(): void
@@ -179,7 +153,7 @@ new #[Title('Programs')] class extends Component {
     {
         $this->resetValidation();
         $this->editingProgramId = null;
-        $this->name = '';
+        $this->editingProgramName = '';
         $this->strategyId = '';
         $this->managerId = '';
     }
@@ -206,10 +180,10 @@ new #[Title('Programs')] class extends Component {
                     {{ $this->programs->total() }}
                 </span>
             </div>
-            <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('Connect delivery programs to strategy and accountable managers.') }}</p>
+            <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('Programs come from the HR system. Link each one to a strategy and an accountable manager.') }}</p>
         </div>
 
-        <div class="grid w-full gap-2 @sm/directory:grid-cols-2 @3xl/directory:grid-cols-[minmax(13rem,1fr)_minmax(10rem,0.8fr)_minmax(10rem,0.8fr)_auto] @6xl/directory:max-w-[62rem]">
+        <div class="grid w-full gap-2 @sm/directory:grid-cols-2 @3xl/directory:grid-cols-[minmax(13rem,1fr)_minmax(10rem,0.8fr)_minmax(10rem,0.8fr)] @6xl/directory:max-w-[62rem]">
             <flux:input type="search" icon="magnifying-glass" :label="__('Search programs')" :placeholder="__('Program, strategy, or manager')" :class="$controlClasses" wire:model.live.debounce.300ms="search" clearable />
 
             <flux:select :label="__('Strategy')" :class="$controlClasses" wire:model.live="strategy">
@@ -225,14 +199,10 @@ new #[Title('Programs')] class extends Component {
                 <flux:select.option value="">{{ __('All managers') }}</flux:select.option>
                 @foreach ($this->managerOptions as $managerOption)
                     <flux:select.option :value="$managerOption->id" :wire:key="'manager-filter-'.$managerOption->id">
-                        {{ $managerOption->name }} · {{ $managerOption->role->value }}
+                        {{ $managerOption->name_en }} · {{ $managerOption->name_ar }}
                     </flux:select.option>
                 @endforeach
             </flux:select>
-
-            <flux:button variant="primary" icon="plus" :class="$primaryButtonClasses.' min-h-11 self-end touch-manipulation @sm/directory:min-h-10'" wire:click="openCreateModal" data-test="create-program-button">
-                {{ __('Add program') }}
-            </flux:button>
         </div>
     </header>
 
@@ -259,15 +229,13 @@ new #[Title('Programs')] class extends Component {
                     <flux:icon.briefcase class="size-5" />
                 </div>
                 <div class="max-w-sm space-y-1">
-                    <flux:heading size="base">{{ $filtersAreActive ? __('No matching programs') : __('No programs yet') }}</flux:heading>
+                    <flux:heading size="base">{{ $filtersAreActive ? __('No matching programs') : __('No programs from HR yet') }}</flux:heading>
                     <p class="text-sm text-secondary-medium dark:text-secondary-soft">
-                        {{ $filtersAreActive ? __('Change the search or filters and try again.') : __('Add the first program and connect it to a strategy and manager.') }}
+                        {{ $filtersAreActive ? __('Change the search or filters and try again.') : __('Programs appear here once they are added in the HR system.') }}
                     </p>
                 </div>
                 @if ($filtersAreActive)
                     <flux:button size="sm" :class="$secondaryButtonClasses" wire:click="clearFilters">{{ __('Reset filters') }}</flux:button>
-                @else
-                    <flux:button size="sm" icon="plus" :class="$primaryButtonClasses" wire:click="openCreateModal">{{ __('Add program') }}</flux:button>
                 @endif
             </div>
         @else
@@ -281,20 +249,18 @@ new #[Title('Programs')] class extends Component {
                                 </div>
                                 <div class="min-w-0">
                                     <h2 class="truncate text-sm font-semibold text-secondary-dark dark:text-white"><a href="{{ route('programs.show', $program) }}" wire:navigate class="hover:underline">{{ $program->name }}</a></h2>
-                                    <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $program->strategy->name }}</p>
+                                    <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $program->strategy?->name ?? __('Strategy not assigned') }}</p>
                                 </div>
                             </div>
-                            <span class="inline-flex shrink-0 rounded-md bg-secondary-soft px-2 py-1 text-xs font-semibold tabular-nums text-secondary-dark dark:bg-secondary-medium dark:text-white">
-                                {{ $program->strategy->start_year }}–{{ $program->strategy->end_year }}
-                            </span>
+                            @if ($program->strategy)
+                                <span class="inline-flex shrink-0 rounded-md bg-secondary-soft px-2 py-1 text-xs font-semibold tabular-nums text-secondary-dark dark:bg-secondary-medium dark:text-white">
+                                    {{ $program->strategy->start_year }}–{{ $program->strategy->end_year }}
+                                </span>
+                            @endif
                         </div>
 
                         <div class="flex items-center gap-2.5 rounded-lg border border-secondary-soft p-2.5 dark:border-secondary-medium">
-                            <flux:avatar class="bg-secondary-soft! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" size="sm" :initials="$program->manager->initials()" />
-                            <div class="min-w-0">
-                                <p class="truncate text-sm font-semibold text-secondary-dark dark:text-white">{{ $program->manager->name }}</p>
-                                <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $program->manager->role->value }} · {{ $program->manager->email }}</p>
-                            </div>
+                            <x-ui.employee-chip :employee="$program->manager" />
                         </div>
 
                         <div class="flex min-h-11 items-center justify-between gap-3 border-t border-secondary-soft pt-2.5 dark:border-secondary-medium">
@@ -328,19 +294,17 @@ new #[Title('Programs')] class extends Component {
                                     </div>
                                 </flux:table.cell>
                                 <flux:table.cell>
-                                    <div class="min-w-0">
-                                        <p class="truncate font-medium text-secondary-dark dark:text-white">{{ $program->strategy->name }}</p>
-                                        <p class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $program->strategy->start_year }}–{{ $program->strategy->end_year }}</p>
-                                    </div>
+                                    @if ($program->strategy)
+                                        <div class="min-w-0">
+                                            <p class="truncate font-medium text-secondary-dark dark:text-white">{{ $program->strategy->name }}</p>
+                                            <p class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $program->strategy->start_year }}–{{ $program->strategy->end_year }}</p>
+                                        </div>
+                                    @else
+                                        <p class="text-secondary-medium dark:text-secondary-soft">{{ __('Not assigned') }}</p>
+                                    @endif
                                 </flux:table.cell>
                                 <flux:table.cell>
-                                    <div class="flex min-w-0 items-center gap-2.5">
-                                        <flux:avatar class="bg-secondary-soft! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" size="sm" :initials="$program->manager->initials()" />
-                                        <div class="min-w-0">
-                                            <p class="truncate font-medium text-secondary-dark dark:text-white">{{ $program->manager->name }}</p>
-                                            <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $program->manager->role->value }} · {{ $program->manager->email }}</p>
-                                        </div>
-                                    </div>
+                                    <x-ui.employee-chip :employee="$program->manager" />
                                 </flux:table.cell>
                                 <flux:table.cell align="center">
                                     <div class="inline-flex items-center gap-1.5" aria-label="{{ __(':projects projects and :plans annual plans', ['projects' => $program->projects_count, 'plans' => $program->yearly_plans_count]) }}">
@@ -368,17 +332,13 @@ new #[Title('Programs')] class extends Component {
     <flux:modal wire:model="showProgramModal" class="w-full max-w-2xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
         <form wire:submit="saveProgram" class="space-y-5">
             <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ $editingProgramId === null ? __('Add program') : __('Edit program') }}</flux:heading>
-                <flux:subheading>
-                    {{ $editingProgramId === null ? __('Create a program, choose its strategic period, and assign direct accountability.') : __('Update the program assignment and strategic alignment.') }}
-                </flux:subheading>
+                <flux:heading size="lg">{{ __('Assign :name', ['name' => $editingProgramName]) }}</flux:heading>
+                <flux:subheading>{{ __('The program name is managed in the HR system. Link it to a strategy and an accountable manager.') }}</flux:subheading>
             </div>
 
-            <flux:input wire:model="name" :class="$controlClasses" :label="__('Program name')" type="text" autocomplete="organization" maxlength="255" required autofocus />
-
             <div class="grid gap-4 sm:grid-cols-2">
-                <flux:select wire:model="strategyId" :class="$controlClasses" :label="__('Linked strategy')" required>
-                    <flux:select.option value="">{{ __('Select a strategy') }}</flux:select.option>
+                <flux:select wire:model="strategyId" :class="$controlClasses" :label="__('Linked strategy')">
+                    <flux:select.option value="">{{ __('Not assigned') }}</flux:select.option>
                     @foreach ($this->strategyOptions as $strategyOption)
                         <flux:select.option :value="$strategyOption->id" :wire:key="'strategy-option-'.$strategyOption->id">
                             {{ $strategyOption->name }} ({{ $strategyOption->start_year }}–{{ $strategyOption->end_year }})
@@ -386,11 +346,11 @@ new #[Title('Programs')] class extends Component {
                     @endforeach
                 </flux:select>
 
-                <flux:select wire:model="managerId" :class="$controlClasses" :label="__('Direct manager')" required>
-                    <flux:select.option value="">{{ __('Select a manager') }}</flux:select.option>
+                <flux:select wire:model="managerId" :class="$controlClasses" :label="__('Direct manager')">
+                    <flux:select.option value="">{{ __('Not assigned') }}</flux:select.option>
                     @foreach ($this->managerOptions as $managerOption)
                         <flux:select.option :value="$managerOption->id" :wire:key="'manager-option-'.$managerOption->id">
-                            {{ $managerOption->name }} · {{ $managerOption->role->value }}
+                            {{ $managerOption->name_en }} · {{ $managerOption->name_ar }}
                         </flux:select.option>
                     @endforeach
                 </flux:select>
@@ -399,14 +359,14 @@ new #[Title('Programs')] class extends Component {
             <div class="rounded-lg border border-secondary-soft bg-secondary-soft/50 p-3 text-sm text-secondary-medium dark:border-secondary-medium dark:bg-secondary-medium/50 dark:text-secondary-soft">
                 <div class="flex items-start gap-2.5">
                     <flux:icon.information-circle class="mt-0.5 size-4 shrink-0" />
-                    <p>{{ __('The assigned manager is the directly accountable staff member for this program. Staff roles are shown for context.') }}</p>
+                    <p>{{ __('The assigned manager is the HR employee directly accountable for this program.') }}</p>
                 </div>
             </div>
 
             <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
                 <flux:button type="button" variant="filled" :class="$secondaryButtonClasses.' min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto'" wire:click="closeProgramModal">{{ __('Cancel') }}</flux:button>
                 <flux:button type="submit" variant="primary" :class="$primaryButtonClasses.' min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto'" data-test="save-program-button">
-                    {{ $editingProgramId === null ? __('Create program') : __('Save changes') }}
+                    {{ __('Save changes') }}
                 </flux:button>
             </div>
         </form>

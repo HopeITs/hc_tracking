@@ -73,13 +73,13 @@ class Project extends Model
     ];
 
     /**
-     * The city this project is delivered in.
+     * The HR city this project is delivered in.
      *
-     * @return BelongsTo<City, $this>
+     * @return BelongsTo<HrCity, $this>
      */
     public function city(): BelongsTo
     {
-        return $this->belongsTo(City::class);
+        return $this->belongsTo(HrCity::class, 'city_id');
     }
 
     /**
@@ -93,13 +93,15 @@ class Project extends Model
     }
 
     /**
-     * The user responsible for this project.
+     * The HR employee responsible for this project.
      *
-     * @return BelongsTo<User, $this>
+     * The column keeps its original name, `user_id`, but holds an HR employee id.
+     *
+     * @return BelongsTo<HrEmployee, $this>
      */
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(HrEmployee::class, 'user_id');
     }
 
     /**

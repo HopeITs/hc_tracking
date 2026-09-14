@@ -9,42 +9,22 @@ test('profile page is displayed', function () {
     $this->get(route('profile.edit'))->assertOk();
 });
 
-test('profile information can be updated', function () {
-    $user = User::factory()->create();
+test('the profile shows the name and email from hr without letting them change', function () {
+    $user = User::factory()->create(['name' => 'Rana Darwish', 'email' => 'rana@example.org']);
 
-    $this->actingAs($user);
+    Livewire::actingAs($user)
+        ->test('pages::settings.profile')
+        ->assertSet('name', 'Rana Darwish')
+        ->assertSet('email', 'rana@example.org')
+        ->assertSee('To change your name or email, update your record in the HR system.')
+        ->assertDontSee('update-profile-button', false);
 
-    $response = Livewire::test('pages::settings.profile')
-        ->set('name', 'Test User')
-        ->set('email', 'test@example.com')
-        ->call('updateProfileInformation');
-
-    $response->assertHasNoErrors();
-
-    $user->refresh();
-
-    expect($user->name)->toEqual('Test User');
-    expect($user->email)->toEqual('test@example.com');
-    expect($user->email_verified_at)->toBeNull();
+    expect(fn () => Livewire::actingAs($user)->test('pages::settings.profile')->call('updateProfileInformation'))
+        ->toThrow(Exception::class);
 });
 
-test('email verification status is unchanged when email address is unchanged', function () {
-    $user = User::factory()->create();
-
-    $this->actingAs($user);
-
-    $response = Livewire::test('pages::settings.profile')
-        ->set('name', 'Test User')
-        ->set('email', $user->email)
-        ->call('updateProfileInformation');
-
-    $response->assertHasNoErrors();
-
-    expect($user->refresh()->email_verified_at)->not->toBeNull();
-});
-
-test('user can delete their account', function () {
-    $user = User::factory()->create();
+test('user can delete their account with their hr password', function () {
+    $user = User::factory()->withHrAccount()->create();
 
     $this->actingAs($user);
 
@@ -61,7 +41,7 @@ test('user can delete their account', function () {
 });
 
 test('correct password must be provided to delete account', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->withHrAccount()->create();
 
     $this->actingAs($user);
 

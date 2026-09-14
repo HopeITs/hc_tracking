@@ -4,7 +4,6 @@ use App\Enums\Currency;
 use App\Enums\FileType;
 use App\Enums\ResultType;
 use App\Models\Account;
-use App\Models\City;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\Indicator;
@@ -19,7 +18,10 @@ use App\Models\Report;
 use App\Models\Result;
 use App\Models\Strategy;
 use App\Models\Task;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 /*
@@ -35,6 +37,7 @@ use Tests\TestCase;
 
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
+    ->beforeEach(fn () => createHrSchema())
     ->in('Feature');
 
 /*
@@ -113,20 +116,14 @@ function insertProposal(string $name = 'Emergency WASH Response'): int
 }
 
 /**
- * Insert a city and return its id.
+ * Insert an HR city and return its id.
  *
- * `cities.name` is unique, so the default name is sequenced to keep a test that
- * needs several cities from colliding with itself.
+ * Projects are delivered in HR cities, so this is a thin alias of insertHrCity()
+ * kept for the many schema tests that build a project.
  */
 function insertCity(?string $name = null): int
 {
-    static $sequence = 0;
-
-    $sequence++;
-
-    return City::factory()->create([
-        'name' => $name ?? "City {$sequence}",
-    ])->id;
+    return insertHrCity($name ?? 'Aleppo');
 }
 
 /**
@@ -305,4 +302,118 @@ function insertIndicatorProgress(int $indicatorId, int $recordedBy, string $date
         'source_of_verification' => null,
         'recorded_by' => $recordedBy,
     ])->id;
+}
+
+/**
+ * Build the slice of the HR schema hc-tracking reads, on the `hr` test connection.
+ *
+ * phpunit.xml points `hr` at an in-memory SQLite database, so tests never touch
+ * the real hr_db. Columns mirror the hchr_ tables for what the app reads.
+ */
+function createHrSchema(): void
+{
+    $schema = Schema::connection('hr');
+
+    $schema->create('cities', function (Blueprint $table): void {
+        $table->id();
+        $table->string('name_en');
+        $table->string('name_ar');
+        $table->string('slug')->unique();
+        $table->string('code')->unique();
+        $table->boolean('is_active')->default(true);
+        $table->timestamps();
+    });
+
+    $schema->create('programs', function (Blueprint $table): void {
+        $table->id();
+        $table->text('name');
+        $table->text('description_en')->nullable();
+        $table->text('description_ar')->nullable();
+        $table->string('code');
+        $table->string('slug')->unique();
+        $table->dateTime('start_date')->nullable();
+        $table->dateTime('end_date')->nullable();
+        $table->boolean('is_active')->default(true);
+        $table->timestamps();
+    });
+
+    $schema->create('employees', function (Blueprint $table): void {
+        $table->id();
+        $table->unsignedBigInteger('city_id')->nullable();
+        $table->string('first_name_en');
+        $table->string('first_name_ar');
+        $table->string('last_name_en');
+        $table->string('last_name_ar');
+        $table->string('username')->unique();
+        $table->boolean('is_active')->default(true);
+        $table->timestamps();
+    });
+
+    $schema->create('users', function (Blueprint $table): void {
+        $table->id();
+        $table->unsignedBigInteger('employee_id')->nullable();
+        $table->string('email')->unique();
+        $table->timestamp('email_verified_at')->nullable();
+        $table->string('password');
+        $table->rememberToken();
+        $table->timestamps();
+    });
+}
+
+/**
+ * Insert an HR city and return its id.
+ *
+ * HR models are read-only, so HR fixtures go through the query builder on the
+ * `hr` test connection instead of a factory.
+ */
+function insertHrCity(string $nameEn = 'Aleppo', string $nameAr = 'حلب', bool $isActive = true): int
+{
+    return DB::connection('hr')->table('cities')->insertGetId([
+        'name_en' => $nameEn,
+        'name_ar' => $nameAr,
+        'slug' => fake()->unique()->slug(),
+        'code' => fake()->unique()->bothify('??####'),
+        'is_active' => $isActive,
+    ]);
+}
+
+/**
+ * Insert an HR program and return its id.
+ */
+function insertHrProgram(string $name = 'Hope Center', bool $isActive = true): int
+{
+    return DB::connection('hr')->table('programs')->insertGetId([
+        'name' => $name,
+        'code' => fake()->bothify('??####'),
+        'slug' => fake()->unique()->slug(),
+        'is_active' => $isActive,
+    ]);
+}
+
+/**
+ * Insert an HR employee and return its id.
+ */
+function insertHrEmployee(?int $cityId = null, string $firstNameEn = 'Sami', string $lastNameEn = 'Haddad', string $firstNameAr = 'سامي', string $lastNameAr = 'حداد', bool $isActive = true): int
+{
+    return DB::connection('hr')->table('employees')->insertGetId([
+        'city_id' => $cityId,
+        'first_name_en' => $firstNameEn,
+        'first_name_ar' => $firstNameAr,
+        'last_name_en' => $lastNameEn,
+        'last_name_ar' => $lastNameAr,
+        'username' => fake()->unique()->userName(),
+        'is_active' => $isActive,
+    ]);
+}
+
+/**
+ * Insert an HR login account and return its id.
+ */
+function insertHrUser(?int $employeeId, string $email, string $password = 'password'): int
+{
+    return DB::connection('hr')->table('users')->insertGetId([
+        'employee_id' => $employeeId,
+        'email' => $email,
+        'password' => bcrypt($password),
+    ]);
 }

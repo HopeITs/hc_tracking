@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\HrEmployee;
 use App\Models\Milestone;
 use App\Models\Program;
 use App\Models\Project;
@@ -31,41 +32,39 @@ test('unverified user confirmation dates remain null', function () {
         ->and($user->two_factor_confirmed_at)->toBeNull();
 });
 
-test('a user has the programs and yearly plans they manage', function () {
-    $user = User::factory()->create();
+test('an hr employee has the programs and yearly plans they manage', function () {
+    $employee = HrEmployee::find(insertHrEmployee());
 
-    Program::factory(2)->create(['manager_id' => $user->id]);
+    Program::factory(2)->create(['manager_id' => $employee->id]);
     Program::factory()->create();
-    YearlyPlan::factory()->create(['manager_id' => $user->id]);
+    YearlyPlan::factory()->create(['manager_id' => $employee->id]);
     YearlyPlan::factory()->create();
 
-    expect($user->managedPrograms)->toHaveCount(2)
-        ->and($user->managedYearlyPlans)->toHaveCount(1);
+    expect($employee->managedPrograms)->toHaveCount(2)
+        ->and($employee->managedYearlyPlans)->toHaveCount(1);
 });
 
-test('a user has the projects and milestones they are responsible for', function () {
-    $user = User::factory()->create();
+test('an hr employee has the projects and milestones they are responsible for', function () {
+    $employee = HrEmployee::find(insertHrEmployee());
 
-    Project::factory(2)->create(['user_id' => $user->id]);
+    Project::factory(2)->create(['user_id' => $employee->id]);
     Project::factory()->create();
-    Milestone::factory()->create(['responsible_user_id' => $user->id]);
+    Milestone::factory()->create(['responsible_user_id' => $employee->id]);
     Milestone::factory()->create();
 
-    expect($user->projects)->toHaveCount(2)
-        ->and($user->responsibleMilestones)->toHaveCount(1);
+    expect($employee->projects)->toHaveCount(2)
+        ->and($employee->responsibleMilestones)->toHaveCount(1);
 });
 
-test('a user separates the tasks assigned to them from the ones they raised', function () {
+test('tasks are assigned to hr employees but raised by users', function () {
+    $employee = HrEmployee::find(insertHrEmployee());
     $user = User::factory()->create();
-    $other = User::factory()->create();
 
-    Task::factory(2)->create(['assigned_to' => $user->id, 'created_by' => $other->id]);
-    Task::factory()->create(['assigned_to' => $other->id, 'created_by' => $user->id]);
+    Task::factory(2)->create(['assigned_to' => $employee->id, 'created_by' => $user->id]);
+    Task::factory()->create();
 
-    expect($user->assignedTasks)->toHaveCount(2)
-        ->and($user->createdTasks)->toHaveCount(1)
-        ->and($other->assignedTasks)->toHaveCount(1)
-        ->and($other->createdTasks)->toHaveCount(2);
+    expect($employee->assignedTasks)->toHaveCount(2)
+        ->and($user->createdTasks)->toHaveCount(2);
 });
 
 test('a user has the task updates and reports they submitted', function () {

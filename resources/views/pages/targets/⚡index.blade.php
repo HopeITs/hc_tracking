@@ -105,7 +105,7 @@ new #[Title('Targets')] class extends Component {
                 'indicator:id,name,result_id,measure',
                 'indicator.result:id,statement,type',
                 'project:id,name,city_id',
-                'project.city:id,name',
+                'project.city:id,name_en',
             ])
             ->withCount('reports')
             ->when($search !== '', function ($query) use ($search): void {
@@ -408,7 +408,7 @@ new #[Title('Targets')] class extends Component {
                                 @if ($target->project === null)
                                     {{ __('Organisation-wide') }}
                                 @else
-                                    {{ $target->project->name }} · {{ $target->project->city->name }}
+                                    {{ $target->project->name }} · {{ $target->project->city?->name_en ?? __('Unknown city') }}
                                 @endif
                             </p>
                         </div>

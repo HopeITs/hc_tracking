@@ -45,7 +45,7 @@ new #[Title('Task')] class extends Component {
                 'milestone:id,name,project_id',
                 'milestone.project:id,name',
                 'proposal:id,name',
-                'assignee:id,name',
+                'assignee:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
                 'creator:id,name',
             ])
             ->findOrFail($this->taskId);
@@ -123,7 +123,7 @@ new #[Title('Task')] class extends Component {
                     {{ $this->task->milestone->name }} · {{ $this->task->milestone->project->name }}
                 </a>
             @endif
-            <span>{{ __('Assigned to :name', ['name' => $this->task->assignee->name]) }}</span>
+            <span>{{ __('Assigned to :name', ['name' => $this->task->assignee?->name ?? __('Not assigned')]) }}</span>
             <span>{{ __('Created by :name', ['name' => $this->task->creator->name]) }}</span>
         </x-slot:meta>
 

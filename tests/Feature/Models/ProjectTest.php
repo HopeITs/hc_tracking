@@ -1,29 +1,30 @@
 <?php
 
-use App\Models\City;
+use App\Models\HrCity;
+use App\Models\HrEmployee;
 use App\Models\Milestone;
 use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Risk;
-use App\Models\User;
 
-test('a project belongs to a city, a program and a user', function () {
-    $city = City::factory()->create();
+test('a project belongs to an hr city, a program and an hr employee', function () {
+    $city = HrCity::find(insertHrCity());
     $program = Program::factory()->create();
-    $user = User::factory()->create();
+    $employeeId = insertHrEmployee();
 
     $project = Project::factory()->create([
         'city_id' => $city->id,
         'program_id' => $program->id,
-        'user_id' => $user->id,
+        'user_id' => $employeeId,
     ]);
 
-    expect($project->city->id)->toBe($city->id)
+    expect($project->city)->toBeInstanceOf(HrCity::class)
+        ->and($project->city->id)->toBe($city->id)
         ->and($project->program->id)->toBe($program->id)
-        ->and($project->user)->toBeInstanceOf(User::class)
-        ->and($project->user->id)->toBe($user->id);
+        ->and($project->user)->toBeInstanceOf(HrEmployee::class)
+        ->and($project->user->id)->toBe($employeeId);
 });
 
 test('a project attaches to proposals through the project_proposal pivot', function () {

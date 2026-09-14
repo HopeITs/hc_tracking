@@ -3,6 +3,7 @@
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 test('a new task starts as todo at medium priority with no progress', function () {
     $user = User::factory()->create();
@@ -40,15 +41,10 @@ test('deleting a proposal deletes the tasks under it', function () {
     $this->assertDatabaseCount('tasks', 0);
 });
 
-test('a user is not deletable while a task is assigned to them', function () {
-    $author = User::factory()->create();
-    $assignee = User::factory()->create();
-    insertTask(insertProposal(), $assignee->id, $author->id);
+test('a task stores its assignee hr employee id with no foreign key to users', function () {
+    $foreignKeyColumns = collect(Schema::getForeignKeys('tasks'))->pluck('columns')->flatten();
 
-    expect(fn () => DB::table('users')->where('id', $assignee->id)->delete())
-        ->toThrow(QueryException::class);
-
-    $this->assertDatabaseHas('users', ['id' => $assignee->id]);
+    expect($foreignKeyColumns)->not->toContain('assigned_to');
 });
 
 test('a user is not deletable while a task they created still exists', function () {

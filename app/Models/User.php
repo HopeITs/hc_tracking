@@ -11,6 +11,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -20,12 +21,21 @@ use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 
 /**
+ * A person who can use hc-tracking.
+ *
+ * They log in with their HR account (see AuthenticateWithHrAccount), matched by
+ * email; this row holds only the application role, two-factor settings and
+ * passkeys. `name` is copied from the HR employee at each login, and `password`
+ * is a leftover that is never checked.
+ *
  * @property int $id
  * @property string $name
  * @property string $email
+ * @property int|null $hr_user_id
+ * @property int|null $employee_id
  * @property UserRole $role
  * @property CarbonImmutable|null $email_verified_at
- * @property string $password
+ * @property string|null $password
  * @property string|null $two_factor_secret
  * @property string|null $two_factor_recovery_codes
  * @property CarbonImmutable|null $two_factor_confirmed_at
@@ -39,56 +49,6 @@ class User extends Authenticatable implements PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
-
-    /**
-     * The programs this user manages.
-     *
-     * @return HasMany<Program, $this>
-     */
-    public function managedPrograms(): HasMany
-    {
-        return $this->hasMany(Program::class, 'manager_id');
-    }
-
-    /**
-     * The annual plans this user manages.
-     *
-     * @return HasMany<YearlyPlan, $this>
-     */
-    public function managedYearlyPlans(): HasMany
-    {
-        return $this->hasMany(YearlyPlan::class, 'manager_id');
-    }
-
-    /**
-     * The projects this user is responsible for.
-     *
-     * @return HasMany<Project, $this>
-     */
-    public function projects(): HasMany
-    {
-        return $this->hasMany(Project::class);
-    }
-
-    /**
-     * The milestones this user is accountable for.
-     *
-     * @return HasMany<Milestone, $this>
-     */
-    public function responsibleMilestones(): HasMany
-    {
-        return $this->hasMany(Milestone::class, 'responsible_user_id');
-    }
-
-    /**
-     * The tasks assigned to this user.
-     *
-     * @return HasMany<Task, $this>
-     */
-    public function assignedTasks(): HasMany
-    {
-        return $this->hasMany(Task::class, 'assigned_to');
-    }
 
     /**
      * The tasks this user raised.
@@ -144,6 +104,108 @@ class User extends Authenticatable implements PasskeyUser
     public function indicatorProgress(): HasMany
     {
         return $this->hasMany(IndicatorProgress::class, 'recorded_by');
+    }
+
+    /**
+     * The tracking user for an HR account, created on first use.
+     *
+     * Every HR account may use tracking. A new user starts as an Officer, or as
+     * an Admin when their email is listed in auth.hr_admin_emails.
+     */
+    public static function forHrAccount(HrUser $hrUser): self
+    {
+        $user = static::query()->where('email', $hrUser->email)->first();
+
+        if ($user !== null) {
+            return $user;
+        }
+
+        $role = in_array(mb_strtolower($hrUser->email), config('auth.hr_admin_emails', []), true)
+            ? UserRole::Admin
+            : UserRole::Officer;
+
+        return static::createFromHrAccount($hrUser, $role);
+    }
+
+    /**
+     * Create the missing tracking users for every HR account.
+     *
+     * @return int The number of users created.
+     */
+    public static function syncFromHrAccounts(): int
+    {
+        $existingEmails = static::query()->pluck('email')->map(fn (string $email): string => mb_strtolower($email))->flip();
+        $created = 0;
+
+        HrUser::query()->with('employee')->orderBy('id')->each(function (HrUser $hrUser) use ($existingEmails, &$created): void {
+            if ($existingEmails->has(mb_strtolower($hrUser->email))) {
+                return;
+            }
+
+            static::forHrAccount($hrUser);
+            $created++;
+        });
+
+        return $created;
+    }
+
+    /**
+     * Give an HR account access to hc-tracking with an application role.
+     *
+     * Name and email are taken from HR. No local password is stored: people
+     * always log in with their HR password.
+     */
+    public static function createFromHrAccount(HrUser $hrUser, UserRole $role, bool $verified = true): self
+    {
+        $user = new self;
+
+        // `role` is deliberately not fillable, so force it rather than widening
+        // mass assignment on the model.
+        $user->forceFill([
+            'name' => $hrUser->employee?->name_en ?: $hrUser->email,
+            'email' => $hrUser->email,
+            'hr_user_id' => $hrUser->id,
+            'employee_id' => $hrUser->employee_id,
+            'password' => null,
+            'role' => $role,
+            'email_verified_at' => $verified ? now() : null,
+        ])->save();
+
+        return $user;
+    }
+
+    /**
+     * Record the HR account this user logged in with and refresh their name.
+     *
+     * Only tracking columns are written; the HR account is read, never changed.
+     */
+    public function linkToHrAccount(HrUser $hrUser): void
+    {
+        $this->forceFill([
+            'hr_user_id' => $hrUser->id,
+            'employee_id' => $hrUser->employee_id,
+            'name' => $hrUser->employee?->name_en ?: $this->name,
+        ])->save();
+    }
+
+    /**
+     * The HR login account this user authenticates with.
+     *
+     * @return BelongsTo<HrUser, $this>
+     */
+    public function hrUser(): BelongsTo
+    {
+        return $this->belongsTo(HrUser::class, 'hr_user_id');
+    }
+
+    /**
+     * The HR employee record of this user.
+     *
+     * @return BelongsTo<HrEmployee, $this>
+     */
+    public function employee(): BelongsTo
+    {
+        return $this->belongsTo(HrEmployee::class, 'employee_id');
     }
 
     /**

@@ -1,7 +1,7 @@
 <?php
 
+use App\Models\HrEmployee;
 use App\Models\Program;
-use App\Models\User;
 use App\Models\YearlyPlan;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -136,15 +136,18 @@ new #[Title('Annual Plans')] class extends Component {
      * Users without a plan are left out, so the filter cannot be set to a value
      * that empties the grid.
      *
-     * @return Collection<int, User>
+     * @return Collection<int, HrEmployee>
      */
     #[Computed]
     public function managerOptions(): Collection
     {
-        return User::query()
-            ->select(['id', 'name', 'email', 'role'])
-            ->whereHas('managedYearlyPlans')
-            ->orderBy('name')
+        // Employees live in the HR database, so "has a plan" is resolved to
+        // ids first instead of a whereHas() across connections.
+        return HrEmployee::query()
+            ->select(HrEmployee::NameColumns)
+            ->whereIn('id', YearlyPlan::query()->distinct()->pluck('manager_id'))
+            ->orderBy('first_name_en')
+            ->orderBy('last_name_en')
             ->orderBy('id')
             ->get();
     }
@@ -206,7 +209,7 @@ new #[Title('Annual Plans')] class extends Component {
             ->whereIn('program_id', $programIds)
             ->forYears($range['from'], $range['to'])
             ->managedBy($this->selectedManagerId())
-            ->with('manager:id,name,email,role')
+            ->with('manager:id,first_name_en,last_name_en,first_name_ar,last_name_ar')
             ->withCount('planIndicators')
             ->get()
             ->keyBy(fn (YearlyPlan $plan): string => $plan->program_id.':'.$plan->year)
@@ -302,7 +305,7 @@ new #[Title('Annual Plans')] class extends Component {
                 <flux:select.option value="">{{ __('All managers') }}</flux:select.option>
                 @foreach ($this->managerOptions as $managerOption)
                     <flux:select.option :value="$managerOption->id" :wire:key="'manager-filter-'.$managerOption->id">
-                        {{ $managerOption->name }} · {{ $managerOption->role->value }}
+                        {{ $managerOption->name_en }} · {{ $managerOption->name_ar }}
                     </flux:select.option>
                 @endforeach
             </flux:select>
@@ -368,7 +371,7 @@ new #[Title('Annual Plans')] class extends Component {
                             </div>
                             <div class="min-w-0">
                                 <h2 class="truncate text-sm font-semibold text-secondary-dark dark:text-white">{{ $program->name }}</h2>
-                                <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $program->strategy->name }}</p>
+                                <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $program->strategy?->name ?? __('Strategy not assigned') }}</p>
                             </div>
                         </div>
 
@@ -382,8 +385,8 @@ new #[Title('Annual Plans')] class extends Component {
                                     @else
                                         <a href="{{ route('yearly-plans.show', $plan) }}" wire:navigate class="inline-flex min-h-11 items-center justify-center rounded-md px-2 hover:underline sm:min-h-8">
                                             <span class="flex min-w-0 items-center gap-2">
-                                                <flux:avatar class="bg-secondary-soft! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" size="xs" :initials="$plan->manager->initials()" />
-                                                <span class="truncate text-xs font-medium text-secondary-dark dark:text-white">{{ $plan->manager->name }}</span>
+                                                <flux:avatar class="bg-secondary-soft! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" size="xs" :initials="$plan->manager?->initials() ?? '?'" />
+                                                <span class="truncate text-xs font-medium text-secondary-dark dark:text-white">{{ $plan->manager?->name ?? __('Not assigned') }}</span>
                                                 <span class="inline-flex min-w-6 shrink-0 items-center justify-center rounded-md border border-secondary-light px-1.5 py-0.5 text-xs font-semibold tabular-nums text-secondary-dark dark:text-white">
                                                     {{ $plan->plan_indicators_count }}
                                                 </span>
@@ -416,7 +419,7 @@ new #[Title('Annual Plans')] class extends Component {
                                         <div class="flex size-8 shrink-0 items-center justify-center rounded-md bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white"><flux:icon.briefcase class="size-4" /></div>
                                         <div class="min-w-0">
                                             <p class="truncate font-semibold">{{ $program->name }}</p>
-                                            <p class="truncate text-xs font-normal text-secondary-medium dark:text-secondary-soft">{{ $program->strategy->name }}</p>
+                                            <p class="truncate text-xs font-normal text-secondary-medium dark:text-secondary-soft">{{ $program->strategy?->name ?? __('Strategy not assigned') }}</p>
                                         </div>
                                     </div>
                                 </flux:table.cell>
@@ -430,9 +433,9 @@ new #[Title('Annual Plans')] class extends Component {
                                                 href="{{ route('yearly-plans.show', $plan) }}"
                                                 wire:navigate
                                                 class="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md px-2 hover:underline sm:min-h-8"
-                                                aria-label="{{ __(':program, :year, managed by :manager, :count targets', ['program' => $program->name, 'year' => $year, 'manager' => $plan->manager->name, 'count' => $plan->plan_indicators_count]) }}"
+                                                aria-label="{{ __(':program, :year, managed by :manager, :count targets', ['program' => $program->name, 'year' => $year, 'manager' => $plan->manager?->name ?? __('Not assigned'), 'count' => $plan->plan_indicators_count]) }}"
                                             >
-                                                <flux:avatar class="bg-secondary-soft! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" size="xs" :initials="$plan->manager->initials()" />
+                                                <flux:avatar class="bg-secondary-soft! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" size="xs" :initials="$plan->manager?->initials() ?? '?'" />
                                                 <span class="inline-flex min-w-6 items-center justify-center rounded-md border border-secondary-light px-1.5 py-0.5 text-xs font-semibold tabular-nums text-secondary-dark dark:text-white">
                                                     {{ $plan->plan_indicators_count }}
                                                 </span>

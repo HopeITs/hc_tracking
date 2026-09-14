@@ -16,14 +16,20 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
 
 /**
+ * A delivery program, mirroring one HR program under the same id.
+ *
+ * `name` is a copy of the HR name refreshed by syncFromHr() and is never edited
+ * here; tracking owns only the strategy and manager links, which stay empty
+ * until someone assigns them.
+ *
  * @property int $id
  * @property string $name
- * @property int $strategy_id
- * @property int $manager_id
+ * @property int|null $strategy_id
+ * @property int|null $manager_id
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['name', 'strategy_id', 'manager_id'])]
+#[Fillable(['strategy_id', 'manager_id'])]
 #[ObservedBy(ProgramObserver::class)]
 class Program extends Model
 {
@@ -43,6 +49,41 @@ class Program extends Model
     }
 
     /**
+     * Mirror every HR program: add new ones and refresh the names of known ones.
+     *
+     * Strategy and manager links are never touched, and programs that have
+     * disappeared from HR are kept so the projects and plans under them survive.
+     */
+    public static function syncFromHr(): void
+    {
+        $now = now();
+
+        $rows = HrProgram::query()
+            ->get(['id', 'name'])
+            ->map(fn (HrProgram $hrProgram): array => [
+                'id' => $hrProgram->id,
+                'name' => trim($hrProgram->name),
+                'created_at' => $now,
+                'updated_at' => $now,
+            ])
+            ->all();
+
+        if ($rows !== []) {
+            static::query()->toBase()->upsert($rows, ['id'], ['name']);
+        }
+    }
+
+    /**
+     * The HR program this row mirrors.
+     *
+     * @return BelongsTo<HrProgram, $this>
+     */
+    public function hrProgram(): BelongsTo
+    {
+        return $this->belongsTo(HrProgram::class, 'id');
+    }
+
+    /**
      * The strategy this program delivers against.
      *
      * @return BelongsTo<Strategy, $this>
@@ -53,13 +94,13 @@ class Program extends Model
     }
 
     /**
-     * The user accountable for this program.
+     * The HR employee accountable for this program.
      *
-     * @return BelongsTo<User, $this>
+     * @return BelongsTo<HrEmployee, $this>
      */
     public function manager(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'manager_id');
+        return $this->belongsTo(HrEmployee::class, 'manager_id');
     }
 
     /**

@@ -1,22 +1,23 @@
 <?php
 
+use App\Models\HrEmployee;
 use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\User;
 use App\Models\YearlyPlan;
 
-test('a yearly plan belongs to a program and a manager', function () {
+test('a yearly plan belongs to a program and an hr employee manager', function () {
     $program = Program::factory()->create();
-    $manager = User::factory()->create();
+    $managerId = insertHrEmployee();
 
     $plan = YearlyPlan::factory()->create([
         'program_id' => $program->id,
-        'manager_id' => $manager->id,
+        'manager_id' => $managerId,
     ]);
 
     expect($plan->program->id)->toBe($program->id)
-        ->and($plan->manager)->toBeInstanceOf(User::class)
-        ->and($plan->manager->id)->toBe($manager->id);
+        ->and($plan->manager)->toBeInstanceOf(HrEmployee::class)
+        ->and($plan->manager->id)->toBe($managerId);
 });
 
 test('a yearly plan has the targets committed in it', function () {

@@ -23,20 +23,20 @@ test('authenticated users can view the task directory', function () {
 
 test('tasks can be filtered by search status priority and assignee', function () {
     $user = User::factory()->create();
-    $alice = User::factory()->create(['name' => 'Alice Nadir']);
-    $bob = User::factory()->create(['name' => 'Bob Rahman']);
+    $alice = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
+    $bob = insertHrEmployee(firstNameEn: 'Bob', lastNameEn: 'Rahman');
 
     Task::factory()->create([
         'title' => 'Draft distribution plan',
         'description' => 'Prepare the delivery sequence.',
-        'assigned_to' => $alice->id,
+        'assigned_to' => $alice,
         'status' => TaskStatus::Todo,
         'priority' => TaskPriority::High,
     ]);
     Task::factory()->create([
         'title' => 'Verify beneficiary list',
         'description' => 'Check every registration.',
-        'assigned_to' => $bob->id,
+        'assigned_to' => $bob,
         'status' => TaskStatus::Done,
         'priority' => TaskPriority::Low,
     ]);
@@ -48,7 +48,7 @@ test('tasks can be filtered by search status priority and assignee', function ()
         ->call('clearFilters')->set('search', 'Bob Rahman')->assertDontSee('Draft distribution plan')->assertSee('Verify beneficiary list')
         ->call('clearFilters')->set('status', TaskStatus::Done->value)->assertDontSee('Draft distribution plan')->assertSee('Verify beneficiary list')
         ->call('clearFilters')->set('priority', TaskPriority::High->value)->assertSee('Draft distribution plan')->assertDontSee('Verify beneficiary list')
-        ->call('clearFilters')->set('assignee', (string) $bob->id)->assertDontSee('Draft distribution plan')->assertSee('Verify beneficiary list')
+        ->call('clearFilters')->set('assignee', (string) $bob)->assertDontSee('Draft distribution plan')->assertSee('Verify beneficiary list')
         ->call('clearFilters')
         ->assertSet('search', '')->assertSet('status', '')->assertSet('priority', '')->assertSet('assignee', '')->assertSet('milestone', '')
         ->assertSee('Draft distribution plan')->assertSee('Verify beneficiary list');
@@ -70,7 +70,7 @@ test('tasks can be filtered by a milestone or the explicit no milestone state', 
 
 test('a task records its creator and safely normalizes optional values', function () {
     $creator = User::factory()->create();
-    $assignee = User::factory()->create();
+    $assignee = insertHrEmployee();
     $proposal = Proposal::factory()->create();
 
     Livewire::actingAs($creator)
@@ -79,7 +79,7 @@ test('a task records its creator and safely normalizes optional values', functio
         ->set('title', '  Prepare the sitrep  ')
         ->set('description', '   ')
         ->set('taskProposalId', (string) $proposal->id)
-        ->set('assignedTo', (string) $assignee->id)
+        ->set('assignedTo', (string) $assignee)
         ->set('taskStatus', TaskStatus::Todo->value)
         ->set('taskPriority', TaskPriority::Medium->value)
         ->set('startDate', '')
@@ -93,7 +93,7 @@ test('a task records its creator and safely normalizes optional values', functio
     $task = Task::query()->where('title', 'Prepare the sitrep')->sole();
 
     expect($task->created_by)->toBe($creator->id)
-        ->and($task->assigned_to)->toBe($assignee->id)
+        ->and($task->assigned_to)->toBe($assignee)
         ->and($task->proposal_id)->toBe($proposal->id)
         ->and($task->milestone_id)->toBeNull()
         ->and($task->description)->toBeNull()
@@ -159,7 +159,7 @@ test('a due date before the start date is rejected', function () {
 test('a task can be fully edited without changing its creator', function () {
     $creator = User::factory()->create();
     $editor = User::factory()->create();
-    $newAssignee = User::factory()->create();
+    $newAssignee = insertHrEmployee();
     $newProposal = Proposal::factory()->create();
     $newMilestone = Milestone::factory()->create();
     $task = Task::factory()->create([
@@ -181,7 +181,7 @@ test('a task can be fully edited without changing its creator', function () {
         ->set('dueDate', '2026-04-30')
         ->set('completedDate', '2026-04-29')
         ->set('progressPercentage', '80')
-        ->set('assignedTo', (string) $newAssignee->id)
+        ->set('assignedTo', (string) $newAssignee)
         ->set('taskProposalId', (string) $newProposal->id)
         ->set('taskMilestoneId', (string) $newMilestone->id)
         ->call('saveTask')
@@ -194,7 +194,7 @@ test('a task can be fully edited without changing its creator', function () {
         ->and($task->status)->toBe(TaskStatus::InProgress)
         ->and($task->priority)->toBe(TaskPriority::High)
         ->and($task->progress_percentage)->toBe(80)
-        ->and($task->assigned_to)->toBe($newAssignee->id)
+        ->and($task->assigned_to)->toBe($newAssignee)
         ->and($task->proposal_id)->toBe($newProposal->id)
         ->and($task->milestone_id)->toBe($newMilestone->id)
         ->and($task->created_by)->toBe($creator->id);
@@ -245,12 +245,12 @@ test('task rows link to the registered task detail route', function () {
 
 test('task directory content is escaped', function () {
     $user = User::factory()->create();
-    $assignee = User::factory()->create(['name' => '<script>assignee()</script>']);
+    $assignee = insertHrEmployee(firstNameEn: '<script>assignee()</script>', lastNameEn: '');
     $proposal = Proposal::factory()->create(['name' => '<img src=x onerror=proposal()>']);
     $milestone = Milestone::factory()->create(['name' => '<svg onload=milestone()>']);
     Task::factory()->create([
         'title' => '<script>task()</script>',
-        'assigned_to' => $assignee->id,
+        'assigned_to' => $assignee,
         'proposal_id' => $proposal->id,
         'milestone_id' => $milestone->id,
     ]);

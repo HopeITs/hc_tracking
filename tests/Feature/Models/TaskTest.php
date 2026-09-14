@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\HrEmployee;
 use App\Models\Milestone;
 use App\Models\Proposal;
 use App\Models\Task;
@@ -21,17 +22,18 @@ test('a task belongs to a milestone and a proposal', function () {
         ->and($task->proposal->id)->toBe($proposal->id);
 });
 
-test('a task resolves its assignee and its creator separately', function () {
-    $assignee = User::factory()->create();
+test('a task resolves its hr employee assignee and its user creator separately', function () {
+    $assigneeId = insertHrEmployee();
     $creator = User::factory()->create();
 
     $task = Task::factory()->create([
-        'assigned_to' => $assignee->id,
+        'assigned_to' => $assigneeId,
         'created_by' => $creator->id,
     ]);
 
-    expect($task->assignee)->toBeInstanceOf(User::class)
-        ->and($task->assignee->id)->toBe($assignee->id)
+    expect($task->assignee)->toBeInstanceOf(HrEmployee::class)
+        ->and($task->assignee->id)->toBe($assigneeId)
+        ->and($task->creator)->toBeInstanceOf(User::class)
         ->and($task->creator->id)->toBe($creator->id);
 });
 

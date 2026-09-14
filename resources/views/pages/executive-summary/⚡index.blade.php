@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\City;
+use App\Models\HrCity;
 use App\Models\Indicator;
 use App\Models\Program;
 use App\Models\Project;
@@ -92,8 +92,10 @@ new #[Title('Executive Summary')] class extends Component {
                 'key' => 'geographic-reach',
                 'label' => __('Geographic reach'),
                 'icon' => 'map-pin',
-                'covered' => City::query()->whereHas('projects')->count(),
-                'total' => City::query()->count(),
+                // Cities live in the HR database, so the covered count cannot
+                // be a whereHas() across connections.
+                'covered' => HrCity::query()->whereIn('id', Project::query()->distinct()->pluck('city_id'))->count(),
+                'total' => HrCity::query()->count(),
                 'unit' => __('cities'),
                 // Projects carry no year, so this one measures the portfolio
                 // rather than the fiscal year, and says so on the card.

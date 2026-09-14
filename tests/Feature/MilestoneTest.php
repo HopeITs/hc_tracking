@@ -1,8 +1,8 @@
 <?php
 
 use App\Models\User;
-use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 test('a new milestone is pending, first in sequence and carries no weight', function () {
     $user = User::factory()->create();
@@ -52,14 +52,8 @@ test('deleting a project deletes its milestones', function () {
     $this->assertDatabaseCount('milestones', 0);
 });
 
-test('a user is not deletable while responsible for a milestone', function () {
-    $user = User::factory()->create();
-    $responsible = User::factory()->create();
-    $projectId = insertProject(insertCity(), insertProgram(insertStrategy(), $user->id), $user->id);
-    insertMilestone($projectId, $responsible->id);
+test('a milestone stores its responsible hr employee id with no foreign key to users', function () {
+    $foreignKeyColumns = collect(Schema::getForeignKeys('milestones'))->pluck('columns')->flatten();
 
-    expect(fn () => DB::table('users')->where('id', $responsible->id)->delete())
-        ->toThrow(QueryException::class);
-
-    $this->assertDatabaseHas('users', ['id' => $responsible->id]);
+    expect($foreignKeyColumns)->not->toContain('responsible_user_id');
 });

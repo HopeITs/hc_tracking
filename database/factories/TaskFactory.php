@@ -6,6 +6,7 @@ use App\Enums\TaskStatus;
 use App\Models\Proposal;
 use App\Models\Task;
 use App\Models\User;
+use Database\Factories\Concerns\CreatesHrRecords;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -13,6 +14,8 @@ use Illuminate\Database\Eloquent\Factories\Factory;
  */
 class TaskFactory extends Factory
 {
+    use CreatesHrRecords;
+
     /**
      * Define the model's default state.
      *
@@ -27,7 +30,7 @@ class TaskFactory extends Factory
             'proposal_id' => Proposal::factory(),
             'title' => fake()->randomElement(['Draft the distribution plan', 'Verify beneficiary list', 'Procure water pumps', 'Run the post-distribution monitoring']),
             'description' => fake()->sentence(),
-            'assigned_to' => User::factory(),
+            'assigned_to' => fn (): int => $this->createHrEmployee(),
             'created_by' => User::factory(),
         ];
     }

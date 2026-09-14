@@ -80,13 +80,16 @@ class Milestone extends Model
     }
 
     /**
-     * The user accountable for reaching this milestone.
+     * The HR employee accountable for reaching this milestone.
      *
-     * @return BelongsTo<User, $this>
+     * The column keeps its original name, `responsible_user_id`, but holds an HR
+     * employee id.
+     *
+     * @return BelongsTo<HrEmployee, $this>
      */
     public function responsibleUser(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'responsible_user_id');
+        return $this->belongsTo(HrEmployee::class, 'responsible_user_id');
     }
 
     /**
