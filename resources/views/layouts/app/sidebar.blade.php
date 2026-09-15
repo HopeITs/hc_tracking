@@ -7,7 +7,7 @@
         <x-navigation.sidebar />
 
         <!-- Mobile User Menu -->
-        <flux:header class="min-h-16 px-3 py-2 lg:hidden">
+        <flux:header sticky class="min-h-16 border-b border-secondary-soft bg-white px-3 py-2 lg:hidden dark:border-secondary-medium dark:bg-secondary-dark">
             <flux:sidebar.toggle
                 class="size-11! touch-manipulation lg:hidden"
                 icon="bars-2"
@@ -68,7 +68,7 @@
         </flux:header>
 
         <!-- Desktop Top Navigation -->
-        <flux:header class="hidden min-h-16 border-b border-secondary-soft bg-white px-4 py-2 lg:flex dark:border-secondary-medium dark:bg-secondary-dark" data-desktop-navigation-header>
+        <flux:header sticky class="hidden min-h-16 border-b border-secondary-soft bg-white px-4 py-2 lg:flex dark:border-secondary-medium dark:bg-secondary-dark" data-desktop-navigation-header>
             <flux:spacer />
 
             <div class="flex items-center gap-1.5">

@@ -352,7 +352,7 @@ new #[Title('titles.strategies')] class extends Component {
                             <bdi class="tabular-nums">{{ $strategy['start_year'] }}–{{ $strategy['end_year'] }}</bdi>
                         </x-ui.data-table.cell>
                         <x-ui.data-table.cell :label="__('strategies.duration')">
-                            {{ __('strategies.count_year_strategic_period', ['count' => $strategy['duration_years']]) }}
+                            {{ trans_choice('strategies.count_years', $strategy['duration_years'], ['count' => $strategy['duration_years']]) }}
                         </x-ui.data-table.cell>
                         <x-ui.data-table.cell :label="__('common.status')">
                             <span class="{{ $statusChipClasses($strategy['status']) }} inline-flex shrink-0 items-center rounded-md px-2.5 py-1 text-xs font-semibold">
@@ -392,7 +392,9 @@ new #[Title('titles.strategies')] class extends Component {
             <form wire:submit="saveStrategy" class="space-y-5">
                 <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
                     <flux:heading size="lg">{{ $editingStrategyId === null ? __('strategies.add_strategy') : __('strategies.edit_strategy') }}</flux:heading>
-                    <flux:subheading>{{ __('strategies.strategy_names_need_not_be_unique') }}</flux:subheading>
+                    @if ($editingStrategyId === null)
+                        <flux:subheading>{{ __('strategies.strategy_names_need_not_be_unique') }}</flux:subheading>
+                    @endif
                 </div>
 
                 <x-ui.input wire:model="name" :label="__('strategies.strategy_name')" type="text" maxlength="255" required autofocus />
