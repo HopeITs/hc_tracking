@@ -2,12 +2,17 @@
 
 use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
+use App\Enums\ReportStatus;
+use App\Enums\ResultType;
 use App\Models\Milestone;
+use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
+use App\Models\Report;
 use App\Models\Result;
 use App\Models\Risk;
 use App\Models\YearlyPlan;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\Attributes\Computed;
@@ -27,13 +32,40 @@ new #[Title('titles.program')] class extends Component {
     #[Url(except: '')]
     public string $projectSearch = '';
 
+    #[Url(except: '')]
+    public string $projectStatus = '';
+
     public function mount(Program $program): void
     {
         $this->programId = $program->id;
+
+        if (ProjectStatus::tryFrom($this->projectStatus) === null) {
+            $this->projectStatus = '';
+        }
     }
 
     public function updatedProjectSearch(): void
     {
+        $this->resetPage('projectsPage');
+    }
+
+    public function updatedProjectStatus(): void
+    {
+        if (ProjectStatus::tryFrom($this->projectStatus) === null) {
+            $this->projectStatus = '';
+        }
+
+        $this->resetPage('projectsPage');
+    }
+
+    /**
+     * Narrow the delivery timeline to one project status, or clear the filter
+     * with an empty string. Unknown values clear the filter.
+     */
+    public function filterProjectsByStatus(string $status): void
+    {
+        $this->projectStatus = ProjectStatus::tryFrom($status)?->value ?? '';
+
         $this->resetPage('projectsPage');
     }
 
@@ -59,26 +91,102 @@ new #[Title('titles.program')] class extends Component {
             ->findOrFail($this->programId);
     }
 
-    /** @return LengthAwarePaginator<int, Project> */
+    /**
+     * The page of projects on the delivery timeline, each with its weighted
+     * milestone progress and the dated milestones plotted along its bar.
+     *
+     * @return LengthAwarePaginator<int, Project>
+     */
     #[Computed]
     public function projects(): LengthAwarePaginator
     {
+        $status = ProjectStatus::tryFrom($this->projectStatus);
+
         return Project::query()
             ->select(['id', 'name', 'status', 'start_date', 'end_date', 'city_id', 'program_id', 'user_id'])
             ->where('program_id', $this->programId)
-            ->when($this->projectSearch !== '', fn ($query) => $query->where('name', 'like', '%'.$this->projectSearch.'%'))
+            ->when($this->projectSearch !== '', fn ($query) => $query->whereRaw(
+                "name like ? escape '!'",
+                ['%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $this->projectSearch).'%'],
+            ))
+            ->when($status !== null, fn ($query) => $query->where('status', $status->value))
             ->with([
                 'city:id,name_en,name_ar',
                 'user:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
+                'milestones' => fn ($query) => $query
+                    ->select(['id', 'project_id', 'name', 'planned_date', 'status'])
+                    ->where('status', '!=', MilestoneStatus::Cancelled->value)
+                    ->reorder()
+                    ->orderBy('planned_date'),
             ])
             ->withCount([
                 'risks',
-                'milestones',
                 'risks as materialised_risks_count' => fn ($query) => $query->where('happened', true),
             ])
+            ->withSum(['milestones as weight_total' => fn ($query) => $query->where('status', '!=', MilestoneStatus::Cancelled->value)], 'weight_percentage')
+            ->withSum(['milestones as weight_reached' => fn ($query) => $query->where('status', MilestoneStatus::Reached->value)], 'weight_percentage')
             ->orderBy('name')
             ->orderBy('id')
             ->paginate(15, pageName: 'projectsPage');
+    }
+
+    /**
+     * The date range every project bar is plotted against: the program's
+     * project dates, today, and each project's milestone dates.
+     *
+     * A milestone only stretches the range when it falls within a year of its
+     * own project's dates, so one mistyped date cannot squash every bar. Such
+     * milestones are still drawn, pinned to the edge and flagged as outside
+     * the delivery window.
+     *
+     * @return array{start: CarbonImmutable, end: CarbonImmutable}|null
+     */
+    #[Computed]
+    public function deliveryWindow(): ?array
+    {
+        $projects = Project::query()
+            ->select(['id', 'start_date', 'end_date'])
+            ->where('program_id', $this->programId)
+            ->get()
+            ->keyBy('id');
+
+        $milestoneBounds = Milestone::query()
+            ->whereIn('project_id', $projects->keys())
+            ->where('status', '!=', MilestoneStatus::Cancelled->value)
+            ->groupBy('project_id')
+            ->selectRaw('project_id, min(planned_date) as first_planned, max(planned_date) as last_planned')
+            ->toBase()
+            ->get();
+
+        $dates = $projects
+            ->flatMap(fn (Project $project): array => [$project->start_date, $project->end_date])
+            ->filter()
+            ->map(fn ($date): CarbonImmutable => CarbonImmutable::parse($date));
+
+        foreach ($milestoneBounds as $bounds) {
+            $project = $projects->get($bounds->project_id);
+            $earliest = $project?->start_date ?? $project?->end_date;
+            $latest = $project?->end_date ?? $project?->start_date;
+
+            foreach ([$bounds->first_planned, $bounds->last_planned] as $planned) {
+                $plannedDate = CarbonImmutable::parse($planned);
+
+                if ($earliest === null || $plannedDate->betweenIncluded(CarbonImmutable::parse($earliest)->subYear(), CarbonImmutable::parse($latest)->addYear())) {
+                    $dates->push($plannedDate);
+                }
+            }
+        }
+
+        if ($dates->isEmpty()) {
+            return null;
+        }
+
+        $dates->push(CarbonImmutable::today());
+
+        return [
+            'start' => $dates->min()->startOfMonth(),
+            'end' => $dates->max()->endOfMonth(),
+        ];
     }
 
     /** @return Collection<int, YearlyPlan> */
@@ -94,17 +202,128 @@ new #[Title('titles.program')] class extends Component {
             ->get();
     }
 
-    /** @return Collection<int, Result> */
+    /**
+     * One slot per fiscal year across the strategy window and every planned
+     * year, each carrying its plan (or null for a gap) and the plan's target
+     * and reporting totals.
+     *
+     * Totals come from two grouped reads over all of the program's plans, so
+     * the slot count never adds queries.
+     *
+     * @return array<int, array{year: int, plan: YearlyPlan|null, targets: int, attributed: int, levels: array<string, int>, reports: int, approved: int}>
+     */
+    #[Computed]
+    public function planTimeline(): array
+    {
+        $plans = $this->yearlyPlans->keyBy('year');
+        $planIds = $this->yearlyPlans->pluck('id');
+
+        $targetTotals = PlanIndicator::query()
+            ->where('plan_indicators.source_type', 'yearly_plan')
+            ->whereIn('plan_indicators.source_id', $planIds)
+            ->leftJoin('indicators', 'indicators.id', '=', 'plan_indicators.indicator_id')
+            ->leftJoin('results', 'results.id', '=', 'indicators.result_id')
+            ->groupBy('plan_indicators.source_id')
+            ->selectRaw('plan_indicators.source_id as plan_id, count(*) as targets')
+            ->selectRaw('sum(case when plan_indicators.project_id is not null then 1 else 0 end) as attributed')
+            ->selectRaw('sum(case when results.type = ? then 1 else 0 end) as impact', [ResultType::Impact->value])
+            ->selectRaw('sum(case when results.type = ? then 1 else 0 end) as outcome', [ResultType::Outcome->value])
+            ->selectRaw('sum(case when results.type = ? then 1 else 0 end) as output', [ResultType::Output->value])
+            ->toBase()
+            ->get()
+            ->keyBy('plan_id');
+
+        $reportTotals = Report::query()
+            ->join('plan_indicators', 'plan_indicators.id', '=', 'reports.plan_indicator_id')
+            ->where('plan_indicators.source_type', 'yearly_plan')
+            ->whereIn('plan_indicators.source_id', $planIds)
+            ->groupBy('plan_indicators.source_id')
+            ->selectRaw('plan_indicators.source_id as plan_id, count(*) as reports')
+            ->selectRaw('sum(case when reports.status = ? then 1 else 0 end) as approved', [ReportStatus::Approved->value])
+            ->toBase()
+            ->get()
+            ->keyBy('plan_id');
+
+        $years = $plans->keys()->all();
+        $strategy = $this->program->strategy;
+
+        if ($strategy !== null && $strategy->start_year !== null && $strategy->end_year !== null && $strategy->end_year - $strategy->start_year < 15) {
+            $years = [...$years, ...range((int) $strategy->start_year, (int) $strategy->end_year)];
+        }
+
+        if ($years === []) {
+            return [];
+        }
+
+        return collect(range(min($years), max($years)))
+            ->map(function (int $year) use ($plans, $targetTotals, $reportTotals): array {
+                $plan = $plans->get($year);
+                $targets = $plan === null ? null : $targetTotals->get($plan->id);
+                $reports = $plan === null ? null : $reportTotals->get($plan->id);
+
+                return [
+                    'year' => $year,
+                    'plan' => $plan,
+                    'targets' => (int) ($targets->targets ?? 0),
+                    'attributed' => (int) ($targets->attributed ?? 0),
+                    'levels' => [
+                        ResultType::Impact->value => (int) ($targets->impact ?? 0),
+                        ResultType::Outcome->value => (int) ($targets->outcome ?? 0),
+                        ResultType::Output->value => (int) ($targets->output ?? 0),
+                    ],
+                    'reports' => (int) ($reports->reports ?? 0),
+                    'approved' => (int) ($reports->approved ?? 0),
+                ];
+            })
+            ->all();
+    }
+
+    /**
+     * The program's logframe as root results with their subtrees attached.
+     *
+     * Loads every statement in one query with its indicator count, then wires
+     * childrenRecursive in memory so every level carries the count.
+     *
+     * @return Collection<int, Result>
+     */
     #[Computed]
     public function resultRoots(): Collection
     {
-        return Result::query()
+        $results = Result::query()
             ->select(['id', 'statement', 'parent_id', 'program_id', 'type', 'checkout_period'])
             ->where('program_id', $this->programId)
-            ->roots()
             ->withCount('indicators')
-            ->with('childrenRecursive')
+            ->orderBy('id')
             ->get();
+
+        $childrenByParent = $results->groupBy('parent_id');
+
+        foreach ($results as $result) {
+            $result->setRelation('childrenRecursive', new Collection($childrenByParent->get($result->id, [])));
+        }
+
+        return $results
+            ->filter(fn (Result $result): bool => $result->parent_id === null || ! $results->contains('id', $result->parent_id))
+            ->values();
+    }
+
+    /**
+     * Statement and indicator totals across the program's logframe.
+     *
+     * @return array{levels: array<string, int>, indicators: int, unmeasured: int}
+     */
+    #[Computed]
+    public function resultSummary(): array
+    {
+        $all = $this->resultRoots->flatMap(fn (Result $root) => collect([$root])->merge($root->descendants()));
+
+        return [
+            'levels' => collect(ResultType::cases())
+                ->mapWithKeys(fn (ResultType $type): array => [$type->value => $all->where('type', $type)->count()])
+                ->all(),
+            'indicators' => (int) $all->sum('indicators_count'),
+            'unmeasured' => $all->where('indicators_count', 0)->count(),
+        ];
     }
 
     /** @return array{percentage: float|null, reached: float, total: float} */
@@ -260,48 +479,16 @@ new #[Title('titles.program')] class extends Component {
     </div>
 
     @if ($tab === 'projects')
-        <section class="overflow-hidden rounded-md border border-secondary-soft bg-white dark:border-secondary-medium dark:bg-secondary-dark" aria-labelledby="program-projects-heading">
-            <div class="flex flex-col gap-3 border-b border-secondary-soft bg-secondary-soft/35 px-4 py-3 @3xl/detail:flex-row @3xl/detail:items-end dark:border-secondary-medium dark:bg-secondary-medium/30">
-                <div class="@3xl/detail:me-auto"><p class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('programs.delivery_projects') }}</p><h2 id="program-projects-heading" class="mt-1 text-lg font-bold">{{ __('common.projects') }}</h2></div>
-                <label class="block @3xl/detail:w-80"><span class="mb-1 block text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('programs.find_a_project') }}</span><div class="flex min-h-10 items-center gap-2 rounded-md border border-secondary-light bg-white px-3 dark:border-secondary-medium dark:bg-secondary-dark"><flux:icon name="magnifying-glass" class="size-4 shrink-0 text-secondary-medium dark:text-secondary-soft" /><input type="search" wire:model.live.debounce.300ms="projectSearch" placeholder="{{ __('programs.search_projects') }}" class="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-secondary-dark placeholder:text-secondary-light outline-none focus:outline-none focus:ring-0 dark:text-white" /></div></label>
-            </div>
-            @if ($this->projects->isEmpty())
-                <x-ui.empty-state icon="rectangle-stack" :heading="$projectSearch === '' ? __('common.no_projects_yet') : __('programs.no_projects_match_search')" :body="$projectSearch === '' ? __('programs.projects_delivered_under_this_program_will_appear_here') : __('programs.adjust_your_project_search')" />
-            @else
-                <div class="overflow-x-auto">
-                    <table class="min-w-[52rem] w-full text-sm"><thead class="bg-secondary-soft/35 text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:bg-secondary-medium/30 dark:text-secondary-soft"><tr><th scope="col" class="px-4 py-3 text-start">{{ __('common.projects') }}</th><th scope="col" class="px-4 py-3 text-start">{{ __('programs.delivery_status') }}</th><th scope="col" class="px-4 py-3 text-start">{{ __('common.city') }}</th><th scope="col" class="px-4 py-3 text-start">{{ __('programs.delivery_window') }}</th><th scope="col" class="px-4 py-3 text-center">{{ __('common.milestones') }}</th><th scope="col" class="px-4 py-3 text-center">{{ __('common.risks') }}</th><th scope="col" class="px-4 py-3 text-center">{{ __('programs.project_owner') }}</th></tr></thead>
-                    <tbody class="divide-y divide-secondary-soft dark:divide-secondary-medium" wire:loading.class="opacity-60" wire:target="projectSearch, gotoPage, previousPage, nextPage">
-                        @foreach ($this->projects as $project)
-                            <tr wire:key="program-project-{{ $project->id }}" class="transition-colors hover:bg-secondary-soft/25 dark:hover:bg-secondary-medium/25"><td class="px-4 py-3"><a href="{{ route('projects.show', $project) }}" wire:navigate class="font-semibold hover:text-primary hover:underline">{{ $project->name }}</a></td><td class="px-4 py-3"><x-ui.enum-badge :case="$project->status" /></td><td class="px-4 py-3 text-secondary-medium dark:text-secondary-soft">{{ $project->city?->name ?? __('common.unknown_city') }}</td><td class="px-4 py-3 text-xs text-secondary-medium tabular-nums dark:text-secondary-soft">{{ $project->start_date?->translatedFormat(__('formats.date')) ?? '—' }} <span aria-hidden="true">–</span> {{ $project->end_date?->translatedFormat(__('formats.date')) ?? '—' }}</td><td class="px-4 py-3 text-center font-semibold tabular-nums">{{ $project->milestones_count }}</td><td class="px-4 py-3 text-center font-semibold tabular-nums {{ $project->materialised_risks_count > 0 ? 'text-primary' : '' }}">{{ $project->risks_count }}</td><td class="px-4 py-3 text-center text-secondary-medium dark:text-secondary-soft">{{ $project->user?->name ?? __('common.not_assigned') }}</td></tr>
-                        @endforeach
-                    </tbody></table>
-                </div>
-                <div class="border-t border-secondary-soft px-4 py-3 dark:border-secondary-medium"><flux:pagination :paginator="$this->projects" class="text-secondary-medium! dark:text-secondary-soft!" scroll-to="#program-projects-heading" /></div>
-            @endif
-        </section>
+        <x-ui.project-timeline
+            :projects="$this->projects"
+            :window="$this->deliveryWindow"
+            :status-segments="$this->projectStatusSegments"
+            :search="$projectSearch"
+            :status="$projectStatus"
+        />
     @elseif ($tab === 'plans')
-        <section class="overflow-hidden rounded-md border border-secondary-soft bg-white dark:border-secondary-medium dark:bg-secondary-dark" aria-labelledby="program-plans-heading">
-            <div class="border-b border-secondary-soft bg-secondary-soft/35 px-4 py-3 dark:border-secondary-medium dark:bg-secondary-medium/30"><p class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('programs.plan_years') }}</p><h2 id="program-plans-heading" class="mt-1 text-lg font-bold">{{ __('programs.annual_plans') }}</h2></div>
-            @if ($this->yearlyPlans->isEmpty())
-                <x-ui.empty-state icon="calendar-days" :heading="__('common.no_annual_plans_yet')" :body="__('programs.operational_plans_written_for_this_program_will_appear_here')" />
-            @else
-                @php $maxTargets = max(1, $this->yearlyPlans->max('plan_indicators_count')); @endphp
-                <div class="grid gap-px bg-secondary-soft p-4 @2xl/detail:grid-cols-2 @5xl/detail:grid-cols-4 dark:bg-secondary-medium">
-                    @foreach ($this->yearlyPlans as $plan)
-                        @php $ratio = $plan->plan_indicators_count / $maxTargets; $toneClass = match (true) { $plan->plan_indicators_count === 0 => 'border-dashed border-secondary-light bg-white text-secondary-medium dark:border-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft', $ratio <= 0.25 => 'border-secondary-soft bg-secondary-soft/50 text-secondary-dark dark:border-secondary-medium dark:bg-secondary-medium/40 dark:text-white', $ratio <= 0.5 => 'border-secondary-light bg-secondary-light/60 text-secondary-dark dark:border-secondary-medium dark:bg-secondary-medium/70 dark:text-white', default => 'border-secondary-dark bg-secondary-dark text-white dark:border-white', }; @endphp
-                        <a href="{{ route('yearly-plans.show', $plan) }}" wire:navigate class="group min-h-36 border p-4 transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2 {{ $toneClass }}" wire:key="program-plan-{{ $plan->id }}"><p class="text-xs font-semibold tracking-[0.1em] uppercase opacity-75">{{ __('common.fy_year', ['year' => $plan->year]) }}</p><p class="mt-4 text-3xl font-bold tabular-nums">{{ $plan->plan_indicators_count }}</p><p class="mt-1 text-xs font-semibold opacity-75">{{ trans_choice('common.count_target', $plan->plan_indicators_count, ['count' => $plan->plan_indicators_count]) }}</p><p class="mt-4 truncate text-xs opacity-80">{{ $plan->manager?->name ?? __('common.not_assigned') }}</p></a>
-                    @endforeach
-                </div>
-            @endif
-        </section>
+        <x-ui.plan-years :slots="$this->planTimeline" :strategy="$this->program->strategy" />
     @else
-        <section class="overflow-hidden rounded-md border border-secondary-soft bg-white dark:border-secondary-medium dark:bg-secondary-dark" aria-labelledby="program-results-heading">
-            <div class="border-b border-secondary-soft bg-secondary-soft/35 px-4 py-3 dark:border-secondary-medium dark:bg-secondary-medium/30"><p class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('programs.results_framework') }}</p><h2 id="program-results-heading" class="mt-1 text-lg font-bold">{{ __('programs.results_logframe') }}</h2><p class="mt-1 text-sm text-secondary-medium dark:text-secondary-soft">{{ __('common.impact_outcome_and_output_statements_nested_as_recorded') }}</p></div>
-            @if ($this->resultRoots->isEmpty())
-                <x-ui.empty-state icon="chart-bar" :heading="__('common.no_results_yet')" :body="__('programs.logframe_statements_assigned_to_this_program_will_appear_her')" />
-            @else
-                <x-ui.tree-rows :nodes="$this->resultRoots" :label="fn (\App\Models\Result $result): string => $result->statement" :badge="fn (\App\Models\Result $result) => $result->type" />
-            @endif
-        </section>
+        <x-ui.logframe :roots="$this->resultRoots" :summary="$this->resultSummary" />
     @endif
 </section>

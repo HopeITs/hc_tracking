@@ -10,4 +10,5 @@ return [
     'date_short' => 'M j',
     'datetime' => 'M j, Y · H:i',
     'month_short' => 'M',
+    'month_year' => 'M Y',
 ];

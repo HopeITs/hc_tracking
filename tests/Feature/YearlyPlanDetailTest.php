@@ -26,7 +26,7 @@ test('annual plan detail shows the plan its program manager and year', function 
     $this->actingAs($user)
         ->get(route('yearly-plans.show', $plan))
         ->assertOk()
-        ->assertSeeText('FY 2026 · Water Security')
+        ->assertSeeText('Annual plan 2026 · Water Security')
         ->assertSeeText('Layla Haddad');
 });
 
