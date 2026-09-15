@@ -29,4 +29,8 @@
         </div>
         {{ $actions ?? '' }}
     </div>
+
+    @isset($summary)
+        <div>{{ $summary }}</div>
+    @endisset
 </header>

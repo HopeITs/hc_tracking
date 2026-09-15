@@ -1,0 +1,11 @@
+{
+    "version": "0.0.1",
+    "configurations": [
+        {
+            "name": "hc-tracking",
+            "runtimeExecutable": "C:\\php85\\php.exe",
+            "runtimeArgs": ["artisan", "dev"],
+            "port": 8000
+        }
+    ]
+}

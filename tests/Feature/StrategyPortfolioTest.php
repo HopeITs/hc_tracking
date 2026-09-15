@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Program;
 use App\Models\Strategy;
 use App\Models\User;
 use Illuminate\Support\Facades\Date;
@@ -20,7 +21,7 @@ test('authenticated users see active upcoming and completed strategies in planni
         'start_year' => 2031,
         'end_year' => 2035,
     ]);
-    Strategy::factory()->create([
+    $active = Strategy::factory()->create([
         'name' => 'Active country strategy',
         'start_year' => 2026,
         'end_year' => 2030,
@@ -43,8 +44,67 @@ test('authenticated users see active upcoming and completed strategies in planni
         ->assertSeeText('Active')
         ->assertSeeText('Upcoming')
         ->assertSeeText('Completed')
-        ->assertSeeText('Planning year 2026')
-        ->assertSee('aria-label="Period 2026 to 2030"', false);
+        // The redesign (P3) replaced the 3-dot mini-timeline (which carried an
+        // aria-label of the period) with the shared x-ui.timeline component and a
+        // compact list; both link to the strategy and show its years as text.
+        ->assertSee(route('strategies.show', $active), false)
+        ->assertSeeText('2026–2030');
+});
+
+test('the active status chip uses the good/green status tone, not the brand red', function () {
+    $user = User::factory()->create();
+    Strategy::factory()->create(['start_year' => 2026, 'end_year' => 2030]);
+
+    $response = Date::withTestNow(
+        '2026-06-15',
+        fn () => $this->actingAs($user)->get(route('strategies.index')),
+    );
+
+    $response
+        ->assertOk()
+        ->assertSee('bg-status-good text-white', false)
+        ->assertDontSee('bg-primary text-white', false);
+});
+
+test('the strategy portfolio search narrows the results', function () {
+    $user = User::factory()->create();
+    Strategy::factory()->create(['name' => 'Water Security Strategy', 'start_year' => 2026, 'end_year' => 2030]);
+    Strategy::factory()->create(['name' => 'Shelter Strategy', 'start_year' => 2026, 'end_year' => 2030]);
+
+    $this->actingAs($user)
+        ->get(route('strategies.index', ['search' => 'Water']))
+        ->assertOk()
+        ->assertSeeText('Water Security Strategy')
+        ->assertDontSeeText('Shelter Strategy');
+});
+
+test('the strategy portfolio status strip filters the results and counts correctly', function () {
+    $user = User::factory()->create();
+    Strategy::factory()->create(['name' => 'Active strategy', 'start_year' => 2026, 'end_year' => 2030]);
+    Strategy::factory()->create(['name' => 'Upcoming strategy', 'start_year' => 2031, 'end_year' => 2035]);
+
+    $response = Date::withTestNow(
+        '2026-06-15',
+        fn () => $this->actingAs($user)->get(route('strategies.index', ['status' => 'upcoming'])),
+    );
+
+    $response
+        ->assertOk()
+        ->assertSeeText('Upcoming strategy')
+        ->assertDontSeeText('Active strategy');
+});
+
+test('the strategy portfolio timeline and list link to the strategy and show its program count', function () {
+    $user = User::factory()->create();
+    $strategy = Strategy::factory()->create(['name' => 'Water Security Strategy', 'start_year' => 2026, 'end_year' => 2030]);
+    Program::factory()->create(['strategy_id' => $strategy->id]);
+    Program::factory()->create(['strategy_id' => $strategy->id]);
+
+    $this->actingAs($user)
+        ->get(route('strategies.index'))
+        ->assertOk()
+        ->assertSee(route('strategies.show', $strategy), false)
+        ->assertSeeText('2 programs');
 });
 
 test('the strategy portfolio explains when the current year has no active period', function () {
@@ -90,7 +150,9 @@ test('the strategy portfolio has a clear empty state', function () {
     $this->actingAs($user)
         ->get(route('strategies.index'))
         ->assertOk()
-        ->assertSeeText('No strategic periods yet');
+        ->assertSeeText('No strategic periods yet')
+        // With no strategies at all, "no active period" is meaningless noise.
+        ->assertDontSeeText('No strategy currently covers');
 });
 
 test('strategy names are escaped in the portfolio', function () {

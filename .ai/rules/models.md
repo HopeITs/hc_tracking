@@ -4,6 +4,7 @@ paths:
   - app/Models/Account.php
   - 'app/Models/Hr*.php'
   - app/Models/Program.php
+  - app/Models/User.php
 ---
 
 # Models
@@ -45,3 +46,6 @@ The `hr` connection (hr_db, prefix hchr_) is owned by another app. It opens ever
 
 ## Programs mirror HR programs under the same id
 Each programs row mirrors one hchr_programs row with the same id, so local FKs and cascades keep working. `name` is a copy refreshed by Program::syncFromHr(), run by SyncProgramsFromHr web middleware at most once a minute; programs removed from HR are kept. Tracking owns only strategy_id and manager_id, both nullable (shown as "Not assigned"). Programs are never created or renamed in tracking; ProgramFactory writes the HR row first (test DB only), seeders sync from HR.
+
+## Mirror DB column defaults in User's $attributes for strict mode
+`User::factory()->create()` without an explicit role never puts `role` in the INSERT payload (it's only set via the `role()` factory state, or `createFromHrAccount()`/`forceFill` in real app code). Under `Model::shouldBeStrict()`, the resulting in-memory model then throws `MissingAttributeException` the moment anything reads `$user->role` (e.g. a Policy). Fixed by adding `'role' => 'Officer'` to `User::$attributes` alongside the existing `'locale' => null` — mirroring the DB column default so a user that hasn't round-tripped through the database still reports it. Apply the same pattern to any other User (or other model) column that has a DB default but isn't always present in factory-created instances.

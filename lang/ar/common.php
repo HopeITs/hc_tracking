@@ -110,5 +110,6 @@ return [
     'unscheduled' => 'غير مجدول',
     'updated_date' => 'آخر تحديث :date',
     'updating' => 'جارٍ التحديث',
+    'view_name' => 'عرض :name',
     'watching' => 'قيد المتابعة',
 ];

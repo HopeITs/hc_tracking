@@ -110,5 +110,6 @@ return [
     'unscheduled' => 'Unscheduled',
     'updated_date' => 'Updated :date',
     'updating' => 'Updating',
+    'view_name' => 'View :name',
     'watching' => 'Watching',
 ];

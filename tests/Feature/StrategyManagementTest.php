@@ -1,0 +1,203 @@
+<?php
+
+use App\Enums\UserRole;
+use App\Models\Program;
+use App\Models\Strategy;
+use App\Models\User;
+use Illuminate\Support\Facades\DB;
+use Livewire\Livewire;
+
+test('a manager can create a strategy and two strategies may share a name', function () {
+    $manager = User::factory()->role(UserRole::Manager)->create();
+    Strategy::factory()->create(['name' => 'Country Strategy']);
+
+    Livewire::actingAs($manager)
+        ->test('pages::strategies.index')
+        ->call('openCreateModal')
+        ->set('name', '  Country Strategy  ')
+        ->set('startYear', '2026')
+        ->set('endYear', '2030')
+        ->call('saveStrategy')
+        ->assertHasNoErrors();
+
+    expect(Strategy::query()->where('name', 'Country Strategy')->count())->toBe(2);
+
+    $created = Strategy::query()->where('name', 'Country Strategy')->latest('id')->first();
+    expect($created)->start_year->toBe(2026)->end_year->toBe(2030);
+});
+
+test('creating a strategy requires a name and a valid year span', function () {
+    $manager = User::factory()->role(UserRole::Manager)->create();
+
+    Livewire::actingAs($manager)
+        ->test('pages::strategies.index')
+        ->call('openCreateModal')
+        ->set('name', '')
+        ->set('startYear', '2026')
+        ->set('endYear', '2030')
+        ->call('saveStrategy')
+        ->assertHasErrors(['name']);
+
+    Livewire::actingAs($manager)
+        ->test('pages::strategies.index')
+        ->call('openCreateModal')
+        ->set('name', 'Backwards Strategy')
+        ->set('startYear', '2030')
+        ->set('endYear', '2026')
+        ->call('saveStrategy')
+        ->assertHasErrors(['endYear']);
+});
+
+test('a manager can edit a strategy', function () {
+    $manager = User::factory()->role(UserRole::Manager)->create();
+    $strategy = Strategy::factory()->create(['name' => 'Draft Strategy', 'start_year' => 2026, 'end_year' => 2028]);
+
+    Livewire::actingAs($manager)
+        ->test('pages::strategies.index')
+        ->call('openEditModal', $strategy->id)
+        ->assertSet('name', 'Draft Strategy')
+        ->set('name', 'Renamed Strategy')
+        ->set('endYear', '2030')
+        ->call('saveStrategy')
+        ->assertHasNoErrors();
+
+    expect($strategy->refresh())->name->toBe('Renamed Strategy')->end_year->toBe(2030);
+});
+
+test('confirming deletion opens the delete modal for the right strategy', function () {
+    $manager = User::factory()->role(UserRole::Manager)->create();
+    $strategy = Strategy::factory()->create();
+
+    // showDeleteModal is the property the confirm dialog's wire:model is bound
+    // to (Flux's flux:modal has no reactive `open` prop, only wire:model), so
+    // this is what actually makes the "yes/cancel" dialog appear.
+    Livewire::actingAs($manager)
+        ->test('pages::strategies.index')
+        ->assertSet('showDeleteModal', false)
+        ->call('confirmDelete', $strategy->id)
+        ->assertSet('showDeleteModal', true)
+        ->assertSet('deletingStrategyId', $strategy->id);
+});
+
+test('a strategy with no programs can be deleted', function () {
+    $manager = User::factory()->role(UserRole::Manager)->create();
+    $strategy = Strategy::factory()->create();
+
+    Livewire::actingAs($manager)
+        ->test('pages::strategies.index')
+        ->call('confirmDelete', $strategy->id)
+        ->call('deleteStrategy')
+        ->assertHasNoErrors()
+        ->assertSet('showDeleteModal', false)
+        ->assertSet('deletingStrategyId', null);
+
+    expect(DB::table('strategies')->find($strategy->id))->toBeNull();
+});
+
+test('a strategy with linked programs is not deleted', function () {
+    $manager = User::factory()->role(UserRole::Manager)->create();
+    $strategy = Strategy::factory()->create();
+    Program::factory()->create(['strategy_id' => $strategy->id]);
+
+    Livewire::actingAs($manager)
+        ->test('pages::strategies.index')
+        ->call('confirmDelete', $strategy->id)
+        ->call('deleteStrategy')
+        ->assertSet('showDeleteModal', false);
+
+    expect(DB::table('strategies')->find($strategy->id))->not->toBeNull();
+});
+
+test('cancelling the delete confirmation closes the modal without deleting', function () {
+    $manager = User::factory()->role(UserRole::Manager)->create();
+    $strategy = Strategy::factory()->create();
+
+    Livewire::actingAs($manager)
+        ->test('pages::strategies.index')
+        ->call('confirmDelete', $strategy->id)
+        ->set('showDeleteModal', false)
+        ->assertSet('showDeleteModal', false);
+
+    $this->assertModelExists($strategy);
+});
+
+test('admins can also manage strategies', function () {
+    $admin = User::factory()->role(UserRole::Admin)->create();
+
+    Livewire::actingAs($admin)
+        ->test('pages::strategies.index')
+        ->call('openCreateModal')
+        ->set('name', 'Admin Strategy')
+        ->set('startYear', '2026')
+        ->set('endYear', '2030')
+        ->call('saveStrategy')
+        ->assertHasNoErrors();
+
+    expect(Strategy::query()->where('name', 'Admin Strategy')->exists())->toBeTrue();
+});
+
+test('officers and meal staff cannot manage strategies', function (UserRole $role) {
+    $user = User::factory()->role($role)->create();
+    $strategy = Strategy::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::strategies.index')
+        ->call('openCreateModal')
+        ->assertForbidden();
+
+    Livewire::actingAs($user)
+        ->test('pages::strategies.index')
+        ->call('openEditModal', $strategy->id)
+        ->assertForbidden();
+
+    Livewire::actingAs($user)
+        ->test('pages::strategies.index')
+        ->call('confirmDelete', $strategy->id)
+        ->call('deleteStrategy')
+        ->assertForbidden();
+
+    $this->assertModelExists($strategy);
+})->with([
+    'officer' => UserRole::Officer,
+    'meal' => UserRole::Meal,
+]);
+
+test('the add strategy control is hidden from officers and meal staff', function (UserRole $role) {
+    $user = User::factory()->role($role)->create();
+
+    $this->actingAs($user)
+        ->get(route('strategies.index'))
+        ->assertOk()
+        ->assertDontSee(__('strategies.add_strategy'));
+})->with([
+    'officer' => UserRole::Officer,
+    'meal' => UserRole::Meal,
+]);
+
+test('the add strategy control is visible to managers', function () {
+    $manager = User::factory()->role(UserRole::Manager)->create();
+
+    $this->actingAs($manager)
+        ->get(route('strategies.index'))
+        ->assertOk()
+        ->assertSeeText(__('strategies.add_strategy'));
+});
+
+test('every role can open a strategy through the view icon, not the name', function (UserRole $role) {
+    $user = User::factory()->role($role)->create();
+    $strategy = Strategy::factory()->create(['name' => 'Country Strategy']);
+
+    $html = $this->actingAs($user)->get(route('strategies.index'))->getContent();
+
+    // The view icon links to the strategy...
+    expect($html)
+        ->toContain(route('strategies.show', $strategy))
+        ->toContain(__('common.view_name', ['name' => 'Country Strategy']))
+        // ...but the name itself is plain text, not a link.
+        ->not->toContain('<a href="'.route('strategies.show', $strategy).'" wire:navigate class="truncate font-semibold');
+})->with([
+    'officer' => UserRole::Officer,
+    'meal' => UserRole::Meal,
+    'manager' => UserRole::Manager,
+    'admin' => UserRole::Admin,
+]);
