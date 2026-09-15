@@ -1,6 +1,8 @@
 <?php
 
+use App\Enums\MilestoneStatus;
 use App\Enums\ResultType;
+use App\Models\Milestone;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Result;
@@ -99,4 +101,52 @@ test('program detail renders a program with nothing attached', function () {
         ->assertOk()
         ->assertSeeText('Bare Program')
         ->assertSeeText('No projects yet');
+});
+
+test('program detail calculates milestone progress without cancelled milestones', function () {
+    $program = Program::factory()->create();
+    $project = Project::factory()->create(['program_id' => $program->id]);
+
+    Milestone::factory()->create([
+        'project_id' => $project->id,
+        'status' => MilestoneStatus::Reached,
+        'weight_percentage' => '40.00',
+    ]);
+    Milestone::factory()->create([
+        'project_id' => $project->id,
+        'status' => MilestoneStatus::Pending,
+        'weight_percentage' => '60.00',
+    ]);
+    Milestone::factory()->create([
+        'project_id' => $project->id,
+        'status' => MilestoneStatus::Cancelled,
+        'weight_percentage' => '100.00',
+    ]);
+
+    Livewire::actingAs(User::factory()->create())
+        ->test('pages::programs.show', ['program' => $program])
+        ->assertSee('40%')
+        ->assertSee('40 of 100 weighted points reached');
+});
+
+test('program detail narrows projects with its delivery search', function () {
+    $program = Program::factory()->create();
+    Project::factory()->create(['program_id' => $program->id, 'name' => 'Water Network Expansion']);
+    Project::factory()->create(['program_id' => $program->id, 'name' => 'Shelter Rehabilitation']);
+
+    Livewire::actingAs(User::factory()->create())
+        ->test('pages::programs.show', ['program' => $program])
+        ->set('projectSearch', 'Water')
+        ->assertSee('Water Network Expansion')
+        ->assertDontSee('Shelter Rehabilitation');
+});
+
+test('program detail links each annual plan year to its plan', function () {
+    $program = Program::factory()->create();
+    $plan = YearlyPlan::factory()->create(['program_id' => $program->id, 'year' => 2026]);
+
+    Livewire::actingAs(User::factory()->create())
+        ->test('pages::programs.show', ['program' => $program])
+        ->set('tab', 'plans')
+        ->assertSee(route('yearly-plans.show', $plan), false);
 });

@@ -4,18 +4,15 @@ use App\Models\HrEmployee;
 use App\Models\Program;
 use App\Models\Strategy;
 use Flux\Flux;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
-use Livewire\WithPagination;
 
 new #[Title('titles.programs')] class extends Component {
-    use WithPagination;
-
     #[Url(except: '')]
     public string $search = '';
 
@@ -25,6 +22,11 @@ new #[Title('titles.programs')] class extends Component {
     #[Url(except: '')]
     public string $manager = '';
 
+    #[Url(except: '')]
+    public string $gap = '';
+
+    public int $visibleProgramCount = 8;
+
     public bool $showProgramModal = false;
     public ?int $editingProgramId = null;
     public string $editingProgramName = '';
@@ -33,17 +35,35 @@ new #[Title('titles.programs')] class extends Component {
 
     public function updatedSearch(): void
     {
-        $this->resetPage();
+        $this->resetVisiblePrograms();
     }
 
     public function updatedStrategy(): void
     {
-        $this->resetPage();
+        $this->resetVisiblePrograms();
     }
 
     public function updatedManager(): void
     {
-        $this->resetPage();
+        $this->resetVisiblePrograms();
+    }
+
+    public function filterByStrategy(?int $strategyId = null): void
+    {
+        $this->strategy = $strategyId === null ? '' : (string) $strategyId;
+        $this->resetVisiblePrograms();
+    }
+
+    public function filterByManager(?int $managerId = null): void
+    {
+        $this->manager = $managerId === null ? '' : (string) $managerId;
+        $this->resetVisiblePrograms();
+    }
+
+    public function updatedGap(): void
+    {
+        $this->gap = in_array($this->gap, ['no_strategy', 'no_manager'], true) ? $this->gap : '';
+        $this->resetVisiblePrograms();
     }
 
     public function clearFilters(): void
@@ -51,35 +71,84 @@ new #[Title('titles.programs')] class extends Component {
         $this->search = '';
         $this->strategy = '';
         $this->manager = '';
-        $this->resetPage();
+        $this->gap = '';
+        $this->resetVisiblePrograms();
     }
 
-    /** @return LengthAwarePaginator<int, Program> */
-    #[Computed]
-    public function programs(): LengthAwarePaginator
+    public function showGap(string $gap): void
     {
-        $search = trim($this->search);
+        $this->gap = $gap;
+        $this->resetVisiblePrograms();
+    }
 
-        return Program::query()
+    public function loadMore(): void
+    {
+        if ($this->visibleProgramCount < $this->programSummary['total']) {
+            $this->visibleProgramCount += 4;
+        }
+    }
+
+    protected function resetVisiblePrograms(): void
+    {
+        $this->visibleProgramCount = 8;
+    }
+
+    /** @return Collection<int, Program> */
+    #[Computed]
+    public function programs(): Collection
+    {
+        return $this->filteredProgramsQuery()
             ->select(['id', 'name', 'strategy_id', 'manager_id', 'updated_at'])
             ->with([
                 'strategy:id,name,start_year,end_year',
                 'manager:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
             ])
-            ->withCount(['projects', 'yearlyPlans'])
-            ->when($search !== '', function ($query) use ($search): void {
-                $query->where(function ($query) use ($search): void {
+            ->withCount([
+                'projects',
+                'yearlyPlans',
+            ])
+            ->orderBy('name')
+            ->orderBy('id')
+            ->limit($this->visibleProgramCount + 1)
+            ->get();
+    }
+
+    /** @return array{total: int, without_strategy: int, without_manager: int} */
+    #[Computed]
+    public function programSummary(): array
+    {
+        /** @var object{total: int|string, without_strategy: int|string, without_manager: int|string} $summary */
+        $summary = $this->filteredProgramsQuery()
+            ->selectRaw('count(*) as total')
+            ->selectRaw('sum(case when strategy_id is null then 1 else 0 end) as without_strategy')
+            ->selectRaw('sum(case when manager_id is null then 1 else 0 end) as without_manager')
+            ->first();
+
+        return [
+            'total' => (int) $summary->total,
+            'without_strategy' => (int) $summary->without_strategy,
+            'without_manager' => (int) $summary->without_manager,
+        ];
+    }
+
+    /** @return Builder<Program> */
+    protected function filteredProgramsQuery(): Builder
+    {
+        $search = trim($this->search);
+
+        return Program::query()
+            ->when($search !== '', function (Builder $query) use ($search): void {
+                $query->where(function (Builder $query) use ($search): void {
                     $query
                         ->where('name', 'like', '%'.$search.'%')
-                        ->orWhereHas('strategy', fn ($query) => $query->where('name', 'like', '%'.$search.'%'))
+                        ->orWhereHas('strategy', fn (Builder $query) => $query->where('name', 'like', '%'.$search.'%'))
                         ->orWhereIn('manager_id', HrEmployee::idsMatchingName($search));
                 });
             })
-            ->when($this->strategy !== '', fn ($query) => $query->where('strategy_id', (int) $this->strategy))
-            ->when($this->manager !== '', fn ($query) => $query->where('manager_id', (int) $this->manager))
-            ->orderBy('name')
-            ->orderBy('id')
-            ->paginate(15);
+            ->when($this->strategy !== '', fn (Builder $query) => $query->where('strategy_id', (int) $this->strategy))
+            ->when($this->manager !== '', fn (Builder $query) => $query->where('manager_id', (int) $this->manager))
+            ->when($this->gap === 'no_strategy', fn (Builder $query) => $query->whereNull('strategy_id'))
+            ->when($this->gap === 'no_manager', fn (Builder $query) => $query->whereNull('manager_id'));
     }
 
     /** @return Collection<int, Strategy> */
@@ -161,173 +230,109 @@ new #[Title('titles.programs')] class extends Component {
 ?>
 
 @php
+    $filtersAreActive = $search !== '' || $strategy !== '' || $manager !== '' || $gap !== '';
+    $summary = $this->programSummary;
+    $visiblePrograms = $this->programs->take($visibleProgramCount);
+    $hasMorePrograms = $this->programs->count() > $visibleProgramCount;
+    $selectedStrategy = $strategy === '' ? null : $this->strategyOptions->firstWhere('id', (int) $strategy);
+    $selectedManager = $manager === '' ? null : $this->managerOptions->firstWhere('id', (int) $manager);
     $controlClasses = 'border-secondary-light! bg-white! text-secondary-dark! placeholder:text-secondary-light! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!';
     $primaryButtonClasses = 'border-primary! bg-primary! text-white! hover:border-primary! hover:bg-primary!';
     $secondaryButtonClasses = 'border-secondary-light! bg-white! text-secondary-dark! hover:bg-secondary-soft! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white! dark:hover:bg-secondary-medium!';
-    $editButtonClasses = 'border-0! bg-transparent! text-secondary-dark! hover:bg-secondary-soft! dark:text-white! dark:hover:bg-secondary-medium!';
-    $filtersAreActive = $search !== '' || $strategy !== '' || $manager !== '';
 @endphp
 
-<section
-    class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white [&_[data-flux-cell]]:border-secondary-soft! [&_[data-flux-cell]]:text-secondary-medium! [&_[data-flux-column]]:border-secondary-soft! [&_[data-flux-column]]:text-secondary-dark! [&_[data-flux-heading]]:text-secondary-dark! [&_[data-flux-label]]:text-secondary-dark! [&_[data-flux-subheading]]:text-secondary-medium! dark:[&_[data-flux-cell]]:border-secondary-medium! dark:[&_[data-flux-cell]]:text-secondary-soft! dark:[&_[data-flux-column]]:border-secondary-medium! dark:[&_[data-flux-column]]:text-white! dark:[&_[data-flux-heading]]:text-white! dark:[&_[data-flux-label]]:text-white! dark:[&_[data-flux-subheading]]:text-secondary-soft!"
-    aria-labelledby="program-directory-heading"
->
-    <header class="flex flex-col gap-3 border-b border-secondary-soft pb-4 dark:border-secondary-medium @6xl/directory:flex-row @6xl/directory:items-end">
-        <div class="min-w-48 @6xl/directory:me-auto">
-            <div class="flex items-center gap-2">
-                <flux:heading id="program-directory-heading" size="lg">{{ __('common.programs') }}</flux:heading>
-                <span class="inline-flex min-w-7 items-center justify-center rounded-md border border-secondary-light px-2 py-0.5 text-xs font-semibold text-secondary-medium dark:text-secondary-soft">
-                    {{ $this->programs->total() }}
-                </span>
+<section class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-8 bg-white px-1 text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="program-directory-heading">
+    <header class="grid gap-8 border-b border-secondary-soft pb-7 @6xl/directory:grid-cols-[minmax(16rem,.7fr)_minmax(0,1.3fr)] @6xl/directory:items-center dark:border-secondary-medium">
+        <div class="min-w-0">
+            <div class="flex items-center gap-2.5">
+                <flux:heading id="program-directory-heading" size="xl" class="text-3xl! font-bold! leading-none!">{{ __('common.programs') }}</flux:heading>
+                <span data-count-badge class="inline-flex min-w-7 items-center justify-center rounded-md bg-primary px-2 py-0.5 text-xs font-bold tabular-nums text-white">{{ $summary['total'] }}</span>
             </div>
-            <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('programs.programs_come_from_the_hr_system_link_each_one_to_a_strategy') }}</p>
         </div>
 
-        <div class="grid w-full gap-2 @sm/directory:grid-cols-2 @3xl/directory:grid-cols-[minmax(13rem,1fr)_minmax(10rem,0.8fr)_minmax(10rem,0.8fr)] @6xl/directory:max-w-[62rem]">
-            <flux:input type="search" icon="magnifying-glass" :label="__('programs.search_programs')" :placeholder="__('programs.program_strategy_or_manager')" :class="$controlClasses" wire:model.live.debounce.300ms="search" clearable />
-
-            <flux:select :label="__('common.strategy')" :class="$controlClasses" wire:model.live="strategy">
-                <flux:select.option value="">{{ __('programs.all_strategies') }}</flux:select.option>
-                @foreach ($this->strategyOptions as $strategyOption)
-                    <flux:select.option :value="$strategyOption->id" :wire:key="'strategy-filter-'.$strategyOption->id">
-                        {{ $strategyOption->name }} ({{ $strategyOption->start_year }}–{{ $strategyOption->end_year }})
-                    </flux:select.option>
-                @endforeach
-            </flux:select>
-
-            <flux:select :label="__('programs.manager')" :class="$controlClasses" wire:model.live="manager">
-                <flux:select.option value="">{{ __('common.all_managers') }}</flux:select.option>
-                @foreach ($this->managerOptions as $managerOption)
-                    <flux:select.option :value="$managerOption->id" :wire:key="'manager-filter-'.$managerOption->id">
-                        {{ $managerOption->name }} · {{ $managerOption->secondary_name }}
-                    </flux:select.option>
-                @endforeach
-            </flux:select>
+        <div class="program-directory-filters grid gap-3 @3xl/directory:grid-cols-2 @6xl/directory:grid-cols-3">
+            <div class="min-w-0">
+                <label for="program-search" class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-secondary-soft">{{ __('programs.search_programs') }}</label>
+                <x-ui.input id="program-search" type="search" icon="magnifying-glass" :aria-label="__('programs.search_programs')" :placeholder="__('programs.program_strategy_or_manager')" wire:model.live.debounce.300ms="search" />
+            </div>
+            <div class="min-w-0">
+                <label for="program-strategy" class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-secondary-soft">{{ __('common.strategy') }}</label>
+                <flux:dropdown position="bottom" align="start" class="program-filter-picker block! w-full!" x-data="{ optionSearch: '' }">
+                    <flux:button id="program-strategy" variant="outline" icon:trailing="chevron-up-down" class="program-filter-trigger w-full! justify-between!" :aria-label="__('common.strategy')">
+                        <span class="truncate">{{ $selectedStrategy ? $selectedStrategy->name.' · '.$selectedStrategy->start_year.'–'.$selectedStrategy->end_year : __('programs.all_strategies') }}</span>
+                    </flux:button>
+                    <flux:menu class="program-filter-menu">
+                        @if ($this->strategyOptions->count() > 6)
+                            <div class="border-b border-secondary-soft p-1.5 dark:border-secondary-medium">
+                                <x-ui.input type="search" size="sm" icon="magnifying-glass" x-model="optionSearch" :aria-label="__('programs.search_strategies')" :placeholder="__('programs.search_strategies')" />
+                            </div>
+                        @endif
+                        <flux:menu.item wire:click="filterByStrategy">
+                            {{ __('programs.all_strategies') }}
+                            @if ($strategy === '')<flux:icon.check class="ms-auto size-4 text-secondary-medium" />@endif
+                        </flux:menu.item>
+                        @foreach ($this->strategyOptions as $strategyOption)
+                            <flux:menu.item wire:click="filterByStrategy({{ $strategyOption->id }})" x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())" :wire:key="'strategy-filter-'.$strategyOption->id">
+                                <span class="min-w-0 truncate">{{ $strategyOption->name }} · {{ $strategyOption->start_year }}–{{ $strategyOption->end_year }}</span>
+                                @if ((int) $strategy === $strategyOption->id)<flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" />@endif
+                            </flux:menu.item>
+                        @endforeach
+                    </flux:menu>
+                </flux:dropdown>
+            </div>
+            <div class="min-w-0">
+                <label for="program-manager" class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-secondary-soft">{{ __('programs.manager') }}</label>
+                <flux:dropdown position="bottom" align="start" class="program-filter-picker block! w-full!" x-data="{ optionSearch: '' }">
+                    <flux:button id="program-manager" variant="outline" icon:trailing="chevron-up-down" class="program-filter-trigger w-full! justify-between!" :aria-label="__('programs.manager')">
+                        <span class="truncate">{{ $selectedManager?->name ?? __('common.all_managers') }}</span>
+                    </flux:button>
+                    <flux:menu class="program-filter-menu">
+                        @if ($this->managerOptions->count() > 6)
+                            <div class="border-b border-secondary-soft p-1.5 dark:border-secondary-medium">
+                                <x-ui.input type="search" size="sm" icon="magnifying-glass" x-model="optionSearch" :aria-label="__('programs.search_managers')" :placeholder="__('programs.search_managers')" />
+                            </div>
+                        @endif
+                        <flux:menu.item wire:click="filterByManager">
+                            {{ __('common.all_managers') }}
+                            @if ($manager === '')<flux:icon.check class="ms-auto size-4 text-secondary-medium" />@endif
+                        </flux:menu.item>
+                        @foreach ($this->managerOptions as $managerOption)
+                            <flux:menu.item wire:click="filterByManager({{ $managerOption->id }})" x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())" :wire:key="'manager-filter-'.$managerOption->id">
+                                <span class="min-w-0 truncate">{{ $managerOption->name }}</span>
+                                @if ((int) $manager === $managerOption->id)<flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" />@endif
+                            </flux:menu.item>
+                        @endforeach
+                    </flux:menu>
+                </flux:dropdown>
+            </div>
         </div>
     </header>
 
-    <div class="overflow-hidden rounded-lg border border-secondary-light bg-white dark:border-secondary-medium dark:bg-secondary-dark">
-        <div class="flex min-h-10 flex-wrap items-center justify-between gap-2 border-b border-secondary-soft px-3.5 py-2 dark:border-secondary-medium">
-            <p class="text-xs font-semibold text-secondary-medium dark:text-secondary-soft">
-                {{ trans_choice('programs.count_matching_program', $this->programs->total(), ['count' => $this->programs->total()]) }}
-            </p>
-            <div class="flex items-center gap-2">
-                <span wire:loading.delay.flex wire:target="search,strategy,manager,clearFilters" class="hidden items-center gap-1.5 text-xs text-secondary-medium dark:text-secondary-soft">
-                    <flux:icon.arrow-path class="size-3.5 animate-spin" /> {{ __('common.updating') }}
-                </span>
-                @if ($filtersAreActive)
-                    <flux:button size="sm" variant="ghost" class="text-secondary-medium! hover:bg-secondary-soft! hover:text-secondary-dark! dark:text-secondary-soft! dark:hover:bg-secondary-medium! dark:hover:text-white!" wire:click="clearFilters">
-                        {{ __('common.reset_filters') }}
-                    </flux:button>
-                @endif
-            </div>
-        </div>
+    <div class="flex justify-end"><span wire:loading.delay.flex wire:target="search,strategy,manager,gap,clearFilters" class="hidden items-center gap-1.5 text-xs text-secondary-medium dark:text-secondary-soft"><flux:icon.arrow-path class="size-3.5 animate-spin" /> {{ __('common.updating') }}</span>@if ($filtersAreActive)<flux:button size="sm" variant="ghost" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>@endif</div>
 
-        @if ($this->programs->isEmpty())
-            <div class="flex min-h-64 flex-col items-center justify-center gap-3 px-5 py-10 text-center">
-                <div class="flex size-12 items-center justify-center rounded-lg border border-secondary-light bg-white text-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft">
-                    <flux:icon.briefcase class="size-5" />
-                </div>
-                <div class="max-w-sm space-y-1">
-                    <flux:heading size="base">{{ $filtersAreActive ? __('programs.no_matching_programs') : __('programs.no_programs_from_hr_yet') }}</flux:heading>
-                    <p class="text-sm text-secondary-medium dark:text-secondary-soft">
-                        {{ $filtersAreActive ? __('common.change_the_search_or_filters_and_try_again') : __('programs.programs_appear_here_once_they_are_added_in_the_hr_system') }}
-                    </p>
-                </div>
+        @if ($visiblePrograms->isEmpty())
+            <x-ui.empty-state icon="briefcase" :heading="$filtersAreActive ? __('programs.no_matching_programs') : __('programs.no_programs_from_hr_yet')" :body="$filtersAreActive ? __('common.change_the_search_or_filters_and_try_again') : __('programs.programs_appear_here_once_they_are_added_in_the_hr_system')">
                 @if ($filtersAreActive)
-                    <flux:button size="sm" :class="$secondaryButtonClasses" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
+                    <x-slot:action>
+                        <x-ui.button size="sm" wire:click="clearFilters">{{ __('common.reset_filters') }}</x-ui.button>
+                    </x-slot:action>
                 @endif
-            </div>
+            </x-ui.empty-state>
         @else
-            <div class="divide-y divide-secondary-soft dark:divide-secondary-medium @5xl/directory:hidden">
-                @foreach ($this->programs as $program)
-                    <article class="flex flex-col gap-3 p-3.5" wire:key="mobile-program-{{ $program->id }}">
-                        <div class="flex min-w-0 items-start justify-between gap-3">
-                            <div class="flex min-w-0 items-center gap-3">
-                                <div class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white">
-                                    <flux:icon.briefcase class="size-4.5" />
-                                </div>
-                                <div class="min-w-0">
-                                    <h2 class="truncate text-sm font-semibold text-secondary-dark dark:text-white"><a href="{{ route('programs.show', $program) }}" wire:navigate class="hover:underline">{{ $program->name }}</a></h2>
-                                    <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $program->strategy?->name ?? __('common.strategy_not_assigned') }}</p>
-                                </div>
-                            </div>
-                            @if ($program->strategy)
-                                <span class="inline-flex shrink-0 rounded-md bg-secondary-soft px-2 py-1 text-xs font-semibold tabular-nums text-secondary-dark dark:bg-secondary-medium dark:text-white">
-                                    {{ $program->strategy->start_year }}–{{ $program->strategy->end_year }}
-                                </span>
-                            @endif
-                        </div>
-
-                        <div class="flex items-center gap-2.5 rounded-lg border border-secondary-soft p-2.5 dark:border-secondary-medium">
-                            <x-ui.employee-chip :employee="$program->manager" />
-                        </div>
-
-                        <div class="flex min-h-11 items-center justify-between gap-3 border-t border-secondary-soft pt-2.5 dark:border-secondary-medium">
-                            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-secondary-medium dark:text-secondary-soft">
-                                <span>{{ trans_choice('common.count_project', $program->projects_count, ['count' => $program->projects_count]) }}</span>
-                                <span>{{ trans_choice('common.count_annual_plan', $program->yearly_plans_count, ['count' => $program->yearly_plans_count]) }}</span>
-                            </div>
-                            <flux:button size="sm" icon="pencil-square" :class="$editButtonClasses.' size-11! shrink-0 touch-manipulation'" wire:click="openEditModal({{ $program->id }})" :aria-label="__('common.edit_name', ['name' => $program->name])" />
-                        </div>
+            <div class="grid gap-6 @3xl/directory:grid-cols-2 @6xl/directory:grid-cols-4">
+                @foreach ($visiblePrograms as $program)
+                    <article class="group relative flex min-h-56 min-w-0 flex-col gap-4 rounded-lg border border-secondary-soft bg-white p-4 transition-colors duration-200 hover:border-primary focus-within:border-primary dark:border-secondary-medium dark:bg-secondary-dark dark:hover:border-primary" wire:key="program-card-{{ $program->id }}">
+                        <a href="{{ route('programs.show', $program) }}" wire:navigate class="absolute inset-0 z-0 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" :aria-label="__('programs.open_name', ['name' => $program->name])"></a>
+                        <div class="relative z-10 flex items-start justify-between gap-3 pointer-events-none"><div class="flex min-w-0 items-center gap-3"><div class="grid size-10 shrink-0 place-items-center rounded-md bg-primary text-white"><flux:icon.briefcase class="size-5" /></div><div class="min-w-0"><p class="text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary-medium dark:text-secondary-soft">{{ __('common.program') }}</p><h2 class="mt-1 truncate text-base font-semibold text-secondary-dark dark:text-white">{{ $program->name }}</h2></div></div><div class="pointer-events-auto flex shrink-0 items-center gap-1"><a href="{{ route('programs.show', $program) }}" wire:navigate class="grid size-11 place-items-center rounded-md border-0! bg-transparent! text-secondary-dark! transition-colors hover:bg-secondary-soft! dark:text-white! dark:hover:bg-secondary-medium! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary @3xl/directory:size-8!" :aria-label="__('programs.open_name', ['name' => $program->name])"><flux:icon.eye class="size-4.5" /></a><x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation @3xl/directory:size-8!" wire:click="openEditModal({{ $program->id }})" :aria-label="__('common.edit_name', ['name' => $program->name])" /></div></div>
+                        <dl class="relative z-10 grid grid-cols-2 gap-4 pointer-events-none"><div class="min-w-0"><dt class="text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary-medium dark:text-secondary-soft">{{ __('common.strategy') }}</dt><dd class="mt-1 truncate text-sm font-medium text-secondary-dark dark:text-white">{{ $program->strategy?->name ?? __('common.not_assigned') }}</dd>@if ($program->strategy)<p class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $program->strategy->start_year }}–{{ $program->strategy->end_year }}</p>@endif</div><div class="min-w-0"><dt class="text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary-medium dark:text-secondary-soft">{{ __('programs.manager') }}</dt><dd class="mt-1">@if ($program->manager)<x-ui.employee-chip :employee="$program->manager" compact />@else<span class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('common.not_assigned') }}</span>@endif</dd></div></dl>
+                        <div class="relative z-10 mt-auto grid grid-cols-2 border-t border-secondary-soft pt-3 dark:border-secondary-medium pointer-events-none"><div><p class="text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary-medium dark:text-secondary-soft">{{ __('common.projects') }}</p><p class="mt-1 text-2xl font-bold tabular-nums text-secondary-dark dark:text-white">{{ $program->projects_count }}</p></div><div><p class="text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary-medium dark:text-secondary-soft">{{ __('programs.annual_plans') }}</p><p class="mt-1 text-2xl font-bold tabular-nums text-secondary-dark dark:text-white">{{ $program->yearly_plans_count }}</p></div></div>
                     </article>
                 @endforeach
             </div>
-
-            <div class="hidden @5xl/directory:block">
-                <flux:table class="table-fixed [&_[data-flux-cell]]:px-3.5! [&_[data-flux-cell]]:py-2.5! [&_[data-flux-column]]:px-3.5! [&_[data-flux-column]]:py-2.5! [&_tbody_tr]:transition-colors [&_tbody_tr]:hover:bg-secondary-soft dark:[&_tbody_tr]:hover:bg-secondary-medium">
-                    <flux:table.columns class="bg-secondary-soft text-xs font-semibold dark:bg-secondary-medium">
-                        <flux:table.column class="w-[22%]">{{ __('common.program') }}</flux:table.column>
-                        <flux:table.column class="w-[22%]">{{ __('common.strategy') }}</flux:table.column>
-                        <flux:table.column class="w-[26%]">{{ __('programs.manager') }}</flux:table.column>
-                        <flux:table.column class="w-[14%]" align="center">{{ __('common.delivery') }}</flux:table.column>
-                        <flux:table.column class="w-[10%]" align="center">{{ __('programs.updated') }}</flux:table.column>
-                        <flux:table.column class="w-[6%]" align="center">{{ __('common.actions') }}</flux:table.column>
-                    </flux:table.columns>
-                    <flux:table.rows>
-                        @foreach ($this->programs as $program)
-                            <flux:table.row :key="$program->id">
-                                <flux:table.cell variant="strong" class="text-secondary-dark! dark:text-white!">
-                                    <div class="flex min-w-0 items-center gap-2.5">
-                                        <div class="flex size-8 shrink-0 items-center justify-center rounded-md bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white"><flux:icon.briefcase class="size-4" /></div>
-                                        <a href="{{ route('programs.show', $program) }}" wire:navigate class="truncate font-semibold hover:underline">{{ $program->name }}</a>
-                                    </div>
-                                </flux:table.cell>
-                                <flux:table.cell>
-                                    @if ($program->strategy)
-                                        <div class="min-w-0">
-                                            <p class="truncate font-medium text-secondary-dark dark:text-white">{{ $program->strategy->name }}</p>
-                                            <p class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $program->strategy->start_year }}–{{ $program->strategy->end_year }}</p>
-                                        </div>
-                                    @else
-                                        <p class="text-secondary-medium dark:text-secondary-soft">{{ __('common.not_assigned') }}</p>
-                                    @endif
-                                </flux:table.cell>
-                                <flux:table.cell>
-                                    <x-ui.employee-chip :employee="$program->manager" />
-                                </flux:table.cell>
-                                <flux:table.cell align="center">
-                                    <div class="inline-flex items-center gap-1.5" aria-label="{{ __('programs.projects_projects_and_plans_annual_plans', ['projects' => $program->projects_count, 'plans' => $program->yearly_plans_count]) }}">
-                                        <span class="inline-flex min-w-8 items-center justify-center rounded-md bg-secondary-soft px-2 py-1 text-xs font-semibold text-secondary-dark dark:bg-secondary-medium dark:text-white">{{ $program->projects_count }}</span>
-                                        <span class="text-secondary-light">/</span>
-                                        <span class="inline-flex min-w-8 items-center justify-center rounded-md border border-secondary-light px-2 py-1 text-xs font-semibold text-secondary-dark dark:text-white">{{ $program->yearly_plans_count }}</span>
-                                    </div>
-                                </flux:table.cell>
-                                <flux:table.cell align="center"><time datetime="{{ $program->updated_at?->toDateString() }}">{{ $program->updated_at?->translatedFormat(__('formats.date')) }}</time></flux:table.cell>
-                                <flux:table.cell align="center">
-                                    <flux:button size="sm" icon="pencil-square" :class="$editButtonClasses.' size-8!'" wire:click="openEditModal({{ $program->id }})" :aria-label="__('common.edit_name', ['name' => $program->name])" />
-                                </flux:table.cell>
-                            </flux:table.row>
-                        @endforeach
-                    </flux:table.rows>
-                </flux:table>
-            </div>
-
-            <div class="border-t border-secondary-soft px-3 pb-3 dark:border-secondary-medium">
-                <flux:pagination :paginator="$this->programs" class="text-secondary-medium! [&_button]:text-secondary-medium! [&_button:hover]:bg-secondary-soft! dark:text-secondary-soft! dark:[&_button]:text-secondary-soft! dark:[&_button:hover]:bg-secondary-medium!" scroll-to="#program-directory-heading" />
-            </div>
+            @if ($hasMorePrograms)
+                <div class="flex justify-center pt-1"><x-ui.button tone="primary" icon="plus" class="min-h-11 px-5 data-loading:opacity-70" wire:click="loadMore" wire:loading.attr="disabled" wire:target="loadMore">{{ __('programs.load_more') }}</x-ui.button></div>
+            @endif
         @endif
-    </div>
 
     <flux:modal wire:model="showProgramModal" class="w-full max-w-2xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
         <form wire:submit="saveProgram" class="space-y-5">

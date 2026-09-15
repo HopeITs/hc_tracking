@@ -385,7 +385,6 @@ new #[Title('titles.annual_plans')] class extends Component {
                                     @else
                                         <a href="{{ route('yearly-plans.show', $plan) }}" wire:navigate class="inline-flex min-h-11 items-center justify-center rounded-md px-2 hover:underline sm:min-h-8">
                                             <span class="flex min-w-0 items-center gap-2">
-                                                <flux:avatar class="bg-secondary-soft! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" size="xs" :initials="$plan->manager?->initials() ?? '?'" />
                                                 <span class="truncate text-xs font-medium text-secondary-dark dark:text-white">{{ $plan->manager?->name ?? __('common.not_assigned') }}</span>
                                                 <span class="inline-flex min-w-6 shrink-0 items-center justify-center rounded-md border border-secondary-light px-1.5 py-0.5 text-xs font-semibold tabular-nums text-secondary-dark dark:text-white">
                                                     {{ $plan->plan_indicators_count }}
@@ -435,7 +434,6 @@ new #[Title('titles.annual_plans')] class extends Component {
                                                 class="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md px-2 hover:underline sm:min-h-8"
                                                 aria-label="{{ __('yearly_plans.program_year_managed_by_manager_count_targets', ['program' => $program->name, 'year' => $year, 'manager' => $plan->manager?->name ?? __('common.not_assigned'), 'count' => $plan->plan_indicators_count]) }}"
                                             >
-                                                <flux:avatar class="bg-secondary-soft! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" size="xs" :initials="$plan->manager?->initials() ?? '?'" />
                                                 <span class="inline-flex min-w-6 items-center justify-center rounded-md border border-secondary-light px-1.5 py-0.5 text-xs font-semibold tabular-nums text-secondary-dark dark:text-white">
                                                     {{ $plan->plan_indicators_count }}
                                                 </span>
