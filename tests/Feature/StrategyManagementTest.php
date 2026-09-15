@@ -64,6 +64,24 @@ test('a manager can edit a strategy', function () {
     expect($strategy->refresh())->name->toBe('Renamed Strategy')->end_year->toBe(2030);
 });
 
+test('the modal subheading only shows when creating a strategy, not editing one', function () {
+    $manager = User::factory()->role(UserRole::Manager)->create();
+    $strategy = Strategy::factory()->create();
+
+    $createHtml = Livewire::actingAs($manager)
+        ->test('pages::strategies.index')
+        ->call('openCreateModal')
+        ->html();
+
+    $editHtml = Livewire::actingAs($manager)
+        ->test('pages::strategies.index')
+        ->call('openEditModal', $strategy->id)
+        ->html();
+
+    expect($createHtml)->toContain(__('strategies.strategy_names_need_not_be_unique'));
+    expect($editHtml)->not->toContain(__('strategies.strategy_names_need_not_be_unique'));
+});
+
 test('confirming deletion opens the delete modal for the right strategy', function () {
     $manager = User::factory()->role(UserRole::Manager)->create();
     $strategy = Strategy::factory()->create();

@@ -9,6 +9,17 @@ test('guests are redirected from the strategy portfolio', function () {
     $this->get(route('strategies.index'))->assertRedirect(route('login'));
 });
 
+test('the duration column shows a plain year count, not "strategic period"', function () {
+    $user = User::factory()->create();
+    Strategy::factory()->create(['name' => 'Five Year Strategy', 'start_year' => 2026, 'end_year' => 2030]);
+
+    $this->actingAs($user)
+        ->get(route('strategies.index'))
+        ->assertOk()
+        ->assertSeeText('5 years')
+        ->assertDontSeeText('strategic period');
+});
+
 test('authenticated users see active upcoming and completed strategies in planning order', function () {
     $user = User::factory()->create();
     Strategy::factory()->create([

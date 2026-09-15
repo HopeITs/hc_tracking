@@ -6,6 +6,12 @@
             "runtimeExecutable": "C:\\php85\\php.exe",
             "runtimeArgs": ["artisan", "dev"],
             "port": 8000
+        },
+        {
+            "name": "static-preview",
+            "runtimeExecutable": "C:\\php85\\php.exe",
+            "runtimeArgs": ["-S", "127.0.0.1:8010", "-t", "storage/app"],
+            "port": 8010
         }
     ]
 }

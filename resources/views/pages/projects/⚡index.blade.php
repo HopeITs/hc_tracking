@@ -28,6 +28,9 @@ new #[Title('titles.projects')] class extends Component {
     public string $program = '';
 
     #[Url(except: '')]
+    public string $strategy = '';
+
+    #[Url(except: '')]
     public string $owner = '';
 
     #[Url(except: '')]
@@ -78,6 +81,11 @@ new #[Title('titles.projects')] class extends Component {
         $this->resetPage();
     }
 
+    public function updatedStrategy(): void
+    {
+        $this->resetPage();
+    }
+
     public function updatedOwner(): void
     {
         $this->resetPage();
@@ -93,6 +101,7 @@ new #[Title('titles.projects')] class extends Component {
         $this->search = '';
         $this->city = '';
         $this->program = '';
+        $this->strategy = '';
         $this->owner = '';
         $this->status = '';
         $this->resetPage();
@@ -146,6 +155,7 @@ new #[Title('titles.projects')] class extends Component {
             })
             ->when($this->city !== '', fn ($query) => $query->where('city_id', (int) $this->city))
             ->when($this->program !== '', fn ($query) => $query->where('program_id', (int) $this->program))
+            ->when($this->strategy !== '', fn ($query) => $query->whereHas('program', fn ($query) => $query->where('strategy_id', (int) $this->strategy)))
             ->when($this->owner !== '', fn ($query) => $query->where('user_id', (int) $this->owner))
             ->when($this->status !== '', fn ($query) => $query->where('status', $this->status))
             ->orderBy('name')

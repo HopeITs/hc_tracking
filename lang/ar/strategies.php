@@ -8,7 +8,7 @@ return [
     'complete_portfolio' => 'المحفظة الكاملة',
     'count_current_period' => '{0} لا توجد فترات حالية|{1} فترة حالية واحدة|{2} فترتان حاليتان|[3,10] :count فترات حالية|[11,*] :count فترة حالية',
     'count_program' => '{0} لا توجد برامج|{1} برنامج واحد|{2} برنامجان|[3,10] :count برامج|[11,*] :count برنامجًا',
-    'count_year_strategic_period' => 'فترة استراتيجية مدتها :count سنوات',
+    'count_years' => '{0} صفر سنوات|{1} سنة واحدة|{2} سنتان|[3,10] :count سنوات|[11,*] :count سنة',
     'create_strategy' => 'إنشاء استراتيجية',
     'delete_strategy' => 'حذف الاستراتيجية',
     'delete_this_strategy' => 'حذف هذه الاستراتيجية؟',

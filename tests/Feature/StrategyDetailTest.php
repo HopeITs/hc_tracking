@@ -104,7 +104,7 @@ test('the strategy detail stat tiles each carry an icon badge', function () {
 
     // Programs, Projects, Annual plans and Plan coverage each render one icon
     // badge with this exact class combination.
-    expect(substr_count($html, 'flex size-9 shrink-0 items-center justify-center rounded-md'))->toBe(4);
+    expect(substr_count($html, 'shrink-0 items-center justify-center rounded-xl'))->toBe(4);
 });
 
 test('the strategy detail programs table sorts by projects descending', function () {
@@ -161,4 +161,16 @@ test('the strategy detail stat row totals equal the sum across programs', functi
         // 2 programs, 3 projects total, 1 annual plan total.
         ->assertSeeText('3')
         ->assertSeeText('1');
+});
+
+test('the projects and annual plans stat tiles link to their own pages, not programs', function () {
+    $user = User::factory()->create();
+    $strategy = Strategy::factory()->create();
+
+    $this->actingAs($user)
+        ->get(route('strategies.show', $strategy))
+        ->assertOk()
+        ->assertSee(route('programs.index', ['strategy' => $strategy->id]), false)
+        ->assertSee(route('projects.index', ['strategy' => $strategy->id]), false)
+        ->assertSee(route('yearly-plans.index', ['strategy' => $strategy->id]), false);
 });

@@ -12,6 +12,7 @@ return [
     'results_learning' => 'النتائج والتعلّم',
     'search' => 'بحث',
     'switch_language' => 'تغيير اللغة',
+    'toggle_sidebar' => 'طي القائمة الجانبية أو توسيعها',
     'toggle_theme' => 'التبديل بين الوضع الفاتح والداكن',
     'user_directory' => 'دليل المستخدمين',
 ];

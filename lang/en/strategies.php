@@ -8,7 +8,7 @@ return [
     'complete_portfolio' => 'Complete portfolio',
     'count_current_period' => ':count current period|:count current periods',
     'count_program' => ':count program|:count programs',
-    'count_year_strategic_period' => ':count-year strategic period',
+    'count_years' => ':count year|:count years',
     'create_strategy' => 'Create strategy',
     'delete_strategy' => 'Delete strategy',
     'delete_this_strategy' => 'Delete this strategy?',
