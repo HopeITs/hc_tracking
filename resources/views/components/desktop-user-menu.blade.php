@@ -3,6 +3,7 @@
         :name="auth()->user()->name"
         :initials="auth()->user()->initials()"
         icon:trailing="chevrons-up-down"
+        class="text-secondary-dark! hover:bg-secondary-soft/70! dark:text-white! dark:hover:bg-white/10!"
         data-test="sidebar-menu-button"
     />
 

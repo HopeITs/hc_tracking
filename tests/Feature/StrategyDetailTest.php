@@ -104,7 +104,7 @@ test('the strategy detail stat tiles each carry an icon badge', function () {
 
     // Programs, Projects, Annual plans and Plan coverage each render one icon
     // badge with this exact class combination.
-    expect(substr_count($html, 'flex size-9 shrink-0 items-center justify-center rounded-md'))->toBe(4);
+    expect(substr_count($html, 'shrink-0 items-center justify-center rounded-xl'))->toBe(4);
 });
 
 test('the strategy detail programs table sorts by projects descending', function () {

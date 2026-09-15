@@ -197,11 +197,11 @@ new #[Title('titles.strategy')] class extends Component {
         <x-ui.stat-tile :label="__('common.projects')" :value="$this->totals['projects']" icon="rectangle-stack" :href="route('programs.index', ['strategy' => $strategy->id])" />
         <x-ui.stat-tile :label="__('common.annual_plans')" :value="$this->totals['plans']" icon="calendar-days" :href="route('programs.index', ['strategy' => $strategy->id])" />
 
-        <div class="rounded-lg border border-secondary-light bg-white p-3.5 dark:border-secondary-medium dark:bg-secondary-dark">
+        <div class="rounded-xl border border-secondary-soft bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-secondary-medium dark:bg-secondary-dark dark:shadow-none">
             <div class="flex items-start justify-between gap-3">
                 <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('strategies.plan_coverage') }}</p>
-                <div class="{{ $coverageIconClasses }} flex size-9 shrink-0 items-center justify-center rounded-md">
-                    <flux:icon.chart-bar class="size-4.5" />
+                <div class="{{ $coverageIconClasses }} flex size-10 shrink-0 items-center justify-center rounded-xl">
+                    <flux:icon.chart-bar class="size-5" />
                 </div>
             </div>
             <div class="mt-3">

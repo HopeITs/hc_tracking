@@ -1,7 +1,7 @@
 @props(['icon' => 'inbox', 'heading', 'body' => null])
 
 <div {{ $attributes->class('flex min-h-64 flex-col items-center justify-center gap-3 px-5 py-10 text-center') }}>
-    <div class="flex size-12 items-center justify-center rounded-lg border border-secondary-light bg-white text-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft">
+    <div class="flex size-12 items-center justify-center rounded-xl border border-secondary-soft bg-white text-secondary-medium dark:border-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft">
         <flux:icon :name="$icon" class="size-5" />
     </div>
     <div class="max-w-sm space-y-1">

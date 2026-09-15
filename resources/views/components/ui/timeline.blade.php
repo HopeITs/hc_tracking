@@ -61,7 +61,7 @@
         </div>
     @endif
 
-    <div class="flex flex-col divide-y divide-board-line rounded-lg border border-board-line bg-board">
+    <div class="flex flex-col divide-y divide-board-line rounded-xl border border-board-line bg-board shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:shadow-none">
         @if ($rows->isEmpty())
             {{ $slot }}
         @endif
