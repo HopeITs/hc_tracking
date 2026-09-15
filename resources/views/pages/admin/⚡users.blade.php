@@ -367,7 +367,6 @@ new #[Title('titles.user_directory')] class extends Component {
                     <article class="flex flex-col gap-3 p-3.5" wire:key="mobile-user-{{ $user->id }}">
                         <div class="flex min-w-0 items-start justify-between gap-3">
                             <div class="flex min-w-0 items-center gap-3">
-                                <flux:avatar class="bg-secondary-soft! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" :initials="$user->initials()" />
                                 <div class="min-w-0">
                                     <p class="truncate text-sm font-semibold text-secondary-dark dark:text-white">{{ $user->name }}</p>
                                     <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $user->email }}</p>
@@ -433,7 +432,6 @@ new #[Title('titles.user_directory')] class extends Component {
                             <flux:table.row :key="$user->id">
                                 <flux:table.cell variant="strong" class="text-secondary-dark! dark:text-white!">
                                     <div class="flex min-w-0 items-center gap-2.5">
-                                        <flux:avatar class="bg-secondary-soft! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" size="sm" :initials="$user->initials()" />
                                         <div class="min-w-0">
                                             <p class="truncate font-semibold">{{ $user->name }}</p>
                                             <p class="truncate text-xs font-normal text-secondary-medium dark:text-secondary-soft">{{ $user->email }}</p>

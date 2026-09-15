@@ -196,7 +196,19 @@
 input:focus[data-flux-control],
 textarea:focus[data-flux-control],
 select:focus[data-flux-control] {
-    @apply outline-hidden ring-2 ring-accent ring-offset-2 ring-offset-accent-foreground;
+    outline: 2px solid var(--color-secondary-medium);
+    outline-offset: 2px;
+    box-shadow: none;
+}
+
+input[type='search']::-webkit-search-cancel-button {
+    cursor: pointer;
+    filter: grayscale(1) saturate(0) brightness(0.72);
+    opacity: 0.85;
+}
+
+.dark input[type='search']::-webkit-search-cancel-button {
+    filter: grayscale(1) saturate(0) brightness(1.7);
 }
 
 /* Keep administrative directories inside their approved brand palette. */
@@ -239,8 +251,112 @@ select:focus[data-flux-control] {
 .admin-directory [data-flux-control]:focus-visible,
 .admin-directory [data-flux-button]:focus-visible {
     box-shadow: none !important;
-    outline: 2px solid var(--color-primary) !important;
+    outline: 2px solid var(--color-secondary-medium) !important;
     outline-offset: 2px !important;
+}
+
+.program-directory-filters [data-flux-control] {
+    min-height: 2.75rem !important;
+    border-color: var(--color-secondary-soft) !important;
+    background-color: color-mix(in srgb, var(--color-secondary-soft) 38%, var(--color-white)) !important;
+    transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.program-directory-filters [data-flux-control]:hover {
+    border-color: var(--color-secondary-light) !important;
+    background-color: var(--color-white) !important;
+}
+
+.program-directory-filters [data-flux-control]:focus,
+.program-directory-filters [data-flux-control]:focus-visible {
+    border-color: var(--color-secondary-medium) !important;
+}
+
+#program-search:focus,
+#program-search:focus-visible {
+    border-color: var(--color-secondary-soft) !important;
+    outline: none !important;
+    outline-offset: 0 !important;
+    box-shadow: none !important;
+}
+
+.dark .program-directory-filters [data-flux-control] {
+    background-color: color-mix(in srgb, var(--color-secondary-medium) 70%, var(--color-secondary-dark)) !important;
+}
+
+.dark .program-directory-filters [data-flux-control]:hover {
+    background-color: var(--color-secondary-medium) !important;
+}
+
+.program-filter-picker [data-flux-button] {
+    min-height: 2.75rem !important;
+    border-color: var(--color-secondary-soft) !important;
+    background-color: color-mix(in srgb, var(--color-secondary-soft) 38%, var(--color-white)) !important;
+    box-shadow: none !important;
+    color: var(--color-secondary-dark) !important;
+}
+
+.program-filter-picker [data-flux-button]:hover {
+    border-color: var(--color-secondary-light) !important;
+    background-color: var(--color-white) !important;
+}
+
+.program-filter-picker [data-flux-menu] {
+    width: min(18.5rem, calc(100vw - 2rem));
+    max-height: 18rem;
+    overflow-y: auto;
+    border-color: var(--color-secondary-soft) !important;
+    background-color: var(--color-white) !important;
+    box-shadow: 0 10px 24px rgb(88 89 91 / 12%) !important;
+}
+
+.program-filter-picker [data-flux-menu-item] {
+    color: var(--color-secondary-dark) !important;
+}
+
+.program-filter-picker [data-flux-menu-item][data-active] {
+    background-color: var(--color-secondary-soft) !important;
+}
+
+.program-filter-menu [data-flux-control] {
+    min-height: 2rem !important;
+    height: 2rem !important;
+    border-color: var(--color-secondary-soft) !important;
+    background-color: color-mix(in srgb, var(--color-secondary-soft) 38%, var(--color-white)) !important;
+    box-shadow: none !important;
+    font-size: 0.8125rem !important;
+}
+
+.program-filter-menu [data-flux-control]:focus,
+.program-filter-menu [data-flux-control]:focus-visible {
+    border-color: var(--color-secondary-soft) !important;
+    outline: none !important;
+    outline-offset: 0 !important;
+}
+
+.dark .program-filter-picker [data-flux-button] {
+    border-color: var(--color-secondary-medium) !important;
+    background-color: color-mix(in srgb, var(--color-secondary-medium) 70%, var(--color-secondary-dark)) !important;
+    color: var(--color-white) !important;
+}
+
+.dark .program-filter-picker [data-flux-button]:hover,
+.dark .program-filter-picker [data-flux-menu-item][data-active] {
+    background-color: var(--color-secondary-medium) !important;
+}
+
+.dark .program-filter-picker [data-flux-menu] {
+    border-color: var(--color-secondary-medium) !important;
+    background-color: var(--color-secondary-dark) !important;
+}
+
+.dark .program-filter-menu [data-flux-control] {
+    border-color: var(--color-secondary-medium) !important;
+    background-color: var(--color-secondary-medium) !important;
+}
+
+.dark .program-filter-picker [data-flux-menu-item] {
+    color: var(--color-white) !important;
 }
 
 .admin-directory [data-flux-control][data-invalid] {

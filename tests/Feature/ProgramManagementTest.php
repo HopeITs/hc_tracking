@@ -173,6 +173,63 @@ test('program management explains that programs come from hr when there are none
         ->assertSeeText('Programs appear here once they are added in the HR system.');
 });
 
+test('program cards are the default and link to their details', function () {
+    $program = Program::factory()->create(['name' => 'Water Security']);
+
+    Livewire::actingAs(User::factory()->create())
+        ->test('pages::programs.index')
+        ->assertSet('visibleProgramCount', 8)
+        ->assertSee('Water Security')
+        ->assertSee(route('programs.show', $program), false)
+        ->assertDontSee('Programs come from the HR system.')
+        ->assertDontSee('matching program');
+});
+
+test('program cards load eight initially and four more on request', function () {
+    foreach (range(1, 9) as $number) {
+        Program::factory()->create(['name' => 'Program '.str_pad((string) $number, 2, '0', STR_PAD_LEFT)]);
+    }
+
+    Livewire::actingAs(User::factory()->create())
+        ->test('pages::programs.index')
+        ->assertSet('visibleProgramCount', 8)
+        ->assertSee('Program 08')
+        ->assertDontSee('Program 09')
+        ->assertSee('Load more')
+        ->call('loadMore')
+        ->assertSet('visibleProgramCount', 12)
+        ->assertSee('Program 09');
+});
+
+test('program gap filter focuses programs without a manager', function () {
+    Program::factory()->create(['name' => 'Managed Program']);
+    Program::factory()->unassigned()->create(['name' => 'Unmanaged Program']);
+
+    Livewire::actingAs(User::factory()->create())
+        ->test('pages::programs.index')
+        ->set('gap', 'no_manager')
+        ->assertSee('Unmanaged Program')
+        ->assertDontSee('Managed Program');
+});
+
+test('program filter pickers apply strategy and manager selections', function () {
+    $strategy = Strategy::factory()->create(['name' => 'Country Strategy']);
+    $manager = insertHrEmployee(firstNameEn: 'Amal', lastNameEn: 'Manager');
+    Program::factory()->create(['name' => 'Selected Program', 'strategy_id' => $strategy->id, 'manager_id' => $manager]);
+    Program::factory()->create(['name' => 'Other Program']);
+
+    Livewire::actingAs(User::factory()->create())
+        ->test('pages::programs.index')
+        ->call('filterByStrategy', $strategy->id)
+        ->assertSet('strategy', (string) $strategy->id)
+        ->assertSee('Selected Program')
+        ->assertDontSee('Other Program')
+        ->call('filterByManager', $manager)
+        ->assertSet('manager', (string) $manager)
+        ->assertSee('Selected Program')
+        ->assertDontSee('Other Program');
+});
+
 test('visiting the app mirrors new hr programs as unassigned', function () {
     Cache::forget(SyncProgramsFromHr::CacheKey);
     $hrProgramId = insertHrProgram('Children University');
