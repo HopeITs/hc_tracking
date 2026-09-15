@@ -273,49 +273,60 @@ new #[Title('titles.strategies')] class extends Component {
     class="@container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white"
     aria-labelledby="strategies-heading"
 >
-    <x-ui.page-header
-        :title="__('common.strategies')"
-        :count="$portfolio['total']"
-        :description="__('strategies.a_complete_view_of_the_strategic_planning_cycles_that_guide')"
-        headingId="strategies-heading"
-    >
-        <x-slot:filters>
+    <header class="grid gap-8 border-b border-secondary-soft pb-7 @6xl/directory:grid-cols-[minmax(16rem,.7fr)_minmax(0,1.3fr)] @6xl/directory:items-center dark:border-secondary-medium">
+        <div class="min-w-0">
+            <div class="flex items-center gap-2.5">
+                <flux:heading id="strategies-heading" size="xl" class="text-3xl! font-bold! leading-none!">{{ __('common.strategies') }}</flux:heading>
+                <span data-count-badge class="inline-flex min-w-7 items-center justify-center rounded-md bg-primary px-2 py-0.5 text-xs font-bold tabular-nums text-white">{{ $portfolio['total'] }}</span>
+            </div>
+        </div>
+
+        <div class="grid gap-3 @3xl/directory:grid-cols-2 @6xl/directory:grid-cols-3">
             @if ($this->canManage)
-                <x-ui.button tone="primary" icon="plus" class="min-h-11 touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-strategy-button">
-                    {{ __('strategies.add_strategy') }}
-                </x-ui.button>
+                <div class="min-w-0">
+                    <span aria-hidden="true" class="mb-1.5 hidden text-[11px] font-semibold uppercase tracking-[0.1em] opacity-0 @3xl/directory:block">&nbsp;</span>
+                    <x-ui.button tone="primary" icon="plus" class="min-h-11 w-full touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-strategy-button">
+                        {{ __('strategies.add_strategy') }}
+                    </x-ui.button>
+                </div>
             @endif
+            <div class="min-w-0">
+                <label for="strategy-search" class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-secondary-soft">{{ __('strategies.search_strategies') }}</label>
+                <x-ui.input id="strategy-search" type="search" icon="magnifying-glass" :aria-label="__('strategies.search_strategies')" :placeholder="__('strategies.search_by_name')" wire:model.live.debounce.300ms="search" clearable />
+            </div>
+            <div class="min-w-0">
+                <label for="strategy-status" class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-secondary-soft">{{ __('strategies.filter_by_status') }}</label>
+                <x-ui.select id="strategy-status" :aria-label="__('strategies.filter_by_status')" wire:model.live="status">
+                    <flux:select.option value="">{{ __('common.all_statuses') }}</flux:select.option>
+                    <flux:select.option value="active">{{ __('common.active') }}</flux:select.option>
+                    <flux:select.option value="upcoming">{{ __('strategies.upcoming') }}</flux:select.option>
+                    <flux:select.option value="completed">{{ __('common.completed') }}</flux:select.option>
+                </x-ui.select>
+            </div>
+        </div>
+    </header>
 
-            <x-ui.input
-                type="search"
-                icon="magnifying-glass"
-                :label="__('strategies.search_strategies')"
-                :placeholder="__('strategies.search_by_name')"
-                wire:model.live.debounce.300ms="search"
-                clearable
-            />
-
-            <x-ui.select :label="__('strategies.filter_by_status')" wire:model.live="status">
-                <flux:select.option value="">{{ __('common.all_statuses') }}</flux:select.option>
-                <flux:select.option value="active">{{ __('common.active') }}</flux:select.option>
-                <flux:select.option value="upcoming">{{ __('strategies.upcoming') }}</flux:select.option>
-                <flux:select.option value="completed">{{ __('common.completed') }}</flux:select.option>
-            </x-ui.select>
-        </x-slot:filters>
-
-        <x-slot:summary>
+    <div class="flex items-center justify-between gap-3">
+        <div class="min-w-0">
             @if ($portfolio['has_records'] && $portfolio['status_counts']['active'] === 0 && ! $portfolio['filters_active'])
-                <div class="mt-3 inline-flex w-fit items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary" role="status">
+                <div class="inline-flex w-fit items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary" role="status">
                     <flux:icon.clock class="size-4" />
                     {{ __('strategies.no_strategy_currently_covers_year', ['year' => $portfolio['current_year']]) }}
                 </div>
             @elseif ($portfolio['status_counts']['active'] > 0 && ! $portfolio['filters_active'])
-                <p class="mt-3 type-meta text-secondary-medium dark:text-secondary-soft">
+                <p class="type-meta text-secondary-medium dark:text-secondary-soft">
                     {{ trans_choice('strategies.count_current_period', $portfolio['status_counts']['active'], ['count' => $portfolio['status_counts']['active']]) }}
                 </p>
             @endif
-        </x-slot:summary>
-    </x-ui.page-header>
+        </div>
+
+        <div class="flex shrink-0 items-center gap-2">
+            <span wire:loading.delay.flex wire:target="search,status,resetFilters" class="hidden items-center gap-1.5 text-xs text-secondary-medium dark:text-secondary-soft"><flux:icon.arrow-path class="size-3.5 animate-spin" /> {{ __('common.updating') }}</span>
+            @if ($portfolio['filters_active'])
+                <flux:button size="sm" variant="ghost" wire:click="resetFilters">{{ __('common.reset_filters') }}</flux:button>
+            @endif
+        </div>
+    </div>
 
     @if ($portfolio['strategies']->isEmpty())
         <x-ui.empty-state
