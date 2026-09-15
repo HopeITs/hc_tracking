@@ -1,0 +1,110 @@
+DIRECTION CONCEPT SEED (key: 40855e20; mode: operate; source: api; approved pool: c3b204a1eed6; 306/564 human-approved; rerun with --scope direction --mode operate --from 40855e20 --reroll 1 --register bolder --candidate-count 7 to reproduce this roll against this catalog revision)
+RE-ROLL ROUND 1 (BOLDER REGISTER, user-requested): every candidate presented in earlier rounds, grounded
+  and challenger alike, is eliminated and may not return reworded.
+BOLDER REGISTER: the user asked for foreign forms at full commitment, so no
+  grounded direction is presented this round and the assigned index is
+  suspended. The hand is every dealt challenger below, each fused with the
+  product and presented as a full card; the FIRST dealt challenger leads, an
+  assignment by deal order, so the dice still choose. Verdicts and donations
+  apply between the challengers, weighed against the leader. The pick card
+  sits out; the canon stays, as always.
+CHALLENGERS:
+  1. a printing darkroom under amber safelight, where enlarger beams, timed baths, and drying lines stage photographs into slow deliberate existence
+     SOURCE ID: signals-instruments-darkroom-safelight-bay
+     CREATIVE SPARK: In the developer tray, gray ghosts gather into a face; the timer ticks, and pulling the print too early is a real loss.
+     SYSTEM GRAMMAR:
+       - Palette/material: amber safelight washing every surface as the ground, wet-print silver grays deepening to black as the image ink, enamel tray white at the edges
+       - Type/composition: grease-pencil notes and printed timer digits under amber, labels sparse on bottles and trays; test strips band the field into stepped exposures
+       - Topology/navigation: work moves through fixed stations in order: compose, expose, develop, fix, wash, dry.
+       - Controls/state: progress is chemical and irreversible past marked points; test strips preview before committing.
+       - Responsive/motion: stations linearize on phones; the develop reveal is one continuous emergence, shown statically under
+     WEB LEVERAGE: Canvas-simulated development curves let previews emerge in real time before an action commits.
+     QUALITY BAR: board https://impeccable.style/worlds/cards/signals-instruments-darkroom-safelight-bay.webp · hero https://impeccable.style/worlds/cards/signals-instruments-darkroom-safelight-bay-hero.webp
+  2. a data-sublime field, where dense barcode columns and sine lattices strobe in pure black and white
+     SOURCE ID: ikeda-datamatics
+     CREATIVE SPARK: A wall of hairline vertical bars, some black, some white, holds like a frozen barcode. Dense monospace numbers pack the margin. A single sine curve traces the lattice, and for one frame the whole field snaps to its negative.
+     SYSTEM GRAMMAR:
+       - Palette/material: Pure black and pure white only, no grey and no color; flat pixel-crisp bars, hairline rules, and monospace numerics; the occasional full-frame inversion.
+       - Type/composition: One monospace face at data density, set in tight tabular columns; barcode bar-fields and sine curves structure the page
+       - Topology/navigation: Move by data column, by frequency band, and by frame index.
+       - Controls/state: Scan, sample, and invert; selecting a column pulls its numbers into focus while the surrounding field drops to a faint bar pattern.
+       - Responsive/motion: Columns thin and drop from the edges as width shrinks; reduced-motion disables all strobing and holds a single high-contrast still.
+     WEB LEVERAGE: Render the barcode and sine lattice on canvas from a seeded sequence, stepping frames on requestAnimationFrame that halts entirely under prefers-reduced-motion.
+     QUALITY BAR: board https://impeccable.style/worlds/cards/ikeda-datamatics.webp · hero https://impeccable.style/worlds/cards/ikeda-datamatics-hero.webp
+  3. an advertising wall calendar from a printing house, a painted figure filling the upper sheet and a tear-off date pad below carrying the merchant's name in gold-line lettering
+     SOURCE ID: vernacular-ephemera-calendar-pinup-pad
+     CREATIVE SPARK: the top half is a painting somebody was paid real money for, the bottom half is twelve months of thin paper, and across the middle in gold script is the name of a hardware store that closed in 1968.
+     SYSTEM GRAMMAR:
+       - Palette/material: warm painted flesh and saturated satin reds over a cream board, with a thin gold rule separating plate from pad
+       - Type/composition: a script merchant line under the plate, a month name in condensed caps, and the date grid set small and even beneath it
+       - Topology/navigation: time is the only axis, and moving forward tears a leaf away to expose the next month against the same painted plate
+       - Controls/state: controls are date cells, today takes a printed ring, past dates gray toward the board, and the pad thins as months go
+       - Responsive/motion: the plate crops to a square on narrow frames while the pad stays legible, and motion is a single leaf tearing free
+     WEB LEVERAGE: a date grid bound to live state, css transforms tearing the top leaf away, and responsive cropping of the painted plate
+     QUALITY BAR: board https://impeccable.style/worlds/cards/vernacular-ephemera-calendar-pinup-pad.webp · hero https://impeccable.style/worlds/cards/vernacular-ephemera-calendar-pinup-pad-hero.webp
+  4. a Wim Crouwel gridded type specimen, where letterforms are built cell by cell on a visible construction grid and the poster is the proof
+     SOURCE ID: crouwel-grid-specimen
+     CREATIVE SPARK: Faint blue gridlines cover the sheet like graph paper; enormous letterforms assemble themselves from its cells, and one diagonal is the only rebellion the system permits.
+     SYSTEM GRAMMAR:
+       - Palette/material: white or one stark saturated ground, faint construction-grid hairlines, one accent plane earned by the headline
+       - Type/composition: monumental grid-constructed letterforms over small neutral grotesk; the layout grid stays visible as part of the design
+       - Topology/navigation: Move by cell, by letter, and by catalog entry.
+       - Controls/state: Reveal construction, snap to cells, and toggle grid visibility as a real state.
+       - Responsive/motion: The page reflows by whole cells; letterforms rebuild cell by cell when content changes.
+     WEB LEVERAGE: CSS grid as the literal visible armature with display letterforms drawn from the same grid tokens
+     QUALITY BAR: board https://impeccable.style/worlds/cards/crouwel-grid-specimen.webp · hero https://impeccable.style/worlds/cards/crouwel-grid-specimen-hero.webp
+  5. a sneaker archive wall, stacked cardboard boxes with silhouette line art printed on the ends, colorway names read as poetry beside monospaced size runs, tissue folded inside each lid
+     SOURCE ID: textiles-weave-drape-fashion-sneaker-box-stacks
+     CREATIVE SPARK: You slide a box from a stack taller than you; the end label lists the colorway name like a line of verse, the lid lifts with a cardboard sigh, and tissue paper folds back from the shape you already know by silhouette.
+     SYSTEM GRAMMAR:
+       - Palette/material: burnt orange box board as the ground, black one-line silhouette art for ink, tissue white interiors, the colorway chip strip carrying accent states
+       - Type/composition: condensed caps on the end label over monospaced size-run digits, the label grid of name, colorway, and size ruling every card
+       - Topology/navigation: a wall of stacked boxes indexed by their end labels; you browse the stack face, pull a box halfway, and open the lid to go deeper
+       - Controls/state: the selected box slides half out of the stack, opening hinges the lid and folds back tissue, the colorway chip marks which variant is live
+       - Responsive/motion: the wall re-shelves to a single column of end labels on narrow screens; motion is lid hinge and tissue lift
+     WEB LEVERAGE: css 3d transforms hinging box lids open on interaction, grid re-shelving the stack from wall to single column across breakpoints
+     QUALITY BAR: board https://impeccable.style/worlds/cards/textiles-weave-drape-fashion-sneaker-box-stacks.webp · hero https://impeccable.style/worlds/cards/textiles-weave-drape-fashion-sneaker-box-stacks-hero.webp
+  6. an alphabet storm, where letters condense into words, break into weather, and reshape the landscape according to grammar
+     SOURCE ID: dream-surreal-impossible-worlds-alphabet-storm
+     CREATIVE SPARK: Black letters gather into CLOUD, burst into rain, and carve the word RIVER across white ground; changing one vowel turns the current into a field of silver ravens.
+     SYSTEM GRAMMAR:
+       - Palette/material: paper white ground, storm-letter black as both body ink and weather mass, one silver flash for words mid-transformation, rain gray for spent grammar
+       - Type/composition: a single monumental grotesk behaving as matter, kerning loosening into wind, words breaking across lines as literal weather fronts on an open field
+       - Topology/navigation: Travel between letter fronts, word formations, grammatical forces, and the landscapes they produce.
+       - Controls/state: Type, split, conjugate, and recombine language while physical consequences remain reversible.
+       - Responsive/motion: Use one word-weather event per phone viewport and preserve readable text throughout transformation.
+     WEB LEVERAGE: Text parsing, procedural particles, and semantic rules turn typed language into deterministic weather with accessible narrative descriptions.
+     QUALITY BAR: board https://impeccable.style/worlds/cards/dream-surreal-impossible-worlds-alphabet-storm.webp · hero https://impeccable.style/worlds/cards/dream-surreal-impossible-worlds-alphabet-storm-hero.webp
+Fuse each challenger before judging it: the challenger supplies the form
+  and its system grammar, the product supplies every fact, and clarity wins
+  conflicts. Weigh every fused challenger against the fused LEADER, the first
+  dealt, on exactly two axes, audience identification and product clarity;
+  verdicts and donations apply between the challengers, and one that beats
+  the leader on both axes presents as the hand's strongest alternate.
+When you can view images, open the QUALITY BAR board and hero for any
+challenger you weigh seriously and for the world you build. They exist as a
+craft bar, the finish level and commitment the build is expected to reach,
+never as a mockup to copy; your surface serves this product, not that render.
+PRODUCT.md and explicit incumbent brand commitments constrain every direction.
+The seed never chooses exact colors, fonts, tokens, or a user preference, and
+it never permits the world and first surface to be selected independently.
+The CREATIVE SPARK is a complete visual system, not a theme or decorative
+reference. Translate every supplied system rule into the product: palette and
+material, type and composition, topology, controls and states, and adaptation.
+Keep the source's visible character, scale, rhythm, and interaction instead of
+reducing vivid grammar to generic nouns. When the source is already a credible
+interface language, commit to it across navigation, content, controls, and
+states. Otherwise keep a literal carrier only when it becomes functional.
+Ambitious motion, spatial media, or interaction is welcome when it strengthens
+the product without weakening semantics, performance, or fallback behavior.
+TELEMETRY: after the user's choice resolves, rerun this script once with
+  --kind <assigned|pick|challenger|canon> --from 40855e20 --scope direction --mode operate,
+  adding --chosen <challenger-id> when a dealt challenger won and keeping
+  --register <safer|bolder> when the resolved round came from a steered hand.
+  One ping per resolved attended round. The ping is anonymous, the card kind
+  plus the catalog id when one won; your grounded candidates' names never
+  leave the machine, and the ping is skipped automatically when DO_NOT_TRACK
+  or IMPECCABLE_NO_TELEMETRY is set.
+A user- or brief-pinned decision beats the roll, always.
+REGISTER (restated for truncated readers): bolder, user-requested; the
+assigned index is suspended this round; seed key 40855e20.

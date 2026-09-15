@@ -1,0 +1,2 @@
+ANSWER: {"optionId":"reroll","steer":"","register":"bolder"}
+REGISTER: the user steered the next hand to the bolder register. Re-run concept-seed with the same key, the next --reroll round, and --register bolder, then follow what it prints; the register is the user's steering, never yours to pre-select.

@@ -1,0 +1,254 @@
+{
+  "title": "Bolder hand · HC Tracking",
+  "question": "Image previews are unavailable (the OpenAI account has no credits), so cards show layout wireframes. Foreign forms at full commitment, each fused with your product; red/gray, Somar Sans and the sidebar still hold. The deal leads with the Darkroom. Keep it, take an alternate, or re-roll.",
+  "options": [
+    {
+      "id": "leader-darkroom",
+      "label": "The Darkroom",
+      "kicker": "THE ROLL",
+      "lineage": "Printing darkroom under safelight: enlarger, timed baths, drying line",
+      "thesis": "Work develops through fixed stations under your own red safelight, and a finished record is a print you can trust.",
+      "palette": [
+        "#1f1d1e",
+        "#be1f24",
+        "#58595b",
+        "#939598",
+        "#dcddde",
+        "#f7f6f4"
+      ],
+      "materials": [
+        "safelight-red station rail",
+        "silver-gray data ink",
+        "white enamel print sheets for finished records",
+        "test strips that preview before commit"
+      ],
+      "viewport": "Dashboard as the darkroom bench: a station rail across the top (Proposed → Approved → Delivering → Reporting → Closed) with counts in timer digits; below, records develop into sharp prints as they load; approved reports hang on a drying line.",
+      "risk": "A red-washed dark ground can feel oppressive and weaken contrast; the safelight must stay on stations and moments, never flood the working surface.",
+      "raised": [
+        {
+          "from": "challenger-sneaker-wall",
+          "raise": "Every record carries one fixed end-label grid (name, variant, key figure), so a stack of records scans by its edge alone."
+        },
+        {
+          "from": "challenger-alphabet-storm",
+          "raise": "Every change narrates its consequence in words (\"Tranche 2 marked received · EUR 40,000 now disbursed\"), and it stays reversible until it's fixed."
+        }
+      ],
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          {
+            "label": "sidebar",
+            "x": 0,
+            "y": 0,
+            "w": 2,
+            "h": 10
+          },
+          {
+            "label": "station rail · timer counts",
+            "x": 2,
+            "y": 0,
+            "w": 10,
+            "h": 2,
+            "accent": true
+          },
+          {
+            "label": "developing records",
+            "x": 2,
+            "y": 2,
+            "w": 7,
+            "h": 5
+          },
+          {
+            "label": "test strip preview",
+            "x": 9,
+            "y": 2,
+            "w": 3,
+            "h": 5
+          },
+          {
+            "label": "drying line · approved prints",
+            "x": 2,
+            "y": 7,
+            "w": 10,
+            "h": 3,
+            "accent": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "challenger-crouwel-grid",
+      "label": "Construction Grid",
+      "verdict": "competitive",
+      "lineage": "Wim Crouwel gridded type specimens",
+      "thesis": "The portfolio is built cell by cell on a visible grid: one cell per project, and the figures themselves are drawn from the grid.",
+      "palette": [
+        "#ffffff",
+        "#dcddde",
+        "#58595b",
+        "#be1f24"
+      ],
+      "materials": [
+        "visible construction-grid hairlines",
+        "monumental grid-built numerals",
+        "one red accent plane per page"
+      ],
+      "viewport": "Dashboard as a specimen sheet: giant grid-constructed portfolio figures, each program a block of unit cells coloured by status, all on a visible grid.",
+      "case": "Holds clarity (grid discipline and huge legible figures) but loses identification: the audience doesn't know this design tradition.",
+      "risk": "Monumental numerals can crowd out dense officer workflows if the scale isn't disciplined."
+    },
+    {
+      "id": "challenger-datamatics",
+      "label": "Datamatics Field",
+      "verdict": "competitive",
+      "lineage": "Ryoji Ikeda data-sublime installations",
+      "thesis": "Every transfer, target and task rendered as one bar in a dense field: the whole portfolio visible at once, sharpening into exact figures on selection.",
+      "palette": [
+        "#0b0b0b",
+        "#ffffff",
+        "#be1f24",
+        "#939598"
+      ],
+      "materials": [
+        "hairline barcode fields",
+        "dense tabular numerals",
+        "red as the only colour"
+      ],
+      "viewport": "Dashboard as a wall of bars, one per record; selecting a column pulls its exact figures into focus while the field dims.",
+      "case": "Holds clarity for dense scanning of figures, but identification is low and it breaks Somar Sans's warmth.",
+      "risk": "Can read as art installation; strobing must be off entirely for daily use."
+    },
+    {
+      "id": "challenger-wall-calendar",
+      "label": "Wall Calendar Pad",
+      "verdict": "competitive",
+      "lineage": "Printing-house advertising calendars with tear-off pads",
+      "thesis": "Time is the axis your office already lives by: deadlines on a tear-off pad beneath a field-work plate.",
+      "palette": [
+        "#f7f6f4",
+        "#be1f24",
+        "#58595b",
+        "#c9a227"
+      ],
+      "materials": [
+        "tear-off date pad",
+        "today's printed ring",
+        "photo plate",
+        "thin gold rule"
+      ],
+      "viewport": "Dashboard as this month's leaf: deadlines in date cells, today ringed, past dates grayed, a field photograph above.",
+      "case": "Holds identification (every NGO office has one on the wall) but loses clarity for money and the logframe.",
+      "risk": "Needs real field photography you'd have to supply; time-only structure strains non-dated pages."
+    },
+    {
+      "id": "challenger-sneaker-wall",
+      "label": "Archive Box Wall",
+      "verdict": "declined",
+      "lineage": "Stacked sneaker-box archives",
+      "thesis": "Records as boxes you pull from a stack.",
+      "palette": [
+        "#c8581e",
+        "#0b0b0b",
+        "#ffffff"
+      ],
+      "materials": [
+        "box end labels",
+        "lid hinge"
+      ],
+      "viewport": "Donors and projects as a stacked wall of labelled box ends.",
+      "case": "Fuses poorly: its orange ground overrides the brand, and box-pulling slows daily work.",
+      "kept": "One fixed end-label grid on every record.",
+      "risk": "Novelty navigation."
+    },
+    {
+      "id": "challenger-alphabet-storm",
+      "label": "Alphabet Storm",
+      "verdict": "declined",
+      "lineage": "Surreal typographic weather",
+      "thesis": "Words becoming weather.",
+      "palette": [
+        "#ffffff",
+        "#0b0b0b",
+        "#c0c0c0"
+      ],
+      "materials": [
+        "letters as particles"
+      ],
+      "viewport": "Status changes as typographic weather events.",
+      "case": "Fuses poorly: no identification; motion obscures figures and Arabic text.",
+      "kept": "Every change narrates its consequence in words.",
+      "risk": "Spectacle over task."
+    }
+  ],
+  "reroll": {
+    "registers": [
+      "safer",
+      "bolder"
+    ]
+  },
+  "buildPath": {
+    "value": "code"
+  },
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "A best-in-class SaaS operations dashboard, in your brand colours.",
+    "palette": [
+      "#ffffff",
+      "#58595b",
+      "#be1f24",
+      "#dcddde"
+    ],
+    "materials": [
+      "KPI cards",
+      "area and donut charts",
+      "clean data tables"
+    ],
+    "viewport": "KPI card row, two charts, then a recent-activity table.",
+    "risk": "Polished, but indistinguishable from every other admin dashboard, which you asked to avoid.",
+    "wireframe": {
+      "cols": 12,
+      "rows": 10,
+      "regions": [
+        {
+          "label": "sidebar",
+          "x": 0,
+          "y": 0,
+          "w": 2,
+          "h": 10
+        },
+        {
+          "label": "kpi cards",
+          "x": 2,
+          "y": 0,
+          "w": 10,
+          "h": 2
+        },
+        {
+          "label": "area chart",
+          "x": 2,
+          "y": 2,
+          "w": 6,
+          "h": 4
+        },
+        {
+          "label": "donut",
+          "x": 8,
+          "y": 2,
+          "w": 4,
+          "h": 4
+        },
+        {
+          "label": "activity table",
+          "x": 2,
+          "y": 6,
+          "w": 10,
+          "h": 4
+        }
+      ]
+    }
+  },
+  "steer": true
+}

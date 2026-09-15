@@ -1,0 +1,343 @@
+{
+  "title": "Choose the visual world for HC Tracking",
+  "question": "Your red/gray palette, Somar Sans and the sidebar stay on every option. The roll assigned the Departures Board. Keep it, take an alternate, or re-roll.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "The Departures Board",
+      "kicker": "THE ROLL",
+      "lineage": "Split-flap station timetables, adapted to program delivery",
+      "thesis": "Every commitment is a departure: scheduled, actual, and a status everyone can read from across the room.",
+      "palette": [
+        "#58595b",
+        "#ffffff",
+        "#be1f24",
+        "#1d7a4c",
+        "#b7791f",
+        "#dcddde"
+      ],
+      "materials": [
+        "split-flap cells for key figures",
+        "timetable rows: scheduled / actual / status",
+        "flat colour, no gradients",
+        "hairline board rules"
+      ],
+      "viewport": "Dashboard opens on a live board of what is due, late and landed this month (milestones, tasks, transfers, reports), with portfolio figures in flap cells above it.",
+      "risk": "Tips into station kitsch if the flap motif spreads beyond key figures and status rows.",
+      "raised": [
+        {
+          "from": "challenger-phosphor-terminal",
+          "raise": "Keyboard-first: a Ctrl+K command line jumps to any record, and system states print as plain status lines, not chrome."
+        },
+        {
+          "from": "challenger-miura-sheet",
+          "raise": "One control propagates: clicking a segment of a page's status strip filters every figure, chart and row on that page."
+        },
+        {
+          "from": "challenger-cassette-jcard",
+          "raise": "Capacity is shown as capacity: disbursed fills a committed budget, milestone weights fill 100%, and overflow is marked."
+        },
+        {
+          "from": "challenger-zoo-map",
+          "raise": "Total colour discipline: status colour owns whole cells flat, with no tinted gradients, glows or decorative shadows."
+        },
+        {
+          "from": "challenger-ascii-scene",
+          "raise": "Density encodes value: matrix and heatmap cells darken by count, so coverage reads before any number is read."
+        }
+      ],
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          {
+            "label": "sidebar",
+            "x": 0,
+            "y": 0,
+            "w": 2,
+            "h": 10
+          },
+          {
+            "label": "split-flap figures",
+            "x": 2,
+            "y": 0,
+            "w": 10,
+            "h": 2,
+            "accent": true
+          },
+          {
+            "label": "due this month · timetable board",
+            "x": 2,
+            "y": 2,
+            "w": 7,
+            "h": 8,
+            "accent": true
+          },
+          {
+            "label": "status strip",
+            "x": 9,
+            "y": 2,
+            "w": 3,
+            "h": 3
+          },
+          {
+            "label": "budget capacity",
+            "x": 9,
+            "y": 5,
+            "w": 3,
+            "h": 5
+          }
+        ]
+      }
+    },
+    {
+      "id": "model-pick",
+      "label": "The Logframe Dossier",
+      "kicker": "IMPECCABLE’S PICK",
+      "lineage": "Donor proposal packs: logframe matrix, Gantt workplan, budget annex",
+      "thesis": "The app as the living version of the proposal pack your team already writes for every donor.",
+      "palette": [
+        "#ffffff",
+        "#58595b",
+        "#be1f24",
+        "#dcddde",
+        "#939598"
+      ],
+      "materials": [
+        "ruled matrix tables",
+        "annex tabs",
+        "Gantt workplan bars",
+        "stamped approval marks"
+      ],
+      "viewport": "Dashboard as a cover sheet: the results chain as a matrix with indicators and targets in columns, and the workplan Gantt beneath.",
+      "risk": "The most familiar direction for this audience: it can feel like more paperwork rather than a command system.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          {
+            "label": "sidebar",
+            "x": 0,
+            "y": 0,
+            "w": 2,
+            "h": 10
+          },
+          {
+            "label": "annex tabs",
+            "x": 2,
+            "y": 0,
+            "w": 10,
+            "h": 1
+          },
+          {
+            "label": "logframe matrix",
+            "x": 2,
+            "y": 1,
+            "w": 10,
+            "h": 5,
+            "accent": true
+          },
+          {
+            "label": "gantt workplan",
+            "x": 2,
+            "y": 6,
+            "w": 10,
+            "h": 4
+          }
+        ]
+      }
+    },
+    {
+      "id": "challenger-phosphor-terminal",
+      "label": "Phosphor Terminal",
+      "verdict": "declined",
+      "lineage": "Green-phosphor machine-room terminals",
+      "thesis": "The portfolio as a scrolling transcript you type into.",
+      "palette": [
+        "#0a0f0a",
+        "#33ff66",
+        "#1a7a33"
+      ],
+      "materials": [
+        "monospace 80-column field",
+        "cursor bloom"
+      ],
+      "viewport": "A transcript of recent events with a typed prompt.",
+      "case": "Fuses poorly: managers and officers don't identify with a terminal, and donor money reads as log noise.",
+      "kept": "Keyboard-first operation and states that print themselves.",
+      "risk": "Unreadable for non-technical staff; conflicts with the brand palette.",
+      "hero": "https://impeccable.style/worlds/cards/signals-instruments-phosphor-terminal-midnight-hero.webp"
+    },
+    {
+      "id": "challenger-miura-sheet",
+      "label": "Miura-fold Sheet",
+      "verdict": "declined",
+      "lineage": "Deployable aerospace fold patterns",
+      "thesis": "Records unfold from packet to full sheet.",
+      "palette": [
+        "#ffffff",
+        "#c9a24a",
+        "#8a8580",
+        "#9fc3e0"
+      ],
+      "materials": [
+        "crease tessellation",
+        "gold foil packet"
+      ],
+      "viewport": "A folded portfolio packet that deploys into the full program sheet.",
+      "case": "Fuses poorly: the fold metaphor obscures status and money.",
+      "kept": "One control propagating across the whole sheet.",
+      "risk": "Heavy geometry for a daily tool."
+    },
+    {
+      "id": "challenger-cassette-jcard",
+      "label": "Mixtape J-card",
+      "verdict": "declined",
+      "lineage": "Hand-ruled cassette inlays",
+      "thesis": "Each program as a timed tracklist.",
+      "palette": [
+        "#ffffff",
+        "#2a3f9d",
+        "#8a8a8a",
+        "#c8102e"
+      ],
+      "materials": [
+        "ballpoint on lined inlay",
+        "side A / side B"
+      ],
+      "viewport": "Projects listed as tracks with running times.",
+      "case": "Fuses poorly: playful handwriting undermines donor-facing seriousness.",
+      "kept": "A hard capacity constraint that must not overflow.",
+      "risk": "Whimsy in a finance context."
+    },
+    {
+      "id": "challenger-zoo-map",
+      "label": "Guide-map Lobes",
+      "verdict": "declined",
+      "lineage": "Zoo & gardens guide maps",
+      "thesis": "Programs as swelling lobes of flat colour.",
+      "palette": [
+        "#8ed462",
+        "#f5f1e4",
+        "#2c2e2a",
+        "#ff705d"
+      ],
+      "materials": [
+        "flat SVG lobes",
+        "capsule controls"
+      ],
+      "viewport": "The portfolio drawn as a map of program regions.",
+      "case": "Fuses poorly: its palette overrides the brand, and geography is a false metaphor for programs.",
+      "kept": "Total, flat colour commitment.",
+      "risk": "Breaks the pinned palette."
+    },
+    {
+      "id": "challenger-ascii-scene",
+      "label": "ASCII Live Scene",
+      "verdict": "declined",
+      "lineage": "Typewriter-glyph renderings",
+      "thesis": "Data drawn as glyph density.",
+      "palette": [
+        "#000000",
+        "#ffb000"
+      ],
+      "materials": [
+        "glyph luminance ramp"
+      ],
+      "viewport": "Portfolio health as a glyph field.",
+      "case": "Fuses poorly: illegible for exact figures and Arabic text.",
+      "kept": "Density as a direct encoding of value.",
+      "risk": "Novelty over clarity."
+    },
+    {
+      "id": "challenger-cloud-quarry",
+      "label": "Cloud Quarry",
+      "verdict": "declined",
+      "lineage": "Surreal constructive worlds",
+      "thesis": "Cutting blocks of weather into buildings.",
+      "palette": [
+        "#f4f6f8",
+        "#6fa8dc",
+        "#5b6068",
+        "#c0c0c0"
+      ],
+      "materials": [
+        "volumetric cloud blocks",
+        "stencil tally boards"
+      ],
+      "viewport": "Stacked strata of program blocks.",
+      "case": "Fuses poorly: no identification, no clarity gain.",
+      "kept": "Stacked sections with deliberate gaps: a dense band earns a quiet one.",
+      "risk": "Pure spectacle."
+    }
+  ],
+  "reroll": {
+    "registers": [
+      "safer",
+      "bolder"
+    ]
+  },
+  "buildPath": {
+    "value": "code"
+  },
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "A best-in-class SaaS operations dashboard, in your brand colours.",
+    "palette": [
+      "#ffffff",
+      "#58595b",
+      "#be1f24",
+      "#dcddde"
+    ],
+    "materials": [
+      "KPI cards",
+      "area and donut charts",
+      "clean data tables"
+    ],
+    "viewport": "KPI card row, two charts, then a recent-activity table.",
+    "risk": "Polished, but indistinguishable from every other admin dashboard, which you asked to avoid.",
+    "wireframe": {
+      "cols": 12,
+      "rows": 10,
+      "regions": [
+        {
+          "label": "sidebar",
+          "x": 0,
+          "y": 0,
+          "w": 2,
+          "h": 10
+        },
+        {
+          "label": "kpi cards",
+          "x": 2,
+          "y": 0,
+          "w": 10,
+          "h": 2
+        },
+        {
+          "label": "area chart",
+          "x": 2,
+          "y": 2,
+          "w": 6,
+          "h": 4
+        },
+        {
+          "label": "donut",
+          "x": 8,
+          "y": 2,
+          "w": 4,
+          "h": 4
+        },
+        {
+          "label": "activity table",
+          "x": 2,
+          "y": 6,
+          "w": 10,
+          "h": 4
+        }
+      ]
+    }
+  },
+  "steer": true
+}
