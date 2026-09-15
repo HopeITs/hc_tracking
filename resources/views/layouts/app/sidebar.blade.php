@@ -67,6 +67,34 @@
             </flux:dropdown>
         </flux:header>
 
+        <!-- Desktop Top Navigation -->
+        <flux:header class="hidden min-h-16 border-b border-secondary-soft bg-white px-4 py-2 lg:flex dark:border-secondary-medium dark:bg-secondary-dark" data-desktop-navigation-header>
+            <flux:spacer />
+
+            <div class="flex items-center gap-1.5">
+                <flux:button
+                    x-data
+                    x-on:click="$flux.dark = ! $flux.dark"
+                    variant="ghost"
+                    size="sm"
+                    square
+                    class="size-9! touch-manipulation text-secondary-medium! hover:bg-secondary-soft! hover:text-secondary-dark! dark:text-secondary-soft! dark:hover:bg-white/10! dark:hover:text-white!"
+                    :aria-label="__('navigation.toggle_theme')"
+                    :tooltip="__('navigation.toggle_theme')"
+                    data-theme-toggle
+                >
+                    <flux:icon.moon x-show="! $flux.dark" variant="mini" />
+                    <flux:icon.sun x-show="$flux.dark" x-cloak variant="mini" />
+                </flux:button>
+
+                <x-locale-toggle />
+
+                <div class="ms-1 border-s border-secondary-soft ps-2 dark:border-secondary-medium">
+                    <x-desktop-user-menu />
+                </div>
+            </div>
+        </flux:header>
+
         {{ $slot }}
 
         @persist('toast')

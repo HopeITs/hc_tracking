@@ -7,6 +7,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/views/{components/navigation/**,layouts/app/sidebar.blade.php} | .ai/rules/app.md |
 | {app/Actions/Fortify/**,app/Console/Commands/**,config/auth.php,database/seeders/**} | .ai/rules/commands-seeders.md |
 | {app/Actions/Fortify/**,app/Console/Commands/**,config/fortify.php} | .ai/rules/commands.md |
+| resources/views/components/navigation/sidebar.blade.php | .ai/rules/components-navigation.md |
 | app/Concerns/HasTree.php | .ai/rules/concerns.md |
 | {config/database.php,.env.example} | .ai/rules/config.md |
 | resources/css/app.css | .ai/rules/css.md |

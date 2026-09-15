@@ -12,6 +12,7 @@ return [
     'results_learning' => 'Results & Learning',
     'search' => 'Search',
     'switch_language' => 'Switch language',
+    'toggle_sidebar' => 'Collapse or expand the sidebar',
     'toggle_theme' => 'Switch light or dark mode',
     'user_directory' => 'User directory',
 ];

@@ -3,6 +3,7 @@
 use App\Enums\ProjectStatus;
 use App\Models\Program;
 use App\Models\Project;
+use App\Models\Strategy;
 use App\Models\User;
 use Livewire\Livewire;
 
@@ -40,6 +41,23 @@ test('projects can be filtered by search city program owner and status', functio
         ->call('clearFilters')->set('search', 'عمر')->assertDontSee('Aleppo Wells')->assertSee('Homs Shelter')
         ->call('clearFilters')->set('status', ProjectStatus::Active->value)->assertSee('Aleppo Wells')->assertDontSee('Homs Shelter')
         ->call('clearFilters')->assertSet('status', '')->assertSee('Aleppo Wells')->assertSee('Homs Shelter');
+});
+
+test('projects can be filtered by strategy across every one of its programs', function () {
+    $user = User::factory()->create();
+    $waterStrategy = Strategy::factory()->create();
+    $otherStrategy = Strategy::factory()->create();
+    $water = Program::factory()->create(['name' => 'Water Security', 'strategy_id' => $waterStrategy->id]);
+    $shelter = Program::factory()->create(['name' => 'Safe Shelter', 'strategy_id' => $otherStrategy->id]);
+
+    Project::factory()->create(['name' => 'Aleppo Wells', 'program_id' => $water->id]);
+    Project::factory()->create(['name' => 'Homs Shelter', 'program_id' => $shelter->id]);
+
+    $this->actingAs($user)
+        ->get(route('projects.index', ['strategy' => $waterStrategy->id]))
+        ->assertOk()
+        ->assertSeeText('Aleppo Wells')
+        ->assertDontSeeText('Homs Shelter');
 });
 
 test('the status URL filter selects projects by lifecycle state', function () {

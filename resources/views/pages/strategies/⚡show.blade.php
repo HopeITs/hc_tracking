@@ -194,8 +194,8 @@ new #[Title('titles.strategy')] class extends Component {
 
     <div class="grid gap-3 @2xl/detail:grid-cols-4">
         <x-ui.stat-tile :label="__('common.programs')" :value="$strategy->programs_count" icon="briefcase" :href="route('programs.index', ['strategy' => $strategy->id])" />
-        <x-ui.stat-tile :label="__('common.projects')" :value="$this->totals['projects']" icon="rectangle-stack" :href="route('programs.index', ['strategy' => $strategy->id])" />
-        <x-ui.stat-tile :label="__('common.annual_plans')" :value="$this->totals['plans']" icon="calendar-days" :href="route('programs.index', ['strategy' => $strategy->id])" />
+        <x-ui.stat-tile :label="__('common.projects')" :value="$this->totals['projects']" icon="rectangle-stack" :href="route('projects.index', ['strategy' => $strategy->id])" />
+        <x-ui.stat-tile :label="__('common.annual_plans')" :value="$this->totals['plans']" icon="calendar-days" :href="route('yearly-plans.index', ['strategy' => $strategy->id])" />
 
         <div class="rounded-xl border border-secondary-soft bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-secondary-medium dark:bg-secondary-dark dark:shadow-none">
             <div class="flex items-start justify-between gap-3">

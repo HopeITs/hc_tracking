@@ -94,6 +94,22 @@ test('filtering by assigned manager keeps only the plans that manager owns', fun
         ->assertSee('Water Security, 2025, no plan');
 });
 
+test('the strategy URL filter keeps only the programs under that strategy', function () {
+    $user = User::factory()->create();
+    $waterStrategy = Strategy::factory()->create();
+    $water = Program::factory()->create(['name' => 'Water Security', 'strategy_id' => $waterStrategy->id]);
+    $shelter = matrixProgram('Safe Shelter');
+
+    YearlyPlan::factory()->create(['program_id' => $water->id, 'year' => 2026]);
+    YearlyPlan::factory()->create(['program_id' => $shelter->id, 'year' => 2026]);
+
+    $this->actingAs($user)
+        ->get(route('yearly-plans.index', ['strategy' => $waterStrategy->id]))
+        ->assertOk()
+        ->assertSeeText('Water Security')
+        ->assertDontSeeText('Safe Shelter');
+});
+
 test('the manager filter only offers hr employees who are accountable for a plan', function () {
     $user = User::factory()->create();
     $planned = insertHrEmployee(firstNameEn: 'Layla', lastNameEn: 'Haddad');

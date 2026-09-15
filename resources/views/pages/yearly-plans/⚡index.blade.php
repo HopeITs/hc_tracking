@@ -33,6 +33,9 @@ new #[Title('titles.annual_plans')] class extends Component {
     #[Url(except: '')]
     public string $manager = '';
 
+    #[Url(except: '')]
+    public string $strategy = '';
+
     public function updatedYearFrom(): void
     {
         $this->resetPage();
@@ -48,11 +51,17 @@ new #[Title('titles.annual_plans')] class extends Component {
         $this->resetPage();
     }
 
+    public function updatedStrategy(): void
+    {
+        $this->resetPage();
+    }
+
     public function clearFilters(): void
     {
         $this->yearFrom = '';
         $this->yearTo = '';
         $this->manager = '';
+        $this->strategy = '';
         $this->resetPage();
     }
 
@@ -181,6 +190,7 @@ new #[Title('titles.annual_plans')] class extends Component {
                     }
                 },
             ))
+            ->when($this->strategy !== '', fn (Builder $query) => $query->where('strategy_id', (int) $this->strategy))
             ->orderBy('name')
             ->orderBy('id')
             ->paginate(15);

@@ -162,3 +162,15 @@ test('the strategy detail stat row totals equal the sum across programs', functi
         ->assertSeeText('3')
         ->assertSeeText('1');
 });
+
+test('the projects and annual plans stat tiles link to their own pages, not programs', function () {
+    $user = User::factory()->create();
+    $strategy = Strategy::factory()->create();
+
+    $this->actingAs($user)
+        ->get(route('strategies.show', $strategy))
+        ->assertOk()
+        ->assertSee(route('programs.index', ['strategy' => $strategy->id]), false)
+        ->assertSee(route('projects.index', ['strategy' => $strategy->id]), false)
+        ->assertSee(route('yearly-plans.index', ['strategy' => $strategy->id]), false);
+});
