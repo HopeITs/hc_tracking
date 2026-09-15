@@ -1,0 +1,126 @@
+{
+  "title": "Dashboard layout",
+  "question": "Three structures for the home dashboard, all in the HC Tracking red/gray world with Somar Sans. Lock one, steer, or re-roll.",
+  "options": [
+    {
+      "id": "triage-bento",
+      "label": "Triage Bento",
+      "kicker": "THE ROLL",
+      "lineage": "Asymmetric bento board where a tile's size tracks its urgency",
+      "thesis": "The biggest tile is always what's slipping today; everything else steps down in size by urgency.",
+      "palette": ["#be1f24", "#58595b", "#939598", "#dcddde", "#2b5f6b", "#1d7a4c"],
+      "materials": ["soft-shadow cards", "ApexCharts donut, bars, area", "per-currency funding bars"],
+      "viewport": "Greeting + date + your 'My work' chips on top; a 7-column Needs Attention queue beside a stacked Funding Position tile per currency (USD/EUR/SYP); five count tiles underneath.",
+      "risk": "Bento can drift into decoration if tile sizes stop meaning urgency.",
+      "comp": ".impeccable/mocks/decision/triage-bento.webp",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "greeting + my work", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "needs attention queue", "x": 0, "y": 1, "w": 7, "h": 5, "accent": true },
+          { "label": "funding by currency", "x": 7, "y": 1, "w": 5, "h": 3 },
+          { "label": "overdue", "x": 7, "y": 4, "w": 2, "h": 2 },
+          { "label": "risks", "x": 9, "y": 4, "w": 3, "h": 2 },
+          { "label": "projects donut", "x": 0, "y": 6, "w": 4, "h": 2 },
+          { "label": "proposal pipeline", "x": 4, "y": 6, "w": 4, "h": 2 },
+          { "label": "received 12 mo", "x": 8, "y": 6, "w": 4, "h": 2 },
+          { "label": "recent activity", "x": 0, "y": 8, "w": 12, "h": 2 }
+        ]
+      }
+    },
+    {
+      "id": "program-matrix",
+      "label": "Program Health Matrix",
+      "lineage": "Portfolio heat grid: programs as rows, health dimensions as columns",
+      "thesis": "One grid answers 'which program is in trouble, and on what': every cell is a status and a link.",
+      "palette": ["#be1f24", "#9a6412", "#1d7a4c", "#58595b", "#dcddde", "#2b5f6b"],
+      "materials": ["status heat cells", "attention ribbon counters", "ApexCharts"],
+      "viewport": "Attention ribbon of five critical counters + My work strip on top; below, a matrix of all 14 programs × Plan / Milestones / Tasks / Risks / Reports / Funding, with Funding Position in a right rail.",
+      "risk": "A 6-column matrix gets dense on phones; it stacks into one program card per row there.",
+      "comp": ".impeccable/mocks/decision/program-matrix.webp",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "attention ribbon", "x": 0, "y": 0, "w": 12, "h": 1, "accent": true },
+          { "label": "my work", "x": 0, "y": 1, "w": 12, "h": 1 },
+          { "label": "program × health matrix", "x": 0, "y": 2, "w": 8, "h": 5, "accent": true },
+          { "label": "funding rail", "x": 8, "y": 2, "w": 4, "h": 5 },
+          { "label": "projects donut", "x": 0, "y": 7, "w": 4, "h": 3 },
+          { "label": "pipeline", "x": 4, "y": 7, "w": 4, "h": 3 },
+          { "label": "activity", "x": 8, "y": 7, "w": 4, "h": 3 }
+        ]
+      }
+    },
+    {
+      "id": "horizon",
+      "label": "90-Day Horizon",
+      "lineage": "One shared time axis, 30 days back to 60 days ahead, with a Today line",
+      "thesis": "Every deadline in the system on one timeline: what's overdue piles up left of Today, what's coming sits to the right.",
+      "palette": ["#be1f24", "#2b5f6b", "#9a6412", "#58595b", "#939598", "#dcddde"],
+      "materials": ["swimlane timeline", "Today rule", "KPI tiles", "ApexCharts"],
+      "viewport": "KPI tiles + My work on top; a full-width horizon with lanes for Milestones, Tasks, Transfers, Reports and Proposal deadlines; below, Funding Position and pipeline side by side.",
+      "risk": "Busy weeks cluster markers; the lanes need grouping and counts to stay readable.",
+      "raised": [
+        { "from": "oscilloscope", "raise": "All delivery and money signals share one time axis instead of separate pages." }
+      ],
+      "comp": ".impeccable/mocks/decision/horizon.webp",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "kpi tiles", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "my work", "x": 0, "y": 1, "w": 12, "h": 1 },
+          { "label": "90-day horizon swimlanes", "x": 0, "y": 2, "w": 12, "h": 4, "accent": true },
+          { "label": "funding by currency", "x": 0, "y": 6, "w": 6, "h": 2 },
+          { "label": "pipeline + projects", "x": 6, "y": 6, "w": 6, "h": 2 },
+          { "label": "attention list", "x": 0, "y": 8, "w": 7, "h": 2 },
+          { "label": "activity", "x": 7, "y": 8, "w": 5, "h": 2 }
+        ]
+      }
+    },
+    {
+      "id": "oscilloscope",
+      "label": "Signal Bench",
+      "verdict": "declined",
+      "lineage": "CRT oscilloscope",
+      "thesis": "Many signals on one graticule.",
+      "palette": ["#0b0f0c", "#39ff88", "#ffb000"],
+      "materials": ["phosphor trace", "graticule"],
+      "viewport": "One screen of overlaid signal traces.",
+      "risk": "Phosphor-on-black breaks the red/gray brand.",
+      "case": "Loses on audience and clarity; its shared-axis discipline went into 90-Day Horizon.",
+      "kept": "One time axis for every signal."
+    },
+    {
+      "id": "busytown",
+      "label": "Cutaway Town",
+      "verdict": "declined",
+      "lineage": "Busytown cross-section spreads",
+      "thesis": "Every program as a labeled building.",
+      "palette": ["#b5412f", "#f2c230", "#4f8a3c"],
+      "materials": ["gouache flats", "printed labels"],
+      "viewport": "A panning illustrated scene.",
+      "risk": "Playful illustration undermines a funding manager's trust.",
+      "case": "Loses both axes for daily operational use.",
+      "kept": "Label everything plainly."
+    },
+    {
+      "id": "ascii",
+      "label": "Glyph Render",
+      "verdict": "declined",
+      "lineage": "ASCII live scene",
+      "thesis": "Density as tone.",
+      "palette": ["#000000", "#33ff66"],
+      "materials": ["monospace grid"],
+      "viewport": "A character-grid scene.",
+      "risk": "Unreadable for figures and Arabic.",
+      "case": "Loses both axes.",
+      "kept": "Strict grid alignment."
+    }
+  ],
+  "reroll": { "registers": ["safer", "bolder"] },
+  "buildPath": { "value": "code", "toggle": true },
+  "steer": true
+}

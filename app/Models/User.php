@@ -54,11 +54,12 @@ class User extends Authenticatable implements PasskeyUser
     /**
      * Mirror the columns' DB defaults so a user that has not been round-tripped
      * through the database still reports them under strict mode: no language
-     * chosen, and the least-privileged application role.
+     * chosen, the least-privileged application role, and no linked HR employee.
      *
      * @var array<string, mixed>
      */
     protected $attributes = [
+        'employee_id' => null,
         'locale' => null,
         'role' => 'Officer',
     ];

@@ -7,6 +7,7 @@
 
 return [
     'date' => 'M j, Y',
+    'date_long' => 'l, F j, Y',
     'date_short' => 'M j',
     'datetime' => 'M j, Y · H:i',
     'month_short' => 'M',

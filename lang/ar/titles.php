@@ -6,6 +6,7 @@ return [
     'annual_plans' => 'الخطط السنوية',
     'appearance_settings' => 'إعدادات المظهر',
     'city_directory' => 'دليل المدن',
+    'dashboard' => 'لوحة التحكم',
     'donor' => 'المانح',
     'donors' => 'المانحون',
     'executive_summary' => 'الملخص التنفيذي',

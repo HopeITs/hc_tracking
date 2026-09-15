@@ -9,7 +9,7 @@ Route::view('/', 'welcome')->name('home');
 Route::post('locale', SwitchLocaleController::class)->name('locale.update');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::view('dashboard', 'dashboard')->name('dashboard');
+    Route::livewire('dashboard', 'pages::dashboard.index')->name('dashboard');
 
     Route::livewire('executive-summary', 'pages::executive-summary.index')
         ->name('executive-summary.index');
