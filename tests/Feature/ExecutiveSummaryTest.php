@@ -119,11 +119,11 @@ test('changing the fiscal year moves the year scoped cards but leaves geographic
     Livewire::actingAs($user)
         ->test('pages::executive-summary.index')
         ->assertSee('2 of 3 programs')
-        ->assertSee('FY '.currentFiscalYear())
+        ->assertSee('Annual plan '.currentFiscalYear())
         ->assertSee('1 of 2 cities')
         ->set('year', (string) (currentFiscalYear() - 1))
         ->assertSee('1 of 3 programs')
-        ->assertSee('FY '.(currentFiscalYear() - 1))
+        ->assertSee('Annual plan '.(currentFiscalYear() - 1))
         ->assertSee('1 of 2 cities');
 });
 
@@ -133,7 +133,7 @@ test('a fiscal year with no plans reports no coverage rather than disappearing',
 
     Livewire::actingAs($user)
         ->test('pages::executive-summary.index')
-        ->assertSee('FY '.currentFiscalYear())
+        ->assertSee('Annual plan '.currentFiscalYear())
         ->assertSee('0 of 2 programs')
         ->assertSee('0%');
 });
@@ -147,7 +147,7 @@ test('a fiscal year outside the offered options falls back to the current one', 
     Livewire::actingAs($user)
         ->test('pages::executive-summary.index')
         ->set('year', '1999')
-        ->assertSee('FY '.currentFiscalYear())
+        ->assertSee('Annual plan '.currentFiscalYear())
         ->assertSee('1 of 1 programs');
 });
 
