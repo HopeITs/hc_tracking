@@ -4,6 +4,7 @@ use App\Models\Program;
 use App\Models\Strategy;
 use App\Models\User;
 use Illuminate\Support\Facades\Date;
+use Livewire\Livewire;
 
 test('guests are redirected from the strategy portfolio', function () {
     $this->get(route('strategies.index'))->assertRedirect(route('login'));
@@ -103,6 +104,26 @@ test('the strategy portfolio status strip filters the results and counts correct
         ->assertOk()
         ->assertSeeText('Upcoming strategy')
         ->assertDontSeeText('Active strategy');
+});
+
+test('the status dropdown filters the list and ignores an unknown status', function () {
+    $user = User::factory()->create();
+    Strategy::factory()->create(['name' => 'Active strategy', 'start_year' => 2026, 'end_year' => 2030]);
+    Strategy::factory()->create(['name' => 'Upcoming strategy', 'start_year' => 2031, 'end_year' => 2035]);
+
+    Date::withTestNow('2026-06-15', function () use ($user) {
+        Livewire::actingAs($user)
+            ->test('pages::strategies.index')
+            ->call('filterByStatus', 'upcoming')
+            ->assertSet('status', 'upcoming')
+            ->assertSeeText('Upcoming strategy')
+            ->assertDontSeeText('Active strategy')
+            // Anything outside the three known statuses falls back to "all".
+            ->call('filterByStatus', 'not-a-status')
+            ->assertSet('status', '')
+            ->assertSeeText('Active strategy')
+            ->assertSeeText('Upcoming strategy');
+    });
 });
 
 test('the strategy portfolio timeline and list link to the strategy and show its program count', function () {

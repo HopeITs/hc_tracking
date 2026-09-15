@@ -25,6 +25,11 @@ new #[Title('titles.strategies')] class extends Component {
     public string $startYear = '';
     public string $endYear = '';
 
+    public function filterByStatus(string $status = ''): void
+    {
+        $this->status = in_array($status, ['active', 'upcoming', 'completed'], true) ? $status : '';
+    }
+
     public function resetFilters(): void
     {
         $this->search = '';
@@ -238,6 +243,12 @@ new #[Title('titles.strategies')] class extends Component {
 @php
     $portfolio = $this->portfolio;
 
+    $statusOptions = [
+        'active' => __('common.active'),
+        'upcoming' => __('strategies.upcoming'),
+        'completed' => __('common.completed'),
+    ];
+
     $toneFor = fn (string $status): string => match ($status) {
         'active' => 'good',
         default => 'neutral',
@@ -270,7 +281,7 @@ new #[Title('titles.strategies')] class extends Component {
 @endphp
 
 <section
-    class="@container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white"
+    class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white"
     aria-labelledby="strategies-heading"
 >
     <header class="grid gap-8 border-b border-secondary-soft pb-7 @6xl/directory:grid-cols-[minmax(16rem,.7fr)_minmax(0,1.3fr)] @6xl/directory:items-center dark:border-secondary-medium">
@@ -281,7 +292,7 @@ new #[Title('titles.strategies')] class extends Component {
             </div>
         </div>
 
-        <div class="grid gap-3 @3xl/directory:grid-cols-2 @6xl/directory:grid-cols-3">
+        <div class="directory-filters grid gap-3 @3xl/directory:grid-cols-2 @6xl/directory:grid-cols-3">
             @if ($this->canManage)
                 <div class="min-w-0">
                     <span aria-hidden="true" class="mb-1.5 hidden text-[11px] font-semibold uppercase tracking-[0.1em] opacity-0 @3xl/directory:block">&nbsp;</span>
@@ -292,16 +303,27 @@ new #[Title('titles.strategies')] class extends Component {
             @endif
             <div class="min-w-0">
                 <label for="strategy-search" class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-secondary-soft">{{ __('strategies.search_strategies') }}</label>
-                <x-ui.input id="strategy-search" type="search" icon="magnifying-glass" :aria-label="__('strategies.search_strategies')" :placeholder="__('strategies.search_by_name')" wire:model.live.debounce.300ms="search" clearable />
+                <x-ui.input id="strategy-search" type="search" icon="magnifying-glass" :aria-label="__('strategies.search_strategies')" :placeholder="__('strategies.search_by_name')" wire:model.live.debounce.300ms="search" />
             </div>
             <div class="min-w-0">
                 <label for="strategy-status" class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-secondary-soft">{{ __('strategies.filter_by_status') }}</label>
-                <x-ui.select id="strategy-status" :aria-label="__('strategies.filter_by_status')" wire:model.live="status">
-                    <flux:select.option value="">{{ __('common.all_statuses') }}</flux:select.option>
-                    <flux:select.option value="active">{{ __('common.active') }}</flux:select.option>
-                    <flux:select.option value="upcoming">{{ __('strategies.upcoming') }}</flux:select.option>
-                    <flux:select.option value="completed">{{ __('common.completed') }}</flux:select.option>
-                </x-ui.select>
+                <flux:dropdown position="bottom" align="start" class="filter-picker block! w-full!">
+                    <flux:button id="strategy-status" variant="outline" icon:trailing="chevron-up-down" class="w-full! justify-between!" :aria-label="__('strategies.filter_by_status')">
+                        <span class="truncate">{{ $statusOptions[$status] ?? __('common.all_statuses') }}</span>
+                    </flux:button>
+                    <flux:menu class="filter-menu">
+                        <flux:menu.item wire:click="filterByStatus">
+                            {{ __('common.all_statuses') }}
+                            @if ($status === '')<flux:icon.check class="ms-auto size-4 text-secondary-medium" />@endif
+                        </flux:menu.item>
+                        @foreach ($statusOptions as $statusValue => $statusOptionLabel)
+                            <flux:menu.item wire:click="filterByStatus('{{ $statusValue }}')" :wire:key="'status-filter-'.$statusValue">
+                                <span class="min-w-0 truncate">{{ $statusOptionLabel }}</span>
+                                @if ($status === $statusValue)<flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" />@endif
+                            </flux:menu.item>
+                        @endforeach
+                    </flux:menu>
+                </flux:dropdown>
             </div>
         </div>
     </header>
@@ -321,7 +343,7 @@ new #[Title('titles.strategies')] class extends Component {
         </div>
 
         <div class="flex shrink-0 items-center gap-2">
-            <span wire:loading.delay.flex wire:target="search,status,resetFilters" class="hidden items-center gap-1.5 text-xs text-secondary-medium dark:text-secondary-soft"><flux:icon.arrow-path class="size-3.5 animate-spin" /> {{ __('common.updating') }}</span>
+            <span wire:loading.delay.flex wire:target="search,filterByStatus,resetFilters" class="hidden items-center gap-1.5 text-xs text-secondary-medium dark:text-secondary-soft"><flux:icon.arrow-path class="size-3.5 animate-spin" /> {{ __('common.updating') }}</span>
             @if ($portfolio['filters_active'])
                 <flux:button size="sm" variant="ghost" wire:click="resetFilters">{{ __('common.reset_filters') }}</flux:button>
             @endif
