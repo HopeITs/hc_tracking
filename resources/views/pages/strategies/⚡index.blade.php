@@ -276,16 +276,9 @@ new #[Title('titles.strategies')] class extends Component {
     <x-ui.page-header
         :title="__('common.strategies')"
         :count="$portfolio['total']"
-        :description="__('strategies.a_complete_view_of_the_strategic_planning_cycles_that_guide')"
         headingId="strategies-heading"
     >
         <x-slot:filters>
-            @if ($this->canManage)
-                <x-ui.button tone="primary" icon="plus" class="min-h-11 touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-strategy-button">
-                    {{ __('strategies.add_strategy') }}
-                </x-ui.button>
-            @endif
-
             <x-ui.input
                 type="search"
                 icon="magnifying-glass"
@@ -295,13 +288,21 @@ new #[Title('titles.strategies')] class extends Component {
                 clearable
             />
 
-            <x-ui.select :label="__('strategies.filter_by_status')" wire:model.live="status">
+            <x-ui.header-filter-select :label="__('strategies.filter_by_status')" wire:model.live="status" :value="$status">
                 <flux:select.option value="">{{ __('common.all_statuses') }}</flux:select.option>
                 <flux:select.option value="active">{{ __('common.active') }}</flux:select.option>
                 <flux:select.option value="upcoming">{{ __('strategies.upcoming') }}</flux:select.option>
                 <flux:select.option value="completed">{{ __('common.completed') }}</flux:select.option>
-            </x-ui.select>
+            </x-ui.header-filter-select>
         </x-slot:filters>
+
+        @if ($this->canManage)
+            <x-slot:actions>
+                <x-ui.button tone="primary" icon="plus" class="min-h-11 touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-strategy-button">
+                    {{ __('strategies.add_strategy') }}
+                </x-ui.button>
+            </x-slot:actions>
+        @endif
 
         <x-slot:summary>
             @if ($portfolio['has_records'] && $portfolio['status_counts']['active'] === 0 && ! $portfolio['filters_active'])

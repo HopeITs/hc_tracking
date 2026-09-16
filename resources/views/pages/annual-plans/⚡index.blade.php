@@ -493,48 +493,32 @@ new #[Title('titles.annual_plans')] class extends Component {
     aria-labelledby="annual-plan-matrix-heading"
     x-data="{ hoverYear: null, hoverProgram: null, gapsOnly: false }"
 >
-    <header class="grid gap-8 border-b border-secondary-soft pb-7 @6xl/matrix:grid-cols-[minmax(16rem,.7fr)_minmax(0,1.3fr)] @6xl/matrix:items-center dark:border-secondary-medium">
-        <div class="min-w-0">
-            <div class="flex items-center gap-2.5">
-                <flux:heading id="annual-plan-matrix-heading" size="xl" class="text-3xl! font-bold! leading-none!">{{ __('common.annual_plans') }}</flux:heading>
-                <span class="inline-flex min-w-7 items-center justify-center rounded-md bg-primary px-2 py-0.5 text-xs font-bold tabular-nums text-white">{{ array_sum(array_column($yearStats, 'plans')) }}</span>
-            </div>
-        </div>
+    <x-ui.page-header heading-id="annual-plan-matrix-heading" :title="__('common.annual_plans')" :count="array_sum(array_column($yearStats, 'plans'))">
+        <x-slot:filters>
+            <x-ui.header-filter-select id="annual-plan-year-from" :label="__('annual_plans.from_fiscal_year')" wire:model.live="yearFrom" :value="$yearFrom">
+                <flux:select.option value="">{{ __('annual_plans.earliest') }}</flux:select.option>
+                @foreach ($this->yearOptions as $yearOption)
+                    <flux:select.option :value="$yearOption" :wire:key="'year-from-'.$yearOption">{{ $yearOption }}</flux:select.option>
+                @endforeach
+            </x-ui.header-filter-select>
 
-        <div class="directory-filters grid gap-3 @3xl/matrix:grid-cols-2 @6xl/matrix:grid-cols-3">
-            <div class="min-w-0">
-                <label for="annual-plan-year-from" class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-secondary-soft">{{ __('annual_plans.from_fiscal_year') }}</label>
-                <flux:select id="annual-plan-year-from" :aria-label="__('annual_plans.from_fiscal_year')" wire:model.live="yearFrom">
-                    <flux:select.option value="">{{ __('annual_plans.earliest') }}</flux:select.option>
-                    @foreach ($this->yearOptions as $yearOption)
-                        <flux:select.option :value="$yearOption" :wire:key="'year-from-'.$yearOption">{{ $yearOption }}</flux:select.option>
-                    @endforeach
-                </flux:select>
-            </div>
+            <x-ui.header-filter-select id="annual-plan-year-to" :label="__('annual_plans.to_fiscal_year')" wire:model.live="yearTo" :value="$yearTo">
+                <flux:select.option value="">{{ __('annual_plans.latest') }}</flux:select.option>
+                @foreach ($this->yearOptions as $yearOption)
+                    <flux:select.option :value="$yearOption" :wire:key="'year-to-'.$yearOption">{{ $yearOption }}</flux:select.option>
+                @endforeach
+            </x-ui.header-filter-select>
 
-            <div class="min-w-0">
-                <label for="annual-plan-year-to" class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-secondary-soft">{{ __('annual_plans.to_fiscal_year') }}</label>
-                <flux:select id="annual-plan-year-to" :aria-label="__('annual_plans.to_fiscal_year')" wire:model.live="yearTo">
-                    <flux:select.option value="">{{ __('annual_plans.latest') }}</flux:select.option>
-                    @foreach ($this->yearOptions as $yearOption)
-                        <flux:select.option :value="$yearOption" :wire:key="'year-to-'.$yearOption">{{ $yearOption }}</flux:select.option>
-                    @endforeach
-                </flux:select>
-            </div>
-
-            <div class="min-w-0">
-                <label for="annual-plan-manager" class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-secondary-soft">{{ __('annual_plans.assigned_manager') }}</label>
-                <flux:select id="annual-plan-manager" :aria-label="__('annual_plans.assigned_manager')" wire:model.live="manager">
-                    <flux:select.option value="">{{ __('common.all_managers') }}</flux:select.option>
-                    @foreach ($this->managerOptions as $managerOption)
-                        <flux:select.option :value="$managerOption->id" :wire:key="'manager-filter-'.$managerOption->id">
-                            {{ $managerOption->name }} · {{ $managerOption->secondary_name }}
-                        </flux:select.option>
-                    @endforeach
-                </flux:select>
-            </div>
-        </div>
-    </header>
+            <x-ui.header-filter-select id="annual-plan-manager" :label="__('annual_plans.assigned_manager')" wire:model.live="manager" :value="$manager">
+                <flux:select.option value="">{{ __('common.all_managers') }}</flux:select.option>
+                @foreach ($this->managerOptions as $managerOption)
+                    <flux:select.option :value="$managerOption->id" :wire:key="'manager-filter-'.$managerOption->id">
+                        {{ $managerOption->name }} · {{ $managerOption->secondary_name }}
+                    </flux:select.option>
+                @endforeach
+            </x-ui.header-filter-select>
+        </x-slot:filters>
+    </x-ui.page-header>
 
     <div class="flex justify-end">
         <span wire:loading.delay.flex wire:target="yearFrom,yearTo,manager,strategy,programSearch,clearFilters,focusOnYear" class="hidden items-center gap-1.5 text-xs text-secondary-medium dark:text-secondary-soft">

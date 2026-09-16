@@ -159,16 +159,15 @@ new #[Title('titles.accounts')] class extends Component {
         heading-id="account-directory-heading"
         :title="__('common.accounts')"
         :count="$this->accounts->total()"
-        :description="__('accounts.bank_accounts_money_is_received_into_accounts_close_they_are')"
     >
         <x-slot:filters>
             <x-ui.input type="search" icon="magnifying-glass" :label="__('accounts.search_accounts')" :placeholder="__('accounts.account_name')" wire:model.live.debounce.300ms="search" clearable />
 
-            <x-ui.select :label="__('common.state')" wire:model.live="state">
+            <x-ui.header-filter-select :label="__('common.state')" wire:model.live="state" :value="$state">
                 <flux:select.option value="">{{ __('common.all_accounts') }}</flux:select.option>
                 <flux:select.option value="active">{{ __('accounts.open') }}</flux:select.option>
                 <flux:select.option value="closed">{{ __('accounts.closed') }}</flux:select.option>
-            </x-ui.select>
+            </x-ui.header-filter-select>
         </x-slot:filters>
 
         <x-slot:actions>

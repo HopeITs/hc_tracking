@@ -234,24 +234,23 @@ new #[Title('titles.proposals')] class extends Component {
         heading-id="proposal-pipeline-heading"
         :title="__('common.proposals')"
         :count="$this->proposals->total()"
-        :description="__('proposals.the_funding_pipeline_newest_planned_start_first_phase_is_der')"
     >
         <x-slot:filters>
             <x-ui.input type="search" icon="magnifying-glass" :label="__('proposals.search_proposals')" :placeholder="__('proposals.name_or_notes')" wire:model.live.debounce.300ms="search" clearable />
 
-            <x-ui.select :label="__('common.status')" wire:model.live="status">
+            <x-ui.header-filter-select :label="__('common.status')" wire:model.live="status" :value="$status">
                 <flux:select.option value="">{{ __('common.all_statuses') }}</flux:select.option>
                 @foreach (ProposalStatus::cases() as $statusCase)
                     <flux:select.option :value="$statusCase->value" :wire:key="'proposal-status-'.$statusCase->value">{{ $statusCase->label() }}</flux:select.option>
                 @endforeach
-            </x-ui.select>
+            </x-ui.header-filter-select>
 
-            <x-ui.select :label="__('proposals.phase')" wire:model.live="phase">
+            <x-ui.header-filter-select :label="__('proposals.phase')" wire:model.live="phase" :value="$phase">
                 <flux:select.option value="">{{ __('proposals.all_phases') }}</flux:select.option>
                 @foreach (ProposalPhase::cases() as $phaseCase)
                     <flux:select.option :value="$phaseCase->value" :wire:key="'proposal-phase-'.$phaseCase->value">{{ $phaseCase->label() }}</flux:select.option>
                 @endforeach
-            </x-ui.select>
+            </x-ui.header-filter-select>
         </x-slot:filters>
 
         <x-slot:actions>

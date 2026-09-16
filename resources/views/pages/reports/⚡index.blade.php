@@ -298,30 +298,29 @@ new #[Title('titles.reports')] class extends Component {
         heading-id="report-directory-heading"
         :title="__('common.reports')"
         :count="$this->reports->total()"
-        :description="__('reports.reported_figures_against_committed_targets_newest_period_fir')"
     >
         <x-slot:filters>
             <x-ui.input type="search" icon="magnifying-glass" :label="__('reports.search_reports')" :placeholder="__('reports.indicator_or_narrative')" wire:model.live.debounce.300ms="search" clearable />
 
-            <x-ui.select :label="__('common.status')" wire:model.live="status">
+            <x-ui.header-filter-select :label="__('common.status')" wire:model.live="status" :value="$status">
                 <flux:select.option value="">{{ __('reports.all_reports') }}</flux:select.option>
                 @foreach (ReportStatus::cases() as $statusCase)
                     <flux:select.option :value="$statusCase->value" :wire:key="'rpt-status-'.$statusCase->value">{{ $statusCase->label() }}</flux:select.option>
                 @endforeach
-            </x-ui.select>
+            </x-ui.header-filter-select>
 
-            <x-ui.select :label="__('reports.meal_review')" wire:model.live="seenByMeal">
+            <x-ui.header-filter-select :label="__('reports.meal_review')" wire:model.live="seenByMeal" :value="$seenByMeal">
                 <flux:select.option value="">{{ __('reports.any') }}</flux:select.option>
                 <flux:select.option value="seen">{{ __('reports.seen_by_meal') }}</flux:select.option>
                 <flux:select.option value="unseen">{{ __('reports.not_yet_seen') }}</flux:select.option>
-            </x-ui.select>
+            </x-ui.header-filter-select>
 
-            <x-ui.select :label="__('reports.reported_by')" wire:model.live="author">
+            <x-ui.header-filter-select :label="__('reports.reported_by')" wire:model.live="author" :value="$author">
                 <flux:select.option value="">{{ __('common.anyone') }}</flux:select.option>
                 @foreach ($this->authorOptions as $authorOption)
                     <flux:select.option :value="$authorOption->id" :wire:key="'rpt-author-'.$authorOption->id">{{ $authorOption->name }}</flux:select.option>
                 @endforeach
-            </x-ui.select>
+            </x-ui.header-filter-select>
         </x-slot:filters>
 
         <x-slot:actions>

@@ -234,29 +234,37 @@ new #[Title('titles.results_framework')] class extends Component {
 
 @php
     $filtersAreActive = $program !== '' || $type !== '';
+    $countVisibleResults = function (Collection $results) use (&$countVisibleResults): int {
+        return $results->sum(
+            fn (Result $result): int => 1 + $countVisibleResults($result->childrenRecursive),
+        );
+    };
+    $visibleResultCount = $this->groupedRoots->sum(
+        fn (Collection $roots): int => $countVisibleResults($roots),
+    );
 @endphp
 
 <section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="results-framework-heading">
     <x-ui.page-header
         heading-id="results-framework-heading"
         :title="__('common.results_framework')"
-        :description="__('common.impact_outcome_and_output_statements_nested_as_recorded')"
+        :count="$visibleResultCount"
     >
         <x-slot:filters>
-            <x-ui.select :label="__('common.program')" wire:model.live="program">
+            <x-ui.header-filter-select :label="__('common.program')" wire:model.live="program" :value="$program">
                 <flux:select.option value="">{{ __('common.all_programs') }}</flux:select.option>
                 <flux:select.option value="none">{{ __('common.unassigned') }}</flux:select.option>
                 @foreach ($this->programOptions as $programOption)
                     <flux:select.option :value="$programOption->id" :wire:key="'result-program-'.$programOption->id">{{ $programOption->name }}</flux:select.option>
                 @endforeach
-            </x-ui.select>
+            </x-ui.header-filter-select>
 
-            <x-ui.select :label="__('common.type')" wire:model.live="type">
+            <x-ui.header-filter-select :label="__('common.type')" wire:model.live="type" :value="$type">
                 <flux:select.option value="">{{ __('results_framework.all_types') }}</flux:select.option>
                 @foreach (ResultType::cases() as $typeCase)
                     <flux:select.option :value="$typeCase->value" :wire:key="'result-type-'.$typeCase->value">{{ $typeCase->label() }}</flux:select.option>
                 @endforeach
-            </x-ui.select>
+            </x-ui.header-filter-select>
         </x-slot:filters>
 
         <x-slot:actions>

@@ -153,28 +153,19 @@ new #[Title('titles.executive_summary')] class extends Component {
 };
 ?>
 
-@php
-    $controlClasses = 'border-secondary-light! bg-white! text-secondary-dark! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!';
-@endphp
-
 <section
     class="admin-directory @container/summary flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white [&_[data-flux-heading]]:text-secondary-dark! [&_[data-flux-label]]:text-secondary-dark! dark:[&_[data-flux-heading]]:text-white! dark:[&_[data-flux-label]]:text-white!"
     aria-labelledby="executive-summary-heading"
 >
-    <header class="flex flex-col gap-3 border-b border-secondary-soft pb-4 dark:border-secondary-medium @3xl/summary:flex-row @3xl/summary:items-end">
-        <div class="min-w-48 @3xl/summary:me-auto">
-            <flux:heading id="executive-summary-heading" size="lg">{{ __('common.executive_summary') }}</flux:heading>
-            <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('executive_summary.how_much_of_the_portfolio_is_planned_targeted_and_reached') }}</p>
-        </div>
-
-        <div class="w-full @3xl/summary:max-w-56">
-            <flux:select :label="__('executive_summary.fiscal_year')" :class="$controlClasses" wire:model.live="year">
+    <x-ui.page-header heading-id="executive-summary-heading" :title="__('common.executive_summary')">
+        <x-slot:filters>
+            <x-ui.header-filter-select :label="__('executive_summary.fiscal_year')" wire:model.live="year" :value="$year">
                 @foreach ($this->yearOptions as $yearOption)
                     <flux:select.option :value="$yearOption" :wire:key="'summary-year-'.$yearOption">{{ $yearOption }}</flux:select.option>
                 @endforeach
-            </flux:select>
-        </div>
-    </header>
+            </x-ui.header-filter-select>
+        </x-slot:filters>
+    </x-ui.page-header>
 
     <div class="flex items-center justify-end">
         <span wire:loading.delay.flex wire:target="year" class="hidden items-center gap-1.5 text-xs text-secondary-medium dark:text-secondary-soft">

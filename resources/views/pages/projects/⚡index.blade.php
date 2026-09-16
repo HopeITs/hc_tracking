@@ -346,38 +346,37 @@ new #[Title('titles.projects')] class extends Component {
         heading-id="project-directory-heading"
         :title="__('common.projects')"
         :count="$this->projects->total()"
-        :description="__('projects.track_delivery_ownership_lifecycle_schedule_and_beneficiary')"
     >
         <x-slot:filters>
             <x-ui.input type="search" icon="magnifying-glass" :label="__('projects.search_projects')" :placeholder="__('projects.project_city_program_or_owner')" wire:model.live.debounce.300ms="search" clearable />
 
-            <x-ui.select :label="__('common.city')" wire:model.live="city">
+            <x-ui.header-filter-select :label="__('common.city')" wire:model.live="city" :value="$city">
                 <flux:select.option value="">{{ __('projects.all_cities') }}</flux:select.option>
                 @foreach ($this->cityOptions as $cityOption)
                     <flux:select.option :value="$cityOption->id" :wire:key="'city-filter-'.$cityOption->id">{{ $cityOption->name }} · {{ $cityOption->secondary_name }}</flux:select.option>
                 @endforeach
-            </x-ui.select>
+            </x-ui.header-filter-select>
 
-            <x-ui.select :label="__('common.program')" wire:model.live="program">
+            <x-ui.header-filter-select :label="__('common.program')" wire:model.live="program" :value="$program">
                 <flux:select.option value="">{{ __('common.all_programs') }}</flux:select.option>
                 @foreach ($this->programOptions as $programOption)
                     <flux:select.option :value="$programOption->id" :wire:key="'program-filter-'.$programOption->id">{{ $programOption->name }}</flux:select.option>
                 @endforeach
-            </x-ui.select>
+            </x-ui.header-filter-select>
 
-            <x-ui.select :label="__('projects.owner')" wire:model.live="owner">
+            <x-ui.header-filter-select :label="__('projects.owner')" wire:model.live="owner" :value="$owner">
                 <flux:select.option value="">{{ __('projects.all_owners') }}</flux:select.option>
                 @foreach ($this->userOptions as $userOption)
                     <flux:select.option :value="$userOption->id" :wire:key="'owner-filter-'.$userOption->id">{{ $userOption->name }} · {{ $userOption->secondary_name }}</flux:select.option>
                 @endforeach
-            </x-ui.select>
+            </x-ui.header-filter-select>
 
-            <x-ui.select :label="__('common.status')" wire:model.live="status">
+            <x-ui.header-filter-select :label="__('common.status')" wire:model.live="status" :value="$status">
                 <flux:select.option value="">{{ __('common.all_statuses') }}</flux:select.option>
                 @foreach (ProjectStatus::cases() as $statusOption)
                     <flux:select.option :value="$statusOption->value" :wire:key="'status-filter-'.$statusOption->value">{{ $statusOption->label() }}</flux:select.option>
                 @endforeach
-            </x-ui.select>
+            </x-ui.header-filter-select>
         </x-slot:filters>
 
         <x-slot:actions>

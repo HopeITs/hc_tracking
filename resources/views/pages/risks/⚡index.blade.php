@@ -216,23 +216,22 @@ new #[Title('titles.risks')] class extends Component {
         heading-id="risk-register-heading"
         :title="__('common.risks')"
         :count="$this->risks->total()"
-        :description="__('risks.risks_logged_against_delivery_projects_materialised_first')"
     >
         <x-slot:filters>
             <x-ui.input type="search" icon="magnifying-glass" :label="__('risks.search_risks')" :placeholder="__('risks.risk_impact_or_project')" wire:model.live.debounce.300ms="search" clearable />
 
-            <x-ui.select :label="__('common.project')" wire:model.live="project">
+            <x-ui.header-filter-select :label="__('common.project')" wire:model.live="project" :value="$project">
                 <flux:select.option value="">{{ __('common.all_projects') }}</flux:select.option>
                 @foreach ($this->projectOptions as $projectOption)
                     <flux:select.option :value="$projectOption->id" :wire:key="'risk-project-filter-'.$projectOption->id">{{ $projectOption->name }}</flux:select.option>
                 @endforeach
-            </x-ui.select>
+            </x-ui.header-filter-select>
 
-            <x-ui.select :label="__('common.state')" wire:model.live="status">
+            <x-ui.header-filter-select :label="__('common.state')" wire:model.live="status" :value="$status">
                 <flux:select.option value="">{{ __('risks.all_risks') }}</flux:select.option>
                 <flux:select.option value="happened">{{ __('common.materialised') }}</flux:select.option>
                 <flux:select.option value="watching">{{ __('common.watching') }}</flux:select.option>
-            </x-ui.select>
+            </x-ui.header-filter-select>
         </x-slot:filters>
 
         <x-slot:actions>

@@ -379,31 +379,39 @@ new #[Title('titles.milestones')] class extends Component {
 
 @php
     $filtersAreActive = $project !== '' || $status !== '' || $responsible !== '';
+    $countVisibleMilestones = function (Collection $milestones) use (&$countVisibleMilestones): int {
+        return $milestones->sum(
+            fn (Milestone $milestone): int => 1 + $countVisibleMilestones($milestone->childrenRecursive),
+        );
+    };
+    $visibleMilestoneCount = $this->projectsWithMilestones->sum(
+        fn (Project $project): int => $countVisibleMilestones($project->milestones),
+    );
 @endphp
 
 <section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="milestone-directory-heading">
-    <x-ui.page-header heading-id="milestone-directory-heading" :title="__('common.milestones')" :description="__('milestones.delivery_gates_grouped_by_project_with_every_dependency_visi')">
+    <x-ui.page-header heading-id="milestone-directory-heading" :title="__('common.milestones')" :count="$visibleMilestoneCount">
         <x-slot:filters>
-            <x-ui.select :label="__('common.project')" wire:model.live="project">
+            <x-ui.header-filter-select :label="__('common.project')" wire:model.live="project" :value="$project">
                 <flux:select.option value="">{{ __('common.all_projects') }}</flux:select.option>
                 @foreach ($this->projectOptions as $projectOption)
                     <flux:select.option :value="$projectOption->id" :wire:key="'milestone-project-filter-'.$projectOption->id">{{ $projectOption->name }}</flux:select.option>
                 @endforeach
-            </x-ui.select>
+            </x-ui.header-filter-select>
 
-            <x-ui.select :label="__('common.status')" wire:model.live="status">
+            <x-ui.header-filter-select :label="__('common.status')" wire:model.live="status" :value="$status">
                 <flux:select.option value="">{{ __('common.all_statuses') }}</flux:select.option>
                 @foreach (MilestoneStatus::cases() as $statusCase)
                     <flux:select.option :value="$statusCase->value" :wire:key="'milestone-status-filter-'.$statusCase->value">{{ $statusCase->label() }}</flux:select.option>
                 @endforeach
-            </x-ui.select>
+            </x-ui.header-filter-select>
 
-            <x-ui.select :label="__('milestones.responsible')" wire:model.live="responsible">
+            <x-ui.header-filter-select :label="__('milestones.responsible')" wire:model.live="responsible" :value="$responsible">
                 <flux:select.option value="">{{ __('common.anyone') }}</flux:select.option>
                 @foreach ($this->userOptions as $userOption)
                     <flux:select.option :value="$userOption->id" :wire:key="'milestone-user-filter-'.$userOption->id">{{ $userOption->name }} · {{ $userOption->secondary_name }}</flux:select.option>
                 @endforeach
-            </x-ui.select>
+            </x-ui.header-filter-select>
         </x-slot:filters>
 
         <x-slot:actions>

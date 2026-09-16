@@ -200,7 +200,6 @@ new #[Title('titles.donors')] class extends Component {
         heading-id="donor-directory-heading"
         :title="__('common.donors')"
         :count="$this->donors->total()"
-        :description="__('donors.funders_and_the_agreements_they_hold')"
     >
         <x-slot:filters>
             <x-ui.input type="search" icon="magnifying-glass" :label="__('donors.search_donors')" :placeholder="__('donors.donor_name')" wire:model.live.debounce.300ms="search" clearable />

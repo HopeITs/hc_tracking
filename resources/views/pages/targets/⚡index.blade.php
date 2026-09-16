@@ -347,32 +347,31 @@ new #[Title('titles.targets')] class extends Component {
         heading-id="target-directory-heading"
         :title="__('common.targets')"
         :count="$this->targets->total()"
-        :description="__('targets.what_was_committed_where_it_was_committed_and_against_which')"
     >
         <x-slot:filters>
             <x-ui.input type="search" icon="magnifying-glass" :label="__('targets.search_targets')" :placeholder="__('common.indicator_name')" wire:model.live.debounce.300ms="search" clearable />
 
-            <x-ui.select :label="__('targets.committed_in')" wire:model.live="sourceType">
+            <x-ui.header-filter-select :label="__('targets.committed_in')" wire:model.live="sourceType" :value="$sourceType">
                 <flux:select.option value="">{{ __('targets.any_source') }}</flux:select.option>
                 @foreach ($sourceTypeLabels as $sourceKey => $sourceLabel)
                     <flux:select.option :value="$sourceKey" :wire:key="'tgt-source-'.$sourceKey">{{ $sourceLabel }}</flux:select.option>
                 @endforeach
-            </x-ui.select>
+            </x-ui.header-filter-select>
 
-            <x-ui.select :label="__('common.project')" wire:model.live="project">
+            <x-ui.header-filter-select :label="__('common.project')" wire:model.live="project" :value="$project">
                 <flux:select.option value="">{{ __('targets.any_project') }}</flux:select.option>
                 <flux:select.option value="none">{{ __('common.organisation_wide') }}</flux:select.option>
                 @foreach ($this->projectOptions as $projectOption)
                     <flux:select.option :value="$projectOption->id" :wire:key="'tgt-project-'.$projectOption->id">{{ $projectOption->name }}</flux:select.option>
                 @endforeach
-            </x-ui.select>
+            </x-ui.header-filter-select>
 
-            <x-ui.select :label="__('common.period')" wire:model.live="period">
+            <x-ui.header-filter-select :label="__('common.period')" wire:model.live="period" :value="$period">
                 <flux:select.option value="">{{ __('targets.all_periods') }}</flux:select.option>
                 @foreach (Period::cases() as $periodCase)
                     <flux:select.option :value="$periodCase->value" :wire:key="'tgt-period-'.$periodCase->value">{{ $periodCase->label() }}</flux:select.option>
                 @endforeach
-            </x-ui.select>
+            </x-ui.header-filter-select>
         </x-slot:filters>
 
         <x-slot:actions>

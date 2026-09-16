@@ -273,6 +273,16 @@ input[type='search']::-webkit-search-cancel-button {
 }
 
 /* The tinted-fill filter row treatment: shared by every directory-style index page's toolbar, not just Programs. */
+.directory-filters [data-flux-label] {
+    margin-bottom: 0.375rem !important;
+    color: var(--color-secondary-medium) !important;
+    font-size: 0.6875rem !important;
+    font-weight: 600 !important;
+    line-height: 1rem !important;
+    letter-spacing: 0.1em !important;
+    text-transform: uppercase !important;
+}
+
 .directory-filters [data-flux-control] {
     min-height: 2.75rem !important;
     border-color: var(--color-secondary-soft) !important;
@@ -300,6 +310,10 @@ input[type='search']::-webkit-search-cancel-button {
 
 .dark .directory-filters [data-flux-control] {
     background-color: color-mix(in srgb, var(--color-secondary-medium) 70%, var(--color-secondary-dark)) !important;
+}
+
+.dark .directory-filters [data-flux-label] {
+    color: var(--color-secondary-soft) !important;
 }
 
 .dark .directory-filters [data-flux-control]:hover {

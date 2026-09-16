@@ -265,26 +265,25 @@ new #[Title('titles.transfers')] class extends Component {
         heading-id="transfer-directory-heading"
         :title="__('common.transfers')"
         :count="$this->transfers->total()"
-        :description="__('transfers.every_tranche_what_was_sent_what_landed_and_in_which_currenc')"
     >
         <x-slot:filters>
             <x-ui.input type="search" icon="magnifying-glass" :label="__('transfers.search_transfers')" :placeholder="__('common.reference_donor_or_proposal')" wire:model.live.debounce.300ms="search" clearable />
 
-            <x-ui.select :label="__('transfers.receipt_status')" wire:model.live="arStatus">
+            <x-ui.header-filter-select :label="__('transfers.receipt_status')" wire:model.live="arStatus" :value="$arStatus">
                 <flux:select.option value="">{{ __('common.all_statuses') }}</flux:select.option>
                 @foreach (ArStatus::cases() as $statusCase)
                     <flux:select.option :value="$statusCase->value" :wire:key="'ar-'.$statusCase->value">{{ $statusCase->label() }}</flux:select.option>
                 @endforeach
-            </x-ui.select>
+            </x-ui.header-filter-select>
 
-            <x-ui.select :label="__('transfers.account')" wire:model.live="account">
+            <x-ui.header-filter-select :label="__('transfers.account')" wire:model.live="account" :value="$account">
                 <flux:select.option value="">{{ __('common.all_accounts') }}</flux:select.option>
                 @foreach ($this->accountOptions as $accountOption)
                     <flux:select.option :value="$accountOption->id" :wire:key="'tr-account-'.$accountOption->id">
                         {{ $accountOption->name }}@unless ($accountOption->is_active) · {{ __('common.closed') }}@endunless
                     </flux:select.option>
                 @endforeach
-            </x-ui.select>
+            </x-ui.header-filter-select>
         </x-slot:filters>
 
         <x-slot:actions>

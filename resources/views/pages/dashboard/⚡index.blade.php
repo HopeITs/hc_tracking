@@ -628,9 +628,9 @@ new #[Title('titles.dashboard')] class extends Component {
 
 <section class="@container/dashboard flex w-full flex-1 flex-col gap-5 pb-10" aria-labelledby="dashboard-heading" data-dashboard>
     {{-- Greeting and the signed-in person's own work --}}
-    <header class="flex flex-col gap-4 @4xl/dashboard:flex-row @4xl/dashboard:items-end @4xl/dashboard:justify-between">
+    <header class="flex flex-col gap-4 border-b border-secondary-soft pb-7 @4xl/dashboard:flex-row @4xl/dashboard:items-center @4xl/dashboard:justify-between dark:border-secondary-medium">
         <div class="min-w-0">
-            <h1 id="dashboard-heading" class="text-2xl font-bold tracking-tight text-balance text-secondary-dark @2xl/dashboard:text-[1.75rem] dark:text-white">
+            <h1 id="dashboard-heading" class="text-3xl font-bold leading-none text-balance text-secondary-dark dark:text-white">
                 {{ $this->greeting() }}
             </h1>
             <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-secondary-medium dark:text-secondary-soft">

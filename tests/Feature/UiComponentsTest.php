@@ -141,14 +141,17 @@ test('the ui button rejects an unknown tone', function () {
     }
 });
 
-test('the page header shows a title with a count badge and a description', function () {
+test('the page header matches the directory title and count design without a description', function () {
     $html = Blade::render(
-        '<x-ui.page-header title="Projects" :count="8" description="Delivery sites." />'
+        '<x-ui.page-header title="Projects" :count="8" description="Delivery sites."><x-slot:filters><input aria-label="Search projects"></x-slot:filters></x-ui.page-header>'
     );
 
     expect($html)->toContain('Projects')
         ->and($html)->toContain('8')
-        ->and($html)->toContain('Delivery sites.');
+        ->and($html)->toContain('text-3xl! font-bold! leading-none!')
+        ->and($html)->toContain('bg-primary')
+        ->and($html)->toContain('data-page-header-controls')
+        ->and($html)->not->toContain('Delivery sites.');
 });
 
 test('the page header omits the count badge when no count is given', function () {
@@ -156,6 +159,37 @@ test('the page header omits the count badge when no count is given', function ()
 
     expect($html)->toContain('Projects')
         ->and($html)->not->toContain('data-count-badge');
+});
+
+test('the page header keeps actions outside the filter grid', function () {
+    $html = Blade::render(
+        '<x-ui.page-header title="Projects"><x-slot:filters><input aria-label="Search projects"></x-slot:filters><x-slot:actions><button data-test="add-project">Add project</button></x-slot:actions></x-ui.page-header>'
+    );
+    $document = new DOMDocument;
+    @$document->loadHTML($html);
+    $xpath = new DOMXPath($document);
+
+    expect($xpath->query('//*[@data-page-header-filters]//input[@aria-label="Search projects"]')->length)->toBe(1)
+        ->and($xpath->query('//*[@data-page-header-filters]//*[@data-test="add-project"]')->length)->toBe(0)
+        ->and($xpath->query('//*[@data-page-header-actions]//*[@data-test="add-project"]')->length)->toBe(1);
+});
+
+test('the header filter select renders the programs dropdown instead of a native select', function () {
+    $html = Blade::render(<<<'BLADE'
+        <x-ui.header-filter-select label="City" value="aleppo" wire:model.live="city">
+            <flux:select.option value="">All cities</flux:select.option>
+            <flux:select.option value="aleppo">Aleppo</flux:select.option>
+            <flux:select.option value="raqqa">Ar-Raqqa</flux:select.option>
+        </x-ui.header-filter-select>
+    BLADE);
+    $document = new DOMDocument;
+    @$document->loadHTML($html);
+    $xpath = new DOMXPath($document);
+
+    expect($xpath->query('//*[@data-header-filter-select]')->length)->toBe(1)
+        ->and($xpath->query('//*[@data-header-filter-select]//select')->length)->toBe(0)
+        ->and($xpath->query('//*[@data-header-filter-select]//*[@data-flux-menu-item]')->length)->toBe(3)
+        ->and(trim($xpath->query('//*[@data-header-filter-select]//*[@data-selected="true"]')->item(0)->textContent))->toBe('Aleppo');
 });
 
 test('the stat tile shows a value over a denominator', function () {

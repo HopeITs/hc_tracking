@@ -313,24 +313,23 @@ new #[Title('titles.indicators')] class extends Component {
         heading-id="indicator-directory-heading"
         :title="__('common.indicators')"
         :count="$this->indicators->total()"
-        :description="__('indicators.what_each_result_is_measured_by')"
     >
         <x-slot:filters>
             <x-ui.input type="search" icon="magnifying-glass" :label="__('indicators.search_indicators')" :placeholder="__('indicators.indicator_or_result_statement')" wire:model.live.debounce.300ms="search" clearable />
 
-            <x-ui.select :label="__('indicators.result')" wire:model.live="result">
+            <x-ui.header-filter-select :label="__('indicators.result')" wire:model.live="result" :value="$result">
                 <flux:select.option value="">{{ __('indicators.all_results') }}</flux:select.option>
                 @foreach ($this->resultOptions as $resultOption)
                     <flux:select.option :value="$resultOption->id" :wire:key="'ind-result-'.$resultOption->id">{{ Str::limit($resultOption->statement, 50) }}</flux:select.option>
                 @endforeach
-            </x-ui.select>
+            </x-ui.header-filter-select>
 
-            <x-ui.select :label="__('indicators.measure')" wire:model.live="measure">
+            <x-ui.header-filter-select :label="__('indicators.measure')" wire:model.live="measure" :value="$measure">
                 <flux:select.option value="">{{ __('indicators.all_measures') }}</flux:select.option>
                 @foreach (IndicatorMeasure::cases() as $measureCase)
                     <flux:select.option :value="$measureCase->value" :wire:key="'ind-measure-'.$measureCase->value">{{ $measureCase->label() }}</flux:select.option>
                 @endforeach
-            </x-ui.select>
+            </x-ui.header-filter-select>
         </x-slot:filters>
 
         <x-slot:actions>

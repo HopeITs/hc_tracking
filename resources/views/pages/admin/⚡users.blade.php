@@ -274,29 +274,18 @@ new #[Title('titles.user_directory')] class extends Component {
     class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white [&_[data-flux-cell]]:border-secondary-soft! [&_[data-flux-cell]]:text-secondary-medium! [&_[data-flux-column]]:border-secondary-soft! [&_[data-flux-column]]:text-secondary-dark! [&_[data-flux-heading]]:text-secondary-dark! [&_[data-flux-label]]:text-secondary-dark! [&_[data-flux-subheading]]:text-secondary-medium! dark:[&_[data-flux-cell]]:border-secondary-medium! dark:[&_[data-flux-cell]]:text-secondary-soft! dark:[&_[data-flux-column]]:border-secondary-medium! dark:[&_[data-flux-column]]:text-white! dark:[&_[data-flux-heading]]:text-white! dark:[&_[data-flux-label]]:text-white! dark:[&_[data-flux-subheading]]:text-secondary-soft!"
     aria-labelledby="user-directory-heading"
 >
-    <div class="flex flex-col gap-3 border-b border-secondary-soft pb-4 dark:border-secondary-medium @4xl/directory:flex-row @4xl/directory:items-end">
-        <div class="min-w-40 @4xl/directory:me-auto">
-            <div class="flex items-center gap-2">
-                <flux:heading id="user-directory-heading" size="lg">{{ __('users.users') }}</flux:heading>
-                <span class="inline-flex min-w-7 items-center justify-center rounded-md border border-secondary-light px-2 py-0.5 text-xs font-semibold text-secondary-medium dark:border-secondary-light dark:text-secondary-soft">
-                    {{ $this->users->total() }}
-                </span>
-            </div>
-            <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('users.manage_staff_accounts_and_access_roles') }}</p>
-        </div>
-
-        <div class="grid w-full gap-2 @sm/directory:grid-cols-[minmax(12rem,1fr)_minmax(9rem,11rem)_auto] @4xl/directory:max-w-[46rem]">
-            <flux:input
+    <x-ui.page-header heading-id="user-directory-heading" :title="__('users.users')" :count="$this->users->total()">
+        <x-slot:filters>
+            <x-ui.input
                 type="search"
                 icon="magnifying-glass"
                 :label="__('users.search_users')"
                 :placeholder="__('users.name_or_email')"
-                :class="$controlClasses"
                 wire:model.live.debounce.300ms="search"
                 clearable
             />
 
-            <flux:select :label="__('users.role')" :class="$controlClasses" wire:model.live="role">
+            <x-ui.header-filter-select :label="__('users.role')" wire:model.live="role" :value="$role">
                 <flux:select.option value="" class="text-secondary-dark! hover:bg-secondary-soft! dark:bg-secondary-dark! dark:text-white! dark:hover:bg-secondary-medium!">
                     {{ __('users.all_roles') }}
                 </flux:select.option>
@@ -309,8 +298,10 @@ new #[Title('titles.user_directory')] class extends Component {
                         {{ $roleOption->label() }}
                     </flux:select.option>
                 @endforeach
-            </flux:select>
+            </x-ui.header-filter-select>
+        </x-slot:filters>
 
+        <x-slot:actions>
             <flux:button
                 variant="primary"
                 icon="user-plus"
@@ -320,8 +311,8 @@ new #[Title('titles.user_directory')] class extends Component {
             >
                 {{ __('users.add_user') }}
             </flux:button>
-        </div>
-    </div>
+        </x-slot:actions>
+    </x-ui.page-header>
 
     <div class="overflow-hidden rounded-lg border border-secondary-light bg-white dark:border-secondary-medium dark:bg-secondary-dark">
         <div class="flex min-h-10 flex-wrap items-center justify-between gap-2 border-b border-secondary-soft bg-white px-3.5 py-2 dark:border-secondary-medium dark:bg-secondary-dark">

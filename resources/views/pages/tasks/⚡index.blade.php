@@ -282,34 +282,34 @@ new #[Title('titles.tasks')] class extends Component {
 @endphp
 
 <section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="task-directory-heading">
-    <x-ui.page-header heading-id="task-directory-heading" :title="__('common.tasks')" :count="$this->tasks->total()" :description="__('tasks.work_items_across_every_proposal_ordered_by_the_nearest_due')">
+    <x-ui.page-header heading-id="task-directory-heading" :title="__('common.tasks')" :count="$this->tasks->total()">
         <x-slot:filters>
             <x-ui.input type="search" icon="magnifying-glass" :label="__('tasks.search_tasks')" :placeholder="__('tasks.title_description_or_assignee')" wire:model.live.debounce.300ms="search" clearable />
-            <x-ui.select :label="__('common.status')" wire:model.live="status">
+            <x-ui.header-filter-select :label="__('common.status')" wire:model.live="status" :value="$status">
                 <flux:select.option value="">{{ __('common.all_statuses') }}</flux:select.option>
                 @foreach (TaskStatus::cases() as $statusCase)
                     <flux:select.option :value="$statusCase->value" :wire:key="'task-status-filter-'.$statusCase->value">{{ $statusCase->label() }}</flux:select.option>
                 @endforeach
-            </x-ui.select>
-            <x-ui.select :label="__('tasks.priority')" wire:model.live="priority">
+            </x-ui.header-filter-select>
+            <x-ui.header-filter-select :label="__('tasks.priority')" wire:model.live="priority" :value="$priority">
                 <flux:select.option value="">{{ __('tasks.all_priorities') }}</flux:select.option>
                 @foreach (TaskPriority::cases() as $priorityCase)
                     <flux:select.option :value="$priorityCase->value" :wire:key="'task-priority-filter-'.$priorityCase->value">{{ $priorityCase->label() }}</flux:select.option>
                 @endforeach
-            </x-ui.select>
-            <x-ui.select :label="__('tasks.assignee')" wire:model.live="assignee">
+            </x-ui.header-filter-select>
+            <x-ui.header-filter-select :label="__('tasks.assignee')" wire:model.live="assignee" :value="$assignee">
                 <flux:select.option value="">{{ __('common.anyone') }}</flux:select.option>
                 @foreach ($this->userOptions as $userOption)
                     <flux:select.option :value="$userOption->id" :wire:key="'task-assignee-filter-'.$userOption->id">{{ $userOption->name }} · {{ $userOption->secondary_name }}</flux:select.option>
                 @endforeach
-            </x-ui.select>
-            <x-ui.select :label="__('tasks.milestone')" wire:model.live="milestone">
+            </x-ui.header-filter-select>
+            <x-ui.header-filter-select :label="__('tasks.milestone')" wire:model.live="milestone" :value="$milestone">
                 <flux:select.option value="">{{ __('tasks.any_milestone') }}</flux:select.option>
                 <flux:select.option value="none">{{ __('tasks.no_milestone') }}</flux:select.option>
                 @foreach ($this->milestoneOptions as $milestoneOption)
                     <flux:select.option :value="$milestoneOption->id" :wire:key="'task-milestone-filter-'.$milestoneOption->id">{{ $milestoneOption->name }} · {{ $milestoneOption->project->name }}</flux:select.option>
                 @endforeach
-            </x-ui.select>
+            </x-ui.header-filter-select>
         </x-slot:filters>
         <x-slot:actions>
             <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-task-button">{{ __('tasks.add_task') }}</x-ui.button>
