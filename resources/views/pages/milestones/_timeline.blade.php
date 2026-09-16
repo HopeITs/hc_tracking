@@ -78,32 +78,53 @@
                     @foreach ($milestones as $milestone)
                         @php
                             $statusLabel = $milestone->planned_date->lt($today) && $milestone->status === MilestoneStatus::Pending ? __('milestones.timeline_overdue') : $milestone->status->label();
+                            $canDeleteMarker = $milestone->children_count === 0 && $milestone->tasks_count === 0;
                         @endphp
-                        <button
-                            type="button"
-                            wire:click="openEditModal({{ $milestone->id }})"
-                            wire:key="milestone-marker-{{ $milestone->id }}"
-                            class="absolute top-1/2 z-10 flex size-7 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-primary rtl:translate-x-1/2"
+                        <div
+                            class="absolute top-1/2 z-10 flex size-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rtl:translate-x-1/2"
                             style="inset-inline-start: {{ $position($milestone->planned_date) }}%"
+                            wire:key="milestone-marker-{{ $milestone->id }}"
                             x-data="{ open: false }"
                             x-on:mouseenter="open = true"
                             x-on:mouseleave="open = false"
-                            x-on:focus="open = true"
-                            x-on:blur="open = false"
-                            aria-label="{{ __('programs.timeline_marker', ['name' => $milestone->name, 'date' => $milestone->planned_date->translatedFormat(__('formats.date')), 'status' => $statusLabel]) }}"
+                            x-on:focusin="open = true"
+                            x-on:focusout="open = false"
                         >
-                            <span aria-hidden="true" class="block size-3.5 rotate-45 rounded-[2px] border-2 shadow-sm ring-2 ring-white dark:ring-secondary-dark {{ $markerTone($milestone) }}"></span>
-                            <span
+                            <button
+                                type="button"
+                                wire:click="openEditModal({{ $milestone->id }})"
+                                class="flex size-7 cursor-pointer items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-primary"
+                                aria-label="{{ __('programs.timeline_marker', ['name' => $milestone->name, 'date' => $milestone->planned_date->translatedFormat(__('formats.date')), 'status' => $statusLabel]) }}"
+                            >
+                                <span aria-hidden="true" class="block size-3.5 rotate-45 rounded-[2px] border-2 shadow-sm ring-2 ring-white dark:ring-secondary-dark {{ $markerTone($milestone) }}"></span>
+                            </button>
+
+                            <div
                                 x-show="open"
                                 style="display: none"
                                 role="tooltip"
-                                class="pointer-events-none absolute bottom-full start-1/2 z-30 mb-2 w-max max-w-56 -translate-x-1/2 rounded-md bg-secondary-dark px-2.5 py-1.5 text-start text-xs leading-snug text-white shadow-lg rtl:translate-x-1/2 dark:bg-white dark:text-secondary-dark"
+                                class="absolute bottom-full start-1/2 z-30 mb-2 w-max max-w-56 -translate-x-1/2 rounded-md bg-secondary-dark px-2.5 py-1.5 text-start text-xs leading-snug text-white shadow-lg rtl:translate-x-1/2 dark:bg-white dark:text-secondary-dark"
                             >
                                 <span class="block font-semibold">{{ $milestone->name }}</span>
                                 <span class="block opacity-80">{{ $milestone->planned_date->translatedFormat(__('formats.date')) }} · {{ $statusLabel }}</span>
                                 <span class="block opacity-80">{{ $milestone->responsibleUser?->name ?? __('common.not_assigned') }}</span>
-                            </span>
-                        </button>
+
+                                <div class="mt-1.5 flex items-center gap-1 border-t border-white/20 pt-1.5 dark:border-secondary-dark/20">
+                                    <button type="button" wire:click="openEditModal({{ $milestone->id }})" class="inline-flex size-7 cursor-pointer items-center justify-center rounded-md hover:bg-white/10 dark:hover:bg-secondary-dark/10" aria-label="{{ __('common.edit_name', ['name' => $milestone->name]) }}">
+                                        <flux:icon.pencil-square class="size-3.5" />
+                                    </button>
+                                    @if ($canDeleteMarker)
+                                        <button type="button" wire:click="confirmDelete({{ $milestone->id }})" class="inline-flex size-7 cursor-pointer items-center justify-center rounded-md hover:bg-white/10 dark:hover:bg-secondary-dark/10" aria-label="{{ __('common.delete_name', ['name' => $milestone->name]) }}">
+                                            <flux:icon.trash class="size-3.5" />
+                                        </button>
+                                    @else
+                                        <span class="inline-flex size-7 cursor-not-allowed items-center justify-center opacity-60" aria-disabled="true" title="{{ __('milestones.only_a_milestone_with_no_nested_milestones_and_no_tasks_can') }}">
+                                            <flux:icon.lock-closed class="size-3.5" />
+                                        </span>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
                     @endforeach
                 </div>
             </div>

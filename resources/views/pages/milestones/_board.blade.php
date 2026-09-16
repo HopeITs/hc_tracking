@@ -39,9 +39,21 @@
                         $isOverdue = $milestone->status === MilestoneStatus::Pending && $milestone->planned_date->lt($today);
                     @endphp
                     <div class="flex flex-col gap-2 rounded-lg border border-secondary-soft bg-white p-3 shadow-[0_1px_2px_rgba(16,24,40,0.04)] dark:border-secondary-medium dark:bg-secondary-dark" wire:key="milestone-board-card-{{ $milestone->id }}">
-                        <button type="button" wire:click="openEditModal({{ $milestone->id }})" class="text-start text-sm font-semibold text-secondary-dark hover:underline dark:text-white" data-test="milestone-board-card-{{ $milestone->id }}">
-                            {{ $milestone->name }}
-                        </button>
+                        <div class="flex items-start justify-between gap-2">
+                            <button type="button" wire:click="openEditModal({{ $milestone->id }})" class="min-w-0 text-start text-sm font-semibold text-secondary-dark hover:underline dark:text-white" data-test="milestone-board-card-{{ $milestone->id }}">
+                                {{ $milestone->name }}
+                            </button>
+
+                            @if ($milestone->children_count === 0 && $milestone->tasks_count === 0)
+                                <x-ui.button tone="ghost" size="sm" icon="trash" class="size-8! shrink-0" wire:click="confirmDelete({{ $milestone->id }})" :aria-label="__('common.delete_name', ['name' => $milestone->name])" />
+                            @else
+                                <flux:tooltip :content="__('milestones.only_a_milestone_with_no_nested_milestones_and_no_tasks_can')">
+                                    <span class="inline-flex size-8 shrink-0 cursor-not-allowed items-center justify-center text-secondary-light" aria-disabled="true">
+                                        <flux:icon.lock-closed class="size-4" />
+                                    </span>
+                                </flux:tooltip>
+                            @endif
+                        </div>
 
                         <a href="{{ route('projects.show', $milestone->project) }}" wire:navigate class="truncate text-xs text-secondary-medium hover:underline dark:text-secondary-soft">{{ $milestone->project->name }}</a>
 

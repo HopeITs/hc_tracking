@@ -101,13 +101,7 @@ new #[Title('titles.milestones')] class extends Component {
                         'responsible_user_id',
                         'parent_milestone_id',
                     ])
-                    ->with([
-                        'responsibleUser:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
-                        'media' => fn ($query) => $query
-                            ->select(['id', 'mediable_type', 'mediable_id', 'collection', 'original_name', 'type', 'uploaded_at'])
-                            ->orderByDesc('uploaded_at')
-                            ->orderByDesc('id'),
-                    ])
+                    ->with(['responsibleUser:id,first_name_en,last_name_en,first_name_ar,last_name_ar'])
                     ->withCount(['children', 'tasks'])
                     ->orderBy('sequence')
                     ->orderBy('id'),
@@ -596,33 +590,37 @@ new #[Title('titles.milestones')] class extends Component {
         <form wire:submit="saveMilestone" class="flex flex-col gap-5">
             <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
                 <flux:heading size="lg">{{ $editingMilestoneId === null ? __('milestones.add_milestone') : __('milestones.edit_milestone') }}</flux:heading>
-                <flux:subheading>{{ __('milestones.a_milestone_may_nest_only_within_its_project_project_ownersh') }}</flux:subheading>
             </div>
 
             <x-ui.input wire:model="name" :label="__('milestones.milestone_name')" type="text" maxlength="255" required autofocus />
-            <flux:textarea wire:model="description" :label="__('common.description')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!" />
 
             <div class="grid gap-4 sm:grid-cols-2">
                 <div class="min-w-0">
                     <label for="milestone-form-project" class="{{ $dropdownLabelClasses }}">{{ __('common.project') }}</label>
-                    <flux:dropdown position="bottom" align="start" class="filter-picker block! w-full!" x-data="{ optionSearch: '' }">
-                        <flux:button id="milestone-form-project" type="button" variant="outline" icon:trailing="chevron-up-down" class="w-full! justify-between!" :disabled="$editingMilestoneId !== null" :aria-label="__('common.project')">
-                            <span class="truncate">{{ $selectedMilestoneProject?->name ?? __('common.select_a_project') }}</span>
-                        </flux:button>
-                        <flux:menu class="filter-menu">
-                            @if ($this->projectOptions->count() > 6)
-                                <div class="border-b border-secondary-soft p-1.5 dark:border-secondary-medium">
-                                    <x-ui.input type="search" size="sm" icon="magnifying-glass" x-model="optionSearch" :aria-label="__('milestones.search_projects')" :placeholder="__('milestones.search_projects')" />
-                                </div>
-                            @endif
-                            @foreach ($this->projectOptions as $projectOption)
-                                <flux:menu.item wire:click="$set('milestoneProjectId', {{ $projectOption->id }})" x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())" :wire:key="'milestone-form-project-option-'.$projectOption->id">
-                                    <span class="min-w-0 truncate">{{ $projectOption->name }}</span>
-                                    @if ((int) $milestoneProjectId === $projectOption->id)<flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" />@endif
-                                </flux:menu.item>
-                            @endforeach
-                        </flux:menu>
-                    </flux:dropdown>
+                    @if ($editingMilestoneId !== null)
+                        <flux:tooltip :content="__('milestones.a_milestone_cannot_be_moved_to_another_project')">
+                    @endif
+                        <flux:dropdown position="bottom" align="start" class="filter-picker block! w-full!" x-data="{ optionSearch: '' }">
+                            <flux:button id="milestone-form-project" type="button" variant="outline" icon:trailing="chevron-up-down" class="w-full! justify-between!" :disabled="$editingMilestoneId !== null" :aria-label="__('common.project')">
+                                <span class="truncate">{{ $selectedMilestoneProject?->name ?? __('common.select_a_project') }}</span>
+                            </flux:button>
+                            <flux:menu class="filter-menu">
+                                @if ($this->projectOptions->count() > 6)
+                                    <div class="border-b border-secondary-soft p-1.5 dark:border-secondary-medium">
+                                        <x-ui.input type="search" size="sm" icon="magnifying-glass" x-model="optionSearch" :aria-label="__('milestones.search_projects')" :placeholder="__('milestones.search_projects')" />
+                                    </div>
+                                @endif
+                                @foreach ($this->projectOptions as $projectOption)
+                                    <flux:menu.item wire:click="$set('milestoneProjectId', {{ $projectOption->id }})" x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())" :wire:key="'milestone-form-project-option-'.$projectOption->id">
+                                        <span class="min-w-0 truncate">{{ $projectOption->name }}</span>
+                                        @if ((int) $milestoneProjectId === $projectOption->id)<flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" />@endif
+                                    </flux:menu.item>
+                                @endforeach
+                            </flux:menu>
+                        </flux:dropdown>
+                    @if ($editingMilestoneId !== null)
+                        </flux:tooltip>
+                    @endif
                     <flux:error name="milestoneProjectId" class="mt-1.5" />
                 </div>
 

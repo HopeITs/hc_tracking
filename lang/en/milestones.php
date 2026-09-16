@@ -3,7 +3,6 @@
 return [
     'a_milestone_cannot_be_moved_to_another_project' => 'A milestone cannot be moved to another project.',
     'a_milestone_cannot_be_nested_under_itself_or_its_descendants' => 'A milestone cannot be nested under itself or its descendants.',
-    'a_milestone_may_nest_only_within_its_project_project_ownersh' => 'A milestone may nest only within its project. Project ownership is fixed after creation.',
     'actual_date' => 'Actual date',
     'add_milestone' => 'Add milestone',
     'add_the_first_milestone_to_a_project' => 'Add the first milestone to a project.',
@@ -12,10 +11,8 @@ return [
     'create_milestone' => 'Create milestone',
     'delete_milestone' => 'Delete milestone',
     'delete_this_milestone' => 'Delete this milestone?',
-    'delete_unavailable_for_name' => 'Delete unavailable for :name',
     'edit_milestone' => 'Edit milestone',
     'enter_a_milestone_name' => 'Enter a milestone name.',
-    'files' => '{0} Files|{1} Files · :count record|[2,*] Files · :count records',
     'list_view' => 'List',
     'milestone_created' => 'Milestone created.',
     'milestone_deleted' => 'Milestone deleted.',

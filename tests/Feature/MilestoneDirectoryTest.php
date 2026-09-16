@@ -39,7 +39,10 @@ test('milestones render as a responsive tree grouped by project with reachable a
         ->assertSee('wire:click="openCreateModal"', false)
         ->assertSee('wire:click="openEditModal('.$parent->id.')"', false)
         ->assertSee('wire:click="confirmDelete('.$child->id.')"', false)
-        ->assertDontSee('wire:click="confirmDelete('.$parent->id.')"', false);
+        ->assertDontSee('wire:click="confirmDelete('.$parent->id.')"', false)
+        ->assertSee('aria-disabled="true"', false)
+        ->assertSee('cursor-not-allowed', false)
+        ->assertSee(__('milestones.only_a_milestone_with_no_nested_milestones_and_no_tasks_can'));
 });
 
 test('milestones can be filtered by project and status', function () {
@@ -252,10 +255,9 @@ test('a milestone project is immutable on edit even when the livewire property i
     expect($milestone->refresh()->project_id)->toBe($project->id);
 });
 
-test('milestone files are isolated metadata only with no storage controls', function () {
+test('the list view no longer displays milestone files', function () {
     $user = User::factory()->create();
     $milestone = Milestone::factory()->create();
-    $otherMilestone = Milestone::factory()->create();
     $media = Media::factory()->forMilestone($milestone->id)->create([
         'original_name' => 'signed-evidence.pdf',
         'path' => 'private/never-expose.pdf',
@@ -263,23 +265,15 @@ test('milestone files are isolated metadata only with no storage controls', func
         'collection' => MediaCollection::Evidence,
         'uploaded_at' => '2026-05-14',
     ]);
-    Media::factory()->forMilestone($otherMilestone->id)->create(['original_name' => 'other-file.pdf']);
 
     $component = Livewire::actingAs($user)
         ->test('pages::milestones.index')
         ->set('view', 'list')
         ->set('project', (string) $milestone->project_id)
-        ->assertSeeText('signed-evidence.pdf')
-        ->assertSeeText('PDF')
-        ->assertSeeText('Evidence')
-        ->assertSeeText('May 14, 2026')
-        ->assertDontSeeText('other-file.pdf')
-        ->assertDontSee($media->path)
-        ->assertDontSee('download', false)
-        ->assertDontSee('type="file"', false)
-        ->assertDontSeeText('Upload file');
+        ->assertDontSeeText('signed-evidence.pdf')
+        ->assertDontSee($media->path);
 
-    expect($component->instance()->projectsWithMilestones()->first()->milestones->first()->relationLoaded('media'))->toBeTrue();
+    expect($component->instance()->projectsWithMilestones()->first()->milestones->first()->relationLoaded('media'))->toBeFalse();
 });
 
 test('a leaf milestone with no tasks can be deleted', function () {
@@ -348,6 +342,30 @@ test('the timeline view plots milestones as clickable markers grouped by project
         ->set('view', 'timeline')
         ->assertSee('Homs Clinic')
         ->assertSee('wire:click="openEditModal('.$milestone->id.')"', false);
+});
+
+test('a deletable milestone shows a delete action in the timeline view, and a locked one does not', function () {
+    $user = User::factory()->create();
+    $parent = Milestone::factory()->create(['name' => 'Root gate']);
+    $child = Milestone::factory()->childOf($parent)->create(['name' => 'Child gate']);
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.index')
+        ->set('view', 'timeline')
+        ->assertSee('wire:click="confirmDelete('.$child->id.')"', false)
+        ->assertDontSee('wire:click="confirmDelete('.$parent->id.')"', false);
+});
+
+test('a deletable milestone shows a delete action in the board view, and a locked one does not', function () {
+    $user = User::factory()->create();
+    $parent = Milestone::factory()->create(['name' => 'Root gate']);
+    $child = Milestone::factory()->childOf($parent)->create(['name' => 'Child gate']);
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.index')
+        ->set('view', 'board')
+        ->assertSee('wire:click="confirmDelete('.$child->id.')"', false)
+        ->assertDontSee('wire:click="confirmDelete('.$parent->id.')"', false);
 });
 
 test('the board view renders a card per milestone and honours the status filter', function () {

@@ -3,7 +3,6 @@
 return [
     'a_milestone_cannot_be_moved_to_another_project' => 'لا يمكن نقل المرحلة الرئيسية إلى مشروع آخر.',
     'a_milestone_cannot_be_nested_under_itself_or_its_descendants' => 'لا يمكن وضع المرحلة الرئيسية تحت نفسها أو تحت إحدى المراحل التابعة لها.',
-    'a_milestone_may_nest_only_within_its_project_project_ownersh' => 'يمكن ترتيب المرحلة الرئيسية ضمن مشروعها فقط، ولا يمكن تغيير المشروع بعد الإنشاء.',
     'actual_date' => 'التاريخ الفعلي',
     'add_milestone' => 'إضافة مرحلة رئيسية',
     'add_the_first_milestone_to_a_project' => 'أضف أول مرحلة رئيسية إلى مشروع.',
@@ -12,10 +11,8 @@ return [
     'create_milestone' => 'إنشاء مرحلة رئيسية',
     'delete_milestone' => 'حذف المرحلة الرئيسية',
     'delete_this_milestone' => 'حذف هذه المرحلة الرئيسية؟',
-    'delete_unavailable_for_name' => 'الحذف غير متاح لـ :name',
     'edit_milestone' => 'تعديل المرحلة الرئيسية',
     'enter_a_milestone_name' => 'أدخل اسم المرحلة الرئيسية.',
-    'files' => '{0} الملفات|{1} الملفات · سجل واحد|{2} الملفات · سجلان|[3,10] الملفات · :count سجلات|[11,*] الملفات · :count سجلًا',
     'list_view' => 'قائمة',
     'milestone_created' => 'تم إنشاء المرحلة الرئيسية.',
     'milestone_deleted' => 'تم حذف المرحلة الرئيسية.',
