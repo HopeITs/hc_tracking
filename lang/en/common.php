@@ -31,6 +31,7 @@ return [
     'count_project' => ':count project|:count projects',
     'count_report' => ':count report|:count reports',
     'count_risk' => ':count risk|:count risks',
+    'count_selected' => ':count selected',
     'count_target' => ':count target|:count targets',
     'count_tranche' => ':count tranche|:count tranches',
     'currency' => 'Currency',

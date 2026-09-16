@@ -2,17 +2,28 @@
 
 use App\Enums\Period;
 use App\Enums\ReportStatus;
+use App\Models\HrEmployee;
 use App\Models\PlanIndicator;
 use App\Models\Report;
 use App\Models\AnnualPlan;
+use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Collection as SupportCollection;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
 new #[Title('titles.annual_plan')] class extends Component {
     public int $annualPlanId;
+
+    public bool $showPlanModal = false;
+
+    public bool $confirmingDelete = false;
+
+    public string $planManagerId = '';
+
+    public string $planYear = '';
 
     public function mount(AnnualPlan $annualPlan): void
     {
@@ -218,6 +229,132 @@ new #[Title('titles.annual_plan')] class extends Component {
             ->limit(8)
             ->get();
     }
+
+    /**
+     * Every HR employee the plan can be made accountable to.
+     *
+     * @return Collection<int, HrEmployee>
+     */
+    #[Computed]
+    public function employeeOptions(): Collection
+    {
+        return HrEmployee::pickerOptions();
+    }
+
+    /**
+     * The fiscal years the form offers.
+     *
+     * This plan's own year is always among them, so an older plan stays
+     * editable without its year silently moving.
+     *
+     * @return array<int, int>
+     */
+    #[Computed]
+    public function yearFormOptions(): array
+    {
+        $thisYear = (int) now()->year;
+
+        $years = AnnualPlan::query()
+            ->select('year')
+            ->distinct()
+            ->pluck('year')
+            ->map(fn ($year): int => (int) $year)
+            ->all();
+
+        $years = [...$years, $thisYear, $thisYear + 1, $this->plan->year];
+
+        if ($this->planYear !== '') {
+            $years[] = (int) $this->planYear;
+        }
+
+        $years = array_values(array_unique($years));
+        sort($years);
+
+        return $years;
+    }
+
+    /**
+     * Load the plan's own values into the edit form.
+     *
+     * The program is not offered here: moving a plan to another program on its
+     * detail page would change what the page is about under the reader. That
+     * edit belongs to the matrix, where both programs are on screen.
+     */
+    public function openEditModal(): void
+    {
+        $plan = $this->plan;
+
+        $this->resetValidation();
+        $this->planManagerId = (string) $plan->manager_id;
+        $this->planYear = (string) $plan->year;
+        $this->showPlanModal = true;
+    }
+
+    /**
+     * Save the manager and fiscal year.
+     *
+     * The (program_id, year) pair is unique in the database, so moving the plan
+     * onto a year the same program already covers is caught here rather than by
+     * the driver.
+     */
+    public function savePlan(): void
+    {
+        $plan = $this->plan;
+
+        $validated = $this->validate([
+            'planManagerId' => ['required', 'integer', Rule::exists(HrEmployee::class, 'id')],
+            'planYear' => [
+                'required',
+                'integer',
+                'min:2000',
+                'max:2100',
+                Rule::unique(AnnualPlan::class, 'year')
+                    ->where(fn ($query) => $query->where('program_id', $plan->program_id))
+                    ->ignore($plan->id),
+            ],
+        ], [
+            'planManagerId.required' => __('annual_plans.select_the_manager_accountable_for_this_plan'),
+            'planManagerId.exists' => __('annual_plans.the_selected_manager_is_no_longer_available'),
+            'planYear.required' => __('annual_plans.select_the_fiscal_year_this_plan_covers'),
+            'planYear.unique' => __('annual_plans.this_program_already_has_a_plan_for_that_fiscal_year'),
+        ]);
+
+        $plan->fill([
+            'manager_id' => (int) $validated['planManagerId'],
+            'year' => (int) $validated['planYear'],
+        ])->save();
+
+        $this->showPlanModal = false;
+        $this->resetValidation();
+
+        // The whole page reads through plan(), targets() and the figures built
+        // on them, all memoised earlier in this request.
+        unset($this->plan, $this->targets, $this->reportStatusCounts, $this->summary, $this->yearFormOptions);
+
+        Flux::toast(variant: 'success', text: __('annual_plans.annual_plan_updated'));
+    }
+
+    /**
+     * Delete the plan and return to the matrix.
+     *
+     * Its observer removes the targets committed in the plan, and the reports
+     * filed against those targets go with them; the confirmation names that
+     * count before this runs.
+     */
+    public function deletePlan(): void
+    {
+        $this->plan->delete();
+
+        Flux::toast(variant: 'success', text: __('annual_plans.annual_plan_deleted'));
+
+        $this->redirectRoute('annual-plans.index', navigate: true);
+    }
+
+    public function closePlanModal(): void
+    {
+        $this->showPlanModal = false;
+        $this->resetValidation();
+    }
 };
 ?>
 
@@ -267,7 +404,13 @@ new #[Title('titles.annual_plan')] class extends Component {
         </x-slot:meta>
 
         <x-slot:actions>
-            <x-ui.employee-chip :employee="$plan->manager" class="rounded-lg border border-secondary-soft p-2.5 dark:border-secondary-medium" />
+            <div class="flex shrink-0 flex-wrap items-center gap-2">
+                <x-ui.employee-chip :employee="$plan->manager" class="rounded-lg border border-secondary-soft p-2.5 dark:border-secondary-medium" />
+                <div class="flex items-center gap-1.5">
+                    <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation @sm/detail:size-10!" wire:click="openEditModal" :aria-label="__('annual_plans.edit_this_annual_plan')" data-test="edit-annual-plan-button" />
+                    <x-ui.button tone="ghost" size="sm" icon="trash" class="size-11! touch-manipulation @sm/detail:size-10!" wire:click="$set('confirmingDelete', true)" :aria-label="__('annual_plans.delete_this_annual_plan')" data-test="delete-annual-plan-button" />
+                </div>
+            </div>
         </x-slot:actions>
     </x-ui.detail-header>
 
@@ -559,4 +702,58 @@ new #[Title('titles.annual_plan')] class extends Component {
             @endif
         </x-ui.panel>
     </div>
+
+    <flux:modal wire:model="showPlanModal" class="w-full max-w-lg border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
+        <form wire:submit="savePlan" class="flex flex-col gap-5">
+            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
+                <flux:heading size="lg">{{ __('annual_plans.edit_annual_plan') }}</flux:heading>
+                <flux:subheading>{{ $plan->program->name }}</flux:subheading>
+            </div>
+
+            @if ($showPlanModal)
+                <x-ui.select wire:model="planYear" :label="__('annual_plans.fiscal_year')" required>
+                    <flux:select.option value="">{{ __('annual_plans.select_a_fiscal_year') }}</flux:select.option>
+                    @foreach ($this->yearFormOptions as $yearFormOption)
+                        <flux:select.option :value="$yearFormOption" :wire:key="'plan-year-option-'.$yearFormOption">{{ $yearFormOption }}</flux:select.option>
+                    @endforeach
+                </x-ui.select>
+
+                <x-ui.select wire:model="planManagerId" :label="__('annual_plans.assigned_manager')" required>
+                    <flux:select.option value="">{{ __('annual_plans.select_a_manager') }}</flux:select.option>
+                    @foreach ($this->employeeOptions as $employeeOption)
+                        <flux:select.option :value="$employeeOption->id" :wire:key="'plan-manager-option-'.$employeeOption->id">
+                            {{ $employeeOption->name }} · {{ $employeeOption->secondary_name }}
+                        </flux:select.option>
+                    @endforeach
+                </x-ui.select>
+            @endif
+
+            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
+                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="closePlanModal">{{ __('common.cancel') }}</x-ui.button>
+                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" data-test="save-annual-plan-button">{{ __('common.save_changes') }}</x-ui.button>
+            </div>
+        </form>
+    </flux:modal>
+
+    <flux:modal wire:model="confirmingDelete" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
+        <div class="flex flex-col gap-4">
+            <flux:heading size="lg">{{ __('annual_plans.delete_this_annual_plan') }}</flux:heading>
+            <flux:subheading>
+                {{ $summary['targets'] > 0
+                    ? __('annual_plans.deleting_the_plan_also_removes_its_targets_and_their_reports', [
+                        'program' => $plan->program->name,
+                        'year' => $plan->year,
+                        'count' => $summary['targets'],
+                    ])
+                    : __('annual_plans.this_plan_has_no_targets_committed_in_it', [
+                        'program' => $plan->program->name,
+                        'year' => $plan->year,
+                    ]) }}
+            </flux:subheading>
+            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
+                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="$set('confirmingDelete', false)">{{ __('common.cancel') }}</x-ui.button>
+                <x-ui.button type="button" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="deletePlan" data-test="confirm-delete-annual-plan">{{ __('annual_plans.delete_annual_plan') }}</x-ui.button>
+            </div>
+        </div>
+    </flux:modal>
 </section>

@@ -90,6 +90,23 @@ class AnnualPlan extends Model
     }
 
     /**
+     * Restrict the query to plans written for any of the given fiscal years.
+     *
+     * The years need not be contiguous: the matrix lets a reader pick an
+     * arbitrary set of columns, so a range cannot express what is on screen.
+     * An empty list matches nothing, which is the honest reading of "none of
+     * these years" and keeps a caller from silently widening to everything.
+     *
+     * @param  Builder<static>  $query
+     * @param  array<int, int>  $years
+     */
+    #[Scope]
+    protected function inYears(Builder $query, array $years): void
+    {
+        $query->whereIn('year', $years);
+    }
+
+    /**
      * Restrict the query to the plans one manager is accountable for.
      *
      * A null id means "any manager" and leaves the query untouched, so an

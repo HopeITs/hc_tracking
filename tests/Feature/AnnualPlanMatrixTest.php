@@ -94,22 +94,6 @@ test('filtering by assigned manager keeps only the plans that manager owns', fun
         ->assertSee('Water Security, 2025, no plan');
 });
 
-test('the strategy URL filter keeps only the programs under that strategy', function () {
-    $user = User::factory()->create();
-    $waterStrategy = Strategy::factory()->create();
-    $water = Program::factory()->create(['name' => 'Water Security', 'strategy_id' => $waterStrategy->id]);
-    $shelter = matrixProgram('Safe Shelter');
-
-    AnnualPlan::factory()->create(['program_id' => $water->id, 'year' => 2026]);
-    AnnualPlan::factory()->create(['program_id' => $shelter->id, 'year' => 2026]);
-
-    $this->actingAs($user)
-        ->get(route('annual-plans.index', ['strategy' => $waterStrategy->id]))
-        ->assertOk()
-        ->assertSeeText('Water Security')
-        ->assertDontSeeText('Safe Shelter');
-});
-
 test('the manager filter only offers hr employees who are accountable for a plan', function () {
     $user = User::factory()->create();
     $planned = insertHrEmployee(firstNameEn: 'Layla', lastNameEn: 'Haddad');
@@ -123,7 +107,7 @@ test('the manager filter only offers hr employees who are accountable for a plan
         ->assertDontSee('Unassigned Person');
 });
 
-test('the fiscal year range drops the columns outside it', function () {
+test('selecting a fiscal year drops the columns outside the selection', function () {
     $user = User::factory()->create();
     $water = matrixProgram('Water Security');
 
@@ -133,13 +117,14 @@ test('the fiscal year range drops the columns outside it', function () {
     Livewire::actingAs($user)
         ->test('pages::annual-plans.index')
         ->assertSee('Water Security, 2026, no plan')
-        ->set('yearFrom', '2026')
-        ->assertSee('Fiscal years 2026–2026')
+        ->call('toggleYear', 2026)
+        ->assertSet('years', [2026])
+        ->assertSee('Fiscal years 2026')
         ->assertSee('Water Security, 2026, no plan')
         ->assertDontSee('Water Security, 2023, no plan');
 });
 
-test('a reversed fiscal year range is read in order instead of rendering nothing', function () {
+test('years ticked out of order are still shown in ascending order', function () {
     $user = User::factory()->create();
     $water = matrixProgram('Water Security');
 
@@ -148,13 +133,16 @@ test('a reversed fiscal year range is read in order instead of rendering nothing
 
     Livewire::actingAs($user)
         ->test('pages::annual-plans.index')
-        ->set('yearFrom', '2026')
-        ->set('yearTo', '2024')
-        ->assertSee('Fiscal years 2024–2026')
-        ->assertSee('Water Security, 2025, no plan');
+        ->call('toggleYear', 2026)
+        ->call('toggleYear', 2024)
+        ->assertSet('years', [2024, 2026])
+        // A gappy selection is listed, not described as a span: 2025 was not
+        // asked for and has no column.
+        ->assertSee('Fiscal years 2024, 2026')
+        ->assertDontSee('Water Security, 2025, no plan');
 });
 
-test('a span wider than ten fiscal years is narrowed to the most recent ten', function () {
+test('a default span wider than ten fiscal years is narrowed to the most recent ten', function () {
     $user = User::factory()->create();
     $water = matrixProgram('Water Security');
 
@@ -168,17 +156,26 @@ test('a span wider than ten fiscal years is narrowed to the most recent ten', fu
         ->assertDontSee('Water Security, 2020, no plan');
 });
 
-test('an explicit start year anchors the narrowed span at its beginning', function () {
+test('a selection of more than ten fiscal years keeps the most recent ten', function () {
     $user = User::factory()->create();
     $water = matrixProgram('Water Security');
 
-    AnnualPlan::factory()->create(['program_id' => $water->id, 'year' => 2010]);
-    AnnualPlan::factory()->create(['program_id' => $water->id, 'year' => 2030]);
+    foreach (range(2010, 2030) as $year) {
+        AnnualPlan::factory()->create(['program_id' => $water->id, 'year' => $year]);
+    }
 
-    Livewire::actingAs($user)
-        ->test('pages::annual-plans.index')
-        ->set('yearFrom', '2010')
-        ->assertSee('Fiscal years 2010–2019');
+    $component = Livewire::actingAs($user)->test('pages::annual-plans.index');
+
+    foreach (range(2010, 2022) as $year) {
+        $component->call('toggleYear', $year);
+    }
+
+    // Thirteen years asked for, ten columns granted, and the ones kept are the
+    // most recent of the selection rather than the first ticked.
+    $component
+        ->assertSee('Fiscal years 2013–2022')
+        ->assertSee('narrowed to 10 columns')
+        ->assertDontSee('Water Security, 2012, no plan');
 });
 
 test('a program with no plan keeps its row until the matrix is filtered by manager', function () {
@@ -248,13 +245,11 @@ test('resetting the filters restores the full span and every manager', function 
 
     Livewire::actingAs($user)
         ->test('pages::annual-plans.index')
-        ->set('yearFrom', '2024')
-        ->set('yearTo', '2024')
+        ->call('toggleYear', 2024)
         ->set('manager', (string) $manager->id)
         ->assertDontSee('Safe Shelter')
         ->call('clearFilters')
-        ->assertSet('yearFrom', '')
-        ->assertSet('yearTo', '')
+        ->assertSet('years', [])
         ->assertSet('manager', '')
         ->assertSee('Safe Shelter')
         ->assertSee('Fiscal years 2024–2026');
@@ -345,7 +340,7 @@ test('a focus year outside the visible span falls back to a column that exists',
     Livewire::actingAs($user)
         ->test('pages::annual-plans.index')
         ->set('focusYear', '2026')
-        ->set('yearTo', '2024')
+        ->call('toggleYear', 2024)
         ->assertSee('Focus fiscal year 2024 — 1 plans, 0 targets')
         ->assertDontSee('Focus fiscal year 2026');
 });
@@ -402,40 +397,9 @@ test('the program search narrows the matrix to programs whose name matches', fun
         ->assertDontSee('Safe Shelter');
 });
 
-test('the strategy filter keeps only the programs under that strategy', function () {
+test('resetting the filters restores every program and clears the search', function () {
     $user = User::factory()->create();
-    $waterStrategy = Strategy::factory()->create();
-    $water = Program::factory()->create(['name' => 'Water Security', 'strategy_id' => $waterStrategy->id]);
-    $shelter = matrixProgram('Safe Shelter');
-
-    AnnualPlan::factory()->create(['program_id' => $water->id, 'year' => 2026]);
-    AnnualPlan::factory()->create(['program_id' => $shelter->id, 'year' => 2026]);
-
-    Livewire::actingAs($user)
-        ->test('pages::annual-plans.index')
-        ->set('strategy', (string) $waterStrategy->id)
-        ->assertSee('Water Security')
-        ->assertDontSee('Safe Shelter');
-});
-
-test('the strategy filter only offers strategies at least one program is assigned to', function () {
-    $user = User::factory()->create();
-    $assigned = Strategy::factory()->create(['name' => 'Assigned Strategy']);
-    Strategy::factory()->create(['name' => 'Orphan Strategy']);
     $water = matrixProgram('Water Security');
-    $water->update(['strategy_id' => $assigned->id]);
-    AnnualPlan::factory()->create(['program_id' => $water->id, 'year' => 2026]);
-
-    Livewire::actingAs($user)
-        ->test('pages::annual-plans.index')
-        ->assertSee('Assigned Strategy')
-        ->assertDontSee('Orphan Strategy');
-});
-
-test('resetting the filters restores every program and clears the search and strategy', function () {
-    $user = User::factory()->create();
-    $waterStrategy = Strategy::factory()->create();
-    $water = Program::factory()->create(['name' => 'Water Security', 'strategy_id' => $waterStrategy->id]);
 
     AnnualPlan::factory()->create(['program_id' => $water->id, 'year' => 2026]);
     AnnualPlan::factory()->create(['program_id' => matrixProgram('Safe Shelter')->id, 'year' => 2026]);
@@ -443,11 +407,9 @@ test('resetting the filters restores every program and clears the search and str
     Livewire::actingAs($user)
         ->test('pages::annual-plans.index')
         ->set('programSearch', 'water')
-        ->set('strategy', (string) $waterStrategy->id)
         ->assertDontSee('Safe Shelter')
         ->call('clearFilters')
         ->assertSet('programSearch', '')
-        ->assertSet('strategy', '')
         ->assertSee('Safe Shelter');
 });
 
@@ -465,4 +427,25 @@ test('searching for a program returns the matrix to its first page', function ()
         ->call('setPage', 2)
         ->set('programSearch', 'Program')
         ->assertSee('Program 01');
+});
+
+test('a fiscal year can be unticked again', function () {
+    $user = User::factory()->create();
+    $water = matrixProgram('Water Security');
+
+    AnnualPlan::factory()->create(['program_id' => $water->id, 'year' => 2024]);
+    AnnualPlan::factory()->create(['program_id' => $water->id, 'year' => 2026]);
+
+    Livewire::actingAs($user)
+        ->test('pages::annual-plans.index')
+        ->call('toggleYear', 2024)
+        ->call('toggleYear', 2026)
+        ->assertSet('years', [2024, 2026])
+        ->call('toggleYear', 2024)
+        ->assertSet('years', [2026])
+        // Emptying the selection returns the grid to the full default span
+        // rather than leaving it with no columns at all.
+        ->call('toggleYear', 2026)
+        ->assertSet('years', [])
+        ->assertSee('Fiscal years 2024–2026');
 });

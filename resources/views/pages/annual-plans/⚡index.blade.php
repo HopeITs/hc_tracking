@@ -6,10 +6,12 @@ use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Strategy;
 use App\Models\AnnualPlan;
+use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Query\JoinClause;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -28,17 +30,20 @@ new #[Title('titles.annual_plans')] class extends Component {
      */
     private const MAX_YEAR_COLUMNS = 10;
 
-    #[Url(except: '')]
-    public string $yearFrom = '';
-
-    #[Url(except: '')]
-    public string $yearTo = '';
+    /**
+     * The fiscal years the grid shows as columns.
+     *
+     * A set rather than a range: a reader comparing 2023 against 2027 should
+     * not have to carry the four years between them. Empty means "every year
+     * that has a plan", which is the view the page opens on.
+     *
+     * @var array<int, int>
+     */
+    #[Url(except: [])]
+    public array $years = [];
 
     #[Url(except: '')]
     public string $manager = '';
-
-    #[Url(except: '')]
-    public string $strategy = '';
 
     /**
      * The program-name search narrowing the matrix's rows.
@@ -52,23 +57,53 @@ new #[Title('titles.annual_plans')] class extends Component {
     #[Url(except: '')]
     public string $focusYear = '';
 
-    public function updatedYearFrom(): void
-    {
-        $this->resetPage();
-    }
+    public bool $showPlanModal = false;
 
-    public function updatedYearTo(): void
-    {
-        $this->resetPage();
-    }
+    public ?int $editingPlanId = null;
+
+    public ?int $deletingPlanId = null;
+
+    /**
+     * Whether the delete confirmation is on screen.
+     *
+     * Carried separately from deletingPlanId because the modal has to be bound
+     * with wire:model: an :open expression is only read when the dialog is
+     * first rendered, so a Livewire patch that flips it never opens the dialog.
+     */
+    public bool $showDeleteModal = false;
+
+    public string $planProgramId = '';
+
+    public string $planManagerId = '';
+
+    public string $planYear = '';
 
     public function updatedManager(): void
     {
         $this->resetPage();
     }
 
-    public function updatedStrategy(): void
+    /**
+     * Add a fiscal year to the visible columns, or take it away again.
+     *
+     * Kept sorted so the grid's column order never depends on the order a
+     * reader happened to tick the boxes in.
+     */
+    public function toggleYear(int $year): void
     {
+        $years = in_array($year, $this->years, true)
+            ? array_values(array_diff($this->years, [$year]))
+            : [...$this->years, $year];
+
+        sort($years);
+
+        $this->years = $years;
+        $this->resetPage();
+    }
+
+    public function clearYears(): void
+    {
+        $this->years = [];
         $this->resetPage();
     }
 
@@ -91,10 +126,8 @@ new #[Title('titles.annual_plans')] class extends Component {
 
     public function clearFilters(): void
     {
-        $this->yearFrom = '';
-        $this->yearTo = '';
+        $this->years = [];
         $this->manager = '';
-        $this->strategy = '';
         $this->programSearch = '';
         $this->focusYear = '';
         $this->resetPage();
@@ -118,60 +151,79 @@ new #[Title('titles.annual_plans')] class extends Component {
     }
 
     /**
-     * The fiscal years the grid spans, after defaults, ordering and the column
-     * cap have been applied.
+     * The columns the grid would show if there were no cap.
      *
-     * Null means there is nothing to span because no plan exists yet. An
-     * explicit From anchors the window at its start; otherwise the window is
-     * anchored at its end, so the default view shows the most recent years
-     * rather than the oldest.
+     * Split out so the toolbar can say whether the cap actually cut anything
+     * without recomputing the rule that produced the columns.
      *
-     * @return array{from: int, to: int, clamped: bool}|null
+     * @return array<int, int>
      */
-    #[Computed]
-    public function yearRange(): ?array
+    private function candidateYearColumns(): array
     {
-        $years = $this->yearOptions;
+        if ($this->years === []) {
+            $available = $this->yearOptions;
 
-        if ($years === []) {
-            return null;
+            return $available === []
+                ? []
+                : range($available[0], $available[count($available) - 1]);
         }
 
-        $anchoredAtStart = $this->yearFrom !== '';
-        $from = $anchoredAtStart ? (int) $this->yearFrom : $years[0];
-        $to = $this->yearTo === '' ? $years[count($years) - 1] : (int) $this->yearTo;
+        $selected = array_values(array_unique(array_map('intval', $this->years)));
+        sort($selected);
 
-        if ($from > $to) {
-            [$from, $to] = [$to, $from];
-        }
-
-        $clamped = ($to - $from + 1) > self::MAX_YEAR_COLUMNS;
-
-        if ($clamped) {
-            if ($anchoredAtStart) {
-                $to = $from + self::MAX_YEAR_COLUMNS - 1;
-            } else {
-                $from = $to - self::MAX_YEAR_COLUMNS + 1;
-            }
-        }
-
-        return ['from' => $from, 'to' => $to, 'clamped' => $clamped];
+        return $selected;
     }
 
     /**
      * The fiscal years rendered as columns, gaps included.
      *
-     * A year no program planned still gets a column: an empty column is the
-     * point of a coverage matrix.
+     * With no selection the grid spans every year from the earliest plan to the
+     * latest, gaps included: a year nobody planned still earns a column,
+     * because an empty column is the point of a coverage matrix.
+     *
+     * A selection shows exactly the years chosen and does not fill the holes
+     * between them — a reader who asked for 2023 and 2027 is comparing two
+     * years, not planning five.
+     *
+     * Either way the list is capped at MAX_YEAR_COLUMNS, keeping the most
+     * recent years when it has to cut.
      *
      * @return array<int, int>
      */
     #[Computed]
     public function yearColumns(): array
     {
-        $range = $this->yearRange;
+        return array_slice($this->candidateYearColumns(), -self::MAX_YEAR_COLUMNS);
+    }
 
-        return $range === null ? [] : range($range['from'], $range['to']);
+    /**
+     * How the visible columns should be described in the toolbar.
+     *
+     * A contiguous run reads as a span; anything else has to be listed, because
+     * "2023–2027" would claim three columns that are not on screen.
+     *
+     * @return array{from: int, to: int, contiguous: bool, clamped: bool, list: string}|null
+     */
+    #[Computed]
+    public function yearRange(): ?array
+    {
+        $columns = $this->yearColumns;
+
+        if ($columns === []) {
+            return null;
+        }
+
+        $from = $columns[0];
+        $to = $columns[count($columns) - 1];
+        $requested = count($this->candidateYearColumns());
+
+        return [
+            'from' => $from,
+            'to' => $to,
+            'contiguous' => ($to - $from + 1) === count($columns),
+            'clamped' => $requested > self::MAX_YEAR_COLUMNS,
+            'list' => implode(', ', $columns),
+        ];
     }
 
     /**
@@ -223,22 +275,6 @@ new #[Title('titles.annual_plans')] class extends Component {
     }
 
     /**
-     * The strategies at least one program is assigned to.
-     *
-     * @return Collection<int, Strategy>
-     */
-    #[Computed]
-    public function strategyOptions(): Collection
-    {
-        return Strategy::query()
-            ->select(['id', 'name', 'start_year', 'end_year'])
-            ->whereHas('programs')
-            ->orderByDesc('start_year')
-            ->orderBy('name')
-            ->get();
-    }
-
-    /**
      * The programs forming the rows of the matrix.
      *
      * Without a manager filter every program is listed, including ones with no
@@ -251,7 +287,7 @@ new #[Title('titles.annual_plans')] class extends Component {
     #[Computed]
     public function programRows(): LengthAwarePaginator
     {
-        $range = $this->yearRange;
+        $columns = $this->yearColumns;
         $managerId = $this->selectedManagerId();
 
         return Program::query()
@@ -259,15 +295,14 @@ new #[Title('titles.annual_plans')] class extends Component {
             ->with(['strategy:id,name,start_year,end_year'])
             ->when($managerId !== null, fn (Builder $query) => $query->whereHas(
                 'annualPlans',
-                function (Builder $query) use ($managerId, $range): void {
+                function (Builder $query) use ($managerId, $columns): void {
                     $query->managedBy($managerId);
 
-                    if ($range !== null) {
-                        $query->forYears($range['from'], $range['to']);
+                    if ($columns !== []) {
+                        $query->inYears($columns);
                     }
                 },
             ))
-            ->when($this->strategy !== '', fn (Builder $query) => $query->where('strategy_id', (int) $this->strategy))
             ->when($this->programSearch !== '', fn (Builder $query) => $query->where('name', 'like', '%'.$this->programSearch.'%'))
             ->orderBy('name')
             ->orderBy('id')
@@ -285,17 +320,17 @@ new #[Title('titles.annual_plans')] class extends Component {
     #[Computed]
     public function planCells(): array
     {
-        $range = $this->yearRange;
+        $columns = $this->yearColumns;
         $programIds = $this->programRows->getCollection()->modelKeys();
 
-        if ($range === null || $programIds === []) {
+        if ($columns === [] || $programIds === []) {
             return [];
         }
 
         return AnnualPlan::query()
             ->select(['id', 'program_id', 'manager_id', 'year'])
             ->whereIn('program_id', $programIds)
-            ->forYears($range['from'], $range['to'])
+            ->inYears($columns)
             ->managedBy($this->selectedManagerId())
             ->with('manager:id,first_name_en,last_name_en,first_name_ar,last_name_ar')
             ->withCount('planIndicators')
@@ -358,9 +393,9 @@ new #[Title('titles.annual_plans')] class extends Component {
     #[Computed]
     public function yearStats(): array
     {
-        $range = $this->yearRange;
+        $columns = $this->yearColumns;
 
-        if ($range === null) {
+        if ($columns === []) {
             return [];
         }
 
@@ -369,7 +404,7 @@ new #[Title('titles.annual_plans')] class extends Component {
                 ->on('plan_indicators.source_id', '=', 'annual_plans.id')
                 ->where('plan_indicators.source_type', '=', 'annual_plan'))
             ->leftJoin('reports', 'reports.plan_indicator_id', '=', 'plan_indicators.id')
-            ->forYears($range['from'], $range['to'])
+            ->inYears($columns)
             ->managedBy($this->selectedManagerId())
             ->groupBy('annual_plans.year')
             ->selectRaw('annual_plans.year as year')
@@ -458,6 +493,271 @@ new #[Title('titles.annual_plans')] class extends Component {
     }
 
     /**
+     * Every program the plan form can be written against.
+     *
+     * The full list, not the filtered rows: a plan is created for a program
+     * whether or not the current filters put it on screen.
+     *
+     * @return Collection<int, Program>
+     */
+    #[Computed]
+    public function programOptions(): Collection
+    {
+        return Program::query()
+            ->select(['id', 'name'])
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
+     * Every HR employee the plan can be made accountable to.
+     *
+     * managerOptions() is the grid's filter and lists only employees who
+     * already own a plan; the form must reach the ones who do not yet.
+     *
+     * @return Collection<int, HrEmployee>
+     */
+    #[Computed]
+    public function employeeOptions(): Collection
+    {
+        return HrEmployee::pickerOptions();
+    }
+
+    /**
+     * The fiscal years the form offers.
+     *
+     * Built from the years already planned, plus this year and the next, so a
+     * new fiscal year can be opened without a data change. The year being
+     * edited — or the one carried in from a clicked cell — is folded in as
+     * well, so a plan written for an older year stays selectable in its own
+     * form. Reads the memoised yearOptions rather than the table, which is why
+     * the form costs the matrix no extra read of annual_plans.
+     *
+     * @return array<int, int>
+     */
+    #[Computed]
+    public function yearFormOptions(): array
+    {
+        $thisYear = (int) now()->year;
+
+        $years = [...$this->yearOptions, $thisYear, $thisYear + 1];
+
+        if ($this->planYear !== '') {
+            $years[] = (int) $this->planYear;
+        }
+
+        $years = array_values(array_unique($years));
+        sort($years);
+
+        return $years;
+    }
+
+    /**
+     * What the delete confirmation has to warn about.
+     *
+     * The plan's observer removes the targets committed in it, and the reports
+     * filed against those targets go with them, so the count is named in the
+     * dialog rather than discovered afterwards. Null while no delete is
+     * pending, which keeps this read out of the matrix's query budget.
+     *
+     * @return array{plan: AnnualPlan, targets: int}|null
+     */
+    #[Computed]
+    public function deletingPlan(): ?array
+    {
+        if ($this->deletingPlanId === null) {
+            return null;
+        }
+
+        $plan = AnnualPlan::query()
+            ->select(['id', 'program_id', 'manager_id', 'year'])
+            ->with('program:id,name')
+            ->withCount('planIndicators')
+            ->find($this->deletingPlanId);
+
+        if ($plan === null) {
+            return null;
+        }
+
+        return ['plan' => $plan, 'targets' => $plan->plan_indicators_count];
+    }
+
+    /**
+     * Open the form for a new plan.
+     *
+     * A gap in the grid passes its own program and fiscal year, so clicking an
+     * empty cell writes the plan that cell is missing instead of asking for
+     * coordinates the user already pointed at.
+     */
+    public function openCreateModal(?int $programId = null, ?int $year = null): void
+    {
+        $this->resetPlanForm();
+        $this->planProgramId = $programId === null ? '' : (string) $programId;
+        $this->planYear = $year === null ? '' : (string) $year;
+        $this->showPlanModal = true;
+    }
+
+    public function openEditModal(int $planId): void
+    {
+        $plan = AnnualPlan::query()
+            ->select(['id', 'program_id', 'manager_id', 'year'])
+            ->findOrFail($planId);
+
+        $this->resetValidation();
+        $this->editingPlanId = $plan->id;
+        $this->planProgramId = (string) $plan->program_id;
+        $this->planManagerId = (string) $plan->manager_id;
+        $this->planYear = (string) $plan->year;
+        $this->showPlanModal = true;
+    }
+
+    /**
+     * Write the plan.
+     *
+     * The (program_id, year) pair is unique in the database, so the pair is
+     * validated here too: without that rule a second plan for the same year
+     * surfaces as a driver error instead of a message on the field.
+     */
+    public function savePlan(): void
+    {
+        $validated = $this->validate([
+            'planProgramId' => ['required', 'integer', Rule::exists(Program::class, 'id')],
+            'planManagerId' => ['required', 'integer', Rule::exists(HrEmployee::class, 'id')],
+            'planYear' => [
+                'required',
+                'integer',
+                'min:2000',
+                'max:2100',
+                Rule::unique(AnnualPlan::class, 'year')
+                    ->where(fn ($query) => $query->where('program_id', (int) $this->planProgramId))
+                    ->ignore($this->editingPlanId),
+            ],
+        ], [
+            'planProgramId.required' => __('annual_plans.select_the_program_this_plan_covers'),
+            'planProgramId.exists' => __('annual_plans.the_selected_program_is_no_longer_available'),
+            'planManagerId.required' => __('annual_plans.select_the_manager_accountable_for_this_plan'),
+            'planManagerId.exists' => __('annual_plans.the_selected_manager_is_no_longer_available'),
+            'planYear.required' => __('annual_plans.select_the_fiscal_year_this_plan_covers'),
+            'planYear.unique' => __('annual_plans.this_program_already_has_a_plan_for_that_fiscal_year'),
+        ]);
+
+        $plan = $this->editingPlanId === null
+            ? new AnnualPlan
+            : AnnualPlan::query()->findOrFail($this->editingPlanId);
+
+        $plan->fill([
+            'program_id' => (int) $validated['planProgramId'],
+            'manager_id' => (int) $validated['planManagerId'],
+            'year' => (int) $validated['planYear'],
+        ])->save();
+
+        $wasRecentlyCreated = $plan->wasRecentlyCreated;
+
+        // Read against the span the writer was looking at, before the write
+        // drops the memoised columns.
+        $landedOutsideTheVisibleSpan = ! in_array($plan->year, $this->yearColumns, true);
+
+        $this->showPlanModal = false;
+        $this->resetPlanForm();
+
+        // A plan written for a year the filters exclude would be saved into an
+        // empty screen: the toast would report success and nothing would
+        // appear. The window opens to show the work instead.
+        if ($landedOutsideTheVisibleSpan) {
+            $this->years = [];
+            $this->focusYear = (string) $plan->year;
+        }
+
+        $this->refreshMatrix();
+
+        Flux::toast(
+            variant: 'success',
+            text: $wasRecentlyCreated ? __('annual_plans.annual_plan_created') : __('annual_plans.annual_plan_updated'),
+        );
+    }
+
+    public function confirmDelete(int $planId): void
+    {
+        $this->deletingPlanId = $planId;
+        $this->showDeleteModal = true;
+    }
+
+    public function cancelDelete(): void
+    {
+        $this->deletingPlanId = null;
+        $this->showDeleteModal = false;
+    }
+
+    /**
+     * Delete the plan and everything committed inside it.
+     *
+     * AnnualPlan::delete() brackets the observer's removal of the plan's
+     * targets in a transaction, so a failure partway through cannot leave the
+     * targets gone and the plan standing.
+     */
+    public function deletePlan(): void
+    {
+        if ($this->deletingPlanId === null) {
+            return;
+        }
+
+        AnnualPlan::query()->findOrFail($this->deletingPlanId)->delete();
+
+        $this->deletingPlanId = null;
+        $this->showDeleteModal = false;
+        $this->refreshMatrix();
+
+        Flux::toast(variant: 'success', text: __('annual_plans.annual_plan_deleted'));
+    }
+
+    public function closePlanModal(): void
+    {
+        $this->showPlanModal = false;
+        $this->resetPlanForm();
+    }
+
+    /**
+     * Drop every memoised read of the grid after a write.
+     *
+     * The cells, the column totals and the year list are all computed
+     * properties resolved earlier in the same request, so a write that is not
+     * followed by this leaves the matrix rendering the state it had before.
+     *
+     * The page is deliberately left alone. Rows are programs, and a write
+     * touches a cell rather than the row set, so resetting to page one would
+     * throw a reader editing the twentieth program back to the first for no
+     * gain.
+     */
+    protected function refreshMatrix(): void
+    {
+        unset(
+            $this->yearOptions,
+            $this->yearRange,
+            $this->yearColumns,
+            $this->activeYear,
+            $this->managerOptions,
+            $this->programRows,
+            $this->planCells,
+            $this->planDelivery,
+            $this->yearStats,
+            $this->yearRail,
+            $this->cockpit,
+            $this->yearFormOptions,
+            $this->deletingPlan,
+        );
+    }
+
+    protected function resetPlanForm(): void
+    {
+        $this->resetValidation();
+        $this->editingPlanId = null;
+        $this->planProgramId = '';
+        $this->planManagerId = '';
+        $this->planYear = '';
+    }
+
+    /**
      * The plan of one program in one fiscal year, or null where none exists.
      */
     public function planFor(int $programId, int $year): ?AnnualPlan
@@ -485,7 +785,7 @@ new #[Title('titles.annual_plans')] class extends Component {
     $cockpit = $this->cockpit;
     $delivery = $this->planDelivery;
     $activeYear = $this->activeYear;
-    $filtersAreActive = $yearFrom !== '' || $yearTo !== '' || $manager !== '' || $strategy !== '' || $programSearch !== '';
+    $filtersAreActive = $years !== [] || $manager !== '' || $programSearch !== '';
 @endphp
 
 <section
@@ -495,19 +795,27 @@ new #[Title('titles.annual_plans')] class extends Component {
 >
     <x-ui.page-header heading-id="annual-plan-matrix-heading" :title="__('common.annual_plans')" :count="array_sum(array_column($yearStats, 'plans'))">
         <x-slot:filters>
-            <x-ui.header-filter-select id="annual-plan-year-from" :label="__('annual_plans.from_fiscal_year')" wire:model.live="yearFrom" :value="$yearFrom">
-                <flux:select.option value="">{{ __('annual_plans.earliest') }}</flux:select.option>
-                @foreach ($this->yearOptions as $yearOption)
-                    <flux:select.option :value="$yearOption" :wire:key="'year-from-'.$yearOption">{{ $yearOption }}</flux:select.option>
-                @endforeach
-            </x-ui.header-filter-select>
+            <x-ui.input
+                type="search"
+                icon="magnifying-glass"
+                :label="__('annual_plans.search_programs')"
+                :placeholder="__('annual_plans.search_programs_placeholder')"
+                wire:model.live.debounce.300ms="programSearch"
+                clearable
+            />
 
-            <x-ui.header-filter-select id="annual-plan-year-to" :label="__('annual_plans.to_fiscal_year')" wire:model.live="yearTo" :value="$yearTo">
-                <flux:select.option value="">{{ __('annual_plans.latest') }}</flux:select.option>
+            <x-ui.header-filter-multiselect
+                id="annual-plan-years"
+                :label="__('annual_plans.fiscal_year')"
+                :empty-label="__('annual_plans.all_fiscal_years')"
+                :selected="$years"
+                toggle="toggleYear"
+                clear="clearYears"
+            >
                 @foreach ($this->yearOptions as $yearOption)
-                    <flux:select.option :value="$yearOption" :wire:key="'year-to-'.$yearOption">{{ $yearOption }}</flux:select.option>
+                    <flux:select.option :value="$yearOption" :wire:key="'year-option-'.$yearOption">{{ $yearOption }}</flux:select.option>
                 @endforeach
-            </x-ui.header-filter-select>
+            </x-ui.header-filter-multiselect>
 
             <x-ui.header-filter-select id="annual-plan-manager" :label="__('annual_plans.assigned_manager')" wire:model.live="manager" :value="$manager">
                 <flux:select.option value="">{{ __('common.all_managers') }}</flux:select.option>
@@ -518,10 +826,17 @@ new #[Title('titles.annual_plans')] class extends Component {
                 @endforeach
             </x-ui.header-filter-select>
         </x-slot:filters>
+
+        <x-slot:actions>
+            {{-- Held at 44px, not the usual 40: this button shares a row with the filter controls, which are 2.75rem, and a 4px difference reads as a misalignment. --}}
+            <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation" wire:click="openCreateModal" data-test="create-annual-plan-button">
+                {{ __('annual_plans.new_annual_plan') }}
+            </x-ui.button>
+        </x-slot:actions>
     </x-ui.page-header>
 
     <div class="flex justify-end">
-        <span wire:loading.delay.flex wire:target="yearFrom,yearTo,manager,strategy,programSearch,clearFilters,focusOnYear" class="hidden items-center gap-1.5 text-xs text-secondary-medium dark:text-secondary-soft">
+        <span wire:loading.delay.flex wire:target="toggleYear,clearYears,manager,programSearch,clearFilters,focusOnYear" class="hidden items-center gap-1.5 text-xs text-secondary-medium dark:text-secondary-soft">
             <flux:icon.arrow-path class="size-3.5 animate-spin" /> {{ __('common.updating') }}
         </span>
         @if ($filtersAreActive)
@@ -535,7 +850,11 @@ new #[Title('titles.annual_plans')] class extends Component {
             :heading="__('common.no_annual_plans_yet')"
             :body="__('annual_plans.once_a_program_has_an_annual_plan_its_fiscal_years_appear_he')"
             class="rounded-xl border border-secondary-soft dark:border-secondary-medium"
-        />
+        >
+            <x-slot:action>
+                <x-ui.button size="sm" tone="primary" icon="plus" wire:click="openCreateModal">{{ __('annual_plans.new_annual_plan') }}</x-ui.button>
+            </x-slot:action>
+        </x-ui.empty-state>
     @else
         @php
             // The arc is plotted in its own coordinate space; every marker,
@@ -618,7 +937,12 @@ new #[Title('titles.annual_plans')] class extends Component {
                 </div>
                 <p class="type-meta text-secondary-medium tabular-nums dark:text-secondary-soft">
                     @if ($yearRange !== null)
-                        {{ __('annual_plans.fiscal_years_from_to', ['from' => $yearRange['from'], 'to' => $yearRange['to']]) }}
+                        {{-- A gappy selection cannot be described as a span: "2023–2027" would claim columns that are not on screen. --}}
+                        @if ($yearRange['contiguous'])
+                            {{ __('annual_plans.fiscal_years_from_to', ['from' => $yearRange['from'], 'to' => $yearRange['to']]) }}
+                        @else
+                            {{ __('annual_plans.fiscal_years_list', ['years' => $yearRange['list']]) }}
+                        @endif
                         @if ($yearRange['clamped'])
                             <span class="font-normal">· {{ __('annual_plans.narrowed_to_count_columns', ['count' => count($yearColumns)]) }}</span>
                         @endif
@@ -799,23 +1123,6 @@ new #[Title('titles.annual_plans')] class extends Component {
                     </button>
                 @endif
             </div>
-
-            <div class="directory-filters grid gap-2 border-b border-board-line bg-board-head px-5 pb-3.5 @sm/matrix:grid-cols-[minmax(0,1fr)_13rem]">
-                <x-ui.input
-                    type="search"
-                    icon="magnifying-glass"
-                    wire:model.live.debounce.300ms="programSearch"
-                    :aria-label="__('annual_plans.search_programs')"
-                    :placeholder="__('annual_plans.search_programs_placeholder')"
-                />
-                <flux:select :aria-label="__('common.strategy')" wire:model.live="strategy">
-                    <flux:select.option value="">{{ __('programs.all_strategies') }}</flux:select.option>
-                    @foreach ($this->strategyOptions as $strategyOption)
-                        <flux:select.option :value="$strategyOption->id" :wire:key="'matrix-strategy-'.$strategyOption->id">{{ $strategyOption->name }}</flux:select.option>
-                    @endforeach
-                </flux:select>
-            </div>
-
             {{-- How to read a cell, stated before the grid rather than after it. --}}
             <div class="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-board-line bg-board-head px-5 py-2.5 type-meta text-secondary-medium dark:text-secondary-soft">
                 <span class="inline-flex items-center gap-1.5">
@@ -856,7 +1163,7 @@ new #[Title('titles.annual_plans')] class extends Component {
                 </x-ui.empty-state>
             @else
                 {{-- Narrow layout: one card per program, its planned years listed. --}}
-                <div class="divide-y divide-board-line @5xl/matrix:hidden">
+                <div class="divide-y divide-board-line @4xl/matrix:hidden">
                     @foreach ($this->programRows as $program)
                         @php($rowPlans = collect($yearColumns)->map(fn (int $year) => $this->planFor($program->id, $year))->filter())
                         <article
@@ -882,22 +1189,32 @@ new #[Title('titles.annual_plans')] class extends Component {
                                 <span class="ms-auto shrink-0 type-meta font-semibold tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $rowPlans->count() }}/{{ count($yearColumns) }}</span>
                             </div>
 
-                            <ul class="grid gap-2 @xs/matrix:grid-cols-2">
+                            {{-- One full-width row per fiscal year: each carries its own edit and delete controls, which a two-column grid leaves no room for at phone widths. --}}
+                            <ul class="grid gap-2">
                                 @foreach ($yearColumns as $year)
                                     @php($plan = $this->planFor($program->id, $year))
                                     @php($stats = $plan === null ? null : ($delivery[$plan->id] ?? ['targets' => 0, 'attributed' => 0, 'reports' => 0, 'approved' => 0]))
                                     <li wire:key="mobile-cell-{{ $program->id }}-{{ $year }}">
                                         @if ($plan === null)
-                                            <div class="flex min-h-11 items-center justify-between gap-3 rounded-md border border-dashed border-board-line px-3 py-2" aria-label="{{ __('annual_plans.program_year_no_plan', ['program' => $program->name, 'year' => $year]) }}">
+                                            <button
+                                                type="button"
+                                                wire:click="openCreateModal({{ $program->id }}, {{ $year }})"
+                                                class="flex w-full min-h-11 touch-manipulation items-center justify-between gap-3 rounded-md border border-dashed border-board-line px-3 py-2 text-start transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                                                aria-label="{{ __('annual_plans.add_a_plan_for_program_in_year', ['program' => $program->name, 'year' => $year]) }}"
+                                            >
                                                 <span class="type-meta font-bold tabular-nums text-secondary-light">{{ $year }}</span>
-                                                <span class="type-meta text-secondary-light">{{ __('annual_plans.no_plan') }}</span>
-                                            </div>
+                                                <span class="inline-flex items-center gap-1 type-meta text-secondary-medium dark:text-secondary-soft">
+                                                    <flux:icon.plus class="size-3.5" />
+                                                    {{ __('annual_plans.add_plan') }}
+                                                </span>
+                                            </button>
                                         @else
+                                            <div class="flex items-stretch gap-1.5">
                                             <a
                                                 href="{{ route('annual-plans.show', $plan) }}"
                                                 wire:navigate
                                                 @class([
-                                                    'flex min-h-11 flex-col justify-center gap-1 rounded-md border px-3 py-2 transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                                                    'flex min-w-0 flex-1 min-h-11 flex-col justify-center gap-1 rounded-md border px-3 py-2 transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
                                                     'border-primary' => $year === $activeYear,
                                                     'border-board-line' => $year !== $activeYear,
                                                 ])
@@ -914,6 +1231,24 @@ new #[Title('titles.annual_plans')] class extends Component {
                                                 </span>
                                                 <span class="truncate type-meta text-secondary-medium dark:text-secondary-soft">{{ $plan->manager?->name ?? __('common.not_assigned') }}</span>
                                             </a>
+
+                                                <x-ui.button
+                                                    tone="ghost"
+                                                    size="sm"
+                                                    icon="pencil-square"
+                                                    class="size-11! shrink-0 touch-manipulation"
+                                                    wire:click="openEditModal({{ $plan->id }})"
+                                                    :aria-label="__('annual_plans.edit_the_plan_for_program_in_year', ['program' => $program->name, 'year' => $year])"
+                                                />
+                                                <x-ui.button
+                                                    tone="ghost"
+                                                    size="sm"
+                                                    icon="trash"
+                                                    class="size-11! shrink-0 touch-manipulation"
+                                                    wire:click="confirmDelete({{ $plan->id }})"
+                                                    :aria-label="__('annual_plans.delete_the_plan_for_program_in_year', ['program' => $program->name, 'year' => $year])"
+                                                />
+                                            </div>
                                         @endif
                                     </li>
                                 @endforeach
@@ -923,7 +1258,7 @@ new #[Title('titles.annual_plans')] class extends Component {
                 </div>
 
                 {{-- Wide layout: the grid. Rows are programs, columns fiscal years. --}}
-                <div class="hidden overflow-x-auto [scrollbar-width:thin] @5xl/matrix:block">
+                <div class="hidden overflow-x-auto [scrollbar-width:thin] @4xl/matrix:block">
                     <div
                         role="table"
                         aria-labelledby="coverage-matrix-heading"
@@ -931,7 +1266,7 @@ new #[Title('titles.annual_plans')] class extends Component {
                         style="--matrix-columns: {{ count($yearColumns) }}"
                     >
                         {{-- Neither this row nor the Program column below is position:sticky. An `overflow-x-auto` ancestor computes `overflow-y: auto` too (CSS Overflow §3), quietly making it a sticky containing block on both axes — a `start-0` column stuck to that box has floated to the top of the page and over the app's own header before, so the Program column simply scrolls with the rest of the row now. --}}
-                        <div role="row" class="grid border-b border-board-line bg-board-head" style="grid-template-columns: minmax(15rem, 1fr) repeat(var(--matrix-columns), minmax(6.25rem, 9rem));">
+                        <div role="row" class="grid border-b border-board-line bg-board-head" style="grid-template-columns: minmax(15rem, 26rem) repeat(var(--matrix-columns), minmax(6.25rem, 14rem)) 1fr;">
                             <div role="columnheader" class="flex items-end bg-board-head px-5 py-3">
                                 <span class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('common.program') }}</span>
                             </div>
@@ -973,7 +1308,7 @@ new #[Title('titles.annual_plans')] class extends Component {
                                     'bg-ground' => $loop->even,
                                     'bg-board' => ! $loop->even,
                                 ])
-                                style="grid-template-columns: minmax(15rem, 1fr) repeat(var(--matrix-columns), minmax(6.25rem, 9rem));"
+                                style="grid-template-columns: minmax(15rem, 26rem) repeat(var(--matrix-columns), minmax(6.25rem, 14rem)) 1fr;"
                                 wire:key="row-{{ $program->id }}"
                                 x-show="! gapsOnly || {{ $this->planFor($program->id, $activeYear ?? 0) === null ? 'true' : 'false' }}"
                                 x-on:mouseenter="hoverProgram = {{ $program->id }}"
@@ -1012,21 +1347,29 @@ new #[Title('titles.annual_plans')] class extends Component {
                                     @php($stats = $plan === null ? null : ($delivery[$plan->id] ?? ['targets' => 0, 'attributed' => 0, 'reports' => 0, 'approved' => 0]))
                                     <div
                                         role="cell"
-                                        class="p-1.5 transition-colors"
+                                        class="group/cell relative p-1.5 transition-colors"
                                         wire:key="cell-{{ $program->id }}-{{ $year }}"
                                         x-bind:class="hoverYear === {{ $year }} ? 'bg-board-head' : ''"
                                     >
                                         @if ($plan === null)
-                                            <div
+                                            {{-- A gap is the one thing a coverage matrix exists to show, so it is also the fastest place to close it: the cell writes the plan it is missing. --}}
+                                            <button
+                                                type="button"
+                                                wire:click="openCreateModal({{ $program->id }}, {{ $year }})"
+                                                x-on:mouseenter="hoverYear = {{ $year }}"
+                                                x-on:mouseleave="hoverYear = null"
+                                                x-on:focus="hoverYear = {{ $year }}"
+                                                x-on:blur="hoverYear = null"
                                                 @class([
-                                                    'flex h-full min-h-14 items-center justify-center rounded-md border border-dashed',
+                                                    'group/gap flex h-full w-full min-h-14 items-center justify-center rounded-md border border-dashed transition-colors hover:border-primary hover:bg-board focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
                                                     'border-primary' => $year === $activeYear,
                                                     'border-secondary-soft dark:border-secondary-medium' => $year !== $activeYear,
                                                 ])
-                                                aria-label="{{ __('annual_plans.program_year_no_plan', ['program' => $program->name, 'year' => $year]) }}"
+                                                aria-label="{{ __('annual_plans.add_a_plan_for_program_in_year', ['program' => $program->name, 'year' => $year]) }}"
                                             >
-                                                <span aria-hidden="true" class="text-secondary-light">—</span>
-                                            </div>
+                                                <span aria-hidden="true" class="text-secondary-light group-hover/gap:hidden">—</span>
+                                                <flux:icon.plus aria-hidden="true" class="hidden size-4 text-primary group-hover/gap:block" />
+                                            </button>
                                         @else
                                             @php($reportShare = $stats['reports'] > 0 ? (int) round($stats['approved'] / $stats['reports'] * 100) : 0)
                                             <a
@@ -1037,7 +1380,7 @@ new #[Title('titles.annual_plans')] class extends Component {
                                                 x-on:focus="hoverYear = {{ $year }}"
                                                 x-on:blur="hoverYear = null"
                                                 @class([
-                                                    'group/cell relative flex h-full min-h-14 flex-col items-center justify-center gap-1.5 overflow-hidden rounded-md border bg-board transition-[transform,border-color,box-shadow] duration-150 hover:-translate-y-0.5 hover:border-primary hover:shadow-[0_10px_20px_-14px_rgb(0_0_0/0.55)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary motion-reduce:transition-none motion-reduce:hover:translate-y-0',
+                                                    'relative flex h-full min-h-14 flex-col items-center justify-center gap-1.5 overflow-hidden rounded-md border bg-board transition-[transform,border-color,box-shadow] duration-150 hover:-translate-y-0.5 hover:border-primary hover:shadow-[0_10px_20px_-14px_rgb(0_0_0/0.55)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary motion-reduce:transition-none motion-reduce:hover:translate-y-0',
                                                     'border-primary' => $year === $activeYear,
                                                     'border-secondary-soft dark:border-secondary-medium' => $year !== $activeYear,
                                                 ])
@@ -1064,6 +1407,26 @@ new #[Title('titles.annual_plans')] class extends Component {
                                                     @endif
                                                 </span>
                                             </a>
+
+                                            {{-- Siblings of the link, not children: a cell is a link first, so its controls sit over it and only surface on hover or keyboard focus. --}}
+                                            <div class="absolute start-2.5 top-2.5 flex gap-0.5 opacity-0 transition-opacity group-hover/cell:opacity-100 group-focus-within/cell:opacity-100 motion-reduce:transition-none">
+                                                <button
+                                                    type="button"
+                                                    wire:click="openEditModal({{ $plan->id }})"
+                                                    class="grid size-5 place-items-center rounded border border-secondary-soft bg-board text-secondary-medium transition-colors hover:border-primary hover:text-primary focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary dark:border-secondary-medium dark:text-secondary-soft"
+                                                    aria-label="{{ __('annual_plans.edit_the_plan_for_program_in_year', ['program' => $program->name, 'year' => $year]) }}"
+                                                >
+                                                    <flux:icon.pencil-square class="size-3" />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    wire:click="confirmDelete({{ $plan->id }})"
+                                                    class="grid size-5 place-items-center rounded border border-secondary-soft bg-board text-secondary-medium transition-colors hover:border-primary hover:text-primary focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary dark:border-secondary-medium dark:text-secondary-soft"
+                                                    aria-label="{{ __('annual_plans.delete_the_plan_for_program_in_year', ['program' => $program->name, 'year' => $year]) }}"
+                                                >
+                                                    <flux:icon.trash class="size-3" />
+                                                </button>
+                                            </div>
                                         @endif
                                     </div>
                                 @endforeach
@@ -1078,4 +1441,72 @@ new #[Title('titles.annual_plans')] class extends Component {
             @endif
         </section>
     @endif
+
+    <flux:modal wire:model="showPlanModal" class="w-full max-w-2xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
+        <form wire:submit="savePlan" class="flex flex-col gap-5">
+            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
+                <flux:heading size="lg">{{ $editingPlanId === null ? __('annual_plans.new_annual_plan') : __('annual_plans.edit_annual_plan') }}</flux:heading>
+                <flux:subheading>{{ __('annual_plans.one_program_one_fiscal_year_one_accountable_manager') }}</flux:subheading>
+            </div>
+
+            @if ($showPlanModal)
+                <x-ui.select wire:model="planProgramId" :label="__('common.program')" required>
+                    <flux:select.option value="">{{ __('annual_plans.select_a_program') }}</flux:select.option>
+                    @foreach ($this->programOptions as $programOption)
+                        <flux:select.option :value="$programOption->id" :wire:key="'plan-program-option-'.$programOption->id">{{ $programOption->name }}</flux:select.option>
+                    @endforeach
+                </x-ui.select>
+
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <x-ui.select wire:model="planYear" :label="__('annual_plans.fiscal_year')" required>
+                        <flux:select.option value="">{{ __('annual_plans.select_a_fiscal_year') }}</flux:select.option>
+                        @foreach ($this->yearFormOptions as $yearFormOption)
+                            <flux:select.option :value="$yearFormOption" :wire:key="'plan-year-option-'.$yearFormOption">{{ $yearFormOption }}</flux:select.option>
+                        @endforeach
+                    </x-ui.select>
+
+                    <x-ui.select wire:model="planManagerId" :label="__('annual_plans.assigned_manager')" required>
+                        <flux:select.option value="">{{ __('annual_plans.select_a_manager') }}</flux:select.option>
+                        @foreach ($this->employeeOptions as $employeeOption)
+                            <flux:select.option :value="$employeeOption->id" :wire:key="'plan-manager-option-'.$employeeOption->id">
+                                {{ $employeeOption->name }} · {{ $employeeOption->secondary_name }}
+                            </flux:select.option>
+                        @endforeach
+                    </x-ui.select>
+                </div>
+            @endif
+
+            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
+                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="closePlanModal">{{ __('common.cancel') }}</x-ui.button>
+                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" data-test="save-annual-plan-button">
+                    {{ $editingPlanId === null ? __('annual_plans.create_annual_plan') : __('common.save_changes') }}
+                </x-ui.button>
+            </div>
+        </form>
+    </flux:modal>
+
+    <flux:modal wire:model="showDeleteModal" wire:close="cancelDelete" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
+        @php($pendingDelete = $this->deletingPlan)
+        <div class="flex flex-col gap-4">
+            <flux:heading size="lg">{{ __('annual_plans.delete_this_annual_plan') }}</flux:heading>
+            @if ($pendingDelete !== null)
+                <flux:subheading>
+                    {{ $pendingDelete['targets'] > 0
+                        ? __('annual_plans.deleting_the_plan_also_removes_its_targets_and_their_reports', [
+                            'program' => $pendingDelete['plan']->program?->name ?? __('common.program'),
+                            'year' => $pendingDelete['plan']->year,
+                            'count' => $pendingDelete['targets'],
+                        ])
+                        : __('annual_plans.this_plan_has_no_targets_committed_in_it', [
+                            'program' => $pendingDelete['plan']->program?->name ?? __('common.program'),
+                            'year' => $pendingDelete['plan']->year,
+                        ]) }}
+                </flux:subheading>
+            @endif
+            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
+                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="cancelDelete">{{ __('common.cancel') }}</x-ui.button>
+                <x-ui.button type="button" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="deletePlan" data-test="confirm-delete-annual-plan">{{ __('annual_plans.delete_annual_plan') }}</x-ui.button>
+            </div>
+        </div>
+    </flux:modal>
 </section>

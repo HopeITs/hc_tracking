@@ -19,7 +19,8 @@
         tabindex="0"
         x-on:keydown.enter="$dispatch('flux-sidebar-toggle')"
         x-on:keydown.space.prevent="$dispatch('flux-sidebar-toggle')"
-        :aria-label="__('navigation.toggle_sidebar')"
+        {{-- Interpolated, not Blade's :attr shorthand: that shorthand is for Blade components, so on a plain div Alpine claims :aria-label as x-bind and evaluates __() as JavaScript, throwing and leaving the toggle unnamed. --}}
+        aria-label="{{ __('navigation.toggle_sidebar') }}"
         data-desktop-navigation-collapse
     >
         <flux:tooltip :content="__('navigation.toggle_sidebar')" position="right">

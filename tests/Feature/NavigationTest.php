@@ -86,3 +86,25 @@ test('a project detail page highlights the projects item', function () {
 
     expect($currentProjectsLinks)->toHaveCount(1);
 });
+
+test('the sidebar collapse toggle carries a translated accessible name, not an Alpine binding', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->get(route('dashboard'))->assertOk();
+
+    $document = new DOMDocument;
+    $document->loadHTML($response->getContent(), LIBXML_NOERROR | LIBXML_NOWARNING);
+    $xpath = new DOMXPath($document);
+
+    $toggles = $xpath->query('//*[@data-desktop-navigation-collapse]');
+
+    expect($toggles)->toHaveCount(1);
+
+    $toggle = $toggles->item(0);
+
+    // The div carries x-data, so a Blade ":attr" here would be claimed by Alpine
+    // and evaluated as JavaScript: __() is not defined in the browser, which
+    // throws on every page load and leaves the control without a name.
+    expect($toggle->getAttribute('aria-label'))->toBe(__('navigation.toggle_sidebar'))
+        ->and($toggle->hasAttribute(':aria-label'))->toBeFalse();
+});

@@ -2,16 +2,46 @@
     'sidebar' => false,
 ])
 
-@if($sidebar)
-    <flux:sidebar.brand :name="config('app.name', 'Laravel')" {{ $attributes }}>
-        <x-slot name="logo" class="flex aspect-square size-8 items-center justify-center rounded-md bg-accent-content text-accent-foreground">
-            <x-app-logo-icon class="size-5 fill-current text-white dark:text-black" />
+@php
+    $brandName = config('app.name', 'HC Tracking');
+@endphp
+
+{{--
+    The brand is rendered without a `name`, because the wordmark already carries
+    it: passing one would print "HC Tracking" in text beside a logo that says
+    the same thing.
+
+    Collapse and theme are kept on separate elements on purpose. The outer spans
+    decide wordmark-versus-icon, and the images inside them decide red-versus-
+    white. Combining both on one element would put `dark:block` and
+    `in-data-flux-sidebar-collapsed-desktop:hidden` at equal specificity, where
+    the winner is decided by stylesheet order rather than by intent.
+--}}
+@if ($sidebar)
+    {{--
+        Collapsed, the brand is pinned to the start rather than centred. The
+        collapse toggle floats at the rail's end edge and, in a 4.5rem rail,
+        a centred mark runs straight under it — the previous Laravel mark
+        cleared it by a single pixel. Starting the mark at the rail's own
+        padding keeps the two apart with room to spare.
+    --}}
+    <flux:sidebar.brand {{ $attributes->class('in-data-flux-sidebar-collapsed-desktop:justify-start!') }}>
+        <x-slot name="logo" class="h-auto! min-w-0! justify-start! rounded-none! [:where(&)]:h-auto">
+            <span class="in-data-flux-sidebar-collapsed-desktop:hidden">
+                <img src="{{ asset('logo-tracking.svg') }}" alt="{{ $brandName }}" class="h-7 w-auto dark:hidden" />
+                <img src="{{ asset('logo-tracking-white.svg') }}" alt="{{ $brandName }}" class="hidden h-7 w-auto dark:block" />
+            </span>
+
+            <span class="hidden in-data-flux-sidebar-collapsed-desktop:block">
+                <img src="{{ asset('logo-tracking-icon.svg') }}" alt="{{ $brandName }}" class="size-7 shrink-0" />
+            </span>
         </x-slot>
     </flux:sidebar.brand>
 @else
-    <flux:brand :name="config('app.name', 'Laravel')" {{ $attributes }}>
-        <x-slot name="logo" class="flex aspect-square size-8 items-center justify-center rounded-md bg-accent-content text-accent-foreground">
-            <x-app-logo-icon class="size-5 fill-current text-white dark:text-black" />
+    <flux:brand {{ $attributes }}>
+        <x-slot name="logo" class="h-auto! min-w-0! justify-start! rounded-none! [:where(&)]:h-auto">
+            <img src="{{ asset('logo-tracking.svg') }}" alt="{{ $brandName }}" class="h-7 w-auto dark:hidden" />
+            <img src="{{ asset('logo-tracking-white.svg') }}" alt="{{ $brandName }}" class="hidden h-7 w-auto dark:block" />
         </x-slot>
     </flux:brand>
 @endif

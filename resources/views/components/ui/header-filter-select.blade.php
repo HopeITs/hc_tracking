@@ -41,7 +41,7 @@
 @endphp
 
 <div class="min-w-0" data-header-filter-select>
-    <label for="{{ $id }}" class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-secondary-soft">
+    <label for="{{ $id }}" class="mb-1.5 block text-[11px] font-semibold uppercase leading-4 tracking-[0.1em] text-secondary-medium dark:text-secondary-soft">
         {{ $label }}
     </label>
 
