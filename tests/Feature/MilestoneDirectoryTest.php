@@ -31,6 +31,7 @@ test('milestones render as a responsive tree grouped by project with reachable a
 
     Livewire::actingAs($user)
         ->test('pages::milestones.index')
+        ->set('view', 'list')
         ->assertSee('Aleppo Wells')
         ->assertSee('Baseline assessment')
         ->assertSee('Household survey')
@@ -58,6 +59,27 @@ test('milestones can be filtered by project and status', function () {
         ->set('status', MilestoneStatus::Pending->value)
         ->assertDontSee('First gate')
         ->assertSee('Second gate');
+});
+
+test('the dropdown filter actions set and clear the project, status and responsible filters', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->create();
+    $responsible = insertHrEmployee();
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.index')
+        ->call('filterByProject', $project->id)
+        ->assertSet('project', (string) $project->id)
+        ->call('filterByProject')
+        ->assertSet('project', '')
+        ->call('filterByStatus', MilestoneStatus::Reached->value)
+        ->assertSet('status', MilestoneStatus::Reached->value)
+        ->call('filterByStatus', 'not-a-real-status')
+        ->assertSet('status', '')
+        ->call('filterByResponsible', $responsible)
+        ->assertSet('responsible', (string) $responsible)
+        ->call('filterByResponsible')
+        ->assertSet('responsible', '');
 });
 
 test('a matching child remains visible with its necessary ancestors for status and responsible filters', function () {
@@ -245,6 +267,7 @@ test('milestone files are isolated metadata only with no storage controls', func
 
     $component = Livewire::actingAs($user)
         ->test('pages::milestones.index')
+        ->set('view', 'list')
         ->set('project', (string) $milestone->project_id)
         ->assertSeeText('signed-evidence.pdf')
         ->assertSeeText('PDF')

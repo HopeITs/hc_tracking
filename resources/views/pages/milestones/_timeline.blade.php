@@ -57,7 +57,7 @@
 
     <x-ui.panel :title="$projectRow->name" :subtitle="$projectRow->city?->name ?? __('common.unknown_city')" :count="$milestones->count()" wire:key="milestone-timeline-project-{{ $projectRow->id }}">
         <x-slot:toolbar>
-            <a href="{{ route('projects.show', $projectRow) }}" wire:navigate class="text-xs font-semibold text-secondary-medium hover:underline dark:text-secondary-soft">{{ __('milestones.open_project') }}</a>
+            <x-ui.button tone="ghost" size="sm" icon="eye" class="size-9!" :href="route('projects.show', $projectRow)" wire:navigate :aria-label="__('common.view_name', ['name' => $projectRow->name])" />
         </x-slot:toolbar>
 
         @if (! $hasWindow)

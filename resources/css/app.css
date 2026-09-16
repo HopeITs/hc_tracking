@@ -197,6 +197,13 @@
     }
 }
 
+/* Every clickable button gets a hand cursor, matching links. */
+button:not(:disabled),
+[data-flux-button]:not(:disabled),
+[role='button']:not([aria-disabled='true']) {
+    cursor: pointer;
+}
+
 [data-flux-field]:not(ui-radio, ui-checkbox) {
     @apply grid gap-2;
 }
