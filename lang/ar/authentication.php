@@ -7,6 +7,7 @@ return [
     'confirm_password' => 'تأكيد كلمة المرور',
     'confirm_with_passkey' => 'التأكيد بمفتاح مرور',
     'confirming' => 'جارٍ التأكيد...',
+    'copyright_notice' => '© :year - مركز الأمل المسيحي - PT',
     'create_account' => 'إنشاء حساب',
     'create_an_account' => 'أنشئ حسابًا',
     'don_t_have_an_account' => 'ليس لديك حساب؟',
@@ -29,6 +30,7 @@ return [
     'or_return_to' => 'أو ارجع إلى',
     'or_you_can' => 'أو يمكنك',
     'please_confirm_access_to_your_account_by_entering_one_of_you' => 'يرجى تأكيد الوصول إلى حسابك بإدخال أحد رموز الاسترداد الطارئة.',
+    'please_enter_your_credentials_to_sign_in' => 'يرجى إدخال بيانات الدخول الخاصة بك',
     'please_enter_your_new_password_below' => 'يرجى إدخال كلمة المرور الجديدة أدناه',
     'please_verify_your_email_address_by_clicking_on_the_link_we' => 'يرجى التحقق من بريدك الإلكتروني بالضغط على الرابط الذي أرسلناه إليك للتو.',
     'recovery_code' => 'رمز الاسترداد',
@@ -36,6 +38,7 @@ return [
     'remember_me' => 'تذكرني',
     'resend_verification_email' => 'إعادة إرسال رسالة التحقق',
     'reset_password' => 'إعادة تعيين كلمة المرور',
+    'sign_in' => 'تسجيل الدخول',
     'sign_up' => 'إنشاء حساب',
     'this_is_a_secure_area_of_the_application_please_confirm_your' => 'هذه منطقة آمنة في التطبيق. يرجى تأكيد كلمة المرور قبل المتابعة.',
 ];

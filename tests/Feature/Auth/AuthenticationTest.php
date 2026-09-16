@@ -2,6 +2,7 @@
 
 use App\Enums\UserRole;
 use App\Models\User;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Fortify\Features;
@@ -44,6 +45,73 @@ test('logging in links the user to their hr account and refreshes their name', f
         ->and($user->employee->name_ar)->toBe('سامي حداد');
 });
 
+test('remember me issues a long-lived remember cookie', function () {
+    $user = User::factory()->withHrAccount()->create();
+
+    $response = $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+        'remember' => 'on',
+    ]);
+
+    $response->assertSessionHasNoErrors();
+    $this->assertAuthenticatedAs($user);
+
+    // The recaller cookie is what actually keeps the session alive past
+    // browser close; remember_token itself isn't a reliable signal here
+    // since the factory always seeds one regardless of login.
+    $response->assertCookie(Auth::guard()->getRecallerName());
+});
+
+test('without remember me no remember cookie is issued', function () {
+    $user = User::factory()->withHrAccount()->create();
+
+    $response = $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+    ]);
+
+    $response->assertSessionHasNoErrors();
+    $this->assertAuthenticatedAs($user);
+
+    $response->assertCookieMissing(Auth::guard()->getRecallerName());
+});
+
+test('the session cookie itself expires when the browser closes, remember me or not', function () {
+    // A cookie with expires-time 0 has no Max-Age/Expires attribute at all,
+    // which is what makes a browser drop it on close. This must hold
+    // whether or not "remember me" was checked — the two are independent:
+    // remember me is a *separate*, long-lived recaller cookie that lets the
+    // user skip the login page next time even though this session cookie
+    // is gone; without it, closing the browser must require signing in
+    // again rather than silently staying logged in for SESSION_LIFETIME.
+    $user = User::factory()->withHrAccount()->create();
+
+    $withoutRemember = $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+    ]);
+
+    $sessionCookie = $withoutRemember->getCookie(config('session.cookie'), decrypt: false);
+    expect($sessionCookie)->not->toBeNull();
+    expect($sessionCookie->getExpiresTime())->toBe(0);
+
+    $this->post(route('logout'));
+
+    $withRemember = $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+        'remember' => 'on',
+    ]);
+
+    $sessionCookieRemembered = $withRemember->getCookie(config('session.cookie'), decrypt: false);
+    expect($sessionCookieRemembered)->not->toBeNull();
+    expect($sessionCookieRemembered->getExpiresTime())->toBe(0);
+
+    $recallerCookie = $withRemember->getCookie(Auth::guard()->getRecallerName(), decrypt: false);
+    expect($recallerCookie->getExpiresTime())->toBeGreaterThan(now()->addYear()->timestamp);
+});
+
 test('logging in never writes to hr', function () {
     $user = User::factory()->withHrAccount()->create();
     $before = DB::connection('hr')->table('users')->get()->toArray();
@@ -64,6 +132,46 @@ test('users can not authenticate with a wrong hr password', function () {
     $response->assertSessionHasErrorsIn('email');
 
     $this->assertGuest();
+});
+
+test('a wrong password for a known account shows the error under the password field', function () {
+    $user = User::factory()->withHrAccount()->create();
+
+    $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'wrong-password',
+    ]);
+
+    $html = $this->get(route('login'))->getContent();
+
+    expect($html)->toContain(__('auth.failed'));
+
+    // The email is fine; only the password field carries the error.
+    $passwordFieldStart = (int) strpos($html, 'id="login-password"');
+    $rememberStart = (int) strpos($html, 'name="remember"');
+    $passwordFieldMarkup = substr($html, $passwordFieldStart, $rememberStart - $passwordFieldStart);
+    $emailFieldStart = (int) strpos($html, 'id="login-email"');
+    $emailFieldMarkup = substr($html, $emailFieldStart, $passwordFieldStart - $emailFieldStart);
+
+    expect($passwordFieldMarkup)->toContain(__('auth.failed'));
+    expect($emailFieldMarkup)->not->toContain(__('auth.failed'));
+});
+
+test('an unknown email shows the error under the email field', function () {
+    $this->post(route('login.store'), [
+        'email' => 'nobody@example.org',
+        'password' => 'whatever',
+    ]);
+
+    $html = $this->get(route('login'))->getContent();
+
+    expect($html)->toContain(__('auth.failed'));
+
+    $emailFieldStart = (int) strpos($html, 'id="login-email"');
+    $passwordFieldStart = (int) strpos($html, 'id="login-password"');
+    $emailFieldMarkup = substr($html, $emailFieldStart, $passwordFieldStart - $emailFieldStart);
+
+    expect($emailFieldMarkup)->toContain(__('auth.failed'));
 });
 
 test('the local tracking password no longer logs anyone in', function () {

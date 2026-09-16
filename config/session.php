@@ -34,7 +34,11 @@ return [
 
     'lifetime' => (int) env('SESSION_LIFETIME', 120),
 
-    'expire_on_close' => env('SESSION_EXPIRE_ON_CLOSE', false),
+    // A session without "remember me" must end when the browser closes,
+    // not silently outlive it for up to SESSION_LIFETIME minutes. This is
+    // independent of the "remember me" cookie, which is a separate,
+    // long-lived recaller cookie unaffected by this setting.
+    'expire_on_close' => (bool) env('SESSION_EXPIRE_ON_CLOSE', true),
 
     /*
     |--------------------------------------------------------------------------

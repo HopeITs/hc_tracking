@@ -8,7 +8,9 @@ use App\Models\HrUser;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Fortify;
+use Laravel\Fortify\LoginRateLimiter;
 
 /**
  * Logs people in with their HR account.
@@ -22,14 +24,33 @@ class AuthenticateWithHrAccount
 {
     /**
      * Resolve the tracking user for valid HR credentials.
+     *
+     * An unknown email fails onto the email field (Fortify's default
+     * behaviour); a known email with the wrong password fails onto the
+     * password field instead, so the login form can point at the field that
+     * actually needs fixing.
      */
     public function __invoke(Request $request): ?User
     {
         $email = (string) $request->input(Fortify::username());
-        $hrUser = self::hrAccountFor($email, (string) $request->input('password'));
+        $password = (string) $request->input('password');
+
+        if ($email === '' || $password === '') {
+            return null;
+        }
+
+        $hrUser = self::findHrUserByEmail($email);
 
         if ($hrUser === null) {
             return null;
+        }
+
+        if (! Hash::check($password, $hrUser->password)) {
+            app(LoginRateLimiter::class)->increment($request);
+
+            throw ValidationException::withMessages([
+                'password' => [trans('auth.failed')],
+            ]);
         }
 
         $user = User::forHrAccount($hrUser);
@@ -56,8 +77,13 @@ class AuthenticateWithHrAccount
             return null;
         }
 
-        $hrUser = HrUser::query()->with('employee')->where('email', $email)->first();
+        $hrUser = self::findHrUserByEmail($email);
 
         return $hrUser !== null && Hash::check($password, $hrUser->password) ? $hrUser : null;
+    }
+
+    private static function findHrUserByEmail(string $email): ?HrUser
+    {
+        return HrUser::query()->with('employee')->where('email', $email)->first();
     }
 }

@@ -4,11 +4,15 @@ Before planning or editing, find the row whose globs match the file's path and r
 
 | Applies to | Rule file |
 | --- | --- |
+| app/Actions/Fortify/AuthenticateWithHrAccount.php | .ai/rules/actions-fortify.md |
 | resources/views/{components/navigation/**,layouts/app/sidebar.blade.php}, resources/views/{components/navigation/sidebar.blade.php,components/desktop-user-menu.blade.php,layouts/app/sidebar.blade.php} | .ai/rules/app.md |
+| resources/views/pages/auth/login.blade.php | .ai/rules/auth.md |
 | {app/Actions/Fortify/**,app/Console/Commands/**,config/auth.php,database/seeders/**} | .ai/rules/commands-seeders.md |
 | {app/Actions/Fortify/**,app/Console/Commands/**,config/fortify.php} | .ai/rules/commands.md |
 | resources/views/components/navigation/sidebar.blade.php | .ai/rules/components-navigation.md |
+| resources/{css/app.css,fonts/alex-brush/**,views/components/hope-pt-logo.blade.php} | .ai/rules/components.md |
 | app/Concerns/HasTree.php | .ai/rules/concerns.md |
+| config/session.php | .ai/rules/config-2.md |
 | {config/database.php,.env.example} | .ai/rules/config.md |
 | resources/css/app.css | .ai/rules/css.md |
 | database/migrations/** | .ai/rules/database-migrations.md |
@@ -17,6 +21,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | database/factories/** | .ai/rules/factories.md |
 | {database/migrations/**,tests/Feature/DatabaseEncodingTest.php} | .ai/rules/feature.md |
 | {config/blaze.php,resources/views/flux/**} | .ai/rules/flux.md |
+| {app/Providers/FortifyServiceProvider.php,app/Actions/Fortify/**,config/fortify.php} | .ai/rules/fortify.md |
 | {config/database.php,.env.example,database/migrations/**} | .ai/rules/migrations.md |
 | app/Models/**, app/Models/Account.php, app/Models/Hr*.php, app/Models/Program.php, app/Models/User.php | .ai/rules/models.md |
 | {app/Http/Middleware/SetLocale.php,app/Http/Controllers/SwitchLocaleController.php,resources/views/components/navigation/sidebar.blade.php,resources/css/app.css} | .ai/rules/navigation-css.md |
