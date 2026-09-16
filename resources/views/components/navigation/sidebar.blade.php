@@ -112,8 +112,8 @@
 
             <flux:sidebar.item
                 icon="calendar-days"
-                :href="route('yearly-plans.index')"
-                :current="request()->routeIs('yearly-plans.*')"
+                :href="route('annual-plans.index')"
+                :current="request()->routeIs('annual-plans.*')"
                 :class="$navigationItemClasses"
                 wire:navigate
             >

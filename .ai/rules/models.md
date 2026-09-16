@@ -9,17 +9,17 @@ paths:
 
 # Models
 
-## plan_indicators sources are YearlyPlan and Proposal, via a morph map
-`plan_indicators.source_type`/`source_id` is a morphTo relation with exactly two valid sources: YearlyPlan and Proposal. A target is committed either in an annual operational plan or in a donor grant proposal.
+## plan_indicators sources are AnnualPlan and Proposal, via a morph map
+`plan_indicators.source_type`/`source_id` is a morphTo relation with exactly two valid sources: AnnualPlan and Proposal. A target is committed either in an annual operational plan or in a donor grant proposal.
 
 `source_type` is VARCHAR(50), so register short morph keys rather than storing class names:
 
     Relation::enforceMorphMap([
-        'yearly_plan' => YearlyPlan::class,
+        'annual_plan' => AnnualPlan::class,
         'proposal' => Proposal::class,
     ]);
 
-Put this in a service provider's boot(). Storing 'App\\Models\\YearlyPlan' would work today but leaves no headroom in the column and couples stored data to the namespace.
+Put this in a service provider's boot(). Storing 'App\\Models\\AnnualPlan' would work today but leaves no headroom in the column and couples stored data to the namespace.
 
 No foreign key backs source_id — see the migrations rule about orphans for the cleanup obligation.
 
@@ -42,7 +42,7 @@ The model carries `protected $attributes = ['is_active' => true]` mirroring the 
 Accounts are never deleted — transfers_tracking.account_id restricts on delete. Close them instead.
 
 ## HR database is read-only; tracking links to it by id
-The `hr` connection (hr_db, prefix hchr_) is owned by another app. It opens every MySQL session READ ONLY, and HrModel::save()/delete() throw. Never write, migrate or seed HR tables. Cross-DB links (projects.city_id, projects.user_id, milestones.responsible_user_id, tasks.assigned_to, programs/yearly_plans.manager_id, users.hr_user_id/employee_id) hold HR ids with NO foreign key; search by HR names resolves ids first (HrEmployee::idsMatchingName) instead of whereHas across connections. HrModel::newRelatedInstance stops tracking models inheriting the hr connection. Tests run `hr` on in-memory SQLite (phpunit.xml); createHrSchema() runs before every Feature test and insertHr*() helpers build fixtures.
+The `hr` connection (hr_db, prefix hchr_) is owned by another app. It opens every MySQL session READ ONLY, and HrModel::save()/delete() throw. Never write, migrate or seed HR tables. Cross-DB links (projects.city_id, projects.user_id, milestones.responsible_user_id, tasks.assigned_to, programs/annual_plans.manager_id, users.hr_user_id/employee_id) hold HR ids with NO foreign key; search by HR names resolves ids first (HrEmployee::idsMatchingName) instead of whereHas across connections. HrModel::newRelatedInstance stops tracking models inheriting the hr connection. Tests run `hr` on in-memory SQLite (phpunit.xml); createHrSchema() runs before every Feature test and insertHr*() helpers build fixtures.
 
 ## Programs mirror HR programs under the same id
 Each programs row mirrors one hchr_programs row with the same id, so local FKs and cascades keep working. `name` is a copy refreshed by Program::syncFromHr(), run by SyncProgramsFromHr web middleware at most once a minute; programs removed from HR are kept. Tracking owns only strategy_id and manager_id, both nullable (shown as "Not assigned"). Programs are never created or renamed in tracking; ProgramFactory writes the HR row first (test DB only), seeders sync from HR.

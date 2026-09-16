@@ -166,7 +166,7 @@ new #[Title('titles.report')] class extends Component {
             <span>
                 @if ($this->report->planIndicator->source === null)
                     {{ __('reports.source_no_longer_exists') }}
-                @elseif ($this->report->planIndicator->source_type === 'yearly_plan')
+                @elseif ($this->report->planIndicator->source_type === 'annual_plan')
                     {{ __('reports.committed_in_an_annual_plan') }}
                 @elseif (Route::has('proposals.show'))
                     {{ __('reports.committed_in_a_proposal_2') }}

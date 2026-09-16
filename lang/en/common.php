@@ -29,6 +29,7 @@ return [
     'count_annual_plan' => ':count annual plan|:count annual plans',
     'count_milestone' => ':count milestone|:count milestones',
     'count_project' => ':count project|:count projects',
+    'count_report' => ':count report|:count reports',
     'count_risk' => ':count risk|:count risks',
     'count_target' => ':count target|:count targets',
     'count_tranche' => ':count tranche|:count tranches',

@@ -5,7 +5,7 @@ use App\Models\HrEmployee;
 use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Strategy;
-use App\Models\YearlyPlan;
+use App\Models\AnnualPlan;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -108,7 +108,7 @@ new #[Title('titles.annual_plans')] class extends Component {
     #[Computed]
     public function yearOptions(): array
     {
-        return YearlyPlan::query()
+        return AnnualPlan::query()
             ->select('year')
             ->distinct()
             ->orderBy('year')
@@ -215,7 +215,7 @@ new #[Title('titles.annual_plans')] class extends Component {
         // ids first instead of a whereHas() across connections.
         return HrEmployee::query()
             ->select(HrEmployee::NameColumns)
-            ->whereIn('id', YearlyPlan::query()->distinct()->pluck('manager_id'))
+            ->whereIn('id', AnnualPlan::query()->distinct()->pluck('manager_id'))
             ->orderBy(\App\Enums\Locale::current() === \App\Enums\Locale::Arabic ? 'first_name_ar' : 'first_name_en')
             ->orderBy(\App\Enums\Locale::current() === \App\Enums\Locale::Arabic ? 'last_name_ar' : 'last_name_en')
             ->orderBy('id')
@@ -258,7 +258,7 @@ new #[Title('titles.annual_plans')] class extends Component {
             ->select(['id', 'name', 'strategy_id'])
             ->with(['strategy:id,name,start_year,end_year'])
             ->when($managerId !== null, fn (Builder $query) => $query->whereHas(
-                'yearlyPlans',
+                'annualPlans',
                 function (Builder $query) use ($managerId, $range): void {
                     $query->managedBy($managerId);
 
@@ -280,7 +280,7 @@ new #[Title('titles.annual_plans')] class extends Component {
      * One query fills the whole grid. Every cell is then an array lookup, so
      * the number of queries does not move as the matrix grows.
      *
-     * @return array<string, YearlyPlan>
+     * @return array<string, AnnualPlan>
      */
     #[Computed]
     public function planCells(): array
@@ -292,7 +292,7 @@ new #[Title('titles.annual_plans')] class extends Component {
             return [];
         }
 
-        return YearlyPlan::query()
+        return AnnualPlan::query()
             ->select(['id', 'program_id', 'manager_id', 'year'])
             ->whereIn('program_id', $programIds)
             ->forYears($range['from'], $range['to'])
@@ -300,16 +300,16 @@ new #[Title('titles.annual_plans')] class extends Component {
             ->with('manager:id,first_name_en,last_name_en,first_name_ar,last_name_ar')
             ->withCount('planIndicators')
             ->get()
-            ->keyBy(fn (YearlyPlan $plan): string => $plan->program_id.':'.$plan->year)
+            ->keyBy(fn (AnnualPlan $plan): string => $plan->program_id.':'.$plan->year)
             ->all();
     }
 
     /**
      * Delivery signal for every plan on screen, keyed by plan id.
      *
-     * Read from plan_indicators rather than yearly_plans, so filling the cells
+     * Read from plan_indicators rather than annual_plans, so filling the cells
      * with progress costs one query for the whole grid and leaves the matrix's
-     * four reads of yearly_plans untouched. Reports fan out against targets,
+     * four reads of annual_plans untouched. Reports fan out against targets,
      * hence the distinct counts.
      *
      * @return array<int, array{targets: int, attributed: int, reports: int, approved: int}>
@@ -317,14 +317,14 @@ new #[Title('titles.annual_plans')] class extends Component {
     #[Computed]
     public function planDelivery(): array
     {
-        $planIds = array_map(fn (YearlyPlan $plan): int => $plan->id, $this->planCells);
+        $planIds = array_map(fn (AnnualPlan $plan): int => $plan->id, $this->planCells);
 
         if ($planIds === []) {
             return [];
         }
 
         return PlanIndicator::query()
-            ->where('plan_indicators.source_type', 'yearly_plan')
+            ->where('plan_indicators.source_type', 'annual_plan')
             ->whereIn('plan_indicators.source_id', $planIds)
             ->leftJoin('reports', 'reports.plan_indicator_id', '=', 'plan_indicators.id')
             ->groupBy('plan_indicators.source_id')
@@ -364,17 +364,17 @@ new #[Title('titles.annual_plans')] class extends Component {
             return [];
         }
 
-        return YearlyPlan::query()
+        return AnnualPlan::query()
             ->leftJoin('plan_indicators', fn (JoinClause $join) => $join
-                ->on('plan_indicators.source_id', '=', 'yearly_plans.id')
-                ->where('plan_indicators.source_type', '=', 'yearly_plan'))
+                ->on('plan_indicators.source_id', '=', 'annual_plans.id')
+                ->where('plan_indicators.source_type', '=', 'annual_plan'))
             ->leftJoin('reports', 'reports.plan_indicator_id', '=', 'plan_indicators.id')
             ->forYears($range['from'], $range['to'])
             ->managedBy($this->selectedManagerId())
-            ->groupBy('yearly_plans.year')
-            ->selectRaw('yearly_plans.year as year')
-            ->selectRaw('count(distinct yearly_plans.id) as plans')
-            ->selectRaw('count(distinct yearly_plans.manager_id) as managers')
+            ->groupBy('annual_plans.year')
+            ->selectRaw('annual_plans.year as year')
+            ->selectRaw('count(distinct annual_plans.id) as plans')
+            ->selectRaw('count(distinct annual_plans.manager_id) as managers')
             ->selectRaw('count(distinct plan_indicators.id) as targets')
             ->selectRaw('count(distinct reports.id) as reports')
             ->selectRaw('count(distinct case when reports.status = ? then reports.id end) as approved', [ReportStatus::Approved->value])
@@ -460,7 +460,7 @@ new #[Title('titles.annual_plans')] class extends Component {
     /**
      * The plan of one program in one fiscal year, or null where none exists.
      */
-    public function planFor(int $programId, int $year): ?YearlyPlan
+    public function planFor(int $programId, int $year): ?AnnualPlan
     {
         return $this->planCells[$programId.':'.$year] ?? null;
     }
@@ -490,22 +490,22 @@ new #[Title('titles.annual_plans')] class extends Component {
 
 <section
     class="admin-directory @container/matrix flex min-h-full w-full flex-1 flex-col gap-8 bg-white px-1 text-secondary-dark dark:bg-secondary-dark dark:text-white"
-    aria-labelledby="yearly-plan-matrix-heading"
+    aria-labelledby="annual-plan-matrix-heading"
     x-data="{ hoverYear: null, hoverProgram: null, gapsOnly: false }"
 >
     <header class="grid gap-8 border-b border-secondary-soft pb-7 @6xl/matrix:grid-cols-[minmax(16rem,.7fr)_minmax(0,1.3fr)] @6xl/matrix:items-center dark:border-secondary-medium">
         <div class="min-w-0">
             <div class="flex items-center gap-2.5">
-                <flux:heading id="yearly-plan-matrix-heading" size="xl" class="text-3xl! font-bold! leading-none!">{{ __('common.annual_plans') }}</flux:heading>
-                <span class="inline-flex min-w-7 items-center justify-center rounded-md bg-primary px-2 py-0.5 text-xs font-bold tabular-nums text-white">{{ $this->programRows->total() }}</span>
+                <flux:heading id="annual-plan-matrix-heading" size="xl" class="text-3xl! font-bold! leading-none!">{{ __('common.annual_plans') }}</flux:heading>
+                <span class="inline-flex min-w-7 items-center justify-center rounded-md bg-primary px-2 py-0.5 text-xs font-bold tabular-nums text-white">{{ array_sum(array_column($yearStats, 'plans')) }}</span>
             </div>
         </div>
 
         <div class="directory-filters grid gap-3 @3xl/matrix:grid-cols-2 @6xl/matrix:grid-cols-3">
             <div class="min-w-0">
-                <label for="yearly-plan-year-from" class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-secondary-soft">{{ __('yearly_plans.from_fiscal_year') }}</label>
-                <flux:select id="yearly-plan-year-from" :aria-label="__('yearly_plans.from_fiscal_year')" wire:model.live="yearFrom">
-                    <flux:select.option value="">{{ __('yearly_plans.earliest') }}</flux:select.option>
+                <label for="annual-plan-year-from" class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-secondary-soft">{{ __('annual_plans.from_fiscal_year') }}</label>
+                <flux:select id="annual-plan-year-from" :aria-label="__('annual_plans.from_fiscal_year')" wire:model.live="yearFrom">
+                    <flux:select.option value="">{{ __('annual_plans.earliest') }}</flux:select.option>
                     @foreach ($this->yearOptions as $yearOption)
                         <flux:select.option :value="$yearOption" :wire:key="'year-from-'.$yearOption">{{ $yearOption }}</flux:select.option>
                     @endforeach
@@ -513,9 +513,9 @@ new #[Title('titles.annual_plans')] class extends Component {
             </div>
 
             <div class="min-w-0">
-                <label for="yearly-plan-year-to" class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-secondary-soft">{{ __('yearly_plans.to_fiscal_year') }}</label>
-                <flux:select id="yearly-plan-year-to" :aria-label="__('yearly_plans.to_fiscal_year')" wire:model.live="yearTo">
-                    <flux:select.option value="">{{ __('yearly_plans.latest') }}</flux:select.option>
+                <label for="annual-plan-year-to" class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-secondary-soft">{{ __('annual_plans.to_fiscal_year') }}</label>
+                <flux:select id="annual-plan-year-to" :aria-label="__('annual_plans.to_fiscal_year')" wire:model.live="yearTo">
+                    <flux:select.option value="">{{ __('annual_plans.latest') }}</flux:select.option>
                     @foreach ($this->yearOptions as $yearOption)
                         <flux:select.option :value="$yearOption" :wire:key="'year-to-'.$yearOption">{{ $yearOption }}</flux:select.option>
                     @endforeach
@@ -523,8 +523,8 @@ new #[Title('titles.annual_plans')] class extends Component {
             </div>
 
             <div class="min-w-0">
-                <label for="yearly-plan-manager" class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-secondary-soft">{{ __('yearly_plans.assigned_manager') }}</label>
-                <flux:select id="yearly-plan-manager" :aria-label="__('yearly_plans.assigned_manager')" wire:model.live="manager">
+                <label for="annual-plan-manager" class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-secondary-soft">{{ __('annual_plans.assigned_manager') }}</label>
+                <flux:select id="annual-plan-manager" :aria-label="__('annual_plans.assigned_manager')" wire:model.live="manager">
                     <flux:select.option value="">{{ __('common.all_managers') }}</flux:select.option>
                     @foreach ($this->managerOptions as $managerOption)
                         <flux:select.option :value="$managerOption->id" :wire:key="'manager-filter-'.$managerOption->id">
@@ -549,7 +549,7 @@ new #[Title('titles.annual_plans')] class extends Component {
         <x-ui.empty-state
             icon="calendar-days"
             :heading="__('common.no_annual_plans_yet')"
-            :body="__('yearly_plans.once_a_program_has_an_annual_plan_its_fiscal_years_appear_he')"
+            :body="__('annual_plans.once_a_program_has_an_annual_plan_its_fiscal_years_appear_he')"
             class="rounded-xl border border-secondary-soft dark:border-secondary-medium"
         />
     @else
@@ -629,17 +629,17 @@ new #[Title('titles.annual_plans')] class extends Component {
         <section class="overflow-hidden rounded-xl border border-board-line bg-board" aria-labelledby="planning-arc-heading">
             <div class="flex flex-wrap items-end justify-between gap-3 border-b border-board-line bg-board-head px-5 py-4">
                 <div class="min-w-0">
-                    <h2 id="planning-arc-heading" class="text-base font-bold">{{ __('yearly_plans.planning_arc') }}</h2>
-                    <p class="mt-0.5 type-meta text-secondary-medium dark:text-secondary-soft">{{ __('yearly_plans.planning_arc_hint') }}</p>
+                    <h2 id="planning-arc-heading" class="text-base font-bold">{{ __('annual_plans.planning_arc') }}</h2>
+                    <p class="mt-0.5 type-meta text-secondary-medium dark:text-secondary-soft">{{ __('annual_plans.planning_arc_hint') }}</p>
                 </div>
                 <p class="type-meta text-secondary-medium tabular-nums dark:text-secondary-soft">
                     @if ($yearRange !== null)
-                        {{ __('yearly_plans.fiscal_years_from_to', ['from' => $yearRange['from'], 'to' => $yearRange['to']]) }}
+                        {{ __('annual_plans.fiscal_years_from_to', ['from' => $yearRange['from'], 'to' => $yearRange['to']]) }}
                         @if ($yearRange['clamped'])
-                            <span class="font-normal">· {{ __('yearly_plans.narrowed_to_count_columns', ['count' => count($yearColumns)]) }}</span>
+                            <span class="font-normal">· {{ __('annual_plans.narrowed_to_count_columns', ['count' => count($yearColumns)]) }}</span>
                         @endif
                     @else
-                        {{ __('yearly_plans.no_fiscal_years_to_show') }}
+                        {{ __('annual_plans.no_fiscal_years_to_show') }}
                     @endif
                 </p>
             </div>
@@ -649,11 +649,11 @@ new #[Title('titles.annual_plans')] class extends Component {
                     <div class="mb-4 flex flex-wrap items-center gap-4 type-meta text-secondary-medium dark:text-secondary-soft">
                         <span class="inline-flex items-center gap-2">
                             <span aria-hidden="true" class="h-0.5 w-5 rounded-full bg-primary"></span>
-                            {{ __('yearly_plans.chart_series_plans') }}
+                            {{ __('annual_plans.chart_series_plans') }}
                         </span>
                         <span class="inline-flex items-center gap-2">
                             <span aria-hidden="true" class="h-0 w-5 border-t-2 border-dashed border-secondary-medium dark:border-secondary-soft"></span>
-                            {{ __('yearly_plans.chart_series_targets') }}
+                            {{ __('annual_plans.chart_series_targets') }}
                         </span>
                     </div>
 
@@ -718,7 +718,7 @@ new #[Title('titles.annual_plans')] class extends Component {
                                     type="button"
                                     wire:click="focusOnYear({{ $rail['year'] }})"
                                     aria-pressed="{{ $rail['isActive'] ? 'true' : 'false' }}"
-                                    aria-label="{{ __('yearly_plans.focus_year_plans_targets', ['year' => $rail['year'], 'plans' => $rail['plans'], 'targets' => $rail['targets']]) }}"
+                                    aria-label="{{ __('annual_plans.focus_year_plans_targets', ['year' => $rail['year'], 'plans' => $rail['plans'], 'targets' => $rail['targets']]) }}"
                                     @class([
                                         'min-h-9 cursor-pointer rounded-md px-2.5 py-1 text-sm font-bold tabular-nums transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
                                         'bg-primary text-white' => $rail['isActive'],
@@ -729,7 +729,7 @@ new #[Title('titles.annual_plans')] class extends Component {
                                 <span @class([
                                     'type-label rounded-full bg-primary px-2 py-0.5 text-white',
                                     'invisible' => ! $rail['isCurrent'],
-                                ])>{{ __('yearly_plans.now') }}</span>
+                                ])>{{ __('annual_plans.now') }}</span>
                             </div>
                         @endforeach
                     </div>
@@ -737,10 +737,10 @@ new #[Title('titles.annual_plans')] class extends Component {
 
                 @if ($cockpit !== null)
                     <aside class="border-t border-board-line bg-board-head px-5 py-5 @4xl/matrix:border-t-0" aria-labelledby="cockpit-heading">
-                        <span id="cockpit-heading" class="sr-only">{{ __('yearly_plans.focused_fiscal_year') }}</span>
+                        <span id="cockpit-heading" class="sr-only">{{ __('annual_plans.focused_fiscal_year') }}</span>
 
                         <div class="flex items-center gap-5">
-                            <div class="relative size-24 shrink-0" role="img" aria-label="{{ __('yearly_plans.portfolio_covered') }}: {{ $gaugeShare }}%">
+                            <div class="relative size-24 shrink-0" role="img" aria-label="{{ __('annual_plans.portfolio_covered') }}: {{ $gaugeShare }}%">
                                 <svg viewBox="0 0 120 120" class="size-full -rotate-90" aria-hidden="true">
                                     <circle cx="60" cy="60" r="{{ $gaugeRadius }}" class="fill-none stroke-board-line" stroke-width="10" />
                                     <circle
@@ -765,12 +765,12 @@ new #[Title('titles.annual_plans')] class extends Component {
                                             'type-meta font-semibold tabular-nums',
                                             'text-status-good' => $cockpit['plansDelta'] > 0,
                                             'text-secondary-medium dark:text-secondary-soft' => $cockpit['plansDelta'] < 0,
-                                        ])>{{ $cockpit['plansDelta'] > 0 ? '+' : '' }}{{ $cockpit['plansDelta'] }} {{ __('yearly_plans.vs_previous_year') }}</span>
+                                        ])>{{ $cockpit['plansDelta'] > 0 ? '+' : '' }}{{ $cockpit['plansDelta'] }} {{ __('annual_plans.vs_previous_year') }}</span>
                                     @endif
                                 </div>
-                                <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('yearly_plans.portfolio_covered') }}</p>
+                                <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('annual_plans.portfolio_covered') }}</p>
                                 <p class="mt-1.5 type-meta text-secondary-medium tabular-nums dark:text-secondary-soft">
-                                    {{ __('yearly_plans.coverage_with_gaps', ['percent' => $gaugeShare, 'gaps' => $cockpit['gaps']]) }}
+                                    {{ __('annual_plans.coverage_with_gaps', ['percent' => $gaugeShare, 'gaps' => $cockpit['gaps']]) }}
                                 </p>
                             </div>
                         </div>
@@ -781,11 +781,11 @@ new #[Title('titles.annual_plans')] class extends Component {
                                 <dd class="mt-0.5 text-xl font-bold tabular-nums">{{ $cockpit['targets'] }}</dd>
                             </div>
                             <div class="px-3 py-2.5">
-                                <dt class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('yearly_plans.approved') }}</dt>
+                                <dt class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('annual_plans.approved') }}</dt>
                                 <dd class="mt-0.5 flex items-baseline gap-1 tabular-nums"><span class="text-xl font-bold">{{ $cockpit['approved'] }}</span><span class="text-sm text-secondary-medium dark:text-secondary-soft">/ {{ $cockpit['reports'] }}</span></dd>
                             </div>
                             <div class="px-3 py-2.5">
-                                <dt class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('yearly_plans.managers') }}</dt>
+                                <dt class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('annual_plans.managers') }}</dt>
                                 <dd class="mt-0.5 text-xl font-bold tabular-nums">{{ $cockpit['managers'] }}</dd>
                             </div>
                         </dl>
@@ -798,8 +798,8 @@ new #[Title('titles.annual_plans')] class extends Component {
         <section class="overflow-hidden rounded-xl border border-board-line bg-board" aria-labelledby="coverage-matrix-heading">
             <div class="flex min-h-12 flex-wrap items-center justify-between gap-3 border-b border-board-line bg-board-head px-5 py-3">
                 <div class="min-w-0">
-                    <h2 id="coverage-matrix-heading" class="text-base font-bold">{{ __('yearly_plans.coverage_matrix') }}</h2>
-                    <p class="mt-0.5 type-meta text-secondary-medium dark:text-secondary-soft">{{ __('yearly_plans.coverage_matrix_hint') }}</p>
+                    <h2 id="coverage-matrix-heading" class="text-base font-bold">{{ __('annual_plans.coverage_matrix') }}</h2>
+                    <p class="mt-0.5 type-meta text-secondary-medium dark:text-secondary-soft">{{ __('annual_plans.coverage_matrix_hint') }}</p>
                 </div>
 
                 @if ($activeYear !== null)
@@ -811,7 +811,7 @@ new #[Title('titles.annual_plans')] class extends Component {
                         x-bind:class="gapsOnly ? 'border-primary bg-primary text-white' : 'border-board-line text-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white'"
                     >
                         <flux:icon.funnel variant="micro" class="size-3.5" aria-hidden="true" />
-                        {{ __('yearly_plans.gaps_in_year', ['year' => $activeYear]) }}
+                        {{ __('annual_plans.gaps_in_year', ['year' => $activeYear]) }}
                     </button>
                 @endif
             </div>
@@ -821,8 +821,8 @@ new #[Title('titles.annual_plans')] class extends Component {
                     type="search"
                     icon="magnifying-glass"
                     wire:model.live.debounce.300ms="programSearch"
-                    :aria-label="__('yearly_plans.search_programs')"
-                    :placeholder="__('yearly_plans.search_programs_placeholder')"
+                    :aria-label="__('annual_plans.search_programs')"
+                    :placeholder="__('annual_plans.search_programs_placeholder')"
                 />
                 <flux:select :aria-label="__('common.strategy')" wire:model.live="strategy">
                     <flux:select.option value="">{{ __('programs.all_strategies') }}</flux:select.option>
@@ -836,33 +836,33 @@ new #[Title('titles.annual_plans')] class extends Component {
             <div class="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-board-line bg-board-head px-5 py-2.5 type-meta text-secondary-medium dark:text-secondary-soft">
                 <span class="inline-flex items-center gap-1.5">
                     <span aria-hidden="true" class="size-3 shrink-0 rounded-[3px] border border-secondary-light bg-board"></span>
-                    {{ __('yearly_plans.legend_plan_on_file') }}
+                    {{ __('annual_plans.legend_plan_on_file') }}
                 </span>
                 <span class="inline-flex items-center gap-1.5">
                     <span aria-hidden="true" class="size-3 shrink-0 rounded-[3px] border border-dashed border-secondary-light"></span>
-                    {{ __('yearly_plans.legend_no_plan') }}
+                    {{ __('annual_plans.legend_no_plan') }}
                 </span>
                 <span class="inline-flex items-center gap-1.5">
                     <span aria-hidden="true" class="relative flex size-3 shrink-0 items-center justify-center rounded-[3px] border border-secondary-light bg-board">
                         <span class="absolute end-0 top-0 size-1.5 -translate-y-1/3 translate-x-1/3 rounded-full bg-primary rtl:translate-x-[-33%]"></span>
                     </span>
-                    {{ __('yearly_plans.legend_no_targets') }}
+                    {{ __('annual_plans.legend_no_targets') }}
                 </span>
                 <span class="inline-flex items-center gap-1.5">
                     <span aria-hidden="true" class="h-1.5 w-6 shrink-0 overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium"><span class="block h-full w-2/3 rounded-full bg-status-good"></span></span>
-                    {{ __('yearly_plans.legend_reporting') }}
+                    {{ __('annual_plans.legend_reporting') }}
                 </span>
                 <span class="inline-flex items-center gap-1.5">
                     <span aria-hidden="true" class="size-3 shrink-0 rounded-[3px] border-2 border-primary bg-board"></span>
-                    {{ __('yearly_plans.legend_focused_year') }}
+                    {{ __('annual_plans.legend_focused_year') }}
                 </span>
             </div>
 
             @if ($this->programRows->isEmpty())
                 <x-ui.empty-state
                     icon="calendar-days"
-                    :heading="$filtersAreActive ? __('yearly_plans.no_matching_annual_plans') : __('common.no_programs_yet')"
-                    :body="$filtersAreActive ? __('yearly_plans.change_the_fiscal_years_or_the_manager_and_try_again') : __('yearly_plans.add_a_program_before_planning_its_year')"
+                    :heading="$filtersAreActive ? __('annual_plans.no_matching_annual_plans') : __('common.no_programs_yet')"
+                    :body="$filtersAreActive ? __('annual_plans.change_the_fiscal_years_or_the_manager_and_try_again') : __('annual_plans.add_a_program_before_planning_its_year')"
                 >
                     @if ($filtersAreActive)
                         <x-slot:action>
@@ -904,20 +904,20 @@ new #[Title('titles.annual_plans')] class extends Component {
                                     @php($stats = $plan === null ? null : ($delivery[$plan->id] ?? ['targets' => 0, 'attributed' => 0, 'reports' => 0, 'approved' => 0]))
                                     <li wire:key="mobile-cell-{{ $program->id }}-{{ $year }}">
                                         @if ($plan === null)
-                                            <div class="flex min-h-11 items-center justify-between gap-3 rounded-md border border-dashed border-board-line px-3 py-2" aria-label="{{ __('yearly_plans.program_year_no_plan', ['program' => $program->name, 'year' => $year]) }}">
+                                            <div class="flex min-h-11 items-center justify-between gap-3 rounded-md border border-dashed border-board-line px-3 py-2" aria-label="{{ __('annual_plans.program_year_no_plan', ['program' => $program->name, 'year' => $year]) }}">
                                                 <span class="type-meta font-bold tabular-nums text-secondary-light">{{ $year }}</span>
-                                                <span class="type-meta text-secondary-light">{{ __('yearly_plans.no_plan') }}</span>
+                                                <span class="type-meta text-secondary-light">{{ __('annual_plans.no_plan') }}</span>
                                             </div>
                                         @else
                                             <a
-                                                href="{{ route('yearly-plans.show', $plan) }}"
+                                                href="{{ route('annual-plans.show', $plan) }}"
                                                 wire:navigate
                                                 @class([
                                                     'flex min-h-11 flex-col justify-center gap-1 rounded-md border px-3 py-2 transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
                                                     'border-primary' => $year === $activeYear,
                                                     'border-board-line' => $year !== $activeYear,
                                                 ])
-                                                aria-label="{{ __('yearly_plans.program_year_managed_by_manager_count_targets', ['program' => $program->name, 'year' => $year, 'manager' => $plan->manager?->name ?? __('common.not_assigned'), 'count' => $stats['targets']]) }}"
+                                                aria-label="{{ __('annual_plans.program_year_managed_by_manager_count_targets', ['program' => $program->name, 'year' => $year, 'manager' => $plan->manager?->name ?? __('common.not_assigned'), 'count' => $stats['targets']]) }}"
                                             >
                                                 <span class="flex items-center justify-between gap-2">
                                                     <span class="type-meta font-bold tabular-nums">{{ $year }}</span>
@@ -962,7 +962,7 @@ new #[Title('titles.annual_plans')] class extends Component {
                                         x-on:focus="hoverYear = {{ $rail['year'] }}"
                                         x-on:blur="hoverYear = null"
                                         aria-pressed="{{ $rail['isActive'] ? 'true' : 'false' }}"
-                                        aria-label="{{ __('yearly_plans.focus_year_plans_targets', ['year' => $rail['year'], 'plans' => $rail['plans'], 'targets' => $rail['targets']]) }}"
+                                        aria-label="{{ __('annual_plans.focus_year_plans_targets', ['year' => $rail['year'], 'plans' => $rail['plans'], 'targets' => $rail['targets']]) }}"
                                         @class([
                                             'flex w-full cursor-pointer flex-col items-center gap-1 rounded-md border-2 px-2 py-1.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
                                             'border-primary' => $rail['isActive'],
@@ -981,7 +981,7 @@ new #[Title('titles.annual_plans')] class extends Component {
 
                         @foreach ($this->programRows as $program)
                             @php($rowPlans = collect($yearColumns)->map(fn (int $year) => $this->planFor($program->id, $year))->filter())
-                            @php($rowTargets = $rowPlans->sum(fn (\App\Models\YearlyPlan $plan): int => $delivery[$plan->id]['targets'] ?? 0))
+                            @php($rowTargets = $rowPlans->sum(fn (\App\Models\AnnualPlan $plan): int => $delivery[$plan->id]['targets'] ?? 0))
                             <div
                                 role="row"
                                 @class([
@@ -1039,14 +1039,14 @@ new #[Title('titles.annual_plans')] class extends Component {
                                                     'border-primary' => $year === $activeYear,
                                                     'border-secondary-soft dark:border-secondary-medium' => $year !== $activeYear,
                                                 ])
-                                                aria-label="{{ __('yearly_plans.program_year_no_plan', ['program' => $program->name, 'year' => $year]) }}"
+                                                aria-label="{{ __('annual_plans.program_year_no_plan', ['program' => $program->name, 'year' => $year]) }}"
                                             >
                                                 <span aria-hidden="true" class="text-secondary-light">—</span>
                                             </div>
                                         @else
                                             @php($reportShare = $stats['reports'] > 0 ? (int) round($stats['approved'] / $stats['reports'] * 100) : 0)
                                             <a
-                                                href="{{ route('yearly-plans.show', $plan) }}"
+                                                href="{{ route('annual-plans.show', $plan) }}"
                                                 wire:navigate
                                                 x-on:mouseenter="hoverYear = {{ $year }}"
                                                 x-on:mouseleave="hoverYear = null"
@@ -1057,7 +1057,7 @@ new #[Title('titles.annual_plans')] class extends Component {
                                                     'border-primary' => $year === $activeYear,
                                                     'border-secondary-soft dark:border-secondary-medium' => $year !== $activeYear,
                                                 ])
-                                                aria-label="{{ __('yearly_plans.program_year_managed_by_manager_count_targets', ['program' => $program->name, 'year' => $year, 'manager' => $plan->manager?->name ?? __('common.not_assigned'), 'count' => $stats['targets']]) }}"
+                                                aria-label="{{ __('annual_plans.program_year_managed_by_manager_count_targets', ['program' => $program->name, 'year' => $year, 'manager' => $plan->manager?->name ?? __('common.not_assigned'), 'count' => $stats['targets']]) }}"
                                             >
                                                 @if ($stats['targets'] === 0)
                                                     {{-- A flat primary dot flags an open plan with nothing committed yet; the number itself stays full-contrast ink in both themes. --}}
@@ -1076,7 +1076,7 @@ new #[Title('titles.annual_plans')] class extends Component {
                                                 <span class="pointer-events-none absolute inset-x-0 bottom-0 flex translate-y-full flex-col gap-0.5 bg-secondary-dark px-1.5 py-1 text-center transition-transform duration-200 group-hover/cell:translate-y-0 motion-reduce:transition-none" aria-hidden="true">
                                                     <span class="truncate text-[0.625rem] font-semibold text-white">{{ $plan->manager?->name ?? __('common.not_assigned') }}</span>
                                                     @if ($stats['reports'] > 0)
-                                                        <span class="text-[0.625rem] tabular-nums text-secondary-soft">{{ __('yearly_plans.approved') }} {{ $stats['approved'] }}/{{ $stats['reports'] }}</span>
+                                                        <span class="text-[0.625rem] tabular-nums text-secondary-soft">{{ __('annual_plans.approved') }} {{ $stats['approved'] }}/{{ $stats['reports'] }}</span>
                                                     @endif
                                                 </span>
                                             </a>
@@ -1089,7 +1089,7 @@ new #[Title('titles.annual_plans')] class extends Component {
                 </div>
 
                 <div class="border-t border-board-line px-4 pb-3">
-                    <flux:pagination :paginator="$this->programRows" class="text-secondary-medium! [&_button]:text-secondary-medium! [&_button:hover]:bg-secondary-soft! dark:text-secondary-soft! dark:[&_button]:text-secondary-soft! dark:[&_button:hover]:bg-secondary-medium!" scroll-to="#yearly-plan-matrix-heading" />
+                    <flux:pagination :paginator="$this->programRows" class="text-secondary-medium! [&_button]:text-secondary-medium! [&_button:hover]:bg-secondary-soft! dark:text-secondary-soft! dark:[&_button]:text-secondary-soft! dark:[&_button:hover]:bg-secondary-medium!" scroll-to="#annual-plan-matrix-heading" />
                 </div>
             @endif
         </section>

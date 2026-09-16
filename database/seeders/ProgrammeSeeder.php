@@ -3,13 +3,13 @@
 namespace Database\Seeders;
 
 use App\Enums\ProjectStatus;
+use App\Models\AnnualPlan;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Strategy;
-use App\Models\YearlyPlan;
 use Database\Seeders\Concerns\PicksHrRecords;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Seeder;
@@ -48,7 +48,7 @@ class ProgrammeSeeder extends Seeder
             ]);
 
             foreach ([$strategy->start_year, $strategy->start_year + 1] as $year) {
-                YearlyPlan::factory()->create([
+                AnnualPlan::factory()->create([
                     'program_id' => $program->id,
                     'manager_id' => $program->manager_id,
                     'year' => $year,

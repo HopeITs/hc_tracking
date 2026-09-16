@@ -1,17 +1,17 @@
 <?php
 
+use App\Models\AnnualPlan;
 use App\Models\Indicator;
 use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Report;
-use App\Models\YearlyPlan;
 
-test('a target planned in a yearly plan resolves that plan as its source', function () {
-    $plan = YearlyPlan::factory()->create();
-    $target = PlanIndicator::factory()->forYearlyPlan($plan)->create();
+test('a target planned in a annual plan resolves that plan as its source', function () {
+    $plan = AnnualPlan::factory()->create();
+    $target = PlanIndicator::factory()->forAnnualPlan($plan)->create();
 
-    expect($target->source)->toBeInstanceOf(YearlyPlan::class)
+    expect($target->source)->toBeInstanceOf(AnnualPlan::class)
         ->and($target->source->id)->toBe($plan->id);
 });
 
@@ -24,11 +24,11 @@ test('a target planned in a proposal resolves that proposal as its source', func
 });
 
 test('a target stores the short morph key rather than the class name', function () {
-    $target = PlanIndicator::factory()->forYearlyPlan(YearlyPlan::factory()->create())->create();
+    $target = PlanIndicator::factory()->forAnnualPlan(AnnualPlan::factory()->create())->create();
 
     $this->assertDatabaseHas('plan_indicators', [
         'id' => $target->id,
-        'source_type' => 'yearly_plan',
+        'source_type' => 'annual_plan',
     ]);
 
     expect(PlanIndicator::factory()->forProposal()->create()->source_type)->toBe('proposal');

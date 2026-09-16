@@ -4,7 +4,7 @@ use App\Models\HrCity;
 use App\Models\Indicator;
 use App\Models\Program;
 use App\Models\Project;
-use App\Models\YearlyPlan;
+use App\Models\AnnualPlan;
 use Illuminate\Database\Eloquent\Builder;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
@@ -27,7 +27,7 @@ new #[Title('titles.executive_summary')] class extends Component {
     #[Computed]
     public function yearOptions(): array
     {
-        $years = YearlyPlan::query()
+        $years = AnnualPlan::query()
             ->select('year')
             ->distinct()
             ->pluck('year')
@@ -60,9 +60,9 @@ new #[Title('titles.executive_summary')] class extends Component {
                 'key' => 'annual-plan-coverage',
                 'label' => __('executive_summary.annual_plan_coverage'),
                 'icon' => 'calendar-days',
-                // yearly_plans is unique on (program_id, year), so a count of
+                // annual_plans is unique on (program_id, year), so a count of
                 // this year's plans is exactly a count of programs planned.
-                'covered' => YearlyPlan::query()->where('year', $year)->count(),
+                'covered' => AnnualPlan::query()->where('year', $year)->count(),
                 'total' => Program::query()->count(),
                 'unit' => __('executive_summary.programs'),
                 'scope' => $fiscalScope,
@@ -146,8 +146,8 @@ new #[Title('titles.executive_summary')] class extends Component {
     {
         return function (Builder $query) use ($year): void {
             $query
-                ->where('source_type', 'yearly_plan')
-                ->whereIn('source_id', YearlyPlan::query()->select('id')->where('year', $year));
+                ->where('source_type', 'annual_plan')
+                ->whereIn('source_id', AnnualPlan::query()->select('id')->where('year', $year));
         };
     }
 };

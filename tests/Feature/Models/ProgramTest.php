@@ -1,11 +1,11 @@
 <?php
 
+use App\Models\AnnualPlan;
 use App\Models\HrEmployee;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Result;
 use App\Models\Strategy;
-use App\Models\YearlyPlan;
 
 test('a program belongs to a strategy and an hr employee manager', function () {
     $strategy = Strategy::factory()->create();
@@ -22,15 +22,15 @@ test('a program belongs to a strategy and an hr employee manager', function () {
         ->and($program->manager->id)->toBe($managerId);
 });
 
-test('a program has its projects, yearly plans and results', function () {
+test('a program has its projects, annual plans and results', function () {
     $program = Program::factory()->create();
 
     Project::factory(2)->create(['program_id' => $program->id]);
-    YearlyPlan::factory()->create(['program_id' => $program->id, 'year' => 2026]);
-    YearlyPlan::factory()->create(['program_id' => $program->id, 'year' => 2027]);
+    AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2026]);
+    AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2027]);
     Result::factory()->create(['program_id' => $program->id]);
 
     expect($program->projects)->toHaveCount(2)
-        ->and($program->yearlyPlans)->toHaveCount(2)
+        ->and($program->annualPlans)->toHaveCount(2)
         ->and($program->results)->toHaveCount(1);
 });

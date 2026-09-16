@@ -39,7 +39,7 @@ class Program extends Model
     /**
      * Delete the model inside a transaction.
      *
-     * Its observer deletes this program's yearly plans, whose own observer
+     * Its observer deletes this program's annual plans, whose own observer
      * reaches the targets planned in them. Those deletions bracket the delete of
      * this row, so a failure partway through must not leave them committed.
      */
@@ -116,11 +116,11 @@ class Program extends Model
     /**
      * The annual operational plans written for this program.
      *
-     * @return HasMany<YearlyPlan, $this>
+     * @return HasMany<AnnualPlan, $this>
      */
-    public function yearlyPlans(): HasMany
+    public function annualPlans(): HasMany
     {
-        return $this->hasMany(YearlyPlan::class);
+        return $this->hasMany(AnnualPlan::class);
     }
 
     /**

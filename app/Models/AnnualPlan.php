@@ -6,7 +6,7 @@ namespace App\Models;
 
 use App\Observers\PlanIndicatorSourceObserver;
 use Carbon\CarbonImmutable;
-use Database\Factories\YearlyPlanFactory;
+use Database\Factories\AnnualPlanFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -27,9 +27,9 @@ use Illuminate\Support\Facades\DB;
  */
 #[Fillable(['program_id', 'manager_id', 'year'])]
 #[ObservedBy(PlanIndicatorSourceObserver::class)]
-class YearlyPlan extends Model
+class AnnualPlan extends Model
 {
-    /** @use HasFactory<YearlyPlanFactory> */
+    /** @use HasFactory<AnnualPlanFactory> */
     use HasFactory;
 
     /**

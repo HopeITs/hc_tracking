@@ -266,7 +266,7 @@ new #[Title('titles.project')] class extends Component {
                             </div>
                             <div class="flex flex-wrap items-center gap-2">
                                 <span class="rounded-md border border-secondary-light px-2 py-0.5 text-[11px] font-semibold text-secondary-medium dark:text-secondary-soft">
-                                    {{ $target->source_type === 'yearly_plan' ? __('common.annual_plan') : __('common.proposal') }}
+                                    {{ $target->source_type === 'annual_plan' ? __('common.annual_plan') : __('common.proposal') }}
                                 </span>
                                 <x-ui.enum-badge :case="$target->period" />
                                 <span class="text-sm font-semibold tabular-nums">{{ number_format((float) $target->target, 2) }}</span>

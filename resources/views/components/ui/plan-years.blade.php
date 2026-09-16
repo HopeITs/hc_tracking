@@ -144,7 +144,7 @@
                                 @endphp
 
                                 <a
-                                    href="{{ route('yearly-plans.show', $plan) }}"
+                                    href="{{ route('annual-plans.show', $plan) }}"
                                     wire:navigate
                                     wire:key="program-plan-{{ $plan->id }}"
                                     @class([

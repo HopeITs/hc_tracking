@@ -1,10 +1,10 @@
 <?php
 
+use App\Models\AnnualPlan;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Strategy;
 use App\Models\User;
-use App\Models\YearlyPlan;
 
 test('guests are redirected from strategy detail', function () {
     $strategy = Strategy::factory()->create();
@@ -67,9 +67,9 @@ test('plan coverage is the share of the strategy span with an annual plan, cappe
     $program = Program::factory()->create(['name' => 'Water Security', 'strategy_id' => $strategy->id]);
 
     // 2 of the 4 span years covered (2027 is outside the span and must not count).
-    YearlyPlan::factory()->create(['program_id' => $program->id, 'year' => 2026]);
-    YearlyPlan::factory()->create(['program_id' => $program->id, 'year' => 2028]);
-    YearlyPlan::factory()->create(['program_id' => $program->id, 'year' => 2031]);
+    AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2026]);
+    AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2028]);
+    AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2031]);
 
     $this->actingAs($user)
         ->get(route('strategies.show', $strategy))
@@ -85,8 +85,8 @@ test('each program row tones its plan coverage bar by how covered it is', functi
     $uncovered = Program::factory()->create(['name' => 'Uncovered Program', 'strategy_id' => $strategy->id]);
     $fullyCovered = Program::factory()->create(['name' => 'Fully Covered Program', 'strategy_id' => $strategy->id]);
 
-    YearlyPlan::factory()->create(['program_id' => $fullyCovered->id, 'year' => 2026]);
-    YearlyPlan::factory()->create(['program_id' => $fullyCovered->id, 'year' => 2027]);
+    AnnualPlan::factory()->create(['program_id' => $fullyCovered->id, 'year' => 2026]);
+    AnnualPlan::factory()->create(['program_id' => $fullyCovered->id, 'year' => 2027]);
 
     $html = $this->actingAs($user)->get(route('strategies.show', $strategy))->getContent();
 
@@ -136,7 +136,7 @@ test('the strategy detail page has no timeline, only the aggregate plan coverage
     $user = User::factory()->create();
     $strategy = Strategy::factory()->create(['start_year' => 2026, 'end_year' => 2030]);
     $program = Program::factory()->create(['strategy_id' => $strategy->id]);
-    YearlyPlan::factory()->create(['program_id' => $program->id, 'year' => 2026]);
+    AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2026]);
 
     $this->actingAs($user)
         ->get(route('strategies.show', $strategy))
@@ -153,7 +153,7 @@ test('the strategy detail stat row totals equal the sum across programs', functi
     $second = Program::factory()->create(['strategy_id' => $strategy->id]);
     Project::factory()->count(2)->create(['program_id' => $first->id]);
     Project::factory()->count(1)->create(['program_id' => $second->id]);
-    YearlyPlan::factory()->create(['program_id' => $first->id]);
+    AnnualPlan::factory()->create(['program_id' => $first->id]);
 
     $this->actingAs($user)
         ->get(route('strategies.show', $strategy))
@@ -172,5 +172,5 @@ test('the projects and annual plans stat tiles link to their own pages, not prog
         ->assertOk()
         ->assertSee(route('programs.index', ['strategy' => $strategy->id]), false)
         ->assertSee(route('projects.index', ['strategy' => $strategy->id]), false)
-        ->assertSee(route('yearly-plans.index', ['strategy' => $strategy->id]), false);
+        ->assertSee(route('annual-plans.index', ['strategy' => $strategy->id]), false);
 });

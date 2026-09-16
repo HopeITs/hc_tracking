@@ -11,7 +11,7 @@ use App\Models\Project;
 use App\Models\Report;
 use App\Models\Result;
 use App\Models\Risk;
-use App\Models\YearlyPlan;
+use App\Models\AnnualPlan;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -87,7 +87,7 @@ new #[Title('titles.program')] class extends Component {
                 'strategy:id,name,start_year,end_year',
                 'manager:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
             ])
-            ->withCount(['projects', 'yearlyPlans', 'results'])
+            ->withCount(['projects', 'annualPlans', 'results'])
             ->findOrFail($this->programId);
     }
 
@@ -189,11 +189,11 @@ new #[Title('titles.program')] class extends Component {
         ];
     }
 
-    /** @return Collection<int, YearlyPlan> */
+    /** @return Collection<int, AnnualPlan> */
     #[Computed]
-    public function yearlyPlans(): Collection
+    public function annualPlans(): Collection
     {
-        return YearlyPlan::query()
+        return AnnualPlan::query()
             ->select(['id', 'program_id', 'manager_id', 'year'])
             ->where('program_id', $this->programId)
             ->with(['manager:id,first_name_en,last_name_en,first_name_ar,last_name_ar'])
@@ -210,16 +210,16 @@ new #[Title('titles.program')] class extends Component {
      * Totals come from two grouped reads over all of the program's plans, so
      * the slot count never adds queries.
      *
-     * @return array<int, array{year: int, plan: YearlyPlan|null, targets: int, attributed: int, levels: array<string, int>, reports: int, approved: int}>
+     * @return array<int, array{year: int, plan: AnnualPlan|null, targets: int, attributed: int, levels: array<string, int>, reports: int, approved: int}>
      */
     #[Computed]
     public function planTimeline(): array
     {
-        $plans = $this->yearlyPlans->keyBy('year');
-        $planIds = $this->yearlyPlans->pluck('id');
+        $plans = $this->annualPlans->keyBy('year');
+        $planIds = $this->annualPlans->pluck('id');
 
         $targetTotals = PlanIndicator::query()
-            ->where('plan_indicators.source_type', 'yearly_plan')
+            ->where('plan_indicators.source_type', 'annual_plan')
             ->whereIn('plan_indicators.source_id', $planIds)
             ->leftJoin('indicators', 'indicators.id', '=', 'plan_indicators.indicator_id')
             ->leftJoin('results', 'results.id', '=', 'indicators.result_id')
@@ -235,7 +235,7 @@ new #[Title('titles.program')] class extends Component {
 
         $reportTotals = Report::query()
             ->join('plan_indicators', 'plan_indicators.id', '=', 'reports.plan_indicator_id')
-            ->where('plan_indicators.source_type', 'yearly_plan')
+            ->where('plan_indicators.source_type', 'annual_plan')
             ->whereIn('plan_indicators.source_id', $planIds)
             ->groupBy('plan_indicators.source_id')
             ->selectRaw('plan_indicators.source_id as plan_id, count(*) as reports')
@@ -379,7 +379,7 @@ new #[Title('titles.program')] class extends Component {
     {
         return [
             ['key' => 'projects', 'label' => __('common.projects'), 'count' => $this->program->projects_count, 'icon' => 'rectangle-stack'],
-            ['key' => 'plans', 'label' => __('programs.annual_plans'), 'count' => $this->program->yearly_plans_count, 'icon' => 'calendar-days'],
+            ['key' => 'plans', 'label' => __('programs.annual_plans'), 'count' => $this->program->annual_plans_count, 'icon' => 'calendar-days'],
             ['key' => 'results', 'label' => __('programs.results'), 'count' => $this->program->results_count, 'icon' => 'chart-bar'],
         ];
     }

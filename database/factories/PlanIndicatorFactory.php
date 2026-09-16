@@ -2,10 +2,10 @@
 
 namespace Database\Factories;
 
+use App\Models\AnnualPlan;
 use App\Models\Indicator;
 use App\Models\PlanIndicator;
 use App\Models\Proposal;
-use App\Models\YearlyPlan;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -25,8 +25,8 @@ class PlanIndicatorFactory extends Factory
     public function definition(): array
     {
         return [
-            'source_type' => 'yearly_plan',
-            'source_id' => YearlyPlan::factory(),
+            'source_type' => 'annual_plan',
+            'source_id' => AnnualPlan::factory(),
             'indicator_id' => Indicator::factory(),
             'target' => fake()->randomFloat(2, 100, 500000),
         ];
@@ -46,11 +46,11 @@ class PlanIndicatorFactory extends Factory
     /**
      * Plan this target inside the given annual plan.
      */
-    public function forYearlyPlan(YearlyPlan $yearlyPlan): static
+    public function forAnnualPlan(AnnualPlan $annualPlan): static
     {
         return $this->state(fn (array $attributes): array => [
-            'source_type' => 'yearly_plan',
-            'source_id' => $yearlyPlan->getKey(),
+            'source_type' => 'annual_plan',
+            'source_id' => $annualPlan->getKey(),
         ]);
     }
 }

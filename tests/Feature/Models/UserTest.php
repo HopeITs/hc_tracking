@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\AnnualPlan;
 use App\Models\HrEmployee;
 use App\Models\Milestone;
 use App\Models\Program;
@@ -8,7 +9,6 @@ use App\Models\Report;
 use App\Models\Task;
 use App\Models\TaskUpdate;
 use App\Models\User;
-use App\Models\YearlyPlan;
 use Carbon\CarbonImmutable;
 
 test('user timestamps are immutable and preserve their time', function (string $attribute) {
@@ -32,16 +32,16 @@ test('unverified user confirmation dates remain null', function () {
         ->and($user->two_factor_confirmed_at)->toBeNull();
 });
 
-test('an hr employee has the programs and yearly plans they manage', function () {
+test('an hr employee has the programs and annual plans they manage', function () {
     $employee = HrEmployee::find(insertHrEmployee());
 
     Program::factory(2)->create(['manager_id' => $employee->id]);
     Program::factory()->create();
-    YearlyPlan::factory()->create(['manager_id' => $employee->id]);
-    YearlyPlan::factory()->create();
+    AnnualPlan::factory()->create(['manager_id' => $employee->id]);
+    AnnualPlan::factory()->create();
 
     expect($employee->managedPrograms)->toHaveCount(2)
-        ->and($employee->managedYearlyPlans)->toHaveCount(1);
+        ->and($employee->managedAnnualPlans)->toHaveCount(1);
 });
 
 test('an hr employee has the projects and milestones they are responsible for', function () {

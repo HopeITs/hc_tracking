@@ -1,11 +1,11 @@
 <?php
 
+use App\Models\AnnualPlan;
 use App\Models\DonorProposal;
 use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Proposal;
 use App\Models\TransfersTracking;
-use App\Models\YearlyPlan;
 use Illuminate\Database\QueryException;
 
 test('a proposal delete that is blocked leaves its targets untouched', function () {
@@ -40,16 +40,16 @@ test('a proposal with no funding still deletes and cleans its targets', function
     $this->assertDatabaseMissing('plan_indicators', ['id' => $target->id]);
 });
 
-test('a program delete that fails rolls back its yearly plan cleanup', function () {
+test('a program delete that fails rolls back its annual plan cleanup', function () {
     $program = Program::factory()->create();
-    $plan = YearlyPlan::factory()->create(['program_id' => $program->id, 'year' => 2026]);
-    $target = PlanIndicator::factory()->forYearlyPlan($plan)->create();
+    $plan = AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2026]);
+    $target = PlanIndicator::factory()->forAnnualPlan($plan)->create();
 
     // Force the delete of the program row itself to fail after the observer has
-    // already removed the yearly plan and its target.
+    // already removed the annual plan and its target.
     Program::deleting(function () use ($plan, $target): void {
         // Prove the observer has already run, so the rollback below is real.
-        expect(YearlyPlan::query()->whereKey($plan->id)->exists())->toBeFalse()
+        expect(AnnualPlan::query()->whereKey($plan->id)->exists())->toBeFalse()
             ->and(PlanIndicator::query()->whereKey($target->id)->exists())->toBeFalse();
 
         throw new RuntimeException('simulated failure after cleanup');
@@ -58,6 +58,6 @@ test('a program delete that fails rolls back its yearly plan cleanup', function 
     expect(fn () => $program->delete())->toThrow(RuntimeException::class);
 
     $this->assertDatabaseHas('programs', ['id' => $program->id]);
-    $this->assertDatabaseHas('yearly_plans', ['id' => $plan->id]);
+    $this->assertDatabaseHas('annual_plans', ['id' => $plan->id]);
     $this->assertDatabaseHas('plan_indicators', ['id' => $target->id]);
 });

@@ -2,10 +2,10 @@
 
 namespace App\Providers;
 
+use App\Models\AnnualPlan;
 use App\Models\Milestone;
 use App\Models\Project;
 use App\Models\Proposal;
-use App\Models\YearlyPlan;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -52,7 +52,7 @@ class AppServiceProvider extends ServiceProvider
     protected function configureMorphMap(): void
     {
         Relation::enforceMorphMap([
-            'yearly_plan' => YearlyPlan::class,
+            'annual_plan' => AnnualPlan::class,
             'proposal' => Proposal::class,
             'project' => Project::class,
             'milestone' => Milestone::class,

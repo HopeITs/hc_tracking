@@ -5,7 +5,7 @@ use App\Models\Indicator;
 use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\Proposal;
-use App\Models\YearlyPlan;
+use App\Models\AnnualPlan;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
@@ -27,7 +27,7 @@ new #[Title('titles.targets')] class extends Component {
      * names: plan_indicators.source_type is VARCHAR(50) and
      * Relation::enforceMorphMap() is global.
      */
-    private const SOURCE_TYPES = ['yearly_plan', 'proposal'];
+    private const SOURCE_TYPES = ['annual_plan', 'proposal'];
 
     #[Url(except: '')]
     public string $search = '';
@@ -45,7 +45,7 @@ new #[Title('titles.targets')] class extends Component {
     public ?int $editingTargetId = null;
     public ?int $deletingTargetId = null;
 
-    public string $targetSourceType = 'yearly_plan';
+    public string $targetSourceType = 'annual_plan';
     public string $targetSourceId = '';
     public string $targetIndicatorId = '';
     public string $targetValue = '';
@@ -99,7 +99,7 @@ new #[Title('titles.targets')] class extends Component {
         return PlanIndicator::query()
             ->select(['id', 'source_type', 'source_id', 'indicator_id', 'target', 'project_id', 'period', 'updated_at'])
             ->with([
-                // morphTo resolves to YearlyPlan or Proposal — or to null, when
+                // morphTo resolves to AnnualPlan or Proposal — or to null, when
                 // the source was removed by a write that fired no model events.
                 'source',
                 'indicator:id,name,result_id,measure',
@@ -139,12 +139,12 @@ new #[Title('titles.targets')] class extends Component {
                 ->all();
         }
 
-        return YearlyPlan::query()
+        return AnnualPlan::query()
             ->select(['id', 'program_id', 'year'])
             ->with('program:id,name')
             ->orderByDesc('year')
             ->get()
-            ->map(fn (YearlyPlan $plan): array => [
+            ->map(fn (AnnualPlan $plan): array => [
                 'id' => $plan->id,
                 'label' => __('common.fy_year_program', ['year' => $plan->year, 'program' => $plan->program->name]),
             ])
@@ -194,7 +194,7 @@ new #[Title('titles.targets')] class extends Component {
             return null;
         }
 
-        if ($source instanceof YearlyPlan) {
+        if ($source instanceof AnnualPlan) {
             return __('common.fy_year', ['year' => $source->year]);
         }
 
@@ -251,7 +251,7 @@ new #[Title('titles.targets')] class extends Component {
         // exists rule cannot express this, because the table depends on the type.
         $sourceExists = $validated['targetSourceType'] === 'proposal'
             ? Proposal::query()->whereKey((int) $validated['targetSourceId'])->exists()
-            : YearlyPlan::query()->whereKey((int) $validated['targetSourceId'])->exists();
+            : AnnualPlan::query()->whereKey((int) $validated['targetSourceId'])->exists();
 
         if (! $sourceExists) {
             $this->addError('targetSourceId', __('targets.the_selected_source_is_no_longer_available'));
@@ -327,7 +327,7 @@ new #[Title('titles.targets')] class extends Component {
     {
         $this->resetValidation();
         $this->editingTargetId = null;
-        $this->targetSourceType = 'yearly_plan';
+        $this->targetSourceType = 'annual_plan';
         $this->targetSourceId = '';
         $this->targetIndicatorId = '';
         $this->targetValue = '';
@@ -339,7 +339,7 @@ new #[Title('titles.targets')] class extends Component {
 
 @php
     $filtersAreActive = $search !== '' || $sourceType !== '' || $project !== '' || $period !== '';
-    $sourceTypeLabels = ['yearly_plan' => __('common.annual_plan'), 'proposal' => __('common.proposal')];
+    $sourceTypeLabels = ['annual_plan' => __('common.annual_plan'), 'proposal' => __('common.proposal')];
 @endphp
 
 <section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="target-directory-heading">

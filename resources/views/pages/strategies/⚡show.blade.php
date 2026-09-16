@@ -2,7 +2,7 @@
 
 use App\Models\Program;
 use App\Models\Strategy;
-use App\Models\YearlyPlan;
+use App\Models\AnnualPlan;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
@@ -55,7 +55,7 @@ new #[Title('titles.strategy')] class extends Component {
             ->select(['id', 'name', 'strategy_id', 'manager_id'])
             ->where('strategy_id', $this->strategyId)
             ->with(['manager:id,first_name_en,last_name_en,first_name_ar,last_name_ar'])
-            ->withCount(['projects', 'yearlyPlans'])
+            ->withCount(['projects', 'annualPlans'])
             ->orderBy('name')
             ->orderBy('id')
             ->get();
@@ -64,7 +64,7 @@ new #[Title('titles.strategy')] class extends Component {
 
         return match ($this->sort) {
             'projects' => $programs->sortBy('projects_count', descending: $direction === 'desc')->values(),
-            'plans' => $programs->sortBy('yearly_plans_count', descending: $direction === 'desc')->values(),
+            'plans' => $programs->sortBy('annual_plans_count', descending: $direction === 'desc')->values(),
             default => $programs->sortBy('name', descending: $direction === 'desc')->values(),
         };
     }
@@ -72,7 +72,7 @@ new #[Title('titles.strategy')] class extends Component {
     /**
      * Distinct plan-years recorded per program, within this strategy's span.
      *
-     * The (program_id, year) unique constraint on yearly_plans makes a plain
+     * The (program_id, year) unique constraint on annual_plans makes a plain
      * row count already a distinct-year count, no DISTINCT needed.
      *
      * @return array<int, int>
@@ -87,7 +87,7 @@ new #[Title('titles.strategy')] class extends Component {
             return [];
         }
 
-        return YearlyPlan::query()
+        return AnnualPlan::query()
             ->whereIn('program_id', $programIds)
             ->whereBetween('year', [$strategy->start_year, $strategy->end_year])
             ->select('program_id', DB::raw('COUNT(*) as years_covered'))
@@ -102,7 +102,7 @@ new #[Title('titles.strategy')] class extends Component {
     {
         return [
             'projects' => (int) $this->programs->sum('projects_count'),
-            'plans' => (int) $this->programs->sum('yearly_plans_count'),
+            'plans' => (int) $this->programs->sum('annual_plans_count'),
         ];
     }
 
@@ -195,7 +195,7 @@ new #[Title('titles.strategy')] class extends Component {
     <div class="grid gap-3 @2xl/detail:grid-cols-4">
         <x-ui.stat-tile :label="__('common.programs')" :value="$strategy->programs_count" icon="briefcase" :href="route('programs.index', ['strategy' => $strategy->id])" />
         <x-ui.stat-tile :label="__('common.projects')" :value="$this->totals['projects']" icon="rectangle-stack" :href="route('projects.index', ['strategy' => $strategy->id])" />
-        <x-ui.stat-tile :label="__('common.annual_plans')" :value="$this->totals['plans']" icon="calendar-days" :href="route('yearly-plans.index', ['strategy' => $strategy->id])" />
+        <x-ui.stat-tile :label="__('common.annual_plans')" :value="$this->totals['plans']" icon="calendar-days" :href="route('annual-plans.index', ['strategy' => $strategy->id])" />
 
         <div class="rounded-xl border border-secondary-soft bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-secondary-medium dark:bg-secondary-dark dark:shadow-none">
             <div class="flex items-start justify-between gap-3">
@@ -286,7 +286,7 @@ new #[Title('titles.strategy')] class extends Component {
                             <span class="inline-flex min-w-8 items-center justify-center rounded-md bg-secondary-soft px-2 py-1 text-xs font-semibold text-secondary-dark dark:bg-secondary-medium dark:text-white">{{ $program->projects_count }}</span>
                         </x-ui.data-table.cell>
                         <x-ui.data-table.cell :label="__('common.annual_plans')" numeric>
-                            <span class="inline-flex min-w-8 items-center justify-center rounded-md border border-secondary-light px-2 py-1 text-xs font-semibold text-secondary-dark dark:text-white">{{ $program->yearly_plans_count }}</span>
+                            <span class="inline-flex min-w-8 items-center justify-center rounded-md border border-secondary-light px-2 py-1 text-xs font-semibold text-secondary-dark dark:text-white">{{ $program->annual_plans_count }}</span>
                         </x-ui.data-table.cell>
                         <x-ui.data-table.cell :label="__('strategies.plan_coverage')">
                             <x-ui.progress-bar :value="$coveragePct" :tone="$rowCoverageTone" show-value />

@@ -1,12 +1,12 @@
 <?php
 
 use App\Enums\Period;
+use App\Models\AnnualPlan;
 use App\Models\Indicator;
 use App\Models\PlanIndicator;
 use App\Models\Proposal;
 use App\Models\Report;
 use App\Models\User;
-use App\Models\YearlyPlan;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
@@ -20,8 +20,8 @@ test('targets can be filtered by source type', function () {
     $proposalIndicator = Indicator::factory()->create(['name' => 'Committed in a proposal']);
 
     PlanIndicator::factory()->create([
-        'source_type' => 'yearly_plan',
-        'source_id' => YearlyPlan::factory()->create()->id,
+        'source_type' => 'annual_plan',
+        'source_id' => AnnualPlan::factory()->create()->id,
         'indicator_id' => $planIndicator->id,
     ]);
     PlanIndicator::factory()->create([
@@ -34,7 +34,7 @@ test('targets can be filtered by source type', function () {
         ->test('pages::targets.index')
         ->assertSee('Committed in a plan')
         ->assertSee('Committed in a proposal')
-        ->set('sourceType', 'yearly_plan')
+        ->set('sourceType', 'annual_plan')
         ->assertSee('Committed in a plan')
         ->assertDontSee('Committed in a proposal')
         ->call('clearFilters')
@@ -45,13 +45,13 @@ test('targets can be filtered by source type', function () {
 
 test('a target stores the morph map key and never a class name', function () {
     $user = User::factory()->create();
-    $plan = YearlyPlan::factory()->create();
+    $plan = AnnualPlan::factory()->create();
     $indicator = Indicator::factory()->create();
 
     Livewire::actingAs($user)
         ->test('pages::targets.index')
         ->call('openCreateModal')
-        ->set('targetSourceType', 'yearly_plan')
+        ->set('targetSourceType', 'annual_plan')
         ->set('targetSourceId', (string) $plan->id)
         ->set('targetIndicatorId', (string) $indicator->id)
         ->set('targetValue', '12000.00')
@@ -61,7 +61,7 @@ test('a target stores the morph map key and never a class name', function () {
 
     $row = DB::table('plan_indicators')->where('indicator_id', $indicator->id)->sole();
 
-    expect($row->source_type)->toBe('yearly_plan')
+    expect($row->source_type)->toBe('annual_plan')
         ->and($row->source_type)->not->toContain('App\\Models')
         ->and((int) $row->source_id)->toBe($plan->id);
 });
@@ -79,12 +79,12 @@ test('the source type select offers exactly the two mapped sources', function ()
 
 test('changing the source type clears the chosen source', function () {
     $user = User::factory()->create();
-    $plan = YearlyPlan::factory()->create();
+    $plan = AnnualPlan::factory()->create();
 
     Livewire::actingAs($user)
         ->test('pages::targets.index')
         ->call('openCreateModal')
-        ->set('targetSourceType', 'yearly_plan')
+        ->set('targetSourceType', 'annual_plan')
         ->set('targetSourceId', (string) $plan->id)
         ->set('targetSourceType', 'proposal')
         ->assertSet('targetSourceId', '');
@@ -92,11 +92,11 @@ test('changing the source type clears the chosen source', function () {
 
 test('a target whose source was removed renders instead of throwing', function () {
     $user = User::factory()->create();
-    $plan = YearlyPlan::factory()->create();
+    $plan = AnnualPlan::factory()->create();
     $indicator = Indicator::factory()->create(['name' => 'Orphaned target indicator']);
 
     PlanIndicator::factory()->create([
-        'source_type' => 'yearly_plan',
+        'source_type' => 'annual_plan',
         'source_id' => $plan->id,
         'indicator_id' => $indicator->id,
     ]);
@@ -104,7 +104,7 @@ test('a target whose source was removed renders instead of throwing', function (
     // A query-builder delete fires no model events, so
     // PlanIndicatorSourceObserver never runs and the target is orphaned. No
     // foreign key can stop this; the UI must survive it.
-    DB::table('yearly_plans')->where('id', $plan->id)->delete();
+    DB::table('annual_plans')->where('id', $plan->id)->delete();
 
     Livewire::actingAs($user)
         ->test('pages::targets.index')
@@ -116,8 +116,8 @@ test('a target with no project reads as organisation wide', function () {
     $user = User::factory()->create();
 
     PlanIndicator::factory()->create([
-        'source_type' => 'yearly_plan',
-        'source_id' => YearlyPlan::factory()->create()->id,
+        'source_type' => 'annual_plan',
+        'source_id' => AnnualPlan::factory()->create()->id,
         'indicator_id' => Indicator::factory()->create()->id,
         'project_id' => null,
     ]);
@@ -128,8 +128,8 @@ test('a target with no project reads as organisation wide', function () {
 test('an unreported target can be deleted', function () {
     $user = User::factory()->create();
     $target = PlanIndicator::factory()->create([
-        'source_type' => 'yearly_plan',
-        'source_id' => YearlyPlan::factory()->create()->id,
+        'source_type' => 'annual_plan',
+        'source_id' => AnnualPlan::factory()->create()->id,
     ]);
 
     Livewire::actingAs($user)
@@ -144,8 +144,8 @@ test('an unreported target can be deleted', function () {
 test('a reported target is not deleted because its reports would cascade', function () {
     $user = User::factory()->create();
     $target = PlanIndicator::factory()->create([
-        'source_type' => 'yearly_plan',
-        'source_id' => YearlyPlan::factory()->create()->id,
+        'source_type' => 'annual_plan',
+        'source_id' => AnnualPlan::factory()->create()->id,
     ]);
     $report = Report::factory()->create(['plan_indicator_id' => $target->id]);
 
@@ -160,13 +160,13 @@ test('a reported target is not deleted because its reports would cascade', funct
 
 test('a target value that would overflow the decimal column is rejected', function () {
     $user = User::factory()->create();
-    $plan = YearlyPlan::factory()->create();
+    $plan = AnnualPlan::factory()->create();
     $indicator = Indicator::factory()->create();
 
     Livewire::actingAs($user)
         ->test('pages::targets.index')
         ->call('openCreateModal')
-        ->set('targetSourceType', 'yearly_plan')
+        ->set('targetSourceType', 'annual_plan')
         ->set('targetSourceId', (string) $plan->id)
         ->set('targetIndicatorId', (string) $indicator->id)
         ->set('targetValue', '10000000000')

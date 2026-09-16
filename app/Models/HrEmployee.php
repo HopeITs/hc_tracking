@@ -162,11 +162,11 @@ class HrEmployee extends HrModel
     /**
      * The annual plans this employee manages.
      *
-     * @return HasMany<YearlyPlan, $this>
+     * @return HasMany<AnnualPlan, $this>
      */
-    public function managedYearlyPlans(): HasMany
+    public function managedAnnualPlans(): HasMany
     {
-        return $this->hasMany(YearlyPlan::class, 'manager_id');
+        return $this->hasMany(AnnualPlan::class, 'manager_id');
     }
 
     /**

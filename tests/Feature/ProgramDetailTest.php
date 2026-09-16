@@ -3,6 +3,7 @@
 use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\ResultType;
+use App\Models\AnnualPlan;
 use App\Models\Indicator;
 use App\Models\Milestone;
 use App\Models\PlanIndicator;
@@ -12,7 +13,6 @@ use App\Models\Report;
 use App\Models\Result;
 use App\Models\Strategy;
 use App\Models\User;
-use App\Models\YearlyPlan;
 use Livewire\Livewire;
 
 test('guests are redirected from program detail', function () {
@@ -58,7 +58,7 @@ test('program detail lists only its own projects', function () {
 test('program detail switches to annual plans and results', function () {
     $user = User::factory()->create();
     $program = Program::factory()->create();
-    YearlyPlan::factory()->create(['program_id' => $program->id, 'year' => 2026]);
+    AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2026]);
     Result::factory()->create([
         'program_id' => $program->id,
         'statement' => 'Improved access to safe water.',
@@ -121,7 +121,7 @@ test('program plan timeline fills the strategy window and totals each plan', fun
     $user = User::factory()->create();
     $strategy = Strategy::factory()->create(['start_year' => 2025, 'end_year' => 2027]);
     $program = Program::factory()->create(['strategy_id' => $strategy->id]);
-    $plan = YearlyPlan::factory()->create(['program_id' => $program->id, 'year' => 2026]);
+    $plan = AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2026]);
     $impact = Result::factory()->create(['program_id' => $program->id, 'type' => ResultType::Impact]);
     $target = PlanIndicator::factory()->create([
         'source_id' => $plan->id,
@@ -370,10 +370,10 @@ test('program delivery window is not stretched by a mistyped milestone date', fu
 
 test('program detail links each annual plan year to its plan', function () {
     $program = Program::factory()->create();
-    $plan = YearlyPlan::factory()->create(['program_id' => $program->id, 'year' => 2026]);
+    $plan = AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2026]);
 
     Livewire::actingAs(User::factory()->create())
         ->test('pages::programs.show', ['program' => $program])
         ->set('tab', 'plans')
-        ->assertSee(route('yearly-plans.show', $plan), false);
+        ->assertSee(route('annual-plans.show', $plan), false);
 });

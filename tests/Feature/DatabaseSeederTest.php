@@ -2,6 +2,7 @@
 
 use App\Enums\UserRole;
 use App\Models\Account;
+use App\Models\AnnualPlan;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\HrEmployee;
@@ -24,7 +25,6 @@ use App\Models\TaskAttachment;
 use App\Models\TaskUpdate;
 use App\Models\TransfersTracking;
 use App\Models\User;
-use App\Models\YearlyPlan;
 use Database\Seeders\CoreDataSeeder;
 use Illuminate\Support\Facades\DB;
 
@@ -36,7 +36,7 @@ test('the seeders populate every table in the schema', function () {
         Strategy::class,
         Donor::class,
         Program::class,
-        YearlyPlan::class,
+        AnnualPlan::class,
         Project::class,
         Proposal::class,
         DonorProposal::class,
@@ -80,14 +80,14 @@ test('staff are the hr accounts and assigned programmes have hr employee manager
         ->toBe(DB::connection('hr')->table('users')->pluck('email')->sort()->values()->all())
         ->and(User::query()->where('role', '!=', UserRole::Officer)->exists())->toBeFalse();
 
-    foreach (Program::query()->whereNotNull('manager_id')->with('manager', 'projects', 'yearlyPlans')->get() as $program) {
+    foreach (Program::query()->whereNotNull('manager_id')->with('manager', 'projects', 'annualPlans')->get() as $program) {
         expect($program->manager)->toBeInstanceOf(HrEmployee::class);
 
         foreach ($program->projects as $project) {
             expect($project->name)->toStartWith($program->name.' Community Response ');
         }
 
-        foreach ($program->yearlyPlans as $plan) {
+        foreach ($program->annualPlans as $plan) {
             expect($plan->manager_id)->toBe($program->manager_id);
         }
     }
@@ -106,7 +106,7 @@ test('lookup seeding reuses existing named donors', function () {
 test('demo targets cover annual plans and proposals in the same programme', function () {
     $this->seed();
 
-    expect(PlanIndicator::query()->where('source_type', 'yearly_plan')->exists())->toBeTrue();
+    expect(PlanIndicator::query()->where('source_type', 'annual_plan')->exists())->toBeTrue();
     $targets = PlanIndicator::query()->where('source_type', 'proposal')
         ->with('source.projects', 'project', 'indicator.result')->get();
 

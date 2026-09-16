@@ -23,7 +23,7 @@ function insertReportFile(int $reportId, string $path = 'report-files/2026/atten
 function insertSubmittedReport(): int
 {
     return insertReport(
-        insertPlanIndicator(insertIndicator(insertResult()), 'yearly_plan', 1),
+        insertPlanIndicator(insertIndicator(insertResult()), 'annual_plan', 1),
         User::factory()->create()->id,
     );
 }

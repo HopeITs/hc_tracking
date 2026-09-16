@@ -1,10 +1,10 @@
 <?php
 
 use App\Enums\ReportStatus;
+use App\Models\AnnualPlan;
 use App\Models\PlanIndicator;
 use App\Models\Report;
 use App\Models\User;
-use App\Models\YearlyPlan;
 use Livewire\Livewire;
 
 test('guests are redirected from the report directory', function () {
@@ -37,8 +37,8 @@ test('reports can be filtered by status and meal visibility', function () {
 test('a report records its author from the authenticated user', function () {
     $author = User::factory()->create();
     $target = PlanIndicator::factory()->create([
-        'source_type' => 'yearly_plan',
-        'source_id' => YearlyPlan::factory()->create()->id,
+        'source_type' => 'annual_plan',
+        'source_id' => AnnualPlan::factory()->create()->id,
     ]);
 
     Livewire::actingAs($author)
@@ -60,8 +60,8 @@ test('a report records its author from the authenticated user', function () {
 test('creating a report persists the narrative sections and period window', function () {
     $author = User::factory()->create();
     $target = PlanIndicator::factory()->create([
-        'source_type' => 'yearly_plan',
-        'source_id' => YearlyPlan::factory()->create()->id,
+        'source_type' => 'annual_plan',
+        'source_id' => AnnualPlan::factory()->create()->id,
     ]);
 
     Livewire::actingAs($author)
@@ -175,8 +175,8 @@ test('saving an edit to a report that was approved meanwhile is refused', functi
 test('a report value that would overflow the decimal column is rejected', function () {
     $user = User::factory()->create();
     $target = PlanIndicator::factory()->create([
-        'source_type' => 'yearly_plan',
-        'source_id' => YearlyPlan::factory()->create()->id,
+        'source_type' => 'annual_plan',
+        'source_id' => AnnualPlan::factory()->create()->id,
     ]);
 
     Livewire::actingAs($user)
@@ -192,8 +192,8 @@ test('a report value that would overflow the decimal column is rejected', functi
 test('a narrative window end before its start is rejected', function () {
     $user = User::factory()->create();
     $target = PlanIndicator::factory()->create([
-        'source_type' => 'yearly_plan',
-        'source_id' => YearlyPlan::factory()->create()->id,
+        'source_type' => 'annual_plan',
+        'source_id' => AnnualPlan::factory()->create()->id,
     ]);
 
     Livewire::actingAs($user)
@@ -211,8 +211,8 @@ test('a narrative window end before its start is rejected', function () {
 test('narrative sections are trimmed and blank narrative sections are stored as null', function () {
     $user = User::factory()->create();
     $target = PlanIndicator::factory()->create([
-        'source_type' => 'yearly_plan',
-        'source_id' => YearlyPlan::factory()->create()->id,
+        'source_type' => 'annual_plan',
+        'source_id' => AnnualPlan::factory()->create()->id,
     ]);
 
     Livewire::actingAs($user)

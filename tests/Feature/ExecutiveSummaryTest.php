@@ -1,13 +1,13 @@
 <?php
 
 use App\Enums\UserRole;
+use App\Models\AnnualPlan;
 use App\Models\Indicator;
 use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Result;
 use App\Models\User;
-use App\Models\YearlyPlan;
 use Livewire\Livewire;
 
 /**
@@ -41,7 +41,7 @@ test('annual plan coverage counts the programs holding a plan for the selected y
     $programs = Program::factory(4)->create();
 
     foreach ($programs->take(3) as $program) {
-        YearlyPlan::factory()->create(['program_id' => $program->id, 'year' => currentFiscalYear()]);
+        AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => currentFiscalYear()]);
     }
 
     Livewire::actingAs($user)
@@ -54,12 +54,12 @@ test('indicators targeted counts only the indicators committed in an annual plan
     $user = User::factory()->create();
     $result = Result::factory()->create();
     $indicators = Indicator::factory(4)->create(['result_id' => $result->id]);
-    $plan = YearlyPlan::factory()->create(['year' => currentFiscalYear()]);
-    $earlierPlan = YearlyPlan::factory()->create(['year' => currentFiscalYear() - 1]);
+    $plan = AnnualPlan::factory()->create(['year' => currentFiscalYear()]);
+    $earlierPlan = AnnualPlan::factory()->create(['year' => currentFiscalYear() - 1]);
 
-    PlanIndicator::factory()->forYearlyPlan($plan)->create(['indicator_id' => $indicators[0]->id]);
-    PlanIndicator::factory()->forYearlyPlan($plan)->create(['indicator_id' => $indicators[1]->id]);
-    PlanIndicator::factory()->forYearlyPlan($earlierPlan)->create(['indicator_id' => $indicators[2]->id]);
+    PlanIndicator::factory()->forAnnualPlan($plan)->create(['indicator_id' => $indicators[0]->id]);
+    PlanIndicator::factory()->forAnnualPlan($plan)->create(['indicator_id' => $indicators[1]->id]);
+    PlanIndicator::factory()->forAnnualPlan($earlierPlan)->create(['indicator_id' => $indicators[2]->id]);
 
     Livewire::actingAs($user)
         ->test('pages::executive-summary.index')
@@ -83,9 +83,9 @@ test('projects carrying a target counts the projects named by this year plans', 
     $user = User::factory()->create();
     $program = Program::factory()->create();
     $projects = Project::factory(4)->create(['program_id' => $program->id]);
-    $plan = YearlyPlan::factory()->create(['program_id' => $program->id, 'year' => currentFiscalYear()]);
+    $plan = AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => currentFiscalYear()]);
 
-    PlanIndicator::factory()->forYearlyPlan($plan)->create(['project_id' => $projects[0]->id]);
+    PlanIndicator::factory()->forAnnualPlan($plan)->create(['project_id' => $projects[0]->id]);
 
     Livewire::actingAs($user)
         ->test('pages::executive-summary.index')
@@ -111,9 +111,9 @@ test('changing the fiscal year moves the year scoped cards but leaves geographic
     $programs = Program::factory(3)->create();
     $cities = [insertHrCity('Aleppo'), insertHrCity('Homs')];
 
-    YearlyPlan::factory()->create(['program_id' => $programs[0]->id, 'year' => currentFiscalYear()]);
-    YearlyPlan::factory()->create(['program_id' => $programs[1]->id, 'year' => currentFiscalYear()]);
-    YearlyPlan::factory()->create(['program_id' => $programs[2]->id, 'year' => currentFiscalYear() - 1]);
+    AnnualPlan::factory()->create(['program_id' => $programs[0]->id, 'year' => currentFiscalYear()]);
+    AnnualPlan::factory()->create(['program_id' => $programs[1]->id, 'year' => currentFiscalYear()]);
+    AnnualPlan::factory()->create(['program_id' => $programs[2]->id, 'year' => currentFiscalYear() - 1]);
     Project::factory()->create(['city_id' => $cities[0], 'program_id' => $programs[0]->id]);
 
     Livewire::actingAs($user)
@@ -142,7 +142,7 @@ test('a fiscal year outside the offered options falls back to the current one', 
     $user = User::factory()->create();
     $program = Program::factory()->create();
 
-    YearlyPlan::factory()->create(['program_id' => $program->id, 'year' => currentFiscalYear()]);
+    AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => currentFiscalYear()]);
 
     Livewire::actingAs($user)
         ->test('pages::executive-summary.index')

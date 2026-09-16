@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Enums\ResultType;
+use App\Models\AnnualPlan;
 use App\Models\Indicator;
 use App\Models\IndicatorProgress;
 use App\Models\PlanIndicator;
@@ -12,7 +13,6 @@ use App\Models\Report;
 use App\Models\ReportFile;
 use App\Models\Result;
 use App\Models\User;
-use App\Models\YearlyPlan;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection;
 
@@ -49,15 +49,15 @@ class MealSeeder extends Seeder
                     'name' => $name,
                 ]));
 
-            $yearlyPlan = $program->yearlyPlans()->first();
+            $annualPlan = $program->annualPlans()->first();
             $project = $program->projects()->with('proposals')->first();
 
-            if ($yearlyPlan === null) {
+            if ($annualPlan === null) {
                 return;
             }
 
             foreach ($indicators as $indicator) {
-                $this->seedTargets($yearlyPlan, $indicator, $project, $users);
+                $this->seedTargets($annualPlan, $indicator, $project, $users);
                 $this->seedProgress($indicator, $users);
             }
         });
@@ -93,9 +93,9 @@ class MealSeeder extends Seeder
      *
      * @param  Collection<int, User>  $users
      */
-    protected function seedTargets(YearlyPlan $yearlyPlan, Indicator $indicator, ?Project $project, Collection $users): void
+    protected function seedTargets(AnnualPlan $annualPlan, Indicator $indicator, ?Project $project, Collection $users): void
     {
-        $planIndicator = PlanIndicator::factory()->forYearlyPlan($yearlyPlan)->create([
+        $planIndicator = PlanIndicator::factory()->forAnnualPlan($annualPlan)->create([
             'indicator_id' => $indicator->id,
             'project_id' => $project?->id,
         ]);

@@ -2,15 +2,15 @@
 
 namespace Database\Factories;
 
+use App\Models\AnnualPlan;
 use App\Models\Program;
-use App\Models\YearlyPlan;
 use Database\Factories\Concerns\CreatesHrRecords;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends Factory<YearlyPlan>
+ * @extends Factory<AnnualPlan>
  */
-class YearlyPlanFactory extends Factory
+class AnnualPlanFactory extends Factory
 {
     use CreatesHrRecords;
 

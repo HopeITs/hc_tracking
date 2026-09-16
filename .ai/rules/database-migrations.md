@@ -27,13 +27,13 @@ Pivots also get a UNIQUE on the id pair (`unique(['project_id', 'proposal_id'])`
 Note `donor_proposal` later in the ERD is NOT a plain pivot — it carries budget and currency, so it is an entity in pivot clothing. Decide its name when you reach it.
 
 ## plan_indicators.source_id has no FK — orphans are possible by design
-`plan_indicators.source_type`/`source_id` is polymorphic, so no foreign key can exist on it. Deleting a source row (e.g. a yearly_plan cascade-deleted with its program) leaves the plan_indicators row behind with a dangling source_id. The database will not stop this.
+`plan_indicators.source_type`/`source_id` is polymorphic, so no foreign key can exist on it. Deleting a source row (e.g. a annual_plan cascade-deleted with its program) leaves the plan_indicators row behind with a dangling source_id. The database will not stop this.
 
-Cleanup lives in application code: `PlanIndicatorSourceObserver` on YearlyPlan and Proposal, plus `ProgramObserver` to bridge the database cascade that fires no model events. See `.ai/rules/observers.md`.
+Cleanup lives in application code: `PlanIndicatorSourceObserver` on AnnualPlan and Proposal, plus `ProgramObserver` to bridge the database cascade that fires no model events. See `.ai/rules/observers.md`.
 
 This covers Eloquent deletes only. A raw query-builder delete still orphans targets and no foreign key can stop it — `tests/Feature/PlanIndicatorTest.php` has a test named "a target outlives a source deleted through the query builder" documenting that remaining route, and `tests/Feature/Models/PlanIndicatorCleanupTest.php` covers the paths that are handled.
 
-`source_type` is VARCHAR(50), so a `Relation::enforceMorphMap()` with short keys ('yearly_plan', not 'App\\Models\\YearlyPlan') is required rather than optional.
+`source_type` is VARCHAR(50), so a `Relation::enforceMorphMap()` with short keys ('annual_plan', not 'App\\Models\\AnnualPlan') is required rather than optional.
 
 ## Two reports columns are deliberately renamed from the ERD
 The ERD draws `reports.plan_indicators_id` (plural) and `reports.is_seen_by_MEAL` (mixed case). The migration uses `plan_indicator_id` and `is_seen_by_meal` instead.

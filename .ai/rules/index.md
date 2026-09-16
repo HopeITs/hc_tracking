@@ -26,4 +26,4 @@ Before planning or editing, find the row whose globs match the file's path and r
 | {database/factories/**,database/seeders/**,tests/Pest.php} | .ai/rules/seeders.md |
 | tests/** | .ai/rules/tests.md |
 | {lang/**,resources/views/**,app/Enums/**} | .ai/rules/views-enums.md |
-| resources/views/pages/yearly-plans/** | .ai/rules/yearly-plans.md |
+| resources/views/pages/annual-plans/** | .ai/rules/annual-plans.md |

@@ -20,7 +20,7 @@ use Illuminate\Database\Eloquent\Model;
 class PlanIndicatorSourceObserver
 {
     /**
-     * Handle the deletion of a yearly plan or a proposal.
+     * Handle the deletion of a annual plan or a proposal.
      */
     public function deleted(Model $source): void
     {

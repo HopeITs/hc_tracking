@@ -2,13 +2,13 @@
 
 use App\Enums\IndicatorMeasure;
 use App\Enums\Period;
+use App\Models\AnnualPlan;
 use App\Models\Indicator;
 use App\Models\IndicatorProgress;
 use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\Result;
 use App\Models\User;
-use App\Models\YearlyPlan;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
@@ -168,8 +168,8 @@ test('an indicator carrying a target is not deleted because targets and reports 
     $indicator = Indicator::factory()->create();
     $target = PlanIndicator::factory()->create([
         'indicator_id' => $indicator->id,
-        'source_type' => 'yearly_plan',
-        'source_id' => YearlyPlan::factory()->create()->id,
+        'source_type' => 'annual_plan',
+        'source_id' => AnnualPlan::factory()->create()->id,
     ]);
 
     Livewire::actingAs($user)

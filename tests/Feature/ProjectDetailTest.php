@@ -3,6 +3,7 @@
 use App\Enums\FileType;
 use App\Enums\MediaCollection;
 use App\Enums\ProjectStatus;
+use App\Models\AnnualPlan;
 use App\Models\Indicator;
 use App\Models\Media;
 use App\Models\Milestone;
@@ -11,7 +12,6 @@ use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Risk;
 use App\Models\User;
-use App\Models\YearlyPlan;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
@@ -121,8 +121,8 @@ test('project detail shows targets naming this project', function () {
     $project = Project::factory()->create();
     $indicator = Indicator::factory()->create(['name' => 'People reached']);
     PlanIndicator::factory()->create([
-        'source_type' => 'yearly_plan',
-        'source_id' => YearlyPlan::factory()->create()->id,
+        'source_type' => 'annual_plan',
+        'source_id' => AnnualPlan::factory()->create()->id,
         'indicator_id' => $indicator->id,
         'project_id' => $project->id,
     ]);

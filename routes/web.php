@@ -26,11 +26,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('programs/{program}', 'pages::programs.show')
         ->name('programs.show');
 
-    Route::livewire('yearly-plans', 'pages::yearly-plans.index')
-        ->name('yearly-plans.index');
+    Route::livewire('annual-plans', 'pages::annual-plans.index')
+        ->name('annual-plans.index');
 
-    Route::livewire('yearly-plans/{yearlyPlan}', 'pages::yearly-plans.show')
-        ->name('yearly-plans.show');
+    Route::livewire('annual-plans/{annualPlan}', 'pages::annual-plans.show')
+        ->name('annual-plans.show');
 
     Route::livewire('projects', 'pages::projects.index')
         ->name('projects.index');

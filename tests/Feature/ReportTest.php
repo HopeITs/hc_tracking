@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
  */
 function insertPlannedTarget(): int
 {
-    return insertPlanIndicator(insertIndicator(insertResult()), 'yearly_plan', 1);
+    return insertPlanIndicator(insertIndicator(insertResult()), 'annual_plan', 1);
 }
 
 test('a new report is a draft, unseen by MEAL, with no narrative written', function () {
