@@ -17,4 +17,5 @@ return [
     'registering' => 'جارٍ التسجيل...',
     'sign_in_with_a_passkey' => 'تسجيل الدخول بمفتاح مرور',
     'today' => 'اليوم',
+    'today_marker_hint' => 'اليوم، :date',
 ];

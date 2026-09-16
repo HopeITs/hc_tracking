@@ -1,4 +1,4 @@
-@props(['breadcrumbs' => [], 'title', 'subtitle' => null])
+@props(['breadcrumbs' => [], 'title', 'subtitle' => null, 'titleClass' => null])
 
 <header {{ $attributes->class('flex flex-col gap-3 border-b border-secondary-soft pb-4 dark:border-secondary-medium') }}>
     @if ($breadcrumbs !== [])
@@ -19,7 +19,7 @@
 
     <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
         <div class="min-w-0 sm:me-auto">
-            <flux:heading size="lg">{{ $title }}</flux:heading>
+            <flux:heading size="lg" class="{{ $titleClass }}">{{ $title }}</flux:heading>
             @if ($subtitle !== null)
                 <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ $subtitle }}</p>
             @endif

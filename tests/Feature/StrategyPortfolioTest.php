@@ -126,6 +126,31 @@ test('the status dropdown filters the list and ignores an unknown status', funct
     });
 });
 
+test('the strategy portfolio table paginates at 15 rows while the timeline shows every strategy', function () {
+    $user = User::factory()->create();
+    Strategy::factory()->count(17)->sequence(fn ($sequence) => [
+        'name' => 'Strategy '.str_pad((string) ($sequence->index + 1), 2, '0', STR_PAD_LEFT),
+        'start_year' => 2000 + $sequence->index,
+        'end_year' => 2001 + $sequence->index,
+    ])->create();
+
+    // All 17 are "completed" (end_year < now) and sort desc by end_year, so
+    // "Strategy 01" (the lowest end_year) ranks last and falls off page 1 of
+    // the table — seeing it here proves the timeline (unpaginated) still
+    // shows every strategy even while the table beneath it is paginated.
+    $this->actingAs($user)
+        ->get(route('strategies.index'))
+        ->assertOk()
+        ->assertSeeText('17')
+        ->assertSeeText('Strategy 01')
+        ->assertSeeText('Showing 1 to 15 of 17 results');
+
+    $this->actingAs($user)
+        ->get(route('strategies.index', ['strategiesPage' => 2]))
+        ->assertOk()
+        ->assertSeeText('Showing 16 to 17 of 17 results');
+});
+
 test('the strategy portfolio timeline and list link to the strategy and show its program count', function () {
     $user = User::factory()->create();
     $strategy = Strategy::factory()->create(['name' => 'Water Security Strategy', 'start_year' => 2026, 'end_year' => 2030]);

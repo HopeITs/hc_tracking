@@ -22,8 +22,12 @@ Before planning or editing, find the row whose globs match the file's path and r
 | {app/Http/Middleware/SetLocale.php,app/Http/Controllers/SwitchLocaleController.php,resources/views/components/navigation/sidebar.blade.php,resources/css/app.css} | .ai/rules/navigation-css.md |
 | resources/views/components/{navigation/sidebar.blade.php,ui/panel.blade.php,ui/stat-tile.blade.php,ui/data-table.blade.php,ui/timeline.blade.php} | .ai/rules/navigation.md |
 | app/Observers/**, app/Observers/{MilestoneObserver,ResultObserver}.php | .ai/rules/observers.md |
+| resources/views/pages/*/⚡index.blade.php | .ai/rules/pages.md |
 | app/Providers/** | .ai/rules/providers.md |
 | {database/factories/**,database/seeders/**,tests/Pest.php} | .ai/rules/seeders.md |
+| resources/views/pages/strategies/⚡show.blade.php, resources/views/pages/strategies/⚡index.blade.php | .ai/rules/strategies.md |
 | tests/** | .ai/rules/tests.md |
+| resources/views/components/ui/detail-header.blade.php | .ai/rules/ui.md |
 | {lang/**,resources/views/**,app/Enums/**} | .ai/rules/views-enums.md |
+| resources/views/**/*.blade.php | .ai/rules/views.md |
 | resources/views/pages/yearly-plans/** | .ai/rules/yearly-plans.md |

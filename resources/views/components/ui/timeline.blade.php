@@ -94,7 +94,11 @@
                         style="inset-inline-start: {{ $startPct }}%; width: {{ $width }}%"
                     ></div>
                     @if ($todayPct !== null)
-                        <div class="absolute -top-1 -bottom-1 w-px bg-primary" style="inset-inline-start: {{ $todayPct }}%" aria-hidden="true" title="{{ __('ui.today') }}"></div>
+                        <flux:tooltip :content="__('ui.today_marker_hint', ['date' => $today->translatedFormat(__('formats.date'))])">
+                            <div class="absolute -top-1.5 -bottom-1.5 w-2 -ms-1 cursor-help" style="inset-inline-start: {{ $todayPct }}%">
+                                <div class="mx-auto h-full w-px bg-primary"></div>
+                            </div>
+                        </flux:tooltip>
                     @endif
                 </div>
 

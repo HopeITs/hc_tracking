@@ -17,4 +17,5 @@ return [
     'registering' => 'Registering...',
     'sign_in_with_a_passkey' => 'Sign in with a passkey',
     'today' => 'Today',
+    'today_marker_hint' => 'Today, :date',
 ];

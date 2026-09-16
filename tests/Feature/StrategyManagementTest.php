@@ -64,22 +64,25 @@ test('a manager can edit a strategy', function () {
     expect($strategy->refresh())->name->toBe('Renamed Strategy')->end_year->toBe(2030);
 });
 
-test('the modal subheading only shows when creating a strategy, not editing one', function () {
+test('the create, edit and delete modals show only a title, no description', function () {
     $manager = User::factory()->role(UserRole::Manager)->create();
     $strategy = Strategy::factory()->create();
 
-    $createHtml = Livewire::actingAs($manager)
-        ->test('pages::strategies.index')
-        ->call('openCreateModal')
-        ->html();
+    $component = Livewire::actingAs($manager)->test('pages::strategies.index');
 
-    $editHtml = Livewire::actingAs($manager)
-        ->test('pages::strategies.index')
-        ->call('openEditModal', $strategy->id)
-        ->html();
+    $createHtml = $component->call('openCreateModal')->html();
+    $editHtml = $component->call('openEditModal', $strategy->id)->html();
+    $deleteHtml = $component->call('confirmDelete', $strategy->id)->html();
 
-    expect($createHtml)->toContain(__('strategies.strategy_names_need_not_be_unique'));
-    expect($editHtml)->not->toContain(__('strategies.strategy_names_need_not_be_unique'));
+    expect($createHtml)
+        ->toContain(__('strategies.add_strategy'))
+        ->not->toContain(__('strategies.strategy_names_need_not_be_unique'));
+    expect($editHtml)
+        ->toContain(__('strategies.edit_strategy'))
+        ->not->toContain(__('strategies.strategy_names_need_not_be_unique'));
+    expect($deleteHtml)
+        ->toContain(__('strategies.delete_this_strategy'))
+        ->not->toContain(__('strategies.only_a_strategy_with_no_linked_programs_can_be_deleted'));
 });
 
 test('confirming deletion opens the delete modal for the right strategy', function () {

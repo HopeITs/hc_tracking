@@ -2,6 +2,7 @@
 
 use App\Models\Strategy;
 use Flux\Flux;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
@@ -9,8 +10,11 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 new #[Title('titles.strategies')] class extends Component {
+    use WithPagination;
+
     #[Url(except: '')]
     public string $search = '';
 
@@ -25,15 +29,22 @@ new #[Title('titles.strategies')] class extends Component {
     public string $startYear = '';
     public string $endYear = '';
 
+    public function updatedSearch(): void
+    {
+        $this->resetPage('strategiesPage');
+    }
+
     public function filterByStatus(string $status = ''): void
     {
         $this->status = in_array($status, ['active', 'upcoming', 'completed'], true) ? $status : '';
+        $this->resetPage('strategiesPage');
     }
 
     public function resetFilters(): void
     {
         $this->search = '';
         $this->status = '';
+        $this->resetPage('strategiesPage');
     }
 
     /**
@@ -171,6 +182,7 @@ new #[Title('titles.strategies')] class extends Component {
     /**
      * @return array{
      *     strategies: Collection<int, array{id: int, name: string, start_year: int, end_year: int, duration_years: int, programs_count: int, status: string}>,
+     *     paginated_strategies: LengthAwarePaginator<int, array{id: int, name: string, start_year: int, end_year: int, duration_years: int, programs_count: int, status: string}>,
      *     total: int,
      *     has_records: bool,
      *     status_counts: array{active: int, upcoming: int, completed: int},
@@ -226,8 +238,20 @@ new #[Title('titles.strategies')] class extends Component {
             ->concat($filtered->where('status', 'completed')->sortByDesc('end_year'))
             ->values();
 
+        $perPage = 15;
+        $currentPage = $this->getPage('strategiesPage');
+
+        $paginatedStrategies = new LengthAwarePaginator(
+            $orderedStrategies->forPage($currentPage, $perPage)->values(),
+            $orderedStrategies->count(),
+            $perPage,
+            $currentPage,
+            ['pageName' => 'strategiesPage'],
+        );
+
         return [
             'strategies' => $orderedStrategies,
+            'paginated_strategies' => $paginatedStrategies,
             'total' => $filtered->count(),
             'has_records' => $searchFiltered->isNotEmpty(),
             'status_counts' => $statusCounts,
@@ -376,7 +400,7 @@ new #[Title('titles.strategies')] class extends Component {
                     <th scope="col" class="sr-only">{{ __('common.actions') }}</th>
                 </x-slot:head>
 
-                @foreach ($portfolio['strategies'] as $strategy)
+                @foreach ($portfolio['paginated_strategies'] as $strategy)
                     <tr wire:key="strategy-row-{{ $strategy['id'] }}">
                         <x-ui.data-table.cell :label="__('common.strategy')">
                             <span class="truncate font-semibold text-secondary-dark dark:text-white">{{ $strategy['name'] }}</span>
@@ -417,6 +441,8 @@ new #[Title('titles.strategies')] class extends Component {
                     </tr>
                 @endforeach
             </x-ui.data-table>
+
+            <flux:pagination :paginator="$portfolio['paginated_strategies']" class="text-secondary-medium! dark:text-secondary-soft!" />
         </div>
     @endif
 
@@ -425,9 +451,6 @@ new #[Title('titles.strategies')] class extends Component {
             <form wire:submit="saveStrategy" class="space-y-5">
                 <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
                     <flux:heading size="lg">{{ $editingStrategyId === null ? __('strategies.add_strategy') : __('strategies.edit_strategy') }}</flux:heading>
-                    @if ($editingStrategyId === null)
-                        <flux:subheading>{{ __('strategies.strategy_names_need_not_be_unique') }}</flux:subheading>
-                    @endif
                 </div>
 
                 <x-ui.input wire:model="name" :label="__('strategies.strategy_name')" type="text" maxlength="255" required autofocus />
@@ -449,7 +472,6 @@ new #[Title('titles.strategies')] class extends Component {
         <flux:modal wire:model="showDeleteModal" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
             <div class="space-y-4">
                 <flux:heading size="lg">{{ __('strategies.delete_this_strategy') }}</flux:heading>
-                <flux:subheading>{{ __('strategies.only_a_strategy_with_no_linked_programs_can_be_deleted') }}</flux:subheading>
                 <div class="flex justify-end gap-2 border-t border-secondary-soft pt-4 dark:border-secondary-medium">
                     <x-ui.button type="button" wire:click="$set('showDeleteModal', false)">{{ __('common.cancel') }}</x-ui.button>
                     <x-ui.button type="button" tone="primary" wire:click="deleteStrategy" data-test="confirm-delete-strategy">{{ __('strategies.delete_strategy') }}</x-ui.button>
