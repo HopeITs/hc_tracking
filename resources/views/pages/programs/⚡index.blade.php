@@ -250,7 +250,7 @@ new #[Title('titles.programs')] class extends Component {
             </div>
         </div>
 
-        <div class="program-directory-filters grid gap-3 @3xl/directory:grid-cols-2 @6xl/directory:grid-cols-3">
+        <div class="directory-filters grid gap-3 @3xl/directory:grid-cols-2 @6xl/directory:grid-cols-3">
             <div class="min-w-0">
                 <label for="program-search" class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-secondary-soft">{{ __('programs.search_programs') }}</label>
                 <x-ui.input id="program-search" type="search" icon="magnifying-glass" :aria-label="__('programs.search_programs')" :placeholder="__('programs.program_strategy_or_manager')" wire:model.live.debounce.300ms="search" />
