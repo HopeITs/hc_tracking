@@ -26,30 +26,26 @@ use Livewire\Component;
 
 new #[Title('titles.dashboard')] class extends Component {
     /**
-     * Which slice of the attention queue is shown: all, delivery, funding or risks.
-     */
-    public string $focus = 'all';
-
-    /**
-     * The most rows the attention queue shows at once.
+     * The most rows the attention queue shows at once, in any view.
      */
     private const AttentionLimit = 8;
 
     /**
-     * Restrict the attention queue to one group.
+     * How many rows of the "All" view are held for materialised risks.
      */
-    public function focusOn(string $focus): void
-    {
-        $this->focus = in_array($focus, ['all', 'delivery', 'funding', 'risks'], true) ? $focus : 'all';
-    }
+    private const RiskSlots = 2;
 
     /**
      * Everything that is late or has gone wrong, most overdue first.
      *
      * Dated items (tasks, milestones, transfers) sort by days late; materialised
-     * risks carry no due date and follow them, newest first.
+     * risks carry no due date and follow them, newest first. Every row is
+     * rendered once and the queue's filter only hides rows in the browser, so
+     * `allRank` and `groupRank` say where a row sits in each view. The "All" view
+     * keeps up to two rows for risks, so a busy week of late work never pushes
+     * a materialised risk off the dashboard.
      *
-     * @return Collection<int, array{key: string, group: string, icon: string, tone: string, title: string, context: string, badge: string, daysLate: int|null, href: string}>
+     * @return Collection<int, array{key: string, group: string, icon: string, tone: string, title: string, context: string, badge: string, daysLate: int|null, href: string, allRank: int|null, groupRank: int}>
      */
     #[Computed]
     public function attentionItems(): Collection
@@ -131,13 +127,38 @@ new #[Title('titles.dashboard')] class extends Component {
                 href: route('risks.index', ['project' => $risk->project_id, 'status' => 'happened']),
             ));
 
-        return $tasks
-            ->concat($milestones)
-            ->concat($transfers)
-            ->sortByDesc('daysLate')
-            ->values()
-            ->concat($risks)
+        $dated = $tasks->concat($milestones)->concat($transfers)->sortByDesc('daysLate')->values();
+        $datedShownInAll = min($dated->count(), self::AttentionLimit - min($risks->count(), self::RiskSlots));
+        $risksShownInAll = min($risks->count(), self::AttentionLimit - $datedShownInAll);
+        $groupRanks = [];
+
+        return $dated
+            ->map(fn (array $item, int $index): array => [...$item, 'allRank' => $index < $datedShownInAll ? $index : null])
+            ->concat($risks->map(fn (array $item, int $index): array => [...$item, 'allRank' => $index < $risksShownInAll ? $datedShownInAll + $index : null]))
+            ->map(function (array $item) use (&$groupRanks): array {
+                $groupRanks[$item['group']] = ($groupRanks[$item['group']] ?? -1) + 1;
+
+                return [...$item, 'groupRank' => $groupRanks[$item['group']]];
+            })
             ->values();
+    }
+
+    /**
+     * How many rows each view of the attention queue actually shows.
+     *
+     * @return array<string, int>
+     */
+    #[Computed]
+    public function attentionShown(): array
+    {
+        $items = $this->attentionItems;
+
+        return [
+            'all' => $items->whereNotNull('allRank')->count(),
+            'delivery' => min(self::AttentionLimit, $items->where('group', 'delivery')->count()),
+            'funding' => min(self::AttentionLimit, $items->where('group', 'funding')->count()),
+            'risks' => min(self::AttentionLimit, $items->where('group', 'risks')->count()),
+        ];
     }
 
     /**
@@ -161,20 +182,6 @@ new #[Title('titles.dashboard')] class extends Component {
             'funding' => $funding,
             'risks' => $risks,
         ];
-    }
-
-    /**
-     * The attention rows for the current focus.
-     *
-     * @return Collection<int, array{key: string, group: string, icon: string, tone: string, title: string, context: string, badge: string, daysLate: int|null, href: string}>
-     */
-    #[Computed]
-    public function visibleAttentionItems(): Collection
-    {
-        return $this->attentionItems
-            ->when($this->focus !== 'all', fn (Collection $items): Collection => $items->where('group', $this->focus))
-            ->take(self::AttentionLimit)
-            ->values();
     }
 
     /**
@@ -223,7 +230,8 @@ new #[Title('titles.dashboard')] class extends Component {
                     'received' => $receivedTotal,
                     'pending' => (float) ($pending[$currency]->total ?? 0),
                     'pendingCount' => (int) ($pending[$currency]->transfers ?? 0),
-                    'share' => $committedTotal > 0 ? (int) min(100, floor($receivedTotal / $committedTotal * 100)) : null,
+                    // Not capped: money received beyond the commitment must show as over 100%.
+                    'share' => $committedTotal > 0 ? (int) floor($receivedTotal / $committedTotal * 100) : null,
                 ];
             });
     }
@@ -237,10 +245,9 @@ new #[Title('titles.dashboard')] class extends Component {
     public function pulse(): array
     {
         $materialisedRisks = $this->attentionCounts['risks'];
-        $awaitingReview = Report::query()
-            ->where('is_seen_by_meal', false)
-            ->where('status', '!=', ReportStatus::Draft)
-            ->count();
+        // Counted exactly as the reports page filters ?seenByMeal=unseen, so the
+        // figure matches the list it links to.
+        $awaitingReview = Report::query()->where('is_seen_by_meal', false)->count();
 
         return [
             [
@@ -337,14 +344,19 @@ new #[Title('titles.dashboard')] class extends Component {
     {
         $byStatus = Proposal::query()->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
 
-        $counts = array_map(
-            fn (ProposalPhase $phase): int => (int) collect($phase->statuses())->sum(fn (ProposalStatus $status): int => (int) ($byStatus[$status->value] ?? 0)),
-            ProposalPhase::cases(),
-        );
+        // Only open proposals, matching the "Proposals in pipeline" figure: a
+        // rejected or completed proposal is no longer in the pipeline, which also
+        // leaves the Archived phase (Completed only) with nothing to count.
+        $closed = [ProposalStatus::Rejected, ProposalStatus::Completed];
+        $openStatuses = fn (ProposalPhase $phase): array => array_values(array_filter($phase->statuses(), fn (ProposalStatus $status): bool => ! in_array($status, $closed, true)));
+        $phases = array_values(array_filter(ProposalPhase::cases(), fn (ProposalPhase $phase): bool => $openStatuses($phase) !== []));
 
         return [
-            'series' => [['name' => __('dashboard.proposals'), 'data' => $counts]],
-            'categories' => array_map(fn (ProposalPhase $phase): string => $phase->label(), ProposalPhase::cases()),
+            'series' => [[
+                'name' => __('dashboard.proposals'),
+                'data' => array_map(fn (ProposalPhase $phase): int => (int) collect($openStatuses($phase))->sum(fn (ProposalStatus $status): int => (int) ($byStatus[$status->value] ?? 0)), $phases),
+            ]],
+            'categories' => array_map(fn (ProposalPhase $phase): string => $phase->label(), $phases),
         ];
     }
 
@@ -482,7 +494,7 @@ new #[Title('titles.dashboard')] class extends Component {
     /**
      * The latest changes across proposals, tasks and reports.
      *
-     * @return Collection<int, array{key: string, at: CarbonImmutable, icon: string, sentence: string, href: string}>
+     * @return Collection<int, array{key: string, at: CarbonImmutable, dateOnly: bool, icon: string, sentence: string, href: string}>
      */
     #[Computed]
     public function activity(): Collection
@@ -496,6 +508,7 @@ new #[Title('titles.dashboard')] class extends Component {
             ->map(fn (ProposalStatusNote $note): array => [
                 'key' => 'note-'.$note->id,
                 'at' => $note->date,
+                'dateOnly' => true,
                 'icon' => 'arrows-right-left',
                 'sentence' => __('dashboard.proposal_moved', ['proposal' => $note->proposal?->name ?? '—', 'status' => $note->status->label()]),
                 'href' => route('proposals.show', $note->proposal_id),
@@ -510,6 +523,7 @@ new #[Title('titles.dashboard')] class extends Component {
             ->map(fn (TaskUpdate $update): array => [
                 'key' => 'update-'.$update->id,
                 'at' => $update->date,
+                'dateOnly' => false,
                 'icon' => 'chat-bubble-left-ellipsis',
                 'sentence' => __('dashboard.task_updated', ['user' => $update->user?->name ?? '—', 'task' => $update->task?->title ?? '—']),
                 'href' => route('tasks.show', $update->task_id),
@@ -525,6 +539,7 @@ new #[Title('titles.dashboard')] class extends Component {
             ->map(fn (Report $report): array => [
                 'key' => 'report-'.$report->id,
                 'at' => $report->submit_date,
+                'dateOnly' => true,
                 'icon' => 'document-check',
                 'sentence' => __('dashboard.report_submitted', ['user' => $report->user?->name ?? '—', 'indicator' => $report->planIndicator?->indicator?->name ?? '—']),
                 'href' => route('reports.show', $report),
@@ -583,6 +598,7 @@ new #[Title('titles.dashboard')] class extends Component {
 
 @php
     $counts = $this->attentionCounts;
+    $shown = $this->attentionShown;
     $myWork = $this->myWork;
     $cardClasses = 'rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-secondary-medium dark:bg-secondary-dark dark:shadow-none';
     $iconTone = fn (string $tone): string => match ($tone) {
@@ -592,10 +608,12 @@ new #[Title('titles.dashboard')] class extends Component {
         'good' => 'bg-status-good-soft text-status-good',
         default => 'bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white',
     };
+    // Figures sit on the card ground: tone tokens only reach contrast there in
+    // light mode, so dark mode keeps figures white and lets the icon chip carry tone.
     $figureTone = fn (string $tone): string => match ($tone) {
         'critical' => 'text-primary dark:text-white',
-        'warn' => 'text-status-warn',
-        'funding' => 'text-funding',
+        'warn' => 'text-status-warn dark:text-white',
+        'funding' => 'text-funding dark:text-white',
         default => 'text-secondary-dark dark:text-white',
     };
     $focusTabs = [
@@ -604,6 +622,7 @@ new #[Title('titles.dashboard')] class extends Component {
         'funding' => __('dashboard.funding'),
         'risks' => __('dashboard.risks'),
     ];
+    $hiddenCounts = collect($focusTabs)->map(fn (string $label, string $key): int => max(0, $counts[$key] - $shown[$key]))->all();
     $receipts = $this->receiptsChart;
 @endphp
 
@@ -620,7 +639,7 @@ new #[Title('titles.dashboard')] class extends Component {
                 @if ($counts['all'] > 0)
                     <span class="rounded-full bg-primary px-2 py-0.5 text-xs font-bold text-white">{{ trans_choice('dashboard.items_need_attention', $counts['all'], ['count' => $counts['all']]) }}</span>
                 @else
-                    <span class="font-semibold text-status-good">{{ __('dashboard.all_clear') }}</span>
+                    <span class="rounded-full bg-status-good-soft px-2 py-0.5 text-xs font-bold text-status-good">{{ __('dashboard.all_clear') }}</span>
                 @endif
             </p>
         </div>
@@ -628,10 +647,11 @@ new #[Title('titles.dashboard')] class extends Component {
         <nav class="flex flex-wrap items-stretch gap-2" aria-label="{{ __('dashboard.my_work') }}" data-my-work>
             <span class="type-label hidden self-center pe-1 text-secondary-medium @xl/dashboard:inline dark:text-secondary-soft">{{ __('dashboard.my_work') }}</span>
             @php
+                $myTasksHref = $myWork['employeeId'] ? route('tasks.index', ['assignee' => $myWork['employeeId']]) : null;
                 $myWorkLinks = [
-                    ['label' => __('dashboard.my_overdue_tasks'), 'value' => $myWork['overdue'], 'tone' => $myWork['overdue'] > 0 ? 'critical' : 'neutral', 'href' => $myWork['employeeId'] ? route('tasks.index', ['assignee' => $myWork['employeeId']]) : null, 'icon' => 'clock'],
-                    ['label' => __('dashboard.due_this_week'), 'value' => $myWork['dueThisWeek'], 'tone' => 'neutral', 'href' => $myWork['employeeId'] ? route('tasks.index', ['assignee' => $myWork['employeeId']]) : null, 'icon' => 'calendar-days'],
-                    ['label' => __('dashboard.my_draft_reports'), 'value' => $myWork['draftReports'], 'tone' => $myWork['draftReports'] > 0 ? 'warn' : 'neutral', 'href' => route('reports.index', ['status' => ReportStatus::Draft->value]), 'icon' => 'document-text'],
+                    ['label' => __('dashboard.my_overdue_tasks'), 'value' => $myWork['overdue'], 'tone' => $myWork['overdue'] > 0 ? 'critical' : 'neutral', 'href' => $myTasksHref, 'icon' => 'clock'],
+                    ['label' => __('dashboard.due_next_7_days'), 'value' => $myWork['dueThisWeek'], 'tone' => 'neutral', 'href' => $myTasksHref, 'icon' => 'calendar-days'],
+                    ['label' => __('dashboard.my_draft_reports'), 'value' => $myWork['draftReports'], 'tone' => $myWork['draftReports'] > 0 ? 'warn' : 'neutral', 'href' => route('reports.index', ['status' => ReportStatus::Draft->value, 'author' => auth()->id()]), 'icon' => 'document-text'],
                 ];
             @endphp
             @foreach ($myWorkLinks as $link)
@@ -644,6 +664,7 @@ new #[Title('titles.dashboard')] class extends Component {
                         'hover:-translate-y-px hover:border-secondary-light focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary' => $link['href'],
                     ])
                     wire:key="my-work-{{ $loop->index }}"
+                    data-my-work-link
                 >
                     <span class="{{ $iconTone($link['tone']) }} flex size-8 items-center justify-center rounded-lg">
                         <flux:icon :name="$link['icon']" variant="micro" class="size-4" />
@@ -657,10 +678,11 @@ new #[Title('titles.dashboard')] class extends Component {
 
     {{-- Bento: attention leads, money and pulse beside it --}}
     <div class="grid grid-cols-1 gap-4 @3xl/dashboard:grid-cols-6 @5xl/dashboard:grid-cols-12">
-        {{-- Needs attention --}}
+        {{-- Needs attention: every row renders once, the filter only hides rows in the browser --}}
         <section
             class="{{ $cardClasses }} flex min-w-0 flex-col @3xl/dashboard:col-span-6 @5xl/dashboard:col-span-7 @5xl/dashboard:row-span-2"
             aria-labelledby="attention-heading"
+            x-data="{ focus: 'all' }"
             data-attention
         >
             <div class="flex flex-wrap items-start justify-between gap-3 border-b border-secondary-soft px-5 pt-4 pb-3 dark:border-secondary-medium">
@@ -676,34 +698,43 @@ new #[Title('titles.dashboard')] class extends Component {
                     <p class="mt-0.5 text-xs text-secondary-medium dark:text-secondary-soft">{{ __('dashboard.needs_attention_hint') }}</p>
                 </div>
 
-                <div class="flex max-w-full gap-0.5 overflow-x-auto rounded-lg bg-board-head p-0.5 ring-1 ring-secondary-soft dark:ring-secondary-medium" role="tablist" aria-label="{{ __('dashboard.filter_attention') }}">
-                    @foreach ($focusTabs as $tabKey => $tabLabel)
-                        <button
-                            type="button"
-                            role="tab"
-                            wire:click="focusOn('{{ $tabKey }}')"
-                            aria-selected="{{ $focus === $tabKey ? 'true' : 'false' }}"
-                            wire:key="focus-{{ $tabKey }}"
-                            @class([
-                                'inline-flex min-h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold whitespace-nowrap transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-primary',
-                                'bg-white text-secondary-dark shadow-[0_1px_2px_rgba(16,24,40,0.08)] dark:bg-secondary-medium dark:text-white' => $focus === $tabKey,
-                                'text-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => $focus !== $tabKey,
-                            ])
-                        >
-                            {{ $tabLabel }}
-                            <span class="tabular-nums opacity-70">{{ $counts[$tabKey] }}</span>
-                        </button>
-                    @endforeach
-                </div>
+                @if ($counts['all'] > 0)
+                    <div class="flex max-w-full gap-0.5 overflow-x-auto rounded-lg bg-board-head p-0.5 ring-1 ring-secondary-soft dark:ring-secondary-medium" role="group" aria-label="{{ __('dashboard.filter_attention') }}">
+                        @foreach ($focusTabs as $tabKey => $tabLabel)
+                            <button
+                                type="button"
+                                x-on:click="focus = @js($tabKey)"
+                                x-bind:aria-pressed="focus === @js($tabKey) ? 'true' : 'false'"
+                                aria-pressed="{{ $tabKey === 'all' ? 'true' : 'false' }}"
+                                wire:key="focus-{{ $tabKey }}"
+                                class="inline-flex min-h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold whitespace-nowrap text-secondary-medium transition-[color,background-color,box-shadow] duration-150 hover:text-secondary-dark focus-visible:outline-2 focus-visible:outline-primary aria-pressed:bg-white aria-pressed:text-secondary-dark aria-pressed:shadow-[0_1px_2px_rgba(16,24,40,0.08)] dark:text-secondary-soft dark:hover:text-white dark:aria-pressed:bg-secondary-medium dark:aria-pressed:text-white"
+                            >
+                                {{ $tabLabel }}
+                                <span class="tabular-nums opacity-70">{{ $counts[$tabKey] }}</span>
+                            </button>
+                        @endforeach
+                    </div>
+                @endif
             </div>
 
-            <div class="relative flex-1 transition-opacity duration-200" wire:loading.class="opacity-50" wire:target="focusOn">
-                @if ($this->visibleAttentionItems->isEmpty())
+            <div class="flex-1">
+                @if ($this->attentionItems->isEmpty())
                     <x-ui.empty-state icon="check-circle" :heading="__('dashboard.nothing_needs_attention')" :body="__('dashboard.nothing_needs_attention_body')" class="min-h-80" />
                 @else
                     <ul class="divide-y divide-secondary-soft dark:divide-secondary-medium" role="list">
-                        @foreach ($this->visibleAttentionItems as $item)
-                            <li wire:key="attention-{{ $item['key'] }}">
+                        @foreach ($this->attentionItems as $item)
+                            @php
+                                $inAll = $item['allRank'] !== null;
+                                $inGroup = $item['groupRank'] < 8;
+                            @endphp
+                            <li
+                                wire:key="attention-{{ $item['key'] }}"
+                                data-attention-group="{{ $item['group'] }}"
+                                x-show="focus === 'all' ? {{ $inAll ? 'true' : 'false' }} : (focus === @js($item['group']) && {{ $inGroup ? 'true' : 'false' }})"
+                                x-transition:enter="transition-opacity duration-200 ease-out"
+                                x-transition:enter-start="opacity-0"
+                                @unless ($inAll) style="display: none" @endunless
+                            >
                                 <a
                                     href="{{ $item['href'] }}"
                                     wire:navigate
@@ -719,7 +750,7 @@ new #[Title('titles.dashboard')] class extends Component {
                                     <span @class([
                                         'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums whitespace-nowrap',
                                         'bg-status-critical-soft text-primary dark:bg-primary dark:text-white' => $item['daysLate'] === null || $item['daysLate'] > 14,
-                                        'bg-status-warn-soft text-status-warn' => $item['daysLate'] !== null && $item['daysLate'] <= 14,
+                                        'bg-white text-status-warn ring-1 ring-status-warn/40 ring-inset dark:bg-status-warn-soft dark:ring-0' => $item['daysLate'] !== null && $item['daysLate'] <= 14,
                                     ])>{{ $item['badge'] }}</span>
                                     <flux:icon.chevron-right variant="micro" class="size-4 shrink-0 text-secondary-light transition-transform duration-200 group-hover:translate-x-0.5 rtl:-scale-x-100 rtl:group-hover:-translate-x-0.5" />
                                 </a>
@@ -729,12 +760,18 @@ new #[Title('titles.dashboard')] class extends Component {
                 @endif
             </div>
 
-            @php $hiddenCount = max(0, $counts[$focus] - $this->visibleAttentionItems->count()); @endphp
-            @if ($hiddenCount > 0)
-                <p class="border-t border-secondary-soft px-5 py-2.5 text-xs text-secondary-medium dark:border-secondary-medium dark:text-secondary-soft">
-                    {{ trans_choice('dashboard.more_not_shown', $hiddenCount, ['count' => $hiddenCount]) }}
-                </p>
-            @endif
+            @foreach ($hiddenCounts as $hiddenFocus => $hiddenCount)
+                @if ($hiddenCount > 0)
+                    <p
+                        class="border-t border-secondary-soft px-5 py-2.5 text-xs text-secondary-medium dark:border-secondary-medium dark:text-secondary-soft"
+                        x-show="focus === @js($hiddenFocus)"
+                        @unless ($hiddenFocus === 'all') style="display: none" @endunless
+                        wire:key="attention-hidden-{{ $hiddenFocus }}"
+                    >
+                        {{ trans_choice('dashboard.more_not_shown', $hiddenCount, ['count' => $hiddenCount]) }}
+                    </p>
+                @endif
+            @endforeach
         </section>
 
         {{-- Funding position --}}
@@ -759,11 +796,11 @@ new #[Title('titles.dashboard')] class extends Component {
                                 <div class="flex min-w-0 items-baseline gap-2">
                                     <span class="rounded-md bg-funding-soft px-1.5 py-0.5 text-[11px] font-bold tracking-wide text-funding">{{ $line['currency'] }}</span>
                                     <span class="truncate text-sm text-secondary-medium dark:text-secondary-soft">
-                                        <span class="font-bold text-secondary-dark tabular-nums dark:text-white" title="{{ Number::format($line['received'], 2) }} {{ $line['currency'] }}">{{ Number::abbreviate($line['received'], maxPrecision: 2) }}</span>
-                                        {{ __('dashboard.of_committed', ['amount' => Number::abbreviate($line['committed'], maxPrecision: 2)]) }}
+                                        <span class="font-bold text-secondary-dark tabular-nums dark:text-white">{{ Number::format($line['received'], maxPrecision: 0) }}</span>
+                                        {{ __('dashboard.of_committed', ['amount' => Number::format($line['committed'], maxPrecision: 0)]) }}
                                     </span>
                                 </div>
-                                <span class="text-xl font-bold tabular-nums text-funding">{{ $line['share'] === null ? '—' : $line['share'].'%' }}</span>
+                                <span class="text-xl font-bold tabular-nums text-funding dark:text-white">{{ $line['share'] === null ? '—' : $line['share'].'%' }}</span>
                             </div>
 
                             <div
@@ -771,17 +808,17 @@ new #[Title('titles.dashboard')] class extends Component {
                                 role="progressbar"
                                 aria-valuemin="0"
                                 aria-valuemax="100"
-                                aria-valuenow="{{ $line['share'] ?? 0 }}"
+                                aria-valuenow="{{ min(100, $line['share'] ?? 0) }}"
                                 aria-label="{{ __('dashboard.received_share', ['currency' => $line['currency']]) }}"
                             >
-                                <div class="h-full rounded-full bg-funding" style="width: {{ $line['share'] ?? 0 }}%"></div>
+                                <div class="h-full rounded-full bg-funding" style="width: {{ min(100, $line['share'] ?? 0) }}%"></div>
                             </div>
 
                             <p class="mt-2 flex flex-wrap items-center gap-x-1.5 text-xs text-secondary-medium dark:text-secondary-soft">
                                 @if ($line['committed'] <= 0)
-                                    <span class="font-semibold text-status-warn">{{ __('dashboard.no_commitment_recorded') }}</span>
+                                    <span class="font-semibold text-status-warn dark:text-white">{{ __('dashboard.no_commitment_recorded') }}</span>
                                 @elseif ($line['pendingCount'] > 0)
-                                    {{ trans_choice('dashboard.pending_transfers', $line['pendingCount'], ['count' => $line['pendingCount'], 'amount' => Number::abbreviate($line['pending'], maxPrecision: 2), 'currency' => $line['currency']]) }}
+                                    {{ trans_choice('dashboard.pending_transfers', $line['pendingCount'], ['count' => $line['pendingCount'], 'amount' => Number::format($line['pending'], maxPrecision: 0), 'currency' => $line['currency']]) }}
                                 @else
                                     {{ __('dashboard.no_pending_transfers') }}
                                 @endif
@@ -872,7 +909,7 @@ new #[Title('titles.dashboard')] class extends Component {
                     :label="__('dashboard.proposal_pipeline')"
                     :series="$pipeline['series']"
                     :categories="$pipeline['categories']"
-                    :tones="['neutral', 'funding', 'good', 'warn', 'strong']"
+                    :tones="['neutral', 'funding', 'good', 'warn']"
                     :height="268"
                     :empty="__('dashboard.no_proposals_yet')"
                 />
@@ -885,13 +922,12 @@ new #[Title('titles.dashboard')] class extends Component {
                     <x-ui.chart type="bar" :label="__('dashboard.received_per_month')" :series="[]" :categories="$receipts['categories']" :height="268" :empty="__('dashboard.no_receipts_yet')" />
                 @else
                     @if (count($receipts['currencies']) > 1)
-                        <div class="mb-2 flex gap-1 px-2" role="tablist" aria-label="{{ __('dashboard.currency') }}">
+                        <div class="mb-2 flex gap-1 px-2" role="group" aria-label="{{ __('dashboard.currency') }}">
                             @foreach ($receipts['currencies'] as $receipt)
                                 <button
                                     type="button"
-                                    role="tab"
                                     x-on:click="currency = @js($receipt['currency'])"
-                                    x-bind:aria-selected="currency === @js($receipt['currency'])"
+                                    x-bind:aria-pressed="currency === @js($receipt['currency']) ? 'true' : 'false'"
                                     x-bind:class="currency === @js($receipt['currency']) ? 'bg-funding-soft text-funding' : 'text-secondary-medium hover:text-secondary-dark dark:text-secondary-soft'"
                                     class="min-h-8 cursor-pointer rounded-md px-2.5 text-xs font-bold transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-primary"
                                     wire:key="receipt-tab-{{ $receipt['currency'] }}"
@@ -900,10 +936,10 @@ new #[Title('titles.dashboard')] class extends Component {
                         </div>
                     @endif
                     @foreach ($receipts['currencies'] as $receipt)
-                        <div x-show="currency === @js($receipt['currency'])" wire:key="receipt-chart-{{ $receipt['currency'] }}">
+                        <div x-show="currency === @js($receipt['currency'])" @unless ($loop->first) style="display: none" @endunless wire:key="receipt-chart-{{ $receipt['currency'] }}">
                             <p class="px-2 text-xs text-secondary-medium dark:text-secondary-soft">
                                 {{ __('dashboard.received_last_12_months') }}
-                                <span class="ms-1 text-base font-bold tabular-nums text-secondary-dark dark:text-white">{{ Number::abbreviate($receipt['total'], maxPrecision: 2) }}</span>
+                                <span class="ms-1 text-base font-bold tabular-nums text-secondary-dark dark:text-white">{{ Number::format($receipt['total'], maxPrecision: 0) }}</span>
                                 <span class="text-[11px] font-semibold">{{ $receipt['currency'] }}</span>
                             </p>
                             <x-ui.chart
@@ -935,7 +971,7 @@ new #[Title('titles.dashboard')] class extends Component {
                         <li wire:key="upcoming-{{ $item['key'] }}">
                             <a href="{{ $item['href'] }}" wire:navigate class="group flex items-center gap-4 px-4 py-2.5 transition-colors duration-150 hover:bg-board-head focus-visible:bg-board-head focus-visible:outline-none">
                                 <span class="flex w-11 shrink-0 flex-col items-center rounded-lg border border-secondary-soft py-1 leading-none dark:border-secondary-medium">
-                                    <span class="text-[10px] font-semibold text-secondary-medium uppercase dark:text-secondary-soft">{{ $item['date']->translatedFormat('M') }}</span>
+                                    <span class="text-[10px] font-semibold text-secondary-medium uppercase dark:text-secondary-soft">{{ $item['date']->translatedFormat(__('formats.month_short')) }}</span>
                                     <span class="mt-0.5 text-base font-bold tabular-nums text-secondary-dark dark:text-white">{{ $item['date']->format('j') }}</span>
                                 </span>
                                 <span class="{{ $iconTone($item['tone']) }} flex size-7 shrink-0 items-center justify-center rounded-md">
@@ -970,7 +1006,7 @@ new #[Title('titles.dashboard')] class extends Component {
                             </span>
                             <a href="{{ $event['href'] }}" wire:navigate class="min-w-0 flex-1 rounded-md pt-0.5 focus-visible:outline-2 focus-visible:outline-primary">
                                 <span class="line-clamp-2 text-sm text-secondary-dark hover:underline hover:underline-offset-4 dark:text-white">{{ $event['sentence'] }}</span>
-                                <time class="text-xs text-secondary-medium dark:text-secondary-soft" datetime="{{ $event['at']->toIso8601String() }}">{{ $event['at']->diffForHumans() }}</time>
+                                <time class="text-xs text-secondary-medium dark:text-secondary-soft" datetime="{{ $event['at']->toIso8601String() }}">{{ $event['dateOnly'] ? $event['at']->translatedFormat(__('formats.date_short')) : $event['at']->diffForHumans() }}</time>
                             </a>
                         </li>
                     @endforeach

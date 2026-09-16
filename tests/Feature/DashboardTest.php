@@ -71,8 +71,7 @@ test('the attention queue lists late work and materialised risks, most overdue f
         ->assertDontSee('Future task');
 });
 
-test('focusing the attention queue on funding shows only late transfers', function () {
-    Task::factory()->create(['title' => 'Submit the water survey', 'due_date' => '2026-09-10']);
+test('late transfers join the attention queue tagged for the funding filter', function () {
     TransfersTracking::factory()->create([
         'payment_amount' => 25000,
         'amount_transfered_currency' => Currency::Eur->value,
@@ -81,18 +80,20 @@ test('focusing the attention queue on funding shows only late transfers', functi
 
     Livewire::actingAs(User::factory()->create())
         ->test('pages::dashboard.index')
-        ->call('focusOn', 'funding')
-        ->assertSet('focus', 'funding')
-        ->assertSee('25,000 EUR from')
-        ->assertSee('10 days late')
-        ->assertDontSee('Submit the water survey');
+        ->assertSeeInOrder(['data-attention-group="funding"', '25,000 EUR from', '10 days late'], false);
 });
 
-test('an unknown focus falls back to the whole queue', function () {
-    Livewire::actingAs(User::factory()->create())
+test('the all view keeps room for materialised risks when late work fills the queue', function () {
+    Task::factory(9)->create(['due_date' => '2026-09-01']);
+    Risk::factory()->happened()->create(['name' => 'Road closure']);
+
+    $items = Livewire::actingAs(User::factory()->create())
         ->test('pages::dashboard.index')
-        ->call('focusOn', 'everything')
-        ->assertSet('focus', 'all');
+        ->instance()
+        ->attentionItems;
+
+    expect($items->whereNotNull('allRank'))->toHaveCount(8)
+        ->and($items->firstWhere('title', 'Road closure')['allRank'])->toBe(7);
 });
 
 test('funding position keeps each currency on its own line', function () {
@@ -116,7 +117,7 @@ test('funding position keeps each currency on its own line', function () {
         ->and($lines['EUR']['committed'])->toBe(400000.0)
         ->and($lines['EUR']['received'])->toBe(0.0);
 
-    $component->assertDontSee('1.4M');
+    $component->assertDontSee('1.4M')->assertSee('1,000,000');
 });
 
 test('my work counts only the signed-in person\'s open tasks', function () {
@@ -130,6 +131,28 @@ test('my work counts only the signed-in person\'s open tasks', function () {
 
     expect($myWork['overdue'])->toBe(1)
         ->and($myWork['dueThisWeek'])->toBe(1);
+});
+
+test('my draft reports links to the signed-in person\'s drafts only', function () {
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::dashboard.index')
+        ->assertSee(e(route('reports.index', ['status' => 'draft', 'author' => $user->id])), false);
+});
+
+test('the proposal pipeline counts only open proposals', function () {
+    Proposal::factory()->create(['status' => ProposalStatus::Submitted]);
+    Proposal::factory()->create(['status' => ProposalStatus::Rejected]);
+    Proposal::factory()->create(['status' => ProposalStatus::Completed]);
+
+    $pipeline = Livewire::actingAs(User::factory()->create())
+        ->test('pages::dashboard.index')
+        ->instance()
+        ->pipelineChart;
+
+    expect($pipeline['categories'])->toBe(['Planning', 'Implementation', 'Monitoring', 'Closure'])
+        ->and($pipeline['series'][0]['data'])->toBe([0, 1, 0, 0]);
 });
 
 test('recent activity describes proposal status changes', function () {

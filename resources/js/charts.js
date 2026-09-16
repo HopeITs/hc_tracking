@@ -39,9 +39,11 @@ function toneColor(tone) {
 }
 
 function numberFormatter(currency) {
-    const locale = document.documentElement.lang || 'en';
-    const compact = new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 });
-    const full = new Intl.NumberFormat(locale, { maximumFractionDigits: currency ? 0 : 1 });
+    // Fixed to 'en-US' rather than the page's own language: the rest of the app
+    // (dates, x-ui.money) always renders Western digits and Latin unit letters,
+    // even in Arabic, and Intl would otherwise switch to Arabic-Indic digits.
+    const compact = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 });
+    const full = new Intl.NumberFormat('en-US', { maximumFractionDigits: currency ? 0 : 1 });
 
     return {
         axis: (value) => (currency ? `${compact.format(value)}` : full.format(value)),
@@ -174,15 +176,26 @@ document.addEventListener('alpine:init', () => {
         observer: null,
         ready: false,
 
+        destroyed: false,
+
         async init() {
             const { default: ApexCharts } = await import('apexcharts');
 
-            if (!this.$refs.canvas) {
+            // The element can leave the page (wire:navigate) while the import is pending.
+            if (this.destroyed || !this.$refs.canvas) {
                 return;
             }
 
             this.chart = new ApexCharts(this.$refs.canvas, buildOptions(config));
             await this.chart.render();
+
+            if (this.destroyed) {
+                this.chart.destroy();
+                this.chart = null;
+
+                return;
+            }
+
             this.ready = true;
 
             this.observer = new MutationObserver(() => this.chart?.updateOptions(buildOptions(config), false, false));
@@ -190,6 +203,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         destroy() {
+            this.destroyed = true;
             this.observer?.disconnect();
             this.chart?.destroy();
             this.chart = null;
