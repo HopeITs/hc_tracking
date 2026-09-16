@@ -310,3 +310,57 @@ test('the milestone directory distinguishes empty and filtered states', function
         ->assertSeeText('No matching milestones')
         ->assertSeeText('Reset filters');
 });
+
+test('the timeline view plots milestones as clickable markers grouped by project', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->create(['name' => 'Homs Clinic']);
+    $milestone = Milestone::factory()->create([
+        'project_id' => $project->id,
+        'name' => 'Foundation poured',
+        'planned_date' => '2026-04-01',
+    ]);
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.index')
+        ->set('view', 'timeline')
+        ->assertSee('Homs Clinic')
+        ->assertSee('wire:click="openEditModal('.$milestone->id.')"', false);
+});
+
+test('the board view renders a card per milestone and honours the status filter', function () {
+    $user = User::factory()->create();
+    $reached = Milestone::factory()->create(['name' => 'Reached gate', 'status' => MilestoneStatus::Reached]);
+    $pending = Milestone::factory()->create(['name' => 'Pending gate', 'status' => MilestoneStatus::Pending]);
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.index')
+        ->set('view', 'board')
+        ->assertSee('data-test="milestone-board-card-'.$reached->id.'"', false)
+        ->assertSee('data-test="milestone-board-card-'.$pending->id.'"', false)
+        ->set('status', MilestoneStatus::Reached->value)
+        ->assertSee('data-test="milestone-board-card-'.$reached->id.'"', false)
+        ->assertDontSee('data-test="milestone-board-card-'.$pending->id.'"', false);
+});
+
+test('a milestone status can be changed from the board view', function () {
+    $user = User::factory()->create();
+    $milestone = Milestone::factory()->create(['status' => MilestoneStatus::Pending]);
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.index')
+        ->call('quickSetStatus', $milestone->id, MilestoneStatus::Reached->value)
+        ->assertHasNoErrors();
+
+    expect($milestone->refresh()->status)->toBe(MilestoneStatus::Reached);
+});
+
+test('an invalid quick status change is ignored', function () {
+    $user = User::factory()->create();
+    $milestone = Milestone::factory()->create(['status' => MilestoneStatus::Pending]);
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.index')
+        ->call('quickSetStatus', $milestone->id, 'not-a-real-status');
+
+    expect($milestone->refresh()->status)->toBe(MilestoneStatus::Pending);
+});

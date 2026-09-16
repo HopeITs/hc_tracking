@@ -25,6 +25,9 @@ new #[Title('titles.milestones')] class extends Component {
     #[Url(except: '')]
     public string $responsible = '';
 
+    #[Url(as: 'view', except: 'list')]
+    public string $view = 'list';
+
     public bool $showMilestoneModal = false;
     public ?int $editingMilestoneId = null;
     public ?int $deletingMilestoneId = null;
@@ -281,6 +284,22 @@ new #[Title('titles.milestones')] class extends Component {
         );
     }
 
+    public function quickSetStatus(int $milestoneId, string $status): void
+    {
+        $newStatus = MilestoneStatus::tryFrom($status);
+        $milestone = Milestone::query()->find($milestoneId);
+
+        if ($newStatus === null || $milestone === null) {
+            return;
+        }
+
+        $milestone->status = $newStatus;
+        $milestone->save();
+        unset($this->projectsWithMilestones);
+
+        Flux::toast(variant: 'success', text: __('milestones.milestone_updated'));
+    }
+
     public function confirmDelete(int $milestoneId): void
     {
         $this->deletingMilestoneId = $milestoneId;
@@ -339,6 +358,23 @@ new #[Title('titles.milestones')] class extends Component {
         $this->milestoneProjectId = '';
         $this->parentMilestoneId = '';
         unset($this->parentOptions);
+    }
+
+    /**
+     * Flattens a filtered milestone tree (as returned by projectsWithMilestones)
+     * into a single ordered list for the timeline and board views.
+     *
+     * @param  Collection<int, Milestone>  $milestones
+     * @return Collection<int, Milestone>
+     */
+    public function flattenMilestones(Collection $milestones): Collection
+    {
+        return $milestones->reduce(
+            fn (Collection $flat, Milestone $milestone): Collection => $flat
+                ->push($milestone)
+                ->merge($this->flattenMilestones($milestone->childrenRecursive)),
+            new Collection,
+        );
     }
 
     protected function matchesMilestoneFilters(Milestone $milestone): bool
@@ -409,6 +445,31 @@ new #[Title('titles.milestones')] class extends Component {
         <x-slot:actions>
             <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-milestone-button">{{ __('milestones.add_milestone') }}</x-ui.button>
         </x-slot:actions>
+
+        <x-slot:summary>
+            <div class="inline-flex flex-wrap gap-1 rounded-lg border border-secondary-soft bg-secondary-soft/40 p-1 dark:border-secondary-medium dark:bg-secondary-medium/40" role="group" aria-label="{{ __('milestones.view') }}">
+                @foreach ([
+                    'list' => ['icon' => 'queue-list', 'label' => __('milestones.list_view')],
+                    'timeline' => ['icon' => 'chart-bar', 'label' => __('milestones.timeline_view')],
+                    'board' => ['icon' => 'view-columns', 'label' => __('milestones.board_view')],
+                ] as $viewOption => $viewMeta)
+                    <button
+                        type="button"
+                        wire:click="$set('view', '{{ $viewOption }}')"
+                        aria-pressed="{{ $view === $viewOption ? 'true' : 'false' }}"
+                        data-test="milestone-view-{{ $viewOption }}"
+                        @class([
+                            'inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-md px-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                            'bg-white text-secondary-dark shadow-sm dark:bg-secondary-dark dark:text-white' => $view === $viewOption,
+                            'text-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => $view !== $viewOption,
+                        ])
+                    >
+                        <flux:icon :name="$viewMeta['icon']" variant="micro" class="size-4" aria-hidden="true" />
+                        {{ $viewMeta['label'] }}
+                    </button>
+                @endforeach
+            </div>
+        </x-slot:summary>
     </x-ui.page-header>
 
     @if ($this->projectsWithMilestones->isEmpty())
@@ -424,19 +485,18 @@ new #[Title('titles.milestones')] class extends Component {
             </x-ui.empty-state>
         </x-ui.panel>
     @else
-        @foreach ($this->projectsWithMilestones as $projectRow)
-            <x-ui.panel :title="$projectRow->name" :subtitle="$projectRow->city?->name ?? __('common.unknown_city')" :count="$projectRow->milestones->count()" wire:key="milestone-project-{{ $projectRow->id }}">
-                <x-slot:toolbar>
-                    <a href="{{ route('projects.show', $projectRow) }}" wire:navigate class="text-xs font-semibold text-secondary-medium hover:underline dark:text-secondary-soft">{{ __('milestones.open_project') }}</a>
-                </x-slot:toolbar>
+        @switch ($view)
+            @case ('timeline')
+                @include('pages.milestones._timeline', ['projects' => $this->projectsWithMilestones])
+                @break
 
-                <div class="divide-y divide-secondary-soft dark:divide-secondary-medium">
-                    @foreach ($projectRow->milestones as $milestone)
-                        @include('pages.milestones._tree-node', ['milestone' => $milestone, 'depth' => 0])
-                    @endforeach
-                </div>
-            </x-ui.panel>
-        @endforeach
+            @case ('board')
+                @include('pages.milestones._board', ['projects' => $this->projectsWithMilestones])
+                @break
+
+            @default
+                @include('pages.milestones._list', ['projects' => $this->projectsWithMilestones])
+        @endswitch
     @endif
 
     <flux:modal wire:model="showMilestoneModal" class="w-full max-w-3xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
