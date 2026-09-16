@@ -63,7 +63,7 @@
                 style="--color-accent: var(--color-primary); --color-accent-foreground: var(--color-white);"
             />
 
-            <x-ui.button type="submit" tone="primary" class="min-h-11 w-full" data-test="login-button">
+            <x-ui.button type="submit" tone="primary" class="min-h-11 w-full cursor-pointer!" data-test="login-button">
                 {{ __('authentication.sign_in') }}
             </x-ui.button>
         </form>
