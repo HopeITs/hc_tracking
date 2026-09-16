@@ -9,7 +9,7 @@ test('the sidebar groups navigation in the application workflow order', function
     $this->actingAs($user)
         ->get(route('dashboard'))
         ->assertOk()
-        ->assertSeeTextInOrder(['Overview', 'Strategy', 'Delivery', 'Administration', 'Settings']);
+        ->assertSeeTextInOrder(['Overview', 'Strategy', 'Delivery', 'Administration']);
 });
 
 test('the sidebar carries a funding group once its routes exist', function () {

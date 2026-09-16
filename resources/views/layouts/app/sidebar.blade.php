@@ -41,14 +41,6 @@
 
                     <flux:menu.separator />
 
-                    <flux:menu.radio.group>
-                        <flux:menu.item class="min-h-11 touch-manipulation" :href="route('profile.edit')" icon="cog" wire:navigate>
-                            {{ __('common.settings') }}
-                        </flux:menu.item>
-                    </flux:menu.radio.group>
-
-                    <flux:menu.separator />
-
                     <form method="POST" action="{{ route('logout') }}" class="w-full">
                         @csrf
                         <flux:menu.item

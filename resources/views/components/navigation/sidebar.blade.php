@@ -294,40 +294,5 @@
                 @endcan
             @endif
         </flux:sidebar.group>
-
-        <flux:sidebar.group
-            :heading="__('common.settings')"
-            :class="$navigationGroupClasses"
-        >
-            <flux:sidebar.item
-                icon="user-circle"
-                :href="route('profile.edit')"
-                :current="request()->routeIs('profile.edit')"
-                :class="$navigationItemClasses"
-                wire:navigate
-            >
-                {{ __('common.profile') }}
-            </flux:sidebar.item>
-
-            <flux:sidebar.item
-                icon="paint-brush"
-                :href="route('appearance.edit')"
-                :current="request()->routeIs('appearance.edit')"
-                :class="$navigationItemClasses"
-                wire:navigate
-            >
-                {{ __('common.appearance') }}
-            </flux:sidebar.item>
-
-            <flux:sidebar.item
-                icon="shield-check"
-                :href="route('security.edit')"
-                :current="request()->routeIs('security.edit')"
-                :class="$navigationItemClasses"
-                wire:navigate
-            >
-                {{ __('common.security') }}
-            </flux:sidebar.item>
-        </flux:sidebar.group>
     </flux:sidebar.nav>
 </flux:sidebar>
