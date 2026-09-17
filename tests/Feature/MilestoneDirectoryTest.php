@@ -482,3 +482,59 @@ test('an invalid quick status change is ignored', function () {
 
     expect($milestone->refresh()->status)->toBe(MilestoneStatus::Pending);
 });
+
+test('the calendar view places milestones on their planned date and honours the project filter', function () {
+    $user = User::factory()->create();
+    $inMonth = Project::factory()->create();
+    $otherProject = Project::factory()->create();
+
+    $milestone = Milestone::factory()->create([
+        'project_id' => $inMonth->id,
+        'name' => 'Foundation poured',
+        'planned_date' => '2026-04-15',
+    ]);
+    $excluded = Milestone::factory()->create([
+        'project_id' => $otherProject->id,
+        'name' => 'Other gate',
+        'planned_date' => '2026-04-16',
+    ]);
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.index')
+        ->set('view', 'calendar')
+        ->set('month', '2026-04')
+        ->assertSee('data-test="milestone-calendar-chip-'.$milestone->id.'"', false)
+        ->assertSee('href="'.route('milestones.show', $milestone).'"', false)
+        ->set('project', (string) $inMonth->id)
+        ->assertSee('Foundation poured')
+        ->assertDontSee('Other gate')
+        ->assertDontSee('data-test="milestone-calendar-chip-'.$excluded->id.'"', false);
+});
+
+test('the calendar view month navigation moves the visible month', function () {
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.index')
+        ->set('view', 'calendar')
+        ->set('month', '2026-04')
+        ->call('nextMonth')
+        ->assertSet('month', '2026-05')
+        ->call('previousMonth')
+        ->assertSet('month', '2026-04')
+        ->call('goToToday')
+        ->assertSet('month', '');
+});
+
+test('a deletable milestone shows a delete action in the calendar view, and a locked one does not', function () {
+    $user = User::factory()->create();
+    $parent = Milestone::factory()->create(['name' => 'Root gate', 'planned_date' => '2026-04-10']);
+    $child = Milestone::factory()->childOf($parent)->create(['name' => 'Child gate', 'planned_date' => '2026-04-11']);
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.index')
+        ->set('view', 'calendar')
+        ->set('month', '2026-04')
+        ->assertSee('wire:click.stop="confirmDelete('.$child->id.')"', false)
+        ->assertDontSee('wire:click.stop="confirmDelete('.$parent->id.')"', false);
+});

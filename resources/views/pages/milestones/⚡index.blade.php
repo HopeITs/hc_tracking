@@ -29,6 +29,9 @@ new #[Title('titles.milestones')] class extends Component {
     #[Url(as: 'view', except: 'timeline')]
     public string $view = 'timeline';
 
+    #[Url(except: '')]
+    public string $month = '';
+
     public bool $showMilestoneModal = false;
     public ?int $deletingMilestoneId = null;
     public bool $showDeleteModal = false;
@@ -48,6 +51,76 @@ new #[Title('titles.milestones')] class extends Component {
         $this->project = '';
         $this->status = '';
         $this->responsible = '';
+    }
+
+    public function previousMonth(): void
+    {
+        $this->month = $this->activeMonth()->subMonthNoOverflow()->format('Y-m');
+    }
+
+    public function nextMonth(): void
+    {
+        $this->month = $this->activeMonth()->addMonthNoOverflow()->format('Y-m');
+    }
+
+    public function goToToday(): void
+    {
+        $this->month = '';
+    }
+
+    protected function activeMonth(): CarbonImmutable
+    {
+        if ($this->month !== '' && preg_match('/^\d{4}-\d{2}$/', $this->month) === 1) {
+            $parsed = CarbonImmutable::createFromFormat('Y-m-d', $this->month.'-01');
+
+            if ($parsed !== false) {
+                return $parsed->startOfMonth();
+            }
+        }
+
+        return CarbonImmutable::now()->startOfMonth();
+    }
+
+    /**
+     * The month grid for the calendar view, built from the same filtered
+     * milestones as the other views so switching views never changes what's
+     * shown — just how.
+     *
+     * @return array{month: CarbonImmutable, weeks: array<int, array<int, CarbonImmutable>>, milestonesByDay: Collection<string, Collection<int, Milestone>>}
+     */
+    #[Computed]
+    public function calendarGrid(): array
+    {
+        $month = $this->activeMonth();
+        $gridStart = $month->startOfWeek(CarbonImmutable::SUNDAY);
+        $gridEnd = $month->endOfMonth()->endOfWeek(CarbonImmutable::SATURDAY);
+
+        $weeks = [];
+        $cursor = $gridStart;
+        while ($cursor->lte($gridEnd)) {
+            $week = [];
+            for ($i = 0; $i < 7; $i++) {
+                $week[] = $cursor;
+                $cursor = $cursor->addDay();
+            }
+            $weeks[] = $week;
+        }
+
+        $milestonesByDay = $this->projectsWithMilestones
+            ->flatMap(fn (Project $projectRow): Collection => $this->flattenMilestones($projectRow->milestones)->map(function (Milestone $milestone) use ($projectRow): Milestone {
+                $milestone->setRelation('project', $projectRow);
+
+                return $milestone;
+            }))
+            ->filter(fn (Milestone $milestone): bool => $milestone->planned_date->between($gridStart, $gridEnd))
+            ->sortBy('sequence')
+            ->groupBy(fn (Milestone $milestone): string => $milestone->planned_date->toDateString());
+
+        return [
+            'month' => $month,
+            'weeks' => $weeks,
+            'milestonesByDay' => $milestonesByDay,
+        ];
     }
 
 
@@ -460,6 +533,7 @@ new #[Title('titles.milestones')] class extends Component {
                 'list' => ['icon' => 'queue-list', 'label' => __('milestones.list_view')],
                 'timeline' => ['icon' => 'chart-bar', 'label' => __('milestones.timeline_view')],
                 'board' => ['icon' => 'view-columns', 'label' => __('milestones.board_view')],
+                'calendar' => ['icon' => 'calendar-days', 'label' => __('milestones.calendar_view')],
             ] as $viewOption => $viewMeta)
                 <button
                     type="button"
@@ -505,6 +579,10 @@ new #[Title('titles.milestones')] class extends Component {
 
             @case ('board')
                 @include('pages.milestones._board', ['projects' => $this->projectsWithMilestones])
+                @break
+
+            @case ('calendar')
+                @include('pages.milestones._calendar')
                 @break
 
             @default

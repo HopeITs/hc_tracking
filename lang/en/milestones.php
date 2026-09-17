@@ -11,6 +11,7 @@ return [
     'are_you_sure_you_want_to_delete_this_milestone' => 'Are you sure you want to delete ":name"? This cannot be undone.',
     'assignment' => 'Assignment',
     'board_view' => 'Board',
+    'calendar_view' => 'Calendar',
     'change_status' => 'Change status',
     'create_milestone' => 'Create milestone',
     'delete_milestone' => 'Delete milestone',

@@ -11,6 +11,7 @@ return [
     'are_you_sure_you_want_to_delete_this_milestone' => 'هل أنت متأكد أنك تريد حذف ":name"؟ لا يمكن التراجع عن هذا الإجراء.',
     'assignment' => 'الإسناد',
     'board_view' => 'لوحة',
+    'calendar_view' => 'التقويم',
     'change_status' => 'تغيير الحالة',
     'create_milestone' => 'إنشاء مرحلة رئيسية',
     'delete_milestone' => 'حذف المرحلة الرئيسية',
