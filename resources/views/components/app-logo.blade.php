@@ -19,21 +19,23 @@
 --}}
 @if ($sidebar)
     {{--
-        Collapsed, the brand is pinned to the start rather than centred. The
-        collapse toggle floats at the rail's end edge and, in a 4.5rem rail,
-        a centred mark runs straight under it — the previous Laravel mark
-        cleared it by a single pixel. Starting the mark at the rail's own
-        padding keeps the two apart with room to spare.
+        Collapsed, the brand stays centred (Flux's own default for
+        `flux:sidebar.brand`: a `w-10` box with `justify-center`), matching
+        the same box model `flux:sidebar.item` uses for its icons — that's
+        what lines the logo mark up with the nav icons below it. The collapse
+        toggle now floats separately at the rail's outer edge (`-end-4
+        top-7`), clear of this row, so nothing forces the mark off-centre
+        anymore.
     --}}
-    <flux:sidebar.brand {{ $attributes->class('in-data-flux-sidebar-collapsed-desktop:justify-start!') }}>
+    <flux:sidebar.brand {{ $attributes }}>
         <x-slot name="logo" class="h-auto! min-w-0! justify-start! rounded-none! [:where(&)]:h-auto">
             <span class="in-data-flux-sidebar-collapsed-desktop:hidden">
-                <img src="{{ asset('logo-tracking.svg') }}" alt="{{ $brandName }}" class="h-7 w-auto dark:hidden" />
-                <img src="{{ asset('logo-tracking-white.svg') }}" alt="{{ $brandName }}" class="hidden h-7 w-auto dark:block" />
+                <img src="{{ asset('logo-tracking.svg') }}" alt="{{ $brandName }}" class="h-9 w-auto dark:hidden" />
+                <img src="{{ asset('logo-tracking-white.svg') }}" alt="{{ $brandName }}" class="hidden h-9 w-auto dark:block" />
             </span>
 
             <span class="hidden in-data-flux-sidebar-collapsed-desktop:block">
-                <img src="{{ asset('logo-tracking-icon.svg') }}" alt="{{ $brandName }}" class="size-7 shrink-0" />
+                <img src="{{ asset('logo-tracking-icon.svg') }}" alt="{{ $brandName }}" class="size-9 shrink-0" />
             </span>
         </x-slot>
     </flux:sidebar.brand>
