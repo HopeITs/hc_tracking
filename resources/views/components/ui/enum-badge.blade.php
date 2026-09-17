@@ -10,8 +10,9 @@
             \App\Enums\TaskStatus::Todo => 'outline',
         },
         $case instanceof \App\Enums\MilestoneStatus => match ($case) {
-            \App\Enums\MilestoneStatus::Reached => 'solid',
-            \App\Enums\MilestoneStatus::Missed, \App\Enums\MilestoneStatus::Cancelled => 'accent',
+            \App\Enums\MilestoneStatus::Reached => 'good',
+            \App\Enums\MilestoneStatus::Missed => 'accent',
+            \App\Enums\MilestoneStatus::Cancelled => 'muted',
             \App\Enums\MilestoneStatus::Pending => 'outline',
         },
         $case instanceof \App\Enums\ProposalStatus => match ($case) {
@@ -57,6 +58,8 @@
         'accent' => 'border-primary bg-primary text-white',
         'solid' => 'border-secondary-dark bg-secondary-dark text-white dark:border-secondary-medium dark:bg-secondary-medium',
         'outline' => 'border-secondary-light text-secondary-medium dark:text-secondary-soft',
+        'good' => 'border-status-good/30 bg-status-good-soft text-status-good',
+        'muted' => 'border-secondary-light bg-secondary-soft text-secondary-medium dark:bg-secondary-medium dark:text-secondary-soft',
         'none' => '',
     };
 @endphp

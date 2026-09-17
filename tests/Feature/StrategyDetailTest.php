@@ -79,7 +79,7 @@ test('plan coverage is the share of the strategy span with an annual plan, cappe
         ->assertDontSeeText('100%');
 });
 
-test('each program row tones its plan coverage bar by how covered it is', function () {
+test('each program row shows its own covered-years fraction and tones the bar accordingly', function () {
     $user = User::factory()->create();
     $strategy = Strategy::factory()->create(['start_year' => 2026, 'end_year' => 2027]);
     $uncovered = Program::factory()->create(['name' => 'Uncovered Program', 'strategy_id' => $strategy->id]);
@@ -91,7 +91,9 @@ test('each program row tones its plan coverage bar by how covered it is', functi
     $html = $this->actingAs($user)->get(route('strategies.show', $strategy))->getContent();
 
     expect($html)
-        // 0% -> warn (amber), 100% -> good (green).
+        // 0/2 -> warn (amber), 2/2 -> good (green).
+        ->toContain('0/2 years')
+        ->toContain('2/2 years')
         ->toContain('bg-status-warn')
         ->toContain('bg-status-good');
 });
@@ -102,9 +104,11 @@ test('the strategy detail stat tiles each carry an icon badge', function () {
 
     $html = $this->actingAs($user)->get(route('strategies.show', $strategy))->getContent();
 
-    // Programs, Projects, Annual plans and Plan coverage each render one icon
-    // badge with this exact class combination.
-    expect(substr_count($html, 'shrink-0 items-center justify-center rounded-xl'))->toBe(4);
+    // Programs, Projects and Annual plans each render one icon badge with
+    // this exact class combination. Plan coverage isn't a stat tile any
+    // more (it's the ring inside the Plan coverage panel below), and that
+    // panel doesn't render at all when the strategy has no programs.
+    expect(substr_count($html, 'shrink-0 items-center justify-center rounded-xl'))->toBe(3);
 });
 
 test('the strategy detail programs table sorts by projects descending', function () {
@@ -119,6 +123,29 @@ test('the strategy detail programs table sorts by projects descending', function
         ->get(route('strategies.show', [$strategy, 'sort' => 'projects', 'direction' => 'desc']))
         ->assertOk()
         ->assertSeeTextInOrder(['More Projects Program', 'Fewer Projects Program']);
+});
+
+test('the strategy detail programs table paginates at 15 rows and totals reflect every program', function () {
+    $user = User::factory()->create();
+    $strategy = Strategy::factory()->create(['start_year' => 2026, 'end_year' => 2026]);
+    Program::factory()->count(17)->sequence(fn ($sequence) => ['name' => 'Program '.str_pad((string) ($sequence->index + 1), 2, '0', STR_PAD_LEFT)])->create(['strategy_id' => $strategy->id]);
+
+    $firstPage = $this->actingAs($user)->get(route('strategies.show', $strategy));
+
+    $firstPage
+        ->assertOk()
+        ->assertSeeText('Program 01')
+        ->assertSeeText('Program 15')
+        ->assertDontSeeText('Program 16')
+        // The Programs stat tile and panel count reflect all 17, not just this page.
+        ->assertSeeText('17');
+
+    $this->actingAs($user)
+        ->get(route('strategies.show', [$strategy, 'programsPage' => 2]))
+        ->assertOk()
+        ->assertSeeText('Program 16')
+        ->assertSeeText('Program 17')
+        ->assertDontSeeText('Program 01');
 });
 
 test('an active strategy is shown with the good/green status tone, not the brand red', function () {

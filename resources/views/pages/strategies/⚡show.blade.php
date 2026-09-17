@@ -1,16 +1,20 @@
 <?php
 
+use App\Models\AnnualPlan;
 use App\Models\Program;
 use App\Models\Strategy;
-use App\Models\AnnualPlan;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 new #[Title('titles.strategy')] class extends Component {
+    use WithPagination;
+
     public int $strategyId;
 
     #[Url(except: 'name')]
@@ -36,6 +40,8 @@ new #[Title('titles.strategy')] class extends Component {
             $this->sort = $column;
             $this->direction = 'asc';
         }
+
+        $this->resetPage('programsPage');
     }
 
     #[Computed]
@@ -47,41 +53,60 @@ new #[Title('titles.strategy')] class extends Component {
             ->findOrFail($this->strategyId);
     }
 
-    /** @return Collection<int, Program> */
-    #[Computed]
-    public function programs(): Collection
+    /** @return Builder<Program> */
+    protected function programsQuery(): Builder
     {
-        $programs = Program::query()
+        return Program::query()
             ->select(['id', 'name', 'strategy_id', 'manager_id'])
             ->where('strategy_id', $this->strategyId)
             ->with(['manager:id,first_name_en,last_name_en,first_name_ar,last_name_ar'])
-            ->withCount(['projects', 'annualPlans'])
-            ->orderBy('name')
-            ->orderBy('id')
-            ->get();
-
-        $direction = $this->direction === 'desc' ? 'desc' : 'asc';
-
-        return match ($this->sort) {
-            'projects' => $programs->sortBy('projects_count', descending: $direction === 'desc')->values(),
-            'plans' => $programs->sortBy('annual_plans_count', descending: $direction === 'desc')->values(),
-            default => $programs->sortBy('name', descending: $direction === 'desc')->values(),
-        };
+            ->withCount(['projects', 'annualPlans']);
     }
 
     /**
-     * Distinct plan-years recorded per program, within this strategy's span.
+     * Every program under this strategy, unpaginated. totals(), planCoverage()
+     * and averageCoverage() need the whole portfolio, not one page of the
+     * table, so they read from here rather than from programs().
      *
-     * The (program_id, year) unique constraint on annual_plans makes a plain
-     * row count already a distinct-year count, no DISTINCT needed.
-     *
-     * @return array<int, int>
+     * @return Collection<int, Program>
      */
     #[Computed]
-    public function planCoverage(): array
+    public function allPrograms(): Collection
+    {
+        return $this->programsQuery()->get();
+    }
+
+    /** @return LengthAwarePaginator<int, Program> */
+    #[Computed]
+    public function programs(): LengthAwarePaginator
+    {
+        $direction = $this->direction === 'desc' ? 'desc' : 'asc';
+
+        $query = match ($this->sort) {
+            'projects' => $this->programsQuery()->orderBy('projects_count', $direction),
+            'plans' => $this->programsQuery()->orderBy('annual_plans_count', $direction),
+            default => $this->programsQuery()->orderBy('name', $direction),
+        };
+
+        return $query
+            ->orderBy('id')
+            ->paginate(15, pageName: 'programsPage');
+    }
+
+    /**
+     * Every (program, year) pair inside the strategy's span that has an
+     * annual plan, as a fast "program:year" => true lookup.
+     *
+     * One query for the whole page; planCoverage() and yearlyProgramCoverage()
+     * both tally it in memory instead of querying again.
+     *
+     * @return array<string, true>
+     */
+    #[Computed]
+    public function plannedYears(): array
     {
         $strategy = $this->strategy;
-        $programIds = $this->programs->pluck('id');
+        $programIds = $this->allPrograms->pluck('id');
 
         if ($programIds->isEmpty()) {
             return [];
@@ -90,19 +115,57 @@ new #[Title('titles.strategy')] class extends Component {
         return AnnualPlan::query()
             ->whereIn('program_id', $programIds)
             ->whereBetween('year', [$strategy->start_year, $strategy->end_year])
-            ->select('program_id', DB::raw('COUNT(*) as years_covered'))
-            ->groupBy('program_id')
-            ->pluck('years_covered', 'program_id')
-            ->map(fn ($count) => (int) $count)
+            ->get(['program_id', 'year'])
+            ->mapWithKeys(fn (AnnualPlan $plan) => [$plan->program_id.':'.$plan->year => true])
             ->all();
+    }
+
+    /**
+     * Distinct plan-years recorded per program, within this strategy's span.
+     *
+     * @return array<int, int>
+     */
+    #[Computed]
+    public function planCoverage(): array
+    {
+        $planned = $this->plannedYears;
+        $counts = [];
+
+        foreach (array_keys($planned) as $key) {
+            [$programId] = explode(':', $key);
+            $counts[(int) $programId] = ($counts[(int) $programId] ?? 0) + 1;
+        }
+
+        return $counts;
+    }
+
+    /**
+     * How many programs have a plan for each year in the strategy's span, for
+     * the heat strip: [year => count of programs planned that year].
+     *
+     * @return array<int, int>
+     */
+    #[Computed]
+    public function yearlyProgramCoverage(): array
+    {
+        $strategy = $this->strategy;
+        $planned = $this->plannedYears;
+        $counts = array_fill_keys(range($strategy->start_year, $strategy->end_year), 0);
+
+        foreach (array_keys($planned) as $key) {
+            [, $year] = explode(':', $key);
+            $counts[(int) $year] = ($counts[(int) $year] ?? 0) + 1;
+        }
+
+        return $counts;
     }
 
     #[Computed]
     public function totals(): array
     {
         return [
-            'projects' => (int) $this->programs->sum('projects_count'),
-            'plans' => (int) $this->programs->sum('annual_plans_count'),
+            'projects' => (int) $this->allPrograms->sum('projects_count'),
+            'plans' => (int) $this->allPrograms->sum('annual_plans_count'),
         ];
     }
 
@@ -113,7 +176,7 @@ new #[Title('titles.strategy')] class extends Component {
     #[Computed]
     public function averageCoverage(): ?float
     {
-        if ($this->programs->isEmpty()) {
+        if ($this->allPrograms->isEmpty()) {
             return null;
         }
 
@@ -123,7 +186,7 @@ new #[Title('titles.strategy')] class extends Component {
             return null;
         }
 
-        $possible = $this->programs->count() * $spanYears;
+        $possible = $this->allPrograms->count() * $spanYears;
         $covered = array_sum($this->planCoverage);
 
         return min(100, ($covered / $possible) * 100);
@@ -135,6 +198,7 @@ new #[Title('titles.strategy')] class extends Component {
     $strategy = $this->strategy;
     $currentYear = now()->year;
     $spanYears = $strategy->end_year - $strategy->start_year + 1;
+    $spanYearsList = range($strategy->start_year, $strategy->end_year);
     $status = match (true) {
         $currentYear < $strategy->start_year => 'upcoming',
         $currentYear > $strategy->end_year => 'completed',
@@ -164,11 +228,11 @@ new #[Title('titles.strategy')] class extends Component {
             ['label' => $strategy->name],
         ]"
         :title="$strategy->name"
+        title-class="text-3xl! font-bold! leading-none!"
         :subtitle="__('strategies.strategic_period_start_to_end', ['start' => $strategy->start_year, 'end' => $strategy->end_year])"
     >
         <x-slot:meta>
             <span class="{{ $statusChipClasses }} inline-flex shrink-0 items-center rounded-md px-2.5 py-1 text-xs font-semibold">{{ $statusLabel }}</span>
-            <span>{{ trans_choice('strategies.count_program', $strategy->programs_count, ['count' => $strategy->programs_count]) }}</span>
             <span>{{ __('common.updated_date', ['date' => $strategy->updated_at?->translatedFormat(__('formats.date'))]) }}</span>
             @if ($yearOfSpan !== null)
                 <span>{{ __('strategies.year_of_total', ['current' => $yearOfSpan, 'total' => $spanYears]) }}</span>
@@ -176,41 +240,85 @@ new #[Title('titles.strategy')] class extends Component {
         </x-slot:meta>
     </x-ui.detail-header>
 
-    @php
-        $coverageTone = match (true) {
-            $this->averageCoverage === null => null,
-            $this->averageCoverage >= 67 => 'good',
-            $this->averageCoverage >= 34 => 'funding',
-            default => 'warn',
-        };
-
-        $coverageIconClasses = match ($coverageTone) {
-            'good' => 'bg-status-good-soft text-status-good',
-            'warn' => 'bg-status-warn-soft text-status-warn',
-            'funding' => 'bg-funding-soft text-funding',
-            default => 'bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white',
-        };
-    @endphp
-
-    <div class="grid gap-3 @2xl/detail:grid-cols-4">
+    <div class="grid gap-3 @2xl/detail:grid-cols-3">
         <x-ui.stat-tile :label="__('common.programs')" :value="$strategy->programs_count" icon="briefcase" :href="route('programs.index', ['strategy' => $strategy->id])" />
         <x-ui.stat-tile :label="__('common.projects')" :value="$this->totals['projects']" icon="rectangle-stack" :href="route('projects.index', ['strategy' => $strategy->id])" />
         <x-ui.stat-tile :label="__('common.annual_plans')" :value="$this->totals['plans']" icon="calendar-days" :href="route('annual-plans.index', ['strategy' => $strategy->id])" />
-
-        <div class="rounded-xl border border-secondary-soft bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-secondary-medium dark:bg-secondary-dark dark:shadow-none">
-            <div class="flex items-start justify-between gap-3">
-                <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('strategies.plan_coverage') }}</p>
-                <div class="{{ $coverageIconClasses }} flex size-10 shrink-0 items-center justify-center rounded-xl">
-                    <flux:icon.chart-bar class="size-5" />
-                </div>
-            </div>
-            <div class="mt-3">
-                <x-ui.progress-bar :value="$this->averageCoverage" :tone="$coverageTone ?? 'neutral'" show-value />
-            </div>
-        </div>
     </div>
 
-    <x-ui.panel :title="__('common.programs')" :count="$this->programs->count()" :subtitle="__('strategies.delivery_programs_carried_by_this_strategy')">
+    @if ($this->allPrograms->isNotEmpty())
+        @php
+            $coveragePct = $this->averageCoverage ?? 0.0;
+            $coverageTone = match (true) {
+                $this->averageCoverage === null => null,
+                $coveragePct >= 67 => 'good',
+                $coveragePct >= 34 => 'funding',
+                default => 'warn',
+            };
+            $coverageRingStrokeClass = match ($coverageTone) {
+                'good' => 'stroke-status-good',
+                'warn' => 'stroke-status-warn',
+                'funding' => 'stroke-funding',
+                default => 'stroke-secondary-medium dark:stroke-secondary-light',
+            };
+            $coverageTextClass = match ($coverageTone) {
+                'good' => 'text-status-good',
+                'warn' => 'text-status-warn',
+                'funding' => 'text-funding',
+                default => 'text-secondary-medium dark:text-secondary-soft',
+            };
+            $ringRadius = 15.5;
+            $ringCircumference = 2 * M_PI * $ringRadius;
+            $ringOffset = $ringCircumference - ($ringCircumference * $coveragePct / 100);
+        @endphp
+
+        <x-ui.panel :title="__('strategies.plan_coverage')" :subtitle="__('strategies.plan_coverage_by_year')">
+            <x-slot:toolbar>
+                <div class="relative flex size-16 shrink-0 items-center justify-center" role="img" :aria-label="__('strategies.average_coverage').': '.round($coveragePct).'%'">
+                    <svg class="size-16 -rotate-90" viewBox="0 0 36 36" aria-hidden="true">
+                        <circle cx="18" cy="18" r="{{ $ringRadius }}" fill="none" stroke-width="3" class="stroke-secondary-soft dark:stroke-secondary-medium" />
+                        <circle
+                            cx="18" cy="18" r="{{ $ringRadius }}" fill="none" stroke-width="3" stroke-linecap="round"
+                            class="{{ $coverageRingStrokeClass }} transition-[stroke-dashoffset] duration-500"
+                            stroke-dasharray="{{ $ringCircumference }}"
+                            stroke-dashoffset="{{ $ringOffset }}"
+                        />
+                    </svg>
+                    <span class="{{ $coverageTextClass }} absolute text-base font-bold tabular-nums">{{ round($coveragePct) }}%</span>
+                </div>
+            </x-slot:toolbar>
+
+            <div class="overflow-x-auto p-4">
+                @php
+                    $yearlyMax = max(1, $this->allPrograms->count());
+                    $yearDotClasses = fn (int $count): string => match (true) {
+                        $count <= 0 => 'border-2 border-dashed border-secondary-light bg-white dark:border-secondary-medium dark:bg-secondary-dark',
+                        $count / $yearlyMax > 0.75 => 'border-2 border-secondary-dark bg-secondary-dark dark:border-white dark:bg-white',
+                        $count / $yearlyMax > 0.5 => 'border-2 border-secondary-dark bg-secondary-dark/60 dark:border-white dark:bg-white/60',
+                        $count / $yearlyMax > 0.25 => 'border-2 border-secondary-dark bg-secondary-dark/30 dark:border-white dark:bg-white/30',
+                        default => 'border-2 border-secondary-dark bg-secondary-dark/[0.12] dark:border-white dark:bg-white/[0.15]',
+                    };
+                @endphp
+                <div class="relative min-w-max px-4 py-2" role="img" aria-label="{{ __('strategies.plan_coverage_by_year') }}">
+                    <div class="absolute inset-x-4 top-1/2 h-px -translate-y-1/2 bg-secondary-soft dark:bg-secondary-medium" aria-hidden="true"></div>
+                    <div class="relative flex items-end justify-between gap-6">
+                        @foreach ($spanYearsList as $year)
+                            @php
+                                $yearCount = $this->yearlyProgramCoverage[$year] ?? 0;
+                            @endphp
+                            <div class="flex flex-col items-center gap-1.5" title="{{ $year }}: {{ trans_choice('strategies.count_program', $yearCount, ['count' => $yearCount]) }}">
+                                <span class="type-meta font-bold tabular-nums {{ $yearCount > 0 ? 'text-secondary-dark dark:text-white' : 'text-secondary-light dark:text-secondary-medium' }}">{{ $yearCount }}</span>
+                                <span class="{{ $yearDotClasses($yearCount) }} size-3 shrink-0 rounded-full"></span>
+                                <span class="type-meta text-secondary-medium dark:text-secondary-soft">{{ $year }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        </x-ui.panel>
+    @endif
+
+    <x-ui.panel :title="__('common.programs')" :count="$this->programs->total()">
         @if ($this->programs->isEmpty())
             <x-ui.empty-state
                 icon="briefcase"
@@ -256,11 +364,11 @@ new #[Title('titles.strategy')] class extends Component {
 
                 @foreach ($this->programs as $program)
                     @php
-                        $yearsCovered = $this->planCoverage[$program->id] ?? 0;
-                        $coveragePct = $spanYears > 0 ? min(100, ($yearsCovered / $spanYears) * 100) : 0;
+                        $rowYearsCovered = $this->planCoverage[$program->id] ?? 0;
+                        $rowCoveragePct = $spanYears > 0 ? min(100, ($rowYearsCovered / $spanYears) * 100) : 0;
                         $rowCoverageTone = match (true) {
-                            $coveragePct >= 67 => 'good',
-                            $coveragePct >= 34 => 'funding',
+                            $rowCoveragePct >= 67 => 'good',
+                            $rowCoveragePct >= 34 => 'funding',
                             default => 'warn',
                         };
                     @endphp
@@ -289,11 +397,22 @@ new #[Title('titles.strategy')] class extends Component {
                             <span class="inline-flex min-w-8 items-center justify-center rounded-md border border-secondary-light px-2 py-1 text-xs font-semibold text-secondary-dark dark:text-white">{{ $program->annual_plans_count }}</span>
                         </x-ui.data-table.cell>
                         <x-ui.data-table.cell :label="__('strategies.plan_coverage')">
-                            <x-ui.progress-bar :value="$coveragePct" :tone="$rowCoverageTone" show-value />
+                            <div class="min-w-28">
+                                <x-ui.progress-bar
+                                    :value="$rowYearsCovered"
+                                    :max="$spanYears"
+                                    :tone="$rowCoverageTone"
+                                    :label="__('strategies.years_covered_fraction', ['covered' => $rowYearsCovered, 'total' => $spanYears])"
+                                />
+                            </div>
                         </x-ui.data-table.cell>
                     </tr>
                 @endforeach
             </x-ui.data-table>
         @endif
+
+        <x-slot:footer>
+            <flux:pagination :paginator="$this->programs" class="text-secondary-medium! dark:text-secondary-soft!" />
+        </x-slot:footer>
     </x-ui.panel>
 </section>

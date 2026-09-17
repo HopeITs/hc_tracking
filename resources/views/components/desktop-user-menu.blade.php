@@ -19,22 +19,17 @@
             </div>
         </div>
         <flux:menu.separator />
-        <flux:menu.radio.group>
-            <flux:menu.item :href="route('profile.edit')" icon="cog" wire:navigate>
-                {{ __('common.settings') }}
+        <form method="POST" action="{{ route('logout') }}" class="w-full">
+            @csrf
+            <flux:menu.item
+                as="button"
+                type="submit"
+                icon="arrow-right-start-on-rectangle"
+                class="w-full cursor-pointer rtl:[&_svg]:-scale-x-100"
+                data-test="logout-button"
+            >
+                {{ __('common.log_out') }}
             </flux:menu.item>
-            <form method="POST" action="{{ route('logout') }}" class="w-full">
-                @csrf
-                <flux:menu.item
-                    as="button"
-                    type="submit"
-                    icon="arrow-right-start-on-rectangle"
-                    class="w-full cursor-pointer rtl:[&_svg]:-scale-x-100"
-                    data-test="logout-button"
-                >
-                    {{ __('common.log_out') }}
-                </flux:menu.item>
-            </form>
-        </flux:menu.radio.group>
+        </form>
     </flux:menu>
 </flux:dropdown>

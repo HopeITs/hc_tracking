@@ -2,9 +2,10 @@
 
 use App\Http\Controllers\SwitchLocaleController;
 use App\Models\User;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
-Route::view('/', 'welcome')->name('home');
+Route::get('/', fn () => redirect()->route(Auth::check() ? 'dashboard' : 'login'))->name('home');
 
 Route::post('locale', SwitchLocaleController::class)->name('locale.update');
 

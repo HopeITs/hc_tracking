@@ -36,10 +36,6 @@ test('authenticated users see the application navigation on the dashboard', func
         ->assertSee('data-mobile-navigation-toggle', false)
         ->assertSeeText('Overview')
         ->assertSeeText('Dashboard')
-        ->assertSeeText('Settings')
-        ->assertSeeText('Profile')
-        ->assertSeeText('Appearance')
-        ->assertSeeText('Security')
         ->assertDontSeeText('Repository')
         ->assertDontSeeText('Documentation');
 });

@@ -12,7 +12,7 @@
 
             <div class="min-w-0 flex-1">
                 <div class="flex flex-wrap items-center gap-2">
-                    <p class="min-w-0 font-semibold text-secondary-dark dark:text-white"><span class="tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $milestone->sequence }}.</span> {{ $milestone->name }}</p>
+                    <p class="min-w-0 font-semibold text-secondary-dark dark:text-white">{{ $milestone->name }}</p>
                     <x-ui.enum-badge :case="$milestone->status" />
                 </div>
                 <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-secondary-medium dark:text-secondary-soft">
@@ -31,35 +31,14 @@
             @if ($milestone->children_count === 0 && $milestone->tasks_count === 0)
                 <x-ui.button tone="ghost" size="sm" icon="trash" class="size-11! touch-manipulation @sm/directory:size-9!" wire:click="confirmDelete({{ $milestone->id }})" :aria-label="__('common.delete_name', ['name' => $milestone->name])" />
             @else
-                <span class="inline-flex size-11 items-center justify-center text-secondary-light @sm/directory:size-9" aria-label="{{ __('milestones.delete_unavailable_for_name', ['name' => $milestone->name]) }}"><flux:icon.lock-closed class="size-4" /></span>
+                <flux:tooltip :content="__('milestones.only_a_milestone_with_no_nested_milestones_and_no_tasks_can')">
+                    <span class="inline-flex size-11 cursor-not-allowed items-center justify-center text-secondary-light @sm/directory:size-9" aria-disabled="true">
+                        <flux:icon.lock-closed class="size-4" />
+                    </span>
+                </flux:tooltip>
             @endif
         </div>
     </div>
-
-    <details class="rounded-md border border-secondary-soft bg-white dark:border-secondary-medium dark:bg-secondary-dark">
-        <summary class="cursor-pointer px-3 py-2 text-xs font-semibold text-secondary-medium marker:text-secondary-light dark:text-secondary-soft">
-            {{ trans_choice('milestones.files', $milestone->media->count(), ['count' => $milestone->media->count()]) }}
-        </summary>
-        @if ($milestone->media->isEmpty())
-            <p class="border-t border-secondary-soft px-3 py-2 text-xs italic text-secondary-medium dark:border-secondary-medium dark:text-secondary-soft">{{ __('common.no_files_recorded') }}</p>
-        @else
-            <ul class="divide-y divide-secondary-soft border-t border-secondary-soft dark:divide-secondary-medium dark:border-secondary-medium">
-                @foreach ($milestone->media as $media)
-                    <li class="flex items-center gap-3 px-3 py-2.5" wire:key="milestone-file-{{ $media->id }}">
-                        <span class="inline-flex size-9 shrink-0 items-center justify-center rounded-md border border-secondary-light text-[11px] font-semibold text-secondary-medium uppercase dark:text-secondary-soft">{{ Str::upper($media->type->value) }}</span>
-                        <div class="min-w-0 flex-1">
-                            <p class="truncate text-sm font-medium">{{ $media->original_name }}</p>
-                            <p class="flex flex-wrap items-center gap-x-2 text-xs text-secondary-medium dark:text-secondary-soft">
-                                <span>{{ $media->collection->label() }}</span>
-                                <span aria-hidden="true">·</span>
-                                <time datetime="{{ $media->uploaded_at?->toDateString() }}">{{ $media->uploaded_at?->translatedFormat(__('formats.date')) ?? '—' }}</time>
-                            </p>
-                        </div>
-                    </li>
-                @endforeach
-            </ul>
-        @endif
-    </details>
 </article>
 
 @foreach ($milestone->childrenRecursive as $childMilestone)

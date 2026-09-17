@@ -7,6 +7,7 @@ return [
     'confirm_password' => 'Confirm password',
     'confirm_with_passkey' => 'Confirm with passkey',
     'confirming' => 'Confirming...',
+    'copyright_notice' => '© :year - Christian Hope Center - PT',
     'create_account' => 'Create account',
     'create_an_account' => 'Create an account',
     'don_t_have_an_account' => 'Don\'t have an account?',
@@ -29,6 +30,7 @@ return [
     'or_return_to' => 'Or, return to',
     'or_you_can' => 'or you can',
     'please_confirm_access_to_your_account_by_entering_one_of_you' => 'Please confirm access to your account by entering one of your emergency recovery codes.',
+    'please_enter_your_credentials_to_sign_in' => 'Please enter your credentials to sign in',
     'please_enter_your_new_password_below' => 'Please enter your new password below',
     'please_verify_your_email_address_by_clicking_on_the_link_we' => 'Please verify your email address by clicking on the link we just emailed to you.',
     'recovery_code' => 'Recovery code',
@@ -36,6 +38,7 @@ return [
     'remember_me' => 'Remember me',
     'resend_verification_email' => 'Resend verification email',
     'reset_password' => 'Reset password',
+    'sign_in' => 'Sign In',
     'sign_up' => 'Sign up',
     'this_is_a_secure_area_of_the_application_please_confirm_your' => 'This is a secure area of the application. Please confirm your password before continuing.',
 ];
