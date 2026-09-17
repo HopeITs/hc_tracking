@@ -11,6 +11,7 @@ return [
     'log_risk' => 'Log risk',
     'log_the_first_risk_against_a_project' => 'Log the first risk against a project.',
     'no_matching_risks' => 'No matching risks',
+    'no_mitigation_recorded_yet' => 'No mitigation recorded yet',
     'record_what_could_go_wrong_what_it_would_cost_and_how_it_is' => 'Record what could go wrong, what it would cost, and how it is mitigated.',
     'risk_deleted' => 'Risk deleted.',
     'risk_impact_or_project' => 'Risk, impact, or project',

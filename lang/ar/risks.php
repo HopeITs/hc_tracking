@@ -11,6 +11,7 @@ return [
     'log_risk' => 'تسجيل خطر',
     'log_the_first_risk_against_a_project' => 'سجّل أول خطر على مشروع.',
     'no_matching_risks' => 'لا توجد مخاطر مطابقة',
+    'no_mitigation_recorded_yet' => 'لم تُسجَّل خطة تخفيف بعد',
     'record_what_could_go_wrong_what_it_would_cost_and_how_it_is' => 'سجّل ما قد يسوء، وتكلفته، وكيفية التخفيف منه.',
     'risk_deleted' => 'تم حذف الخطر.',
     'risk_impact_or_project' => 'الخطر أو الأثر أو المشروع',

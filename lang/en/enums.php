@@ -19,7 +19,7 @@ return [
     'media_collection' => [
         'proposal' => 'Proposal',
         'agreement' => 'Agreement',
-        'mou' => 'Mou',
+        'mou' => 'MOU',
         'photo' => 'Photo',
         'evidence' => 'Evidence',
         'other' => 'Other',

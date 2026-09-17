@@ -1,4 +1,4 @@
-@props(['nodes', 'depth' => 0, 'label', 'badge' => null])
+@props(['nodes', 'depth' => 0, 'label', 'badge' => null, 'subtitle' => null])
 
 @foreach ($nodes as $node)
     <div
@@ -11,7 +11,12 @@
             <span aria-hidden="true" class="text-secondary-light">└</span>
         @endif
 
-        <p class="min-w-0 flex-1 truncate text-sm text-secondary-dark dark:text-white">{{ $label($node) }}</p>
+        <div class="min-w-0 flex-1">
+            <p class="truncate text-sm text-secondary-dark dark:text-white">{{ $label($node) }}</p>
+            @if ($subtitle !== null && $subtitle($node) !== null)
+                <p class="truncate type-meta text-secondary-medium dark:text-secondary-soft">{{ $subtitle($node) }}</p>
+            @endif
+        </div>
 
         @if ($badge !== null)
             <x-ui.enum-badge :case="$badge($node)" />
@@ -19,6 +24,6 @@
     </div>
 
     @if ($node->childrenRecursive->isNotEmpty())
-        <x-ui.tree-rows :nodes="$node->childrenRecursive" :depth="$depth + 1" :label="$label" :badge="$badge" />
+        <x-ui.tree-rows :nodes="$node->childrenRecursive" :depth="$depth + 1" :label="$label" :badge="$badge" :subtitle="$subtitle" />
     @endif
 @endforeach

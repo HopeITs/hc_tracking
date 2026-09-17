@@ -7,6 +7,7 @@ use App\Enums\TaskStatus;
 use App\Enums\UserRole;
 use App\Models\Result;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\View;
@@ -278,4 +279,84 @@ test('the tree renderer indents a loaded subtree without querying per node', fun
         ->and($html)->toContain('Child outcome')
         ->and($html)->toContain('Second child outcome')
         ->and($html)->toContain('data-tree-depth="1"');
+});
+
+test('the tree renderer shows a subtitle when one is supplied', function () {
+    $root = Result::factory()->create(['statement' => 'Root impact']);
+
+    $html = Blade::render('<x-ui.tree-rows :nodes="$nodes" :label="$label" :subtitle="$subtitle" />', [
+        'nodes' => Result::query()->whereKey($root->id)->with('childrenRecursive')->get(),
+        'label' => fn (Result $result): string => $result->statement,
+        'subtitle' => fn (Result $result): string => 'Extra detail',
+    ]);
+
+    expect($html)->toContain('Root impact')
+        ->and($html)->toContain('Extra detail');
+});
+
+test('the progress ring shows a rounded percentage and an em dash when unset', function () {
+    $withValue = Blade::render('<x-ui.progress-ring size="lg" :value="72.5" tone="good" label="Progress" />');
+    $withoutValue = Blade::render('<x-ui.progress-ring size="lg" :value="null" label="Progress" />');
+
+    expect($withValue)->toContain('73%')
+        ->and($withValue)->toContain('role="progressbar"')
+        ->and($withoutValue)->toContain('—')
+        ->and($withoutValue)->not->toContain('aria-valuenow');
+});
+
+test('the schedule status reads overdue, due soon and future dates correctly', function () {
+    Carbon\Carbon::setTestNow('2026-09-17');
+
+    $overdue = Blade::render('<x-ui.schedule-status :planned="$planned" />', ['planned' => CarbonImmutable::parse('2026-09-10')]);
+    $dueSoon = Blade::render('<x-ui.schedule-status :planned="$planned" />', ['planned' => CarbonImmutable::parse('2026-09-20')]);
+    $dueLater = Blade::render('<x-ui.schedule-status :planned="$planned" />', ['planned' => CarbonImmutable::parse('2026-12-08')]);
+    $unscheduled = Blade::render('<x-ui.schedule-status />');
+
+    Carbon\Carbon::setTestNow();
+
+    $textOf = fn (string $html): string => trim(preg_replace('/\s+/', ' ', strip_tags($html)));
+
+    expect($textOf($overdue))->toBe('Overdue by 7 days')
+        ->and($textOf($dueSoon))->toBe('Due in 3 days')
+        ->and($textOf($dueLater))->not->toContain('-')
+        ->and($textOf($unscheduled))->toBe('Unscheduled');
+});
+
+test('the capacity bar shows committed and received money and flags an overflow', function () {
+    $withinBudget = Blade::render('<x-ui.capacity-bar :committed="1000" :used="400" currency="USD" />');
+    $overBudget = Blade::render('<x-ui.capacity-bar :committed="1000" :used="1200" currency="USD" />');
+
+    expect($withinBudget)->toContain('1,000.00')
+        ->and($withinBudget)->toContain('400.00')
+        ->and($overBudget)->toContain('Over by 20%');
+});
+
+test('the capacity bar throws without a currency', function () {
+    try {
+        Blade::render('<x-ui.capacity-bar :committed="1000" :used="400" :currency="null" />');
+
+        $this->fail('Expected x-ui.capacity-bar to reject null currency.');
+    } catch (ViewException $exception) {
+        $causes = [];
+
+        for ($cause = $exception->getPrevious(); $cause !== null; $cause = $cause->getPrevious()) {
+            $causes[] = $cause;
+        }
+
+        expect(array_filter($causes, fn (Throwable $cause): bool => $cause instanceof InvalidArgumentException))
+            ->not->toBeEmpty();
+    }
+});
+
+test('the view toggle marks the active option and wires the others to set it', function () {
+    $html = Blade::render('<x-ui.view-toggle wire-model="milestoneView" active="tree" :options="$options" />', [
+        'options' => [
+            ['key' => 'tree', 'label' => 'Tree'],
+            ['key' => 'board', 'label' => 'Board'],
+        ],
+    ]);
+
+    expect($html)->toContain('role="radiogroup"')
+        ->and($html)->toContain('aria-checked="true"')
+        ->and($html)->toContain("\$set('milestoneView', 'board')");
 });
