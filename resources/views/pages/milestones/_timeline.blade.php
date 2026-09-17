@@ -103,16 +103,16 @@
                     @endif
 
                     @foreach ($milestones as $milestone)
-                        <button
-                            type="button"
-                            wire:click="openEditModal({{ $milestone->id }})"
+                        <a
+                            href="{{ route('milestones.show', $milestone) }}"
+                            wire:navigate
                             wire:key="milestone-marker-{{ $milestone->id }}"
                             class="absolute top-1/2 z-10 flex size-7 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-primary rtl:translate-x-1/2"
                             style="inset-inline-start: {{ $position($milestone->planned_date) }}%"
                             aria-label="{{ __('common.edit_name', ['name' => $milestone->name]) }}"
                         >
                             <span aria-hidden="true" class="block size-3.5 rotate-45 rounded-[2px] border-2 shadow-sm ring-2 ring-white dark:ring-secondary-dark {{ $markerTone($milestone) }}"></span>
-                        </button>
+                        </a>
                     @endforeach
                 </div>
 
@@ -144,9 +144,9 @@
 
                             <div class="w-full rounded-lg border border-secondary-soft bg-white p-2.5 text-xs shadow-sm dark:border-secondary-medium dark:bg-secondary-dark">
                                 <div class="flex items-start justify-between gap-1">
-                                    <button type="button" wire:click="openEditModal({{ $milestone->id }})" class="min-w-0 cursor-pointer text-start font-semibold text-secondary-dark hover:underline dark:text-white">
+                                    <a href="{{ route('milestones.show', $milestone) }}" wire:navigate class="min-w-0 cursor-pointer text-start font-semibold text-secondary-dark hover:underline dark:text-white">
                                         <span class="line-clamp-2">{{ $milestone->name }}</span>
-                                    </button>
+                                    </a>
                                     @if ($canDeleteMarker)
                                         <button type="button" wire:click="confirmDelete({{ $milestone->id }})" class="shrink-0 cursor-pointer rounded-md p-1 text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium" aria-label="{{ __('common.delete_name', ['name' => $milestone->name]) }}">
                                             <flux:icon.trash class="size-3.5" />

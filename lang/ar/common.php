@@ -3,6 +3,7 @@
 return [
     'accounts' => 'الحسابات',
     'actions' => 'الإجراءات',
+    'add' => 'إضافة',
     'active' => 'نشط',
     'all_accounts' => 'كل الحسابات',
     'all_managers' => 'كل المدراء',
@@ -91,6 +92,7 @@ return [
     'results_framework' => 'إطار النتائج',
     'risks' => 'المخاطر',
     'save_changes' => 'حفظ التغييرات',
+    'search_proposals' => 'البحث عن المقترحات',
     'security' => 'الأمان',
     'select' => 'اختر',
     'select_a_project' => 'اختر مشروعًا',

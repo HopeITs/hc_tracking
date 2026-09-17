@@ -14,6 +14,7 @@ return [
     'funding_agreement' => 'Funding Agreement',
     'funding_agreements' => 'Funding Agreements',
     'indicators' => 'Indicators',
+    'milestone' => 'Milestone',
     'milestones' => 'Milestones',
     'profile_settings' => 'Profile settings',
     'program' => 'Program',

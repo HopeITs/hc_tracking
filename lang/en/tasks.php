@@ -41,6 +41,7 @@ return [
     'progress_cannot_exceed_100_percent' => 'Progress cannot exceed 100 percent.',
     'search_tasks' => 'Search tasks',
     'select_the_proposal_this_task_delivers_against' => 'Select the proposal this task delivers against.',
+    'task' => 'Task',
     'task_created' => 'Task created.',
     'task_deleted' => 'Task deleted.',
     'task_title' => 'Task title',

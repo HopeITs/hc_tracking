@@ -41,6 +41,7 @@ return [
     'progress_cannot_exceed_100_percent' => 'لا يمكن أن يتجاوز التقدم 100 بالمئة.',
     'search_tasks' => 'البحث في المهام',
     'select_the_proposal_this_task_delivers_against' => 'اختر المقترح الذي تُنفذ هذه المهمة ضمنه.',
+    'task' => 'مهمة',
     'task_created' => 'تم إنشاء المهمة.',
     'task_deleted' => 'تم حذف المهمة.',
     'task_title' => 'عنوان المهمة',

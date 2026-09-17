@@ -61,9 +61,9 @@
                         x-on:dragend="$event.currentTarget.classList.remove('opacity-40')"
                     >
                         <div class="flex items-start justify-between gap-2">
-                            <button type="button" wire:click="openEditModal({{ $milestone->id }})" class="min-w-0 text-start text-sm font-semibold text-secondary-dark hover:underline dark:text-white" data-test="milestone-board-card-{{ $milestone->id }}">
+                            <a href="{{ route('milestones.show', $milestone) }}" wire:navigate class="min-w-0 truncate text-sm font-semibold text-secondary-dark hover:underline dark:text-white" data-test="milestone-board-card-{{ $milestone->id }}">
                                 {{ $milestone->name }}
-                            </button>
+                            </a>
 
                             @if ($milestone->children_count === 0 && $milestone->tasks_count === 0)
                                 <x-ui.button tone="ghost" size="sm" icon="trash" class="size-8! shrink-0" wire:click="confirmDelete({{ $milestone->id }})" :aria-label="__('common.delete_name', ['name' => $milestone->name])" />

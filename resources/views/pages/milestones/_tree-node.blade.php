@@ -27,7 +27,7 @@
         </div>
 
         <div class="flex shrink-0 items-center gap-1 self-end @lg/directory:self-start">
-            <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation @sm/directory:size-9!" wire:click="openEditModal({{ $milestone->id }})" :aria-label="__('common.edit_name', ['name' => $milestone->name])" />
+            <x-ui.button tone="ghost" size="sm" icon="pencil-square" href="{{ route('milestones.show', $milestone) }}" wire:navigate class="size-11! touch-manipulation @sm/directory:size-9!" :aria-label="__('common.edit_name', ['name' => $milestone->name])" />
             @if ($milestone->children_count === 0 && $milestone->tasks_count === 0)
                 <x-ui.button tone="ghost" size="sm" icon="trash" class="size-11! touch-manipulation @sm/directory:size-9!" wire:click="confirmDelete({{ $milestone->id }})" :aria-label="__('common.delete_name', ['name' => $milestone->name])" />
             @else

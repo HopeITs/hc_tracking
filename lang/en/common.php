@@ -3,6 +3,7 @@
 return [
     'accounts' => 'Accounts',
     'actions' => 'Actions',
+    'add' => 'Add',
     'active' => 'Active',
     'all_accounts' => 'All accounts',
     'all_managers' => 'All managers',
@@ -91,6 +92,7 @@ return [
     'results_framework' => 'Results Framework',
     'risks' => 'Risks',
     'save_changes' => 'Save changes',
+    'search_proposals' => 'Search proposals',
     'security' => 'Security',
     'select' => 'Select',
     'select_a_project' => 'Select a project',

@@ -6,13 +6,13 @@ Before planning or editing, find the row whose globs match the file's path and r
 | --- | --- |
 | app/Actions/Fortify/AuthenticateWithHrAccount.php | .ai/rules/actions-fortify.md |
 | resources/views/pages/annual-plans/** | .ai/rules/annual-plans.md |
-| resources/views/{components/navigation/**,components/desktop-user-menu.blade.php,layouts/app/sidebar.blade.php} | .ai/rules/app.md |
+| resources/views/{components/navigation/**,layouts/app/sidebar.blade.php}, resources/views/{components/navigation/sidebar.blade.php,components/desktop-user-menu.blade.php,layouts/app/sidebar.blade.php} | .ai/rules/app.md |
 | resources/views/pages/auth/login.blade.php | .ai/rules/auth.md |
 | {app/Actions/Fortify/**,app/Console/Commands/**,config/auth.php,database/seeders/**} | .ai/rules/commands-seeders.md |
 | {app/Actions/Fortify/**,app/Console/Commands/**,config/fortify.php} | .ai/rules/commands.md |
 | resources/views/components/navigation/sidebar.blade.php | .ai/rules/components-navigation.md |
 | resources/views/components/ui/** | .ai/rules/components-ui.md |
-| resources/views/components/app-logo.blade.php | .ai/rules/components.md |
+| resources/views/components/app-logo.blade.php, resources/views/layouts/auth/simple.blade.php | .ai/rules/components.md |
 | app/Concerns/HasTree.php | .ai/rules/concerns.md |
 | config/session.php | .ai/rules/config-2.md |
 | {config/database.php,.env.example} | .ai/rules/config.md |
@@ -25,6 +25,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | {config/blaze.php,resources/views/flux/**} | .ai/rules/flux.md |
 | {app/Providers/FortifyServiceProvider.php,app/Actions/Fortify/**,config/fortify.php} | .ai/rules/fortify.md |
 | {config/database.php,.env.example,database/migrations/**} | .ai/rules/migrations.md |
+| resources/views/pages/milestones/** | .ai/rules/milestones.md |
 | app/Models/**, app/Models/Account.php, app/Models/Hr*.php, app/Models/Program.php, app/Models/User.php | .ai/rules/models.md |
 | {app/Http/Middleware/SetLocale.php,app/Http/Controllers/SwitchLocaleController.php,resources/views/components/navigation/sidebar.blade.php,resources/css/app.css} | .ai/rules/navigation-css.md |
 | resources/views/components/{navigation/sidebar.blade.php,ui/panel.blade.php,ui/stat-tile.blade.php,ui/data-table.blade.php,ui/timeline.blade.php} | .ai/rules/navigation.md |
@@ -33,8 +34,8 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Providers/** | .ai/rules/providers.md |
 | routes/web.php | .ai/rules/routes.md |
 | {database/factories/**,database/seeders/**,tests/Pest.php} | .ai/rules/seeders.md |
-| resources/views/pages/strategies/{⚡show.blade.php,⚡index.blade.php} | .ai/rules/strategies.md |
+| resources/views/pages/strategies/⚡show.blade.php, resources/views/pages/strategies/⚡index.blade.php | .ai/rules/strategies.md |
 | tests/** | .ai/rules/tests.md |
-| resources/views/{components/ui/page-header.blade.php,components/ui/header-filter-select.blade.php,components/ui/detail-header.blade.php,pages/**} | .ai/rules/ui.md |
+| resources/views/{components/ui/page-header.blade.php,pages/**}, resources/views/{components/ui/header-filter-select.blade.php,pages/**}, resources/views/components/ui/detail-header.blade.php | .ai/rules/ui.md |
 | {lang/**,resources/views/**,app/Enums/**} | .ai/rules/views-enums.md |
 | resources/views/**/*.blade.php | .ai/rules/views.md |

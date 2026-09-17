@@ -14,6 +14,7 @@ return [
     'funding_agreement' => 'اتفاقية التمويل',
     'funding_agreements' => 'اتفاقيات التمويل',
     'indicators' => 'المؤشرات',
+    'milestone' => 'المرحلة الرئيسية',
     'milestones' => 'المراحل الرئيسية',
     'profile_settings' => 'إعدادات الملف الشخصي',
     'program' => 'البرنامج',

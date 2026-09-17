@@ -37,7 +37,7 @@ test('milestones render as a responsive tree grouped by project with reachable a
         ->assertSee('Household survey')
         ->assertSee('data-tree-depth="1"', false)
         ->assertSee('wire:click="openCreateModal"', false)
-        ->assertSee('wire:click="openEditModal('.$parent->id.')"', false)
+        ->assertSee('href="'.route('milestones.show', $parent).'"', false)
         ->assertSee('wire:click="confirmDelete('.$child->id.')"', false)
         ->assertDontSee('wire:click="confirmDelete('.$parent->id.')"', false)
         ->assertSee('aria-disabled="true"', false)
@@ -174,25 +174,15 @@ test('changing the project while creating clears the selected parent', function 
         ->assertSet('parentMilestoneId', '');
 });
 
-test('a milestone can be edited while its project remains fixed', function () {
+test('each milestone links to its own edit page instead of an edit modal', function () {
     $user = User::factory()->create();
-    $milestone = Milestone::factory()->create(['name' => 'Initial gate']);
+    $milestone = Milestone::factory()->create();
 
     Livewire::actingAs($user)
         ->test('pages::milestones.index')
-        ->call('openEditModal', $milestone->id)
-        ->set('name', '  Revised gate  ')
-        ->set('sequence', '8')
-        ->set('weightPercentage', '35.50')
-        ->call('saveMilestone')
-        ->assertHasNoErrors()
-        ->assertSet('showMilestoneModal', false);
-
-    $milestone->refresh();
-
-    expect($milestone->name)->toBe('Revised gate')
-        ->and($milestone->sequence)->toBe(8)
-        ->and($milestone->weight_percentage)->toBe('35.50');
+        ->set('view', 'list')
+        ->assertSee('href="'.route('milestones.show', $milestone).'"', false)
+        ->assertDontSee('wire:click="openEditModal', false);
 });
 
 test('creating a milestone requires its core delivery fields', function () {
@@ -209,62 +199,22 @@ test('creating a milestone requires its core delivery fields', function () {
         ->assertHasErrors(['name', 'plannedDate', 'responsibleUserId', 'milestoneProjectId']);
 });
 
-test('the parent picker is project local and excludes the edited subtree', function () {
+test('the create parent picker is limited to the selected project', function () {
     $user = User::factory()->create();
     $project = Project::factory()->create();
     $otherProject = Project::factory()->create();
-    $root = Milestone::factory()->create(['project_id' => $project->id, 'name' => 'Root gate']);
-    Milestone::factory()->childOf($root)->create(['name' => 'Child gate']);
     Milestone::factory()->create(['project_id' => $project->id, 'name' => 'Sibling gate']);
     Milestone::factory()->create(['project_id' => $otherProject->id, 'name' => 'Other project gate']);
 
     $component = Livewire::actingAs($user)
         ->test('pages::milestones.index')
-        ->call('openEditModal', $root->id);
+        ->call('openCreateModal')
+        ->set('milestoneProjectId', (string) $project->id);
 
     $names = $component->instance()->parentOptions()->pluck('name')->all();
 
     expect($names)->toContain('Sibling gate')
-        ->not->toContain('Root gate')
-        ->not->toContain('Child gate')
         ->not->toContain('Other project gate');
-});
-
-test('tampered cross-project and descendant parents produce validation errors', function () {
-    $user = User::factory()->create();
-    $project = Project::factory()->create();
-    $otherProject = Project::factory()->create();
-    $root = Milestone::factory()->create(['project_id' => $project->id]);
-    $child = Milestone::factory()->childOf($root)->create();
-    $other = Milestone::factory()->create(['project_id' => $otherProject->id]);
-
-    Livewire::actingAs($user)
-        ->test('pages::milestones.index')
-        ->call('openEditModal', $root->id)
-        ->set('parentMilestoneId', (string) $other->id)
-        ->call('saveMilestone')
-        ->assertHasErrors(['parentMilestoneId'])
-        ->set('parentMilestoneId', (string) $child->id)
-        ->call('saveMilestone')
-        ->assertHasErrors(['parentMilestoneId']);
-
-    expect($root->refresh()->parent_milestone_id)->toBeNull();
-});
-
-test('a milestone project is immutable on edit even when the livewire property is tampered', function () {
-    $user = User::factory()->create();
-    $project = Project::factory()->create();
-    $otherProject = Project::factory()->create();
-    $milestone = Milestone::factory()->create(['project_id' => $project->id]);
-
-    Livewire::actingAs($user)
-        ->test('pages::milestones.index')
-        ->call('openEditModal', $milestone->id)
-        ->set('milestoneProjectId', (string) $otherProject->id)
-        ->call('saveMilestone')
-        ->assertHasErrors(['milestoneProjectId']);
-
-    expect($milestone->refresh()->project_id)->toBe($project->id);
 });
 
 test('the list view no longer displays milestone files', function () {
@@ -288,6 +238,32 @@ test('the list view no longer displays milestone files', function () {
     expect($component->instance()->projectsWithMilestones()->first()->milestones->first()->relationLoaded('media'))->toBeFalse();
 });
 
+test('confirming delete opens the delete modal with the milestone name', function () {
+    $user = User::factory()->create();
+    $milestone = Milestone::factory()->create(['name' => 'Foundation poured']);
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.index')
+        ->call('confirmDelete', $milestone->id)
+        ->assertSet('showDeleteModal', true)
+        ->assertSet('deletingMilestoneId', $milestone->id)
+        ->assertSeeText('Foundation poured');
+});
+
+test('cancelling delete closes the modal without deleting the milestone', function () {
+    $user = User::factory()->create();
+    $milestone = Milestone::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.index')
+        ->call('confirmDelete', $milestone->id)
+        ->call('cancelDelete')
+        ->assertSet('showDeleteModal', false)
+        ->assertSet('deletingMilestoneId', null);
+
+    $this->assertDatabaseHas('milestones', ['id' => $milestone->id]);
+});
+
 test('a leaf milestone with no tasks can be deleted', function () {
     $user = User::factory()->create();
     $milestone = Milestone::factory()->create();
@@ -295,7 +271,9 @@ test('a leaf milestone with no tasks can be deleted', function () {
     Livewire::actingAs($user)
         ->test('pages::milestones.index')
         ->call('confirmDelete', $milestone->id)
+        ->assertSet('showDeleteModal', true)
         ->call('deleteMilestone')
+        ->assertSet('showDeleteModal', false)
         ->assertHasNoErrors();
 
     $this->assertDatabaseMissing('milestones', ['id' => $milestone->id]);
@@ -377,7 +355,7 @@ test('the timeline view plots milestones as clickable markers grouped by project
         ->test('pages::milestones.index')
         ->set('view', 'timeline')
         ->assertSee('Homs Clinic')
-        ->assertSee('wire:click="openEditModal('.$milestone->id.')"', false);
+        ->assertSee('href="'.route('milestones.show', $milestone).'"', false);
 });
 
 test('the timeline view counts only root milestones next to the project name, like the list view', function () {

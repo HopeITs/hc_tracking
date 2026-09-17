@@ -48,6 +48,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('milestones', 'pages::milestones.index')
         ->name('milestones.index');
 
+    Route::livewire('milestones/{milestone}', 'pages::milestones.show')
+        ->name('milestones.show');
+
     Route::livewire('results', 'pages::results.index')
         ->name('results.index');
 

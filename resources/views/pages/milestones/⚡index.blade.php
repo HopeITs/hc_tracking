@@ -30,8 +30,8 @@ new #[Title('titles.milestones')] class extends Component {
     public string $view = 'timeline';
 
     public bool $showMilestoneModal = false;
-    public ?int $editingMilestoneId = null;
     public ?int $deletingMilestoneId = null;
+    public bool $showDeleteModal = false;
     public string $name = '';
     public string $description = '';
     public string $plannedDate = '';
@@ -86,9 +86,7 @@ new #[Title('titles.milestones')] class extends Component {
 
     public function updatedMilestoneProjectId(): void
     {
-        if ($this->editingMilestoneId === null) {
-            $this->parentMilestoneId = '';
-        }
+        $this->parentMilestoneId = '';
 
         unset($this->parentOptions);
     }
@@ -211,16 +209,23 @@ new #[Title('titles.milestones')] class extends Component {
             return new Collection;
         }
 
-        $invalidParentIds = $this->invalidParentIds();
-
         return Milestone::query()
             ->select(['id', 'name', 'project_id', 'sequence'])
-            ->where('project_id', $this->parentProjectId())
-            ->when($invalidParentIds !== [], fn (Builder $query) => $query->whereNotIn('id', $invalidParentIds))
+            ->where('project_id', (int) $this->milestoneProjectId)
             ->orderBy('sequence')
             ->orderBy('name')
             ->orderBy('id')
             ->get();
+    }
+
+    #[Computed]
+    public function deletingMilestone(): ?Milestone
+    {
+        if ($this->deletingMilestoneId === null) {
+            return null;
+        }
+
+        return Milestone::query()->select(['id', 'name'])->find($this->deletingMilestoneId);
     }
 
     public function canDelete(int $milestoneId): bool
@@ -241,37 +246,10 @@ new #[Title('titles.milestones')] class extends Component {
         $this->showMilestoneModal = true;
     }
 
-    public function openEditModal(int $milestoneId): void
-    {
-        $milestone = Milestone::query()
-            ->select(['id', 'project_id', 'name', 'description', 'planned_date', 'actual_date', 'status', 'sequence', 'weight_percentage', 'responsible_user_id', 'parent_milestone_id'])
-            ->findOrFail($milestoneId);
-
-        $this->resetValidation();
-        $this->editingMilestoneId = $milestone->id;
-        $this->name = $milestone->name;
-        $this->description = $milestone->description ?? '';
-        $this->plannedDate = $milestone->planned_date->toDateString();
-        $this->actualDate = $milestone->actual_date?->toDateString() ?? '';
-        $this->milestoneStatus = $milestone->status->value;
-        $this->sequence = (string) $milestone->sequence;
-        $this->weightPercentage = $milestone->weight_percentage;
-        $this->responsibleUserId = (string) $milestone->responsible_user_id;
-        $this->milestoneProjectId = (string) $milestone->project_id;
-        $this->parentMilestoneId = (string) ($milestone->parent_milestone_id ?? '');
-        $this->showMilestoneModal = true;
-    }
-
     public function saveMilestone(): void
     {
         $this->name = trim($this->name);
         $this->description = trim($this->description);
-
-        $existingMilestone = $this->editingMilestoneId === null
-            ? null
-            : Milestone::query()->findOrFail($this->editingMilestoneId);
-        $projectId = $existingMilestone?->project_id ?? (int) $this->milestoneProjectId;
-        $invalidParentIds = $this->invalidParentIds();
 
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -282,33 +260,25 @@ new #[Title('titles.milestones')] class extends Component {
             'sequence' => ['required', 'integer', 'min:0'],
             'weightPercentage' => ['required', 'numeric', 'min:0', 'max:100'],
             'responsibleUserId' => ['required', 'integer', Rule::exists(HrEmployee::class, 'id')],
-            'milestoneProjectId' => [
-                'required',
-                'integer',
-                Rule::exists(Project::class, 'id'),
-                Rule::when($existingMilestone !== null, Rule::in([(string) $existingMilestone?->project_id])),
-            ],
+            'milestoneProjectId' => ['required', 'integer', Rule::exists(Project::class, 'id')],
             'parentMilestoneId' => [
                 'nullable',
                 'integer',
                 Rule::exists(Milestone::class, 'id')->where(
-                    fn ($query) => $query->where('project_id', $projectId),
+                    fn ($query) => $query->where('project_id', (int) $this->milestoneProjectId),
                 ),
-                Rule::notIn($invalidParentIds),
             ],
         ], [
             'name.required' => __('milestones.enter_a_milestone_name'),
             'plannedDate.required' => __('milestones.set_the_planned_date'),
             'responsibleUserId.required' => __('milestones.select_the_responsible_staff_member'),
             'milestoneProjectId.required' => __('milestones.select_the_project'),
-            'milestoneProjectId.in' => __('milestones.a_milestone_cannot_be_moved_to_another_project'),
             'parentMilestoneId.exists' => __('milestones.select_a_milestone_from_this_project'),
-            'parentMilestoneId.not_in' => __('milestones.a_milestone_cannot_be_nested_under_itself_or_its_descendants'),
             'weightPercentage.max' => __('milestones.weight_cannot_exceed_100_percent'),
         ]);
 
-        $milestone = $existingMilestone ?? new Milestone;
-        $attributes = [
+        Milestone::query()->create([
+            'project_id' => (int) $validated['milestoneProjectId'],
             'name' => $validated['name'],
             'description' => $validated['description'] === '' ? null : $validated['description'],
             'planned_date' => $validated['plannedDate'],
@@ -320,23 +290,13 @@ new #[Title('titles.milestones')] class extends Component {
             'parent_milestone_id' => $validated['parentMilestoneId'] === '' || $validated['parentMilestoneId'] === null
                 ? null
                 : (int) $validated['parentMilestoneId'],
-        ];
-
-        if ($existingMilestone === null) {
-            $attributes['project_id'] = (int) $validated['milestoneProjectId'];
-        }
-
-        $milestone->fill($attributes)->save();
-        $wasRecentlyCreated = $milestone->wasRecentlyCreated;
+        ]);
 
         $this->showMilestoneModal = false;
         $this->resetMilestoneForm();
         unset($this->projectsWithMilestones);
 
-        Flux::toast(
-            variant: 'success',
-            text: $wasRecentlyCreated ? __('milestones.milestone_created') : __('milestones.milestone_updated'),
-        );
+        Flux::toast(variant: 'success', text: __('milestones.milestone_created'));
     }
 
     public function quickSetStatus(int $milestoneId, string $status): void
@@ -358,6 +318,15 @@ new #[Title('titles.milestones')] class extends Component {
     public function confirmDelete(int $milestoneId): void
     {
         $this->deletingMilestoneId = $milestoneId;
+        $this->showDeleteModal = true;
+        unset($this->deletingMilestone);
+    }
+
+    public function cancelDelete(): void
+    {
+        $this->showDeleteModal = false;
+        $this->deletingMilestoneId = null;
+        unset($this->deletingMilestone);
     }
 
     public function deleteMilestone(): void
@@ -377,7 +346,9 @@ new #[Title('titles.milestones')] class extends Component {
             return (bool) $milestone->delete();
         });
 
+        $this->showDeleteModal = false;
         $this->deletingMilestoneId = null;
+        unset($this->deletingMilestone);
         unset($this->projectsWithMilestones);
 
         if (! $deleted) {
@@ -401,7 +372,6 @@ new #[Title('titles.milestones')] class extends Component {
     protected function resetMilestoneForm(): void
     {
         $this->resetValidation();
-        $this->editingMilestoneId = null;
         $this->name = '';
         $this->description = '';
         $this->plannedDate = '';
@@ -438,33 +408,6 @@ new #[Title('titles.milestones')] class extends Component {
             && ($this->responsible === '' || $milestone->responsible_user_id === (int) $this->responsible);
     }
 
-    /** @return array<int, int> */
-    protected function invalidParentIds(): array
-    {
-        if ($this->editingMilestoneId === null) {
-            return [];
-        }
-
-        $milestone = Milestone::query()
-            ->select(['id', 'parent_milestone_id'])
-            ->with('childrenRecursive:id,parent_milestone_id,sequence')
-            ->find($this->editingMilestoneId);
-
-        if ($milestone === null) {
-            return [];
-        }
-
-        return [...$milestone->descendants()->modelKeys(), $milestone->id];
-    }
-
-    protected function parentProjectId(): int
-    {
-        if ($this->editingMilestoneId !== null) {
-            return (int) Milestone::query()->whereKey($this->editingMilestoneId)->value('project_id');
-        }
-
-        return (int) $this->milestoneProjectId;
-    }
 };
 ?>
 
@@ -579,7 +522,7 @@ new #[Title('titles.milestones')] class extends Component {
     <flux:modal wire:model="showMilestoneModal" class="w-full max-w-3xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
         <form wire:submit="saveMilestone" class="flex flex-col gap-5">
             <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ $editingMilestoneId === null ? __('milestones.add_milestone') : __('milestones.edit_milestone') }}</flux:heading>
+                <flux:heading size="lg">{{ __('milestones.add_milestone') }}</flux:heading>
             </div>
 
             <x-ui.input wire:model="name" :label="__('milestones.milestone_name')" type="text" maxlength="255" required autofocus />
@@ -587,13 +530,7 @@ new #[Title('titles.milestones')] class extends Component {
             <div class="grid gap-4 sm:grid-cols-2">
                 <div class="min-w-0">
                     <label for="milestone-form-project" class="{{ $dropdownLabelClasses }}">{{ __('common.project') }}</label>
-                    @if ($editingMilestoneId !== null)
-                        <flux:tooltip :content="__('milestones.a_milestone_cannot_be_moved_to_another_project')">
-                            @include('pages.milestones._project-dropdown', ['disabled' => true])
-                        </flux:tooltip>
-                    @else
-                        @include('pages.milestones._project-dropdown', ['disabled' => false])
-                    @endif
+                    @include('pages.milestones._project-dropdown', ['disabled' => false])
                     <flux:error name="milestoneProjectId" class="mt-1.5" />
                 </div>
 
@@ -681,17 +618,24 @@ new #[Title('titles.milestones')] class extends Component {
 
             <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
                 <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="closeMilestoneModal">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" data-test="save-milestone-button">{{ $editingMilestoneId === null ? __('milestones.create_milestone') : __('common.save_changes') }}</x-ui.button>
+                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" data-test="save-milestone-button">{{ __('milestones.create_milestone') }}</x-ui.button>
             </div>
         </form>
     </flux:modal>
 
-    <flux:modal :open="$deletingMilestoneId !== null" wire:close="$set('deletingMilestoneId', null)" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
+    <flux:modal wire:model="showDeleteModal" wire:close="cancelDelete" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
+        @php
+            $pendingDeleteMilestone = $this->deletingMilestone;
+        @endphp
         <div class="flex flex-col gap-4">
             <flux:heading size="lg">{{ __('milestones.delete_this_milestone') }}</flux:heading>
-            <flux:subheading>{{ __('milestones.only_a_milestone_with_no_nested_milestones_and_no_tasks_can') }}</flux:subheading>
+            <flux:subheading>
+                {{ $pendingDeleteMilestone !== null
+                    ? __('milestones.are_you_sure_you_want_to_delete_this_milestone', ['name' => $pendingDeleteMilestone->name])
+                    : __('milestones.only_a_milestone_with_no_nested_milestones_and_no_tasks_can') }}
+            </flux:subheading>
             <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="$set('deletingMilestoneId', null)">{{ __('common.cancel') }}</x-ui.button>
+                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="cancelDelete">{{ __('common.cancel') }}</x-ui.button>
                 <x-ui.button type="button" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="deleteMilestone" data-test="confirm-delete-milestone">{{ __('milestones.delete_milestone') }}</x-ui.button>
             </div>
         </div>
