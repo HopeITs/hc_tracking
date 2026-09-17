@@ -3,6 +3,7 @@
     'max' => 100,
     'tone' => 'neutral',
     'label' => null,
+    'labelHidden' => false,
     'showValue' => false,
 ])
 
@@ -21,9 +22,9 @@
 @endphp
 
 <div {{ $attributes->class('flex flex-col gap-1') }}>
-    @if ($label !== null || $showValue)
-        <div class="flex items-center justify-between gap-2">
-            @if ($label !== null)
+    @if (($label !== null && ! $labelHidden) || $showValue)
+        <div class="flex items-center gap-2 {{ $label !== null && ! $labelHidden ? 'justify-between' : 'justify-end' }}">
+            @if ($label !== null && ! $labelHidden)
                 <p class="type-meta text-secondary-medium dark:text-secondary-soft">{{ $label }}</p>
             @endif
             @if ($showValue)

@@ -13,6 +13,7 @@ Files in this folder:
 
 | File | What it is |
 | --- | --- |
+| [`cockpit-plan.md`](cockpit-plan.md) | **START HERE.** The approved Portfolio Cockpit design; supersedes §5 and §6 below |
 | `README.md` | This spec: what to build and how, in order |
 | [`copy.md`](copy.md) | Every new/changed string, English + Arabic, with exact keys |
 | [`tests.md`](tests.md) | Existing tests to keep + new tests to write (full Pest code) |

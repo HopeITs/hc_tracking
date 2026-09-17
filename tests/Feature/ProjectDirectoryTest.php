@@ -1,10 +1,17 @@
 <?php
 
+use App\Enums\Currency;
+use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
+use App\Models\DonorProposal;
+use App\Models\Milestone;
 use App\Models\Program;
 use App\Models\Project;
+use App\Models\Proposal;
+use App\Models\Risk;
 use App\Models\Strategy;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 test('guests are redirected from the project directory', function () {
@@ -265,4 +272,418 @@ test('the project directory renders with no projects', function () {
     $user = User::factory()->create();
 
     Livewire::actingAs($user)->test('pages::projects.index')->assertSee('No projects yet');
+});
+
+/**
+ * One project per triage lens, each tripping exactly one of them.
+ *
+ * @return array<string, Project>
+ */
+function projectsForEachLens(): array
+{
+    $fund = function (Project $project): Project {
+        $proposal = Proposal::factory()->create();
+        DonorProposal::factory()->create(['proposal_id' => $proposal->id, 'budget' => '1000.00']);
+        $project->proposals()->attach($proposal);
+
+        return $project;
+    };
+
+    $unfunded = Project::factory()->active()->create(['name' => 'Unfunded Wells', 'end_date' => today()->addYear()]);
+
+    $overdue = $fund(Project::factory()->active()->create(['name' => 'Overdue Clinic', 'start_date' => today()->subYears(2), 'end_date' => today()->subDay()]));
+
+    $slipping = $fund(Project::factory()->active()->create(['name' => 'Slipping Shelter', 'end_date' => today()->addYear()]));
+    Milestone::factory()->create(['project_id' => $slipping->id, 'planned_date' => today()->subWeek(), 'status' => MilestoneStatus::Pending]);
+
+    $risky = $fund(Project::factory()->active()->create(['name' => 'Risky Bakery', 'end_date' => today()->addYear()]));
+    Risk::factory()->happened()->create(['project_id' => $risky->id]);
+
+    return ['unfunded' => $unfunded, 'overdue' => $overdue, 'slipping' => $slipping, 'risks' => $risky];
+}
+
+test('each triage lens selects only the projects that trip it', function (string $lens, string $expected) {
+    $user = User::factory()->create();
+    projectsForEachLens();
+
+    $component = Livewire::actingAs($user)->test('pages::projects.index')->set('lens', $lens);
+
+    expect($component->instance()->projects->getCollection()->pluck('name')->all())->toBe([$expected]);
+})->with([
+    ['unfunded', 'Unfunded Wells'],
+    ['overdue', 'Overdue Clinic'],
+    ['slipping', 'Slipping Shelter'],
+    ['risks', 'Risky Bakery'],
+]);
+
+test('an unknown lens filters nothing away', function () {
+    $user = User::factory()->create();
+    projectsForEachLens();
+
+    $component = Livewire::actingAs($user)->test('pages::projects.index')->set('lens', 'not-a-lens');
+
+    expect($component->get('lens'))->toBe('')
+        ->and($component->instance()->projects->total())->toBe(4);
+});
+
+test('triage counts ignore the active lens so a tile never shrinks itself', function () {
+    $user = User::factory()->create();
+    projectsForEachLens();
+
+    $component = Livewire::actingAs($user)->test('pages::projects.index');
+
+    expect($component->instance()->triageCounts)->toBe(['unfunded' => 1, 'overdue' => 1, 'slipping' => 1, 'risks' => 1]);
+
+    $component->set('lens', 'overdue');
+
+    expect($component->instance()->triageCounts)->toBe(['unfunded' => 1, 'overdue' => 1, 'slipping' => 1, 'risks' => 1])
+        ->and($component->instance()->projects->total())->toBe(1);
+});
+
+test('the active triage lens renders a complete inset border', function () {
+    $user = User::factory()->create();
+    projectsForEachLens();
+
+    $html = Livewire::actingAs($user)
+        ->test('pages::projects.index')
+        ->set('lens', 'overdue')
+        ->html();
+
+    $document = new DOMDocument;
+    $document->loadHTML($html, LIBXML_NOERROR | LIBXML_NOWARNING);
+    $xpath = new DOMXPath($document);
+    $activeLens = $xpath->query('//button[@data-test="lens-overdue" and @aria-pressed="true"]')->item(0);
+
+    expect($activeLens)->not->toBeNull()
+        ->and($activeLens->getAttribute('class'))->toContain('ring-2', 'ring-inset', 'ring-primary');
+});
+
+test('lifecycle counts ignore the status filter but respect every other filter', function () {
+    $user = User::factory()->create();
+    $aleppo = insertHrCity('Aleppo');
+    $homs = insertHrCity('Homs');
+
+    Project::factory()->active()->create(['city_id' => $aleppo]);
+    Project::factory()->closed()->create(['city_id' => $aleppo]);
+    Project::factory()->active()->create(['city_id' => $homs]);
+
+    $component = Livewire::actingAs($user)->test('pages::projects.index');
+
+    expect($component->instance()->statusCounts)->toBe(['active' => 2, 'closed' => 1]);
+
+    $component->set('status', ProjectStatus::Active->value);
+
+    expect($component->instance()->statusCounts)->toBe(['active' => 2, 'closed' => 1]);
+
+    $component->set('city', (string) $aleppo);
+
+    expect($component->instance()->statusCounts)->toBe(['active' => 1, 'closed' => 1]);
+});
+
+test('committed funding counts a proposal shared by two projects once', function () {
+    $user = User::factory()->create();
+    $proposal = Proposal::factory()->create();
+    DonorProposal::factory()->create(['proposal_id' => $proposal->id, 'budget' => '1000.00']);
+
+    foreach (Project::factory()->count(2)->create() as $project) {
+        $project->proposals()->attach($proposal);
+    }
+
+    $component = Livewire::actingAs($user)->test('pages::projects.index');
+
+    expect($component->instance()->committedFunding)->toBe(['USD' => 1000.0]);
+});
+
+test('committed funding reports one line per currency and never adds them together', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->create();
+
+    foreach ([Currency::Usd, Currency::Eur] as $currency) {
+        $proposal = Proposal::factory()->create();
+        DonorProposal::factory()->create(['proposal_id' => $proposal->id, 'budget' => '2500.00', 'currency' => $currency]);
+        $project->proposals()->attach($proposal);
+    }
+
+    $funding = Livewire::actingAs($user)->test('pages::projects.index')->instance()->committedFunding;
+
+    ksort($funding);
+
+    expect($funding)->toBe(['EUR' => 2500.0, 'USD' => 2500.0]);
+});
+
+test('weighted milestone progress is derived from the reached weight and capped at 100', function () {
+    $user = User::factory()->create();
+    $weighted = Project::factory()->create(['name' => 'Weighted Works']);
+    $unweighted = Project::factory()->create(['name' => 'Unweighted Works']);
+    $overweight = Project::factory()->create(['name' => 'Overweight Works']);
+
+    Milestone::factory()->reached()->create(['project_id' => $weighted->id, 'weight_percentage' => '40.00']);
+    Milestone::factory()->create(['project_id' => $weighted->id, 'weight_percentage' => '60.00']);
+    Milestone::factory()->create(['project_id' => $weighted->id, 'weight_percentage' => '10.00', 'status' => MilestoneStatus::Cancelled]);
+
+    Milestone::factory()->create(['project_id' => $unweighted->id, 'weight_percentage' => '0.00']);
+
+    Milestone::factory()->reached()->create(['project_id' => $overweight->id, 'weight_percentage' => '90.00']);
+    Milestone::factory()->reached()->create(['project_id' => $overweight->id, 'weight_percentage' => '60.00']);
+
+    $component = Livewire::actingAs($user)->test('pages::projects.index');
+    $page = $component->instance()->projects->getCollection()->keyBy('name');
+
+    expect($component->instance()->progressFor($page['Weighted Works']))->toBe(40.0)
+        ->and($component->instance()->progressFor($page['Unweighted Works']))->toBeNull()
+        ->and($component->instance()->progressFor($page['Overweight Works']))->toBe(100.0);
+});
+
+test('every view renders the same filtered project set and an unknown view falls back to the board', function () {
+    $user = User::factory()->create();
+    Project::factory()->active()->create(['name' => 'Aleppo Wells']);
+    Project::factory()->closed()->create(['name' => 'Homs Shelter']);
+
+    $component = Livewire::actingAs($user)->test('pages::projects.index');
+
+    foreach (['board', 'timeline', 'table'] as $view) {
+        $component->set('view', $view)->assertSee('Aleppo Wells')->assertSee('Homs Shelter');
+    }
+
+    $component->set('view', 'gantt');
+
+    expect($component->get('view'))->toBe('board');
+
+    $component->assertSee('Aleppo Wells')->assertSee('Homs Shelter');
+});
+
+test('projects can be sorted by name dates and recency with undated projects last', function () {
+    $user = User::factory()->create();
+    Project::factory()->create(['name' => 'Beta', 'start_date' => '2026-03-01', 'end_date' => '2026-12-31', 'updated_at' => '2026-01-01 00:00:00']);
+    Project::factory()->create(['name' => 'Alpha', 'start_date' => '2026-06-01', 'end_date' => '2026-07-31', 'updated_at' => '2026-02-01 00:00:00']);
+    Project::factory()->create(['name' => 'Gamma', 'start_date' => null, 'end_date' => null, 'updated_at' => '2026-03-01 00:00:00']);
+
+    $component = Livewire::actingAs($user)->test('pages::projects.index')->set('view', 'table');
+
+    $order = fn (): array => $component->instance()->projects->getCollection()->pluck('name')->all();
+
+    $component->set('sort', 'name');
+    expect($order())->toBe(['Alpha', 'Beta', 'Gamma']);
+
+    $component->set('sort', 'start_date');
+    expect($order())->toBe(['Beta', 'Alpha', 'Gamma']);
+
+    $component->set('sort', 'end_date');
+    expect($order())->toBe(['Alpha', 'Beta', 'Gamma']);
+
+    $component->set('sort', 'updated_at');
+    expect($order())->toBe(['Gamma', 'Alpha', 'Beta']);
+
+    $component->set('sort', 'sideways');
+    expect($component->get('sort'))->toBe('name')
+        ->and($order())->toBe(['Alpha', 'Beta', 'Gamma']);
+});
+
+test('the board groups projects by lifecycle state and pages them in twenty-fours', function () {
+    $user = User::factory()->create();
+    Project::factory()->count(2)->closed()->create();
+    Project::factory()->count(2)->active()->create();
+    Project::factory()->count(21)->create();
+
+    $component = Livewire::actingAs($user)->test('pages::projects.index');
+    $page = $component->instance()->projects;
+
+    expect($page->perPage())->toBe(24)
+        ->and($page->count())->toBe(24)
+        ->and($page->getCollection()->pluck('status.value')->unique()->values()->all())->toBe(['draft', 'active', 'closed']);
+
+    $component->set('view', 'table');
+
+    expect($component->instance()->projects->perPage())->toBe(15);
+});
+
+test('the project directory renders within its query budget', function () {
+    $user = User::factory()->create();
+    Project::factory()->count(5)->create();
+
+    $queries = 0;
+    DB::listen(function () use (&$queries): void {
+        $queries++;
+    });
+
+    Livewire::actingAs($user)->test('pages::projects.index');
+
+    expect($queries)->toBeLessThanOrEqual(17);
+});
+
+test('a board card hides relations it has none of and keeps a materialised risk', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
+    Milestone::factory()->count(2)->create(['project_id' => $project->id]);
+
+    $component = Livewire::actingAs($user)->test('pages::projects.index');
+
+    // Two milestones earn a chip; the five empty relations are not rendered at all.
+    $component->assertSeeHtml('aria-hidden="true">2</span>')
+        ->assertSeeText('2 milestones')
+        ->assertDontSeeHtml('aria-hidden="true">0</span>');
+
+    Risk::factory()->create(['project_id' => $project->id, 'happened' => true]);
+
+    // A materialised risk always shows, and takes the solid alert treatment.
+    Livewire::actingAs($user)->test('pages::projects.index')
+        ->assertSeeHtml('border-primary bg-primary font-semibold text-white');
+});
+
+test('a board card with no relations at all says so instead of rendering empty chips', function () {
+    $user = User::factory()->create();
+    Project::factory()->active()->create(['name' => 'Bare Project']);
+
+    Livewire::actingAs($user)->test('pages::projects.index')
+        ->assertSeeText('Nothing linked yet')
+        ->assertDontSeeHtml('aria-hidden="true">0</span>');
+});
+
+test('a board card opens the project through an eye action, not a clickable name', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
+
+    Livewire::actingAs($user)->test('pages::projects.index')
+        ->assertSeeHtml('aria-label="Open Wells Of Hope"')
+        ->assertSeeHtml('href="'.route('projects.show', $project).'"')
+        // The name is plain text; nothing stretches a link across the card.
+        ->assertDontSeeHtml('after:absolute after:inset-0');
+});
+
+test('a board card never prints the progress bar accessibility label as visible copy', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
+    Milestone::factory()->create(['project_id' => $project->id, 'weight_percentage' => 100, 'status' => MilestoneStatus::Reached]);
+
+    $rendered = Livewire::actingAs($user)->test('pages::projects.index');
+
+    // The name still reaches assistive tech through aria-label, but is not drawn.
+    $rendered->assertSeeHtml('aria-label="Milestone progress for Wells Of Hope"')
+        ->assertDontSeeText('Milestone progress for Wells Of Hope');
+});
+
+test('a board card rates an overdue project critical and an on-track project good', function () {
+    $user = User::factory()->create();
+    $overdue = Project::factory()->active()->create([
+        'name' => 'Overdue Project',
+        'start_date' => now()->subYear(),
+        'end_date' => now()->subMonth(),
+    ]);
+    Milestone::factory()->create(['project_id' => $overdue->id, 'weight_percentage' => 100, 'status' => MilestoneStatus::Pending]);
+
+    Livewire::actingAs($user)->test('pages::projects.index')
+        // Critical fills solid so white type carries it in both themes.
+        ->assertSeeHtml('border-primary bg-primary font-semibold text-white')
+        ->assertSeeHtml('border-primary/40');
+});
+
+test('every view opens a project through the same eye action instead of a clickable name', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
+    $showUrl = route('projects.show', $project);
+
+    foreach (['board', 'timeline', 'table'] as $view) {
+        Livewire::actingAs($user)->test('pages::projects.index')
+            ->set('view', $view)
+            ->assertSeeHtml('aria-label="Open Wells Of Hope"')
+            ->assertSeeHtml('href="'.$showUrl.'"')
+            // The name is plain text in every view; only the eye navigates.
+            ->assertDontSeeHtml('href="'.$showUrl.'" wire:navigate title="Wells Of Hope"');
+    }
+});
+
+test('a project is archived rather than deleted, keeping every record it carries', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
+    Milestone::factory()->count(2)->create(['project_id' => $project->id]);
+    Risk::factory()->create(['project_id' => $project->id]);
+
+    Livewire::actingAs($user)->test('pages::projects.index')
+        ->call('confirmArchive', $project->id)
+        // The dialog only opens from the boolean, so both must be set.
+        ->assertSet('archivingProjectId', $project->id)
+        ->assertSet('showArchiveModal', true)
+        ->call('archiveProject')
+        ->assertSet('archivingProjectId', null)
+        ->assertSet('showArchiveModal', false);
+
+    expect($project->fresh()->status)->toBe(ProjectStatus::Archived)
+        // Archiving destroys nothing.
+        ->and(Milestone::query()->where('project_id', $project->id)->count())->toBe(2)
+        ->and(Risk::query()->where('project_id', $project->id)->count())->toBe(1);
+});
+
+test('an archived project can be restored back into the portfolio as a draft', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->create(['name' => 'Wells Of Hope', 'status' => ProjectStatus::Archived]);
+
+    Livewire::actingAs($user)->test('pages::projects.index')->call('restoreProject', $project->id);
+
+    expect($project->fresh()->status)->toBe(ProjectStatus::Draft);
+});
+
+test('restoring only applies to archived projects', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
+
+    Livewire::actingAs($user)->test('pages::projects.index')->call('restoreProject', $project->id);
+
+    expect($project->fresh()->status)->toBe(ProjectStatus::Active);
+});
+
+test('cancelling the archive confirmation leaves the project where it was', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
+
+    Livewire::actingAs($user)->test('pages::projects.index')
+        ->call('confirmArchive', $project->id)
+        ->call('cancelArchive')
+        ->assertSet('archivingProjectId', null)
+        ->assertSet('showArchiveModal', false);
+
+    expect($project->fresh()->status)->toBe(ProjectStatus::Active);
+});
+
+test('the archive confirmation names the work the project keeps', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
+    Milestone::factory()->count(3)->create(['project_id' => $project->id]);
+
+    $component = Livewire::actingAs($user)->test('pages::projects.index')->call('confirmArchive', $project->id);
+    $pending = $component->instance()->archivingProject;
+
+    // Nothing with a zero count is listed.
+    expect($pending['carries'])->toBe(['Milestones' => 3]);
+
+    $component->assertSeeText('Archive this project?')
+        ->assertSeeText('3 Milestones');
+});
+
+test('archiving a project that vanished mid-confirmation closes cleanly instead of erroring', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
+
+    $component = Livewire::actingAs($user)->test('pages::projects.index')->call('confirmArchive', $project->id);
+
+    Project::query()->whereKey($project->id)->delete();
+
+    $component->call('archiveProject')
+        ->assertSet('archivingProjectId', null)
+        ->assertSet('showArchiveModal', false)
+        ->assertHasNoErrors();
+});
+
+test('every view offers archive for a live project and restore for an archived one', function () {
+    $user = User::factory()->create();
+    $live = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
+    $archived = Project::factory()->create(['name' => 'Retired Project', 'status' => ProjectStatus::Archived]);
+
+    foreach (['board', 'timeline', 'table'] as $view) {
+        Livewire::actingAs($user)->test('pages::projects.index')
+            ->set('view', $view)
+            ->assertSeeHtml('confirmArchive('.$live->id.')')
+            ->assertSeeHtml('Archive Wells Of Hope')
+            ->assertSeeHtml('restoreProject('.$archived->id.')')
+            ->assertSeeHtml('Restore Retired Project');
+    }
 });

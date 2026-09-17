@@ -1,13 +1,18 @@
 <?php
 
+use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
+use App\Enums\RagStatus;
 use App\Models\HrCity;
 use App\Models\HrEmployee;
 use App\Models\Program;
 use App\Models\Project;
+use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
@@ -17,6 +22,20 @@ use Livewire\WithPagination;
 
 new #[Title('titles.projects')] class extends Component {
     use WithPagination;
+
+    /** The views this page can render the filtered portfolio in. */
+    private const VIEWS = ['board', 'timeline', 'table'];
+
+    /** The orders the portfolio can be read in. */
+    private const SORTS = ['name', 'start_date', 'end_date', 'updated_at'];
+
+    /** The single-select triage lenses of the cockpit strip. */
+    private const LENSES = ['unfunded', 'overdue', 'slipping', 'risks'];
+
+    /** Cards are smaller than rows, so the board shows more of them. */
+    private const BOARD_PAGE_SIZE = 24;
+
+    private const LIST_PAGE_SIZE = 15;
 
     #[Url(except: '')]
     public string $search = '';
@@ -36,9 +55,26 @@ new #[Title('titles.projects')] class extends Component {
     #[Url(except: '')]
     public string $status = '';
 
+    #[Url(except: 'board')]
+    public string $view = 'board';
+
+    #[Url(except: 'name')]
+    public string $sort = 'name';
+
+    #[Url(except: '')]
+    public string $lens = '';
+
     public bool $showProjectModal = false;
 
     public ?int $editingProjectId = null;
+
+    public ?int $archivingProjectId = null;
+
+    /**
+     * Carried separately from archivingProjectId because a flux:modal only opens
+     * from a boolean bound with wire:model; :open never reopens on a round trip.
+     */
+    public bool $showArchiveModal = false;
 
     public string $name = '';
 
@@ -96,6 +132,59 @@ new #[Title('titles.projects')] class extends Component {
         $this->resetPage();
     }
 
+    /**
+     * Fall back to the board rather than rendering nothing for a view name
+     * that is not one of ours.
+     */
+    public function updatedView(): void
+    {
+        if (! in_array($this->view, self::VIEWS, true)) {
+            $this->view = 'board';
+        }
+    }
+
+    public function updatedSort(): void
+    {
+        if (! in_array($this->sort, self::SORTS, true)) {
+            $this->sort = 'name';
+        }
+
+        $this->resetPage();
+    }
+
+    public function updatedLens(): void
+    {
+        if (! in_array($this->lens, self::LENSES, true)) {
+            $this->lens = '';
+        }
+
+        $this->resetPage();
+    }
+
+    /**
+     * Select a lifecycle segment, or clear it when it is already selected.
+     */
+    public function toggleStatus(string $status): void
+    {
+        $this->status = $this->status === $status ? '' : $status;
+        $this->resetPage();
+    }
+
+    /**
+     * Lenses are single-select: combining them produces empty sets that read
+     * as a bug rather than as an answer.
+     */
+    public function toggleLens(string $lens): void
+    {
+        $this->lens = $this->lens === $lens || ! in_array($lens, self::LENSES, true) ? '' : $lens;
+        $this->resetPage();
+    }
+
+    /**
+     * Reset every filter, including the lens.
+     *
+     * `view` and `sort` survive: they are reading preferences, not filters.
+     */
     public function clearFilters(): void
     {
         $this->search = '';
@@ -104,24 +193,121 @@ new #[Title('titles.projects')] class extends Component {
         $this->strategy = '';
         $this->owner = '';
         $this->status = '';
+        $this->lens = '';
         $this->resetPage();
+    }
+
+    /**
+     * The HR ids a name search resolves to, read once per request.
+     *
+     * Cities and employees live in the HR database, so a name search resolves
+     * to ids here instead of a whereHas() across connections. Memoising them
+     * keeps `applyFilters()` free to run for the list, the rail and the
+     * triage strip without paying for the same two reads each time.
+     *
+     * @return array{cities: list<int>, owners: list<int>}
+     */
+    #[Computed]
+    public function searchMatches(): array
+    {
+        $search = trim($this->search);
+
+        if ($search === '') {
+            return ['cities' => [], 'owners' => []];
+        }
+
+        return [
+            'cities' => HrCity::query()
+                ->where('name_en', 'like', '%'.$search.'%')
+                ->orWhere('name_ar', 'like', '%'.$search.'%')
+                ->pluck('id')
+                ->all(),
+            'owners' => HrEmployee::idsMatchingName($search),
+        ];
+    }
+
+    /**
+     * The one place the portfolio is narrowed down.
+     *
+     * The list, the lifecycle rail and the triage tiles all read through this
+     * method, so a filter can never mean one thing in the board and another in
+     * the counts above it.
+     *
+     * @param  Builder<Project>  $query
+     * @return Builder<Project>
+     */
+    protected function applyFilters(Builder $query, bool $includeStatus = true, bool $includeLens = true): Builder
+    {
+        $search = trim($this->search);
+        $matches = $this->searchMatches;
+
+        return $query
+            ->when($search !== '', function (Builder $query) use ($search, $matches): void {
+                $query->where(function (Builder $query) use ($search, $matches): void {
+                    $query
+                        ->where('name', 'like', '%'.$search.'%')
+                        ->orWhereIn('city_id', $matches['cities'])
+                        ->orWhereHas('program', fn ($query) => $query->where('name', 'like', '%'.$search.'%'))
+                        ->orWhereIn('user_id', $matches['owners']);
+                });
+            })
+            ->when($this->city !== '', fn (Builder $query) => $query->where('city_id', (int) $this->city))
+            ->when($this->program !== '', fn (Builder $query) => $query->where('program_id', (int) $this->program))
+            ->when($this->strategy !== '', fn (Builder $query) => $query->whereHas('program', fn ($query) => $query->where('strategy_id', (int) $this->strategy)))
+            ->when($this->owner !== '', fn (Builder $query) => $query->where('user_id', (int) $this->owner))
+            ->when($includeStatus && $this->status !== '', fn (Builder $query) => $query->where('status', $this->status))
+            ->when($includeLens && $this->lens !== '', fn (Builder $query) => $this->applyLens($query));
+    }
+
+    /**
+     * @param  Builder<Project>  $query
+     * @return Builder<Project>
+     */
+    protected function applyLens(Builder $query): Builder
+    {
+        return match ($this->lens) {
+            'unfunded' => $query->doesntHave('proposals'),
+            'overdue' => $query->where('status', ProjectStatus::Active->value)->whereDate('end_date', '<', today()),
+            'slipping' => $query->whereHas('milestones', fn ($query) => $query
+                ->whereDate('planned_date', '<', today())
+                ->whereNotIn('status', [MilestoneStatus::Reached->value, MilestoneStatus::Cancelled->value])),
+            'risks' => $query->whereHas('risks', fn ($query) => $query->where('happened', true)),
+            default => $query,
+        };
+    }
+
+    /**
+     * @param  Builder<Project>  $query
+     * @return Builder<Project>
+     */
+    protected function applySort(Builder $query): Builder
+    {
+        if ($this->view === 'board') {
+            $cases = ProjectStatus::cases();
+            $arms = [];
+
+            foreach (array_keys($cases) as $position) {
+                $arms[] = 'when status = ? then '.$position;
+            }
+
+            $query->orderByRaw('case '.implode(' ', $arms).' else '.count($cases).' end', array_column($cases, 'value'));
+        }
+
+        // Nulls sort last in both date orders, which is what the raw
+        // "is null" ordering in front of each column buys.
+        return match ($this->sort) {
+            'start_date' => $query->orderByRaw('start_date is null')->orderBy('start_date')->orderBy('name'),
+            'end_date' => $query->orderByRaw('end_date is null')->orderBy('end_date')->orderBy('name'),
+            'updated_at' => $query->orderByDesc('updated_at')->orderByDesc('id'),
+            default => $query->orderBy('name')->orderBy('id'),
+        };
     }
 
     /** @return LengthAwarePaginator<int, Project> */
     #[Computed]
     public function projects(): LengthAwarePaginator
     {
-        $search = trim($this->search);
-
-        // Cities are in the HR database, so a city-name search resolves to ids
-        // first instead of a whereHas() across connections.
-        $matchingCityIds = $search === '' ? [] : HrCity::query()
-            ->where('name_en', 'like', '%'.$search.'%')
-            ->orWhere('name_ar', 'like', '%'.$search.'%')
-            ->pluck('id')
-            ->all();
-
-        return Project::query()
+        $query = Project::query()
             ->select([
                 'id',
                 'name',
@@ -140,27 +326,231 @@ new #[Title('titles.projects')] class extends Component {
             ])
             ->with([
                 'city:id,name_en,name_ar',
-                'program:id,name',
+                'program:id,name,strategy_id',
+                'program.strategy:id,name',
                 'user:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
             ])
-            ->withCount(['risks', 'milestones', 'planIndicators', 'proposals'])
-            ->when($search !== '', function ($query) use ($search, $matchingCityIds): void {
-                $query->where(function ($query) use ($search, $matchingCityIds): void {
-                    $query
-                        ->where('name', 'like', '%'.$search.'%')
-                        ->orWhereIn('city_id', $matchingCityIds)
-                        ->orWhereHas('program', fn ($query) => $query->where('name', 'like', '%'.$search.'%'))
-                        ->orWhereIn('user_id', HrEmployee::idsMatchingName($search));
-                });
-            })
-            ->when($this->city !== '', fn ($query) => $query->where('city_id', (int) $this->city))
-            ->when($this->program !== '', fn ($query) => $query->where('program_id', (int) $this->program))
-            ->when($this->strategy !== '', fn ($query) => $query->whereHas('program', fn ($query) => $query->where('strategy_id', (int) $this->strategy)))
-            ->when($this->owner !== '', fn ($query) => $query->where('user_id', (int) $this->owner))
-            ->when($this->status !== '', fn ($query) => $query->where('status', $this->status))
-            ->orderBy('name')
-            ->orderBy('id')
-            ->paginate(15);
+            ->when($this->view === 'timeline', fn (Builder $query) => $query->with([
+                'milestones' => fn ($query) => $query
+                    ->select(['id', 'project_id', 'name', 'planned_date', 'status'])
+                    ->where('status', '!=', MilestoneStatus::Cancelled->value)
+                    ->reorder()
+                    ->orderBy('planned_date'),
+            ]))
+            ->withCount([
+                'risks',
+                'milestones',
+                'planIndicators',
+                'proposals',
+                'indicators',
+                'media',
+                'risks as materialised_risks_count' => fn ($query) => $query->where('happened', true),
+                'milestones as reached_milestones_count' => fn ($query) => $query->where('status', MilestoneStatus::Reached->value),
+            ])
+            ->withSum(['milestones as reached_weight' => fn ($query) => $query->where('status', MilestoneStatus::Reached->value)], 'weight_percentage')
+            ->withSum(['milestones as planned_weight' => fn ($query) => $query->where('status', '!=', MilestoneStatus::Cancelled->value)], 'weight_percentage');
+
+        return $this->applySort($this->applyFilters($query))
+            ->paginate($this->view === 'board' ? self::BOARD_PAGE_SIZE : self::LIST_PAGE_SIZE);
+    }
+
+    /**
+     * Weighted milestone progress, or null when nothing carries a weight.
+     *
+     * Weights that add up to more than 100 are capped rather than rejected:
+     * the figure is a reading of the record, not a validation of it.
+     */
+    public function progressFor(Project $project): ?float
+    {
+        $planned = (float) ($project->planned_weight ?? 0);
+
+        return $planned > 0 ? round(min(100, ((float) ($project->reached_weight ?? 0) / $planned) * 100), 1) : null;
+    }
+
+    /**
+     * How many projects sit in each lifecycle state.
+     *
+     * The rail ignores the status filter so it always shows where the rest of
+     * the filtered portfolio sits; every other filter still applies.
+     *
+     * @return array<string, int>
+     */
+    #[Computed]
+    public function statusCounts(): array
+    {
+        return $this->applyFilters(Project::query(), includeStatus: false)
+            ->toBase()
+            ->groupBy('status')
+            ->selectRaw('status, count(*) as aggregate')
+            ->pluck('aggregate', 'status')
+            ->map(fn ($count): int => (int) $count)
+            ->all();
+    }
+
+    /**
+     * The four triage counts, in one read.
+     *
+     * They ignore both the status filter and the active lens: a lens that
+     * shrank its own tile would make the number jump the moment it is clicked
+     * and the strip would read as broken.
+     *
+     * @return array<string, int>
+     */
+    #[Computed]
+    public function triageCounts(): array
+    {
+        $today = today()->toDateString();
+
+        $row = $this->applyFilters(Project::query(), includeStatus: false, includeLens: false)
+            ->toBase()
+            ->selectRaw(
+                'sum(case when not exists (select 1 from project_proposal where project_proposal.project_id = projects.id) then 1 else 0 end) as unfunded_count, '
+                .'sum(case when projects.status = ? and projects.end_date < ? then 1 else 0 end) as overdue_count, '
+                .'sum(case when exists (select 1 from milestones where milestones.project_id = projects.id and milestones.planned_date < ? and milestones.status not in (?, ?)) then 1 else 0 end) as slipping_count, '
+                .'sum(case when exists (select 1 from risks where risks.project_id = projects.id and risks.happened = 1) then 1 else 0 end) as risks_count',
+                [
+                    ProjectStatus::Active->value,
+                    $today,
+                    $today,
+                    MilestoneStatus::Reached->value,
+                    MilestoneStatus::Cancelled->value,
+                ],
+            )
+            ->first();
+
+        return [
+            'unfunded' => (int) ($row->unfunded_count ?? 0),
+            'overdue' => (int) ($row->overdue_count ?? 0),
+            'slipping' => (int) ($row->slipping_count ?? 0),
+            'risks' => (int) ($row->risks_count ?? 0),
+        ];
+    }
+
+    /**
+     * Committed funding for the filtered portfolio, per currency.
+     *
+     * Every proposal in this database is shared by two or three projects, so
+     * the total is taken over the DISTINCT proposals the filtered set reaches.
+     * Adding up a per-project figure instead overcounts by roughly 2.25x.
+     *
+     * Currencies are never added together: USD, EUR and SYP have no conversion
+     * anywhere in this system.
+     *
+     * @return array<string, float>
+     */
+    #[Computed]
+    public function committedFunding(): array
+    {
+        $projectIds = $this->applyFilters(Project::query())->toBase()->select('projects.id');
+
+        return DB::table('donor_proposal')
+            ->whereIn('proposal_id', fn ($query) => $query
+                ->select('proposal_id')
+                ->from('project_proposal')
+                ->whereIn('project_id', $projectIds))
+            ->groupBy('currency')
+            ->selectRaw('currency, sum(budget) as total')
+            ->pluck('total', 'currency')
+            ->map(fn ($total): float => (float) $total)
+            ->all();
+    }
+
+    /**
+     * The headline beneficiary commitment across the filtered portfolio.
+     */
+    #[Computed]
+    public function committedBeneficiaries(): int
+    {
+        return (int) $this->applyFilters(Project::query())->sum('target_beneficiaries');
+    }
+
+    /**
+     * The funding envelope of every project on the visible page, in one read.
+     *
+     * A shared proposal's budget is not attributable to one project, so the
+     * card reports the envelope covering it and says how many other projects
+     * the same proposal covers.
+     *
+     * @return array<int, array{currencies: array<string, float>, donors: list<string>, proposals: list<string>, shared: int}>
+     */
+    #[Computed]
+    public function fundingByProject(): array
+    {
+        $visibleIds = $this->projects->getCollection()->modelKeys();
+
+        if ($visibleIds === []) {
+            return [];
+        }
+
+        $rows = DB::table('project_proposal')
+            ->join('donor_proposal', 'donor_proposal.proposal_id', '=', 'project_proposal.proposal_id')
+            ->join('donors', 'donors.id', '=', 'donor_proposal.donor_id')
+            ->join('proposals', 'proposals.id', '=', 'project_proposal.proposal_id')
+            ->whereIn('project_proposal.project_id', $visibleIds)
+            ->select([
+                'project_proposal.project_id',
+                'project_proposal.proposal_id',
+                'donor_proposal.currency',
+                'donor_proposal.budget',
+                'donors.name as donor_name',
+                'proposals.name as proposal_name',
+            ])
+            ->selectSub(
+                DB::table('project_proposal as shares')
+                    ->selectRaw('count(*)')
+                    ->whereColumn('shares.proposal_id', 'project_proposal.proposal_id'),
+                'share_count',
+            )
+            ->get();
+
+        $funding = [];
+
+        foreach ($rows as $row) {
+            $projectId = (int) $row->project_id;
+
+            $funding[$projectId] ??= ['currencies' => [], 'donors' => [], 'proposals' => [], 'shared' => 0];
+            $funding[$projectId]['currencies'][$row->currency] = ($funding[$projectId]['currencies'][$row->currency] ?? 0.0) + (float) $row->budget;
+            $funding[$projectId]['shared'] = max($funding[$projectId]['shared'], (int) $row->share_count - 1);
+
+            if (! in_array($row->donor_name, $funding[$projectId]['donors'], true)) {
+                $funding[$projectId]['donors'][] = $row->donor_name;
+            }
+
+            if (! in_array($row->proposal_name, $funding[$projectId]['proposals'], true)) {
+                $funding[$projectId]['proposals'][] = $row->proposal_name;
+            }
+        }
+
+        return $funding;
+    }
+
+    /**
+     * The date range the timeline plots every bar against.
+     *
+     * It is read from the projects already on the page, so switching to the
+     * timeline costs no extra query.
+     *
+     * @return array{start: CarbonImmutable, end: CarbonImmutable}|null
+     */
+    #[Computed]
+    public function timelineWindow(): ?array
+    {
+        $dates = $this->projects
+            ->getCollection()
+            ->flatMap(fn (Project $project): array => [$project->start_date, $project->end_date])
+            ->filter()
+            ->values();
+
+        if ($dates->isEmpty()) {
+            return null;
+        }
+
+        $start = $dates->min();
+        $end = $dates->max();
+
+        return $end->lte($start)
+            ? ['start' => $start, 'end' => $start->addMonth()]
+            : ['start' => $start, 'end' => $end];
     }
 
     /** @return Collection<int, HrCity> */
@@ -301,6 +691,98 @@ new #[Title('titles.projects')] class extends Component {
         $this->resetProjectForm();
     }
 
+    public function confirmArchive(int $projectId): void
+    {
+        $this->archivingProjectId = $projectId;
+        $this->showArchiveModal = true;
+    }
+
+    public function cancelArchive(): void
+    {
+        $this->archivingProjectId = null;
+        $this->showArchiveModal = false;
+    }
+
+    /**
+     * The project under the archive confirmation, with the work it carries, so
+     * the dialog can say what leaves the active board. Nothing is destroyed.
+     *
+     * @return array{project: Project, carries: array<string, int>}|null
+     */
+    #[Computed]
+    public function archivingProject(): ?array
+    {
+        if ($this->archivingProjectId === null) {
+            return null;
+        }
+
+        $project = Project::query()
+            ->select(['id', 'name', 'status'])
+            ->withCount(['milestones', 'risks', 'proposals'])
+            ->find($this->archivingProjectId);
+
+        if ($project === null) {
+            return null;
+        }
+
+        return [
+            'project' => $project,
+            'carries' => array_filter([
+                __('common.milestones') => $project->milestones_count,
+                __('common.risks') => $project->risks_count,
+                __('common.proposals') => $project->proposals_count,
+            ]),
+        ];
+    }
+
+    /**
+     * Retire the project into the Archived lifecycle state.
+     *
+     * Nothing in this application is soft-deleted, so archiving is how a
+     * project leaves the active portfolio without destroying its delivery
+     * record. restoreProject() puts it back.
+     */
+    public function archiveProject(): void
+    {
+        if ($this->archivingProjectId === null) {
+            return;
+        }
+
+        $project = Project::query()->find($this->archivingProjectId);
+
+        if ($project === null) {
+            $this->cancelArchive();
+
+            return;
+        }
+
+        $project->update(['status' => ProjectStatus::Archived]);
+
+        $this->archivingProjectId = null;
+        $this->showArchiveModal = false;
+        $this->resetPage();
+
+        Flux::toast(variant: 'success', text: __('projects.project_archived'));
+    }
+
+    /**
+     * Put an archived project back into the portfolio as a draft, which is the
+     * one lifecycle state that carries no claim about where the work stands.
+     */
+    public function restoreProject(int $projectId): void
+    {
+        $project = Project::query()->find($projectId);
+
+        if ($project === null || $project->status !== ProjectStatus::Archived) {
+            return;
+        }
+
+        $project->update(['status' => ProjectStatus::Draft]);
+        $this->resetPage();
+
+        Flux::toast(variant: 'success', text: __('projects.project_restored'));
+    }
+
     protected function resetProjectForm(): void
     {
         $this->resetValidation();
@@ -338,14 +820,140 @@ new #[Title('titles.projects')] class extends Component {
 ?>
 
 @php
-    $filtersAreActive = $search !== '' || $city !== '' || $program !== '' || $owner !== '' || $status !== '';
+    /* The class block above already imports every symbol this view uses; a
+       single-file page compiles both halves into one PHP file, so repeating
+       the `use` statements here would be a redeclaration. */
+    $filtersAreActive = $search !== '' || $city !== '' || $program !== '' || $owner !== '' || $status !== '' || $lens !== '';
+    $today = CarbonImmutable::today();
+
+    $statusCounts = $this->statusCounts;
+    $triageCounts = $this->triageCounts;
+    $fundingByProject = $this->fundingByProject;
+    $projects = $this->projects;
+
+    $loadingTargets = 'search, city, program, owner, status, lens, sort, view, toggleStatus, toggleLens, clearFilters, gotoPage, nextPage, previousPage';
+
+    /* Tabs, tiles, panels and card chrome are lifted from pages/milestones so
+       the two directories read as one product. */
+    $viewOptions = [
+        'table' => ['icon' => 'queue-list', 'label' => __('projects.view_table')],
+        'timeline' => ['icon' => 'chart-bar', 'label' => __('projects.view_timeline')],
+        'board' => ['icon' => 'view-columns', 'label' => __('projects.view_board')],
+    ];
+
+    $sortOptions = [
+        'name' => __('projects.sort_name'),
+        'start_date' => __('projects.sort_start_date'),
+        'end_date' => __('projects.sort_end_date'),
+        'updated_at' => __('projects.sort_recently_updated'),
+    ];
+
+    $lensTiles = [
+        'unfunded' => ['label' => __('projects.lens_unfunded'), 'hint' => __('projects.lens_unfunded_hint'), 'icon' => 'banknotes'],
+        'overdue' => ['label' => __('projects.lens_overdue'), 'hint' => __('projects.lens_overdue_hint'), 'icon' => 'calendar-days'],
+        'slipping' => ['label' => __('projects.lens_slipping'), 'hint' => __('projects.lens_slipping_hint'), 'icon' => 'exclamation-triangle'],
+        'risks' => ['label' => __('projects.lens_risks'), 'hint' => __('projects.lens_risks_hint'), 'icon' => 'bolt'],
+    ];
+
+    /* The fill mirrors the pill, so a verdict never disagrees with its own bar. */
+    $progressFillClasses = fn (string $tone): string => match ($tone) {
+        'critical' => 'bg-primary',
+        'warn' => 'bg-status-warn',
+        'good' => 'bg-status-good',
+        default => 'bg-secondary-dark dark:bg-white',
+    };
+
+    /* The board card reads the same verdict at full RAG resolution. Critical
+       fills solid so white type carries it in both themes; the softer tones
+       already flip their own tokens in dark mode. */
+    $tonePillClasses = fn (string $tone): string => match ($tone) {
+        'critical' => 'border-primary bg-primary font-semibold text-white',
+        'warn' => 'border-status-warn/40 bg-status-warn-soft font-semibold text-status-warn',
+        'good' => 'border-status-good/40 bg-status-good-soft font-semibold text-status-good',
+        default => 'border-board-line text-secondary-medium dark:text-secondary-soft',
+    };
+
+    /* How much of a project's own window has passed, as a percentage. */
+    $elapsedOf = function (Project $project) use ($today): ?float {
+        if ($project->start_date === null || $project->end_date === null || $project->end_date->lt($project->start_date)) {
+            return null;
+        }
+
+        $span = max(1, $project->end_date->getTimestamp() - $project->start_date->getTimestamp());
+
+        return min(100, max(0, ($today->getTimestamp() - $project->start_date->getTimestamp()) / $span * 100));
+    };
+
+    /* The schedule verdict, rated with RagStatus so this page and the program
+       timeline can never disagree about what "slipping" means. Only two
+       appearances exist — needs attention (primary) and calm (grey) — so the
+       words carry the meaning and the colour only raises a hand. */
+    $scheduleOf = function (Project $project) use ($today, $elapsedOf): array {
+        $progress = $this->progressFor($project);
+        $elapsed = $elapsedOf($project);
+        $isFinished = in_array($project->status, [ProjectStatus::Closed, ProjectStatus::Archived], true);
+
+        return match (true) {
+            $project->start_date === null || $project->end_date === null => ['label' => __('projects.unscheduled'), 'icon' => 'calendar', 'alert' => false, 'tone' => 'neutral'],
+            $isFinished => ['label' => $project->status->label(), 'icon' => 'archive-box', 'alert' => false, 'tone' => 'neutral'],
+            $today->gt($project->end_date) && ($progress ?? 0) < 100 => ['label' => __('programs.timeline_past_end'), 'icon' => 'exclamation-circle', 'alert' => true, 'tone' => 'critical'],
+            $progress === null => ['label' => __('programs.timeline_unmeasured'), 'icon' => 'minus-circle', 'alert' => false, 'tone' => 'neutral'],
+            $progress >= 100 => ['label' => __('programs.timeline_complete'), 'icon' => 'check-circle', 'alert' => false, 'tone' => 'good'],
+            $today->lt($project->start_date) => ['label' => __('programs.timeline_not_started'), 'icon' => 'clock', 'alert' => false, 'tone' => 'neutral'],
+            default => match (RagStatus::rate($progress, (float) $elapsed)) {
+                RagStatus::Green => ['label' => __('programs.timeline_on_track'), 'icon' => 'check-circle', 'alert' => false, 'tone' => 'good'],
+                RagStatus::Amber => ['label' => __('programs.timeline_slipping'), 'icon' => 'exclamation-triangle', 'alert' => true, 'tone' => 'warn'],
+                RagStatus::Red => ['label' => __('programs.timeline_behind'), 'icon' => 'exclamation-circle', 'alert' => true, 'tone' => 'critical'],
+            },
+        };
+    };
+
+    /* Every relation a project carries, counted in the list query and shown in
+       one fixed order so the same chip sits in the same place on every record. */
+    $connectionsOf = function (Project $project): array {
+        $openRisks = $project->risks_count - $project->materialised_risks_count;
+
+        /* An empty relation says nothing worth a chip; a materialised risk always does. */
+        return array_values(array_filter([
+            ['icon' => 'flag', 'count' => $project->milestones_count, 'label' => trans_choice('common.count_milestone', $project->milestones_count, ['count' => $project->milestones_count]), 'alert' => false],
+            ['icon' => 'chart-bar', 'count' => $project->plan_indicators_count, 'label' => trans_choice('common.count_target', $project->plan_indicators_count, ['count' => $project->plan_indicators_count]), 'alert' => false],
+            ['icon' => 'presentation-chart-line', 'count' => $project->indicators_count, 'label' => trans_choice('projects.count_indicator', $project->indicators_count, ['count' => $project->indicators_count]), 'alert' => false],
+            ['icon' => 'document-text', 'count' => $project->proposals_count, 'label' => trans_choice('projects.count_proposal', $project->proposals_count, ['count' => $project->proposals_count]), 'alert' => false],
+            ['icon' => 'paper-clip', 'count' => $project->media_count, 'label' => trans_choice('projects.count_file', $project->media_count, ['count' => $project->media_count]), 'alert' => false],
+            [
+                'icon' => 'shield-exclamation',
+                'count' => $project->risks_count,
+                'label' => $project->materialised_risks_count > 0
+                    ? trans_choice('projects.count_risks_materialised', $project->risks_count, ['count' => $project->risks_count, 'materialised' => $project->materialised_risks_count])
+                    : trans_choice('programs.timeline_open_risks', $openRisks, ['count' => $openRisks]),
+                'alert' => $project->materialised_risks_count > 0,
+            ],
+        ], fn (array $connection): bool => $connection['count'] > 0 || $connection['alert']));
+    };
+
+    /* The four demographic commitments, shown only where they were recorded. */
+    $demographicsOf = fn (Project $project): array => array_filter([
+        __('projects.men') => $project->target_men,
+        __('projects.women') => $project->target_women,
+        __('projects.boys') => $project->target_boys,
+        __('projects.girls') => $project->target_girls,
+    ], fn (?int $value): bool => $value !== null);
+
+    /* Plural forms with the count left as a marker, so the modal's Alpine
+       hint can pick the right Arabic range without a round trip. */
+    $durationForms = [
+        1 => trans_choice('projects.duration_days', 1, ['count' => '__N__']),
+        2 => trans_choice('projects.duration_days', 2, ['count' => '__N__']),
+        3 => trans_choice('projects.duration_days', 3, ['count' => '__N__']),
+        11 => trans_choice('projects.duration_days', 11, ['count' => '__N__']),
+    ];
 @endphp
 
-<section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="project-directory-heading">
+<section class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="project-directory-heading">
     <x-ui.page-header
         heading-id="project-directory-heading"
         :title="__('common.projects')"
-        :count="$this->projects->total()"
+        :count="$projects->total()"
     >
         <x-slot:filters>
             <x-ui.input type="search" icon="magnifying-glass" :label="__('projects.search_projects')" :placeholder="__('projects.project_city_program_or_owner')" wire:model.live.debounce.300ms="search" clearable />
@@ -371,10 +979,9 @@ new #[Title('titles.projects')] class extends Component {
                 @endforeach
             </x-ui.header-filter-select>
 
-            <x-ui.header-filter-select :label="__('common.status')" wire:model.live="status" :value="$status">
-                <flux:select.option value="">{{ __('common.all_statuses') }}</flux:select.option>
-                @foreach (ProjectStatus::cases() as $statusOption)
-                    <flux:select.option :value="$statusOption->value" :wire:key="'status-filter-'.$statusOption->value">{{ $statusOption->label() }}</flux:select.option>
+            <x-ui.header-filter-select :label="__('projects.sort_by')" wire:model.live="sort" :value="$sort">
+                @foreach ($sortOptions as $sortValue => $sortLabel)
+                    <flux:select.option :value="$sortValue" :wire:key="'sort-option-'.$sortValue">{{ $sortLabel }}</flux:select.option>
                 @endforeach
             </x-ui.header-filter-select>
         </x-slot:filters>
@@ -386,14 +993,141 @@ new #[Title('titles.projects')] class extends Component {
         </x-slot:actions>
     </x-ui.page-header>
 
-    <x-ui.panel :subtitle="trans_choice('projects.count_matching_project', $this->projects->total(), ['count' => $this->projects->total()])">
-        <x-slot:toolbar>
-            @if ($filtersAreActive)
-                <flux:button size="sm" variant="ghost" class="text-secondary-medium! hover:bg-secondary-soft! dark:text-secondary-soft!" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
-            @endif
-        </x-slot:toolbar>
+    {{-- The pipeline, which is also the status filter. Six equal segments on
+         one baseline; the selected one is the only large red area here. --}}
+    <div role="group" aria-label="{{ __('projects.lifecycle') }}" class="grid grid-flow-col auto-cols-[minmax(7.5rem,1fr)] snap-x gap-px overflow-x-auto rounded-xl border border-secondary-soft bg-secondary-soft dark:border-secondary-medium dark:bg-secondary-medium">
+        @foreach (ProjectStatus::cases() as $case)
+            @php
+                $segmentCount = $statusCounts[$case->value] ?? 0;
+                $isSelected = $status === $case->value;
+            @endphp
 
-        @if ($this->projects->isEmpty())
+            <button
+                type="button"
+                wire:click="toggleStatus('{{ $case->value }}')"
+                aria-pressed="{{ $isSelected ? 'true' : 'false' }}"
+                data-test="lifecycle-{{ $case->value }}"
+                @class([
+                    'flex min-h-16 snap-start cursor-pointer flex-col justify-center gap-1 px-4 py-3 text-start transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary',
+                    'bg-primary text-white' => $isSelected,
+                    'bg-white text-secondary-dark hover:bg-secondary-soft/50 dark:bg-secondary-dark dark:text-white dark:hover:bg-secondary-medium/40' => ! $isSelected,
+                ])
+            >
+                <span class="sr-only">{{ trans_choice('projects.lifecycle_segment', $segmentCount, ['status' => $case->label(), 'count' => $segmentCount]) }}</span>
+                <span aria-hidden="true" class="type-label truncate {{ $isSelected ? 'text-white/80' : 'text-secondary-medium dark:text-secondary-soft' }}">{{ $case->label() }}</span>
+                <span aria-hidden="true" class="text-2xl leading-none font-bold tabular-nums">{{ $segmentCount }}</span>
+            </button>
+        @endforeach
+    </div>
+
+    {{-- Two readings of the same filtered portfolio, then the four decisions
+         waiting on it. Kept apart because they answer different questions. --}}
+    <div class="grid gap-4 @4xl/directory:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+        <section aria-labelledby="portfolio-figures-heading">
+            <h2 id="portfolio-figures-heading" class="type-label mb-2 text-secondary-medium dark:text-secondary-soft">{{ __('projects.group_portfolio') }}</h2>
+
+            <div class="grid min-h-[calc(100%-1.75rem)] grid-cols-2 gap-px overflow-hidden rounded-xl border border-secondary-soft bg-secondary-soft dark:border-secondary-medium dark:bg-secondary-medium">
+                <div class="flex flex-col justify-between gap-2 bg-white p-4 dark:bg-secondary-dark">
+                    <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.tile_committed_funding') }}</p>
+                    <div>
+                        @forelse ($this->committedFunding as $fundingCurrency => $fundingTotal)
+                            <p class="type-figure" wire:key="committed-{{ $fundingCurrency }}">
+                                <x-ui.money :amount="$fundingTotal" :currency="$fundingCurrency" />
+                            </p>
+                        @empty
+                            <p class="type-figure text-secondary-light">—</p>
+                        @endforelse
+                    </div>
+                    <p class="type-meta text-secondary-medium dark:text-secondary-soft">{{ __('projects.tile_committed_funding_hint') }}</p>
+                </div>
+
+                <div class="flex flex-col justify-between gap-2 bg-white p-4 dark:bg-secondary-dark">
+                    <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.tile_beneficiaries') }}</p>
+                    <p class="type-figure">{{ number_format($this->committedBeneficiaries) }}</p>
+                    <p class="type-meta text-secondary-medium dark:text-secondary-soft">{{ __('projects.tile_beneficiaries_hint') }}</p>
+                </div>
+            </div>
+        </section>
+
+        <section aria-labelledby="portfolio-triage-heading">
+            <h2 id="portfolio-triage-heading" class="type-label mb-2 text-secondary-medium dark:text-secondary-soft">{{ __('projects.group_attention') }}</h2>
+
+            <div class="grid min-h-[calc(100%-1.75rem)] grid-cols-2 gap-px overflow-hidden rounded-xl border border-secondary-soft bg-secondary-soft @2xl/directory:grid-cols-4 dark:border-secondary-medium dark:bg-secondary-medium">
+                @foreach ($lensTiles as $lensValue => $lensTile)
+                    @php
+                        $lensCount = $triageCounts[$lensValue] ?? 0;
+                        $lensIsActive = $lens === $lensValue;
+                        $lensIsQuiet = $lensCount === 0;
+
+                        // The grid is 2x2 below @2xl/directory and a single row of 4 from
+                        // it up, so which corners each tile owns changes at that breakpoint.
+                        // Match the container's rounded-xl so an active tile's own border
+                        // isn't squared off where the container clips it round.
+                        $lensCornerClasses = match ($loop->index) {
+                            0 => 'rounded-tl-xl @2xl/directory:rounded-bl-xl',
+                            1 => 'rounded-tr-xl @2xl/directory:rounded-tr-none',
+                            2 => 'rounded-bl-xl @2xl/directory:rounded-bl-none',
+                            3 => 'rounded-br-xl @2xl/directory:rounded-tr-xl',
+                        };
+                    @endphp
+
+                    <button
+                        type="button"
+                        wire:click="toggleLens('{{ $lensValue }}')"
+                        @disabled($lensIsQuiet)
+                        aria-pressed="{{ $lensIsActive ? 'true' : 'false' }}"
+                        data-test="lens-{{ $lensValue }}"
+                        wire:key="tile-lens-{{ $lensValue }}"
+                        @class([
+                            'box-border flex flex-col justify-between gap-2 border-2 p-4 text-start transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary',
+                            $lensCornerClasses,
+                            'cursor-pointer border-white bg-white hover:border-secondary-soft/50 hover:bg-secondary-soft/50 dark:border-secondary-dark dark:bg-secondary-dark dark:hover:border-secondary-medium/40 dark:hover:bg-secondary-medium/40' => ! $lensIsQuiet && ! $lensIsActive,
+                            'cursor-pointer border-primary bg-white dark:bg-secondary-dark' => $lensIsActive,
+                            'cursor-default border-white bg-white dark:border-secondary-dark dark:bg-secondary-dark' => $lensIsQuiet,
+                        ])
+                    >
+                        <span class="type-label flex items-center gap-1.5 text-secondary-medium dark:text-secondary-soft">
+                            <flux:icon :name="$lensTile['icon']" variant="micro" class="size-3.5 shrink-0" aria-hidden="true" />
+                            <span class="truncate">{{ $lensTile['label'] }}</span>
+                        </span>
+                        <span class="type-figure {{ $lensIsQuiet ? 'text-secondary-light' : 'text-primary' }}">{{ $lensCount }}</span>
+                        <span class="type-meta text-secondary-medium dark:text-secondary-soft">{{ $lensTile['hint'] }}</span>
+                    </button>
+                @endforeach
+            </div>
+        </section>
+    </div>
+
+    {{-- Tabs, exactly as the milestones directory renders them. --}}
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="inline-flex flex-wrap gap-1 rounded-lg border border-secondary-soft bg-secondary-soft/40 p-1 dark:border-secondary-medium dark:bg-secondary-medium/40" role="group" aria-label="{{ __('projects.views') }}">
+            @foreach ($viewOptions as $viewValue => $viewMeta)
+                <button
+                    type="button"
+                    wire:click="$set('view', '{{ $viewValue }}')"
+                    aria-pressed="{{ $view === $viewValue ? 'true' : 'false' }}"
+                    data-test="project-view-{{ $viewValue }}"
+                    @class([
+                        'inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-md px-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                        'bg-white text-secondary-dark shadow-sm dark:bg-secondary-dark dark:text-white' => $view === $viewValue,
+                        'text-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => $view !== $viewValue,
+                    ])
+                >
+                    <flux:icon :name="$viewMeta['icon']" variant="micro" class="size-4" aria-hidden="true" />
+                    {{ $viewMeta['label'] }}
+                </button>
+            @endforeach
+        </div>
+
+        <div class="flex shrink-0 items-center gap-2">
+            @if ($filtersAreActive)
+                <flux:button size="sm" variant="ghost" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
+            @endif
+        </div>
+    </div>
+
+    @if ($projects->isEmpty())
+        <x-ui.panel>
             <x-ui.empty-state
                 icon="rectangle-stack"
                 :heading="$filtersAreActive ? __('projects.no_matching_projects') : __('common.no_projects_yet')"
@@ -407,44 +1141,525 @@ new #[Title('titles.projects')] class extends Component {
                     @endif
                 </x-slot:action>
             </x-ui.empty-state>
-        @else
-            <div class="divide-y divide-secondary-soft dark:divide-secondary-medium">
-                @foreach ($this->projects as $project)
-                    <article class="grid gap-3 p-3.5 @3xl/directory:grid-cols-[minmax(0,1.4fr)_minmax(12rem,0.8fr)_minmax(11rem,0.7fr)_auto] @3xl/directory:items-center" wire:key="project-{{ $project->id }}">
-                        <div class="min-w-0">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <a href="{{ route('projects.show', $project) }}" wire:navigate class="text-sm font-semibold hover:underline">{{ $project->name }}</a>
-                                <x-ui.enum-badge :case="$project->status" />
-                            </div>
-                            <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">
-                                {{ $project->city?->name ?? __('common.unknown_city') }} · {{ $project->program->name }}
-                            </p>
-                            <p class="mt-1 text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">
-                                {{ $project->start_date?->translatedFormat(__('formats.date')) ?? '—' }} → {{ $project->end_date?->translatedFormat(__('formats.date')) ?? '—' }}
-                            </p>
+        </x-ui.panel>
+    @else
+        <div class="flex flex-col gap-4 transition-opacity motion-reduce:transition-none" wire:loading.class="opacity-60" wire:target="{{ $loadingTargets }}">
+            @if ($view === 'board')
+                @foreach ($projects->getCollection()->groupBy(fn (Project $project): string => $project->status->value) as $bandStatus => $bandProjects)
+                    @php $bandCase = ProjectStatus::from($bandStatus); @endphp
+
+                    <x-ui.panel :title="$bandCase->label()" :count="$bandProjects->count()" wire:key="project-band-{{ $bandStatus }}">
+                        <div class="grid grid-cols-1 items-stretch gap-3 p-3 @2xl/directory:grid-cols-2 @5xl/directory:grid-cols-3">
+                            @foreach ($bandProjects as $project)
+                                @php
+                                    $progress = $this->progressFor($project);
+                                    $schedule = $scheduleOf($project);
+                                    $funding = $fundingByProject[$project->id] ?? null;
+                                    $breakdown = $project->targetDemographicTotal();
+                                    $demographics = $demographicsOf($project);
+
+                                    /* The progress fill carries the same verdict as the pill above it. */
+                                    $progressTone = $schedule['tone'];
+
+                                    /* Three label rows collapse into one breadcrumb; the labels move to the tooltip. */
+                                    $projectPath = [
+                                        $project->city?->name ?? __('common.unknown_city'),
+                                        $project->program->name,
+                                        $project->program->strategy?->name ?? __('common.strategy_not_assigned'),
+                                    ];
+                                    $pathTitle = implode(' · ', [
+                                        __('common.city').': '.$projectPath[0],
+                                        __('common.program').': '.$projectPath[1],
+                                        __('common.strategy').': '.$projectPath[2],
+                                    ]);
+
+                                    $demographicsTitle = implode(' · ', array_map(
+                                        fn (string $label, int $value): string => $label.' '.number_format($value),
+                                        array_keys($demographics),
+                                        array_values($demographics),
+                                    ));
+
+                                    $connections = $connectionsOf($project);
+                                @endphp
+
+                                <article
+                                    @class([
+                                        'group/card relative isolate flex h-full flex-col rounded-xl border bg-board p-4',
+                                        'transition-[transform,box-shadow,border-color] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none',
+                                        'hover:-translate-y-0.5 hover:shadow-[0_10px_24px_-12px_rgb(16_24_40/0.28),0_2px_6px_-2px_rgb(16_24_40/0.10)] motion-reduce:hover:translate-y-0',
+                                        'border-primary/40' => $schedule['tone'] === 'critical',
+                                        'border-status-warn/45' => $schedule['tone'] === 'warn',
+                                        'border-board-line' => ! in_array($schedule['tone'], ['critical', 'warn'], true),
+                                    ])
+                                    wire:key="project-card-{{ $project->id }}"
+                                >
+                                    {{-- Identity. Open and edit sit together as icon actions, exactly as on programs. --}}
+                                    <div class="flex items-start justify-between gap-3">
+                                        <div class="min-w-0">
+                                            <h3 class="line-clamp-2 text-[15px] leading-snug font-semibold text-secondary-dark dark:text-white" title="{{ $project->name }}">{{ $project->name }}</h3>
+
+                                            {{-- City, program and strategy as one breadcrumb instead of three label rows. --}}
+                                            <p class="type-meta mt-1 truncate text-secondary-medium dark:text-secondary-soft" title="{{ $pathTitle }}">
+                                                {{ $projectPath[0] }} <span class="text-secondary-soft dark:text-secondary-medium">&middot;</span> {{ $projectPath[1] }} <span class="text-secondary-soft dark:text-secondary-medium">&middot;</span> {{ $projectPath[2] }}
+                                            </p>
+                                        </div>
+
+                                        <div class="flex shrink-0 items-center gap-1">
+                                            <a
+                                                href="{{ route('projects.show', $project) }}"
+                                                wire:navigate
+                                                class="grid size-11 place-items-center rounded-md border-0! bg-transparent! text-secondary-dark! transition-colors hover:bg-secondary-soft! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-white! dark:hover:bg-secondary-medium! @3xl/directory:size-8!"
+                                                aria-label="{{ __('projects.open_project', ['name' => $project->name]) }}"
+                                            >
+                                                <flux:icon.eye class="size-4.5" />
+                                            </a>
+
+                                            <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation @3xl/directory:size-8!" wire:click="openEditModal({{ $project->id }})" :aria-label="__('common.edit_name', ['name' => $project->name])" />
+                                            @if ($project->status === ProjectStatus::Archived)
+                                                <x-ui.button tone="ghost" size="sm" icon="arrow-uturn-left" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="restoreProject({{ $project->id }})" :aria-label="__('projects.restore_name', ['name' => $project->name])" />
+                                            @else
+                                                <x-ui.button tone="ghost" size="sm" icon="archive-box" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="confirmArchive({{ $project->id }})" :aria-label="__('projects.archive_name', ['name' => $project->name])" />
+                                            @endif
+                                        </div>
+                                    </div>
+
+                                    {{-- Delivery. The verdict, the number and the window read as one signal. --}}
+                                    <div class="mt-4">
+                                        <div class="flex items-center justify-between gap-2">
+                                            <span class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs whitespace-nowrap {{ $tonePillClasses($schedule['tone']) }}">
+                                                <flux:icon :name="$schedule['icon']" variant="micro" class="size-3.5" aria-hidden="true" />{{ $schedule['label'] }}
+                                            </span>
+
+                                            <p class="shrink-0 text-xl leading-none font-bold tracking-tight tabular-nums text-secondary-dark dark:text-white">
+                                                @if ($progress === null)
+                                                    <span class="text-base font-semibold text-secondary-medium dark:text-secondary-soft">&mdash;</span>
+                                                @else
+                                                    {{ round($progress) }}<span class="text-xs font-semibold text-secondary-medium dark:text-secondary-soft">%</span>
+                                                @endif
+                                            </p>
+                                        </div>
+
+                                        <x-ui.progress-bar class="mt-2.5" :value="$progress" :tone="$progressTone" :label="__('projects.milestone_progress_for', ['name' => $project->name])" label-hidden />
+
+                                        <div class="mt-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                                            <p class="type-meta text-secondary-medium dark:text-secondary-soft">
+                                                {{ $progress === null ? __('projects.no_weighted_milestones') : __('projects.milestones_reached', ['reached' => $project->reached_milestones_count, 'total' => $project->milestones_count]) }}
+                                            </p>
+                                            <p class="type-meta shrink-0 tabular-nums text-secondary-medium dark:text-secondary-soft">
+                                                {{ $project->start_date?->translatedFormat(__('formats.date')) ?? '—' }}
+                                                <flux:icon.arrow-long-right variant="micro" class="inline size-3.5 rtl:-scale-x-100" aria-hidden="true" />
+                                                {{ $project->end_date?->translatedFormat(__('formats.date')) ?? '—' }}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {{-- Money and people: the two commitments, on one shared baseline. --}}
+                                    <div class="mt-4 grid grid-cols-2 gap-x-4 gap-y-1 border-t border-board-line pt-3.5">
+                                        <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.funding_envelope') }}</p>
+                                        <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.col_beneficiaries') }}</p>
+
+                                        <div class="min-w-0">
+                                            @if ($funding === null)
+                                                <p class="text-base font-semibold text-secondary-medium dark:text-secondary-soft">{{ $project->proposals_count === 0 ? __('projects.not_funded_yet') : '—' }}</p>
+                                            @else
+                                                @foreach ($funding['currencies'] as $cardCurrency => $cardTotal)
+                                                    <p class="text-base text-secondary-dark dark:text-white" wire:key="funding-{{ $project->id }}-{{ $cardCurrency }}">
+                                                        <x-ui.money :amount="$cardTotal" :currency="$cardCurrency" />
+                                                    </p>
+                                                @endforeach
+                                                <p class="type-meta mt-0.5 truncate text-secondary-medium dark:text-secondary-soft" title="{{ implode(' · ', $funding['donors']) }}">{{ implode(' · ', $funding['donors']) }}</p>
+                                                <p class="type-meta truncate text-secondary-medium dark:text-secondary-soft" title="{{ implode(' · ', $funding['proposals']) }}">{{ implode(' · ', $funding['proposals']) }}</p>
+                                            @endif
+                                        </div>
+
+                                        <div class="min-w-0">
+                                            <p class="text-base font-semibold tabular-nums text-secondary-dark dark:text-white">{{ $project->target_beneficiaries === null ? '—' : number_format($project->target_beneficiaries) }}</p>
+                                            @if ($demographics !== [])
+                                                <p class="type-meta mt-0.5 truncate tabular-nums text-secondary-medium dark:text-secondary-soft" title="{{ $demographicsTitle }}">
+                                                    @foreach ($demographics as $demographicLabel => $demographicValue)
+                                                        {{ $demographicLabel }} {{ number_format($demographicValue) }}@if (! $loop->last) <span class="text-secondary-soft dark:text-secondary-medium">&middot;</span> @endif
+                                                    @endforeach
+                                                </p>
+                                            @endif
+                                            @if ($breakdown !== null && $breakdown !== $project->target_beneficiaries)
+                                                <p class="type-meta tabular-nums text-secondary-medium dark:text-secondary-soft">{{ __('projects.breakdown_count', ['count' => number_format($breakdown)]) }}</p>
+                                            @endif
+                                        </div>
+
+                                        @if ($funding !== null && $funding['shared'] > 0)
+                                            <span class="type-meta col-span-2 mt-1.5 inline-flex w-fit items-center gap-1 rounded-full border border-board-line px-2 py-0.5 text-secondary-medium dark:text-secondary-soft">
+                                                <flux:icon.arrows-right-left variant="micro" class="size-3.5 shrink-0" aria-hidden="true" />
+                                                {{ trans_choice('projects.shared_with_other_projects', $funding['shared'], ['count' => $funding['shared']]) }}
+                                            </span>
+                                        @endif
+                                    </div>
+
+                                    {{-- Footer: what this project is linked to, and who owns it. --}}
+                                    <div class="mt-auto pt-4">
+                                        <div class="flex items-center justify-between gap-3 border-t border-board-line pt-3.5">
+                                            @if ($connections !== [])
+                                                <div class="flex min-w-0 flex-wrap items-center gap-1.5">
+                                                    @foreach ($connections as $connection)
+                                                        <span
+                                                            @class([
+                                                                'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs tabular-nums',
+                                                                'border-primary bg-primary font-semibold text-white' => $connection['alert'],
+                                                                'border-board-line text-secondary-medium dark:text-secondary-soft' => ! $connection['alert'],
+                                                            ])
+                                                            title="{{ $connection['label'] }}"
+                                                        >
+                                                            <flux:icon :name="$connection['icon']" variant="micro" class="size-3.5" aria-hidden="true" />
+                                                            <span aria-hidden="true">{{ $connection['count'] }}</span>
+                                                            <span class="sr-only">{{ $connection['label'] }}</span>
+                                                        </span>
+                                                    @endforeach
+                                                </div>
+                                            @else
+                                                <p class="type-meta text-secondary-medium dark:text-secondary-soft">{{ __('projects.no_connections_yet') }}</p>
+                                            @endif
+
+                                            <x-ui.employee-chip :employee="$project->user" compact class="shrink-0 justify-end" />
+                                        </div>
+                                    </div>
+                                </article>
+                            @endforeach
                         </div>
-
-                        <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs font-medium text-secondary-medium dark:text-secondary-soft">
-                            <span>{{ __('projects.headline_count', ['count' => $project->target_beneficiaries === null ? '—' : number_format($project->target_beneficiaries)]) }}</span>
-                            <span>{{ __('projects.breakdown_count', ['count' => $project->targetDemographicTotal() === null ? '—' : number_format($project->targetDemographicTotal())]) }}</span>
-                            <span>{{ trans_choice('common.count_risk', $project->risks_count, ['count' => $project->risks_count]) }}</span>
-                            <span>{{ trans_choice('common.count_milestone', $project->milestones_count, ['count' => $project->milestones_count]) }}</span>
-                            <span>{{ trans_choice('common.count_target', $project->plan_indicators_count, ['count' => $project->plan_indicators_count]) }}</span>
-                            <span>{{ trans_choice('projects.count_proposal', $project->proposals_count, ['count' => $project->proposals_count]) }}</span>
-                        </div>
-
-                        <x-ui.employee-chip :employee="$project->user" />
-
-                        <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="openEditModal({{ $project->id }})" :aria-label="__('common.edit_name', ['name' => $project->name])" />
-                    </article>
+                    </x-ui.panel>
                 @endforeach
-            </div>
-        @endif
+            @elseif ($view === 'table')
+                <x-ui.data-table :caption="__('projects.project_directory')">
+                    <x-slot:head>
+                        <th scope="col" class="w-32">{{ __('projects.col_scheduled') }}</th>
+                        <th scope="col">{{ __('common.projects') }}</th>
+                        <th scope="col" class="w-44">{{ __('projects.col_progress') }}</th>
+                        <th scope="col" class="w-32 text-end! @max-6xl:hidden">{{ __('projects.col_beneficiaries') }}</th>
+                        <th scope="col" class="w-44 text-end! @max-5xl:hidden">{{ __('projects.col_funding') }}</th>
+                        <th scope="col" class="w-44 @max-6xl:hidden">{{ __('projects.connections') }}</th>
+                        <th scope="col" class="w-40 @max-4xl:hidden">{{ __('projects.owner') }}</th>
+                        <th scope="col" class="w-36">{{ __('projects.col_schedule') }}</th>
+                        <th scope="col" class="w-28">{{ __('common.status') }}</th>
+                        <th scope="col" class="w-28"><span class="sr-only">{{ __('common.actions') }}</span></th>
+                    </x-slot:head>
 
-        <x-slot:footer>
-            <flux:pagination :paginator="$this->projects" class="text-secondary-medium! dark:text-secondary-soft!" scroll-to="#project-directory-heading" />
-        </x-slot:footer>
-    </x-ui.panel>
+                    @foreach ($projects as $project)
+                        @php
+                            $progress = $this->progressFor($project);
+                            $schedule = $scheduleOf($project);
+                            $funding = $fundingByProject[$project->id] ?? null;
+                            $breakdown = $project->targetDemographicTotal();
+                            $connections = $connectionsOf($project);
+                        @endphp
+
+                        <tr wire:key="project-{{ $project->id }}">
+                            <x-ui.data-table.cell :label="__('projects.col_scheduled')">
+                                <span class="block text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $project->start_date?->translatedFormat(__('formats.date')) ?? '—' }}</span>
+                                <span class="block text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">
+                                    <flux:icon.arrow-long-right variant="micro" class="inline size-3.5 rtl:-scale-x-100" aria-hidden="true" />
+                                    {{ $project->end_date?->translatedFormat(__('formats.date')) ?? '—' }}
+                                </span>
+                            </x-ui.data-table.cell>
+
+                            <x-ui.data-table.cell>
+                                <span class="line-clamp-2 text-sm font-semibold" title="{{ $project->name }}">{{ $project->name }}</span>
+                                <span class="block truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $project->city?->name ?? __('common.unknown_city') }} · {{ $project->program->name }}</span>
+                                <span class="block truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $project->program->strategy?->name ?? __('common.strategy_not_assigned') }}</span>
+                                <span class="hidden truncate text-xs tabular-nums text-secondary-medium @max-6xl:block @max-3xl:hidden! dark:text-secondary-soft">
+                                    {{ $project->target_beneficiaries === null ? '—' : number_format($project->target_beneficiaries) }}
+                                    @foreach ($connections as $connection)
+                                        <span aria-hidden="true"> · </span><span aria-label="{{ $connection['label'] }}" class="{{ $connection['alert'] ? 'font-semibold text-primary' : '' }}">{{ $connection['count'] }}</span>
+                                    @endforeach
+                                </span>
+                            </x-ui.data-table.cell>
+
+                            <x-ui.data-table.cell :label="__('projects.col_progress')">
+                                <x-ui.progress-bar :value="$progress" :tone="$schedule['tone']" :label="__('projects.milestone_progress_for', ['name' => $project->name])" label-hidden :show-value="$progress !== null" />
+                                <span class="mt-1 block text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">
+                                    {{ $progress === null ? __('projects.no_weighted_milestones') : __('projects.milestones_reached', ['reached' => $project->reached_milestones_count, 'total' => $project->milestones_count]) }}
+                                </span>
+                            </x-ui.data-table.cell>
+
+                            <x-ui.data-table.cell :label="__('projects.col_beneficiaries')" numeric class="@max-6xl:hidden @max-3xl:flex!">
+                                <span class="block font-semibold">{{ $project->target_beneficiaries === null ? '—' : number_format($project->target_beneficiaries) }}</span>
+                                @if ($breakdown !== null && $breakdown !== $project->target_beneficiaries)
+                                    <span class="block text-xs text-secondary-medium dark:text-secondary-soft">{{ __('projects.breakdown_count', ['count' => number_format($breakdown)]) }}</span>
+                                @endif
+                            </x-ui.data-table.cell>
+
+                            <x-ui.data-table.cell :label="__('projects.col_funding')" numeric class="@max-5xl:hidden @max-3xl:flex!">
+                                @if ($funding === null)
+                                    <span class="text-xs text-secondary-light">{{ $project->proposals_count === 0 ? __('projects.not_funded_yet') : '—' }}</span>
+                                @else
+                                    @foreach ($funding['currencies'] as $rowCurrency => $rowTotal)
+                                        <span class="block" wire:key="row-funding-{{ $project->id }}-{{ $rowCurrency }}">
+                                            <x-ui.money :amount="$rowTotal" :currency="$rowCurrency" />
+                                        </span>
+                                    @endforeach
+                                    <span class="block truncate text-xs text-secondary-medium dark:text-secondary-soft" title="{{ implode(' · ', $funding['donors']) }}">{{ implode(' · ', $funding['donors']) }}</span>
+                                    @if ($funding['shared'] > 0)
+                                        <span class="block text-xs text-secondary-medium dark:text-secondary-soft">{{ trans_choice('projects.shared_with_other_projects', $funding['shared'], ['count' => $funding['shared']]) }}</span>
+                                    @endif
+                                @endif
+                            </x-ui.data-table.cell>
+
+                            <x-ui.data-table.cell :label="__('projects.connections')" class="@max-6xl:hidden @max-3xl:flex!">
+                                <span class="flex flex-wrap items-center gap-1">
+                                    @foreach ($connections as $connection)
+                                        <span
+                                            @class([
+                                                'inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs tabular-nums',
+                                                'border-primary bg-primary font-semibold text-white' => $connection['alert'],
+                                                'border-board-line text-secondary-medium dark:text-secondary-soft' => ! $connection['alert'],
+                                            ])
+                                            title="{{ $connection['label'] }}"
+                                            aria-label="{{ $connection['label'] }}"
+                                        >
+                                            <flux:icon :name="$connection['icon']" variant="micro" class="size-3.5" aria-hidden="true" />{{ $connection['count'] }}
+                                        </span>
+                                    @endforeach
+                                </span>
+                            </x-ui.data-table.cell>
+
+                            <x-ui.data-table.cell :label="__('projects.owner')" class="@max-4xl:hidden @max-3xl:flex!">
+                                <x-ui.employee-chip :employee="$project->user" compact />
+                            </x-ui.data-table.cell>
+
+                            <x-ui.data-table.cell :label="__('projects.col_schedule')">
+                                <span class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs whitespace-nowrap {{ $tonePillClasses($schedule['tone']) }}">
+                                    <flux:icon :name="$schedule['icon']" variant="micro" class="size-3.5" aria-hidden="true" />{{ $schedule['label'] }}
+                                </span>
+                            </x-ui.data-table.cell>
+
+                            <x-ui.data-table.cell :label="__('common.status')">
+                                <x-ui.enum-badge :case="$project->status" />
+                            </x-ui.data-table.cell>
+
+                            <x-ui.data-table.cell>
+                                <div class="flex items-center justify-end gap-1">
+                                    <a
+                                        href="{{ route('projects.show', $project) }}"
+                                        wire:navigate
+                                        class="grid size-11 shrink-0 place-items-center rounded-md border-0! bg-transparent! text-secondary-dark! transition-colors hover:bg-secondary-soft! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-white! dark:hover:bg-secondary-medium! @3xl/directory:size-8!"
+                                        aria-label="{{ __('projects.open_project', ['name' => $project->name]) }}"
+                                    >
+                                        <flux:icon.eye class="size-4.5" />
+                                    </a>
+                                    <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="openEditModal({{ $project->id }})" :aria-label="__('common.edit_name', ['name' => $project->name])" />
+                                    @if ($project->status === ProjectStatus::Archived)
+                                        <x-ui.button tone="ghost" size="sm" icon="arrow-uturn-left" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="restoreProject({{ $project->id }})" :aria-label="__('projects.restore_name', ['name' => $project->name])" />
+                                    @else
+                                        <x-ui.button tone="ghost" size="sm" icon="archive-box" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="confirmArchive({{ $project->id }})" :aria-label="__('projects.archive_name', ['name' => $project->name])" />
+                                    @endif
+                                </div>
+                            </x-ui.data-table.cell>
+                        </tr>
+                    @endforeach
+                </x-ui.data-table>
+            @else
+                @php
+                    $window = $this->timelineWindow;
+                    $windowStart = $window['start'] ?? null;
+                    $windowSpan = $window === null ? 1 : max(1, $window['end']->getTimestamp() - $windowStart->getTimestamp());
+                    $position = fn (CarbonImmutable $date): float => $window === null
+                        ? 0.0
+                        : round(min(100, max(0, ($date->getTimestamp() - $windowStart->getTimestamp()) / $windowSpan * 100)), 3);
+
+                    $ticks = [];
+                    if ($window !== null) {
+                        $months = (int) $windowStart->diffInMonths($window['end']) + 1;
+                        $step = max(1, (int) ceil($months / 8));
+                        for ($tick = $windowStart; $tick <= $window['end']; $tick = $tick->addMonthsNoOverflow($step)) {
+                            $ticks[] = ['label' => $tick->translatedFormat(__('formats.month_year')), 'at' => $position($tick), 'nearToday' => abs($position($tick) - $position($today)) < 7];
+                        }
+                    }
+                    $todayAt = $position($today);
+                    $timelineColumns = '@4xl/directory:grid-cols-[minmax(15rem,20rem)_minmax(0,1fr)_10rem]';
+                @endphp
+
+                <x-ui.panel>
+                    {{-- Same legend grammar as the milestones timeline. --}}
+                    <div class="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-secondary-soft px-4 py-3 text-xs text-secondary-medium dark:border-secondary-medium dark:text-secondary-soft" aria-hidden="true">
+                        <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-secondary-dark bg-secondary-dark dark:border-white dark:bg-white"></span>{{ MilestoneStatus::Reached->label() }}</span>
+                        <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-secondary-dark bg-white dark:border-white dark:bg-secondary-dark"></span>{{ MilestoneStatus::Pending->label() }}</span>
+                        <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-primary bg-white dark:bg-secondary-dark"></span>{{ __('programs.timeline_overdue') }}</span>
+                        <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-primary bg-primary"></span>{{ MilestoneStatus::Missed->label() }}</span>
+                        <span class="inline-flex items-center gap-1.5"><span class="h-3.5 w-0.5 bg-primary"></span>{{ __('programs.timeline_today') }}</span>
+                    </div>
+
+                    @if ($window !== null)
+                        <div class="hidden gap-6 border-b border-secondary-soft px-4 {{ $timelineColumns }} @4xl/directory:grid dark:border-secondary-medium">
+                            <span></span>
+                            <div class="relative h-9">
+                                @foreach ($ticks as $tick)
+                                    @continue($tick['nearToday'])
+                                    <span class="absolute bottom-2 -translate-x-1/2 text-xs whitespace-nowrap tabular-nums text-secondary-light rtl:translate-x-1/2 dark:text-secondary-medium" style="inset-inline-start: {{ $tick['at'] }}%">{{ $tick['label'] }}</span>
+                                @endforeach
+                                <span class="absolute bottom-1.5 -translate-x-1/2 rounded-full bg-primary px-2 py-0.5 text-[0.6875rem] font-bold whitespace-nowrap text-white rtl:translate-x-1/2" style="inset-inline-start: {{ $todayAt }}%">{{ __('programs.timeline_today') }}</span>
+                            </div>
+                            <span></span>
+                        </div>
+                    @endif
+
+                    <ol class="divide-y divide-secondary-soft dark:divide-secondary-medium">
+                        @foreach ($projects as $project)
+                            @php
+                                $progress = $this->progressFor($project);
+                                $schedule = $scheduleOf($project);
+                                $elapsed = $elapsedOf($project);
+                                $connections = $connectionsOf($project);
+                                $funding = $fundingByProject[$project->id] ?? null;
+                                $hasDates = $project->start_date !== null && $project->end_date !== null && $project->end_date->gte($project->start_date);
+                                $hasWindow = $window !== null && $hasDates;
+                                $barStart = $hasWindow ? $position($project->start_date) : 0;
+                                $barWidth = $hasWindow ? max(1.5, $position($project->end_date) - $barStart) : 0;
+                                $isLive = $project->status === ProjectStatus::Active;
+                                $isFinished = in_array($project->status, [ProjectStatus::Closed, ProjectStatus::Archived], true);
+                                $barLabel = ($progress === null ? __('programs.timeline_unmeasured') : $progress.'% '.__('programs.timeline_weighted_complete'))
+                                    .($elapsed === null ? '' : ' · '.__('programs.timeline_expected', ['percent' => (int) round($elapsed)]));
+                            @endphp
+
+                            <li class="bg-white transition-colors hover:bg-secondary-soft/30 dark:bg-secondary-dark dark:hover:bg-secondary-medium/30" wire:key="project-timeline-{{ $project->id }}">
+                                <div class="grid gap-4 px-4 py-4 {{ $timelineColumns }} @4xl/directory:items-center @4xl/directory:gap-6">
+                                    <div class="min-w-0">
+                                        <div class="flex items-start justify-between gap-2">
+                                            <span class="line-clamp-2 min-w-0 text-sm font-semibold" title="{{ $project->name }}">{{ $project->name }}</span>
+
+                                            <div class="flex shrink-0 items-center gap-1">
+                                                <a
+                                                href="{{ route('projects.show', $project) }}"
+                                                wire:navigate
+                                                class="grid size-11 place-items-center rounded-md border-0! bg-transparent! text-secondary-dark! transition-colors hover:bg-secondary-soft! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-white! dark:hover:bg-secondary-medium! @3xl/directory:size-8!"
+                                                aria-label="{{ __('projects.open_project', ['name' => $project->name]) }}"
+                                            >
+                                                <flux:icon.eye class="size-4.5" />
+                                            </a>
+                                            <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="openEditModal({{ $project->id }})" :aria-label="__('common.edit_name', ['name' => $project->name])" />
+                                                @if ($project->status === ProjectStatus::Archived)
+                                                    <x-ui.button tone="ghost" size="sm" icon="arrow-uturn-left" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="restoreProject({{ $project->id }})" :aria-label="__('projects.restore_name', ['name' => $project->name])" />
+                                                @else
+                                                    <x-ui.button tone="ghost" size="sm" icon="archive-box" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="confirmArchive({{ $project->id }})" :aria-label="__('projects.archive_name', ['name' => $project->name])" />
+                                                @endif
+                                            </div>
+                                        </div>
+
+                                        <p class="mt-1 truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $project->city?->name ?? __('common.unknown_city') }} · {{ $project->program->name }}</p>
+                                        <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $project->program->strategy?->name ?? __('common.strategy_not_assigned') }}</p>
+
+                                        <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                                            <x-ui.enum-badge :case="$project->status" />
+                                            <x-ui.employee-chip :employee="$project->user" compact />
+                                        </div>
+
+                                        <div class="mt-2 flex flex-wrap items-center gap-1">
+                                            @foreach ($connections as $connection)
+                                                <span
+                                                    @class([
+                                                        'inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs tabular-nums',
+                                                        'border-primary/30 bg-primary/10 font-semibold text-primary' => $connection['alert'],
+                                                        'border-secondary-soft text-secondary-medium dark:border-secondary-medium dark:text-secondary-soft' => ! $connection['alert'] && $connection['count'] > 0,
+                                                        'border-secondary-soft text-secondary-light dark:border-secondary-medium' => ! $connection['alert'] && $connection['count'] === 0,
+                                                    ])
+                                                    aria-label="{{ $connection['label'] }}"
+                                                >
+                                                    <flux:icon :name="$connection['icon']" variant="micro" class="size-3.5" aria-hidden="true" />{{ $connection['count'] }}
+                                                </span>
+                                            @endforeach
+                                        </div>
+                                    </div>
+
+                                    <div class="min-w-0">
+                                        <div class="relative h-11">
+                                            @if ($window !== null)
+                                                @foreach ($ticks as $tick)
+                                                    <span aria-hidden="true" class="absolute inset-y-0 hidden w-px bg-secondary-soft @4xl/directory:block dark:bg-secondary-medium" style="inset-inline-start: {{ $tick['at'] }}%"></span>
+                                                @endforeach
+                                                <span aria-hidden="true" class="absolute inset-y-0 z-10 w-0.5 -translate-x-1/2 bg-primary rtl:translate-x-1/2" style="inset-inline-start: {{ $todayAt }}%"></span>
+                                            @endif
+
+                                            @if ($hasWindow)
+                                                <div
+                                                    class="absolute top-1/2 h-6 -translate-y-1/2 overflow-hidden rounded-full border {{ $isFinished ? 'border-secondary-light bg-secondary-soft/60 dark:bg-secondary-medium/40' : ($isLive ? 'border-secondary-light bg-secondary-soft dark:bg-secondary-medium' : 'border-dashed border-secondary-light bg-white dark:bg-secondary-dark') }}"
+                                                    style="inset-inline-start: {{ $barStart }}%; width: {{ $barWidth }}%"
+                                                    role="img"
+                                                    aria-label="{{ $barLabel }}"
+                                                >
+                                                    <div class="h-full {{ $progressFillClasses($schedule['tone']) }}" style="width: {{ $progress ?? 0 }}%"></div>
+                                                </div>
+
+                                                @if ($elapsed !== null && $isLive)
+                                                    <span aria-hidden="true" class="absolute top-1/2 h-8 w-0.5 -translate-x-1/2 -translate-y-1/2 bg-secondary-dark/40 rtl:translate-x-1/2 dark:bg-white/40" style="inset-inline-start: {{ round($barStart + ($barWidth * $elapsed / 100), 3) }}%"></span>
+                                                @endif
+
+                                                @foreach ($project->milestones as $milestone)
+                                                    @php
+                                                        $isOverdueMarker = $milestone->planned_date->lt($today) && $milestone->status === MilestoneStatus::Pending;
+                                                        $markerTone = match (true) {
+                                                            $milestone->status === MilestoneStatus::Reached => 'border-secondary-dark bg-secondary-dark dark:border-white dark:bg-white',
+                                                            $milestone->status === MilestoneStatus::Missed => 'border-primary bg-primary',
+                                                            $isOverdueMarker => 'border-primary bg-white dark:bg-secondary-dark',
+                                                            default => 'border-secondary-dark bg-white dark:border-white dark:bg-secondary-dark',
+                                                        };
+                                                        $markerLabel = __('programs.timeline_marker', [
+                                                            'name' => $milestone->name,
+                                                            'date' => $milestone->planned_date->translatedFormat(__('formats.date')),
+                                                            'status' => $isOverdueMarker ? __('programs.timeline_overdue') : $milestone->status->label(),
+                                                        ]);
+                                                    @endphp
+
+                                                    <span
+                                                        class="absolute top-1/2 z-20 block size-3 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[2px] border-2 shadow-sm ring-2 ring-white rtl:translate-x-1/2 dark:ring-secondary-dark {{ $markerTone }}"
+                                                        style="inset-inline-start: {{ $position($milestone->planned_date) }}%"
+                                                        role="img"
+                                                        aria-label="{{ $markerLabel }}"
+                                                        wire:key="timeline-marker-{{ $milestone->id }}"
+                                                    ></span>
+                                                @endforeach
+                                            @else
+                                                <span class="absolute inset-x-0 top-1/2 flex h-7 -translate-y-1/2 items-center justify-center rounded-full border border-dashed border-secondary-light bg-white text-xs text-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft">{{ __('projects.unscheduled') }}</span>
+                                            @endif
+                                        </div>
+
+                                        <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">
+                                            <span>
+                                                {{ $project->start_date?->translatedFormat(__('formats.date')) ?? '—' }}
+                                                <flux:icon.arrow-long-right variant="micro" class="inline size-3.5 rtl:-scale-x-100" aria-hidden="true" />
+                                                {{ $project->end_date?->translatedFormat(__('formats.date')) ?? '—' }}
+                                            </span>
+                                            @if ($funding !== null)
+                                                @foreach ($funding['currencies'] as $barCurrency => $barTotal)
+                                                    <span wire:key="timeline-funding-{{ $project->id }}-{{ $barCurrency }}"><x-ui.money :amount="$barTotal" :currency="$barCurrency" /></span>
+                                                @endforeach
+                                            @endif
+                                            @if ($project->target_beneficiaries !== null)
+                                                <span>{{ number_format($project->target_beneficiaries) }} · {{ __('projects.col_beneficiaries') }}</span>
+                                            @endif
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-end justify-between gap-3 @4xl/directory:flex-col @4xl/directory:items-end @4xl/directory:gap-2">
+                                        <span class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs whitespace-nowrap {{ $tonePillClasses($schedule['tone']) }}">
+                                            <flux:icon :name="$schedule['icon']" variant="micro" class="size-3.5" aria-hidden="true" />{{ $schedule['label'] }}
+                                        </span>
+                                        <div class="text-end">
+                                            <p class="type-figure">{{ $progress === null ? '—' : $progress.'%' }}</p>
+                                            <p class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">
+                                                {{ $progress === null ? __('projects.no_weighted_milestones') : __('projects.milestones_reached', ['reached' => $project->reached_milestones_count, 'total' => $project->milestones_count]) }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </li>
+                        @endforeach
+                    </ol>
+                </x-ui.panel>
+            @endif
+
+            @if ($projects->hasPages())
+                <x-ui.panel class="px-4 py-3">
+                    <flux:pagination :paginator="$projects" class="text-secondary-medium! dark:text-secondary-soft!" scroll-to="#project-directory-heading" />
+                </x-ui.panel>
+            @endif
+        </div>
+    @endif
 
     <flux:modal wire:model="showProjectModal" class="w-full max-w-4xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
         <form wire:submit="saveProject" class="flex flex-col gap-5">
@@ -453,49 +1668,105 @@ new #[Title('titles.projects')] class extends Component {
                 <flux:subheading>{{ __('projects.define_delivery_ownership_lifecycle_schedule_and_beneficiary') }}</flux:subheading>
             </div>
 
-            <div class="grid gap-4 @2xl/directory:grid-cols-2">
-                <x-ui.input wire:model="name" :label="__('projects.project_name')" type="text" maxlength="255" required autofocus />
+            <fieldset class="flex flex-col gap-4 border-t border-secondary-soft pt-4 dark:border-secondary-medium">
+                <legend class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.section_identity') }}</legend>
 
-                <x-ui.select wire:model="projectStatus" :label="__('common.status')" required>
-                    @foreach (ProjectStatus::cases() as $statusOption)
-                        <flux:select.option :value="$statusOption->value" :wire:key="'project-status-'.$statusOption->value">{{ $statusOption->label() }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
-            </div>
+                <div class="grid gap-4 @2xl/directory:grid-cols-2">
+                    <x-ui.input wire:model="name" :label="__('projects.project_name')" type="text" maxlength="255" required autofocus />
 
-            <flux:textarea wire:model="description" :label="__('common.description')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!" />
+                    <x-ui.select wire:model="projectStatus" :label="__('common.status')" required>
+                        @foreach (ProjectStatus::cases() as $statusOption)
+                            <flux:select.option :value="$statusOption->value" :wire:key="'project-status-'.$statusOption->value">{{ $statusOption->label() }}</flux:select.option>
+                        @endforeach
+                    </x-ui.select>
+                </div>
 
-            <div class="grid gap-4 @2xl/directory:grid-cols-3">
-                <x-ui.select wire:model="cityId" :label="__('common.city')" required>
-                    <flux:select.option value="">{{ __('projects.select_a_city') }}</flux:select.option>
-                    @foreach ($this->cityOptions as $cityOption)
-                        <flux:select.option :value="$cityOption->id" :wire:key="'city-option-'.$cityOption->id">{{ $cityOption->name }} · {{ $cityOption->secondary_name }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
+                <flux:textarea wire:model="description" :label="__('common.description')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!" />
+            </fieldset>
 
-                <x-ui.select wire:model="programId" :label="__('common.program')" required>
-                    <flux:select.option value="">{{ __('projects.select_a_program') }}</flux:select.option>
-                    @foreach ($this->programOptions as $programOption)
-                        <flux:select.option :value="$programOption->id" :wire:key="'program-option-'.$programOption->id">{{ $programOption->name }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
+            <fieldset class="flex flex-col gap-4 border-t border-secondary-soft pt-4 dark:border-secondary-medium">
+                <legend class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.section_placement') }}</legend>
 
-                <x-ui.select wire:model="userId" :label="__('projects.owner')" required>
-                    <flux:select.option value="">{{ __('projects.select_an_owner') }}</flux:select.option>
-                    @foreach ($this->userOptions as $userOption)
-                        <flux:select.option :value="$userOption->id" :wire:key="'owner-option-'.$userOption->id">{{ $userOption->name }} · {{ $userOption->secondary_name }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
-            </div>
+                <div class="grid gap-4 @2xl/directory:grid-cols-3">
+                    <x-ui.select wire:model="cityId" :label="__('common.city')" required>
+                        <flux:select.option value="">{{ __('projects.select_a_city') }}</flux:select.option>
+                        @foreach ($this->cityOptions as $cityOption)
+                            <flux:select.option :value="$cityOption->id" :wire:key="'city-option-'.$cityOption->id">{{ $cityOption->name }} · {{ $cityOption->secondary_name }}</flux:select.option>
+                        @endforeach
+                    </x-ui.select>
 
-            <div class="grid gap-4 @2xl/directory:grid-cols-2">
-                <x-ui.input wire:model="startDate" :label="__('common.start_date')" type="date" />
-                <x-ui.input wire:model="endDate" :label="__('projects.end_date')" type="date" />
-            </div>
+                    <x-ui.select wire:model="programId" :label="__('common.program')" required>
+                        <flux:select.option value="">{{ __('projects.select_a_program') }}</flux:select.option>
+                        @foreach ($this->programOptions as $programOption)
+                            <flux:select.option :value="$programOption->id" :wire:key="'program-option-'.$programOption->id">{{ $programOption->name }}</flux:select.option>
+                        @endforeach
+                    </x-ui.select>
 
-            <fieldset class="flex flex-col gap-3 rounded-lg border border-secondary-soft p-4 dark:border-secondary-medium">
+                    <x-ui.select wire:model="userId" :label="__('projects.owner')" required>
+                        <flux:select.option value="">{{ __('projects.select_an_owner') }}</flux:select.option>
+                        @foreach ($this->userOptions as $userOption)
+                            <flux:select.option :value="$userOption->id" :wire:key="'owner-option-'.$userOption->id">{{ $userOption->name }} · {{ $userOption->secondary_name }}</flux:select.option>
+                        @endforeach
+                    </x-ui.select>
+                </div>
+            </fieldset>
+
+            <fieldset
+                class="flex flex-col gap-4 border-t border-secondary-soft pt-4 dark:border-secondary-medium"
+                x-data="{
+                    forms: @js($durationForms),
+                    get durationLabel() {
+                        const start = Date.parse($wire.startDate);
+                        const end = Date.parse($wire.endDate);
+
+                        if (Number.isNaN(start) || Number.isNaN(end)) {
+                            return '';
+                        }
+
+                        const days = Math.floor((end - start) / 86400000) + 1;
+
+                        if (days < 1) {
+                            return '';
+                        }
+
+                        const form = days <= 3 ? this.forms[days] : (days <= 10 ? this.forms[3] : this.forms[11]);
+
+                        return form.replace('__N__', days.toLocaleString());
+                    },
+                }"
+            >
+                <legend class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.section_schedule') }}</legend>
+
+                <div class="grid gap-4 @2xl/directory:grid-cols-2">
+                    <x-ui.input wire:model="startDate" :label="__('common.start_date')" type="date" />
+                    <x-ui.input wire:model="endDate" :label="__('projects.end_date')" type="date" />
+                </div>
+
+                <p class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft" x-show="durationLabel !== ''" x-text="durationLabel" style="display: none"></p>
+            </fieldset>
+
+            <fieldset
+                class="flex flex-col gap-4 border-t border-secondary-soft pt-4 dark:border-secondary-medium"
+                x-data="{
+                    template: @js(__('projects.breakdown_adds_up', ['breakdown' => '__BREAKDOWN__', 'headline' => '__HEADLINE__'])),
+                    get breakdownLabel() {
+                        const parts = [$wire.targetMen, $wire.targetWomen, $wire.targetBoys, $wire.targetGirls]
+                            .map((value) => Number(value) || 0);
+                        const breakdown = parts.reduce((total, value) => total + value, 0);
+                        const headline = Number($wire.targetBeneficiaries) || 0;
+
+                        if (breakdown === 0 && headline === 0) {
+                            return '';
+                        }
+
+                        return this.template
+                            .replace('__BREAKDOWN__', breakdown.toLocaleString())
+                            .replace('__HEADLINE__', headline.toLocaleString());
+                    },
+                }"
+            >
                 <div>
-                    <legend class="text-sm font-semibold">{{ __('projects.beneficiary_targets') }}</legend>
+                    <legend class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.beneficiary_targets') }}</legend>
                     <p class="text-xs text-secondary-medium dark:text-secondary-soft">{{ __('projects.the_headline_commitment_and_demographic_breakdown_are_record') }}</p>
                 </div>
 
@@ -506,6 +1777,8 @@ new #[Title('titles.projects')] class extends Component {
                     <x-ui.input wire:model="targetBoys" :label="__('projects.boys')" type="number" min="0" step="1" />
                     <x-ui.input wire:model="targetGirls" :label="__('projects.girls')" type="number" min="0" step="1" />
                 </div>
+
+                <p class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft" x-show="breakdownLabel !== ''" x-text="breakdownLabel" style="display: none"></p>
             </fieldset>
 
             <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
@@ -515,5 +1788,38 @@ new #[Title('titles.projects')] class extends Component {
                 </x-ui.button>
             </div>
         </form>
+    </flux:modal>
+
+    {{-- Archiving is reversible, so the dialog explains where the work goes, not what is lost. --}}
+    <flux:modal wire:model="showArchiveModal" wire:close="cancelArchive" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
+        @php
+            $pendingArchive = $this->archivingProject;
+        @endphp
+
+        <div class="flex flex-col gap-4">
+            <flux:heading size="lg">{{ __('projects.archive_this_project') }}</flux:heading>
+
+            @if ($pendingArchive !== null)
+                <flux:subheading>
+                    {{ __('projects.archiving_keeps_everything', ['name' => $pendingArchive['project']->name]) }}
+                </flux:subheading>
+
+                @if ($pendingArchive['carries'] !== [])
+                    <div class="rounded-lg border border-board-line bg-board-head p-3">
+                        <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.kept_with_the_project') }}</p>
+                        <ul class="mt-1.5 flex flex-col gap-0.5">
+                            @foreach ($pendingArchive['carries'] as $carriedLabel => $carriedCount)
+                                <li class="text-sm tabular-nums text-secondary-dark dark:text-white" wire:key="carried-{{ $loop->index }}">{{ $carriedCount }} {{ $carriedLabel }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+            @endif
+
+            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
+                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="cancelArchive">{{ __('common.cancel') }}</x-ui.button>
+                <x-ui.button type="button" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="archiveProject" data-test="confirm-archive-project">{{ __('projects.archive_project') }}</x-ui.button>
+            </div>
+        </div>
     </flux:modal>
 </section>
