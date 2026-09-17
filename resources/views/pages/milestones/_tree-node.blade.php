@@ -12,7 +12,7 @@
 
             <div class="min-w-0 flex-1">
                 <div class="flex flex-wrap items-center gap-2">
-                    <p class="min-w-0 font-semibold text-secondary-dark dark:text-white"><span class="tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $milestone->sequence }}.</span> {{ $milestone->name }}</p>
+                    <p class="min-w-0 font-semibold text-secondary-dark dark:text-white">{{ $milestone->name }}</p>
                     <x-ui.enum-badge :case="$milestone->status" />
                 </div>
                 <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-secondary-medium dark:text-secondary-soft">

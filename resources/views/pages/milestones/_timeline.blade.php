@@ -23,12 +23,21 @@
         <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-primary bg-primary"></span>{{ MilestoneStatus::Missed->label() }}</span>
         <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-secondary-light bg-secondary-light"></span>{{ MilestoneStatus::Cancelled->label() }}</span>
         <span class="inline-flex items-center gap-1.5"><span class="h-3.5 w-0.5 bg-primary"></span>{{ __('milestones.timeline_today') }}</span>
+        <span class="inline-flex items-center gap-1.5">
+            <span class="flex items-center">
+                <span class="size-2 rounded-full border-2 border-secondary-medium bg-white dark:border-secondary-soft dark:bg-secondary-dark"></span>
+                <span class="h-0 w-4 border-t-2 border-dashed border-secondary-medium dark:border-secondary-soft"></span>
+                <span class="size-2 rounded-full bg-secondary-medium dark:bg-secondary-soft"></span>
+            </span>
+            {{ __('milestones.nested_milestone') }}
+        </span>
     </div>
 </x-ui.panel>
 
 @foreach ($projects as $projectRow)
     @php
         $milestones = $this->flattenMilestones($projectRow->milestones)->sortBy('planned_date')->values();
+        $milestonesById = $milestones->keyBy('id');
         $windowStart = $milestones->min('planned_date');
         $windowEnd = $milestones->max('planned_date');
         $hasWindow = $windowStart !== null && $windowEnd !== null;
@@ -53,9 +62,27 @@
                 $guard++;
             }
         }
+
+        // Each nested milestone is tied back to its parent by a dashed span
+        // between the two dates, so the hierarchy reads on the axis itself.
+        $nestingLinks = $milestones
+            ->filter(fn ($milestone) => $milestone->parent_milestone_id !== null && $milestonesById->has($milestone->parent_milestone_id))
+            ->map(function ($milestone) use ($milestonesById, $position) {
+                $parentAt = $position($milestonesById->get($milestone->parent_milestone_id)->planned_date);
+                $childAt = $position($milestone->planned_date);
+
+                return [
+                    'key' => $milestone->id,
+                    'start' => min($parentAt, $childAt),
+                    'width' => max(abs($childAt - $parentAt), 0.5),
+                    'parent_at' => $parentAt,
+                    'child_at' => $childAt,
+                ];
+            })
+            ->values();
     @endphp
 
-    <x-ui.panel :title="$projectRow->name" :subtitle="$projectRow->city?->name ?? __('common.unknown_city')" :count="$milestones->count()" wire:key="milestone-timeline-project-{{ $projectRow->id }}">
+    <x-ui.panel :title="$projectRow->name" :subtitle="$projectRow->city?->name ?? __('common.unknown_city')" :count="$projectRow->milestones->count()" wire:key="milestone-timeline-project-{{ $projectRow->id }}">
         <x-slot:toolbar>
             <x-ui.button tone="ghost" size="sm" icon="eye" class="size-9!" :href="route('projects.show', $projectRow)" wire:navigate :aria-label="__('common.view_name', ['name' => $projectRow->name])" />
         </x-slot:toolbar>
@@ -89,14 +116,27 @@
                     @endforeach
                 </div>
 
-                <div class="relative mt-3 h-36">
+                @if ($nestingLinks->isNotEmpty())
+                    <div class="relative h-4" aria-hidden="true">
+                        @foreach ($nestingLinks as $link)
+                            <div wire:key="milestone-nesting-link-{{ $link['key'] }}">
+                                <span class="absolute top-1.5 h-0 border-t-2 border-dashed border-secondary-medium dark:border-secondary-soft" style="inset-inline-start: {{ $link['start'] }}%; width: {{ $link['width'] }}%"></span>
+                                <span class="absolute top-0.5 size-2 -translate-x-1/2 rounded-full border-2 border-secondary-medium bg-white dark:border-secondary-soft dark:bg-secondary-dark rtl:translate-x-1/2" style="inset-inline-start: {{ $link['parent_at'] }}%"></span>
+                                <span class="absolute top-0.5 size-2 -translate-x-1/2 rounded-full bg-secondary-medium dark:bg-secondary-soft rtl:translate-x-1/2" style="inset-inline-start: {{ $link['child_at'] }}%"></span>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+
+                <div class="relative mt-3 h-44">
                     @foreach ($milestones as $milestone)
                         @php
                             $isOverdue = $milestone->planned_date->lt($today) && $milestone->status === MilestoneStatus::Pending;
                             $canDeleteMarker = $milestone->children_count === 0 && $milestone->tasks_count === 0;
+                            $isNested = $milestone->parent_milestone_id !== null;
                         @endphp
                         <div
-                            class="absolute top-0 flex w-40 -translate-x-1/2 flex-col items-center gap-1 focus-within:z-20 hover:z-20 rtl:translate-x-1/2"
+                            class="absolute flex w-40 -translate-x-1/2 flex-col items-center gap-1 focus-within:z-20 hover:z-20 rtl:translate-x-1/2 {{ $isNested ? 'top-6' : 'top-0' }}"
                             style="inset-inline-start: clamp(5rem, {{ $position($milestone->planned_date) }}%, calc(100% - 5rem))"
                             wire:key="milestone-card-{{ $milestone->id }}"
                         >

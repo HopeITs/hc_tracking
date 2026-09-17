@@ -121,6 +121,18 @@ test('a matching child remains visible with its necessary ancestors for status a
         ->assertDontSee('Unrelated root');
 });
 
+test('the create modal renders a project dropdown with every project option', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->create(['name' => 'Coastal Relief']);
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.index')
+        ->call('openCreateModal')
+        ->assertSee('id="milestone-form-project"', false)
+        ->assertSee('$set(\'milestoneProjectId\', '.$project->id.')', false)
+        ->assertSee('Coastal Relief');
+});
+
 test('a milestone can be created under a parent in the same project', function () {
     $user = User::factory()->create();
     $project = Project::factory()->create();
@@ -317,6 +329,30 @@ test('a milestone carrying tasks is not deleted because tasks would be orphaned'
         ->and(DB::table('tasks')->find($task->id)->milestone_id)->toBe($milestone->id);
 });
 
+test('the stat cards summarise reached, overdue, missed and upcoming milestones', function () {
+    $user = User::factory()->create();
+    $today = now()->startOfDay();
+
+    Milestone::factory()->create(['status' => MilestoneStatus::Reached, 'planned_date' => $today->copy()->subDays(10)]);
+    Milestone::factory()->create(['status' => MilestoneStatus::Missed, 'planned_date' => $today->copy()->subDays(5)]);
+    Milestone::factory()->create(['status' => MilestoneStatus::Pending, 'planned_date' => $today->copy()->subDay()]);
+    Milestone::factory()->create(['status' => MilestoneStatus::Pending, 'planned_date' => $today->copy()->addDays(3)]);
+    Milestone::factory()->create(['status' => MilestoneStatus::Pending, 'planned_date' => $today->copy()->addDays(30)]);
+
+    $stats = Livewire::actingAs($user)
+        ->test('pages::milestones.index')
+        ->instance()
+        ->milestoneStats();
+
+    expect($stats)->toBe([
+        'total' => 5,
+        'reached' => 1,
+        'overdue' => 1,
+        'missed' => 1,
+        'due_soon' => 1,
+    ]);
+});
+
 test('the milestone directory distinguishes empty and filtered states', function () {
     $user = User::factory()->create();
 
@@ -342,6 +378,53 @@ test('the timeline view plots milestones as clickable markers grouped by project
         ->set('view', 'timeline')
         ->assertSee('Homs Clinic')
         ->assertSee('wire:click="openEditModal('.$milestone->id.')"', false);
+});
+
+test('the timeline view counts only root milestones next to the project name, like the list view', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->create(['name' => 'Homs Clinic']);
+    $parent = Milestone::factory()->create(['project_id' => $project->id, 'name' => 'Root gate']);
+    Milestone::factory()->childOf($parent)->create(['name' => 'Child gate']);
+
+    $countBadge = fn (int $count) => '<span class="inline-flex min-w-6 items-center justify-center rounded-full bg-secondary-soft px-2 py-0.5 text-[11px] font-semibold tabular-nums text-secondary-dark dark:bg-secondary-medium dark:text-white">'.$count.'</span>';
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.index')
+        ->set('view', 'timeline')
+        ->assertSee('Homs Clinic')
+        ->assertSee($countBadge(1), false)
+        ->assertDontSee($countBadge(2), false);
+});
+
+test('a nested milestone card is shifted below the root cards in the timeline view', function () {
+    $user = User::factory()->create();
+    $parent = Milestone::factory()->create(['name' => 'Root gate']);
+    $child = Milestone::factory()->childOf($parent)->create(['name' => 'Child gate']);
+
+    $html = Livewire::actingAs($user)
+        ->test('pages::milestones.index')
+        ->set('view', 'timeline')
+        ->html();
+
+    preg_match('/<div\s+class="([^"]*)"\s+style="[^"]*"\s+wire:key="milestone-card-'.$parent->id.'"/s', $html, $parentDiv);
+    preg_match('/<div\s+class="([^"]*)"\s+style="[^"]*"\s+wire:key="milestone-card-'.$child->id.'"/s', $html, $childDiv);
+
+    expect($parentDiv[1] ?? null)->toContain('top-0')
+        ->and($childDiv[1] ?? null)->toContain('top-6');
+});
+
+test('the timeline view links a nested milestone back to its parent', function () {
+    $user = User::factory()->create();
+    $parent = Milestone::factory()->create(['name' => 'Root gate']);
+    $child = Milestone::factory()->childOf($parent)->create(['name' => 'Child gate']);
+    $standalone = Milestone::factory()->create(['name' => 'Standalone gate']);
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.index')
+        ->set('view', 'timeline')
+        ->assertSee('wire:key="milestone-nesting-link-'.$child->id.'"', false)
+        ->assertDontSee('wire:key="milestone-nesting-link-'.$parent->id.'"', false)
+        ->assertDontSee('wire:key="milestone-nesting-link-'.$standalone->id.'"', false);
 });
 
 test('a deletable milestone shows a delete action in the timeline view, and a locked one does not', function () {
