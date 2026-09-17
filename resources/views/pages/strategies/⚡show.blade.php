@@ -94,8 +94,14 @@ new #[Title('titles.strategy')] class extends Component {
     }
 
     /**
-     * Every (program, year) pair inside the strategy's span that has an
-     * annual plan, as a fast "program:year" => true lookup.
+     * Every (program, year) pair inside the strategy's span whose annual plan
+     * has at least one committed indicator target, as a fast
+     * "program:year" => true lookup.
+     *
+     * An empty AnnualPlan shell (no plan_indicators yet) does not count as
+     * covered — coverage must reflect real target commitments, not just a
+     * planning row existing. planIndicators::target is a required column, so
+     * having any plan_indicators row is equivalent to having a real target.
      *
      * One query for the whole page; planCoverage() and yearlyProgramCoverage()
      * both tally it in memory instead of querying again.
@@ -115,6 +121,7 @@ new #[Title('titles.strategy')] class extends Component {
         return AnnualPlan::query()
             ->whereIn('program_id', $programIds)
             ->whereBetween('year', [$strategy->start_year, $strategy->end_year])
+            ->whereHas('planIndicators')
             ->get(['program_id', 'year'])
             ->mapWithKeys(fn (AnnualPlan $plan) => [$plan->program_id.':'.$plan->year => true])
             ->all();

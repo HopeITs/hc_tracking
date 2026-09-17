@@ -5,6 +5,7 @@ return [
     'annual_plan' => 'Annual Plan',
     'annual_plans' => 'Annual Plans',
     'appearance_settings' => 'Appearance settings',
+    'calendar' => 'My Calendar',
     'city_directory' => 'City directory',
     'dashboard' => 'Dashboard',
     'donor' => 'Donor',

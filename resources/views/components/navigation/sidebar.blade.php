@@ -83,6 +83,16 @@
             >
                 {{ __('common.executive_summary') }}
             </flux:sidebar.item>
+
+            <flux:sidebar.item
+                icon="calendar"
+                :href="route('calendar.index')"
+                :current="request()->routeIs('calendar.*')"
+                :class="$navigationItemClasses"
+                wire:navigate
+            >
+                {{ __('common.my_calendar') }}
+            </flux:sidebar.item>
         </flux:sidebar.group>
 
         <flux:sidebar.group

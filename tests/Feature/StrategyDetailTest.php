@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\AnnualPlan;
+use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Strategy;
@@ -61,15 +62,17 @@ test('strategy detail renders a strategy with no programs', function () {
         ->assertSeeText('No programs yet');
 });
 
-test('plan coverage is the share of the strategy span with an annual plan, capped at 100', function () {
+test('plan coverage is the share of the strategy span with an annual plan carrying a committed target, capped at 100', function () {
     $user = User::factory()->create();
     $strategy = Strategy::factory()->create(['start_year' => 2026, 'end_year' => 2029]);
     $program = Program::factory()->create(['name' => 'Water Security', 'strategy_id' => $strategy->id]);
 
     // 2 of the 4 span years covered (2027 is outside the span and must not count).
-    AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2026]);
-    AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2028]);
+    $covered2026 = AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2026]);
+    $covered2028 = AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2028]);
     AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2031]);
+    PlanIndicator::factory()->forAnnualPlan($covered2026)->create();
+    PlanIndicator::factory()->forAnnualPlan($covered2028)->create();
 
     $this->actingAs($user)
         ->get(route('strategies.show', $strategy))
@@ -79,14 +82,30 @@ test('plan coverage is the share of the strategy span with an annual plan, cappe
         ->assertDontSeeText('100%');
 });
 
+test('an annual plan with no committed indicator targets does not count toward coverage', function () {
+    $user = User::factory()->create();
+    $strategy = Strategy::factory()->create(['start_year' => 2026, 'end_year' => 2027]);
+    $program = Program::factory()->create(['strategy_id' => $strategy->id]);
+
+    // An empty planning shell, with no plan_indicators committed yet.
+    AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2026]);
+
+    $this->actingAs($user)
+        ->get(route('strategies.show', $strategy))
+        ->assertOk()
+        ->assertSeeText('0%');
+});
+
 test('each program row shows its own covered-years fraction and tones the bar accordingly', function () {
     $user = User::factory()->create();
     $strategy = Strategy::factory()->create(['start_year' => 2026, 'end_year' => 2027]);
     $uncovered = Program::factory()->create(['name' => 'Uncovered Program', 'strategy_id' => $strategy->id]);
     $fullyCovered = Program::factory()->create(['name' => 'Fully Covered Program', 'strategy_id' => $strategy->id]);
 
-    AnnualPlan::factory()->create(['program_id' => $fullyCovered->id, 'year' => 2026]);
-    AnnualPlan::factory()->create(['program_id' => $fullyCovered->id, 'year' => 2027]);
+    $plan2026 = AnnualPlan::factory()->create(['program_id' => $fullyCovered->id, 'year' => 2026]);
+    $plan2027 = AnnualPlan::factory()->create(['program_id' => $fullyCovered->id, 'year' => 2027]);
+    PlanIndicator::factory()->forAnnualPlan($plan2026)->create();
+    PlanIndicator::factory()->forAnnualPlan($plan2027)->create();
 
     $html = $this->actingAs($user)->get(route('strategies.show', $strategy))->getContent();
 

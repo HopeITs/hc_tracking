@@ -27,7 +27,21 @@
     @foreach (MilestoneStatus::cases() as $case)
         @php $columnMilestones = $allMilestones->where('status', $case)->values(); @endphp
 
-        <div class="flex flex-col gap-3 rounded-xl border p-3 {{ $columnTone($case) }}" wire:key="milestone-board-column-{{ $case->value }}">
+        <div
+            class="flex flex-col gap-3 rounded-xl border p-3 transition-colors {{ $columnTone($case) }}"
+            wire:key="milestone-board-column-{{ $case->value }}"
+            x-data="{ dragOver: false }"
+            x-on:dragover.prevent="dragOver = true"
+            x-on:dragleave="dragOver = false"
+            x-on:drop.prevent="
+                dragOver = false;
+                const dragged = JSON.parse($event.dataTransfer.getData('text/plain') || '{}');
+                if (dragged.id && dragged.status !== '{{ $case->value }}') {
+                    $wire.quickSetStatus(dragged.id, '{{ $case->value }}');
+                }
+            "
+            :class="dragOver ? 'ring-2 ring-primary ring-offset-1' : ''"
+        >
             <div class="flex items-center justify-between px-1">
                 <x-ui.enum-badge :case="$case" />
                 <span class="text-xs font-semibold tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $columnMilestones->count() }}</span>
@@ -38,7 +52,14 @@
                     @php
                         $isOverdue = $milestone->status === MilestoneStatus::Pending && $milestone->planned_date->lt($today);
                     @endphp
-                    <div class="flex flex-col gap-2 rounded-lg border border-secondary-soft bg-white p-3 shadow-[0_1px_2px_rgba(16,24,40,0.04)] dark:border-secondary-medium dark:bg-secondary-dark" wire:key="milestone-board-card-{{ $milestone->id }}">
+                    <div
+                        class="flex flex-col gap-2 rounded-lg border border-secondary-soft bg-white p-3 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-opacity dark:border-secondary-medium dark:bg-secondary-dark"
+                        wire:key="milestone-board-card-{{ $milestone->id }}"
+                        draggable="true"
+                        style="cursor: grab"
+                        x-on:dragstart="$event.dataTransfer.setData('text/plain', JSON.stringify({ id: {{ $milestone->id }}, status: '{{ $milestone->status->value }}' })); $event.currentTarget.classList.add('opacity-40')"
+                        x-on:dragend="$event.currentTarget.classList.remove('opacity-40')"
+                    >
                         <div class="flex items-start justify-between gap-2">
                             <button type="button" wire:click="openEditModal({{ $milestone->id }})" class="min-w-0 text-start text-sm font-semibold text-secondary-dark hover:underline dark:text-white" data-test="milestone-board-card-{{ $milestone->id }}">
                                 {{ $milestone->name }}

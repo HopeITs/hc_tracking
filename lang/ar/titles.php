@@ -5,6 +5,7 @@ return [
     'annual_plan' => 'الخطة السنوية',
     'annual_plans' => 'الخطط السنوية',
     'appearance_settings' => 'إعدادات المظهر',
+    'calendar' => 'تقويمي',
     'city_directory' => 'دليل المدن',
     'dashboard' => 'لوحة التحكم',
     'donor' => 'المانح',

@@ -466,6 +466,22 @@ test('the board view renders a card per milestone and honours the status filter'
         ->assertDontSee('data-test="milestone-board-card-'.$pending->id.'"', false);
 });
 
+test('the board view wires each card to be dragged and each column to accept a drop', function () {
+    $user = User::factory()->create();
+    $milestone = Milestone::factory()->create(['name' => 'Pending gate', 'status' => MilestoneStatus::Pending]);
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.index')
+        ->set('view', 'board')
+        // The card is a genuine HTML5 drag source carrying its id and current status.
+        ->assertSee('draggable="true"', false)
+        ->assertSee('{ id: '.$milestone->id.", status: 'pending' }", false)
+        // Each column is a drop target that calls quickSetStatus with its own status.
+        ->assertSee('$wire.quickSetStatus(dragged.id, \'reached\')', false)
+        ->assertSee('$wire.quickSetStatus(dragged.id, \'missed\')', false)
+        ->assertSee('$wire.quickSetStatus(dragged.id, \'cancelled\')', false);
+});
+
 test('a milestone status can be changed from the board view', function () {
     $user = User::factory()->create();
     $milestone = Milestone::factory()->create(['status' => MilestoneStatus::Pending]);

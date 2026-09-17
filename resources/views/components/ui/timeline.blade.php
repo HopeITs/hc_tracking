@@ -7,10 +7,23 @@
 @php
     use Illuminate\Support\Carbon;
 
-    $rows = collect($items)->values();
+    // Dates built with Carbon::create() default any omitted time component to
+    // the current time-of-day rather than midnight, so two otherwise-aligned
+    // dates can carry different times. diffInDays() then truncates the
+    // fractional day between them, quietly shifting every position (most
+    // visibly the "today" marker) by up to a day. Normalizing everything to
+    // midnight here neutralizes that regardless of how callers built the dates.
+    $atMidnight = fn (?Carbon $date): ?Carbon => $date?->copy()->startOfDay();
 
-    $windowStart = $from ?? $rows->map(fn ($item) => $item['start'] ?? null)->filter()->min();
-    $windowEnd = $to ?? $rows->map(fn ($item) => $item['end'] ?? $item['start'] ?? null)->filter()->max();
+    $rows = collect($items)->map(function ($item) use ($atMidnight) {
+        $item['start'] = $atMidnight($item['start'] ?? null);
+        $item['end'] = $atMidnight($item['end'] ?? null) ?? $item['start'];
+
+        return $item;
+    })->values();
+
+    $windowStart = $atMidnight($from) ?? $rows->map(fn ($item) => $item['start'] ?? null)->filter()->min();
+    $windowEnd = $atMidnight($to) ?? $rows->map(fn ($item) => $item['end'] ?? $item['start'] ?? null)->filter()->max();
 
     $totalDays = ($windowStart && $windowEnd) ? max($windowStart->diffInDays($windowEnd), 1) : 1;
 
@@ -52,12 +65,22 @@
 
 <div {{ $attributes->class('flex flex-col gap-1') }}>
     @if ($ticks->isNotEmpty())
-        <div class="relative hidden h-4 @2xl:block" aria-hidden="true">
-            @foreach ($ticks as $tick)
-                <span class="type-meta absolute top-0 tabular-nums text-secondary-light dark:text-secondary-medium" style="inset-inline-start: {{ $position($tick) }}%">
-                    {{ $ticksByYear ? $tick->format('Y') : $tick->translatedFormat(__('formats.month_short')) }}
-                </span>
-            @endforeach
+        {{-- The ruler mirrors each row's own box (label column + gap + horizontal
+             padding) so a given percentage lands at the same pixel position in
+             both places; without this spacer the ruler spans the full width
+             while the bars below sit inset by the label column, and every tick
+             (and the today line) drifts out of alignment with the row bars. --}}
+        <div class="hidden @2xl:block" aria-hidden="true">
+            <div class="flex items-center gap-4 px-3">
+                <div class="shrink-0" style="width: 13rem"></div>
+                <div class="relative h-4 min-w-0 flex-1">
+                    @foreach ($ticks as $tick)
+                        <span class="type-meta absolute top-0 tabular-nums text-secondary-light dark:text-secondary-medium" style="inset-inline-start: {{ $position($tick) }}%">
+                            {{ $ticksByYear ? $tick->format('Y') : $tick->translatedFormat(__('formats.month_short')) }}
+                        </span>
+                    @endforeach
+                </div>
+            </div>
         </div>
     @endif
 
