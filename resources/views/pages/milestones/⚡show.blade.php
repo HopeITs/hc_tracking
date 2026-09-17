@@ -57,7 +57,7 @@ new #[Title('titles.milestone')] class extends Component {
     public function milestone(): Milestone
     {
         return Milestone::query()
-            ->select(['id', 'project_id', 'name', 'description', 'planned_date', 'actual_date', 'status', 'sequence', 'weight_percentage', 'responsible_user_id', 'parent_milestone_id'])
+            ->select(['id', 'project_id', 'name', 'description', 'planned_date', 'actual_date', 'status', 'sequence', 'weight_percentage', 'responsible_user_id', 'parent_milestone_id', 'updated_at'])
             ->with(['project:id,name', 'responsibleUser:id,first_name_en,last_name_en,first_name_ar,last_name_ar', 'parent:id,name'])
             ->findOrFail($this->milestoneId);
     }
@@ -270,18 +270,17 @@ new #[Title('titles.milestone')] class extends Component {
             ['label' => $this->milestone->name],
         ]"
         :title="$this->milestone->name"
+        title-class="text-3xl! font-bold! leading-none!"
         :subtitle="$this->milestone->project->name"
     >
         <x-slot:meta>
+            <x-ui.enum-badge :case="$this->milestone->status" />
             @if ($this->milestone->parent !== null)
                 <span>{{ __('milestones.nested_milestone') }}: {{ $this->milestone->parent->name }}</span>
             @endif
             <span>{{ __('milestones.responsible') }}: {{ $this->milestone->responsibleUser->name }} · {{ $this->milestone->responsibleUser->secondary_name }}</span>
+            <span>{{ __('common.updated_date', ['date' => $this->milestone->updated_at?->translatedFormat(__('formats.date'))]) }}</span>
         </x-slot:meta>
-
-        <x-slot:actions>
-            <x-ui.enum-badge :case="$this->milestone->status" />
-        </x-slot:actions>
     </x-ui.detail-header>
 
     <div class="grid gap-3 @2xl/detail:grid-cols-4">
