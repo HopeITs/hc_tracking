@@ -1,6 +1,7 @@
 ---
 paths:
   - 'resources/views/components/ui/**'
+  - 'resources/views/components/ui/{logframe-node.blade.php,logframe.blade.php,target-lineage.blade.php}'
 ---
 
 # Components Ui
@@ -11,3 +12,6 @@ This app serves flux-lite, which registers ui-dropdown, ui-select and ui-options
 x-ui.header-filter-multiselect therefore drives its own panel with Alpine (x-show) rather than flux:dropdown: a flux menu item closes the popover the moment it is clicked, which is wrong for picking several values. It keeps the data-flux-button / data-flux-menu / data-flux-menu-item attributes and the .program-filter-picker wrapper class purely so the shared CSS in app.css still styles it — verified computed background, colour and border are identical to the Flux picker beside it in both light and dark.
 
 Alpine's open state survives the Livewire round trip each toggle causes, so the panel stays open across selections. Confirmed with real clicks, not synthetic ones — a programmatic .click() does not open a Flux dropdown.
+
+## Reuse the logframe ResultType mark/accent color mapping everywhere results are shown
+Impact/Outcome/Output get one fixed visual identity app-wide: mark dot classes 'bg-secondary-dark ring-secondary-dark dark:bg-white dark:ring-white' (Impact), 'bg-primary ring-primary' (Outcome), 'bg-board ring-secondary-light' (Output) — originally defined in logframe.blade.php/logframe-node.blade.php. target-lineage.blade.php (projects show, targets tab) copies this exact mapping plus a matching top accent bar (h-1 bg-primary for Impact, h-0.5 bg-primary/60 for Outcome, none for Output) instead of inventing new colors. Any new UI that surfaces a Result's type should copy this same mapping rather than reinvent one, so Impact/Outcome/Output read consistently across programs/show, results/index and projects/show.

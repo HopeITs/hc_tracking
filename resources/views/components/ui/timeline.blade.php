@@ -5,6 +5,7 @@
 ])
 
 @php
+    use Carbon\CarbonInterface;
     use Illuminate\Support\Carbon;
 
     $rows = collect($items)->values();
@@ -14,7 +15,7 @@
 
     $totalDays = ($windowStart && $windowEnd) ? max($windowStart->diffInDays($windowEnd), 1) : 1;
 
-    $position = function (?Carbon $date) use ($windowStart, $totalDays): float {
+    $position = function (?CarbonInterface $date) use ($windowStart, $totalDays): float {
         if (! $date || ! $windowStart) {
             return 0.0;
         }
@@ -36,7 +37,7 @@
         $limit = $ticksByYear ? 60 : 240;
         while ($cursor->lte($windowEnd) && $guard < $limit) {
             $ticks->push($cursor->copy());
-            $ticksByYear ? $cursor->addYear() : $cursor->addMonthNoOverflow();
+            $cursor = $ticksByYear ? $cursor->addYear() : $cursor->addMonthNoOverflow();
             $guard++;
         }
     }
