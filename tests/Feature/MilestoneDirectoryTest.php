@@ -460,6 +460,33 @@ test('the board view wires each card to be dragged and each column to accept a d
         ->assertSee('$wire.quickSetStatus(dragged.id, \'cancelled\')', false);
 });
 
+test('the board view wires each column to open the create modal with that status when its empty space is clicked', function () {
+    $user = User::factory()->create();
+    Milestone::factory()->create(['status' => MilestoneStatus::Pending]);
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.index')
+        ->set('view', 'board')
+        ->assertSee('data-milestone-card', false)
+        ->assertSee("\$wire.openCreateModal(null, 'reached')", false)
+        ->assertSee("\$wire.openCreateModal(null, 'missed')", false)
+        ->assertSee("\$wire.openCreateModal(null, 'cancelled')", false)
+        ->assertSee("\$wire.openCreateModal(null, 'pending')", false);
+});
+
+test('opening the create modal with a status prefills it, and an invalid status is ignored', function () {
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.index')
+        ->call('openCreateModal', null, MilestoneStatus::Reached->value)
+        ->assertSet('showMilestoneModal', true)
+        ->assertSet('milestoneStatus', MilestoneStatus::Reached->value)
+        ->call('closeMilestoneModal')
+        ->call('openCreateModal', null, 'not-a-real-status')
+        ->assertSet('milestoneStatus', 'pending');
+});
+
 test('a milestone status can be changed from the board view', function () {
     $user = User::factory()->create();
     $milestone = Milestone::factory()->create(['status' => MilestoneStatus::Pending]);

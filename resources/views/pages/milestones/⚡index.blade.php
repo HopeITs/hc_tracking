@@ -313,12 +313,16 @@ new #[Title('titles.milestones')] class extends Component {
             && $milestone->tasks_count === 0;
     }
 
-    public function openCreateModal(?string $date = null): void
+    public function openCreateModal(?string $date = null, ?string $status = null): void
     {
         $this->resetMilestoneForm();
 
         if ($date !== null) {
             $this->plannedDate = $date;
+        }
+
+        if ($status !== null && MilestoneStatus::tryFrom($status) !== null) {
+            $this->milestoneStatus = $status;
         }
 
         $this->showMilestoneModal = true;
