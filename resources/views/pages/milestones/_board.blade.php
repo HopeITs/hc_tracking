@@ -28,9 +28,11 @@
         @php $columnMilestones = $allMilestones->where('status', $case)->values(); @endphp
 
         <div
-            class="flex flex-col gap-3 rounded-xl border p-3 transition-colors {{ $columnTone($case) }}"
+            class="flex cursor-pointer flex-col gap-3 rounded-xl border p-3 transition-colors {{ $columnTone($case) }}"
             wire:key="milestone-board-column-{{ $case->value }}"
+            data-test="milestone-board-column-{{ $case->value }}"
             x-data="{ dragOver: false }"
+            x-on:click="$event.target.closest('[data-milestone-card]') || $wire.openCreateModal(null, '{{ $case->value }}')"
             x-on:dragover.prevent="dragOver = true"
             x-on:dragleave="dragOver = false"
             x-on:drop.prevent="
@@ -55,6 +57,7 @@
                     <div
                         class="flex flex-col gap-2 rounded-lg border border-secondary-soft bg-white p-3 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-opacity dark:border-secondary-medium dark:bg-secondary-dark"
                         wire:key="milestone-board-card-{{ $milestone->id }}"
+                        data-milestone-card
                         draggable="true"
                         style="cursor: grab"
                         x-on:dragstart="$event.dataTransfer.setData('text/plain', JSON.stringify({ id: {{ $milestone->id }}, status: '{{ $milestone->status->value }}' })); $event.currentTarget.classList.add('opacity-40')"

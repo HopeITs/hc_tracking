@@ -313,9 +313,31 @@ new #[Title('titles.milestones')] class extends Component {
             && $milestone->tasks_count === 0;
     }
 
-    public function openCreateModal(): void
+    public function openCreateModal(?string $date = null, ?string $status = null, ?int $projectId = null, ?int $parentId = null): void
     {
         $this->resetMilestoneForm();
+
+        if ($date !== null) {
+            $this->plannedDate = $date;
+        }
+
+        if ($status !== null && MilestoneStatus::tryFrom($status) !== null) {
+            $this->milestoneStatus = $status;
+        }
+
+        if ($parentId !== null) {
+            $parent = Milestone::query()->select(['id', 'project_id'])->find($parentId);
+
+            if ($parent !== null) {
+                $this->milestoneProjectId = (string) $parent->project_id;
+                $this->parentMilestoneId = (string) $parent->id;
+            }
+        } elseif ($projectId !== null && Project::query()->whereKey($projectId)->exists()) {
+            $this->milestoneProjectId = (string) $projectId;
+        }
+
+        unset($this->parentOptions);
+
         $this->showMilestoneModal = true;
     }
 

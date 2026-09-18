@@ -120,4 +120,6 @@ return [
     'updating' => 'Updating',
     'view_name' => 'View :name',
     'watching' => 'Watching',
+    'zoom_in' => 'Zoom in',
+    'zoom_out' => 'Zoom out',
 ];
