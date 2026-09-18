@@ -35,6 +35,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | routes/web.php | .ai/rules/routes.md |
 | {database/factories/**,database/seeders/**,tests/Pest.php} | .ai/rules/seeders.md |
 | resources/views/pages/strategies/⚡show.blade.php, resources/views/pages/strategies/⚡index.blade.php | .ai/rules/strategies.md |
+| resources/views/pages/tasks/** | .ai/rules/tasks.md |
 | tests/** | .ai/rules/tests.md |
 | resources/views/{components/ui/page-header.blade.php,pages/**}, resources/views/{components/ui/header-filter-select.blade.php,pages/**}, resources/views/components/ui/detail-header.blade.php | .ai/rules/ui.md |
 | {lang/**,resources/views/**,app/Enums/**} | .ai/rules/views-enums.md |

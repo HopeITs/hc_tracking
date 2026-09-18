@@ -53,6 +53,31 @@ test('a task has its updates and attachments', function () {
         ->and($task->attachments)->toHaveCount(1);
 });
 
+test('a task can have subtasks and each resolves its parent', function () {
+    $parent = Task::factory()->create();
+    $subtaskOne = Task::factory()->subtaskOf($parent)->create();
+    $subtaskTwo = Task::factory()->subtaskOf($parent)->create();
+    $unrelated = Task::factory()->create();
+
+    expect($parent->subtasks)->toHaveCount(2)
+        ->and($parent->subtasks->pluck('id')->sort()->values()->all())->toBe(collect([$subtaskOne->id, $subtaskTwo->id])->sort()->values()->all())
+        ->and($subtaskOne->parentTask->id)->toBe($parent->id)
+        ->and($parent->parentTask)->toBeNull()
+        ->and($unrelated->parentTask)->toBeNull();
+});
+
+test('a subtask inherits its parent proposal and milestone through the factory helper', function () {
+    $milestone = Milestone::factory()->create();
+    $proposal = Proposal::factory()->create();
+    $parent = Task::factory()->create(['milestone_id' => $milestone->id, 'proposal_id' => $proposal->id]);
+
+    $subtask = Task::factory()->subtaskOf($parent)->create();
+
+    expect($subtask->parent_task_id)->toBe($parent->id)
+        ->and($subtask->milestone_id)->toBe($milestone->id)
+        ->and($subtask->proposal_id)->toBe($proposal->id);
+});
+
 test('a task casts its dates and progress', function () {
     $task = Task::factory()->create([
         'start_date' => '2026-01-05',

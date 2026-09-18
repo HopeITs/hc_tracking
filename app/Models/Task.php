@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * @property int $id
  * @property int|null $milestone_id
+ * @property int|null $parent_task_id
  * @property int $proposal_id
  * @property string $title
  * @property string|null $description
@@ -33,6 +34,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 #[Fillable([
     'milestone_id',
+    'parent_task_id',
     'proposal_id',
     'title',
     'description',
@@ -68,6 +70,28 @@ class Task extends Model
     public function proposal(): BelongsTo
     {
         return $this->belongsTo(Proposal::class);
+    }
+
+    /**
+     * The task this one is a subtask of, if any. Subtasks are a single
+     * level deep — a subtask cannot itself carry subtasks, enforced in
+     * the task-management components rather than the schema.
+     *
+     * @return BelongsTo<Task, $this>
+     */
+    public function parentTask(): BelongsTo
+    {
+        return $this->belongsTo(Task::class, 'parent_task_id');
+    }
+
+    /**
+     * The subtasks carried out under this task.
+     *
+     * @return HasMany<Task, $this>
+     */
+    public function subtasks(): HasMany
+    {
+        return $this->hasMany(Task::class, 'parent_task_id');
     }
 
     /**

@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\FileType;
+use App\Enums\TaskStatus;
 use App\Models\Milestone;
 use App\Models\Project;
 use App\Models\Proposal;
@@ -231,4 +232,99 @@ test('task detail renders a task without a milestone updates or attachments', fu
         ->assertSeeText('No milestone')
         ->assertSeeText('No updates yet')
         ->assertSeeText('No files recorded');
+});
+
+test('a subtask can be added from the task detail page and inherits the parent proposal milestone and assignee', function () {
+    $user = User::factory()->create();
+    $milestone = Milestone::factory()->create();
+    $assignee = insertHrEmployee();
+    $parent = Task::factory()->create(['milestone_id' => $milestone->id, 'assigned_to' => $assignee]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.show', ['task' => $parent])
+        ->set('newSubtaskTitle', '  Confirm the delivery window  ')
+        ->call('addSubtask')
+        ->assertHasNoErrors()
+        ->assertSet('newSubtaskTitle', '')
+        ->assertSee('Confirm the delivery window');
+
+    $subtask = Task::query()->where('title', 'Confirm the delivery window')->sole();
+
+    expect($subtask->parent_task_id)->toBe($parent->id)
+        ->and($subtask->proposal_id)->toBe($parent->proposal_id)
+        ->and($subtask->milestone_id)->toBe($milestone->id)
+        ->and($subtask->assigned_to)->toBe($assignee)
+        ->and($subtask->status)->toBe(TaskStatus::Todo)
+        ->and($subtask->created_by)->toBe($user->id);
+});
+
+test('adding a subtask with a blank title is rejected', function () {
+    $user = User::factory()->create();
+    $parent = Task::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.show', ['task' => $parent])
+        ->set('newSubtaskTitle', '   ')
+        ->call('addSubtask')
+        ->assertHasErrors(['newSubtaskTitle' => 'required']);
+
+    expect(Task::query()->where('parent_task_id', $parent->id)->count())->toBe(0);
+});
+
+test('subtasks persist and remain visible after navigating back to the task', function () {
+    $user = User::factory()->create();
+    $parent = Task::factory()->create();
+    Task::factory()->subtaskOf($parent)->create(['title' => 'Existing subtask']);
+
+    $this->actingAs($user)
+        ->get(route('tasks.show', $parent))
+        ->assertOk()
+        ->assertSeeText('Existing subtask');
+
+    $this->actingAs($user)
+        ->get(route('tasks.show', $parent))
+        ->assertOk()
+        ->assertSeeText('Existing subtask');
+});
+
+test('a subtask can be toggled complete from its parent task page', function () {
+    $user = User::factory()->create();
+    $parent = Task::factory()->create();
+    $subtask = Task::factory()->subtaskOf($parent)->create(['status' => TaskStatus::Todo, 'progress_percentage' => 0]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.show', ['task' => $parent])
+        ->call('toggleSubtaskComplete', $subtask->id);
+
+    expect($subtask->refresh()->status)->toBe(TaskStatus::Done)
+        ->and($subtask->progress_percentage)->toBe(100);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.show', ['task' => $parent])
+        ->call('toggleSubtaskComplete', $subtask->id);
+
+    expect($subtask->refresh()->status)->toBe(TaskStatus::Todo);
+});
+
+test('toggling a task that is not a subtask of this parent is a no-op', function () {
+    $user = User::factory()->create();
+    $parent = Task::factory()->create();
+    $unrelated = Task::factory()->create(['status' => TaskStatus::Todo]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.show', ['task' => $parent])
+        ->call('toggleSubtaskComplete', $unrelated->id);
+
+    expect($unrelated->refresh()->status)->toBe(TaskStatus::Todo);
+});
+
+test('a subtask panel does not appear on a subtask s own detail page', function () {
+    $user = User::factory()->create();
+    $parent = Task::factory()->create();
+    $subtask = Task::factory()->subtaskOf($parent)->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.show', ['task' => $subtask])
+        ->assertDontSee('Add subtask')
+        ->assertSeeText('Subtask of');
 });

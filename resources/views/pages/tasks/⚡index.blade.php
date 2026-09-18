@@ -6,10 +6,13 @@ use App\Models\HrEmployee;
 use App\Models\Milestone;
 use App\Models\Proposal;
 use App\Models\Task;
+use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
@@ -37,9 +40,25 @@ new #[Title('titles.tasks')] class extends Component {
     #[Url(except: '')]
     public string $milestone = '';
 
-    public bool $showTaskModal = false;
+    #[Url(as: 'view', except: 'list')]
+    public string $view = 'list';
+
+    #[Url(as: 'sort', except: 'due')]
+    public string $sortField = 'due';
+
+    #[Url(as: 'dir', except: 'asc')]
+    public string $sortDirection = 'asc';
+
+    #[Url(except: 'none')]
+    public string $group = 'none';
+
+    #[Url(except: '')]
+    public string $month = '';
+
+    public bool $showTaskDrawer = false;
     public ?int $editingTaskId = null;
     public ?int $deletingTaskId = null;
+    public bool $showDeleteModal = false;
     public string $title = '';
     public string $description = '';
     public string $taskStatus = 'todo';
@@ -77,6 +96,36 @@ new #[Title('titles.tasks')] class extends Component {
         $this->resetPage();
     }
 
+    public function updatedSortField(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedSortDirection(): void
+    {
+        $this->resetPage();
+    }
+
+    /**
+     * Toggles direction when the same column is clicked again, otherwise
+     * switches to the new column with a predictable ascending default.
+     */
+    public function setSort(string $field): void
+    {
+        if (! in_array($field, ['title', 'status', 'priority', 'due', 'assignee', 'created'], true)) {
+            return;
+        }
+
+        if ($this->sortField === $field) {
+            $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            $this->sortField = $field;
+            $this->sortDirection = 'asc';
+        }
+
+        $this->resetPage();
+    }
+
     public function clearFilters(): void
     {
         $this->search = '';
@@ -87,14 +136,47 @@ new #[Title('titles.tasks')] class extends Component {
         $this->resetPage();
     }
 
-    /** @return LengthAwarePaginator<int, Task> */
-    #[Computed]
-    public function tasks(): LengthAwarePaginator
+    public function previousMonth(): void
+    {
+        $this->month = $this->activeMonth()->subMonthNoOverflow()->format('Y-m');
+    }
+
+    public function nextMonth(): void
+    {
+        $this->month = $this->activeMonth()->addMonthNoOverflow()->format('Y-m');
+    }
+
+    public function goToToday(): void
+    {
+        $this->month = '';
+    }
+
+    protected function activeMonth(): CarbonImmutable
+    {
+        if ($this->month !== '' && preg_match('/^\d{4}-\d{2}$/', $this->month) === 1) {
+            $parsed = CarbonImmutable::createFromFormat('Y-m-d', $this->month.'-01');
+
+            if ($parsed !== false) {
+                return $parsed->startOfMonth();
+            }
+        }
+
+        return CarbonImmutable::now()->startOfMonth();
+    }
+
+    /**
+     * The base filtered query, shared by every view so switching views never
+     * changes what's shown — just how.
+     *
+     * @return Builder<Task>
+     */
+    protected function filteredTasksQuery(): Builder
     {
         $search = trim($this->search);
 
         return Task::query()
-            ->select(['id', 'milestone_id', 'proposal_id', 'title', 'assigned_to', 'status', 'priority', 'due_date', 'progress_percentage'])
+            ->select(['id', 'milestone_id', 'parent_task_id', 'proposal_id', 'title', 'description', 'assigned_to', 'status', 'priority', 'start_date', 'due_date', 'completed_date', 'progress_percentage'])
+            ->withCount('subtasks')
             ->with([
                 'milestone:id,name,project_id',
                 'milestone.project:id,name',
@@ -112,28 +194,215 @@ new #[Title('titles.tasks')] class extends Component {
             ->when($this->priority !== '', fn (Builder $query) => $query->where('priority', $this->priority))
             ->when($this->assignee !== '', fn (Builder $query) => $query->where('assigned_to', (int) $this->assignee))
             ->when($this->milestone === 'none', fn (Builder $query) => $query->whereNull('milestone_id'))
-            ->when($this->milestone !== '' && $this->milestone !== 'none', fn (Builder $query) => $query->where('milestone_id', (int) $this->milestone))
-            ->orderByRaw('due_date is null, due_date')
-            ->orderBy('id')
-            ->paginate(15);
+            ->when($this->milestone !== '' && $this->milestone !== 'none', fn (Builder $query) => $query->where('milestone_id', (int) $this->milestone));
     }
 
-    /** @return Collection<int, HrEmployee> */
+    /** @return LengthAwarePaginator<int, Task> */
     #[Computed]
+    public function tasks(): LengthAwarePaginator
+    {
+        return $this->applySort($this->filteredTasksQuery())
+            ->orderBy('id')
+            ->paginate(20);
+    }
+
+    /**
+     * Applies the active column/direction to a filtered query. Every branch
+     * pushes ordering to the database so it stays correct under pagination —
+     * never sort the already-paginated page in PHP.
+     *
+     * @param  Builder<Task>  $query
+     * @return Builder<Task>
+     */
+    protected function applySort(Builder $query): Builder
+    {
+        $direction = $this->sortDirection === 'desc' ? 'desc' : 'asc';
+
+        return match ($this->sortField) {
+            'title' => $query->orderBy('title', $direction),
+            'priority' => $this->orderByEnumSequence($query, 'priority', ['low', 'medium', 'high'], $direction),
+            'status' => $this->orderByEnumSequence($query, 'status', ['todo', 'in progress', 'under review', 'done'], $direction),
+            'assignee' => $this->orderByAssigneeName($query, $direction),
+            'created' => $query->orderBy('created_at', $direction),
+            default => $query->orderByRaw('due_date is null, due_date '.$direction),
+        };
+    }
+
+    /**
+     * Orders by a fixed, meaningful sequence (workflow stage / severity)
+     * rather than alphabetically, since 'in progress' < 'todo' alphabetically
+     * would be a confusing default.
+     *
+     * @param  Builder<Task>  $query
+     * @param  array<int, string>  $orderedValues
+     * @return Builder<Task>
+     */
+    protected function orderByEnumSequence(Builder $query, string $column, array $orderedValues, string $direction): Builder
+    {
+        $cases = collect($orderedValues)
+            ->map(fn (string $value, int $index): string => "when '{$value}' then {$index}")
+            ->implode(' ');
+
+        return $query->orderByRaw("(case {$column} {$cases} end) {$direction}");
+    }
+
+    /**
+     * Assignees live in the read-only HR database (a separate connection),
+     * so their names can't be joined in SQL. Resolve the small set of ids in
+     * the current filter, sort those by name in PHP, then order the task
+     * query by that id sequence — one extra lightweight query instead of a
+     * cross-database join. Unassigned tasks always sort last.
+     *
+     * @param  Builder<Task>  $query
+     * @return Builder<Task>
+     */
+    protected function orderByAssigneeName(Builder $query, string $direction): Builder
+    {
+        $ids = (clone $query)->whereNotNull('assigned_to')->distinct()->pluck('assigned_to');
+
+        if ($ids->isEmpty()) {
+            return $query;
+        }
+
+        $orderedIds = HrEmployee::query()
+            ->whereIn('id', $ids)
+            ->get()
+            ->sortBy('name')
+            ->when($direction === 'desc', fn (Collection $employees) => $employees->reverse())
+            ->values()
+            ->pluck('id');
+
+        if ($orderedIds->isEmpty()) {
+            return $query;
+        }
+
+        $cases = $orderedIds
+            ->map(fn ($id, int $index): string => 'when '.(int) $id." then {$index}")
+            ->implode(' ');
+
+        return $query
+            ->orderByRaw('assigned_to is null')
+            ->orderByRaw("(case assigned_to {$cases} end)");
+    }
+
+    /**
+     * Every task matching the current filters, unpaginated, for the board and
+     * calendar views (and the stats built from them) — capped at a sane
+     * ceiling so a very large backlog can't make either view unusable.
+     *
+     * @return EloquentCollection<int, Task>
+     */
+    #[Computed]
+    public function boardTasks(): EloquentCollection
+    {
+        return $this->filteredTasksQuery()
+            ->orderByRaw('due_date is null, due_date')
+            ->orderBy('id')
+            ->limit(500)
+            ->get();
+    }
+
+    /**
+     * Delivery health across the currently filtered tasks, computed as a
+     * single aggregate query rather than hydrating every matching task (and
+     * its milestone/proposal/assignee relations) just to count them — this
+     * ran on every list-view page load via boardTasks() before, which is a
+     * full board/calendar-sized query the list view never otherwise needs.
+     *
+     * @return array{total: int, done: int, overdue: int, due_soon: int}
+     */
+    #[Computed]
+    public function taskStats(): array
+    {
+        // Dates are server-generated (never user input), so it's safe to
+        // inline them literally instead of passing bindings through a raw
+        // select expression — Eloquent's select() replaces the column list
+        // rather than appending to it, which selectRaw()/addSelect() would.
+        $today = CarbonImmutable::today()->toDateString();
+        $dueSoonEnd = CarbonImmutable::today()->addDays(7)->toDateString();
+
+        $row = $this->filteredTasksQuery()->toBase()->select(DB::raw(
+            "count(*) as total,
+            sum(case when status = 'done' then 1 else 0 end) as done,
+            sum(case when status <> 'done' and due_date is not null and due_date < '{$today}' then 1 else 0 end) as overdue,
+            sum(case when status <> 'done' and due_date is not null and due_date between '{$today}' and '{$dueSoonEnd}' then 1 else 0 end) as due_soon",
+        ))->first();
+
+        return [
+            'total' => (int) ($row->total ?? 0),
+            'done' => (int) ($row->done ?? 0),
+            'overdue' => (int) ($row->overdue ?? 0),
+            'due_soon' => (int) ($row->due_soon ?? 0),
+        ];
+    }
+
+    /**
+     * The month grid for the calendar view, built from the same filtered
+     * tasks as the other views. Tasks without a due date are returned
+     * separately for the "unscheduled" panel.
+     *
+     * @return array{month: CarbonImmutable, weeks: array<int, array<int, CarbonImmutable>>, tasksByDay: Collection<string, EloquentCollection<int, Task>>, unscheduled: EloquentCollection<int, Task>}
+     */
+    #[Computed]
+    public function calendarGrid(): array
+    {
+        $month = $this->activeMonth();
+        $gridStart = $month->startOfWeek(CarbonImmutable::SUNDAY);
+        $gridEnd = $month->endOfMonth()->endOfWeek(CarbonImmutable::SATURDAY);
+
+        $weeks = [];
+        $cursor = $gridStart;
+        while ($cursor->lte($gridEnd)) {
+            $week = [];
+            for ($i = 0; $i < 7; $i++) {
+                $week[] = $cursor;
+                $cursor = $cursor->addDay();
+            }
+            $weeks[] = $week;
+        }
+
+        $tasks = $this->boardTasks;
+
+        $tasksByDay = $tasks
+            ->filter(fn (Task $task): bool => $task->due_date !== null && $task->due_date->between($gridStart, $gridEnd))
+            ->groupBy(fn (Task $task): string => $task->due_date->toDateString());
+
+        $unscheduled = $tasks->filter(fn (Task $task): bool => $task->due_date === null)->values();
+
+        return [
+            'month' => $month,
+            'weeks' => $weeks,
+            'tasksByDay' => $tasksByDay,
+            'unscheduled' => $unscheduled,
+        ];
+    }
+
+    /**
+     * These three option lists back every filter, drawer field, and quick-set
+     * popover, so without caching they were re-queried in full on every
+     * single quick action (toggle complete, quick status, reschedule, …)
+     * even though nothing about the employees/proposals/milestones changed.
+     * `persist` keys the cache to this component instance, so it never leaks
+     * across users and expires with the page (5 minutes is just a safety
+     * bound against an unusually long-lived tab, not a real staleness risk).
+     *
+     * @return Collection<int, HrEmployee>
+     */
+    #[Computed(persist: true, seconds: 300)]
     public function userOptions(): Collection
     {
         return HrEmployee::pickerOptions();
     }
 
     /** @return Collection<int, Proposal> */
-    #[Computed]
+    #[Computed(persist: true, seconds: 300)]
     public function proposalOptions(): Collection
     {
         return Proposal::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get();
     }
 
     /** @return Collection<int, Milestone> */
-    #[Computed]
+    #[Computed(persist: true, seconds: 300)]
     public function milestoneOptions(): Collection
     {
         return Milestone::query()
@@ -144,13 +413,53 @@ new #[Title('titles.tasks')] class extends Component {
             ->get();
     }
 
-    public function openCreateModal(): void
+    #[Computed]
+    public function deletingTask(): ?Task
     {
-        $this->resetTaskForm();
-        $this->showTaskModal = true;
+        if ($this->deletingTaskId === null) {
+            return null;
+        }
+
+        return Task::query()->select(['id', 'title'])->find($this->deletingTaskId);
     }
 
-    public function openEditModal(int $taskId): void
+    public function openCreateDrawer(?string $dueDate = null, ?string $status = null, ?string $milestoneId = null): void
+    {
+        $this->resetTaskForm();
+
+        if ($dueDate !== null) {
+            $this->dueDate = $dueDate;
+        }
+
+        if ($status !== null && TaskStatus::tryFrom($status) !== null) {
+            $this->taskStatus = $status;
+        }
+
+        if ($milestoneId !== null && Milestone::query()->whereKey((int) $milestoneId)->exists()) {
+            $this->taskMilestoneId = $milestoneId;
+        }
+
+        $this->showTaskDrawer = true;
+    }
+
+    /**
+     * A group's inline "+ Add task" row only captures a title — proposal and
+     * assignee are required fields, so this opens the drawer pre-filled with
+     * the title and the group's own context instead of saving directly.
+     */
+    public function quickCreateTask(string $title, ?string $status = null, ?string $milestoneId = null): void
+    {
+        $title = trim($title);
+
+        if ($title === '') {
+            return;
+        }
+
+        $this->openCreateDrawer(status: $status, milestoneId: $milestoneId);
+        $this->title = $title;
+    }
+
+    public function openEditDrawer(int $taskId): void
     {
         $task = Task::query()
             ->select(['id', 'milestone_id', 'proposal_id', 'title', 'description', 'assigned_to', 'status', 'priority', 'start_date', 'due_date', 'completed_date', 'progress_percentage'])
@@ -169,7 +478,7 @@ new #[Title('titles.tasks')] class extends Component {
         $this->assignedTo = (string) $task->assigned_to;
         $this->taskProposalId = (string) $task->proposal_id;
         $this->taskMilestoneId = (string) ($task->milestone_id ?? '');
-        $this->showTaskModal = true;
+        $this->showTaskDrawer = true;
     }
 
     public function saveTask(): void
@@ -221,7 +530,7 @@ new #[Title('titles.tasks')] class extends Component {
         }
 
         $task->fill($attributes)->save();
-        $this->showTaskModal = false;
+        $this->showTaskDrawer = false;
         $this->resetTaskForm();
         $this->resetPage();
 
@@ -231,6 +540,15 @@ new #[Title('titles.tasks')] class extends Component {
     public function confirmDelete(int $taskId): void
     {
         $this->deletingTaskId = $taskId;
+        $this->showDeleteModal = true;
+        unset($this->deletingTask);
+    }
+
+    public function cancelDelete(): void
+    {
+        $this->showDeleteModal = false;
+        $this->deletingTaskId = null;
+        unset($this->deletingTask);
     }
 
     public function deleteTask(): void
@@ -239,15 +557,144 @@ new #[Title('titles.tasks')] class extends Component {
             return;
         }
 
-        Task::query()->findOrFail($this->deletingTaskId)->delete();
+        $taskId = $this->deletingTaskId;
+        $deleted = DB::transaction(function () use ($taskId): bool {
+            $task = Task::query()->lockForUpdate()->find($taskId);
+
+            if ($task === null || $task->subtasks()->exists()) {
+                return false;
+            }
+
+            return (bool) $task->delete();
+        });
+
+        $this->showDeleteModal = false;
         $this->deletingTaskId = null;
+        unset($this->deletingTask);
+
+        if (! $deleted) {
+            Flux::toast(variant: 'danger', text: __('tasks.this_task_still_has_subtasks_move_or_delete_them_first'));
+
+            return;
+        }
+
         $this->resetPage();
+
         Flux::toast(variant: 'success', text: __('tasks.task_deleted'));
     }
 
-    public function closeTaskModal(): void
+    public function duplicateTask(int $taskId): void
     {
-        $this->showTaskModal = false;
+        $original = Task::query()->findOrFail($taskId);
+
+        $copy = $original->replicate();
+        $copy->title = __('tasks.copy_of_title', ['title' => $original->title]);
+        $copy->status = TaskStatus::Todo;
+        $copy->completed_date = null;
+        $copy->progress_percentage = 0;
+        $copy->created_by = (int) auth()->id();
+        $copy->save();
+
+        Flux::toast(variant: 'success', text: __('tasks.task_duplicated'));
+    }
+
+    public function toggleComplete(int $taskId): void
+    {
+        $task = Task::query()->find($taskId);
+
+        if ($task === null) {
+            return;
+        }
+
+        if ($task->status === TaskStatus::Done) {
+            $task->status = TaskStatus::Todo;
+            $task->completed_date = null;
+        } else {
+            $task->status = TaskStatus::Done;
+            $task->completed_date = CarbonImmutable::today();
+            $task->progress_percentage = 100;
+        }
+
+        $task->save();
+    }
+
+    public function quickSetStatus(int $taskId, string $status): void
+    {
+        $newStatus = TaskStatus::tryFrom($status);
+        $task = Task::query()->find($taskId);
+
+        if ($task === null) {
+            // Most likely dropped after being deleted elsewhere — the board
+            // re-renders from the database regardless, so the card already
+            // "rolls back" to wherever the data actually says it is; this
+            // just explains why the drop didn't visibly do anything.
+            Flux::toast(variant: 'danger', text: __('tasks.this_task_no_longer_exists'));
+
+            return;
+        }
+
+        if ($newStatus === null) {
+            return;
+        }
+
+        $task->status = $newStatus;
+
+        if ($newStatus === TaskStatus::Done) {
+            $task->completed_date ??= CarbonImmutable::today();
+            $task->progress_percentage = 100;
+        } elseif ($task->completed_date !== null) {
+            $task->completed_date = null;
+        }
+
+        $task->save();
+    }
+
+    public function quickSetPriority(int $taskId, string $priority): void
+    {
+        $newPriority = TaskPriority::tryFrom($priority);
+        $task = Task::query()->find($taskId);
+
+        if ($newPriority === null || $task === null) {
+            return;
+        }
+
+        $task->priority = $newPriority;
+        $task->save();
+    }
+
+    public function quickSetAssignee(int $taskId, int $userId): void
+    {
+        $task = Task::query()->find($taskId);
+
+        if ($task === null || ! HrEmployee::query()->whereKey($userId)->exists()) {
+            return;
+        }
+
+        $task->assigned_to = $userId;
+        $task->save();
+    }
+
+    public function rescheduleTask(int $taskId, string $date): void
+    {
+        if ($date !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) !== 1) {
+            return;
+        }
+
+        $task = Task::query()->find($taskId);
+
+        if ($task === null) {
+            return;
+        }
+
+        $task->due_date = $date === '' ? null : CarbonImmutable::parse($date);
+        $task->save();
+
+        Flux::toast(variant: 'success', text: __('tasks.task_rescheduled'));
+    }
+
+    public function closeTaskDrawer(): void
+    {
+        $this->showTaskDrawer = false;
         $this->resetTaskForm();
     }
 
@@ -281,8 +728,8 @@ new #[Title('titles.tasks')] class extends Component {
     $filtersAreActive = $search !== '' || $status !== '' || $priority !== '' || $assignee !== '' || $milestone !== '';
 @endphp
 
-<section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="task-directory-heading">
-    <x-ui.page-header heading-id="task-directory-heading" :title="__('common.tasks')" :count="$this->tasks->total()">
+<section class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="task-directory-heading">
+    <x-ui.page-header heading-id="task-directory-heading" :title="__('common.tasks')" :count="$this->taskStats['total']">
         <x-slot:filters>
             <x-ui.input type="search" icon="magnifying-glass" :label="__('tasks.search_tasks')" :placeholder="__('tasks.title_description_or_assignee')" wire:model.live.debounce.300ms="search" clearable />
             <x-ui.header-filter-select :label="__('common.status')" wire:model.live="status" :value="$status">
@@ -312,73 +759,106 @@ new #[Title('titles.tasks')] class extends Component {
             </x-ui.header-filter-select>
         </x-slot:filters>
         <x-slot:actions>
-            <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-task-button">{{ __('tasks.add_task') }}</x-ui.button>
+            <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateDrawer" data-test="create-task-button">{{ __('tasks.add_task') }}</x-ui.button>
         </x-slot:actions>
     </x-ui.page-header>
 
-    <x-ui.panel :subtitle="trans_choice('tasks.count_matching_task', $this->tasks->total(), ['count' => $this->tasks->total()])">
-        <x-slot:toolbar>
-            @if ($filtersAreActive)
-                <flux:button size="sm" variant="ghost" class="text-secondary-medium! hover:bg-secondary-soft! dark:text-secondary-soft!" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
-            @endif
-        </x-slot:toolbar>
+    <div class="grid gap-3 @2xl/directory:grid-cols-2 @5xl/directory:grid-cols-4">
+        <x-ui.stat-tile :label="__('tasks.total_tasks')" :value="$this->taskStats['total']" icon="clipboard-document-check" wire:key="task-stat-total" />
+        <x-ui.stat-tile :label="TaskStatus::Done->label()" :value="$this->taskStats['done']" icon="check-circle" tone="good" wire:key="task-stat-done" />
+        <x-ui.stat-tile :label="__('tasks.overdue')" :value="$this->taskStats['overdue']" icon="exclamation-triangle" tone="critical" wire:key="task-stat-overdue" />
+        <x-ui.stat-tile :label="__('tasks.due_within_7_days')" :value="$this->taskStats['due_soon']" icon="clock" tone="warn" wire:key="task-stat-due-soon" />
+    </div>
 
-        @if ($this->tasks->isEmpty())
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="inline-flex flex-wrap gap-1 rounded-lg border border-secondary-soft bg-secondary-soft/40 p-1 dark:border-secondary-medium dark:bg-secondary-medium/40" role="group" aria-label="{{ __('tasks.view') }}">
+            @foreach ([
+                'list' => ['icon' => 'queue-list', 'label' => __('tasks.list_view')],
+                'board' => ['icon' => 'view-columns', 'label' => __('tasks.board_view')],
+                'calendar' => ['icon' => 'calendar-days', 'label' => __('tasks.calendar_view')],
+            ] as $viewOption => $viewMeta)
+                <button
+                    type="button"
+                    wire:click="$set('view', '{{ $viewOption }}')"
+                    aria-pressed="{{ $view === $viewOption ? 'true' : 'false' }}"
+                    data-test="task-view-{{ $viewOption }}"
+                    @class([
+                        'inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-md px-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                        'bg-white text-secondary-dark shadow-sm dark:bg-secondary-dark dark:text-white' => $view === $viewOption,
+                        'text-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => $view !== $viewOption,
+                    ])
+                >
+                    <flux:icon :name="$viewMeta['icon']" variant="micro" class="size-4" aria-hidden="true" />
+                    {{ $viewMeta['label'] }}
+                </button>
+            @endforeach
+        </div>
+
+        <div class="flex shrink-0 flex-wrap items-center gap-2">
+            @if ($view === 'list')
+                <x-ui.header-filter-select :label="__('tasks.group_by')" wire:model.live="group" :value="$group" class="w-40!">
+                    <flux:select.option value="none">{{ __('tasks.no_grouping') }}</flux:select.option>
+                    <flux:select.option value="status">{{ __('common.status') }}</flux:select.option>
+                    <flux:select.option value="priority">{{ __('tasks.priority') }}</flux:select.option>
+                    <flux:select.option value="assignee">{{ __('tasks.assignee') }}</flux:select.option>
+                    <flux:select.option value="milestone">{{ __('tasks.milestone') }}</flux:select.option>
+                </x-ui.header-filter-select>
+                <x-ui.header-filter-select :label="__('tasks.sort_by')" wire:model.live="sortField" :value="$sortField" class="w-40!">
+                    <flux:select.option value="due">{{ __('tasks.due_date_2') }}</flux:select.option>
+                    <flux:select.option value="title">{{ __('common.name') }}</flux:select.option>
+                    <flux:select.option value="status">{{ __('common.status') }}</flux:select.option>
+                    <flux:select.option value="priority">{{ __('tasks.priority') }}</flux:select.option>
+                    <flux:select.option value="assignee">{{ __('tasks.assignee') }}</flux:select.option>
+                    <flux:select.option value="created">{{ __('tasks.created_date') }}</flux:select.option>
+                </x-ui.header-filter-select>
+                <x-ui.button
+                    size="sm"
+                    wire:click="$set('sortDirection', '{{ $sortDirection === 'asc' ? 'desc' : 'asc' }}')"
+                    :aria-label="$sortDirection === 'asc' ? __('tasks.sort_ascending') : __('tasks.sort_descending')"
+                    data-test="task-sort-direction-toggle"
+                >
+                    <flux:icon :name="$sortDirection === 'asc' ? 'bars-arrow-up' : 'bars-arrow-down'" variant="micro" class="size-4" aria-hidden="true" />
+                </x-ui.button>
+            @endif
+
+            @if ($filtersAreActive)
+                <flux:button size="sm" variant="ghost" class="self-end" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
+            @endif
+        </div>
+    </div>
+
+    @if ($this->taskStats['total'] === 0)
+        <x-ui.panel>
             <x-ui.empty-state icon="clipboard-document-check" :heading="$filtersAreActive ? __('tasks.no_matching_tasks') : __('common.no_tasks_yet')" :body="$filtersAreActive ? __('common.change_the_search_or_filters_and_try_again') : __('tasks.add_the_first_task_against_a_proposal')">
                 <x-slot:action>
                     @if ($filtersAreActive)
                         <x-ui.button size="sm" wire:click="clearFilters">{{ __('common.reset_filters') }}</x-ui.button>
                     @else
-                        <x-ui.button size="sm" tone="primary" icon="plus" wire:click="openCreateModal">{{ __('tasks.add_task') }}</x-ui.button>
+                        <x-ui.button size="sm" tone="primary" icon="plus" wire:click="openCreateDrawer">{{ __('tasks.add_task') }}</x-ui.button>
                     @endif
                 </x-slot:action>
             </x-ui.empty-state>
-        @else
-            <div class="divide-y divide-secondary-soft dark:divide-secondary-medium">
-                @foreach ($this->tasks as $task)
-                    <article class="flex flex-col gap-3 p-3.5 @4xl/directory:flex-row @4xl/directory:items-center" wire:key="task-{{ $task->id }}">
-                        <div class="min-w-0 @4xl/directory:me-auto">
-                            <a href="{{ route('tasks.show', $task) }}" wire:navigate class="text-sm font-semibold hover:underline">{{ $task->title }}</a>
-                            <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">
-                                @if ($task->milestone === null)
-                                    <span class="italic">{{ __('tasks.no_milestone') }}</span>
-                                @else
-                                    {{ $task->milestone->name }} · {{ $task->milestone->project->name }}
-                                @endif
-                                · {{ $task->proposal->name }}
-                            </p>
-                        </div>
-                        <div class="flex flex-wrap items-center gap-2">
-                            <x-ui.enum-badge :case="$task->status" />
-                            <x-ui.enum-badge :case="$task->priority" />
-                            <span class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $task->progress_percentage }}%</span>
-                            @if ($task->due_date !== null)
-                                <span class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">{{ __('tasks.due_date', ['date' => $task->due_date->translatedFormat(__('formats.date_short'))]) }}</span>
-                            @endif
-                        </div>
-                        <x-ui.employee-chip :employee="$task->assignee" compact class="@4xl/directory:w-44" />
-                        <div class="flex shrink-0 items-center gap-1">
-                            <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation @sm/directory:size-9!" wire:click="openEditModal({{ $task->id }})" :aria-label="__('tasks.edit_title', ['title' => $task->title])" />
-                            <x-ui.button tone="ghost" size="sm" icon="trash" class="size-11! touch-manipulation @sm/directory:size-9!" wire:click="confirmDelete({{ $task->id }})" :aria-label="__('tasks.delete_title', ['title' => $task->title])" />
-                        </div>
-                    </article>
-                @endforeach
-            </div>
-        @endif
+        </x-ui.panel>
+    @else
+        @switch ($view)
+            @case ('board')
+                @include('pages.tasks._board')
+                @break
 
-        <x-slot:footer>
-            <flux:pagination :paginator="$this->tasks" class="text-secondary-medium! dark:text-secondary-soft!" scroll-to="#task-directory-heading" />
-        </x-slot:footer>
-    </x-ui.panel>
+            @case ('calendar')
+                @include('pages.tasks._calendar')
+                @break
 
-    <flux:modal wire:model="showTaskModal" class="w-full max-w-3xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <form wire:submit="saveTask" class="flex flex-col gap-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ $editingTaskId === null ? __('tasks.add_task') : __('tasks.edit_task') }}</flux:heading>
-                <flux:subheading>{{ __('tasks.every_task_delivers_against_a_proposal_a_milestone_is_option') }}</flux:subheading>
-            </div>
+            @default
+                @include('pages.tasks._list')
+        @endswitch
+    @endif
+
+    <x-ui.drawer wire:model="showTaskDrawer" :title="$editingTaskId === null ? __('tasks.add_task') : __('tasks.edit_task')" :subtitle="__('tasks.every_task_delivers_against_a_proposal_a_milestone_is_option')">
+        <form wire:submit="saveTask" id="task-drawer-form" class="flex flex-col gap-5">
             <x-ui.input wire:model="title" :label="__('tasks.task_title')" type="text" maxlength="255" required autofocus />
             <flux:textarea wire:model="description" :label="__('common.description')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!" />
+
             <div class="grid gap-4 sm:grid-cols-2">
                 <x-ui.select wire:model="taskProposalId" :label="__('common.proposal')" required>
                     <flux:select.option value="">{{ __('common.select_a_proposal') }}</flux:select.option>
@@ -393,7 +873,8 @@ new #[Title('titles.tasks')] class extends Component {
                     @endforeach
                 </x-ui.select>
             </div>
-            <div class="grid gap-4 sm:grid-cols-2 @2xl/directory:grid-cols-4">
+
+            <div class="grid gap-4 sm:grid-cols-2">
                 <x-ui.select wire:model="taskStatus" :label="__('common.status')" required>
                     @foreach (TaskStatus::cases() as $statusCase)
                         <flux:select.option :value="$statusCase->value" :wire:key="'task-status-option-'.$statusCase->value">{{ $statusCase->label() }}</flux:select.option>
@@ -404,6 +885,9 @@ new #[Title('titles.tasks')] class extends Component {
                         <flux:select.option :value="$priorityCase->value" :wire:key="'task-priority-option-'.$priorityCase->value">{{ $priorityCase->label() }}</flux:select.option>
                     @endforeach
                 </x-ui.select>
+            </div>
+
+            <div class="grid gap-4 sm:grid-cols-2">
                 <x-ui.input wire:model="progressPercentage" :label="__('tasks.progress_2')" type="number" min="0" max="100" required />
                 <x-ui.select wire:model="assignedTo" :label="__('tasks.assignee')" required>
                     <flux:select.option value="">{{ __('common.select') }}</flux:select.option>
@@ -412,24 +896,33 @@ new #[Title('titles.tasks')] class extends Component {
                     @endforeach
                 </x-ui.select>
             </div>
+
             <div class="grid gap-4 sm:grid-cols-3">
                 <x-ui.input wire:model="startDate" :label="__('common.start_date')" type="date" />
                 <x-ui.input wire:model="dueDate" :label="__('tasks.due_date_2')" type="date" />
                 <x-ui.input wire:model="completedDate" :label="__('tasks.completed_date')" type="date" />
             </div>
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="closeTaskModal">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" data-test="save-task-button">{{ $editingTaskId === null ? __('tasks.create_task') : __('common.save_changes') }}</x-ui.button>
-            </div>
         </form>
-    </flux:modal>
 
-    <flux:modal :open="$deletingTaskId !== null" wire:close="$set('deletingTaskId', null)" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
+        <x-slot:footer>
+            <div class="grid grid-cols-2 gap-2 sm:flex sm:justify-end">
+                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="closeTaskDrawer">{{ __('common.cancel') }}</x-ui.button>
+                <x-ui.button type="submit" form="task-drawer-form" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" data-test="save-task-button">{{ $editingTaskId === null ? __('tasks.create_task') : __('common.save_changes') }}</x-ui.button>
+            </div>
+        </x-slot:footer>
+    </x-ui.drawer>
+
+    <flux:modal wire:model="showDeleteModal" wire:close="cancelDelete" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
+        @php $pendingDeleteTask = $this->deletingTask; @endphp
         <div class="flex flex-col gap-4">
             <flux:heading size="lg">{{ __('tasks.delete_this_task') }}</flux:heading>
-            <flux:subheading>{{ __('tasks.its_comments_and_attachment_records_are_removed_with_it_noth') }}</flux:subheading>
+            <flux:subheading>
+                {{ $pendingDeleteTask !== null
+                    ? __('tasks.are_you_sure_you_want_to_delete_this_task', ['title' => $pendingDeleteTask->title])
+                    : __('tasks.its_comments_and_attachment_records_are_removed_with_it_noth') }}
+            </flux:subheading>
             <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="$set('deletingTaskId', null)">{{ __('common.cancel') }}</x-ui.button>
+                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="cancelDelete">{{ __('common.cancel') }}</x-ui.button>
                 <x-ui.button type="button" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="deleteTask" data-test="confirm-delete-task">{{ __('tasks.delete_task') }}</x-ui.button>
             </div>
         </div>
