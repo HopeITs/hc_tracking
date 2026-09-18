@@ -526,6 +526,18 @@ test('the calendar view month navigation moves the visible month', function () {
         ->assertSet('month', '');
 });
 
+test('clicking a day in the calendar view opens the create modal with that date prefilled', function () {
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.index')
+        ->set('view', 'calendar')
+        ->set('month', '2026-04')
+        ->call('openCreateModal', '2026-04-15')
+        ->assertSet('showMilestoneModal', true)
+        ->assertSet('plannedDate', '2026-04-15');
+});
+
 test('a deletable milestone shows a delete action in the calendar view, and a locked one does not', function () {
     $user = User::factory()->create();
     $parent = Milestone::factory()->create(['name' => 'Root gate', 'planned_date' => '2026-04-10']);
@@ -535,6 +547,7 @@ test('a deletable milestone shows a delete action in the calendar view, and a lo
         ->test('pages::milestones.index')
         ->set('view', 'calendar')
         ->set('month', '2026-04')
-        ->assertSee('wire:click.stop="confirmDelete('.$child->id.')"', false)
-        ->assertDontSee('wire:click.stop="confirmDelete('.$parent->id.')"', false);
+        ->assertSee('data-milestone-chip', false)
+        ->assertSee('wire:click="confirmDelete('.$child->id.')"', false)
+        ->assertDontSee('wire:click="confirmDelete('.$parent->id.')"', false);
 });
