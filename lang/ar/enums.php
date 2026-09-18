@@ -86,7 +86,6 @@ return [
         'in_progress' => 'قيد التنفيذ',
         'under_review' => 'قيد المراجعة',
         'done' => 'منجزة',
-        'blocked' => 'متوقفة',
     ],
     'user_role' => [
         'officer' => 'موظف',

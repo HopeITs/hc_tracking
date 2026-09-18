@@ -677,7 +677,6 @@ new #[Title('titles.calendar')] class extends Component {
 
     $taskTone = fn (TaskStatus $status): string => match ($status) {
         TaskStatus::Done => 'bg-status-good-soft text-status-good',
-        TaskStatus::Blocked => 'bg-status-critical-soft text-primary',
         TaskStatus::InProgress, TaskStatus::UnderReview => 'bg-funding-soft text-funding',
         TaskStatus::Todo => 'bg-white text-secondary-dark ring-1 ring-secondary-soft dark:bg-secondary-dark dark:text-white dark:ring-secondary-medium',
     };

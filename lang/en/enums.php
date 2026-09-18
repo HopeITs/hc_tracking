@@ -86,7 +86,6 @@ return [
         'in_progress' => 'In Progress',
         'under_review' => 'Under Review',
         'done' => 'Done',
-        'blocked' => 'Blocked',
     ],
     'user_role' => [
         'officer' => 'Officer',

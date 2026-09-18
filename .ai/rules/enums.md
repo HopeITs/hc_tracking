@@ -121,6 +121,14 @@ by any standard M&E reading), and the currencies 'GBP' and 'TRY', which only
 ever appeared inside `AccountFactory`'s account NAME strings, never in a
 currency column. `AccountFactory` now names accounts from `Currency::values()`.
 
+## Blocked removed from TaskStatus — four values only
+
+`TaskStatus::Blocked` ('blocked') was removed by user decision 2026-09-18. The enum is now exactly Todo, InProgress, UnderReview, Done — no "blocked" concept anywhere in the tasks domain.
+
+Migration `2026_09_18_154724_remove_blocked_status_from_tasks` reassigns any existing `tasks.status = 'blocked'` row to 'todo' before the enum stops recognizing the value — `tasks.status` is a free VARCHAR(50) with no DB check constraint, so without this a pre-existing blocked row would throw a ValueError the next time Eloquent read it through the `TaskStatus` cast. There's no "previous status" recorded for a blocked task, so the fallback is always 'todo', never a guess at what it resumes as.
+
+Also removed: the `'blocked' => 'accent'` arm from `x-ui.enum-badge`'s TaskStatus match, the `TaskStatus::Blocked` arm from the shared calendar page's (`resources/views/pages/calendar/⚡index.blade.php`) `$taskTone` match, and the `enums.task_status.blocked` key from both `lang/en/enums.php` and `lang/ar/enums.php`. All three were plain `match` expressions over `TaskStatus::cases()` with no `default` arm, so removing the case and its arm together keeps them exhaustive — do not add a `default` arm as a shortcut; a future 5th status should still be forced to declare its own tone in every match, the same way `ProposalStatus::phase()` above is deliberately exhaustive.
+
 ## PHPStan does not analyse tests/, and adding it is not a one-line change
 
 `phpstan.neon` lists app/, bootstrap/app.php, config/, database/ and routes/.
