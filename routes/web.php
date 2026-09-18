@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ProjectFileDownloadController;
 use App\Http\Controllers\SwitchLocaleController;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
@@ -41,6 +42,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::livewire('projects/{project}', 'pages::projects.show')
         ->name('projects.show');
+
+    Route::get('projects/{project}/files/{media}/download', ProjectFileDownloadController::class)
+        ->name('projects.files.download');
 
     Route::livewire('risks', 'pages::risks.index')
         ->name('risks.index');

@@ -1,4 +1,4 @@
-@props(['media'])
+@props(['media', 'projectId'])
 
 @php
     $icon = match ($media->type) {
@@ -49,5 +49,31 @@
             @endif
             <time datetime="{{ $media->uploaded_at?->toDateString() }}">{{ $media->uploaded_at?->translatedFormat(__('formats.date')) ?? '—' }}</time>
         </div>
+    </div>
+
+    <div class="flex items-center justify-end gap-1 border-t border-secondary-soft pt-2 dark:border-secondary-medium">
+        <a
+            href="{{ route('projects.files.download', [$projectId, $media]) }}"
+            class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-secondary-soft dark:hover:bg-secondary-medium dark:hover:text-white"
+            aria-label="{{ __('common.download_name', ['name' => $media->original_name]) }}"
+        >
+            <flux:icon name="arrow-down-tray" variant="micro" class="size-4" />
+        </a>
+        <x-ui.button
+            tone="ghost"
+            size="sm"
+            icon="pencil-square"
+            class="size-8!"
+            wire:click="openEditFileModal({{ $media->id }})"
+            :aria-label="__('common.edit_name', ['name' => $media->original_name])"
+        />
+        <x-ui.button
+            tone="ghost"
+            size="sm"
+            icon="trash"
+            class="size-8! text-primary! hover:bg-status-critical-soft!"
+            wire:click="confirmDeleteFile({{ $media->id }})"
+            :aria-label="__('common.delete_name', ['name' => $media->original_name])"
+        />
     </div>
 </article>

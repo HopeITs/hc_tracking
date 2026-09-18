@@ -270,11 +270,11 @@ test('attaching the same proposal twice does not duplicate the pivot row', funct
         ->count())->toBe(1);
 });
 
-test('project files list only this projects metadata without upload or download controls', function () {
+test('project files list only this projects metadata and download through the authenticated route, never the raw storage path', function () {
     $user = User::factory()->create();
     $project = Project::factory()->create();
     $otherProject = Project::factory()->create();
-    Media::factory()->inCollection(MediaCollection::Agreement)->create([
+    $media = Media::factory()->inCollection(MediaCollection::Agreement)->create([
         'mediable_type' => 'project',
         'mediable_id' => $project->id,
         'original_name' => 'signed-agreement.pdf',
@@ -296,10 +296,9 @@ test('project files list only this projects metadata without upload or download 
         ->assertSee('PDF')
         ->assertSee('Agreement')
         ->assertSee('Sep 10, 2026')
+        ->assertSee(route('projects.files.download', [$project, $media]), false)
         ->assertDontSee('other-project-photo.jpg')
         ->assertDontSee('media/private-storage-name.pdf')
-        ->assertDontSee('download', false)
-        ->assertDontSee('upload', false)
         ->assertDontSee('href="media/private-storage-name.pdf"', false);
 });
 

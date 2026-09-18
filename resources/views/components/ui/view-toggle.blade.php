@@ -14,7 +14,7 @@
             wire:click="$set('{{ $wireModel }}', '{{ $option['key'] }}')"
             @class([
                 'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 type-meta font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-primary',
-                'bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white' => $isActive,
+                'bg-primary text-white' => $isActive,
                 'text-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => ! $isActive,
             ])
         >

@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\FileType;
 use App\Enums\IndicatorMeasure;
 use App\Enums\MediaCollection;
 use App\Enums\MilestoneStatus;
@@ -16,13 +17,19 @@ use App\Models\Result;
 use App\Models\Risk;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 new #[Title('titles.project')] class extends Component {
+    use WithFileUploads;
+
     public int $projectId;
 
     #[Url(except: 'milestones')]
@@ -31,6 +38,20 @@ new #[Title('titles.project')] class extends Component {
     public string $proposalToAttach = '';
 
     public string $fileCategoryFilter = 'all';
+
+    public bool $showFileModal = false;
+
+    public bool $confirmingFileDelete = false;
+
+    public ?int $editingFileId = null;
+
+    public ?int $deletingFileId = null;
+
+    public $newFile = null;
+
+    public string $fileCategory = '';
+
+    public string $fileDisplayName = '';
 
     public function mount(Project $project): void
     {
@@ -187,6 +208,175 @@ new #[Title('titles.project')] class extends Component {
         return $this->project->media
             ->filter(fn (Media $media): bool => $media->collection->value === $this->fileCategoryFilter)
             ->values();
+    }
+
+    /**
+     * The media row behind a file-tab action, scoped to this project.
+     *
+     * Every method below takes a media id from the client — a clicked
+     * download/edit/delete button — so it must be re-scoped to this project
+     * rather than trusting a bare findOrFail(). Without this guard a user
+     * could act on another project's file by tampering with the id (IDOR).
+     */
+    private function projectFile(int $mediaId): Media
+    {
+        return Media::query()
+            ->where('mediable_type', 'project')
+            ->where('mediable_id', $this->projectId)
+            ->findOrFail($mediaId);
+    }
+
+    /**
+     * A user-typed display name, guaranteed to carry the file's real
+     * extension.
+     *
+     * The download controller sends this value as the saved filename, so a
+     * display name typed without an extension (the common case — nobody
+     * types ".pdf" into a "name" field) must not silently drop it; that
+     * left downloaded files without the extension needed to open them.
+     */
+    private function displayNameWithExtension(string $displayName, FileType $type): string
+    {
+        $displayName = trim($displayName);
+
+        if (Str::lower(pathinfo($displayName, PATHINFO_EXTENSION)) === $type->value) {
+            return $displayName;
+        }
+
+        return $displayName.'.'.$type->value;
+    }
+
+    public function openCreateFileModal(): void
+    {
+        $this->resetValidation();
+        $this->editingFileId = null;
+        $this->newFile = null;
+        $this->fileCategory = '';
+        $this->fileDisplayName = '';
+        $this->showFileModal = true;
+    }
+
+    public function openEditFileModal(int $mediaId): void
+    {
+        $media = $this->projectFile($mediaId);
+
+        $this->resetValidation();
+        $this->editingFileId = $media->id;
+        $this->newFile = null;
+        $this->fileCategory = $media->collection->value;
+        $this->fileDisplayName = $media->original_name;
+        $this->showFileModal = true;
+    }
+
+    /**
+     * Create a new project file or update an existing one's metadata.
+     *
+     * Create validates and stores the upload itself; edit changes only the
+     * category and display name — swapping the underlying document is
+     * delete + re-upload, not an in-place replace.
+     */
+    public function saveFile(): void
+    {
+        if ($this->editingFileId === null) {
+            $validated = $this->validate([
+                'newFile' => ['required', 'file', 'max:5120', 'mimes:'.implode(',', FileType::values())],
+                'fileCategory' => ['required', Rule::enum(MediaCollection::class)],
+                'fileDisplayName' => ['nullable', 'string', 'max:255'],
+            ], [
+                'newFile.required' => __('projects.select_a_file_to_upload'),
+                'fileCategory.required' => __('projects.select_a_file_category'),
+            ]);
+
+            $path = $this->newFile->store('media/projects/'.$this->projectId, 'local');
+            $type = FileType::from(strtolower($this->newFile->getClientOriginalExtension()));
+            $displayName = trim((string) ($validated['fileDisplayName'] ?? ''));
+
+            Media::create([
+                'mediable_type' => 'project',
+                'mediable_id' => $this->projectId,
+                'collection' => $validated['fileCategory'],
+                'disk' => 'local',
+                'path' => $path,
+                'original_name' => $displayName !== ''
+                    ? $this->displayNameWithExtension($displayName, $type)
+                    : $this->newFile->getClientOriginalName(),
+                'mime_type' => $this->newFile->getMimeType(),
+                'size' => $this->newFile->getSize(),
+                'type' => $type,
+                'uploaded_at' => now(),
+                'uploaded_by' => auth()->id(),
+            ]);
+
+            $toast = __('projects.file_uploaded');
+        } else {
+            $media = $this->projectFile($this->editingFileId);
+
+            $validated = $this->validate([
+                'fileCategory' => ['required', Rule::enum(MediaCollection::class)],
+                'fileDisplayName' => ['required', 'string', 'max:255'],
+            ], [
+                'fileCategory.required' => __('projects.select_a_file_category'),
+            ]);
+
+            $media->update([
+                'collection' => $validated['fileCategory'],
+                'original_name' => $this->displayNameWithExtension($validated['fileDisplayName'], $media->type),
+            ]);
+
+            $toast = __('projects.file_updated');
+        }
+
+        $this->closeFileModal();
+        unset($this->project, $this->fileCategoryCounts, $this->filteredProjectFiles);
+
+        Flux::toast(variant: 'success', text: $toast);
+    }
+
+    public function confirmDeleteFile(int $mediaId): void
+    {
+        $media = $this->projectFile($mediaId);
+
+        $this->deletingFileId = $media->id;
+        $this->confirmingFileDelete = true;
+    }
+
+    /**
+     * Delete a file's row and its underlying disk file.
+     *
+     * A storage I/O failure is logged, not surfaced — the record is removed
+     * regardless so it doesn't linger stuck in the UI over a storage hiccup.
+     */
+    public function deleteFile(): void
+    {
+        $media = $this->projectFile($this->deletingFileId);
+
+        try {
+            Storage::disk($media->disk)->delete($media->path);
+        } catch (\Throwable $exception) {
+            Log::warning('Failed to delete project file from disk.', [
+                'media_id' => $media->id,
+                'path' => $media->path,
+                'exception' => $exception->getMessage(),
+            ]);
+        }
+
+        $media->delete();
+
+        $this->confirmingFileDelete = false;
+        $this->deletingFileId = null;
+        unset($this->project, $this->fileCategoryCounts, $this->filteredProjectFiles);
+
+        Flux::toast(variant: 'success', text: __('projects.file_deleted'));
+    }
+
+    public function closeFileModal(): void
+    {
+        $this->showFileModal = false;
+        $this->editingFileId = null;
+        $this->newFile = null;
+        $this->fileCategory = '';
+        $this->fileDisplayName = '';
+        $this->resetValidation();
     }
 
     /**
@@ -610,9 +800,17 @@ new #[Title('titles.project')] class extends Component {
             @endif
         </x-ui.panel>
     @elseif ($tab === 'files')
-        <x-ui.panel :title="__('projects.project_files')" :count="$this->project->media_count" :subtitle="__('common.file_records_only_the_files_themselves_are_not_stored_in_thi')">
+        <x-ui.panel :title="__('projects.project_files')" :count="$this->project->media_count" :subtitle="__('projects.project_files_subtitle')">
+            <x-slot:toolbar>
+                <x-ui.button tone="primary" size="sm" icon="plus" wire:click="openCreateFileModal" data-test="add-project-file-button">{{ __('projects.add_file') }}</x-ui.button>
+            </x-slot:toolbar>
+
             @if ($this->project->media->isEmpty())
-                <x-ui.empty-state icon="paper-clip" :heading="__('common.no_files_recorded')" :body="__('projects.file_records_for_this_project_will_appear_here')" />
+                <x-ui.empty-state icon="paper-clip" :heading="__('common.no_files_recorded')" :body="__('projects.file_records_for_this_project_will_appear_here')">
+                    <x-slot:action>
+                        <x-ui.button size="sm" tone="primary" icon="plus" wire:click="openCreateFileModal">{{ __('projects.add_file') }}</x-ui.button>
+                    </x-slot:action>
+                </x-ui.empty-state>
             @else
                 @if (count($this->fileCategoryCounts) > 2)
                     <div class="flex flex-wrap items-center gap-2 border-b border-secondary-soft p-3.5 dark:border-secondary-medium">
@@ -642,7 +840,7 @@ new #[Title('titles.project')] class extends Component {
 
                 <div class="grid gap-3 p-3.5 @lg/detail:grid-cols-2 @4xl/detail:grid-cols-3 @6xl/detail:p-5">
                     @forelse ($this->filteredProjectFiles as $media)
-                        <x-ui.file-card :media="$media" wire:key="project-file-{{ $media->id }}" />
+                        <x-ui.file-card :media="$media" :project-id="$this->projectId" wire:key="project-file-{{ $media->id }}" />
                     @empty
                         <div class="col-span-full">
                             <x-ui.empty-state icon="funnel" :heading="__('projects.no_files_in_this_category')" />
@@ -734,4 +932,45 @@ new #[Title('titles.project')] class extends Component {
             @endif
         </x-ui.panel>
     @endif
+
+    <flux:modal wire:model="showFileModal" class="w-full max-w-lg border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
+        <form wire:submit="saveFile" class="flex flex-col gap-5">
+            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
+                <flux:heading size="lg">{{ $editingFileId === null ? __('projects.add_file') : __('projects.edit_file') }}</flux:heading>
+            </div>
+
+            @if ($showFileModal)
+                @if ($editingFileId === null)
+                    <x-ui.input type="file" wire:model="newFile" :label="__('projects.choose_a_file')" required />
+                @endif
+
+                <x-ui.select wire:model="fileCategory" :label="__('projects.file_category')" required>
+                    <flux:select.option value="">{{ __('common.select') }}</flux:select.option>
+                    @foreach (\App\Enums\MediaCollection::cases() as $collectionOption)
+                        <flux:select.option :value="$collectionOption->value" :wire:key="'file-category-option-'.$collectionOption->value">{{ $collectionOption->label() }}</flux:select.option>
+                    @endforeach
+                </x-ui.select>
+
+                <x-ui.input wire:model="fileDisplayName" :label="__('projects.file_display_name')" :required="$editingFileId !== null" />
+            @endif
+
+            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
+                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="closeFileModal">{{ __('common.cancel') }}</x-ui.button>
+                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" data-test="save-project-file-button">{{ __('common.save_changes') }}</x-ui.button>
+            </div>
+        </form>
+    </flux:modal>
+
+    <flux:modal wire:model="confirmingFileDelete" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
+        <div class="flex flex-col gap-4">
+            <flux:heading size="lg">{{ __('projects.delete_this_file') }}</flux:heading>
+            @if ($deletingFileId !== null && ($deletingMedia = $this->project->media->firstWhere('id', $deletingFileId)) !== null)
+                <flux:subheading>{{ __('projects.deleting_the_file_also_removes_it_from_storage', ['name' => $deletingMedia->original_name]) }}</flux:subheading>
+            @endif
+            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
+                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="$set('confirmingFileDelete', false)">{{ __('common.cancel') }}</x-ui.button>
+                <x-ui.button type="button" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="deleteFile" data-test="confirm-delete-project-file">{{ __('projects.delete_this_file') }}</x-ui.button>
+            </div>
+        </div>
+    </flux:modal>
 </section>
