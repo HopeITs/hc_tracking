@@ -5,7 +5,10 @@
 @foreach ($projects as $projectRow)
     <x-ui.panel :title="$projectRow->name" :subtitle="$projectRow->city?->name ?? __('common.unknown_city')" :count="$projectRow->milestones->count()" wire:key="milestone-project-{{ $projectRow->id }}">
         <x-slot:toolbar>
-            <x-ui.button tone="ghost" size="sm" icon="eye" class="size-9!" :href="route('projects.show', $projectRow)" wire:navigate :aria-label="__('common.view_name', ['name' => $projectRow->name])" />
+            <div class="flex shrink-0 items-center gap-1">
+                <x-ui.button tone="ghost" size="sm" icon="plus" class="size-9!" wire:click="openCreateModal(null, null, {{ $projectRow->id }})" data-test="milestone-list-add-{{ $projectRow->id }}" :aria-label="__('milestones.add_milestone_to_project', ['name' => $projectRow->name])" />
+                <x-ui.button tone="ghost" size="sm" icon="eye" class="size-9!" :href="route('projects.show', $projectRow)" wire:navigate :aria-label="__('common.view_name', ['name' => $projectRow->name])" />
+            </div>
         </x-slot:toolbar>
 
         <div class="divide-y divide-secondary-soft dark:divide-secondary-medium">
