@@ -21,7 +21,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $proposal_id
  * @property string $title
  * @property string|null $description
- * @property int $assigned_to
  * @property TaskStatus $status
  * @property TaskPriority $priority
  * @property CarbonImmutable|null $start_date
@@ -38,7 +37,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'proposal_id',
     'title',
     'description',
-    'assigned_to',
     'status',
     'priority',
     'start_date',
@@ -95,13 +93,13 @@ class Task extends Model
     }
 
     /**
-     * The HR employee this task is assigned to.
+     * The HR employees assigned to this task. A task can have several.
      *
-     * @return BelongsTo<HrEmployee, $this>
+     * @return HasMany<TaskAssignee, $this>
      */
-    public function assignee(): BelongsTo
+    public function taskAssignees(): HasMany
     {
-        return $this->belongsTo(HrEmployee::class, 'assigned_to');
+        return $this->hasMany(TaskAssignee::class);
     }
 
     /**
@@ -112,16 +110,6 @@ class Task extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
-    }
-
-    /**
-     * The progress comments logged against this task.
-     *
-     * @return HasMany<TaskUpdate, $this>
-     */
-    public function updates(): HasMany
-    {
-        return $this->hasMany(TaskUpdate::class);
     }
 
     /**

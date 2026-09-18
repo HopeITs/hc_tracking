@@ -75,7 +75,12 @@
                             <div class="h-full rounded-full bg-primary" style="width: {{ $task->progress_percentage }}%"></div>
                         </div>
 
-                        <x-ui.employee-chip :employee="$task->assignee" compact />
+                        @php $boardAssignees = $task->taskAssignees->pluck('employee')->filter(); @endphp
+                        @if ($boardAssignees->isEmpty())
+                            <x-ui.employee-chip :employee="null" compact />
+                        @else
+                            <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $boardAssignees->map->name->implode(', ') }}</p>
+                        @endif
 
                         {{-- Non-pointer alternative to the drag-and-drop status change above,
                              matching the milestone board's established fallback pattern. --}}

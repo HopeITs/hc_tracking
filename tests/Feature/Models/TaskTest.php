@@ -5,7 +5,6 @@ use App\Models\Milestone;
 use App\Models\Proposal;
 use App\Models\Task;
 use App\Models\TaskAttachment;
-use App\Models\TaskUpdate;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 
@@ -22,17 +21,18 @@ test('a task belongs to a milestone and a proposal', function () {
         ->and($task->proposal->id)->toBe($proposal->id);
 });
 
-test('a task resolves its hr employee assignee and its user creator separately', function () {
+test('a task resolves its hr employee assignees and its user creator separately', function () {
     $assigneeId = insertHrEmployee();
+    $secondAssigneeId = insertHrEmployee();
     $creator = User::factory()->create();
 
-    $task = Task::factory()->create([
-        'assigned_to' => $assigneeId,
-        'created_by' => $creator->id,
-    ]);
+    $task = Task::factory()->create(['created_by' => $creator->id]);
+    $task->taskAssignees()->create(['employee_id' => $assigneeId]);
+    $task->taskAssignees()->create(['employee_id' => $secondAssigneeId]);
 
-    expect($task->assignee)->toBeInstanceOf(HrEmployee::class)
-        ->and($task->assignee->id)->toBe($assigneeId)
+    expect($task->taskAssignees)->toHaveCount(2)
+        ->and($task->taskAssignees->first()->employee)->toBeInstanceOf(HrEmployee::class)
+        ->and($task->taskAssignees->pluck('employee_id')->sort()->values()->all())->toBe(collect([$assigneeId, $secondAssigneeId])->sort()->values()->all())
         ->and($task->creator)->toBeInstanceOf(User::class)
         ->and($task->creator->id)->toBe($creator->id);
 });
@@ -43,14 +43,12 @@ test('a task with no milestone has a null milestone relation', function () {
     expect($task->milestone)->toBeNull();
 });
 
-test('a task has its updates and attachments', function () {
+test('a task has its attachments', function () {
     $task = Task::factory()->create();
 
-    TaskUpdate::factory(2)->create(['task_id' => $task->id]);
     TaskAttachment::factory()->create(['task_id' => $task->id]);
 
-    expect($task->updates)->toHaveCount(2)
-        ->and($task->attachments)->toHaveCount(1);
+    expect($task->attachments)->toHaveCount(1);
 });
 
 test('a task can have subtasks and each resolves its parent', function () {
@@ -76,6 +74,16 @@ test('a subtask inherits its parent proposal and milestone through the factory h
     expect($subtask->parent_task_id)->toBe($parent->id)
         ->and($subtask->milestone_id)->toBe($milestone->id)
         ->and($subtask->proposal_id)->toBe($proposal->id);
+});
+
+test('a task assignee resolves its task and its hr employee', function () {
+    $employeeId = insertHrEmployee();
+    $task = Task::factory()->create();
+    $assignment = $task->taskAssignees()->create(['employee_id' => $employeeId]);
+
+    expect($assignment->task->id)->toBe($task->id)
+        ->and($assignment->employee)->toBeInstanceOf(HrEmployee::class)
+        ->and($assignment->employee->id)->toBe($employeeId);
 });
 
 test('a task casts its dates and progress', function () {

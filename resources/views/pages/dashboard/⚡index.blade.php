@@ -15,7 +15,6 @@ use App\Models\ProposalStatusNote;
 use App\Models\Report;
 use App\Models\Risk;
 use App\Models\Task;
-use App\Models\TaskUpdate;
 use App\Models\TransfersTracking;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
@@ -299,7 +298,9 @@ new #[Title('titles.dashboard')] class extends Component {
         $user = auth()->user();
         $employeeId = $user->employee_id;
         $today = CarbonImmutable::today();
-        $openTasks = fn () => Task::query()->where('assigned_to', $employeeId)->where('status', '!=', TaskStatus::Done);
+        $openTasks = fn () => Task::query()
+            ->whereHas('taskAssignees', fn ($query) => $query->where('employee_id', $employeeId))
+            ->where('status', '!=', TaskStatus::Done);
 
         return [
             'employeeId' => $employeeId,
@@ -514,21 +515,6 @@ new #[Title('titles.dashboard')] class extends Component {
                 'href' => route('proposals.show', $note->proposal_id),
             ]);
 
-        $updates = TaskUpdate::query()
-            ->select(['id', 'task_id', 'user_id', 'date'])
-            ->with(['task:id,title', 'user:id,name'])
-            ->latest('date')
-            ->limit(6)
-            ->get()
-            ->map(fn (TaskUpdate $update): array => [
-                'key' => 'update-'.$update->id,
-                'at' => $update->date,
-                'dateOnly' => false,
-                'icon' => 'chat-bubble-left-ellipsis',
-                'sentence' => __('dashboard.task_updated', ['user' => $update->user?->name ?? '—', 'task' => $update->task?->title ?? '—']),
-                'href' => route('tasks.show', $update->task_id),
-            ]);
-
         $reports = Report::query()
             ->select(['id', 'plan_indicator_id', 'user_id', 'submit_date'])
             ->with(['user:id,name', 'planIndicator:id,indicator_id', 'planIndicator.indicator:id,name'])
@@ -546,7 +532,6 @@ new #[Title('titles.dashboard')] class extends Component {
             ]);
 
         return $notes
-            ->concat($updates)
             ->concat($reports)
             ->sortByDesc(fn (array $item): int => $item['at']->getTimestamp())
             ->take(7)

@@ -77,21 +77,29 @@
                         </p>
                     </td>
                     <td class="px-2">
+                        @php $assignees = $task->taskAssignees->pluck('employee')->filter(); @endphp
                         <button
                             type="button"
                             wire:click="openEditDrawer({{ $task->id }})"
-                            class="inline-flex cursor-pointer items-center rounded-full hover:ring-2 hover:ring-secondary-soft dark:hover:ring-secondary-medium"
-                            aria-label="{{ __('tasks.assignee') }}: {{ $task->assignee?->name ?? __('common.not_assigned') }} — {{ __('tasks.edit_task') }}"
+                            class="inline-flex cursor-pointer items-center -space-x-2 rtl:space-x-reverse"
+                            aria-label="{{ $assignees->isEmpty() ? __('common.not_assigned') : $assignees->map->name->implode(', ') }} — {{ __('tasks.edit_task') }}"
                             data-test="task-assignee-trigger-{{ $task->id }}"
                         >
-                            @if ($task->assignee === null)
+                            @if ($assignees->isEmpty())
                                 <span class="inline-flex size-7 items-center justify-center rounded-full border border-dashed border-secondary-light text-secondary-light">
                                     <flux:icon.user variant="micro" class="size-3.5" />
                                 </span>
                             @else
-                                <span class="inline-flex size-7 items-center justify-center rounded-full bg-secondary-dark text-[11px] font-semibold text-white dark:bg-secondary-medium">
-                                    {{ Illuminate\Support\Str::of($task->assignee->name)->explode(' ')->map(fn ($part) => mb_substr($part, 0, 1))->take(2)->implode('') }}
-                                </span>
+                                @foreach ($assignees->take(3) as $employee)
+                                    <span class="inline-flex size-7 items-center justify-center rounded-full border-2 border-white bg-secondary-dark text-[11px] font-semibold text-white dark:border-secondary-dark dark:bg-secondary-medium">
+                                        {{ Illuminate\Support\Str::of($employee->name)->explode(' ')->map(fn ($part) => mb_substr($part, 0, 1))->take(2)->implode('') }}
+                                    </span>
+                                @endforeach
+                                @if ($assignees->count() > 3)
+                                    <span class="inline-flex size-7 items-center justify-center rounded-full border-2 border-white bg-secondary-soft text-[10px] font-semibold text-secondary-dark dark:border-secondary-dark dark:bg-secondary-medium dark:text-white">
+                                        +{{ $assignees->count() - 3 }}
+                                    </span>
+                                @endif
                             @endif
                         </button>
                     </td>
@@ -138,7 +146,6 @@
                     </td>
                     <td class="pe-3 text-end opacity-0 group-hover/row:opacity-100 group-focus-within/row:opacity-100 focus-within:opacity-100">
                         <div class="inline-flex items-center gap-0.5">
-                            <x-ui.button tone="ghost" size="sm" icon="document-duplicate" class="size-8!" wire:click="duplicateTask({{ $task->id }})" :aria-label="__('tasks.duplicate_title', ['title' => $task->title])" data-test="task-duplicate-{{ $task->id }}" />
                             <x-ui.button tone="ghost" size="sm" icon="trash" class="size-8!" wire:click="confirmDelete({{ $task->id }})" :aria-label="__('tasks.delete_title', ['title' => $task->title])" />
                         </div>
                     </td>
@@ -190,11 +197,15 @@
                             {{ $task->due_date->translatedFormat(__('formats.date_short')) }}
                         </span>
                     @endif
-                    <x-ui.employee-chip :employee="$task->assignee" compact class="ms-auto" />
+                    @php $mobileAssignees = $task->taskAssignees->pluck('employee')->filter(); @endphp
+                    @if ($mobileAssignees->isEmpty())
+                        <x-ui.employee-chip :employee="null" compact class="ms-auto" />
+                    @else
+                        <span class="ms-auto truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $mobileAssignees->map->name->implode(', ') }}</span>
+                    @endif
                 </div>
                 <div class="flex items-center justify-end gap-1 ps-12">
                     <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation" wire:click="openEditDrawer({{ $task->id }})" :aria-label="__('tasks.edit_title', ['title' => $task->title])" />
-                    <x-ui.button tone="ghost" size="sm" icon="document-duplicate" class="size-11! touch-manipulation" wire:click="duplicateTask({{ $task->id }})" :aria-label="__('tasks.duplicate_title', ['title' => $task->title])" />
                     <x-ui.button tone="ghost" size="sm" icon="trash" class="size-11! touch-manipulation" wire:click="confirmDelete({{ $task->id }})" :aria-label="__('tasks.delete_title', ['title' => $task->title])" />
                 </div>
             </article>

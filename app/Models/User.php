@@ -75,16 +75,6 @@ class User extends Authenticatable implements PasskeyUser
     }
 
     /**
-     * The task updates this user has logged.
-     *
-     * @return HasMany<TaskUpdate, $this>
-     */
-    public function taskUpdates(): HasMany
-    {
-        return $this->hasMany(TaskUpdate::class);
-    }
-
-    /**
      * The reports this user has submitted.
      *
      * @return HasMany<Report, $this>

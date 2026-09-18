@@ -6,6 +6,7 @@ use App\Models\HrEmployee;
 use App\Models\Milestone;
 use App\Models\Proposal;
 use App\Models\Task;
+use App\Models\TaskAssignee;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -67,7 +68,10 @@ new #[Title('titles.tasks')] class extends Component {
     public string $dueDate = '';
     public string $completedDate = '';
     public string $progressPercentage = '0';
-    public string $assignedTo = '';
+
+    /** @var array<int, string> */
+    public array $assignedTo = [];
+
     public string $taskProposalId = '';
     public string $taskMilestoneId = '';
 
@@ -175,24 +179,24 @@ new #[Title('titles.tasks')] class extends Component {
         $search = trim($this->search);
 
         return Task::query()
-            ->select(['id', 'milestone_id', 'parent_task_id', 'proposal_id', 'title', 'description', 'assigned_to', 'status', 'priority', 'start_date', 'due_date', 'completed_date', 'progress_percentage'])
+            ->select(['id', 'milestone_id', 'parent_task_id', 'proposal_id', 'title', 'description', 'status', 'priority', 'start_date', 'due_date', 'completed_date', 'progress_percentage'])
             ->withCount('subtasks')
             ->with([
                 'milestone:id,name,project_id',
                 'milestone.project:id,name',
                 'proposal:id,name',
-                'assignee:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
+                'taskAssignees.employee:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
             ])
             ->when($search !== '', function (Builder $query) use ($search): void {
                 $query->where(function (Builder $query) use ($search): void {
                     $query->where('title', 'like', '%'.$search.'%')
                         ->orWhere('description', 'like', '%'.$search.'%')
-                        ->orWhereIn('assigned_to', HrEmployee::idsMatchingName($search));
+                        ->orWhereHas('taskAssignees', fn (Builder $query) => $query->whereIn('employee_id', HrEmployee::idsMatchingName($search)));
                 });
             })
             ->when($this->status !== '', fn (Builder $query) => $query->where('status', $this->status))
             ->when($this->priority !== '', fn (Builder $query) => $query->where('priority', $this->priority))
-            ->when($this->assignee !== '', fn (Builder $query) => $query->where('assigned_to', (int) $this->assignee))
+            ->when($this->assignee !== '', fn (Builder $query) => $query->whereHas('taskAssignees', fn (Builder $query) => $query->where('employee_id', (int) $this->assignee)))
             ->when($this->milestone === 'none', fn (Builder $query) => $query->whereNull('milestone_id'))
             ->when($this->milestone !== '' && $this->milestone !== 'none', fn (Builder $query) => $query->where('milestone_id', (int) $this->milestone));
     }
@@ -247,42 +251,64 @@ new #[Title('titles.tasks')] class extends Component {
     }
 
     /**
-     * Assignees live in the read-only HR database (a separate connection),
-     * so their names can't be joined in SQL. Resolve the small set of ids in
-     * the current filter, sort those by name in PHP, then order the task
-     * query by that id sequence — one extra lightweight query instead of a
-     * cross-database join. Unassigned tasks always sort last.
+     * A task can have several assignees now, so "sort by assignee" orders by
+     * each task's alphabetically-first assignee name — a deterministic,
+     * if necessarily simplified, choice once there's more than one name to
+     * pick from. Assignees live in the read-only HR database (a separate
+     * connection), so names can't be joined in SQL: resolve the small set of
+     * (task, employee) pairs in the current filter, compute one representative
+     * name per task in PHP, then order the query by that task-id sequence —
+     * one extra lightweight query instead of a cross-database join. Tasks
+     * with no assignee always sort last.
      *
      * @param  Builder<Task>  $query
      * @return Builder<Task>
      */
     protected function orderByAssigneeName(Builder $query, string $direction): Builder
     {
-        $ids = (clone $query)->whereNotNull('assigned_to')->distinct()->pluck('assigned_to');
+        $taskIds = (clone $query)->pluck('id');
 
-        if ($ids->isEmpty()) {
+        if ($taskIds->isEmpty()) {
             return $query;
         }
 
-        $orderedIds = HrEmployee::query()
-            ->whereIn('id', $ids)
+        $pairs = TaskAssignee::query()
+            ->whereIn('task_id', $taskIds)
+            ->get(['task_id', 'employee_id']);
+
+        if ($pairs->isEmpty()) {
+            return $query;
+        }
+
+        $employeeNamesById = HrEmployee::query()
+            ->whereIn('id', $pairs->pluck('employee_id')->unique())
             ->get()
-            ->sortBy('name')
-            ->when($direction === 'desc', fn (Collection $employees) => $employees->reverse())
-            ->values()
-            ->pluck('id');
+            ->pluck('name', 'id');
 
-        if ($orderedIds->isEmpty()) {
+        $orderedTaskIds = $pairs
+            ->groupBy('task_id')
+            ->map(fn (Collection $assignees): ?string => $assignees
+                ->map(fn (TaskAssignee $assignee): ?string => $employeeNamesById->get($assignee->employee_id))
+                ->filter()
+                ->sort()
+                ->first())
+            ->filter()
+            ->sort()
+            ->when($direction === 'desc', fn (Collection $names) => $names->reverse())
+            ->keys();
+
+        if ($orderedTaskIds->isEmpty()) {
             return $query;
         }
 
-        $cases = $orderedIds
+        $cases = $orderedTaskIds
+            ->values()
             ->map(fn ($id, int $index): string => 'when '.(int) $id." then {$index}")
             ->implode(' ');
 
         return $query
-            ->orderByRaw('assigned_to is null')
-            ->orderByRaw("(case assigned_to {$cases} end)");
+            ->orderByRaw('id not in ('.$orderedTaskIds->map(fn ($id): string => (string) (int) $id)->implode(',').')')
+            ->orderByRaw("(case id {$cases} end)");
     }
 
     /**
@@ -462,7 +488,8 @@ new #[Title('titles.tasks')] class extends Component {
     public function openEditDrawer(int $taskId): void
     {
         $task = Task::query()
-            ->select(['id', 'milestone_id', 'proposal_id', 'title', 'description', 'assigned_to', 'status', 'priority', 'start_date', 'due_date', 'completed_date', 'progress_percentage'])
+            ->select(['id', 'milestone_id', 'proposal_id', 'title', 'description', 'status', 'priority', 'start_date', 'due_date', 'completed_date', 'progress_percentage'])
+            ->with('taskAssignees:id,task_id,employee_id')
             ->findOrFail($taskId);
 
         $this->resetValidation();
@@ -475,7 +502,7 @@ new #[Title('titles.tasks')] class extends Component {
         $this->dueDate = $task->due_date?->toDateString() ?? '';
         $this->completedDate = $task->completed_date?->toDateString() ?? '';
         $this->progressPercentage = (string) $task->progress_percentage;
-        $this->assignedTo = (string) $task->assigned_to;
+        $this->assignedTo = $task->taskAssignees->pluck('employee_id')->map(fn (int $id): string => (string) $id)->all();
         $this->taskProposalId = (string) $task->proposal_id;
         $this->taskMilestoneId = (string) ($task->milestone_id ?? '');
         $this->showTaskDrawer = true;
@@ -494,13 +521,15 @@ new #[Title('titles.tasks')] class extends Component {
             'dueDate' => ['nullable', 'date', Rule::when($this->startDate !== '', ['after_or_equal:startDate'])],
             'completedDate' => ['nullable', 'date'],
             'progressPercentage' => ['required', 'integer', 'min:0', 'max:100'],
-            'assignedTo' => ['required', 'integer', Rule::exists(HrEmployee::class, 'id')],
+            'assignedTo' => ['required', 'array', 'min:1'],
+            'assignedTo.*' => ['integer', Rule::exists(HrEmployee::class, 'id')],
             'taskProposalId' => ['required', 'integer', Rule::exists(Proposal::class, 'id')],
             'taskMilestoneId' => ['nullable', 'integer', Rule::exists(Milestone::class, 'id')],
         ], [
             'title.required' => __('tasks.enter_a_task_title'),
             'assignedTo.required' => __('tasks.assign_this_task_to_someone'),
-            'assignedTo.exists' => __('tasks.the_selected_assignee_is_no_longer_available'),
+            'assignedTo.min' => __('tasks.assign_this_task_to_someone'),
+            'assignedTo.*.exists' => __('tasks.the_selected_assignee_is_no_longer_available'),
             'taskProposalId.required' => __('tasks.select_the_proposal_this_task_delivers_against'),
             'taskProposalId.exists' => __('common.the_selected_proposal_is_no_longer_available'),
             'taskMilestoneId.exists' => __('tasks.the_selected_milestone_is_no_longer_available'),
@@ -520,7 +549,6 @@ new #[Title('titles.tasks')] class extends Component {
             'due_date' => $validated['dueDate'] === '' ? null : $validated['dueDate'],
             'completed_date' => $validated['completedDate'] === '' ? null : $validated['completedDate'],
             'progress_percentage' => (int) $validated['progressPercentage'],
-            'assigned_to' => (int) $validated['assignedTo'],
             'proposal_id' => (int) $validated['taskProposalId'],
             'milestone_id' => $validated['taskMilestoneId'] === '' || $validated['taskMilestoneId'] === null ? null : (int) $validated['taskMilestoneId'],
         ];
@@ -529,7 +557,19 @@ new #[Title('titles.tasks')] class extends Component {
             $attributes['created_by'] = (int) auth()->id();
         }
 
-        $task->fill($attributes)->save();
+        DB::transaction(function () use ($task, $attributes, $validated): void {
+            $task->fill($attributes)->save();
+
+            $employeeIds = collect($validated['assignedTo'])->map(fn ($id): int => (int) $id)->unique()->values();
+
+            $task->taskAssignees()->whereNotIn('employee_id', $employeeIds)->delete();
+            $existingIds = $task->taskAssignees()->pluck('employee_id');
+
+            $employeeIds->diff($existingIds)->each(fn (int $employeeId) => $task->taskAssignees()->create([
+                'employee_id' => $employeeId,
+            ]));
+        });
+
         $this->showTaskDrawer = false;
         $this->resetTaskForm();
         $this->resetPage();
@@ -581,21 +621,6 @@ new #[Title('titles.tasks')] class extends Component {
         $this->resetPage();
 
         Flux::toast(variant: 'success', text: __('tasks.task_deleted'));
-    }
-
-    public function duplicateTask(int $taskId): void
-    {
-        $original = Task::query()->findOrFail($taskId);
-
-        $copy = $original->replicate();
-        $copy->title = __('tasks.copy_of_title', ['title' => $original->title]);
-        $copy->status = TaskStatus::Todo;
-        $copy->completed_date = null;
-        $copy->progress_percentage = 0;
-        $copy->created_by = (int) auth()->id();
-        $copy->save();
-
-        Flux::toast(variant: 'success', text: __('tasks.task_duplicated'));
     }
 
     public function toggleComplete(int $taskId): void
@@ -662,18 +687,6 @@ new #[Title('titles.tasks')] class extends Component {
         $task->save();
     }
 
-    public function quickSetAssignee(int $taskId, int $userId): void
-    {
-        $task = Task::query()->find($taskId);
-
-        if ($task === null || ! HrEmployee::query()->whereKey($userId)->exists()) {
-            return;
-        }
-
-        $task->assigned_to = $userId;
-        $task->save();
-    }
-
     public function rescheduleTask(int $taskId, string $date): void
     {
         if ($date !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) !== 1) {
@@ -710,14 +723,14 @@ new #[Title('titles.tasks')] class extends Component {
         $this->dueDate = '';
         $this->completedDate = '';
         $this->progressPercentage = '0';
-        $this->assignedTo = '';
+        $this->assignedTo = [];
         $this->taskProposalId = '';
         $this->taskMilestoneId = '';
     }
 
     protected function trimTaskForm(): void
     {
-        foreach (['title', 'description', 'taskStatus', 'taskPriority', 'startDate', 'dueDate', 'completedDate', 'progressPercentage', 'assignedTo', 'taskProposalId', 'taskMilestoneId'] as $property) {
+        foreach (['title', 'description', 'taskStatus', 'taskPriority', 'startDate', 'dueDate', 'completedDate', 'progressPercentage', 'taskProposalId', 'taskMilestoneId'] as $property) {
             $this->{$property} = trim($this->{$property});
         }
     }
@@ -887,14 +900,19 @@ new #[Title('titles.tasks')] class extends Component {
                 </x-ui.select>
             </div>
 
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.input wire:model="progressPercentage" :label="__('tasks.progress_2')" type="number" min="0" max="100" required />
-                <x-ui.select wire:model="assignedTo" :label="__('tasks.assignee')" required>
-                    <flux:select.option value="">{{ __('common.select') }}</flux:select.option>
+            <x-ui.input wire:model="progressPercentage" :label="__('tasks.progress_2')" type="number" min="0" max="100" required />
+
+            <div class="min-w-0">
+                <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('tasks.assignees') }}</label>
+                <div class="max-h-48 space-y-0.5 overflow-y-auto rounded-md border border-secondary-light p-1.5 dark:border-secondary-light">
                     @foreach ($this->userOptions as $userOption)
-                        <flux:select.option :value="$userOption->id" :wire:key="'task-assignee-option-'.$userOption->id">{{ $userOption->name }} · {{ $userOption->secondary_name }}</flux:select.option>
+                        <label class="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1.5 hover:bg-secondary-soft dark:hover:bg-secondary-medium">
+                            <input type="checkbox" wire:model="assignedTo" value="{{ $userOption->id }}" class="rounded border-secondary-light text-primary focus:ring-primary" data-test="task-assignee-checkbox-{{ $userOption->id }}" />
+                            <span class="min-w-0 truncate text-sm">{{ $userOption->name }} · {{ $userOption->secondary_name }}</span>
+                        </label>
                     @endforeach
-                </x-ui.select>
+                </div>
+                <flux:error name="assignedTo" class="mt-1.5" />
             </div>
 
             <div class="grid gap-4 sm:grid-cols-3">
@@ -919,7 +937,7 @@ new #[Title('titles.tasks')] class extends Component {
             <flux:subheading>
                 {{ $pendingDeleteTask !== null
                     ? __('tasks.are_you_sure_you_want_to_delete_this_task', ['title' => $pendingDeleteTask->title])
-                    : __('tasks.its_comments_and_attachment_records_are_removed_with_it_noth') }}
+                    : __('tasks.its_attachment_records_are_removed_with_it_nothing_outside') }}
             </flux:subheading>
             <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
                 <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="cancelDelete">{{ __('common.cancel') }}</x-ui.button>

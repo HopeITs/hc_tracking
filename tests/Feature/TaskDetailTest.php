@@ -7,9 +7,7 @@ use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Task;
 use App\Models\TaskAttachment;
-use App\Models\TaskUpdate;
 use App\Models\User;
-use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 
 test('guests are redirected from task detail', function () {
@@ -24,7 +22,7 @@ test('missing tasks return not found from task detail', function () {
     $this->actingAs($user)->get(route('tasks.show', 999999))->assertNotFound();
 });
 
-test('task detail shows the task proposal milestone assignee and creator', function () {
+test('task detail shows the task proposal milestone assignees and creator', function () {
     $user = User::factory()->create();
     $assignee = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
     $creator = User::factory()->create(['name' => 'Bob Rahman']);
@@ -38,12 +36,12 @@ test('task detail shows the task proposal milestone assignee and creator', funct
         'milestone_id' => $milestone->id,
         'proposal_id' => $proposal->id,
         'title' => 'Draft distribution plan',
-        'assigned_to' => $assignee,
         'created_by' => $creator->id,
         'start_date' => '2026-09-01',
         'due_date' => '2026-09-30',
         'progress_percentage' => 35,
     ]);
+    $task->taskAssignees()->create(['employee_id' => $assignee]);
 
     $this->actingAs($user)
         ->get(route('tasks.show', $task))
@@ -59,98 +57,19 @@ test('task detail shows the task proposal milestone assignee and creator', funct
         ->assertSeeText('Sep 30, 2026');
 });
 
-test('task detail shows only its own updates newest first', function () {
+test('task detail lists every assignee when a task has more than one', function () {
     $user = User::factory()->create();
+    $alice = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
+    $bob = insertHrEmployee(firstNameEn: 'Bob', lastNameEn: 'Karam');
     $task = Task::factory()->create();
-    $otherTask = Task::factory()->create();
-
-    TaskUpdate::factory()->create(['task_id' => $task->id, 'comment' => 'Mine first', 'date' => '2026-09-10 08:00:00']);
-    TaskUpdate::factory()->create(['task_id' => $task->id, 'comment' => 'Mine second', 'date' => '2026-09-11 08:00:00']);
-    TaskUpdate::factory()->create(['task_id' => $otherTask->id, 'comment' => 'Not mine']);
+    $task->taskAssignees()->create(['employee_id' => $alice]);
+    $task->taskAssignees()->create(['employee_id' => $bob]);
 
     $this->actingAs($user)
         ->get(route('tasks.show', $task))
         ->assertOk()
-        ->assertSeeText('Mine second')
-        ->assertSeeText('Mine first')
-        ->assertDontSeeText('Not mine')
-        ->assertSeeTextInOrder(['Mine second', 'Mine first']);
-});
-
-test('updates with the same date are ordered newest first by id', function () {
-    $user = User::factory()->create();
-    $task = Task::factory()->create();
-
-    TaskUpdate::factory()->create(['task_id' => $task->id, 'comment' => 'Lower id', 'date' => '2026-09-11 08:00:00']);
-    TaskUpdate::factory()->create(['task_id' => $task->id, 'comment' => 'Higher id', 'date' => '2026-09-11 08:00:00']);
-
-    $this->actingAs($user)
-        ->get(route('tasks.show', $task))
-        ->assertOk()
-        ->assertSeeTextInOrder(['Higher id', 'Lower id']);
-});
-
-test('an update records the authenticated user as its author after trimming', function () {
-    $author = User::factory()->create();
-    $task = Task::factory()->create();
-
-    $this->freezeTime(function () use ($author, $task): void {
-        Livewire::actingAs($author)
-            ->test('pages::tasks.show', ['task' => $task])
-            ->set('comment', '  Distribution list verified with the field team.  ')
-            ->call('addUpdate')
-            ->assertHasNoErrors()
-            ->assertSet('comment', '')
-            ->assertSee('Distribution list verified with the field team.');
-
-        $this->assertDatabaseHas('task_updates', [
-            'task_id' => $task->id,
-            'user_id' => $author->id,
-            'comment' => 'Distribution list verified with the field team.',
-            'date' => now()->format('Y-m-d H:i:s'),
-        ]);
-    });
-});
-
-test('an empty update is rejected with a useful message', function () {
-    $user = User::factory()->create();
-    $task = Task::factory()->create();
-
-    Livewire::actingAs($user)
-        ->test('pages::tasks.show', ['task' => $task])
-        ->set('comment', '   ')
-        ->call('addUpdate')
-        ->assertHasErrors(['comment' => 'required'])
-        ->assertSee('Write an update before posting it.');
-
-    $this->assertDatabaseMissing('task_updates', ['task_id' => $task->id]);
-});
-
-test('an update longer than the supported limit is rejected', function () {
-    $user = User::factory()->create();
-    $task = Task::factory()->create();
-
-    Livewire::actingAs($user)
-        ->test('pages::tasks.show', ['task' => $task])
-        ->set('comment', str_repeat('a', 5001))
-        ->call('addUpdate')
-        ->assertHasErrors(['comment' => 'max']);
-
-    $this->assertDatabaseMissing('task_updates', ['task_id' => $task->id]);
-});
-
-test('the task id cannot be changed from the client before posting an update', function () {
-    $user = User::factory()->create();
-    $task = Task::factory()->create();
-    $otherTask = Task::factory()->create();
-
-    expect(fn () => Livewire::actingAs($user)
-        ->test('pages::tasks.show', ['task' => $task])
-        ->set('taskId', $otherTask->id))
-        ->toThrow(CannotUpdateLockedPropertyException::class);
-
-    $this->assertDatabaseMissing('task_updates', ['task_id' => $task->id]);
-    $this->assertDatabaseMissing('task_updates', ['task_id' => $otherTask->id]);
+        ->assertSeeText('Alice Nadir')
+        ->assertSeeText('Bob Karam');
 });
 
 test('attachments are listed as metadata without exposing storage or controls', function () {
@@ -189,15 +108,10 @@ test('task detail escapes all user controlled content', function () {
     $task = Task::factory()->create([
         'title' => '<script>task()</script>',
         'description' => '<img src=x onerror=description()>',
-        'assigned_to' => $assignee,
         'created_by' => $creator->id,
         'proposal_id' => $proposal->id,
     ]);
-    TaskUpdate::factory()->create([
-        'task_id' => $task->id,
-        'user_id' => $creator->id,
-        'comment' => '<script>update()</script>',
-    ]);
+    $task->taskAssignees()->create(['employee_id' => $assignee]);
     TaskAttachment::factory()->create([
         'task_id' => $task->id,
         'path' => 'task-attachments/<img src=x onerror=attachment()>.pdf',
@@ -211,18 +125,16 @@ test('task detail escapes all user controlled content', function () {
         ->assertSee('<script>assignee()</script>')
         ->assertSee('<img src=x onerror=creator()>')
         ->assertSee('<svg onload=proposal()>')
-        ->assertSee('<script>update()</script>')
         ->assertSee('<img src=x onerror=attachment()>.pdf')
         ->assertDontSeeHtml('<script>task()</script>')
         ->assertDontSeeHtml('<img src=x onerror=description()>')
         ->assertDontSeeHtml('<script>assignee()</script>')
         ->assertDontSeeHtml('<img src=x onerror=creator()>')
         ->assertDontSeeHtml('<svg onload=proposal()>')
-        ->assertDontSeeHtml('<script>update()</script>')
         ->assertDontSeeHtml('<img src=x onerror=attachment()>.pdf');
 });
 
-test('task detail renders a task without a milestone updates or attachments', function () {
+test('task detail renders a task without a milestone or attachments', function () {
     $user = User::factory()->create();
     $task = Task::factory()->create(['milestone_id' => null, 'description' => null]);
 
@@ -230,15 +142,15 @@ test('task detail renders a task without a milestone updates or attachments', fu
         ->get(route('tasks.show', $task))
         ->assertOk()
         ->assertSeeText('No milestone')
-        ->assertSeeText('No updates yet')
         ->assertSeeText('No files recorded');
 });
 
-test('a subtask can be added from the task detail page and inherits the parent proposal milestone and assignee', function () {
+test('a subtask can be added from the task detail page and inherits the parent proposal milestone and assignees', function () {
     $user = User::factory()->create();
     $milestone = Milestone::factory()->create();
     $assignee = insertHrEmployee();
-    $parent = Task::factory()->create(['milestone_id' => $milestone->id, 'assigned_to' => $assignee]);
+    $parent = Task::factory()->create(['milestone_id' => $milestone->id]);
+    $parent->taskAssignees()->create(['employee_id' => $assignee]);
 
     Livewire::actingAs($user)
         ->test('pages::tasks.show', ['task' => $parent])
@@ -253,7 +165,7 @@ test('a subtask can be added from the task detail page and inherits the parent p
     expect($subtask->parent_task_id)->toBe($parent->id)
         ->and($subtask->proposal_id)->toBe($parent->proposal_id)
         ->and($subtask->milestone_id)->toBe($milestone->id)
-        ->and($subtask->assigned_to)->toBe($assignee)
+        ->and($subtask->taskAssignees->pluck('employee_id')->all())->toBe([$assignee])
         ->and($subtask->status)->toBe(TaskStatus::Todo)
         ->and($subtask->created_by)->toBe($user->id);
 });

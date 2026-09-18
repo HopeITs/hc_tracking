@@ -65,7 +65,6 @@ return [
     'risks' => 'المخاطر',
     'scheduled_transfer' => 'تحويل مجدول',
     'task_in' => 'مهمة · :parent',
-    'task_updated' => 'حدّث :user :task',
     'today' => 'اليوم',
     'transfer_from' => ':amount :currency من :donor',
     'view_agreements' => 'كل الاتفاقيات',
