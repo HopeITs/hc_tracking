@@ -120,4 +120,6 @@ return [
     'updating' => 'جارٍ التحديث',
     'view_name' => 'عرض :name',
     'watching' => 'قيد المتابعة',
+    'zoom_in' => 'تكبير',
+    'zoom_out' => 'تصغير',
 ];

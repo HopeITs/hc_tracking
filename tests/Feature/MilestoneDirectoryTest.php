@@ -410,24 +410,7 @@ test('the timeline view counts only root milestones next to the project name, li
         ->assertDontSee($countBadge(2), false);
 });
 
-test('a nested milestone card is shifted below the root cards in the timeline view', function () {
-    $user = User::factory()->create();
-    $parent = Milestone::factory()->create(['name' => 'Root gate']);
-    $child = Milestone::factory()->childOf($parent)->create(['name' => 'Child gate']);
-
-    $html = Livewire::actingAs($user)
-        ->test('pages::milestones.index')
-        ->set('view', 'timeline')
-        ->html();
-
-    preg_match('/<div\s+class="([^"]*)"\s+style="[^"]*"\s+wire:key="milestone-card-'.$parent->id.'"/s', $html, $parentDiv);
-    preg_match('/<div\s+class="([^"]*)"\s+style="[^"]*"\s+wire:key="milestone-card-'.$child->id.'"/s', $html, $childDiv);
-
-    expect($parentDiv[1] ?? null)->toContain('top-0')
-        ->and($childDiv[1] ?? null)->toContain('top-6');
-});
-
-test('the timeline view groups a nested milestone with its parent into one shared family lane', function () {
+test('a nested milestone marker is dropped one row below its parent in the timeline view, and connected to it', function () {
     $user = User::factory()->create();
     $parent = Milestone::factory()->create(['name' => 'Root gate']);
     $child = Milestone::factory()->childOf($parent)->create(['name' => 'Child gate']);
@@ -438,16 +421,20 @@ test('the timeline view groups a nested milestone with its parent into one share
         ->set('view', 'timeline')
         ->html();
 
-    preg_match('/wire:key="milestone-family-'.$parent->id.'".*?(?=wire:key="milestone-family-|$)/s', $html, $familyBlock);
+    preg_match('/wire:key="milestone-node-'.$parent->id.'"[\s\S]{0,300}?data-milestone-depth="([^"]*)"/', $html, $parentDepthAttr);
+    preg_match('/wire:key="milestone-node-'.$child->id.'"[\s\S]{0,300}?data-milestone-depth="([^"]*)"/', $html, $childDepthAttr);
 
-    expect($familyBlock[0] ?? '')
-        ->toContain('wire:key="milestone-marker-'.$parent->id.'"')
-        ->toContain('wire:key="milestone-marker-'.$child->id.'"')
-        ->not->toContain('wire:key="milestone-marker-'.$standalone->id.'"')
-        ->and($familyBlock[0] ?? '')->toContain('milestone-timeline-lane-'.$parent->id);
+    $parentDepth = $parentDepthAttr[1] ?? null;
+    $childDepth = $childDepthAttr[1] ?? null;
+
+    expect($parentDepth)->toBe('0')
+        ->and($childDepth)->toBe('1')
+        ->and($html)->toContain('wire:key="milestone-connector-'.$child->id.'"')
+        ->and($html)->not->toContain('wire:key="milestone-connector-'.$parent->id.'"')
+        ->and($html)->not->toContain('wire:key="milestone-connector-'.$standalone->id.'"');
 });
 
-test('the timeline view lets clicking a family lane create a milestone nested under that family, and clicking a project add strip create a root milestone', function () {
+test('the timeline view lets clicking a marker offer to add a related milestone nested under it, and clicking empty timeline space add a root milestone', function () {
     $user = User::factory()->create();
     $project = Project::factory()->create();
     $parent = Milestone::factory()->create(['project_id' => $project->id]);
@@ -455,11 +442,13 @@ test('the timeline view lets clicking a family lane create a milestone nested un
     Livewire::actingAs($user)
         ->test('pages::milestones.index')
         ->set('view', 'timeline')
-        ->assertSee('$wire.openCreateModal(dateAt($event), null, '.$project->id.', '.$parent->id.')', false)
-        ->assertSee('$wire.openCreateModal(dateAt($event), null, '.$project->id.')', false);
+        ->assertSee('data-test="milestone-timeline-add-related-'.$parent->id.'"', false)
+        ->assertSee('wire:click="openCreateModal(null, null, null, '.$parent->id.')"', false)
+        ->assertSee('$wire.openCreateModal(pointerInfo($event).iso, null, '.$project->id.')', false)
+        ->assertSee('data-test="milestone-timeline-river-'.$project->id.'"', false);
 });
 
-test('the timeline view offers months/weeks/days zoom controls that switch the tick resolution', function () {
+test('the timeline view offers a zoom slider that switches the tick resolution between months, weeks and days', function () {
     $user = User::factory()->create();
     $project = Project::factory()->create();
     $milestone = Milestone::factory()->create(['project_id' => $project->id]);
@@ -467,11 +456,9 @@ test('the timeline view offers months/weeks/days zoom controls that switch the t
     Livewire::actingAs($user)
         ->test('pages::milestones.index')
         ->set('view', 'timeline')
-        ->assertSee('data-test="milestone-timeline-zoom-months-'.$project->id.'"', false)
-        ->assertSee('data-test="milestone-timeline-zoom-weeks-'.$project->id.'"', false)
-        ->assertSee('data-test="milestone-timeline-zoom-days-'.$project->id.'"', false)
-        ->assertSee("zoom === 'weeks'", false)
-        ->assertSee("zoom === 'days'", false);
+        ->assertSee('data-test="milestone-timeline-zoom-'.$project->id.'"', false)
+        ->assertSee("tickMode === 'weeks'", false)
+        ->assertSee("tickMode === 'days'", false);
 });
 
 test('a deletable milestone shows a delete action in the timeline view, and a locked one does not', function () {
