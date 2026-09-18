@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\UserRole;
 use App\Http\Middleware\SyncProgramsFromHr;
 use App\Models\Program;
 use App\Models\Strategy;
@@ -13,8 +12,8 @@ test('guests are redirected from program management', function () {
     $this->get(route('programs.index'))->assertRedirect(route('login'));
 });
 
-test('all authenticated roles can access program management while permissions are deferred', function (UserRole $role) {
-    $user = User::factory()->role($role)->create();
+test('all authenticated roles can access program management while permissions are deferred', function (string $roleName) {
+    $user = User::factory()->role($roleName)->create();
 
     $this->actingAs($user)
         ->get(route('programs.index'))
@@ -22,10 +21,10 @@ test('all authenticated roles can access program management while permissions ar
         ->assertSeeText('Programs')
         ->assertSee(route('programs.index'), false);
 })->with([
-    'officer' => UserRole::Officer,
-    'manager' => UserRole::Manager,
-    'meal' => UserRole::Meal,
-    'admin' => UserRole::Admin,
+    'officer' => 'Officer',
+    'manager' => 'Managers',
+    'meal' => 'MEAL',
+    'admin' => 'Super Admin',
 ]);
 
 test('authenticated users can search and filter programs by strategy and manager', function () {

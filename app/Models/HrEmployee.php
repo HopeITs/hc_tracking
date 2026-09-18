@@ -28,6 +28,7 @@ use Illuminate\Support\Str;
  * @property string $last_name_ar
  * @property string $username
  * @property bool $is_active
+ * @property bool $is_board_member
  * @property-read string $name
  * @property-read string $secondary_name
  * @property-read string $name_en
@@ -110,6 +111,7 @@ class HrEmployee extends HrModel
     {
         return [
             'is_active' => 'boolean',
+            'is_board_member' => 'boolean',
         ];
     }
 

@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\UserRole;
 use App\Models\AnnualPlan;
 use App\Models\PlanIndicator;
 use App\Models\Program;
@@ -24,18 +23,18 @@ test('guests are redirected from the annual plan matrix', function () {
     $this->get(route('annual-plans.index'))->assertRedirect(route('login'));
 });
 
-test('all authenticated roles can access the annual plan matrix while permissions are deferred', function (UserRole $role) {
-    $user = User::factory()->role($role)->create();
+test('all authenticated roles can access the annual plan matrix while permissions are deferred', function (string $roleName) {
+    $user = User::factory()->role($roleName)->create();
 
     $this->actingAs($user)
         ->get(route('annual-plans.index'))
         ->assertOk()
         ->assertSeeText('Annual Plans');
 })->with([
-    'officer' => UserRole::Officer,
-    'manager' => UserRole::Manager,
-    'meal' => UserRole::Meal,
-    'admin' => UserRole::Admin,
+    'officer' => 'Officer',
+    'manager' => 'Managers',
+    'meal' => 'MEAL',
+    'admin' => 'Super Admin',
 ]);
 
 test('renders one row per program and one column per fiscal year in the span', function () {

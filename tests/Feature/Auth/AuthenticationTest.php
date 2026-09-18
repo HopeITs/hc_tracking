@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\UserRole;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -187,7 +186,7 @@ test('the local tracking password no longer logs anyone in', function () {
     $this->assertGuest();
 });
 
-test('an hr account logging in for the first time gets a tracking user as an officer', function () {
+test('an hr account logging in for the first time gets a tracking user with no role', function () {
     $employeeId = insertHrEmployee(firstNameEn: 'Mai', lastNameEn: 'Nasser');
     insertHrUser($employeeId, 'new.person@example.org', 'password');
 
@@ -199,12 +198,12 @@ test('an hr account logging in for the first time gets a tracking user as an off
     $user = User::query()->where('email', 'new.person@example.org')->sole();
 
     $this->assertAuthenticatedAs($user);
-    expect($user->role)->toBe(UserRole::Officer)
+    expect($user->roles)->toBeEmpty()
         ->and($user->name)->toBe('Mai Nasser')
         ->and($user->employee_id)->toBe($employeeId);
 });
 
-test('listed hr admin emails start as admins on first login', function () {
+test('listed hr admin emails start as super admins on first login', function () {
     config(['auth.hr_admin_emails' => ['boss@example.org']]);
     insertHrUser(insertHrEmployee(), 'boss@example.org', 'password');
 
@@ -213,16 +212,16 @@ test('listed hr admin emails start as admins on first login', function () {
         'password' => 'password',
     ])->assertSessionHasNoErrors();
 
-    expect(User::query()->sole()->role)->toBe(UserRole::Admin);
+    expect(User::query()->sole()->roles->first()?->name)->toBe('Super Admin');
 });
 
 test('an existing role is kept when that user logs in again', function () {
     config(['auth.hr_admin_emails' => ['boss@example.org']]);
-    $user = User::factory()->role(UserRole::Manager)->withHrAccount()->create(['email' => 'boss@example.org']);
+    $user = User::factory()->role('Managers')->withHrAccount()->create(['email' => 'boss@example.org']);
 
     $this->post(route('login.store'), ['email' => 'boss@example.org', 'password' => 'password']);
 
-    expect($user->refresh()->role)->toBe(UserRole::Manager);
+    expect($user->refresh()->roles->first()?->name)->toBe('Managers');
 });
 
 test('a wrong hr password creates no tracking user', function () {

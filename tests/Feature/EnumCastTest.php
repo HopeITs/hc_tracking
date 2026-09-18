@@ -287,8 +287,8 @@ test('a column default hydrates as its enum case', function (array $column) {
 })->with('defaulted enum columns');
 
 /**
- * Casing is part of the value, exactly as it is for UserRole. A value that
- * differs only by capitalisation is not a fifth member — it is unreadable.
+ * Casing is part of every enum value here. A value that differs only by
+ * capitalisation is not a member — it is unreadable.
  */
 test('a value differing only by casing is not accepted on read', function (array $column) {
     $model = $column['model']::factory()->create();

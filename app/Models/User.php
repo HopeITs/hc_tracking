@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
-use App\Enums\UserRole;
 use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -19,21 +18,23 @@ use Illuminate\Support\Str;
 use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Spatie\Permission\Traits\HasRoles;
 
 /**
  * A person who can use hc-tracking.
  *
  * They log in with their HR account (see AuthenticateWithHrAccount), matched by
- * email; this row holds only the application role, two-factor settings and
- * passkeys. `name` is copied from the HR employee at each login, and `password`
- * is a leftover that is never checked.
+ * email; this row holds only two-factor settings, passkeys, and (via
+ * Spatie\Permission\Traits\HasRoles) role/permission assignments. `name` is
+ * copied from the HR employee at each login, and `password` is a leftover
+ * that is never checked.
  *
  * @property int $id
  * @property string $name
  * @property string $email
  * @property int|null $hr_user_id
  * @property int|null $employee_id
- * @property UserRole $role
+ * @property int|null $active_role_id
  * @property string|null $locale
  * @property CarbonImmutable|null $email_verified_at
  * @property string|null $password
@@ -49,19 +50,18 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 class User extends Authenticatable implements PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
+    use HasFactory, HasRoles, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
 
     /**
      * Mirror the columns' DB defaults so a user that has not been round-tripped
      * through the database still reports them under strict mode: no language
-     * chosen, the least-privileged application role, and no linked HR employee.
+     * chosen and no linked HR employee.
      *
      * @var array<string, mixed>
      */
     protected $attributes = [
         'employee_id' => null,
         'locale' => null,
-        'role' => 'Officer',
     ];
 
     /**
@@ -123,8 +123,9 @@ class User extends Authenticatable implements PasskeyUser
     /**
      * The tracking user for an HR account, created on first use.
      *
-     * Every HR account may use tracking. A new user starts as an Officer, or as
-     * an Admin when their email is listed in auth.hr_admin_emails.
+     * Every HR account may use tracking. A new user starts with no role,
+     * except an email listed in auth.hr_admin_emails, which starts as Super
+     * Admin.
      */
     public static function forHrAccount(HrUser $hrUser): self
     {
@@ -135,8 +136,8 @@ class User extends Authenticatable implements PasskeyUser
         }
 
         $role = in_array(mb_strtolower($hrUser->email), config('auth.hr_admin_emails', []), true)
-            ? UserRole::Admin
-            : UserRole::Officer;
+            ? 'Super Admin'
+            : null;
 
         return static::createFromHrAccount($hrUser, $role);
     }
@@ -164,28 +165,60 @@ class User extends Authenticatable implements PasskeyUser
     }
 
     /**
-     * Give an HR account access to hc-tracking with an application role.
+     * Give an HR account access to hc-tracking, optionally with a role.
      *
      * Name and email are taken from HR. No local password is stored: people
      * always log in with their HR password.
      */
-    public static function createFromHrAccount(HrUser $hrUser, UserRole $role, bool $verified = true): self
+    public static function createFromHrAccount(HrUser $hrUser, ?string $roleName, bool $verified = true): self
     {
         $user = new self;
 
-        // `role` is deliberately not fillable, so force it rather than widening
-        // mass assignment on the model.
         $user->forceFill([
             'name' => $hrUser->employee?->name_en ?: $hrUser->email,
             'email' => $hrUser->email,
             'hr_user_id' => $hrUser->id,
             'employee_id' => $hrUser->employee_id,
             'password' => null,
-            'role' => $role,
             'email_verified_at' => $verified ? now() : null,
         ])->save();
 
+        if ($roleName !== null) {
+            $role = Role::findOrCreate($roleName);
+            $user->assignRole($role);
+            $user->setActiveRole($role->id);
+        }
+
         return $user;
+    }
+
+    /**
+     * The role shown as this user's primary role.
+     *
+     * A user can hold several roles at once (see HasRoles); this is display
+     * only — every assigned role still contributes its permissions (Spatie's
+     * normal additive behavior). It does not narrow what the user can do.
+     *
+     * @return BelongsTo<Role, $this>
+     */
+    public function activeRole(): BelongsTo
+    {
+        return $this->belongsTo(Role::class, 'active_role_id');
+    }
+
+    /**
+     * Mark one of this user's already-assigned roles as active.
+     *
+     * Silently no-ops for a role the user does not hold, so a stale request
+     * can never point active_role_id at a role that was just unassigned.
+     */
+    public function setActiveRole(?int $roleId): void
+    {
+        if ($roleId !== null && ! $this->roles()->whereKey($roleId)->exists()) {
+            return;
+        }
+
+        $this->forceFill(['active_role_id' => $roleId])->save();
     }
 
     /**
@@ -245,7 +278,6 @@ class User extends Authenticatable implements PasskeyUser
             'email_verified_at' => 'datetime',
             'two_factor_confirmed_at' => 'datetime',
             'password' => 'hashed',
-            'role' => UserRole::class,
         ];
     }
 }

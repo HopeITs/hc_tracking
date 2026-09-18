@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
-use App\Enums\UserRole;
 use App\Models\Strategy;
 use App\Models\User;
 
@@ -31,7 +30,7 @@ class StrategyPolicy
      */
     public function create(User $user): bool
     {
-        return in_array($user->role, [UserRole::Manager, UserRole::Admin], true);
+        return $user->can('strategies.create');
     }
 
     /**
@@ -39,7 +38,7 @@ class StrategyPolicy
      */
     public function update(User $user, Strategy $strategy): bool
     {
-        return $this->create($user);
+        return $user->can('strategies.update');
     }
 
     /**
@@ -47,7 +46,7 @@ class StrategyPolicy
      */
     public function delete(User $user, Strategy $strategy): bool
     {
-        return $this->create($user);
+        return $user->can('strategies.delete');
     }
 
     /**

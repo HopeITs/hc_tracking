@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\UserRole;
 use App\Models\Account;
 use App\Models\AnnualPlan;
 use App\Models\Donor;
@@ -78,7 +77,7 @@ test('staff are the hr accounts and assigned programmes have hr employee manager
 
     expect(User::query()->pluck('email')->sort()->values()->all())
         ->toBe(DB::connection('hr')->table('users')->pluck('email')->sort()->values()->all())
-        ->and(User::query()->where('role', '!=', UserRole::Officer)->exists())->toBeFalse();
+        ->and(User::query()->whereHas('roles')->exists())->toBeFalse();
 
     foreach (Program::query()->whereNotNull('manager_id')->with('manager', 'projects', 'annualPlans')->get() as $program) {
         expect($program->manager)->toBeInstanceOf(HrEmployee::class);

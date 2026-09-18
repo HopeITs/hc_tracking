@@ -14,5 +14,6 @@ return [
     'switch_language' => 'Switch language',
     'toggle_sidebar' => 'Collapse or expand the sidebar',
     'toggle_theme' => 'Switch light or dark mode',
+    'roles_and_permissions' => 'Roles & permissions',
     'user_directory' => 'User directory',
 ];

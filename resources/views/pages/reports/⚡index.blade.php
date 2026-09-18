@@ -123,7 +123,7 @@ new #[Title('titles.reports')] class extends Component {
                 'planIndicator:id,indicator_id,target,period,source_type,source_id,project_id',
                 'planIndicator.indicator:id,name,measure',
                 'planIndicator.project:id,name',
-                'user:id,name,email,role',
+                'user:id,name,email',
             ])
             ->withCount('files')
             ->when($this->status !== '', fn ($query) => $query->where('status', $this->status))
@@ -268,7 +268,7 @@ new #[Title('titles.reports')] class extends Component {
     #[Computed]
     public function authorOptions(): Collection
     {
-        return User::query()->select(['id', 'name', 'email', 'role'])->orderBy('name')->orderBy('id')->get();
+        return User::query()->select(['id', 'name', 'email'])->orderBy('name')->orderBy('id')->get();
     }
 
     public function openCreateModal(): void

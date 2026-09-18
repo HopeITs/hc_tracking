@@ -14,5 +14,6 @@ return [
     'switch_language' => 'تغيير اللغة',
     'toggle_sidebar' => 'طي القائمة الجانبية أو توسيعها',
     'toggle_theme' => 'التبديل بين الوضع الفاتح والداكن',
+    'roles_and_permissions' => 'الأدوار والصلاحيات',
     'user_directory' => 'دليل المستخدمين',
 ];

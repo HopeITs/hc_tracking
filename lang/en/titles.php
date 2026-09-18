@@ -27,6 +27,7 @@ return [
     'reports' => 'Reports',
     'results_framework' => 'Results Framework',
     'risks' => 'Risks',
+    'roles_and_permissions' => 'Roles & permissions',
     'security_settings' => 'Security settings',
     'strategies' => 'Strategies',
     'strategy' => 'Strategy',

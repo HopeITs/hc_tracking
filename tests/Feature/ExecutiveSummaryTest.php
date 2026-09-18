@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\UserRole;
 use App\Models\AnnualPlan;
 use App\Models\Indicator;
 use App\Models\PlanIndicator;
@@ -22,18 +21,18 @@ test('guests are redirected from the executive summary', function () {
     $this->get(route('executive-summary.index'))->assertRedirect(route('login'));
 });
 
-test('all authenticated roles can access the executive summary while permissions are deferred', function (UserRole $role) {
-    $user = User::factory()->role($role)->create();
+test('all authenticated roles can access the executive summary while permissions are deferred', function (string $roleName) {
+    $user = User::factory()->role($roleName)->create();
 
     $this->actingAs($user)
         ->get(route('executive-summary.index'))
         ->assertOk()
         ->assertSeeText('Executive Summary');
 })->with([
-    'officer' => UserRole::Officer,
-    'manager' => UserRole::Manager,
-    'meal' => UserRole::Meal,
-    'admin' => UserRole::Admin,
+    'officer' => 'Officer',
+    'manager' => 'Managers',
+    'meal' => 'MEAL',
+    'admin' => 'Super Admin',
 ]);
 
 test('annual plan coverage counts the programs holding a plan for the selected year', function () {

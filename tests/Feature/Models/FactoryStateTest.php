@@ -1,7 +1,6 @@
 <?php
 
 use App\Enums\ArStatus;
-use App\Enums\UserRole;
 use App\Models\Account;
 use App\Models\Milestone;
 use App\Models\Proposal;
@@ -10,11 +9,14 @@ use App\Models\Strategy;
 use App\Models\TransfersTracking;
 use App\Models\User;
 
-test('a user factory supports every staff role', function (UserRole $role) {
-    $user = User::factory()->role($role)->create()->fresh();
+test('a user factory can assign an arbitrary role name', function (string $roleName) {
+    $user = User::factory()->role($roleName)->create()->fresh();
 
-    expect($user->role)->toBe($role);
-})->with(UserRole::cases());
+    expect($user->roles->first()?->name)->toBe($roleName);
+})->with([
+    'Financial', 'Media Team', 'MEAL', 'Public Relations',
+    'Public Relations Manager', 'Managers', 'Super Admin', 'General Manager',
+]);
 
 test('a proposal end date follows an overridden start date', function () {
     $proposal = Proposal::factory()->running()->create(['planned_date_begin' => '2035-04-15'])->fresh();

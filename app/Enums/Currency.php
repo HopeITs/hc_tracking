@@ -13,7 +13,7 @@ namespace App\Enums;
  * These values are UPPER case, unlike every other enum in this namespace.
  * They are ISO 4217 codes, which are upper case by the standard, and the
  * columns already stored 'USD'. Casing is still part of the value, so 'usd'
- * throws on read exactly as 'meal' does for UserRole.
+ * throws on read, same as any other backed enum with case-sensitive values.
  *
  * The list is deliberately short. Adding a currency is a code change, which is
  * the point: a transfer in an unexpected currency should stop and be looked at

@@ -48,7 +48,7 @@ new #[Title('titles.report')] class extends Component {
                 'planIndicator.indicator.result:id,statement,type',
                 'planIndicator.project:id,name',
                 'planIndicator.source',
-                'user:id,name,email,role',
+                'user:id,name,email',
             ])
             ->findOrFail($this->reportId);
     }

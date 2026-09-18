@@ -2,7 +2,7 @@
 
 namespace Database\Factories;
 
-use App\Enums\UserRole;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\DB;
@@ -65,11 +65,13 @@ class UserFactory extends Factory
     }
 
     /**
-     * Create staff with an explicit application role.
+     * Assign the user an existing (or newly-created) application role.
      */
-    public function role(UserRole $role): static
+    public function role(string $roleName): static
     {
-        return $this->state(['role' => $role]);
+        return $this->afterCreating(function (User $user) use ($roleName): void {
+            $user->assignRole(Role::findOrCreate($roleName, 'web'));
+        });
     }
 
     /**

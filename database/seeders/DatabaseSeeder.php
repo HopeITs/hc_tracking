@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
     {
 
         $this->call([
+            RolesAndPermissionsSeeder::class,
             CoreDataSeeder::class,
             ProgrammeSeeder::class,
             DeliverySeeder::class,

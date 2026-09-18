@@ -1,10 +1,9 @@
 <?php
 
-use App\Enums\UserRole;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
-test('every hr account gets a tracking user as an officer, listed admins as admin', function () {
+test('every hr account gets a tracking user with no role, listed admins as super admin', function () {
     config(['auth.hr_admin_emails' => ['admin@example.org']]);
     insertHrUser(insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Darwish'), 'rana@example.org');
     insertHrUser(insertHrEmployee(), 'admin@example.org');
@@ -13,19 +12,19 @@ test('every hr account gets a tracking user as an officer, listed admins as admi
     $this->artisan('hr:sync-users')->assertSuccessful();
 
     expect(User::query()->where('email', 'rana@example.org')->sole())
-        ->role->toBe(UserRole::Officer)
+        ->roles->toBeEmpty()
         ->name->toBe('Rana Darwish')
-        ->and(User::query()->where('email', 'admin@example.org')->sole()->role)->toBe(UserRole::Admin)
+        ->and(User::query()->where('email', 'admin@example.org')->sole()->roles->first()?->name)->toBe('Super Admin')
         ->and(DB::connection('hr')->table('users')->get()->toArray())->toEqual($before);
 });
 
 test('syncing again leaves existing users and their roles alone', function () {
-    $user = User::factory()->role(UserRole::Manager)->create(['email' => 'rana@example.org']);
+    $user = User::factory()->role('Managers')->create(['email' => 'rana@example.org']);
     insertHrUser(insertHrEmployee(), 'rana@example.org');
 
     $this->artisan('hr:sync-users')->assertSuccessful();
     $this->artisan('hr:sync-users')->assertSuccessful();
 
     expect(User::query()->count())->toBe(1)
-        ->and($user->refresh()->role)->toBe(UserRole::Manager);
+        ->and($user->refresh()->roles->first()?->name)->toBe('Managers');
 });

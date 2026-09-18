@@ -6,6 +6,7 @@ use App\Models\AnnualPlan;
 use App\Models\Milestone;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -42,12 +43,10 @@ class AppServiceProvider extends ServiceProvider
      *
      * enforceMorphMap() is global: any model on either side of ANY morph must
      * appear here or getMorphClass() throws ClassMorphViolationException. The
-     * first two entries are the sources a target can be committed in; the last
-     * two are the owners a file can be attached to.
-     *
-     * `User` is still deliberately absent. It uses Notifiable, so the day a
-     * `notifications` table appears, `notifiable_type` will throw until
-     * 'user' => User::class is added — which is the point of enforcing the map.
+     * first two entries are the sources a target can be committed in; the next
+     * two are the owners a file can be attached to; `user` is the model side
+     * of spatie/laravel-permission's `model_has_roles`/`model_has_permissions`
+     * polymorphic pivots.
      */
     protected function configureMorphMap(): void
     {
@@ -56,6 +55,7 @@ class AppServiceProvider extends ServiceProvider
             'proposal' => Proposal::class,
             'project' => Project::class,
             'milestone' => Milestone::class,
+            'user' => User::class,
         ]);
     }
 

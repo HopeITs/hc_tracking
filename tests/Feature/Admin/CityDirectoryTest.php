@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\UserRole;
 use App\Models\Project;
 use App\Models\User;
 use Livewire\Livewire;
@@ -9,8 +8,8 @@ test('guests are redirected from the city directory', function () {
     $this->get(route('admin.cities.index'))->assertRedirect(route('login'));
 });
 
-test('all authenticated roles can view the city directory', function (UserRole $role) {
-    $user = User::factory()->role($role)->create();
+test('all authenticated roles can view the city directory', function (string $roleName) {
+    $user = User::factory()->role($roleName)->create();
 
     $this->actingAs($user)
         ->get(route('admin.cities.index'))
@@ -18,10 +17,10 @@ test('all authenticated roles can view the city directory', function (UserRole $
         ->assertSeeText('Cities')
         ->assertSee(route('admin.cities.index'), false);
 })->with([
-    'officer' => UserRole::Officer,
-    'manager' => UserRole::Manager,
-    'meal' => UserRole::Meal,
-    'admin' => UserRole::Admin,
+    'officer' => 'Officer',
+    'manager' => 'Managers',
+    'meal' => 'MEAL',
+    'admin' => 'Super Admin',
 ]);
 
 test('the directory lists every hr city in english and arabic, active or not', function () {

@@ -346,6 +346,7 @@ function createHrSchema(): void
         $table->string('last_name_ar');
         $table->string('username')->unique();
         $table->boolean('is_active')->default(true);
+        $table->boolean('is_board_member')->default(false);
         $table->timestamps();
     });
 

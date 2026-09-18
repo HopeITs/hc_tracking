@@ -10,7 +10,7 @@
             <p class="truncate text-sm font-medium text-secondary-dark dark:text-white">{{ $user->name }}</p>
             @unless ($compact)
                 <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">
-                    {{ $user->role->label() }} · {{ $user->email }}
+                    {{ $user->roles->first()?->name ?? __('users.no_role') }} · {{ $user->email }}
                 </p>
             @endunless
         </div>

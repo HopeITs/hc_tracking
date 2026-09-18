@@ -289,19 +289,17 @@
                 {{ __('common.cities') }}
             </flux:sidebar.item>
 
-            @if (auth()->user()?->getRawOriginal('role') !== null)
-                @can('viewAny', App\Models\User::class)
-                    <flux:sidebar.item
-                        icon="users"
-                        :href="route('admin.users.index')"
-                        :current="request()->routeIs('admin.users.*')"
-                        :class="$navigationItemClasses"
-                        wire:navigate
-                    >
-                        {{ __('navigation.user_directory') }}
-                    </flux:sidebar.item>
-                @endcan
-            @endif
+            @can('viewAny', App\Models\User::class)
+                <flux:sidebar.item
+                    icon="users"
+                    :href="route('admin.users.index')"
+                    :current="request()->routeIs('admin.users.*')"
+                    :class="$navigationItemClasses"
+                    wire:navigate
+                >
+                    {{ __('navigation.user_directory') }}
+                </flux:sidebar.item>
+            @endcan
         </flux:sidebar.group>
     </flux:sidebar.nav>
 </flux:sidebar>

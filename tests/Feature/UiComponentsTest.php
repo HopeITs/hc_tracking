@@ -4,7 +4,6 @@ use App\Enums\Currency;
 use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\TaskStatus;
-use App\Enums\UserRole;
 use App\Models\Result;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -101,7 +100,7 @@ test('money refuses to render an amount with no currency', function () {
 });
 
 test('the user chip shows name role and email', function () {
-    $user = User::factory()->role(UserRole::Meal)->create([
+    $user = User::factory()->role('MEAL')->create([
         'name' => 'Layla Haddad',
         'email' => 'layla@example.com',
     ]);

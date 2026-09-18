@@ -1,9 +1,10 @@
 <?php
 
-use App\Enums\UserRole;
+use App\Models\Role;
 use App\Models\User;
 
 test('the command gives an hr account access with the given role', function () {
+    Role::findOrCreate('MEAL', 'web');
     $employeeId = insertHrEmployee(firstNameEn: 'Amina', lastNameEn: 'Haddad');
     $hrUserId = insertHrUser($employeeId, 'amina@example.org');
 
@@ -16,14 +17,14 @@ test('the command gives an hr account access with the given role', function () {
     $user = User::query()->where('email', 'amina@example.org')->sole();
 
     expect($user->name)->toBe('Amina Haddad')
-        ->and($user->role)->toBe(UserRole::Meal)
+        ->and($user->roles->first()?->name)->toBe('MEAL')
         ->and($user->hr_user_id)->toBe($hrUserId)
         ->and($user->employee_id)->toBe($employeeId)
         ->and($user->password)->toBeNull()
         ->and($user->email_verified_at)->not->toBeNull();
 });
 
-test('a user defaults to Officer when no role is given', function () {
+test('a user has no role when none is given', function () {
     insertHrUser(insertHrEmployee(), 'dana@example.org');
 
     $this->artisan('user:create', [
@@ -31,7 +32,7 @@ test('a user defaults to Officer when no role is given', function () {
         '--no-interaction' => true,
     ])->assertSuccessful();
 
-    expect(User::query()->sole()->role)->toBe(UserRole::Officer);
+    expect(User::query()->sole()->roles)->toBeEmpty();
 });
 
 test('the unverified flag leaves the address unverified', function () {
@@ -60,7 +61,7 @@ test('an unknown role is rejected', function () {
 
     $this->artisan('user:create', [
         '--email' => 'dana@example.org',
-        '--role' => 'meal',
+        '--role' => 'not-a-real-role',
         '--no-interaction' => true,
     ])->assertFailed();
 
