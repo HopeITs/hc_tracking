@@ -2,10 +2,16 @@
 
 use App\Enums\Period;
 use App\Enums\ResultType;
+use App\Models\AnnualPlan;
+use App\Models\DonorProposal;
 use App\Models\Indicator;
+use App\Models\IndicatorProgress;
+use App\Models\PlanIndicator;
 use App\Models\Program;
+use App\Models\Report;
 use App\Models\Result;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
@@ -155,4 +161,216 @@ test('the results framework renders with no results', function () {
     $user = User::factory()->create();
 
     Livewire::actingAs($user)->test('pages::results.index')->assertSee('No results yet');
+});
+
+test('the overview counts statements, indicators, targets and measurement coverage', function () {
+    $user = User::factory()->create();
+    $program = Program::factory()->create();
+
+    $measured = Result::factory()->create(['program_id' => $program->id, 'type' => ResultType::Outcome]);
+    Result::factory()->create(['program_id' => $program->id, 'type' => ResultType::Output]);
+
+    $indicator = Indicator::factory()->create([
+        'result_id' => $measured->id,
+        'baseline' => 0,
+        'target' => 100,
+    ]);
+    IndicatorProgress::factory()->create(['indicator_id' => $indicator->id, 'value' => 100]);
+    PlanIndicator::factory()->create(['indicator_id' => $indicator->id]);
+
+    $overview = Livewire::actingAs($user)
+        ->test('pages::results.index')
+        ->instance()
+        ->overview();
+
+    expect($overview['statements'])->toBe(2)
+        ->and($overview['measured'])->toBe(1)
+        ->and($overview['indicators'])->toBe(1)
+        ->and($overview['targets'])->toBe(1)
+        ->and($overview['coverage'])->toBe(50.0)
+        ->and($overview['levels'][ResultType::Outcome->value]['measured'])->toBe(1)
+        ->and($overview['levels'][ResultType::Output->value]['measured'])->toBe(0);
+});
+
+test('the search matches an indicator name as well as a statement', function () {
+    $user = User::factory()->create();
+
+    $measured = Result::factory()->create(['statement' => 'Households reached with cash.']);
+    Result::factory()->create(['statement' => 'Unrelated statement.']);
+    Indicator::factory()->create(['result_id' => $measured->id, 'name' => 'Litres of water distributed']);
+
+    Livewire::actingAs($user)
+        ->test('pages::results.index')
+        ->set('search', 'litres of water')
+        ->assertSee('Households reached with cash.')
+        ->assertDontSee('Unrelated statement.');
+});
+
+test('the needs indicators chip keeps only statements carrying no indicator', function () {
+    $user = User::factory()->create();
+
+    $measured = Result::factory()->create(['statement' => 'Measured statement.']);
+    Result::factory()->create(['statement' => 'Unmeasured statement.']);
+    Indicator::factory()->create(['result_id' => $measured->id]);
+
+    Livewire::actingAs($user)
+        ->test('pages::results.index')
+        ->call('setFocus', 'unmeasured')
+        ->assertSet('focus', 'unmeasured')
+        ->assertSee('Unmeasured statement.')
+        ->assertDontSee('Measured statement.')
+        ->call('setFocus', 'unmeasured')
+        ->assertSet('focus', '')
+        ->assertSee('Measured statement.');
+});
+
+test('the off track chip keeps only statements whose indicators are rating amber or red', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-06-30 12:00:00'));
+
+    $user = User::factory()->create();
+
+    $behind = Result::factory()->create(['statement' => 'Statement falling behind.']);
+    $ahead = Result::factory()->create(['statement' => 'Statement on track.']);
+
+    $behindIndicator = Indicator::factory()->create(['result_id' => $behind->id, 'baseline' => 0, 'target' => 100]);
+    IndicatorProgress::factory()->create(['indicator_id' => $behindIndicator->id, 'value' => 2]);
+
+    $aheadIndicator = Indicator::factory()->create(['result_id' => $ahead->id, 'baseline' => 0, 'target' => 100]);
+    IndicatorProgress::factory()->create(['indicator_id' => $aheadIndicator->id, 'value' => 100]);
+
+    Livewire::actingAs($user)
+        ->test('pages::results.index')
+        ->call('setFocus', 'offtrack')
+        ->assertSee('Statement falling behind.')
+        ->assertDontSee('Statement on track.');
+});
+
+test('a statement whose parent a filter hides is promoted to the top and keeps its lineage', function () {
+    $user = User::factory()->create();
+    $first = Program::factory()->create();
+    $second = Program::factory()->create();
+
+    $impact = Result::factory()->create([
+        'program_id' => $first->id,
+        'statement' => 'Parent impact statement.',
+        'type' => ResultType::Impact,
+    ]);
+    Result::factory()->create([
+        'program_id' => $second->id,
+        'parent_id' => $impact->id,
+        'statement' => 'Child outcome statement.',
+        'type' => ResultType::Outcome,
+    ]);
+
+    Livewire::actingAs($user)
+        ->test('pages::results.index')
+        ->set('program', (string) $second->id)
+        ->assertSee('Child outcome statement.')
+        // The hidden parent is named as lineage, not drawn as a card of its own.
+        ->assertSee('Parent impact statement.')
+        ->assertDontSee('data-result-type="impact"', false);
+});
+
+test('the matrix view lists every visible statement', function () {
+    $user = User::factory()->create();
+    $program = Program::factory()->create();
+
+    $impact = Result::factory()->create([
+        'program_id' => $program->id,
+        'statement' => 'Matrix impact statement.',
+        'type' => ResultType::Impact,
+    ]);
+    Result::factory()->create([
+        'program_id' => $program->id,
+        'parent_id' => $impact->id,
+        'statement' => 'Matrix output statement.',
+        'type' => ResultType::Output,
+    ]);
+
+    Livewire::actingAs($user)
+        ->test('pages::results.index')
+        ->set('view', 'matrix')
+        ->assertSee('Matrix impact statement.')
+        ->assertSee('Matrix output statement.')
+        ->assertSee('data-tree-depth="1"', false);
+});
+
+test('adding a result from a statement pre-wires it as the parent', function () {
+    $user = User::factory()->create();
+    $program = Program::factory()->create();
+    $parent = Result::factory()->create(['program_id' => $program->id, 'type' => ResultType::Impact]);
+
+    Livewire::actingAs($user)
+        ->test('pages::results.index')
+        ->call('openCreateModal', $parent->id)
+        ->assertSet('showResultModal', true)
+        ->assertSet('parentId', (string) $parent->id)
+        ->assertSet('resultProgramId', (string) $program->id)
+        ->assertSet('resultType', ResultType::Outcome->value);
+});
+
+test('confirming a delete opens the dialog, and cancelling closes it', function () {
+    $user = User::factory()->create();
+    $result = Result::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::results.index')
+        ->call('confirmDelete', $result->id)
+        ->assertSet('deletingResultId', $result->id)
+        // The dialog is driven by the boolean; asserting the id alone passes while the UI stays dead.
+        ->assertSet('showDeleteModal', true)
+        ->call('cancelDelete')
+        ->assertSet('deletingResultId', null)
+        ->assertSet('showDeleteModal', false);
+});
+
+test('a statement shows the plan, the proposal and the donor its targets were committed in', function () {
+    $user = User::factory()->create();
+    $program = Program::factory()->create();
+    $result = Result::factory()->create(['program_id' => $program->id, 'statement' => 'Funded output statement.']);
+    $indicator = Indicator::factory()->create(['result_id' => $result->id, 'name' => 'Households reached']);
+
+    $plan = AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2026]);
+    $planTarget = PlanIndicator::factory()->forAnnualPlan($plan)->create(['indicator_id' => $indicator->id]);
+    Report::factory()->approved()->create(['plan_indicator_id' => $planTarget->id]);
+
+    $agreement = DonorProposal::factory()->create();
+    PlanIndicator::factory()->forProposal($agreement->proposal)->create(['indicator_id' => $indicator->id]);
+
+    Livewire::actingAs($user)
+        ->test('pages::results.index')
+        ->assertSee('Funded output statement.')
+        // The plan the target sits in, the proposal, and the donor behind it.
+        ->assertSee('Annual plan 2026')
+        ->assertSee($agreement->proposal->name)
+        ->assertSee($agreement->donor->name)
+        ->assertSee('1 reported · 1 approved');
+});
+
+test('the attention chips count under the other active filters, not the whole table', function () {
+    $user = User::factory()->create();
+    $first = Program::factory()->create();
+    $second = Program::factory()->create();
+
+    Result::factory()->create(['program_id' => $first->id, 'statement' => 'Unmeasured in first.']);
+    Result::factory()->create(['program_id' => $second->id, 'statement' => 'Unmeasured in second.']);
+
+    $component = Livewire::actingAs($user)->test('pages::results.index');
+
+    expect($component->instance()->focusCounts())->toBe(['unmeasured' => 2, 'offtrack' => 0]);
+
+    $scoped = $component->set('program', (string) $first->id);
+
+    expect($scoped->instance()->focusCounts())->toBe(['unmeasured' => 1, 'offtrack' => 0]);
+});
+
+test('a level in the results chain toggles the type filter', function () {
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::results.index')
+        ->call('setType', ResultType::Output->value)
+        ->assertSet('type', ResultType::Output->value)
+        ->call('setType', ResultType::Output->value)
+        ->assertSet('type', '');
 });
