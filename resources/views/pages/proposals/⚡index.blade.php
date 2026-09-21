@@ -14,6 +14,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
@@ -439,6 +440,8 @@ new #[Title('titles.proposals')] class extends Component {
 
     public function openCreateModal(): void
     {
+        Gate::authorize('create', Proposal::class);
+
         $this->resetProposalForm();
         $this->showProposalModal = true;
     }
@@ -448,6 +451,8 @@ new #[Title('titles.proposals')] class extends Component {
         $proposal = Proposal::query()
             ->select(['id', 'name', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end', 'status', 'notes'])
             ->findOrFail($proposalId);
+
+        Gate::authorize('update', $proposal);
 
         $this->resetValidation();
         $this->editingProposalId = $proposal->id;
@@ -486,6 +491,8 @@ new #[Title('titles.proposals')] class extends Component {
             ? new Proposal
             : Proposal::query()->findOrFail($this->editingProposalId);
 
+        Gate::authorize($proposal->exists ? 'update' : 'create', $proposal->exists ? $proposal : Proposal::class);
+
         $proposal->fill([
             'name' => $validated['name'],
             'planned_date_begin' => $validated['plannedDateBegin'],
@@ -515,6 +522,8 @@ new #[Title('titles.proposals')] class extends Component {
     {
         $proposal = Proposal::query()->select(['id', 'status'])->findOrFail($proposalId);
 
+        Gate::authorize('update', $proposal);
+
         $this->resetValidation();
         $this->stageProposalId = $proposal->id;
         $this->newStatus = ($proposal->status->next() ?? $proposal->status)->value;
@@ -534,6 +543,8 @@ new #[Title('titles.proposals')] class extends Component {
         if ($this->stageProposalId === null) {
             return;
         }
+
+        Gate::authorize('update', Proposal::query()->findOrFail($this->stageProposalId));
 
         $this->statusContext = trim($this->statusContext);
 
@@ -574,6 +585,8 @@ new #[Title('titles.proposals')] class extends Component {
 
     public function confirmDelete(int $proposalId): void
     {
+        Gate::authorize('delete', Proposal::query()->findOrFail($proposalId));
+
         $this->deletingProposalId = $proposalId;
         $this->showDeleteModal = true;
     }
@@ -601,7 +614,11 @@ new #[Title('titles.proposals')] class extends Component {
             return;
         }
 
-        Proposal::query()->findOrFail($this->deletingProposalId)->delete();
+        $proposal = Proposal::query()->findOrFail($this->deletingProposalId);
+
+        Gate::authorize('delete', $proposal);
+
+        $proposal->delete();
 
         $this->cancelDelete();
         $this->resetPage();
@@ -668,9 +685,11 @@ new #[Title('titles.proposals')] class extends Component {
         </x-slot:filters>
 
         <x-slot:actions>
+            @can('create', App\Models\Proposal::class)
             <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-proposal-button">
                 {{ __('proposals.add_proposal') }}
             </x-ui.button>
+            @endcan
         </x-slot:actions>
     </x-ui.page-header>
 
@@ -991,6 +1010,7 @@ new #[Title('titles.proposals')] class extends Component {
                                 </div>
 
                                 <div class="flex shrink-0 flex-wrap items-center gap-1">
+                                    @can('update', $proposal)
                                     @if ($nextStatus !== null)
                                         <x-ui.button size="sm" icon:trailing="arrow-right" class="min-h-10 touch-manipulation rtl:[&_svg]:rotate-180" wire:click="openStageModal({{ $proposal->id }})" data-test="advance-proposal-{{ $proposal->id }}">
                                             {{ __('proposals.move_to_status', ['status' => $nextStatus->label()]) }}
@@ -1001,6 +1021,8 @@ new #[Title('titles.proposals')] class extends Component {
                                         </x-ui.button>
                                     @endif
                                     <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-10! touch-manipulation" wire:click="openEditModal({{ $proposal->id }})" :aria-label="__('common.edit_name', ['name' => $proposal->name])" />
+                                    @endcan
+                                    @can('delete', $proposal)
                                     @if ($proposal->donorProposals->isEmpty())
                                         <x-ui.button tone="ghost" size="sm" icon="trash" class="size-10! touch-manipulation" wire:click="confirmDelete({{ $proposal->id }})" :aria-label="__('common.delete_name', ['name' => $proposal->name])" />
                                     @else
@@ -1010,6 +1032,7 @@ new #[Title('titles.proposals')] class extends Component {
                                             </span>
                                         </flux:tooltip>
                                     @endif
+                                    @endcan
                                 </div>
                             </div>
 

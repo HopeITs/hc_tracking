@@ -1,0 +1,89 @@
+{
+  "title": "Choose the composition for a proposal's page",
+  "question": "The visual world is settled (the pipeline page's world). This choice is how one proposal's whole dossier is composed. The roll dealt these three; lock one, steer it, or re-roll.",
+  "options": [
+    {
+      "id": "vitals-bench",
+      "label": "The Grant Vitals Bench",
+      "kicker": "THE ROLL",
+      "lineage": "instrument bench readings — four gauges taken at once",
+      "thesis": "Four vital signs read at a glance — money in, work done, time spent, promises reported — each opening its own evidence in place.",
+      "palette": ["#be1f24", "#2b5f6b", "#9a6412", "#58595b", "#ffffff"],
+      "materials": ["oversized tabular figures", "hairline spark-bars", "no boxes"],
+      "viewport": "Name, status and the seven-stop lifecycle rail across the top; beneath it four huge typographic readings — 40% funded, 2 of 6 tasks done, day 264 of 365, 0 of 3 targets reported — each over its own thin bar, the off-track one in HC red. Everything else opens underneath without leaving the page.",
+      "risk": "Four readings in a row sits one step away from the stat-tile grid you already rejected; it only earns its place if the figures stay typographic and unboxed.",
+      "case": "Strongest for the daily 'is this grant healthy?' scan. Weakest at showing how the pieces connect to each other — it reports four truths side by side rather than one chain.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "name · status · change status", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "lifecycle rail (7 stops)", "x": 0, "y": 1, "w": 12, "h": 1, "accent": true },
+          { "label": "funding", "x": 0, "y": 2, "w": 3, "h": 2, "accent": true },
+          { "label": "delivery", "x": 3, "y": 2, "w": 3, "h": 2 },
+          { "label": "schedule", "x": 6, "y": 2, "w": 3, "h": 2 },
+          { "label": "reporting", "x": 9, "y": 2, "w": 3, "h": 2 },
+          { "label": "opened vital — evidence in place", "x": 0, "y": 4, "w": 12, "h": 3 },
+          { "label": "donors & transfers", "x": 0, "y": 7, "w": 4, "h": 3 },
+          { "label": "projects", "x": 4, "y": 7, "w": 4, "h": 3 },
+          { "label": "targets & tasks", "x": 8, "y": 7, "w": 4, "h": 3 }
+        ]
+      },
+      "comp": ".impeccable/mocks/decision/surface-vitals-bench.png"
+    },
+    {
+      "id": "grant-instrument",
+      "label": "The Grant Instrument",
+      "lineage": "the signed grant agreement itself, as a living document",
+      "thesis": "The page is the instrument: articles for Parties, Term, Consideration, Deliverables and Reporting, each holding live data and reporting its own state in the margin.",
+      "palette": ["#be1f24", "#2b5f6b", "#9a6412", "#58595b", "#ffffff"],
+      "materials": ["document measure", "margin state rail", "red status seal"],
+      "viewport": "An instrument head — the proposal name set large, the status struck as a red seal, term and parties as a preamble — then Article I Parties (ECHO, 1,102,582.21 USD, agreement PRJ-0001) running down one measure, with a numbered article rail in the margin that both navigates and shows each article satisfied, outstanding or breached.",
+      "risk": "Document typography can slow a daily operational scan; the operator's actions (change status, jump to a project) must stay fast inside a form that wants to be read, not worked.",
+      "case": "Strongest at making obligations feel binding and complete — nothing can be quietly missing, because an empty article still prints. Weakest for the manager who wants the number, not the clause.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "instrument head · parties · term", "x": 0, "y": 0, "w": 9, "h": 2 },
+          { "label": "status seal", "x": 9, "y": 0, "w": 3, "h": 2, "accent": true },
+          { "label": "article rail · state margin", "x": 0, "y": 2, "w": 2, "h": 8, "accent": true },
+          { "label": "I · Parties and funding", "x": 2, "y": 2, "w": 10, "h": 2 },
+          { "label": "II · Term", "x": 2, "y": 4, "w": 10, "h": 1 },
+          { "label": "III · Consideration — transfers", "x": 2, "y": 5, "w": 10, "h": 2 },
+          { "label": "IV · Deliverables — projects, targets, tasks", "x": 2, "y": 7, "w": 10, "h": 2 },
+          { "label": "V · Record of amendments — status history", "x": 2, "y": 9, "w": 10, "h": 1 }
+        ]
+      },
+      "comp": ".impeccable/mocks/decision/surface-grant-instrument.png"
+    },
+    {
+      "id": "grant-chronology",
+      "label": "The Grant Chronology",
+      "lineage": "a single time axis — the money above the line, the work below it",
+      "thesis": "One spine from first concept to final report: transfers above, delivery below, the lifecycle as the line itself — so 'when does the money land against when the work is due' answers itself.",
+      "palette": ["#be1f24", "#2b5f6b", "#9a6412", "#58595b", "#ffffff"],
+      "materials": ["time ribbon", "dot-and-thread events", "today marker"],
+      "viewport": "A full-width ribbon across the proposal's term with today marked: above the line the money events (441,032 received 9 Sep, 661,549 pending 27 Apr), below it the project windows, task due dates and target reporting periods; the line itself thickens through the stage the proposal actually sat in longest.",
+      "risk": "Undated records fall off a time axis — and in your live data every one of this proposal's six tasks has no due date. They need an honest berth beside the spine or the page lies by omission.",
+      "case": "Strongest at showing connection: it is the only one of the three where money and delivery are measured against the same ruler. Weakest when a proposal's records are thinly dated.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "name · status · change status", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "money above the line — transfers scheduled & received", "x": 0, "y": 1, "w": 12, "h": 3, "accent": true },
+          { "label": "the spine — lifecycle axis, today", "x": 0, "y": 4, "w": 12, "h": 1, "accent": true },
+          { "label": "work below the line — projects, tasks, target periods", "x": 0, "y": 5, "w": 12, "h": 3 },
+          { "label": "undated records", "x": 0, "y": 8, "w": 4, "h": 2 },
+          { "label": "selected date — full state on that day", "x": 4, "y": 8, "w": 8, "h": 2 }
+        ]
+      },
+      "comp": ".impeccable/mocks/decision/surface-grant-chronology.png"
+    }
+  ],
+  "reroll": { "registers": ["safer", "bolder"] },
+  "steer": true,
+  "canon": false,
+  "buildPath": { "value": "code", "toggle": true }
+}

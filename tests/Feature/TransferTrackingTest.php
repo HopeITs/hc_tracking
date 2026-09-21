@@ -6,14 +6,19 @@ use App\Models\Account;
 use App\Models\DonorProposal;
 use App\Models\TransfersTracking;
 use App\Models\User;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Livewire\Livewire;
+
+beforeEach(function () {
+    $this->seed(RolesAndPermissionsSeeder::class);
+});
 
 test('guests are redirected from transfer tracking', function () {
     $this->get(route('transfers.index'))->assertRedirect(route('login'));
 });
 
 test('transfers can be filtered by receipt status and account', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $operations = Account::factory()->create(['name' => 'Operations USD']);
     $reserve = Account::factory()->create(['name' => 'Reserve EUR']);
 
@@ -42,7 +47,7 @@ test('transfers can be filtered by receipt status and account', function () {
 });
 
 test('a tranche can be scheduled with no account assigned', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $agreement = DonorProposal::factory()->create();
 
     Livewire::actingAs($user)
@@ -64,7 +69,7 @@ test('a tranche can be scheduled with no account assigned', function () {
 });
 
 test('a pending tranche with no received figures saves those columns as null', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $agreement = DonorProposal::factory()->create();
 
     Livewire::actingAs($user)
@@ -88,7 +93,7 @@ test('a pending tranche with no received figures saves those columns as null', f
 });
 
 test('the three currency columns are recorded independently', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $agreement = DonorProposal::factory()->create();
     $account = Account::factory()->create();
 
@@ -118,7 +123,7 @@ test('the three currency columns are recorded independently', function () {
 });
 
 test('a negative payment amount is rejected', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
 
     Livewire::actingAs($user)
         ->test('pages::transfers.index')
@@ -132,7 +137,7 @@ test('a negative payment amount is rejected', function () {
 });
 
 test('transfers offer no delete', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     TransfersTracking::factory()->create();
 
     $component = Livewire::actingAs($user)->test('pages::transfers.index');
@@ -143,7 +148,7 @@ test('transfers offer no delete', function () {
 });
 
 test('transfer totals are never summed across currencies', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
 
     TransfersTracking::factory()->create([
         'payment_amount' => '100000.00',
@@ -162,7 +167,24 @@ test('transfer totals are never summed across currencies', function () {
 });
 
 test('transfer tracking renders with no transfers', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
 
     Livewire::actingAs($user)->test('pages::transfers.index')->assertSee('No transfers recorded');
+});
+
+test('a user without transfer permissions cannot schedule a tranche', function () {
+    $viewer = User::factory()->role('Managers')->create();
+    $agreement = DonorProposal::factory()->create(['currency' => Currency::Usd]);
+
+    $fresh = fn () => Livewire::actingAs($viewer)->test('pages::transfers.index');
+
+    $fresh()->assertDontSeeHtml('data-test="create-transfer-button"');
+    $fresh()->call('openCreateModal')->assertForbidden();
+    $fresh()->set('transferAgreementId', (string) $agreement->id)
+        ->set('paymentAmount', '100.00')
+        ->set('transferredCurrency', Currency::Usd->value)
+        ->set('transferArStatus', ArStatus::Pending->value)
+        ->call('saveTransfer')->assertForbidden();
+
+    expect(TransfersTracking::query()->count())->toBe(0);
 });

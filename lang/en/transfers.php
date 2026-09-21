@@ -32,6 +32,7 @@ return [
     'sent_fees_and_received_each_carry_their_own_currency_they_ar' => 'Sent, fees and received each carry their own currency. They are recorded separately and never combined.',
     'sent_on' => 'Sent on',
     'sent_on_this_page' => 'Sent on this page',
+    'that_account_is_closed_choose_an_active_one' => 'That account is closed. Choose an active account.',
     'transfer_recorded' => 'Transfer recorded.',
     'transfer_updated' => 'Transfer updated.',
 ];

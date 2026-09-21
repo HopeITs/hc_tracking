@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * A file attached to a project or a milestone.
@@ -75,10 +76,10 @@ class Media extends Model
     ];
 
     /**
-     * The project or milestone this file is attached to.
+     * The proposal, project or milestone this file is attached to.
      *
-     * Resolves through the morph map, so `mediable_type` holds 'project' or
-     * 'milestone', never a class name. It can resolve to NULL: `mediable_id`
+     * Resolves through the morph map, so `mediable_type` holds 'proposal',
+     * 'project' or 'milestone', never a class name. It can resolve to NULL: `mediable_id`
      * carries no foreign key, because a polymorphic column cannot.
      *
      * @return MorphTo<Model, $this>
@@ -96,6 +97,25 @@ class Media extends Model
     public function uploader(): BelongsTo
     {
         return $this->belongsTo(User::class, 'uploaded_by');
+    }
+
+    /**
+     * Whether a real file sits on disk behind this row.
+     *
+     * Seeded demo rows never had one written, so they are shown as reference
+     * only rather than offered for a preview that would 404.
+     */
+    public function isStored(): bool
+    {
+        return Storage::disk($this->disk)->exists($this->path);
+    }
+
+    /**
+     * Whether the browser can render this file type inline (PDF or image).
+     */
+    public function isPreviewable(): bool
+    {
+        return in_array($this->type, [FileType::Pdf, FileType::Jpg, FileType::Png], true);
     }
 
     /**

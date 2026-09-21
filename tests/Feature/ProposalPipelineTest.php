@@ -10,15 +10,20 @@ use App\Models\Proposal;
 use App\Models\Task;
 use App\Models\TransfersTracking;
 use App\Models\User;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
+
+beforeEach(function () {
+    $this->seed(RolesAndPermissionsSeeder::class);
+});
 
 test('guests are redirected from the proposal pipeline', function () {
     $this->get(route('proposals.index'))->assertRedirect(route('login'));
 });
 
 test('proposals can be filtered by search and status', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
 
     Proposal::factory()->create(['name' => 'Emergency WASH Response', 'status' => ProposalStatus::Active]);
     Proposal::factory()->create(['name' => 'Winter Shelter Kit', 'status' => ProposalStatus::Rejected]);
@@ -37,7 +42,7 @@ test('proposals can be filtered by search and status', function () {
 });
 
 test('the phase filter selects every status belonging to that phase', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
 
     // Monitoring holds exactly ProposalStatus::Active.
     Proposal::factory()->create(['name' => 'Monitored proposal', 'status' => ProposalStatus::Active]);
@@ -56,7 +61,7 @@ test('the phase filter selects every status belonging to that phase', function (
 });
 
 test('a proposal can be created with a trimmed name', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
 
     Livewire::actingAs($user)
         ->test('pages::proposals.index')
@@ -75,7 +80,7 @@ test('a proposal can be created with a trimmed name', function () {
 });
 
 test('a proposal end date cannot fall before its begin date', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
 
     Livewire::actingAs($user)
         ->test('pages::proposals.index')
@@ -89,7 +94,7 @@ test('a proposal end date cannot fall before its begin date', function () {
 });
 
 test('an unfunded proposal can be deleted', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $proposal = Proposal::factory()->create();
 
     Livewire::actingAs($user)
@@ -102,7 +107,7 @@ test('an unfunded proposal can be deleted', function () {
 });
 
 test('a proposal holding a funding agreement is not deleted and says why', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $proposal = Proposal::factory()->create();
     $donor = Donor::factory()->create();
     $agreement = DonorProposal::factory()->create([
@@ -120,13 +125,13 @@ test('a proposal holding a funding agreement is not deleted and says why', funct
 });
 
 test('the pipeline renders with no proposals', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
 
     Livewire::actingAs($user)->test('pages::proposals.index')->assertSee('No proposals yet');
 });
 
 test('the delete confirmation opens and closes through its boolean', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $proposal = Proposal::factory()->create();
 
     Livewire::actingAs($user)
@@ -139,7 +144,7 @@ test('the delete confirmation opens and closes through its boolean', function ()
 });
 
 test('moving a proposal to its next stage records the status and the reason together', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $proposal = Proposal::factory()->create(['status' => ProposalStatus::Submitted]);
 
     Livewire::actingAs($user)
@@ -163,7 +168,7 @@ test('moving a proposal to its next stage records the status and the reason toge
 });
 
 test('a stage move without a reason changes nothing', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $proposal = Proposal::factory()->create(['status' => ProposalStatus::Active]);
 
     Livewire::actingAs($user)
@@ -178,7 +183,7 @@ test('a stage move without a reason changes nothing', function () {
 });
 
 test('a proposal with no next stage opens the stage move on its current status', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $proposal = Proposal::factory()->create(['status' => ProposalStatus::Rejected]);
 
     Livewire::actingAs($user)
@@ -188,7 +193,7 @@ test('a proposal with no next stage opens the stage move on its current status',
 });
 
 test('selecting a donor shows only the proposals it funds, and selecting it again clears the filter', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $echo = Donor::factory()->create(['name' => 'ECHO']);
     $giz = Donor::factory()->create(['name' => 'GIZ']);
     $funded = Proposal::factory()->create(['name' => 'Water Response']);
@@ -209,7 +214,7 @@ test('selecting a donor shows only the proposals it funds, and selecting it agai
 });
 
 test('the pipeline rail toggles the phase filter and still counts the phases it hides', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     Proposal::factory()->create(['status' => ProposalStatus::Active]);
     Proposal::factory()->create(['status' => ProposalStatus::Rejected]);
 
@@ -227,7 +232,7 @@ test('the pipeline rail toggles the phase filter and still counts the phases it 
 });
 
 test('the funding position splits committed, received and pending per currency for matching proposals only', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $donor = Donor::factory()->create();
     $shown = Proposal::factory()->create(['name' => 'Shown Proposal']);
     $hidden = Proposal::factory()->create(['name' => 'Hidden Proposal']);
@@ -256,7 +261,7 @@ test('the funding position splits committed, received and pending per currency f
 });
 
 test('the funding flow draws one graph per currency and lists unfunded proposals apart', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $donor = Donor::factory()->create(['name' => 'ECHO']);
     $funded = Proposal::factory()->create(['name' => 'Funded Proposal']);
     $unfunded = Proposal::factory()->create(['name' => 'Unfunded Proposal']);
@@ -282,7 +287,7 @@ test('the funding flow draws one graph per currency and lists unfunded proposals
 });
 
 test('each proposal row shows its task progress and overdue work', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $proposal = Proposal::factory()->create();
     Task::factory()->for($proposal)->create(['status' => TaskStatus::Done]);
     Task::factory()->for($proposal)->create(['status' => TaskStatus::Todo, 'due_date' => now()->subDays(3)->toDateString()]);
@@ -292,4 +297,22 @@ test('each proposal row shows its task progress and overdue work', function () {
         ->test('pages::proposals.index')
         ->assertSee('1 of 3 tasks done')
         ->assertSee('1 overdue');
+});
+
+test('a user without proposal permissions sees no edit controls and cannot create, move or delete', function () {
+    $viewer = User::factory()->role('General Manager')->create();
+    $proposal = Proposal::factory()->create();
+
+    $fresh = fn () => Livewire::actingAs($viewer)->test('pages::proposals.index');
+
+    $fresh()->assertDontSeeHtml('data-test="create-proposal-button"')
+        ->assertDontSeeHtml('data-test="advance-proposal-'.$proposal->id.'"');
+
+    $fresh()->call('openCreateModal')->assertForbidden();
+    $fresh()->set('name', 'Sneaked in')->set('plannedDateBegin', '2026-01-01')->set('plannedDateEnd', '2026-12-31')->set('proposalStatus', 'concept note')->call('saveProposal')->assertForbidden();
+    $fresh()->call('openStageModal', $proposal->id)->assertForbidden();
+    $fresh()->set('deletingProposalId', $proposal->id)->call('deleteProposal')->assertForbidden();
+
+    expect(DB::table('proposals')->where('name', 'Sneaked in')->exists())->toBeFalse()
+        ->and(DB::table('proposals')->find($proposal->id))->not->toBeNull();
 });

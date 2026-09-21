@@ -1,0 +1,279 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Livewire\Concerns;
+
+use App\Enums\ArStatus;
+use App\Enums\Currency;
+use App\Models\Account;
+use App\Models\DonorProposal;
+use App\Models\TransfersTracking;
+use Closure;
+use Flux\Flux;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Enum;
+use Livewire\Attributes\Computed;
+
+/**
+ * The payment tranche form, shared by the transfer directory and the proposal
+ * page so a tranche is scheduled and received by one set of rules.
+ *
+ * The using component renders resources/views/components/funding/transfer-modal
+ * and decides what happens after a save through transferSaved(). A page that
+ * lives inside one proposal limits the form to that proposal's agreements
+ * through transferProposalScope().
+ */
+trait ManagesTransferForm
+{
+    public bool $showTransferModal = false;
+
+    public ?int $editingTransferId = null;
+
+    public string $transferAgreementId = '';
+
+    public string $transferAccountId = '';
+
+    public string $paymentAmount = '';
+
+    public string $transferredCurrency = 'USD';
+
+    public string $scheduledDate = '';
+
+    public string $transferDate = '';
+
+    public string $fees = '0';
+
+    public string $feesCurrency = 'USD';
+
+    public string $amountReceived = '';
+
+    public string $exchangeRate = '1.000000';
+
+    public string $netAmountReceived = '';
+
+    public string $receivedCurrency = 'USD';
+
+    public string $receiveDate = '';
+
+    public string $transferArStatus = 'pending';
+
+    /**
+     * Called after a tranche is recorded or edited.
+     */
+    abstract protected function transferSaved(TransfersTracking $transfer, bool $isCreate): void;
+
+    /**
+     * The proposal whose agreements this page may schedule against, or null
+     * when any agreement is allowed.
+     */
+    protected function transferProposalScope(): ?int
+    {
+        return null;
+    }
+
+    /** @return Collection<int, Account> */
+    #[Computed]
+    public function accountOptions(): Collection
+    {
+        return Account::query()->select(['id', 'name', 'is_active'])->orderBy('name')->orderBy('id')->get();
+    }
+
+    /** @return Collection<int, DonorProposal> */
+    #[Computed]
+    public function agreementOptions(): Collection
+    {
+        return $this->scopedAgreements()
+            ->select(['id', 'donor_id', 'proposal_id', 'project_num', 'currency'])
+            ->with(['donor:id,name', 'proposal:id,name'])
+            ->orderBy('id')
+            ->get();
+    }
+
+    /** @return Builder<DonorProposal> */
+    protected function scopedAgreements(): Builder
+    {
+        return DonorProposal::query()
+            ->when($this->transferProposalScope() !== null, fn (Builder $query) => $query->where('proposal_id', $this->transferProposalScope()));
+    }
+
+    /**
+     * Open a new tranche, optionally against one agreement.
+     *
+     * Every currency starts at the agreement's own: most tranches are sent,
+     * charged and received in the currency the budget was signed in.
+     */
+    public function openTransferCreate(?int $agreementId = null): void
+    {
+        Gate::authorize('transfers.create');
+
+        $this->resetTransferForm();
+
+        // A page pinned to one proposal with a single agreement has only one
+        // possible answer, so it is chosen rather than asked for.
+        if ($agreementId === null && $this->transferProposalScope() !== null) {
+            $onlyAgreement = $this->scopedAgreements()->limit(2)->pluck('id');
+            $agreementId = $onlyAgreement->count() === 1 ? $onlyAgreement->first() : null;
+        }
+
+        if ($agreementId !== null) {
+            $agreement = $this->scopedAgreements()->select(['id', 'currency'])->findOrFail($agreementId);
+
+            $this->transferAgreementId = (string) $agreement->id;
+            $this->transferredCurrency = $agreement->currency->value;
+            $this->feesCurrency = $agreement->currency->value;
+            $this->receivedCurrency = $agreement->currency->value;
+        }
+
+        $this->showTransferModal = true;
+    }
+
+    public function openTransferEdit(int $transferId): void
+    {
+        Gate::authorize('transfers.update');
+
+        $transfer = $this->scopedTransfer($transferId);
+
+        $this->resetValidation();
+        $this->editingTransferId = $transfer->id;
+        $this->transferAgreementId = (string) $transfer->donor_proposal_id;
+        $this->transferAccountId = (string) ($transfer->account_id ?? '');
+        $this->paymentAmount = (string) $transfer->payment_amount;
+        $this->transferredCurrency = $transfer->amount_transfered_currency->value;
+        $this->scheduledDate = $transfer->scheduled_date?->toDateString() ?? '';
+        $this->transferDate = $transfer->transfer_date?->toDateString() ?? '';
+        $this->fees = (string) $transfer->fees;
+        $this->feesCurrency = $transfer->fees_currency->value;
+        $this->amountReceived = (string) ($transfer->amount_received ?? '');
+        $this->exchangeRate = (string) $transfer->exchange_rate;
+        $this->netAmountReceived = (string) ($transfer->net_amount_received ?? '');
+        $this->receivedCurrency = $transfer->amount_received_currency->value;
+        $this->receiveDate = $transfer->receive_date?->toDateString() ?? '';
+        $this->transferArStatus = $transfer->ar_status->value;
+        $this->showTransferModal = true;
+    }
+
+    public function saveTransfer(): void
+    {
+        Gate::authorize($this->editingTransferId === null ? 'transfers.create' : 'transfers.update');
+
+        $existing = $this->editingTransferId === null ? null : $this->scopedTransfer($this->editingTransferId);
+
+        $validated = $this->validate([
+            'transferAgreementId' => [
+                'required',
+                'integer',
+                Rule::exists(DonorProposal::class, 'id')->when(
+                    $this->transferProposalScope() !== null,
+                    fn ($rule) => $rule->where('proposal_id', $this->transferProposalScope()),
+                ),
+            ],
+            'transferAccountId' => [
+                'nullable',
+                'integer',
+                Rule::exists(Account::class, 'id'),
+                // is_active decides whether an account can receive money. A
+                // tranche already filed against an account that has since
+                // closed may keep it; nothing new may be pointed at one.
+                function (string $attribute, mixed $value, Closure $fail) use ($existing): void {
+                    if ($value === null || $value === '' || (int) $value === $existing?->account_id) {
+                        return;
+                    }
+
+                    if (Account::query()->whereKey((int) $value)->active()->doesntExist()) {
+                        $fail(__('transfers.that_account_is_closed_choose_an_active_one'));
+                    }
+                },
+            ],
+            'paymentAmount' => ['required', 'numeric', 'min:0'],
+            'transferredCurrency' => ['required', new Enum(Currency::class)],
+            'scheduledDate' => ['nullable', 'date'],
+            'transferDate' => ['nullable', 'date'],
+            'fees' => ['required', 'numeric', 'min:0'],
+            'feesCurrency' => ['required', new Enum(Currency::class)],
+            'amountReceived' => ['nullable', 'numeric', 'min:0'],
+            'exchangeRate' => ['required', 'numeric', 'min:0'],
+            'netAmountReceived' => ['nullable', 'numeric', 'min:0'],
+            'receivedCurrency' => ['required', new Enum(Currency::class)],
+            'receiveDate' => ['nullable', 'date'],
+            'transferArStatus' => ['required', new Enum(ArStatus::class)],
+        ], [
+            'transferAgreementId.required' => __('transfers.select_the_funding_agreement_this_tranche_belongs_to'),
+            'paymentAmount.required' => __('transfers.enter_the_payment_amount'),
+            'paymentAmount.min' => __('transfers.a_payment_amount_cannot_be_negative'),
+            'fees.min' => __('transfers.fees_cannot_be_negative'),
+            'exchangeRate.min' => __('transfers.an_exchange_rate_cannot_be_negative'),
+        ]);
+
+        $transfer = $existing ?? new TransfersTracking;
+
+        $transfer->fill([
+            'donor_proposal_id' => (int) $validated['transferAgreementId'],
+            'account_id' => $validated['transferAccountId'] === '' || $validated['transferAccountId'] === null
+                ? null
+                : (int) $validated['transferAccountId'],
+            'payment_amount' => $validated['paymentAmount'],
+            'amount_transfered_currency' => $validated['transferredCurrency'],
+            'scheduled_date' => $validated['scheduledDate'] === '' ? null : $validated['scheduledDate'],
+            'transfer_date' => $validated['transferDate'] === '' ? null : $validated['transferDate'],
+            'fees' => $validated['fees'],
+            'fees_currency' => $validated['feesCurrency'],
+            'amount_received' => $validated['amountReceived'] === '' ? null : $validated['amountReceived'],
+            'exchange_rate' => $validated['exchangeRate'],
+            'net_amount_received' => $validated['netAmountReceived'] === '' ? null : $validated['netAmountReceived'],
+            'amount_received_currency' => $validated['receivedCurrency'],
+            'receive_date' => $validated['receiveDate'] === '' ? null : $validated['receiveDate'],
+            'ar_status' => $validated['transferArStatus'],
+        ])->save();
+
+        $isCreate = $transfer->wasRecentlyCreated;
+
+        $this->showTransferModal = false;
+        $this->resetTransferForm();
+        $this->transferSaved($transfer, $isCreate);
+
+        Flux::toast(
+            variant: 'success',
+            text: $isCreate ? __('transfers.transfer_recorded') : __('transfers.transfer_updated'),
+        );
+    }
+
+    public function closeTransferModal(): void
+    {
+        $this->showTransferModal = false;
+        $this->resetTransferForm();
+    }
+
+    /**
+     * A tranche by id, re-scoped to the agreements this page may touch.
+     */
+    protected function scopedTransfer(int $transferId): TransfersTracking
+    {
+        return TransfersTracking::query()
+            ->whereIn('donor_proposal_id', $this->scopedAgreements()->select('id'))
+            ->findOrFail($transferId);
+    }
+
+    protected function resetTransferForm(): void
+    {
+        $this->resetValidation();
+        $this->editingTransferId = null;
+        $this->transferAgreementId = '';
+        $this->transferAccountId = '';
+        $this->paymentAmount = '';
+        $this->transferredCurrency = 'USD';
+        $this->scheduledDate = '';
+        $this->transferDate = '';
+        $this->fees = '0';
+        $this->feesCurrency = 'USD';
+        $this->amountReceived = '';
+        $this->exchangeRate = '1.000000';
+        $this->netAmountReceived = '';
+        $this->receivedCurrency = 'USD';
+        $this->receiveDate = '';
+        $this->transferArStatus = 'pending';
+    }
+}

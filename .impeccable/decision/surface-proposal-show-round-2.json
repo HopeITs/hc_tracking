@@ -1,0 +1,89 @@
+{
+  "title": "How one proposal's page should be composed",
+  "question": "The visual world is already settled — it's the pipeline page's world (white ground, tabular figures, funding teal for money received, amber for pending, HC red for the live stage, hairline rules, dot-and-thread connections, no boxed cards). This choice is only about composition: how this proposal's whole dossier — 1 agreement, 2 transfers, 2 projects, 6 tasks, 3 targets, 3 status moves — is arranged on one page. Lock one, steer it, or re-roll.",
+  "options": [
+    {
+      "id": "vitals-bench",
+      "label": "The Vitals Bench",
+      "kicker": "THE ROLL",
+      "lineage": "an instrument bench — four gauges read in one glance, each openable for its trace",
+      "thesis": "Four vital signs of the grant, set as huge unboxed figures on one shared baseline: money landed, work done, time spent, promises reported. Touch one and its evidence unfolds in place.",
+      "palette": ["#be1f24", "#2b5f6b", "#9a6412", "#58595b", "#ffffff"],
+      "materials": ["oversized tabular figures on one baseline rule", "hairline spark-bars", "inline drawers, never boxes"],
+      "viewport": "Name, status and the seven-stop lifecycle rail across the top. Beneath, four readings sharing one hairline: 40% received (441,033 of 1,102,582 USD), 2 of 6 tasks done, day 264 of 365, 0 of 3 targets reported — the off-track one carried in HC red. Each reading sits over its own thin bar; clicking it slides that vital's evidence open underneath without leaving the page.",
+      "risk": "Four readings in a row sits one step from the stat-tile grid you already rejected. It only earns its place if the figures stay typographic, unboxed, and on one continuous rule — the moment they get borders it becomes the thing you threw out.",
+      "case": "Strongest for the daily 'is this grant healthy?' scan, and the fastest of the three to read on a phone. Weakest at showing how the pieces connect — it reports four truths side by side rather than one chain.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "name · status · change status", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "lifecycle rail — 7 stops, live one in red", "x": 0, "y": 1, "w": 12, "h": 1, "accent": true },
+          { "label": "MONEY LANDED 40%", "x": 0, "y": 2, "w": 3, "h": 2, "accent": true },
+          { "label": "WORK DONE 2/6", "x": 3, "y": 2, "w": 3, "h": 2 },
+          { "label": "TIME SPENT day 264/365", "x": 6, "y": 2, "w": 3, "h": 2 },
+          { "label": "PROMISES REPORTED 0/3", "x": 9, "y": 2, "w": 3, "h": 2 },
+          { "label": "the opened vital — its evidence in place", "x": 0, "y": 4, "w": 12, "h": 3, "accent": true },
+          { "label": "donor & tranches", "x": 0, "y": 7, "w": 4, "h": 3 },
+          { "label": "projects funded", "x": 4, "y": 7, "w": 4, "h": 3 },
+          { "label": "targets & tasks", "x": 8, "y": 7, "w": 4, "h": 3 }
+        ]
+      },
+      "comp": ".impeccable/mocks/decision/proposal-show-vitals-bench.png"
+    },
+    {
+      "id": "grant-chronology",
+      "label": "The Grant Chronology",
+      "lineage": "one time axis — the money above the line, the work below it",
+      "thesis": "A single spine across the grant's term: transfers above, delivery below, today marked. 'When does the money land against when the work is due' stops being two screens and becomes one reading.",
+      "palette": ["#be1f24", "#2b5f6b", "#9a6412", "#58595b", "#ffffff"],
+      "materials": ["full-width time ribbon", "dot-and-thread events", "today marker in HC red"],
+      "viewport": "Name and status, then a ribbon spanning 1 Jan – 31 Dec 2026 with today struck through it. Above the line the money: 441,033 received 9 Sep in teal, 661,549 still pending from 27 Apr in amber — visibly overdue because it sits behind today. Below the line the delivery: two project windows (one closed Apr 2026, one running to Dec), target reporting periods as quarterly ticks. Click any date and the page states the whole grant's position on that day.",
+      "risk": "Undated records fall off a time axis, and in your live data all six of this proposal's tasks have no due date. They need an honest berth beside the spine or the page lies by omission — and that berth is real estate the other two don't have to spend.",
+      "case": "Strongest at showing connection: the only one of the three where money and delivery are measured against the same ruler, and the only one that makes an overdue tranche impossible to miss. Weakest when a proposal is thinly dated, which several of yours are.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "name · status · change status", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "MONEY ABOVE THE LINE — tranches scheduled & received", "x": 0, "y": 1, "w": 12, "h": 3, "accent": true },
+          { "label": "the spine — grant term, lifecycle, TODAY", "x": 0, "y": 4, "w": 12, "h": 1, "accent": true },
+          { "label": "WORK BELOW THE LINE — project windows, target periods", "x": 0, "y": 5, "w": 12, "h": 3 },
+          { "label": "undated records — honest berth", "x": 0, "y": 8, "w": 4, "h": 2 },
+          { "label": "selected day — full position on that date", "x": 4, "y": 8, "w": 8, "h": 2, "accent": true }
+        ]
+      },
+      "comp": ".impeccable/mocks/decision/proposal-show-grant-chronology.png"
+    },
+    {
+      "id": "connection-atlas",
+      "label": "The Connection Atlas",
+      "lineage": "the pipeline page's own funding river, turned to face one proposal",
+      "thesis": "The proposal sits at the centre of a single drawn chain: donor money flows in from the left, delivery flows out to the right, and touching any node lights its entire path end to end while everything else recedes.",
+      "palette": ["#be1f24", "#2b5f6b", "#9a6412", "#58595b", "#ffffff"],
+      "materials": ["budget-weighted flow ribbons", "dot-and-thread nodes", "a detail rail that fills from the lit chain"],
+      "viewport": "The proposal's name set large at the centre of the page with the lifecycle rail through it. Left of it, the inflow: ECHO → agreement PRJ-0001 → two tranche dots, the received one solid teal, the pending one amber and hollow, ribbon widths sized by money. Right of it, the outflow: two projects → their milestones, 6 tasks, 3 targets, each thread thinning as it branches. Hover ECHO and the whole path from donor to a specific target lights; everything unrelated drops to 30%.",
+      "risk": "A graph can become decoration that answers nothing. It only holds if every ribbon is sized by a real number and every node is a link that goes somewhere — and it needs a genuinely different stacked form on a phone, not a shrunken diagram.",
+      "case": "Strongest at exactly what you asked for — seeing every connection on one surface — and it's the only card that continues the pipeline page's visual language rather than introducing a second one. Weakest at the quick health read: 'is the money late?' takes a second look here.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "name · status · lifecycle rail · change status", "x": 0, "y": 0, "w": 12, "h": 2, "accent": true },
+          { "label": "INFLOW — donor", "x": 0, "y": 2, "w": 2, "h": 5 },
+          { "label": "agreement + tranches", "x": 2, "y": 2, "w": 3, "h": 5, "accent": true },
+          { "label": "THE PROPOSAL — money position", "x": 5, "y": 2, "w": 2, "h": 5, "accent": true },
+          { "label": "OUTFLOW — projects", "x": 7, "y": 2, "w": 2, "h": 5 },
+          { "label": "tasks · targets · milestones", "x": 9, "y": 2, "w": 3, "h": 5 },
+          { "label": "detail rail — the lit chain, in full", "x": 0, "y": 7, "w": 8, "h": 3, "accent": true },
+          { "label": "status history", "x": 8, "y": 7, "w": 4, "h": 3 }
+        ]
+      },
+      "comp": ".impeccable/mocks/decision/proposal-show-connection-atlas.png"
+    }
+  ],
+  "reroll": { "registers": ["safer", "bolder"] },
+  "steer": true,
+  "canon": false,
+  "buildPath": { "value": "comp", "toggle": true }
+}

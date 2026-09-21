@@ -24,6 +24,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | {database/migrations/**,tests/Feature/DatabaseEncodingTest.php} | .ai/rules/feature.md |
 | {config/blaze.php,resources/views/flux/**} | .ai/rules/flux.md |
 | {app/Providers/FortifyServiceProvider.php,app/Actions/Fortify/**,config/fortify.php} | .ai/rules/fortify.md |
+| {app/Livewire/Concerns/**,resources/views/components/funding/**} | .ai/rules/funding.md |
 | resources/views/pages/indicators/** | .ai/rules/indicators.md |
 | {config/database.php,.env.example,database/migrations/**} | .ai/rules/migrations.md |
 | resources/views/pages/milestones/** | .ai/rules/milestones.md |
