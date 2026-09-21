@@ -6,7 +6,7 @@
     /** @var \Illuminate\Support\Collection<int, \App\Models\Task> $groupTasks */
 @endphp
 
-<div class="@container">
+<div class="@container" x-data="{ subtasksOpen: {} }">
     <table class="hidden w-full table-fixed border-collapse text-start text-sm @3xl:table">
         <thead class="bg-secondary-soft/30 dark:bg-secondary-medium/20">
             <tr class="[&>th]:px-3.5 [&>th]:py-2 [&>th]:text-start [&>th]:text-[11px] [&>th]:font-semibold [&>th]:tracking-wide [&>th]:text-secondary-medium [&>th]:uppercase [&>th]:dark:text-secondary-soft">
@@ -54,18 +54,28 @@
                     </td>
                     <td class="min-w-0 px-2 py-2.5">
                         <div class="flex min-w-0 items-center gap-1.5">
+                            @if ($task->parent_task_id === null)
+                                <button
+                                    type="button"
+                                    x-on:click="subtasksOpen[{{ $task->id }}] = !subtasksOpen[{{ $task->id }}]"
+                                    :aria-expanded="!!subtasksOpen[{{ $task->id }}]"
+                                    class="inline-flex shrink-0 items-center gap-0.5 rounded px-1 py-0.5 text-xs text-secondary-medium hover:bg-secondary-soft hover:text-secondary-dark dark:text-secondary-soft dark:hover:bg-secondary-medium dark:hover:text-white"
+                                    :aria-label="subtasksOpen[{{ $task->id }}] ? {{ Js::from(__('tasks.hide_subtasks')) }} : {{ Js::from(__('tasks.show_subtasks')) }}"
+                                    data-test="task-subtasks-toggle-{{ $task->id }}"
+                                >
+                                    <flux:icon.chevron-right variant="micro" class="size-3.5 transition-transform rtl:rotate-180" x-bind:class="subtasksOpen[{{ $task->id }}] ? 'rotate-90 rtl:rotate-90' : ''" aria-hidden="true" />
+                                    @if ($task->subtasks_count > 0)
+                                        <flux:icon.rectangle-stack variant="micro" class="size-3.5" aria-hidden="true" />
+                                        {{ $task->subtasks_count }}
+                                    @endif
+                                </button>
+                            @endif
                             <a
                                 href="{{ route('tasks.show', $task) }}"
                                 wire:navigate
                                 title="{{ $task->title }}"
                                 @class(['min-w-0 truncate text-sm font-semibold hover:underline', 'text-secondary-light line-through' => $isDone, 'text-secondary-dark dark:text-white' => ! $isDone])
                             >{{ $task->title }}</a>
-                            @if ($task->subtasks_count > 0)
-                                <span class="inline-flex shrink-0 items-center gap-0.5 text-xs text-secondary-medium dark:text-secondary-soft" title="{{ __('tasks.subtask_count', ['count' => $task->subtasks_count]) }}">
-                                    <flux:icon.rectangle-stack variant="micro" class="size-3.5" aria-hidden="true" />
-                                    {{ $task->subtasks_count }}
-                                </span>
-                            @endif
                         </div>
                         <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">
                             @if ($task->milestone === null)
@@ -118,18 +128,18 @@
                             </x-slot:trigger>
 
                             @foreach ($this->userOptions as $userOption)
-                                @php $isAssigned = in_array($userOption->id, $assignedIds, true); @endphp
+                                @php $isAssigned = in_array($userOption['id'], $assignedIds, true); @endphp
                                 <button
                                     type="button"
                                     role="option"
                                     aria-selected="{{ $isAssigned ? 'true' : 'false' }}"
-                                    wire:click="toggleAssignee({{ $task->id }}, {{ $userOption->id }})"
-                                    wire:key="task-{{ $task->id }}-assignee-option-{{ $userOption->id }}"
+                                    wire:click="toggleAssignee({{ $task->id }}, {{ $userOption['id'] }})"
+                                    wire:key="task-{{ $task->id }}-assignee-option-{{ $userOption['id'] }}"
                                     x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
                                     class="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm hover:bg-secondary-soft dark:hover:bg-secondary-medium"
-                                    data-test="task-assignee-option-{{ $task->id }}-{{ $userOption->id }}"
+                                    data-test="task-assignee-option-{{ $task->id }}-{{ $userOption['id'] }}"
                                 >
-                                    <span class="min-w-0 flex-1 truncate">{{ $userOption->name }} · {{ $userOption->secondary_name }}</span>
+                                    <span class="min-w-0 flex-1 truncate">{{ $userOption['name'] }} · {{ $userOption['secondary_name'] }}</span>
                                     @if ($isAssigned)
                                         <flux:icon.check class="size-4 shrink-0 text-primary" />
                                     @endif
@@ -184,6 +194,47 @@
                         </div>
                     </td>
                 </tr>
+                @if ($task->parent_task_id === null)
+                    <tr x-show="subtasksOpen[{{ $task->id }}]" x-cloak wire:key="task-subtasks-panel-{{ $task->id }}">
+                        <td></td>
+                        <td colspan="5" class="bg-secondary-soft/30 px-3.5 py-2.5 dark:bg-secondary-medium/20">
+                            <div class="flex flex-col gap-1.5">
+                                @foreach ($task->subtasks as $subtask)
+                                    <div class="flex items-center gap-2" wire:key="task-subtask-row-{{ $subtask->id }}" data-test="task-subtask-row-{{ $subtask->id }}">
+                                        <button
+                                            type="button"
+                                            wire:click="toggleComplete({{ $subtask->id }})"
+                                            aria-label="{{ $subtask->status === TaskStatus::Done ? __('tasks.mark_incomplete') : __('tasks.mark_complete') }}"
+                                            class="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium"
+                                        >
+                                            <flux:icon.check-circle :variant="$subtask->status === TaskStatus::Done ? 'solid' : 'outline'" class="size-4 {{ $subtask->status === TaskStatus::Done ? 'text-status-good' : '' }}" />
+                                        </button>
+                                        <a
+                                            href="{{ route('tasks.show', $subtask) }}"
+                                            wire:navigate
+                                            title="{{ $subtask->title }}"
+                                            @class(['min-w-0 flex-1 truncate text-sm hover:underline', 'text-secondary-light line-through' => $subtask->status === TaskStatus::Done, 'text-secondary-dark dark:text-white' => $subtask->status !== TaskStatus::Done])
+                                        >{{ $subtask->title }}</a>
+                                        <x-ui.status-pill :case="$subtask->status" class="shrink-0" />
+                                    </div>
+                                @endforeach
+                                <label class="flex items-center gap-2 pt-0.5">
+                                    <flux:icon.plus variant="micro" class="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+                                    <span class="sr-only">{{ __('tasks.add_subtask') }}</span>
+                                    <input
+                                        type="text"
+                                        placeholder="{{ __('tasks.add_subtask') }}"
+                                        class="w-full min-w-0 border-0 bg-transparent p-1 text-sm text-secondary-dark placeholder:text-secondary-light focus:ring-0 focus:outline-none dark:text-white"
+                                        wire:keydown.enter="addSubtaskQuick({{ $task->id }}, $event.target.value)"
+                                        x-on:keydown.enter="$nextTick(() => $event.target.value = '')"
+                                        data-test="task-subtask-quick-add-{{ $task->id }}"
+                                    />
+                                </label>
+                            </div>
+                        </td>
+                        <td></td>
+                    </tr>
+                @endif
             @endforeach
         </tbody>
     </table>
@@ -220,11 +271,18 @@
                 <div class="flex flex-wrap items-center gap-2 ps-12">
                     <x-ui.status-pill :case="$task->status" />
                     <flux:icon.flag :variant="$task->priority === TaskPriority::Low ? 'outline' : 'solid'" class="size-4 {{ $priorityIconClasses($task->priority) }}" />
-                    @if ($task->subtasks_count > 0)
-                        <span class="inline-flex items-center gap-0.5 text-xs text-secondary-medium dark:text-secondary-soft">
+                    @if ($task->parent_task_id === null)
+                        <button
+                            type="button"
+                            x-on:click="subtasksOpen[{{ $task->id }}] = !subtasksOpen[{{ $task->id }}]"
+                            :aria-expanded="!!subtasksOpen[{{ $task->id }}]"
+                            class="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-xs text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium"
+                            :aria-label="subtasksOpen[{{ $task->id }}] ? {{ Js::from(__('tasks.hide_subtasks')) }} : {{ Js::from(__('tasks.show_subtasks')) }}"
+                            data-test="task-subtasks-toggle-mobile-{{ $task->id }}"
+                        >
                             <flux:icon.rectangle-stack variant="micro" class="size-3.5" aria-hidden="true" />
                             {{ $task->subtasks_count }}
-                        </span>
+                        </button>
                     @endif
                     @if ($task->due_date !== null)
                         <span @class(['text-xs tabular-nums', 'font-semibold text-primary' => $isOverdue, 'text-secondary-medium dark:text-secondary-soft' => ! $isOverdue])>
@@ -242,6 +300,41 @@
                     <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation" wire:click="openEditDrawer({{ $task->id }})" :aria-label="__('tasks.edit_title', ['title' => $task->title])" />
                     <x-ui.button tone="ghost" size="sm" icon="trash" class="size-11! touch-manipulation" wire:click="confirmDelete({{ $task->id }})" :aria-label="__('tasks.delete_title', ['title' => $task->title])" />
                 </div>
+                @if ($task->parent_task_id === null)
+                    <div x-show="subtasksOpen[{{ $task->id }}]" x-cloak class="ms-12 flex flex-col gap-1.5 rounded-lg bg-secondary-soft/30 p-2.5 dark:bg-secondary-medium/20">
+                        @foreach ($task->subtasks as $subtask)
+                            <div class="flex items-center gap-2" wire:key="task-subtask-row-mobile-{{ $subtask->id }}" data-test="task-subtask-row-{{ $subtask->id }}">
+                                <button
+                                    type="button"
+                                    wire:click="toggleComplete({{ $subtask->id }})"
+                                    aria-label="{{ $subtask->status === TaskStatus::Done ? __('tasks.mark_incomplete') : __('tasks.mark_complete') }}"
+                                    class="inline-flex size-6 shrink-0 cursor-pointer touch-manipulation items-center justify-center rounded-full text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium"
+                                >
+                                    <flux:icon.check-circle :variant="$subtask->status === TaskStatus::Done ? 'solid' : 'outline'" class="size-4 {{ $subtask->status === TaskStatus::Done ? 'text-status-good' : '' }}" />
+                                </button>
+                                <a
+                                    href="{{ route('tasks.show', $subtask) }}"
+                                    wire:navigate
+                                    title="{{ $subtask->title }}"
+                                    @class(['min-w-0 flex-1 truncate text-sm hover:underline', 'text-secondary-light line-through' => $subtask->status === TaskStatus::Done, 'text-secondary-dark dark:text-white' => $subtask->status !== TaskStatus::Done])
+                                >{{ $subtask->title }}</a>
+                                <x-ui.status-pill :case="$subtask->status" class="shrink-0" />
+                            </div>
+                        @endforeach
+                        <label class="flex items-center gap-2 pt-0.5">
+                            <flux:icon.plus variant="micro" class="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+                            <span class="sr-only">{{ __('tasks.add_subtask') }}</span>
+                            <input
+                                type="text"
+                                placeholder="{{ __('tasks.add_subtask') }}"
+                                class="w-full min-w-0 border-0 bg-transparent p-1 text-sm text-secondary-dark placeholder:text-secondary-light focus:ring-0 focus:outline-none dark:text-white"
+                                wire:keydown.enter="addSubtaskQuick({{ $task->id }}, $event.target.value)"
+                                x-on:keydown.enter="$nextTick(() => $event.target.value = '')"
+                                data-test="task-subtask-quick-add-mobile-{{ $task->id }}"
+                            />
+                        </label>
+                    </div>
+                @endif
             </article>
         @endforeach
     </div>
@@ -255,6 +348,7 @@
                 placeholder="{{ __('tasks.add_task') }}"
                 class="w-full min-w-0 border-0 bg-transparent p-1 text-sm text-secondary-dark placeholder:text-secondary-light focus:ring-0 focus:outline-none dark:text-white"
                 wire:keydown.enter="quickCreateTask($event.target.value, {{ $group === 'status' ? Js::from($groupKeyString) : 'null' }}, {{ $group === 'milestone' && $groupKeyString !== '' ? Js::from($groupKeyString) : 'null' }})"
+                x-on:keydown.enter="$nextTick(() => $event.target.value = '')"
                 data-test="task-quick-add-{{ $group }}-{{ $groupKeyString }}"
             />
         </label>

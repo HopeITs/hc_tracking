@@ -186,6 +186,10 @@ new #[Title('titles.tasks')] class extends Component {
                 'milestone.project:id,name',
                 'proposal:id,name',
                 'taskAssignees.employee:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
+                // Loaded alongside the count above so the list/board rows can expand
+                // a subtask panel in place (client-side, no extra round trip) instead
+                // of sending people to the parent task's own page to see them.
+                'subtasks:id,parent_task_id,title,status,priority,due_date',
             ])
             ->when($search !== '', function (Builder $query) use ($search): void {
                 $query->where(function (Builder $query) use ($search): void {
@@ -412,31 +416,53 @@ new #[Title('titles.tasks')] class extends Component {
      * across users and expires with the page (5 minutes is just a safety
      * bound against an unusually long-lived tab, not a real staleness risk).
      *
-     * @return Collection<int, HrEmployee>
+     * Returned as plain arrays, not Eloquent collections/models: the cache
+     * store's `serializable_classes` is `false` (intentionally, to block
+     * gadget-chain attacks — see config/cache.php), so any object graph
+     * silently fails to unserialize on every read. `persist` would then
+     * re-run the query AND re-write the cache on every single request,
+     * which is slower than no caching at all — this is what actually made
+     * every quick action take seconds.
+     *
+     * @return array<int, array{id: int, name: string, secondary_name: string}>
      */
     #[Computed(persist: true, seconds: 300)]
-    public function userOptions(): Collection
+    public function userOptions(): array
     {
-        return HrEmployee::pickerOptions();
+        return HrEmployee::pickerOptions()
+            ->map(fn (HrEmployee $employee): array => [
+                'id' => $employee->id,
+                'name' => $employee->name,
+                'secondary_name' => $employee->secondary_name,
+            ])
+            ->all();
     }
 
-    /** @return Collection<int, Proposal> */
+    /** @return array<int, array{id: int, name: string}> */
     #[Computed(persist: true, seconds: 300)]
-    public function proposalOptions(): Collection
+    public function proposalOptions(): array
     {
-        return Proposal::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get();
+        return Proposal::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get()
+            ->map(fn (Proposal $proposal): array => ['id' => $proposal->id, 'name' => $proposal->name])
+            ->all();
     }
 
-    /** @return Collection<int, Milestone> */
+    /** @return array<int, array{id: int, name: string, project_name: string}> */
     #[Computed(persist: true, seconds: 300)]
-    public function milestoneOptions(): Collection
+    public function milestoneOptions(): array
     {
         return Milestone::query()
             ->select(['id', 'name', 'project_id'])
             ->with('project:id,name')
             ->orderBy('name')
             ->orderBy('id')
-            ->get();
+            ->get()
+            ->map(fn (Milestone $milestone): array => [
+                'id' => $milestone->id,
+                'name' => $milestone->name,
+                'project_name' => $milestone->project->name,
+            ])
+            ->all();
     }
 
     #[Computed]
@@ -469,9 +495,17 @@ new #[Title('titles.tasks')] class extends Component {
     }
 
     /**
-     * A group's inline "+ Add task" row only captures a title — proposal and
-     * assignee are required fields, so this opens the drawer pre-filled with
-     * the title and the group's own context instead of saving directly.
+     * A group's inline "+ Add task" row only captures a title, but a task
+     * always needs a proposal and an assignee. Both are inferred from context
+     * so the row can create the task directly, with no drawer:
+     *  - proposal: the one proposal funding the resolved milestone's project
+     *    (its own milestoneId, falling back to the active milestone filter),
+     *    only when that project is funded by exactly one — a project funded
+     *    by several, or no milestone context at all, is genuinely ambiguous.
+     *  - assignee: the signed-in user's own HR employee record, if linked.
+     * When either can't be resolved, this falls back to the drawer exactly
+     * as before, pre-filled with the title and the row's own context, so
+     * nothing is ever silently dropped.
      */
     public function quickCreateTask(string $title, ?string $status = null, ?string $milestoneId = null): void
     {
@@ -481,8 +515,114 @@ new #[Title('titles.tasks')] class extends Component {
             return;
         }
 
-        $this->openCreateDrawer(status: $status, milestoneId: $milestoneId);
-        $this->title = $title;
+        $proposalId = $this->resolveInlineProposalId($milestoneId);
+        $employeeId = $this->resolveInlineAssigneeId();
+
+        if ($proposalId === null || $employeeId === null) {
+            $this->openCreateDrawer(status: $status, milestoneId: $milestoneId);
+            $this->title = $title;
+
+            return;
+        }
+
+        $statusCase = $status !== null ? TaskStatus::tryFrom($status) : null;
+
+        DB::transaction(function () use ($title, $statusCase, $milestoneId, $proposalId, $employeeId): void {
+            $task = Task::query()->create([
+                'title' => $title,
+                'status' => $statusCase ?? TaskStatus::Todo,
+                'priority' => TaskPriority::Medium,
+                'progress_percentage' => 0,
+                'proposal_id' => $proposalId,
+                'milestone_id' => $milestoneId !== null ? (int) $milestoneId : null,
+                'created_by' => (int) auth()->id(),
+            ]);
+
+            $task->taskAssignees()->create(['employee_id' => $employeeId]);
+        });
+
+        $this->resetPage();
+
+        Flux::toast(variant: 'success', text: __('tasks.task_created'));
+    }
+
+    /**
+     * Resolves the single proposal a group's inline "+ Add task" row can
+     * safely default to, or null when that would be a guess.
+     *
+     * @return int|null
+     */
+    protected function resolveInlineProposalId(?string $milestoneId): ?int
+    {
+        $resolvedMilestoneId = $milestoneId ?? (
+            $this->milestone !== '' && $this->milestone !== 'none' ? $this->milestone : null
+        );
+
+        if ($resolvedMilestoneId === null) {
+            return null;
+        }
+
+        $milestone = Milestone::query()->select(['id', 'project_id'])->find((int) $resolvedMilestoneId);
+
+        if ($milestone === null) {
+            return null;
+        }
+
+        $proposalIds = Proposal::query()
+            ->whereHas('projects', fn (Builder $query) => $query->whereKey($milestone->project_id))
+            ->pluck('id');
+
+        return $proposalIds->count() === 1 ? $proposalIds->first() : null;
+    }
+
+    /** The signed-in user's own HR employee id, when their account is linked to one. */
+    protected function resolveInlineAssigneeId(): ?int
+    {
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        return $user->employee_id;
+    }
+
+    /**
+     * Adds a one-line subtask under an already-visible parent task, from the
+     * inline input in its expanded row — no drawer, matching the parent's own
+     * proposal, milestone and assignees so only a title is needed. Mirrors the
+     * show page's own addSubtask(), kept separate because this is a different
+     * Livewire component instance.
+     */
+    public function addSubtaskQuick(int $parentTaskId, string $title): void
+    {
+        $title = trim($title);
+
+        if ($title === '') {
+            return;
+        }
+
+        $parent = Task::query()->with('taskAssignees:id,task_id,employee_id')->find($parentTaskId);
+
+        if ($parent === null || $parent->parent_task_id !== null) {
+            return;
+        }
+
+        DB::transaction(function () use ($parent, $title): void {
+            $subtask = Task::query()->create([
+                'parent_task_id' => $parent->id,
+                'proposal_id' => $parent->proposal_id,
+                'milestone_id' => $parent->milestone_id,
+                'title' => $title,
+                'status' => TaskStatus::Todo,
+                'priority' => TaskPriority::Medium,
+                'progress_percentage' => 0,
+                'created_by' => (int) auth()->id(),
+            ]);
+
+            foreach ($parent->taskAssignees as $assignee) {
+                $subtask->taskAssignees()->create(['employee_id' => $assignee->employee_id]);
+            }
+        });
+
+        Flux::toast(variant: 'success', text: __('tasks.subtask_added'));
     }
 
     public function openEditDrawer(int $taskId): void
@@ -792,14 +932,14 @@ new #[Title('titles.tasks')] class extends Component {
             <x-ui.header-filter-select :label="__('tasks.assignee')" wire:model.live="assignee" :value="$assignee">
                 <flux:select.option value="">{{ __('common.anyone') }}</flux:select.option>
                 @foreach ($this->userOptions as $userOption)
-                    <flux:select.option :value="$userOption->id" :wire:key="'task-assignee-filter-'.$userOption->id">{{ $userOption->name }} · {{ $userOption->secondary_name }}</flux:select.option>
+                    <flux:select.option :value="$userOption['id']" :wire:key="'task-assignee-filter-'.$userOption['id']">{{ $userOption['name'] }} · {{ $userOption['secondary_name'] }}</flux:select.option>
                 @endforeach
             </x-ui.header-filter-select>
             <x-ui.header-filter-select :label="__('tasks.milestone')" wire:model.live="milestone" :value="$milestone">
                 <flux:select.option value="">{{ __('tasks.any_milestone') }}</flux:select.option>
                 <flux:select.option value="none">{{ __('tasks.no_milestone') }}</flux:select.option>
                 @foreach ($this->milestoneOptions as $milestoneOption)
-                    <flux:select.option :value="$milestoneOption->id" :wire:key="'task-milestone-filter-'.$milestoneOption->id">{{ $milestoneOption->name }} · {{ $milestoneOption->project->name }}</flux:select.option>
+                    <flux:select.option :value="$milestoneOption['id']" :wire:key="'task-milestone-filter-'.$milestoneOption['id']">{{ $milestoneOption['name'] }} · {{ $milestoneOption['project_name'] }}</flux:select.option>
                 @endforeach
             </x-ui.header-filter-select>
         </x-slot:filters>
@@ -908,13 +1048,13 @@ new #[Title('titles.tasks')] class extends Component {
                 <x-ui.select wire:model="taskProposalId" :label="__('common.proposal')" required>
                     <flux:select.option value="">{{ __('common.select_a_proposal') }}</flux:select.option>
                     @foreach ($this->proposalOptions as $proposalOption)
-                        <flux:select.option :value="$proposalOption->id" :wire:key="'task-proposal-option-'.$proposalOption->id">{{ $proposalOption->name }}</flux:select.option>
+                        <flux:select.option :value="$proposalOption['id']" :wire:key="'task-proposal-option-'.$proposalOption['id']">{{ $proposalOption['name'] }}</flux:select.option>
                     @endforeach
                 </x-ui.select>
                 <x-ui.select wire:model="taskMilestoneId" :label="__('tasks.milestone')">
                     <flux:select.option value="">{{ __('tasks.no_milestone') }}</flux:select.option>
                     @foreach ($this->milestoneOptions as $milestoneOption)
-                        <flux:select.option :value="$milestoneOption->id" :wire:key="'task-milestone-option-'.$milestoneOption->id">{{ $milestoneOption->name }} · {{ $milestoneOption->project->name }}</flux:select.option>
+                        <flux:select.option :value="$milestoneOption['id']" :wire:key="'task-milestone-option-'.$milestoneOption['id']">{{ $milestoneOption['name'] }} · {{ $milestoneOption['project_name'] }}</flux:select.option>
                     @endforeach
                 </x-ui.select>
             </div>
@@ -937,10 +1077,10 @@ new #[Title('titles.tasks')] class extends Component {
             <div class="min-w-0">
                 <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('tasks.assignees') }}</label>
                 @php
-                    $selectedAssigneeOptions = $this->userOptions->whereIn('id', collect($assignedTo)->map(fn ($id) => (int) $id));
+                    $selectedAssigneeOptions = collect($this->userOptions)->whereIn('id', collect($assignedTo)->map(fn ($id) => (int) $id));
                     $assigneeTriggerLabel = match (true) {
                         $selectedAssigneeOptions->isEmpty() => __('common.select'),
-                        $selectedAssigneeOptions->count() <= 2 => $selectedAssigneeOptions->map->name->implode(', '),
+                        $selectedAssigneeOptions->count() <= 2 => $selectedAssigneeOptions->pluck('name')->implode(', '),
                         default => __('common.count_selected', ['count' => $selectedAssigneeOptions->count()]),
                     };
                 @endphp
@@ -959,8 +1099,8 @@ new #[Title('titles.tasks')] class extends Component {
                             x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
                             class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-secondary-soft dark:hover:bg-secondary-medium"
                         >
-                            <input type="checkbox" wire:model.live="assignedTo" value="{{ $userOption->id }}" class="rounded border-secondary-light text-primary focus:ring-primary" data-test="task-assignee-checkbox-{{ $userOption->id }}" />
-                            <span class="min-w-0 truncate">{{ $userOption->name }} · {{ $userOption->secondary_name }}</span>
+                            <input type="checkbox" wire:model.live="assignedTo" value="{{ $userOption['id'] }}" class="rounded border-secondary-light text-primary focus:ring-primary" data-test="task-assignee-checkbox-{{ $userOption['id'] }}" />
+                            <span class="min-w-0 truncate">{{ $userOption['name'] }} · {{ $userOption['secondary_name'] }}</span>
                         </label>
                     @endforeach
                 </x-ui.multi-select-popover>
