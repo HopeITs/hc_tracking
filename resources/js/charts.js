@@ -129,16 +129,32 @@ function buildOptions(config) {
         return options;
     }
 
+    // Every value axis in this app plots whole counts or currency amounts,
+    // never fractions. ApexCharts' own "nice scale" tick generator can still
+    // land on fractional steps (e.g. 0, 0.2, 0.4 ... for a max of 2) — and
+    // since we supply our own axis label `formatter` above, its
+    // `decimalsInFloat` option has no effect (a custom formatter bypasses
+    // it entirely). So the tick positions themselves are pinned to whole
+    // numbers instead, by picking an integer step and sizing the axis to a
+    // multiple of it.
+    const valueAxisValues = (config.series ?? []).flatMap((entry) => (Array.isArray(entry?.data) ? entry.data : []));
+    const valueAxisMax = valueAxisValues.length ? Math.max(...valueAxisValues) : 0;
+    let valueAxisBounds = {};
+
+    if (Number.isFinite(valueAxisMax) && valueAxisMax > 0) {
+        const step = Math.max(1, Math.ceil(valueAxisMax / 6));
+        const tickAmount = Math.ceil(valueAxisMax / step);
+
+        valueAxisBounds = { min: 0, max: tickAmount * step, tickAmount };
+    }
+
     options.xaxis = {
         categories: config.categories,
         axisBorder: { show: false },
         axisTicks: { show: false },
         labels: { style: { colors: text, fontSize: '11px' }, formatter: config.horizontal ? format.axis : undefined },
         tooltip: { enabled: false },
-        // Every value axis in this app plots whole counts or currency
-        // amounts, never fractions — without this ApexCharts' own "nice
-        // scale" tick generator can land on .5 steps for a small max value.
-        decimalsInFloat: 0,
+        ...(config.horizontal ? valueAxisBounds : {}),
     };
     options.yaxis = {
         labels: {
@@ -146,7 +162,7 @@ function buildOptions(config) {
             formatter: config.horizontal ? undefined : format.axis,
             maxWidth: 120,
         },
-        decimalsInFloat: 0,
+        ...(config.horizontal ? {} : valueAxisBounds),
     };
 
     if (config.type === 'bar') {
