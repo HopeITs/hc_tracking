@@ -150,6 +150,7 @@ test('a subtask can be added from the task detail page and inherits the parent p
     $milestone = Milestone::factory()->create();
     $assignee = insertHrEmployee();
     $parent = Task::factory()->create(['milestone_id' => $milestone->id]);
+    $parent->taskAssignees()->delete();
     $parent->taskAssignees()->create(['employee_id' => $assignee]);
 
     Livewire::actingAs($user)

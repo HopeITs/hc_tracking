@@ -50,6 +50,7 @@ return [
     'overdue' => 'Overdue',
     'priority' => 'Priority',
     'progress' => 'Progress',
+    'remove_assignee_name' => 'Remove :name',
     'progress_2' => 'Progress %',
     'progress_cannot_be_negative' => 'Progress cannot be negative.',
     'progress_cannot_exceed_100_percent' => 'Progress cannot exceed 100 percent.',

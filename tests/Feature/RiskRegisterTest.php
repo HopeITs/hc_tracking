@@ -39,23 +39,22 @@ test('risks can be filtered by search project and whether they materialised', fu
         ->set('search', 'checkpoint')->assertSee('Access restrictions')->assertDontSee('Currency collapse')
         ->call('clearFilters')->set('search', 'Homs Shelter')->assertDontSee('Access restrictions')->assertSee('Currency collapse')
         ->call('clearFilters')->set('project', (string) $second->id)->assertDontSee('Access restrictions')->assertSee('Currency collapse')
-        ->call('clearFilters')->set('status', 'happened')->assertSee('Access restrictions')->assertDontSee('Currency collapse')
-        ->call('clearFilters')->set('status', 'watching')->assertDontSee('Access restrictions')->assertSee('Currency collapse')
+        ->call('clearFilters')->call('toggleMaterialisedOnly')->assertSee('Access restrictions')->assertDontSee('Currency collapse')
         ->call('clearFilters')
-        ->assertSet('search', '')->assertSet('project', '')->assertSet('status', '')
+        ->assertSet('search', '')->assertSet('project', '')->assertSet('materialisedOnly', false)
         ->assertSee('Access restrictions')->assertSee('Currency collapse');
 });
 
-test('the state URL filter selects materialised risks', function () {
+test('the materialised-only URL filter selects materialised risks', function () {
     $user = User::factory()->create();
     Risk::factory()->create(['name' => 'Materialised risk', 'happened' => true]);
-    Risk::factory()->create(['name' => 'Watched risk', 'happened' => false]);
+    Risk::factory()->create(['name' => 'Open risk', 'happened' => false]);
 
     $this->actingAs($user)
-        ->get(route('risks.index', ['status' => 'happened']))
+        ->get(route('risks.index', ['materialisedOnly' => true]))
         ->assertOk()
         ->assertSeeText('Materialised risk')
-        ->assertDontSeeText('Watched risk');
+        ->assertDontSeeText('Open risk');
 });
 
 test('a risk can be logged against a project', function () {
@@ -149,11 +148,28 @@ test('a risk can be deleted after confirmation', function () {
         ->test('pages::risks.index')
         ->call('confirmDelete', $risk->id)
         ->assertSet('deletingRiskId', $risk->id)
+        ->assertSet('showDeleteModal', true)
         ->call('deleteRisk')
         ->assertHasNoErrors()
-        ->assertSet('deletingRiskId', null);
+        ->assertSet('deletingRiskId', null)
+        ->assertSet('showDeleteModal', false);
 
     $this->assertDatabaseMissing('risks', ['id' => $risk->id]);
+});
+
+test('cancelling a delete closes the modal without deleting the risk', function () {
+    $user = User::factory()->create();
+    $risk = Risk::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::risks.index')
+        ->call('confirmDelete', $risk->id)
+        ->assertSet('showDeleteModal', true)
+        ->call('cancelDelete')
+        ->assertSet('deletingRiskId', null)
+        ->assertSet('showDeleteModal', false);
+
+    $this->assertDatabaseHas('risks', ['id' => $risk->id]);
 });
 
 test('delete is a no-op until a risk is confirmed', function () {
@@ -173,6 +189,7 @@ test('risk content is escaped in the register', function () {
         'name' => '<script>name()</script>',
         'impact' => '<img src=x onerror=impact()>',
         'solution' => '<svg onload=solution()>',
+        'happened' => true,
     ]);
 
     Livewire::actingAs($user)
@@ -191,4 +208,134 @@ test('the risk register renders with no risks', function () {
     $user = User::factory()->create();
 
     Livewire::actingAs($user)->test('pages::risks.index')->assertSee('No risks logged');
+});
+
+test('the materialised count stays stable regardless of the materialised-only toggle', function () {
+    $user = User::factory()->create();
+    Risk::factory()->count(2)->create(['happened' => true]);
+    Risk::factory()->create(['happened' => false]);
+
+    $component = Livewire::actingAs($user)->test('pages::risks.index');
+
+    expect($component->get('materialisedCount'))->toBe(2);
+
+    $component->call('toggleMaterialisedOnly');
+
+    expect($component->get('materialisedCount'))->toBe(2);
+});
+
+test('toggling materialised-only filters the register to materialised risks', function () {
+    $user = User::factory()->create();
+    Risk::factory()->create(['name' => 'Materialised risk', 'happened' => true]);
+    Risk::factory()->create(['name' => 'Open risk', 'happened' => false]);
+
+    Livewire::actingAs($user)
+        ->test('pages::risks.index')
+        ->assertSee('Materialised risk')->assertSee('Open risk')
+        ->call('toggleMaterialisedOnly')
+        ->assertSet('materialisedOnly', true)
+        ->assertSee('Materialised risk')->assertDontSee('Open risk')
+        ->call('toggleMaterialisedOnly')
+        ->assertSet('materialisedOnly', false)
+        ->assertSee('Open risk');
+});
+
+test('the unmitigated toggle filters to challenges with no mitigation recorded', function () {
+    $user = User::factory()->create();
+    Risk::factory()->create(['name' => 'Has mitigation', 'solution' => 'A plan.', 'happened' => true]);
+    Risk::factory()->create(['name' => 'No mitigation', 'solution' => null, 'happened' => true]);
+    Risk::factory()->create(['name' => 'Blank mitigation', 'solution' => '', 'happened' => true]);
+
+    $component = Livewire::actingAs($user)->test('pages::risks.index');
+
+    expect($component->get('unmitigatedCount'))->toBe(2);
+
+    $component
+        ->assertSee('Has mitigation')->assertSee('No mitigation')->assertSee('Blank mitigation')
+        ->call('toggleUnmitigated')
+        ->assertSet('unmitigated', true)
+        ->assertDontSee('Has mitigation')->assertSee('No mitigation')->assertSee('Blank mitigation')
+        ->call('toggleUnmitigated')
+        ->assertSet('unmitigated', false)
+        ->assertSee('Has mitigation');
+});
+
+test('a potential risk that has not happened never counts toward challenges without a solution', function () {
+    $user = User::factory()->create();
+    Risk::factory()->create(['name' => 'Not yet occurred', 'solution' => null, 'happened' => false]);
+
+    $component = Livewire::actingAs($user)->test('pages::risks.index');
+
+    expect($component->get('unmitigatedCount'))->toBe(0);
+
+    $component->call('toggleUnmitigated')->assertDontSee('Not yet occurred');
+});
+
+test('clearing filters also clears the unmitigated toggle', function () {
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::risks.index')
+        ->call('toggleUnmitigated')
+        ->assertSet('unmitigated', true)
+        ->call('clearFilters')
+        ->assertSet('unmitigated', false);
+});
+
+test('the project chart splits challenges from potential risks per project', function () {
+    $user = User::factory()->create();
+    $projectA = Project::factory()->create(['name' => 'Project A']);
+    $projectB = Project::factory()->create(['name' => 'Project B']);
+
+    Risk::factory()->count(2)->create(['project_id' => $projectA->id, 'happened' => true]);
+    Risk::factory()->create(['project_id' => $projectB->id, 'happened' => false]);
+
+    $component = Livewire::actingAs($user)->test('pages::risks.index');
+
+    $chart = $component->get('projectRiskChart');
+
+    $projectAIndex = array_search('Project A', $chart['categories'], true);
+    $projectBIndex = array_search('Project B', $chart['categories'], true);
+
+    expect($chart['series'][0]['data'][$projectAIndex])->toBe(2)
+        ->and($chart['series'][1]['data'][$projectAIndex])->toBe(0)
+        ->and($chart['series'][0]['data'][$projectBIndex])->toBe(0)
+        ->and($chart['series'][1]['data'][$projectBIndex])->toBe(1);
+});
+
+test('the risk landscape totals match the currently filtered risks', function () {
+    $user = User::factory()->create();
+    Risk::factory()->count(2)->create(['happened' => true]);
+    Risk::factory()->create(['happened' => false]);
+
+    $component = Livewire::actingAs($user)->test('pages::risks.index');
+
+    expect($component->get('riskLandscape'))->toBe(['challenges' => 2, 'potential' => 1]);
+
+    $component->call('toggleMaterialisedOnly');
+
+    expect($component->get('riskLandscape'))->toBe(['challenges' => 2, 'potential' => 0]);
+});
+
+test('the project chart respects every active filter, including the project filter itself', function () {
+    $user = User::factory()->create();
+    $projectA = Project::factory()->create(['name' => 'Project A']);
+    $projectB = Project::factory()->create(['name' => 'Project B']);
+
+    Risk::factory()->count(2)->create(['project_id' => $projectA->id, 'solution' => 'A plan.', 'happened' => true]);
+    Risk::factory()->create(['project_id' => $projectB->id, 'solution' => null, 'happened' => false]);
+
+    $component = Livewire::actingAs($user)->test('pages::risks.index');
+
+    $component->call('toggleMaterialisedOnly');
+    $materialisedChart = $component->get('projectRiskChart');
+    expect(array_search('Project B', $materialisedChart['categories'], true))->toBeFalse();
+
+    $component->call('clearFilters')->call('toggleUnmitigated');
+    $unmitigatedChart = $component->get('projectRiskChart');
+    expect(array_search('Project A', $unmitigatedChart['categories'], true))->toBeFalse();
+
+    $component->call('clearFilters')->set('project', (string) $projectA->id);
+    $projectFilteredChart = $component->get('projectRiskChart');
+    expect($projectFilteredChart['categories'])->toBe(['Project A']);
 });

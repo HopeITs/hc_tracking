@@ -1,6 +1,7 @@
 ---
 paths:
   - 'resources/views/pages/tasks/**'
+  - resources/views/pages/tasks/_list-group.blade.php
 ---
 
 # Tasks
@@ -21,3 +22,10 @@ Subtasks: `tasks.parent_task_id` (self-FK, `restrictOnDelete`), one level deep (
 Task name truncation needs `table-fixed` on the `<table>` in `_list-group.blade.php` — without it `truncate` is a no-op in a table cell and a long title stretches the whole table.
 
 If Blocked (or any status) is ever reintroduced, every `match(TaskStatus ...)` without a `default` arm across this feature (status-pill, `_board.blade.php`'s `$columnTone`, `orderByEnumSequence`'s status list, `enum-badge.blade.php`) needs the new arm added — they're deliberately exhaustive so a forgotten one is a compile-time/runtime error, not a silent gap.
+
+## Assignee cell is an inline multi-select popover, not a drawer shortcut
+The desktop list row's assignee cell used to just open the edit drawer on click — user feedback was that this reads as "no click action" since every other column (due date, priority, status) edits inline. It's now a real inline multi-select: click the avatar stack to open a checkbox-style popover of every `userOptions()` employee, click any row to call `toggleAssignee($taskId, $employeeId)` (added to the index component next to `quickSetPriority`/`quickSetStatus`), which adds the employee if absent or removes them if present — refusing removal (toast, no-op) when it would leave zero assignees, matching `saveTask()`'s own `min:1` rule.
+
+This popover is hand-rolled Alpine, NOT `flux:dropdown` — same reasoning as `x-ui.header-filter-multiselect` (see components-ui.md): a Flux menu item closes the popover on the first click, which is wrong when picking several values in a row. It also uses `<template x-teleport="body">` with `position: fixed` coordinates computed from `getBoundingClientRect()` on click, because the list panel wrapper (`_list.blade.php`) has `overflow-hidden` for its rounded corners — an in-flow `absolute` popover would get clipped for rows near the bottom of the table. `x-teleport` is Alpine core (no plugin needed) and survives Livewire's morph correctly since Livewire diffs the `<template>` at its original server-rendered position, not the teleported runtime location.
+
+Known limitation: the popover's `left` position isn't RTL-aware (always anchors to the visual left edge of the trigger, not the reading-direction start) — acceptable today since the panel is narrow (`w-60`) and rarely reaches the viewport edge, but revisit if Arabic-locale users report it running off-screen.

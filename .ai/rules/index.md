@@ -11,7 +11,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | {app/Actions/Fortify/**,app/Console/Commands/**,config/auth.php,database/seeders/**} | .ai/rules/commands-seeders.md |
 | {app/Actions/Fortify/**,app/Console/Commands/**,config/fortify.php} | .ai/rules/commands.md |
 | resources/views/components/navigation/sidebar.blade.php | .ai/rules/components-navigation.md |
-| resources/views/components/ui/**, resources/views/components/ui/{logframe-node.blade.php,logframe.blade.php,target-lineage.blade.php}, resources/views/components/ui/framework-node.blade.php | .ai/rules/components-ui.md |
+| resources/views/components/ui/**, resources/views/components/ui/{logframe-node.blade.php,logframe.blade.php,target-lineage.blade.php}, resources/views/components/ui/framework-node.blade.php, resources/views/components/ui/multi-select-popover.blade.php | .ai/rules/components-ui.md |
 | resources/views/components/app-logo.blade.php, resources/views/layouts/auth/simple.blade.php | .ai/rules/components.md |
 | app/Concerns/HasTree.php | .ai/rules/concerns.md |
 | config/session.php | .ai/rules/config-2.md |
@@ -27,7 +27,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/views/pages/indicators/** | .ai/rules/indicators.md |
 | {config/database.php,.env.example,database/migrations/**} | .ai/rules/migrations.md |
 | resources/views/pages/milestones/** | .ai/rules/milestones.md |
-| app/Models/**, app/Models/Account.php, app/Models/Hr*.php, app/Models/Program.php, app/Models/User.php | .ai/rules/models.md |
+| app/Models/**, app/Models/Account.php, app/Models/Hr*.php, app/Models/Program.php, app/Models/User.php, app/Models/Task.php | .ai/rules/models.md |
 | {app/Http/Middleware/SetLocale.php,app/Http/Controllers/SwitchLocaleController.php,resources/views/components/navigation/sidebar.blade.php,resources/css/app.css} | .ai/rules/navigation-css.md |
 | resources/views/components/{navigation/sidebar.blade.php,ui/panel.blade.php,ui/stat-tile.blade.php,ui/data-table.blade.php,ui/timeline.blade.php} | .ai/rules/navigation.md |
 | app/Observers/**, app/Observers/{MilestoneObserver,ResultObserver}.php | .ai/rules/observers.md |
@@ -36,10 +36,11 @@ Before planning or editing, find the row whose globs match the file's path and r
 | {app/Livewire/Concerns/ManagesReportForm.php,resources/views/pages/reports/**,resources/views/components/reports/**} | .ai/rules/reports.md |
 | resources/views/pages/results/** | .ai/rules/results.md |
 | {app/Models/PlanIndicator.php,resources/views/pages/{results,indicators,targets,reports}/**} | .ai/rules/resultsindicatorstargetsreports.md |
+| resources/views/pages/risks/** | .ai/rules/risks.md |
 | routes/web.php | .ai/rules/routes.md |
 | {database/factories/**,database/seeders/**,tests/Pest.php} | .ai/rules/seeders.md |
 | resources/views/pages/strategies/⚡show.blade.php, resources/views/pages/strategies/⚡index.blade.php | .ai/rules/strategies.md |
-| resources/views/pages/tasks/** | .ai/rules/tasks.md |
+| resources/views/pages/tasks/**, resources/views/pages/tasks/_list-group.blade.php | .ai/rules/tasks.md |
 | tests/** | .ai/rules/tests.md |
 | resources/views/{components/ui/page-header.blade.php,pages/**}, resources/views/{components/ui/header-filter-select.blade.php,pages/**}, resources/views/components/ui/detail-header.blade.php | .ai/rules/ui.md |
 | {app/Models/PlanIndicator.php,resources/views/pages/{results,indicators,targets}/**,resources/views/components/ui/framework-node.blade.php} | .ai/rules/views-components-ui.md |

@@ -30,9 +30,22 @@ class TaskFactory extends Factory
             'proposal_id' => Proposal::factory(),
             'title' => fake()->randomElement(['Draft the distribution plan', 'Verify beneficiary list', 'Procure water pumps', 'Run the post-distribution monitoring']),
             'description' => fake()->sentence(),
-            'assigned_to' => fn (): int => $this->createHrEmployee(),
             'created_by' => User::factory(),
         ];
+    }
+
+    /**
+     * A task always has at least one assignee in the app (the drawer
+     * requires it), so every factory-made task gets one by default unless
+     * the caller sets its own via taskAssignees() afterwards.
+     */
+    public function configure(): static
+    {
+        return $this->afterCreating(function (Task $task): void {
+            if (! $task->taskAssignees()->exists()) {
+                $task->taskAssignees()->create(['employee_id' => $this->createHrEmployee()]);
+            }
+        });
     }
 
     /**

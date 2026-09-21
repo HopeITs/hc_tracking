@@ -154,14 +154,16 @@ test('a linked user sees their own assigned tasks on the correct day, and not an
 
     $mine = Task::factory()->create([
         'title' => 'My task',
-        'assigned_to' => $employeeId,
         'due_date' => Carbon::create(2026, 6, 15),
     ]);
+    $mine->taskAssignees()->delete();
+    $mine->taskAssignees()->create(['employee_id' => $employeeId]);
     $notMine = Task::factory()->create([
         'title' => 'Not my task',
-        'assigned_to' => $otherEmployeeId,
         'due_date' => Carbon::create(2026, 6, 15),
     ]);
+    $notMine->taskAssignees()->delete();
+    $notMine->taskAssignees()->create(['employee_id' => $otherEmployeeId]);
 
     Livewire::actingAs($user)
         ->test('pages::calendar.index')
@@ -194,7 +196,7 @@ test('clicking a day pre-fills the add task form with that date and defaults the
         ->call('openCreateTaskModal', '2026-06-15')
         ->assertSet('dueDate', '2026-06-15')
         ->assertSet('showTaskModal', true)
-        ->assertSet('assignedTo', (string) $employeeId);
+        ->assertSet('assignedTo', [(string) $employeeId]);
 });
 
 test('saving a task from the calendar creates it with the clicked due date', function () {
@@ -214,7 +216,7 @@ test('saving a task from the calendar creates it with the clicked due date', fun
     $task = Task::query()->where('title', 'Follow up with donor')->sole();
 
     expect($task->due_date->toDateString())->toBe('2026-06-15')
-        ->and($task->assigned_to)->toBe($employeeId)
+        ->and($task->taskAssignees->pluck('employee_id')->all())->toBe([$employeeId])
         ->and($task->proposal_id)->toBe($proposal->id);
 });
 
@@ -244,9 +246,10 @@ test('a task can be edited and deleted from the calendar', function () {
     $user = linkUserToEmployee(User::factory()->create(), $employeeId);
     $task = Task::factory()->create([
         'title' => 'Original task',
-        'assigned_to' => $employeeId,
         'due_date' => Carbon::create(2026, 6, 15),
     ]);
+    $task->taskAssignees()->delete();
+    $task->taskAssignees()->create(['employee_id' => $employeeId]);
 
     Livewire::actingAs($user)
         ->test('pages::calendar.index')
@@ -278,9 +281,10 @@ test('turning off a type filter hides that type\'s chips without affecting the o
         'planned_date' => Carbon::create(2026, 6, 15),
     ]);
     $task = Task::factory()->create([
-        'assigned_to' => $employeeId,
         'due_date' => Carbon::create(2026, 6, 15),
     ]);
+    $task->taskAssignees()->delete();
+    $task->taskAssignees()->create(['employee_id' => $employeeId]);
 
     Livewire::actingAs($user)
         ->test('pages::calendar.index')

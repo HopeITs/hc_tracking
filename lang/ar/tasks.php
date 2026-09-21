@@ -50,6 +50,7 @@ return [
     'overdue' => 'متأخرة',
     'priority' => 'الأولوية',
     'progress' => 'التقدم',
+    'remove_assignee_name' => 'إزالة :name',
     'progress_2' => 'التقدم %',
     'progress_cannot_be_negative' => 'لا يمكن أن يكون التقدم سالبًا.',
     'progress_cannot_exceed_100_percent' => 'لا يمكن أن يتجاوز التقدم 100 بالمئة.',

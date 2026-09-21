@@ -687,6 +687,38 @@ new #[Title('titles.tasks')] class extends Component {
         $task->save();
     }
 
+    /**
+     * Adds or removes one assignee from a task's list, for the inline
+     * multi-select popover on the list row — the drawer's own checkbox list
+     * covers the same ground for a full edit, this is the quick path. A
+     * task must always keep at least one assignee, matching saveTask()'s
+     * own validation, so the last one can't be toggled off here either.
+     */
+    public function toggleAssignee(int $taskId, int $employeeId): void
+    {
+        $task = Task::query()->find($taskId);
+
+        if ($task === null || ! HrEmployee::query()->whereKey($employeeId)->exists()) {
+            return;
+        }
+
+        $existing = $task->taskAssignees()->where('employee_id', $employeeId)->first();
+
+        if ($existing !== null) {
+            if ($task->taskAssignees()->count() <= 1) {
+                Flux::toast(variant: 'danger', text: __('tasks.assign_this_task_to_someone'));
+
+                return;
+            }
+
+            $existing->delete();
+
+            return;
+        }
+
+        $task->taskAssignees()->create(['employee_id' => $employeeId]);
+    }
+
     public function rescheduleTask(int $taskId, string $date): void
     {
         if ($date !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) !== 1) {
@@ -904,14 +936,34 @@ new #[Title('titles.tasks')] class extends Component {
 
             <div class="min-w-0">
                 <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('tasks.assignees') }}</label>
-                <div class="max-h-48 space-y-0.5 overflow-y-auto rounded-md border border-secondary-light p-1.5 dark:border-secondary-light">
+                @php
+                    $selectedAssigneeOptions = $this->userOptions->whereIn('id', collect($assignedTo)->map(fn ($id) => (int) $id));
+                    $assigneeTriggerLabel = match (true) {
+                        $selectedAssigneeOptions->isEmpty() => __('common.select'),
+                        $selectedAssigneeOptions->count() <= 2 => $selectedAssigneeOptions->map->name->implode(', '),
+                        default => __('common.count_selected', ['count' => $selectedAssigneeOptions->count()]),
+                    };
+                @endphp
+                <x-ui.multi-select-popover
+                    :label="__('tasks.assignees')"
+                    class="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-secondary-light bg-white px-3 py-2 text-start text-sm dark:border-secondary-light dark:bg-secondary-medium"
+                    data-test="task-assignee-picker"
+                >
+                    <x-slot:trigger>
+                        <span class="min-w-0 truncate">{{ $assigneeTriggerLabel }}</span>
+                        <flux:icon.chevron-up-down class="size-4 shrink-0 text-secondary-medium dark:text-secondary-soft" aria-hidden="true" />
+                    </x-slot:trigger>
+
                     @foreach ($this->userOptions as $userOption)
-                        <label class="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1.5 hover:bg-secondary-soft dark:hover:bg-secondary-medium">
-                            <input type="checkbox" wire:model="assignedTo" value="{{ $userOption->id }}" class="rounded border-secondary-light text-primary focus:ring-primary" data-test="task-assignee-checkbox-{{ $userOption->id }}" />
-                            <span class="min-w-0 truncate text-sm">{{ $userOption->name }} · {{ $userOption->secondary_name }}</span>
+                        <label
+                            x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
+                            class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-secondary-soft dark:hover:bg-secondary-medium"
+                        >
+                            <input type="checkbox" wire:model.live="assignedTo" value="{{ $userOption->id }}" class="rounded border-secondary-light text-primary focus:ring-primary" data-test="task-assignee-checkbox-{{ $userOption->id }}" />
+                            <span class="min-w-0 truncate">{{ $userOption->name }} · {{ $userOption->secondary_name }}</span>
                         </label>
                     @endforeach
-                </div>
+                </x-ui.multi-select-popover>
                 <flux:error name="assignedTo" class="mt-1.5" />
             </div>
 

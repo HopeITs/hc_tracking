@@ -3,6 +3,7 @@ paths:
   - 'resources/views/components/ui/**'
   - 'resources/views/components/ui/{logframe-node.blade.php,logframe.blade.php,target-lineage.blade.php}'
   - resources/views/components/ui/framework-node.blade.php
+  - resources/views/components/ui/multi-select-popover.blade.php
 ---
 
 # Components Ui
@@ -21,3 +22,12 @@ Impact/Outcome/Output get one fixed visual identity app-wide: mark dot classes '
 x-ui.framework-node recurses over the node arrays built by results/⚡index.blade.php's `buildNode()`: `{result, depth, order, deletable, measurement, children, rollup, lineage}`. It renders no queries of its own — every count, percentage and RAG split is already on the array — so do not reach for `$result->indicators` or `->childrenRecursive` inside it, or the page goes N+1 per card.
 
 It reuses the shared ResultType identity (mark dot + top accent bar) from logframe-node/target-lineage rather than defining its own, per .ai/rules/components-ui.md. `data-tree-depth` and `data-result-type` on the root div are asserted by tests/Feature/ResultsFrameworkTest.php; keep them.
+
+## Shared searchable multi-select popover for assignee pickers
+`x-ui.multi-select-popover` is a new reusable component extracted from the list row's inline assignee picker so the task drawer (`tasks/⚡index.blade.php`) and the calendar page's own task form (`calendar/⚡index.blade.php`) could get the same searchable dropdown instead of an always-expanded checkbox box. It owns the Alpine open/search/position state and the `x-teleport="body"` positioning; callers supply a `trigger` slot and option rows in the default slot.
+
+Two different binding styles live behind the same shell, both intentional:
+- **List row** (`tasks/_list-group.blade.php`): no client-side selection state — each option row is `wire:click="toggleAssignee($taskId, $employeeId)"`, an immediate server action per click. The trigger is the avatar cluster; each avatar also carries a small hover-revealed "x" (`wire:click.stop`) for one-click removal without opening the popover — the trigger had to change from a real `<button>` to a `<div role="button">` specifically so a real nested `<button>` (the "x") is valid HTML.
+- **Drawer / calendar form**: option rows are plain `<input type="checkbox" wire:model.live="assignedTo" value="...">` — a Livewire-bound array property accumulated before the whole form submits. `.live` (not deferred) is deliberate: without it the trigger's "N selected" label (computed server-side from `$assignedTo` + `$this->userOptions`) would only refresh after the next unrelated Livewire round trip, which reads as broken.
+
+Every option row needs `x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"` on itself to participate in the popover's search box — the component doesn't do this filtering for you, matching the same per-item convention `x-ui.header-filter-multiselect` already uses.
