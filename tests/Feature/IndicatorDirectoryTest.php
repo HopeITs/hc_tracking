@@ -2,11 +2,15 @@
 
 use App\Enums\IndicatorMeasure;
 use App\Enums\Period;
+use App\Enums\RagStatus;
+use App\Enums\ReportStatus;
+use App\Enums\ResultType;
 use App\Models\AnnualPlan;
 use App\Models\Indicator;
 use App\Models\IndicatorProgress;
 use App\Models\PlanIndicator;
 use App\Models\Project;
+use App\Models\Report;
 use App\Models\Result;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -185,4 +189,265 @@ test('the indicator directory renders with no indicators', function () {
     $user = User::factory()->create();
 
     Livewire::actingAs($user)->test('pages::indicators.index')->assertSee('No indicators yet');
+});
+
+test('the rating band narrows the directory to indicators rated that colour', function () {
+    $user = User::factory()->create();
+
+    // Sitting on its target all year rates green; sitting on its baseline rates red.
+    $green = Indicator::factory()->create(['name' => 'Wells fully repaired', 'baseline' => 0, 'target' => 100]);
+    IndicatorProgress::factory()->create(['indicator_id' => $green->id, 'value' => 100, 'date' => now()->toDateString()]);
+
+    $red = Indicator::factory()->create(['name' => 'Latrines fully repaired', 'baseline' => 0, 'target' => 100]);
+    IndicatorProgress::factory()->create(['indicator_id' => $red->id, 'value' => 1, 'date' => now()->toDateString()]);
+
+    Livewire::actingAs($user)
+        ->test('pages::indicators.index')
+        ->assertSee('Wells fully repaired')
+        ->assertSee('Latrines fully repaired')
+        ->call('setRag', RagStatus::Red->value)
+        ->assertSee('Latrines fully repaired')
+        ->assertDontSee('Wells fully repaired')
+        // Clicking the active band again releases it.
+        ->call('setRag', RagStatus::Red->value)
+        ->assertSet('rag', '')
+        ->assertSee('Wells fully repaired');
+});
+
+test('the attention chips narrow the directory and count what they would show', function () {
+    $user = User::factory()->create();
+
+    $measured = Indicator::factory()->create(['name' => 'Measured indicator']);
+    IndicatorProgress::factory()->create(['indicator_id' => $measured->id, 'date' => now()->toDateString()]);
+
+    Indicator::factory()->create(['name' => 'Silent indicator']);
+    Indicator::factory()->untargeted()->create(['name' => 'Aimless indicator']);
+
+    $component = Livewire::actingAs($user)->test('pages::indicators.index');
+
+    expect($component->get('focusCounts')['unmeasured'])->toBe(2)
+        ->and($component->get('focusCounts')['untargeted'])->toBe(1);
+
+    $component
+        ->call('setFocus', 'unmeasured')
+        ->assertSee('Silent indicator')
+        ->assertDontSee('Measured indicator')
+        ->call('setFocus', 'untargeted')
+        ->assertSee('Aimless indicator')
+        ->assertDontSee('Silent indicator')
+        ->call('setFocus', 'untargeted')
+        ->assertSet('focus', '')
+        ->assertSee('Measured indicator');
+});
+
+test('an indicator whose last reading is older than its own frequency needs a reading', function () {
+    $user = User::factory()->create();
+
+    $stale = Indicator::factory()->measuredEvery(Period::Monthly)->create(['name' => 'Monthly indicator']);
+    IndicatorProgress::factory()->create(['indicator_id' => $stale->id, 'date' => now()->subMonths(3)->toDateString()]);
+
+    $fresh = Indicator::factory()->measuredEvery(Period::Annual)->create(['name' => 'Annual indicator']);
+    IndicatorProgress::factory()->create(['indicator_id' => $fresh->id, 'date' => now()->subMonths(3)->toDateString()]);
+
+    Livewire::actingAs($user)
+        ->test('pages::indicators.index')
+        ->call('setFocus', 'stale')
+        ->assertSee('Monthly indicator')
+        ->assertDontSee('Annual indicator');
+});
+
+test('the chain inspector shows the readings and the targets behind one indicator', function () {
+    $user = User::factory()->create();
+    $recorder = User::factory()->create(['name' => 'Rana Saleh']);
+    $indicator = Indicator::factory()->create(['name' => 'Households reached']);
+
+    IndicatorProgress::factory()->create([
+        'indicator_id' => $indicator->id,
+        'value' => 120,
+        'date' => now()->subMonth()->toDateString(),
+        'source_of_verification' => 'Household survey',
+        'recorded_by' => $recorder->id,
+    ]);
+
+    PlanIndicator::factory()->create([
+        'indicator_id' => $indicator->id,
+        'source_type' => 'annual_plan',
+        'source_id' => AnnualPlan::factory()->create(['year' => 2026])->id,
+    ]);
+
+    Livewire::actingAs($user)
+        ->test('pages::indicators.index')
+        ->call('openInspectModal', $indicator->id)
+        ->assertSet('showInspectModal', true)
+        ->assertSet('inspectingIndicatorId', $indicator->id)
+        ->assertSee('Household survey')
+        ->assertSee('Recorded by Rana Saleh')
+        ->assertSee('Annual plan 2026')
+        ->call('closeInspectModal')
+        ->assertSet('showInspectModal', false)
+        ->assertSet('inspectingIndicatorId', null);
+});
+
+test('the delete and reading dialogs are driven by a boolean the modal can bind to', function () {
+    $user = User::factory()->create();
+    $indicator = Indicator::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::indicators.index')
+        ->call('confirmDelete', $indicator->id)
+        ->assertSet('showDeleteModal', true)
+        ->call('cancelDelete')
+        ->assertSet('showDeleteModal', false)
+        ->assertSet('deletingIndicatorId', null)
+        ->call('openProgressModal', $indicator->id)
+        ->assertSet('showProgressModal', true)
+        ->call('closeProgressModal')
+        ->assertSet('showProgressModal', false);
+});
+
+test('the table view renders the same indicators as the cards', function () {
+    $user = User::factory()->create();
+    Indicator::factory()->create(['name' => 'Wells rehabilitated']);
+
+    Livewire::actingAs($user)
+        ->test('pages::indicators.index')
+        ->set('view', 'table')
+        ->assertSee('Wells rehabilitated')
+        ->assertSee('Baseline to target');
+});
+
+test('a new reading refreshes the figures in the same request', function () {
+    $user = User::factory()->create();
+    $indicator = Indicator::factory()->create(['baseline' => 0, 'target' => 200]);
+
+    $component = Livewire::actingAs($user)->test('pages::indicators.index');
+
+    expect($component->get('overview')['readings'])->toBe(0);
+
+    $component
+        ->call('openProgressModal', $indicator->id)
+        ->set('progressValue', '150')
+        ->call('saveProgress')
+        ->assertHasNoErrors();
+
+    expect($component->get('overview')['readings'])->toBe(1);
+});
+
+test('the directory reads a flat number of queries however many indicators there are', function () {
+    $user = User::factory()->create();
+
+    $seed = function (int $indicators): void {
+        foreach (range(1, $indicators) as $index) {
+            $result = Result::factory()->create();
+            $indicator = Indicator::factory()->create(['result_id' => $result->id]);
+            IndicatorProgress::factory()->count(2)->create(['indicator_id' => $indicator->id]);
+            $target = PlanIndicator::factory()->create([
+                'indicator_id' => $indicator->id,
+                'source_type' => 'annual_plan',
+                'source_id' => AnnualPlan::factory()->create()->id,
+            ]);
+            Report::factory()->count(2)->create(['plan_indicator_id' => $target->id]);
+        }
+    };
+
+    $countQueries = function () use ($user): int {
+        $queries = 0;
+        DB::listen(function () use (&$queries): void {
+            $queries++;
+        });
+
+        Livewire::actingAs($user)->test('pages::indicators.index')->call('openInspectModal', Indicator::query()->value('id'));
+
+        return $queries;
+    };
+
+    $seed(2);
+    $small = $countQueries();
+
+    $seed(8);
+    $large = $countQueries();
+
+    // Eager loading is what holds this flat; a dropped `with()` turns the
+    // difference into one query per indicator, reading or target.
+    expect($large)->toBeLessThanOrEqual($small + 2);
+});
+
+test('the page shows what was reported against what was committed, not just how many reports there are', function () {
+    $user = User::factory()->create();
+    $indicator = Indicator::factory()->create(['name' => 'Meals distributed']);
+
+    $target = PlanIndicator::factory()->create([
+        'indicator_id' => $indicator->id,
+        'target' => 1000,
+        'source_type' => 'annual_plan',
+        'source_id' => AnnualPlan::factory()->create(['year' => 2026])->id,
+    ]);
+
+    Report::factory()->create(['plan_indicator_id' => $target->id, 'value' => 400, 'status' => ReportStatus::Approved]);
+    Report::factory()->create(['plan_indicator_id' => $target->id, 'value' => 150, 'status' => ReportStatus::Draft]);
+
+    $component = Livewire::actingAs($user)->test('pages::indicators.index');
+    $overview = $component->get('overview');
+
+    expect($overview['committed'])->toBe(1000.0)
+        ->and($overview['reported'])->toBe(550.0);
+
+    $component->assertSee('550 reported of 1,000 committed');
+});
+
+test('a draft report past its planned date counts as reporting overdue', function () {
+    $user = User::factory()->create();
+
+    $late = Indicator::factory()->create(['name' => 'Late reporter']);
+    $lateTarget = PlanIndicator::factory()->create([
+        'indicator_id' => $late->id,
+        'source_type' => 'annual_plan',
+        'source_id' => AnnualPlan::factory()->create()->id,
+    ]);
+    Report::factory()->create([
+        'plan_indicator_id' => $lateTarget->id,
+        'status' => ReportStatus::Draft,
+        'planned_date' => now()->subMonth()->toDateString(),
+    ]);
+
+    $punctual = Indicator::factory()->create(['name' => 'Punctual reporter']);
+    $punctualTarget = PlanIndicator::factory()->create([
+        'indicator_id' => $punctual->id,
+        'source_type' => 'annual_plan',
+        'source_id' => AnnualPlan::factory()->create()->id,
+    ]);
+    // Approved, so being past its date is not an outstanding obligation.
+    Report::factory()->create([
+        'plan_indicator_id' => $punctualTarget->id,
+        'status' => ReportStatus::Approved,
+        'planned_date' => now()->subMonth()->toDateString(),
+    ]);
+
+    $component = Livewire::actingAs($user)->test('pages::indicators.index');
+
+    expect($component->get('focusCounts')['reporting'])->toBe(1);
+
+    $component
+        ->call('setFocus', 'reporting')
+        ->assertSee('Late reporter')
+        ->assertDontSee('Punctual reporter');
+});
+
+test('the chain inspector shows the statements this indicator rolls up through', function () {
+    $user = User::factory()->create();
+
+    $outcome = Result::factory()->create(['statement' => 'Livelihoods restored.', 'type' => ResultType::Outcome]);
+    $output = Result::factory()->create([
+        'statement' => 'Grants disbursed.',
+        'type' => ResultType::Output,
+        'parent_id' => $outcome->id,
+    ]);
+    $indicator = Indicator::factory()->create(['result_id' => $output->id, 'name' => 'Grants paid']);
+
+    Livewire::actingAs($user)
+        ->test('pages::indicators.index')
+        ->call('openInspectModal', $indicator->id)
+        // The statement it measures, and the one that statement rolls up into.
+        ->assertSee('Grants disbursed.')
+        ->assertSee('Livelihoods restored.');
 });
