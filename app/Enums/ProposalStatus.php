@@ -45,6 +45,44 @@ enum ProposalStatus: string
     }
 
     /**
+     * The stage a proposal normally moves on to, or null when there is none.
+     *
+     * Rejected is a dead end and Completed ends the lifecycle. Submitted
+     * advances to Approved; a rejection is still recorded through the full
+     * status change, never proposed as the "next" step.
+     */
+    public function next(): ?self
+    {
+        return match ($this) {
+            self::ConceptNote => self::ProposalDraft,
+            self::ProposalDraft => self::Submitted,
+            self::Submitted => self::Approved,
+            self::Approved => self::Active,
+            self::Active => self::FinalReports,
+            self::FinalReports => self::Completed,
+            self::Rejected, self::Completed => null,
+        };
+    }
+
+    /**
+     * The lifecycle in order, without the Rejected branch.
+     *
+     * @return list<self>
+     */
+    public static function lifecycle(): array
+    {
+        return [
+            self::ConceptNote,
+            self::ProposalDraft,
+            self::Submitted,
+            self::Approved,
+            self::Active,
+            self::FinalReports,
+            self::Completed,
+        ];
+    }
+
+    /**
      * All status values, for validation rules and console prompts.
      *
      * @return array<int, string>

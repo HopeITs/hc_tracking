@@ -580,6 +580,83 @@ input[type='search']::-webkit-search-cancel-button {
     }
 }
 
+/* Proposals funding flow (resources/js/funding-flow.js) and money bars. */
+.money-pending {
+    background-color: color-mix(in srgb, var(--color-status-warn) 22%, transparent);
+    background-image: repeating-linear-gradient(135deg, var(--color-status-warn) 0 2px, transparent 2px 6px);
+}
+
+.flow-ribbon {
+    fill: var(--color-funding);
+    fill-opacity: 0.32;
+    transition: fill-opacity 200ms cubic-bezier(0.16, 1, 0.3, 1), fill 200ms ease-out;
+}
+
+.flow-ribbon[data-state='lit'] {
+    fill-opacity: 0.55;
+}
+
+.flow-ribbon[data-state='dim'] {
+    fill-opacity: 0.06;
+}
+
+.flow-thread {
+    fill: none;
+    stroke: var(--color-secondary-light);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    transition: stroke-opacity 200ms cubic-bezier(0.16, 1, 0.3, 1), stroke 200ms ease-out;
+}
+
+.flow-thread[data-state='lit'] {
+    stroke: var(--color-primary);
+    stroke-width: 2;
+}
+
+.flow-thread[data-state='dim'] {
+    stroke-opacity: 0.15;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    /* The river pours in once from the donors' side; bars fill from the start edge. */
+    .flow-reveal {
+        animation: flow-pour 1100ms cubic-bezier(0.16, 1, 0.3, 1) both;
+        animation-delay: 150ms;
+    }
+
+    [dir='rtl'] .flow-reveal {
+        animation-name: flow-pour-rtl;
+    }
+
+    .money-grow {
+        transform-origin: left center;
+        animation: target-bar-grow 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+        animation-delay: 200ms;
+    }
+
+    [dir='rtl'] .money-grow {
+        transform-origin: right center;
+    }
+}
+
+@keyframes flow-pour {
+    from {
+        clip-path: inset(0 100% 0 0);
+    }
+    to {
+        clip-path: inset(0 0 0 0);
+    }
+}
+
+@keyframes flow-pour-rtl {
+    from {
+        clip-path: inset(0 0 0 100%);
+    }
+    to {
+        clip-path: inset(0 0 0 0);
+    }
+}
+
 /* In-page Office previews (resources/js/file-preview.js): a spreadsheet grid and docx-preview's paper pages. */
 .sheet-preview-table {
     border-collapse: collapse;
