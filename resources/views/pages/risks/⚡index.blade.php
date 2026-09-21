@@ -509,14 +509,13 @@ new #[Title('titles.risks')] class extends Component {
         <form wire:submit="saveRisk" class="flex flex-col gap-5">
             <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
                 <flux:heading size="lg">{{ $editingRiskId === null ? __('risks.log_risk') : __('risks.edit_risk') }}</flux:heading>
-                <flux:subheading>{{ __('risks.record_what_could_go_wrong_what_it_would_cost_and_how_it_is') }}</flux:subheading>
             </div>
 
             <x-ui.input wire:model="name" :label="__('risks.risk_name')" type="text" maxlength="255" required autofocus />
 
-            <flux:textarea wire:model="impact" :label="__('common.impact')" rows="3" required class="border-secondary-light! bg-white! text-secondary-dark! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!" />
+            <flux:textarea wire:model="impact" :label="__('common.impact')" rows="3" required />
 
-            <flux:textarea wire:model="solution" :label="__('common.mitigation')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!" />
+            <flux:textarea wire:model="solution" :label="__('common.mitigation')" rows="3" />
 
             <div class="grid gap-4 sm:grid-cols-2">
                 <x-ui.select wire:model="riskProjectId" :label="__('common.project')" required>

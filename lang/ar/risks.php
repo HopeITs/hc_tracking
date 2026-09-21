@@ -17,7 +17,6 @@ return [
     'no_mitigation_recorded' => 'لا يوجد إجراء تخفيف مسجّل',
     'potential_risk' => 'خطر محتمل',
     'potential_risks' => 'مخاطر محتملة',
-    'record_what_could_go_wrong_what_it_would_cost_and_how_it_is' => 'سجّل ما قد يسوء، وتكلفته، وكيفية التخفيف منه.',
     'risk_deleted' => 'تم حذف الخطر.',
     'risk_impact_or_project' => 'الخطر أو الأثر أو المشروع',
     'risk_logged' => 'تم تسجيل الخطر.',

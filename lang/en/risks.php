@@ -17,7 +17,6 @@ return [
     'no_mitigation_recorded' => 'No mitigation recorded',
     'potential_risk' => 'Potential risk',
     'potential_risks' => 'Potential risks',
-    'record_what_could_go_wrong_what_it_would_cost_and_how_it_is' => 'Record what could go wrong, what it would cost, and how it is mitigated.',
     'risk_deleted' => 'Risk deleted.',
     'risk_impact_or_project' => 'Risk, impact, or project',
     'risk_logged' => 'Risk logged.',
