@@ -135,6 +135,10 @@ function buildOptions(config) {
         axisTicks: { show: false },
         labels: { style: { colors: text, fontSize: '11px' }, formatter: config.horizontal ? format.axis : undefined },
         tooltip: { enabled: false },
+        // Every value axis in this app plots whole counts or currency
+        // amounts, never fractions — without this ApexCharts' own "nice
+        // scale" tick generator can land on .5 steps for a small max value.
+        decimalsInFloat: 0,
     };
     options.yaxis = {
         labels: {
@@ -142,6 +146,7 @@ function buildOptions(config) {
             formatter: config.horizontal ? undefined : format.axis,
             maxWidth: 120,
         },
+        decimalsInFloat: 0,
     };
 
     if (config.type === 'bar') {

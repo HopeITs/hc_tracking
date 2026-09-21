@@ -1,7 +1,6 @@
 <?php
 
 return [
-    'challenge' => 'تحدٍ',
     'challenges' => 'تحديات',
     'challenges_count' => '{0} لا توجد تحديات|{1} تحدٍ واحد|{2} تحديان|[3,10] :count تحديات|[11,*] :count تحديًا',
     'challenges_without_solution' => '{0} لا توجد تحديات بلا حل|{1} تحدٍ واحد بلا حل|{2} تحديان بلا حل|[3,10] :count تحديات بلا حل|[11,*] :count تحديًا بلا حل',
@@ -18,7 +17,6 @@ return [
     'no_mitigation_recorded_yet' => 'لم تُسجَّل خطة تخفيف بعد',
     'potential_risk' => 'خطر محتمل',
     'potential_risks' => 'مخاطر محتملة',
-    'record_what_could_go_wrong_what_it_would_cost_and_how_it_is' => 'سجّل ما قد يسوء، وتكلفته، وكيفية التخفيف منه.',
     'risk_deleted' => 'تم حذف الخطر.',
     'risk_impact_or_project' => 'الخطر أو الأثر أو المشروع',
     'risk_logged' => 'تم تسجيل الخطر.',
@@ -31,5 +29,4 @@ return [
     'select_the_project_this_risk_affects' => 'اختر المشروع الذي يؤثر عليه هذا الخطر.',
     'the_risk_and_its_mitigation_notes_are_removed_nothing_else_i' => 'سيُحذف الخطر وملاحظات التخفيف الخاصة به. لن يتأثر أي شيء آخر.',
     'the_selected_project_is_no_longer_available' => 'المشروع المحدد لم يعد متاحًا.',
-    'this_risk_has_materialised' => 'تحقق هذا الخطر',
 ];

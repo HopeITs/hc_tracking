@@ -1,7 +1,6 @@
 <?php
 
 return [
-    'challenge' => 'Challenge',
     'challenges' => 'Challenges',
     'challenges_count' => '{0} No challenges|{1} :count challenge|[2,*] :count challenges',
     'challenges_without_solution' => '{0} No challenges without a solution|{1} :count challenge without a solution|[2,*] :count challenges without a solution',
@@ -18,7 +17,6 @@ return [
     'no_mitigation_recorded_yet' => 'No mitigation recorded yet',
     'potential_risk' => 'Potential risk',
     'potential_risks' => 'Potential risks',
-    'record_what_could_go_wrong_what_it_would_cost_and_how_it_is' => 'Record what could go wrong, what it would cost, and how it is mitigated.',
     'risk_deleted' => 'Risk deleted.',
     'risk_impact_or_project' => 'Risk, impact, or project',
     'risk_logged' => 'Risk logged.',
@@ -31,5 +29,4 @@ return [
     'select_the_project_this_risk_affects' => 'Select the project this risk affects.',
     'the_risk_and_its_mitigation_notes_are_removed_nothing_else_i' => 'The risk and its mitigation notes are removed. Nothing else is affected.',
     'the_selected_project_is_no_longer_available' => 'The selected project is no longer available.',
-    'this_risk_has_materialised' => 'This risk has materialised',
 ];

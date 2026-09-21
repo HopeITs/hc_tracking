@@ -205,6 +205,12 @@ new #[Title('titles.risks')] class extends Component {
         $this->showRiskModal = true;
     }
 
+    /** Quick-toggle a risk's materialised state directly from its card, without opening the edit modal. */
+    public function setHappened(int $riskId, bool $happened): void
+    {
+        Risk::query()->findOrFail($riskId)->update(['happened' => $happened]);
+    }
+
     public function openEditModal(int $riskId): void
     {
         $risk = Risk::query()
@@ -393,7 +399,7 @@ new #[Title('titles.risks')] class extends Component {
             </button>
 
             <div x-show="open" x-collapse class="border-t border-secondary-soft px-2 pt-3 pb-2 dark:border-secondary-medium">
-                <div class="flex flex-wrap items-center gap-4 px-2 pb-2" role="group" :aria-label="__('risks.risks_by_project')">
+                <div class="flex flex-wrap items-center gap-4 px-2 pb-2" role="group" aria-label="{{ __('risks.risks_by_project') }}">
                     <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-secondary-dark dark:text-white">
                         <span class="size-2.5 shrink-0 rounded-full bg-primary" aria-hidden="true"></span>
                         {{ __('risks.challenges') }} · <span class="tabular-nums">{{ $landscape['challenges'] }}</span>
@@ -443,18 +449,48 @@ new #[Title('titles.risks')] class extends Component {
                 @foreach ($this->risks as $risk)
                     <article class="flex flex-col gap-2 rounded-lg border border-secondary-soft p-3.5 dark:border-secondary-medium" wire:key="risk-{{ $risk->id }}">
                         <div class="flex items-start justify-between gap-3">
-                            <div class="min-w-0">
-                                @if ($risk->happened)
-                                    <span class="inline-flex items-center gap-1 rounded-md border border-primary bg-primary px-2 py-0.5 text-xs font-semibold text-white">
-                                        <flux:icon.exclamation-triangle variant="micro" class="size-3" />
-                                        {{ __('risks.challenge') }}
-                                    </span>
-                                @else
-                                    <span class="inline-flex items-center gap-1 rounded-md border border-secondary-light px-2 py-0.5 text-xs font-semibold text-secondary-medium dark:text-secondary-soft">
-                                        <flux:icon.light-bulb variant="micro" class="size-3" />
-                                        {{ __('risks.potential_risk') }}
-                                    </span>
-                                @endif
+                            <div
+                                class="inline-flex shrink-0 overflow-hidden rounded-full border border-secondary-light dark:border-secondary-medium"
+                                role="radiogroup"
+                                aria-label="{{ __('common.state') }}"
+                                data-test="happened-toggle-{{ $risk->id }}"
+                            >
+                                <button
+                                    type="button"
+                                    role="radio"
+                                    aria-checked="{{ $risk->happened ? 'false' : 'true' }}"
+                                    wire:click="setHappened({{ $risk->id }}, false)"
+                                    @class([
+                                        'inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold transition-colors',
+                                        'bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white' => ! $risk->happened,
+                                        'text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium' => $risk->happened,
+                                    ])
+                                >
+                                    <span @class([
+                                        'size-2.5 shrink-0 rounded-full border',
+                                        'border-secondary-dark bg-secondary-dark dark:border-white dark:bg-white' => ! $risk->happened,
+                                        'border-secondary-light dark:border-secondary-soft' => $risk->happened,
+                                    ]) aria-hidden="true"></span>
+                                    {{ __('risks.potential_risk') }}
+                                </button>
+                                <button
+                                    type="button"
+                                    role="radio"
+                                    aria-checked="{{ $risk->happened ? 'true' : 'false' }}"
+                                    wire:click="setHappened({{ $risk->id }}, true)"
+                                    @class([
+                                        'inline-flex items-center gap-1.5 border-s border-secondary-light px-2.5 py-1 text-xs font-semibold transition-colors dark:border-secondary-medium',
+                                        'bg-primary text-white' => $risk->happened,
+                                        'text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium' => ! $risk->happened,
+                                    ])
+                                >
+                                    <span @class([
+                                        'size-2.5 shrink-0 rounded-full border',
+                                        'border-white bg-white' => $risk->happened,
+                                        'border-secondary-light dark:border-secondary-soft' => ! $risk->happened,
+                                    ]) aria-hidden="true"></span>
+                                    {{ __('common.materialised') }}
+                                </button>
                             </div>
                             <div class="flex shrink-0 items-center gap-1.5">
                                 <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation @sm/directory:size-9!" wire:click="openEditModal({{ $risk->id }})" :aria-label="__('common.edit_name', ['name' => $risk->name])" />
@@ -525,7 +561,48 @@ new #[Title('titles.risks')] class extends Component {
                     @endforeach
                 </x-ui.select>
 
-                <flux:checkbox wire:model="happened" :label="__('risks.this_risk_has_materialised')" class="self-end" />
+                <div class="self-end">
+                    <span class="mb-1.5 block text-[11px] font-semibold uppercase leading-4 tracking-[0.1em] text-secondary-medium dark:text-secondary-soft">{{ __('common.state') }}</span>
+                    <div class="inline-flex w-full overflow-hidden rounded-lg border border-secondary-light dark:border-secondary-medium" role="radiogroup" aria-label="{{ __('common.state') }}">
+                        <button
+                            type="button"
+                            role="radio"
+                            aria-checked="{{ ! $happened ? 'true' : 'false' }}"
+                            wire:click="$set('happened', false)"
+                            @class([
+                                'flex flex-1 items-center justify-center gap-1.5 px-3 py-2 text-sm font-semibold transition-colors',
+                                'bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white' => ! $happened,
+                                'text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium' => $happened,
+                            ])
+                        >
+                            <span @class([
+                                'size-2.5 shrink-0 rounded-full border',
+                                'border-secondary-dark bg-secondary-dark dark:border-white dark:bg-white' => ! $happened,
+                                'border-secondary-light dark:border-secondary-soft' => $happened,
+                            ]) aria-hidden="true"></span>
+                            {{ __('risks.potential_risk') }}
+                        </button>
+                        <button
+                            type="button"
+                            role="radio"
+                            aria-checked="{{ $happened ? 'true' : 'false' }}"
+                            wire:click="$set('happened', true)"
+                            @class([
+                                'flex flex-1 items-center justify-center gap-1.5 border-s border-secondary-light px-3 py-2 text-sm font-semibold transition-colors dark:border-secondary-medium',
+                                'bg-primary text-white' => $happened,
+                                'text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium' => ! $happened,
+                            ])
+                            data-test="form-materialised-option"
+                        >
+                            <span @class([
+                                'size-2.5 shrink-0 rounded-full border',
+                                'border-white bg-white' => $happened,
+                                'border-secondary-light dark:border-secondary-soft' => ! $happened,
+                            ]) aria-hidden="true"></span>
+                            {{ __('common.materialised') }}
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
