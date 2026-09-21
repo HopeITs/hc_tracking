@@ -192,6 +192,11 @@ new #[Title('titles.tasks')] class extends Component {
 
         return Task::query()
             ->select(['id', 'milestone_id', 'parent_task_id', 'proposal_id', 'title', 'description', 'status', 'priority', 'start_date', 'due_date', 'completed_date', 'progress_percentage'])
+            // Subtasks are shown nested under their parent (each parent's own
+            // `subtasks` eager load below), never as their own top-level row —
+            // so the list/board/calendar and the stat tiles all count and
+            // display only top-level tasks.
+            ->whereNull('parent_task_id')
             ->withCount('subtasks')
             ->with([
                 'milestone:id,name,project_id',
