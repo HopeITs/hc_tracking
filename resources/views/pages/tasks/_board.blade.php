@@ -1,6 +1,7 @@
 @php
     use App\Enums\TaskStatus;
     use Carbon\CarbonImmutable;
+    use Illuminate\Support\Js;
 
     /** @var \Illuminate\Database\Eloquent\Collection<int, \App\Models\Task> $allTasks */
     $allTasks = $this->boardTasks;
@@ -13,15 +14,14 @@
     };
 @endphp
 
-<div class="grid grid-cols-1 gap-4 @2xl/directory:grid-cols-2 @6xl/directory:grid-cols-4">
+<div class="grid grid-cols-1 gap-4 @2xl/directory:grid-cols-2 @6xl/directory:grid-cols-4" x-data="{ subtasksOpen: {} }">
     @foreach (TaskStatus::cases() as $case)
         @php $columnTasks = $allTasks->where('status', $case)->values(); @endphp
 
         <div
-            class="flex cursor-pointer flex-col gap-3 rounded-xl border p-3 transition-colors {{ $columnTone($case) }}"
+            class="flex flex-col gap-3 rounded-xl border p-3 transition-colors {{ $columnTone($case) }}"
             wire:key="task-board-column-{{ $case->value }}"
             data-test="task-board-column-{{ $case->value }}"
-            x-on:click="$event.target.closest('[data-task-card]') || $wire.openCreateDrawer(null, '{{ $case->value }}')"
         >
             <div class="flex items-center justify-between px-1">
                 <x-ui.enum-badge :case="$case" />
@@ -63,11 +63,18 @@
                                     {{ $task->due_date->translatedFormat(__('formats.date_short')) }}
                                 </span>
                             @endif
-                            @if ($task->subtasks_count > 0)
-                                <span class="inline-flex items-center gap-0.5 text-secondary-medium dark:text-secondary-soft">
+                            @if ($task->parent_task_id === null && $task->subtasks_count > 0)
+                                <button
+                                    type="button"
+                                    x-on:click="subtasksOpen[{{ $task->id }}] = !subtasksOpen[{{ $task->id }}]"
+                                    :aria-expanded="!!subtasksOpen[{{ $task->id }}]"
+                                    class="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-secondary-medium hover:bg-secondary-soft/60 dark:text-secondary-soft dark:hover:bg-secondary-medium"
+                                    :aria-label="subtasksOpen[{{ $task->id }}] ? {{ Js::from(__('tasks.hide_subtasks')) }} : {{ Js::from(__('tasks.show_subtasks')) }}"
+                                    data-test="task-board-subtasks-toggle-{{ $task->id }}"
+                                >
                                     <flux:icon.rectangle-stack variant="micro" class="size-3.5" aria-hidden="true" />
                                     {{ $task->subtasks_count }}
-                                </span>
+                                </button>
                             @endif
                         </div>
 
@@ -98,11 +105,46 @@
                                 @endforeach
                             </select>
                         </label>
+
+                        @if ($task->parent_task_id === null && $task->subtasks_count > 0)
+                            <div x-show="subtasksOpen[{{ $task->id }}]" x-cloak class="flex flex-col gap-1.5 rounded-lg bg-secondary-soft/30 p-2 dark:bg-secondary-medium/20">
+                                @foreach ($task->subtasks as $subtask)
+                                    <div class="flex items-center gap-1.5" wire:key="task-board-subtask-row-{{ $subtask->id }}" data-test="task-board-subtask-row-{{ $subtask->id }}">
+                                        <button
+                                            type="button"
+                                            wire:click="toggleComplete({{ $subtask->id }})"
+                                            aria-label="{{ $subtask->status === TaskStatus::Done ? __('tasks.mark_incomplete') : __('tasks.mark_complete') }}"
+                                            class="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium"
+                                        >
+                                            <flux:icon.check-circle :variant="$subtask->status === TaskStatus::Done ? 'solid' : 'outline'" class="size-4 {{ $subtask->status === TaskStatus::Done ? 'text-status-good' : '' }}" />
+                                        </button>
+                                        <a
+                                            href="{{ route('tasks.show', $subtask) }}"
+                                            wire:navigate
+                                            title="{{ $subtask->title }}"
+                                            @class(['min-w-0 flex-1 truncate text-xs hover:underline', 'text-secondary-light line-through' => $subtask->status === TaskStatus::Done, 'text-secondary-dark dark:text-white' => $subtask->status !== TaskStatus::Done])
+                                        >{{ $subtask->title }}</a>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
                     </div>
                 @empty
                     <p class="px-1 py-4 text-center text-xs text-secondary-light" data-test="task-board-empty-{{ $case->value }}">{{ __('tasks.no_tasks_in_this_status') }}</p>
                 @endforelse
             </div>
+
+            <label class="flex items-center gap-2 rounded-lg border border-dashed border-secondary-light px-2 py-1.5 dark:border-secondary-medium">
+                <flux:icon.plus variant="micro" class="size-4 shrink-0 text-primary" aria-hidden="true" />
+                <span class="sr-only">{{ __('tasks.add_task') }}</span>
+                <input
+                    type="text"
+                    placeholder="{{ __('tasks.add_task') }}"
+                    class="w-full min-w-0 border-0 bg-transparent p-0 text-sm text-secondary-dark placeholder:text-secondary-light focus:ring-0 focus:outline-none dark:text-white"
+                    wire:keydown.enter="quickCreateTask($event.target.value, '{{ $case->value }}', null); $event.target.value = ''"
+                    data-test="task-board-quick-add-{{ $case->value }}"
+                />
+            </label>
         </div>
     @endforeach
 </div>

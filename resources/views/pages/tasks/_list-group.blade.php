@@ -225,8 +225,7 @@
                                         type="text"
                                         placeholder="{{ __('tasks.add_subtask') }}"
                                         class="w-full min-w-0 border-0 bg-transparent p-1 text-sm text-secondary-dark placeholder:text-secondary-light focus:ring-0 focus:outline-none dark:text-white"
-                                        wire:keydown.enter="addSubtaskQuick({{ $task->id }}, $event.target.value)"
-                                        x-on:keydown.enter="$nextTick(() => $event.target.value = '')"
+                                        wire:keydown.enter="addSubtaskQuick({{ $task->id }}, $event.target.value); $event.target.value = ''"
                                         data-test="task-subtask-quick-add-{{ $task->id }}"
                                     />
                                 </label>
@@ -328,8 +327,7 @@
                                 type="text"
                                 placeholder="{{ __('tasks.add_subtask') }}"
                                 class="w-full min-w-0 border-0 bg-transparent p-1 text-sm text-secondary-dark placeholder:text-secondary-light focus:ring-0 focus:outline-none dark:text-white"
-                                wire:keydown.enter="addSubtaskQuick({{ $task->id }}, $event.target.value)"
-                                x-on:keydown.enter="$nextTick(() => $event.target.value = '')"
+                                wire:keydown.enter="addSubtaskQuick({{ $task->id }}, $event.target.value); $event.target.value = ''"
                                 data-test="task-subtask-quick-add-mobile-{{ $task->id }}"
                             />
                         </label>
@@ -347,8 +345,7 @@
                 type="text"
                 placeholder="{{ __('tasks.add_task') }}"
                 class="w-full min-w-0 border-0 bg-transparent p-1 text-sm text-secondary-dark placeholder:text-secondary-light focus:ring-0 focus:outline-none dark:text-white"
-                wire:keydown.enter="quickCreateTask($event.target.value, {{ $group === 'status' ? Js::from($groupKeyString) : 'null' }}, {{ $group === 'milestone' && $groupKeyString !== '' ? Js::from($groupKeyString) : 'null' }})"
-                x-on:keydown.enter="$nextTick(() => $event.target.value = '')"
+                wire:keydown.enter="quickCreateTask($event.target.value, {{ $group === 'status' ? Js::from($groupKeyString) : 'null' }}, {{ $group === 'milestone' && $groupKeyString !== '' ? Js::from($groupKeyString) : 'null' }}); $event.target.value = ''"
                 data-test="task-quick-add-{{ $group }}-{{ $groupKeyString }}"
             />
         </label>
