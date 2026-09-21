@@ -37,9 +37,9 @@ new #[Title('titles.milestones')] class extends Component {
     public bool $showDeleteModal = false;
     public string $name = '';
     public string $description = '';
-    public string $plannedDate = '';
-    public string $actualDate = '';
-    public string $milestoneStatus = 'pending';
+    public string $plannedStartDate = '';
+    public string $plannedEndDate = '';
+    public string $milestoneStatus = 'planned';
     public string $weightPercentage = '0';
     public string $responsibleUserId = '';
     public string $milestoneProjectId = '';
@@ -111,9 +111,9 @@ new #[Title('titles.milestones')] class extends Component {
 
                 return $milestone;
             }))
-            ->filter(fn (Milestone $milestone): bool => $milestone->planned_date->between($gridStart, $gridEnd))
+            ->filter(fn (Milestone $milestone): bool => $milestone->planned_start_date->between($gridStart, $gridEnd))
             ->sortBy('sequence')
-            ->groupBy(fn (Milestone $milestone): string => $milestone->planned_date->toDateString());
+            ->groupBy(fn (Milestone $milestone): string => $milestone->planned_start_date->toDateString());
 
         return [
             'month' => $month,
@@ -183,8 +183,10 @@ new #[Title('titles.milestones')] class extends Component {
                         'project_id',
                         'name',
                         'description',
-                        'planned_date',
-                        'actual_date',
+                        'planned_start_date',
+                        'planned_end_date',
+                        'actual_start_date',
+                        'actual_end_date',
                         'status',
                         'sequence',
                         'weight_percentage',
@@ -236,7 +238,10 @@ new #[Title('titles.milestones')] class extends Component {
     /**
      * Delivery health across the currently filtered milestones.
      *
-     * @return array{total: int, reached: int, overdue: int, missed: int, due_soon: int}
+     * 'missed' is derived (Milestone::isMissed()), not a stored status — see
+     * app/Enums/MilestoneStatus.php.
+     *
+     * @return array{total: int, reached: int, missed: int, due_soon: int}
      */
     #[Computed]
     public function milestoneStats(): array
@@ -249,12 +254,11 @@ new #[Title('titles.milestones')] class extends Component {
         return [
             'total' => $milestones->count(),
             'reached' => $milestones->where('status', MilestoneStatus::Reached)->count(),
-            'overdue' => $milestones->filter(
-                fn (Milestone $milestone): bool => $milestone->status === MilestoneStatus::Pending && $milestone->planned_date->lt($today),
-            )->count(),
-            'missed' => $milestones->where('status', MilestoneStatus::Missed)->count(),
+            'missed' => $milestones->filter(fn (Milestone $milestone): bool => $milestone->isMissed())->count(),
             'due_soon' => $milestones->filter(
-                fn (Milestone $milestone): bool => $milestone->status === MilestoneStatus::Pending && $milestone->planned_date->between($today, $today->addDays(7)),
+                fn (Milestone $milestone): bool => $milestone->status === MilestoneStatus::Planned
+                    && $milestone->planned_end_date !== null
+                    && $milestone->planned_end_date->between($today, $today->addDays(7)),
             )->count(),
         ];
     }
@@ -317,7 +321,7 @@ new #[Title('titles.milestones')] class extends Component {
         $this->resetMilestoneForm();
 
         if ($date !== null) {
-            $this->plannedDate = $date;
+            $this->plannedStartDate = $date;
         }
 
         if ($status !== null && MilestoneStatus::tryFrom($status) !== null) {
@@ -348,8 +352,8 @@ new #[Title('titles.milestones')] class extends Component {
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
-            'plannedDate' => ['required', 'date'],
-            'actualDate' => ['nullable', 'date'],
+            'plannedStartDate' => ['required', 'date'],
+            'plannedEndDate' => ['nullable', 'date', 'after_or_equal:plannedStartDate'],
             'milestoneStatus' => ['required', new Enum(MilestoneStatus::class)],
             'weightPercentage' => ['required', 'numeric', 'min:0', 'max:100'],
             'responsibleUserId' => ['required', 'integer', Rule::exists(HrEmployee::class, 'id')],
@@ -363,7 +367,8 @@ new #[Title('titles.milestones')] class extends Component {
             ],
         ], [
             'name.required' => __('milestones.enter_a_milestone_name'),
-            'plannedDate.required' => __('milestones.set_the_planned_date'),
+            'plannedStartDate.required' => __('milestones.set_the_planned_start_date'),
+            'plannedEndDate.after_or_equal' => __('milestones.planned_end_date_must_be_on_or_after_the_planned_start_date'),
             'responsibleUserId.required' => __('milestones.select_the_responsible_staff_member'),
             'milestoneProjectId.required' => __('milestones.select_the_project'),
             'parentMilestoneId.exists' => __('milestones.select_a_milestone_from_this_project'),
@@ -374,8 +379,8 @@ new #[Title('titles.milestones')] class extends Component {
             'project_id' => (int) $validated['milestoneProjectId'],
             'name' => $validated['name'],
             'description' => $validated['description'] === '' ? null : $validated['description'],
-            'planned_date' => $validated['plannedDate'],
-            'actual_date' => $validated['actualDate'] === '' ? null : $validated['actualDate'],
+            'planned_start_date' => $validated['plannedStartDate'],
+            'planned_end_date' => $validated['plannedEndDate'] === '' ? null : $validated['plannedEndDate'],
             'status' => $validated['milestoneStatus'],
             'weight_percentage' => $validated['weightPercentage'],
             'responsible_user_id' => (int) $validated['responsibleUserId'],
@@ -466,9 +471,9 @@ new #[Title('titles.milestones')] class extends Component {
         $this->resetValidation();
         $this->name = '';
         $this->description = '';
-        $this->plannedDate = '';
-        $this->actualDate = '';
-        $this->milestoneStatus = 'pending';
+        $this->plannedStartDate = '';
+        $this->plannedEndDate = '';
+        $this->milestoneStatus = 'planned';
         $this->weightPercentage = '0';
         $this->responsibleUserId = '';
         $this->milestoneProjectId = '';
@@ -537,11 +542,10 @@ new #[Title('titles.milestones')] class extends Component {
         </x-slot:actions>
     </x-ui.page-header>
 
-    <div class="grid gap-3 @2xl/directory:grid-cols-3 @5xl/directory:grid-cols-5">
+    <div class="grid gap-3 @2xl/directory:grid-cols-2 @5xl/directory:grid-cols-4">
         <x-ui.stat-tile :label="__('milestones.total_milestones')" :value="$this->milestoneStats['total']" icon="flag" wire:key="milestone-stat-total" />
         <x-ui.stat-tile :label="MilestoneStatus::Reached->label()" :value="$this->milestoneStats['reached']" icon="check-circle" tone="good" wire:key="milestone-stat-reached" />
-        <x-ui.stat-tile :label="__('milestones.timeline_overdue')" :value="$this->milestoneStats['overdue']" icon="exclamation-triangle" tone="warn" wire:key="milestone-stat-overdue" />
-        <x-ui.stat-tile :label="MilestoneStatus::Missed->label()" :value="$this->milestoneStats['missed']" icon="x-circle" tone="critical" wire:key="milestone-stat-missed" />
+        <x-ui.stat-tile :label="__('milestones.missed')" :value="$this->milestoneStats['missed']" icon="x-circle" tone="critical" wire:key="milestone-stat-missed" />
         <x-ui.stat-tile :label="__('milestones.due_within_7_days')" :value="$this->milestoneStats['due_soon']" icon="clock" wire:key="milestone-stat-due-soon" />
     </div>
 
@@ -661,8 +665,8 @@ new #[Title('titles.milestones')] class extends Component {
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.input wire:model="plannedDate" :label="__('milestones.planned_date_2')" type="date" required />
-                <x-ui.input wire:model="actualDate" :label="__('milestones.actual_date')" type="date" />
+                <x-ui.input wire:model="plannedStartDate" :label="__('milestones.planned_start_date')" type="date" required />
+                <x-ui.input wire:model="plannedEndDate" :label="__('milestones.planned_end_date')" type="date" />
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2">

@@ -53,8 +53,8 @@ function enumColumns(): array
             'width' => 50,
             'assign' => MilestoneStatus::Cancelled,
             'stored' => 'cancelled',
-            'default' => MilestoneStatus::Pending,
-            'badCasing' => 'Pending',
+            'default' => MilestoneStatus::Planned,
+            'badCasing' => 'Planned',
         ]],
         'tasks.status' => [[
             'model' => Task::class,

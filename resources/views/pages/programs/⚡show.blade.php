@@ -114,10 +114,10 @@ new #[Title('titles.program')] class extends Component {
                 'city:id,name_en,name_ar',
                 'user:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
                 'milestones' => fn ($query) => $query
-                    ->select(['id', 'project_id', 'name', 'planned_date', 'status'])
+                    ->select(['id', 'project_id', 'name', 'planned_start_date', 'planned_end_date', 'actual_end_date', 'status'])
                     ->where('status', '!=', MilestoneStatus::Cancelled->value)
                     ->reorder()
-                    ->orderBy('planned_date'),
+                    ->orderBy('planned_start_date'),
             ])
             ->withCount([
                 'risks',
@@ -154,7 +154,7 @@ new #[Title('titles.program')] class extends Component {
             ->whereIn('project_id', $projects->keys())
             ->where('status', '!=', MilestoneStatus::Cancelled->value)
             ->groupBy('project_id')
-            ->selectRaw('project_id, min(planned_date) as first_planned, max(planned_date) as last_planned')
+            ->selectRaw('project_id, min(planned_start_date) as first_planned, max(planned_start_date) as last_planned')
             ->toBase()
             ->get();
 

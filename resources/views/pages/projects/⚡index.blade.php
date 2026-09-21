@@ -269,7 +269,7 @@ new #[Title('titles.projects')] class extends Component {
             'unfunded' => $query->doesntHave('proposals'),
             'overdue' => $query->where('status', ProjectStatus::Active->value)->whereDate('end_date', '<', today()),
             'slipping' => $query->whereHas('milestones', fn ($query) => $query
-                ->whereDate('planned_date', '<', today())
+                ->whereDate('planned_start_date', '<', today())
                 ->whereNotIn('status', [MilestoneStatus::Reached->value, MilestoneStatus::Cancelled->value])),
             'risks' => $query->whereHas('risks', fn ($query) => $query->where('happened', true)),
             default => $query,
@@ -332,10 +332,10 @@ new #[Title('titles.projects')] class extends Component {
             ])
             ->when($this->view === 'timeline', fn (Builder $query) => $query->with([
                 'milestones' => fn ($query) => $query
-                    ->select(['id', 'project_id', 'name', 'planned_date', 'status'])
+                    ->select(['id', 'project_id', 'name', 'planned_start_date', 'planned_end_date', 'actual_end_date', 'status'])
                     ->where('status', '!=', MilestoneStatus::Cancelled->value)
                     ->reorder()
-                    ->orderBy('planned_date'),
+                    ->orderBy('planned_start_date'),
             ]))
             ->withCount([
                 'risks',
@@ -406,7 +406,7 @@ new #[Title('titles.projects')] class extends Component {
             ->selectRaw(
                 'sum(case when not exists (select 1 from project_proposal where project_proposal.project_id = projects.id) then 1 else 0 end) as unfunded_count, '
                 .'sum(case when projects.status = ? and projects.end_date < ? then 1 else 0 end) as overdue_count, '
-                .'sum(case when exists (select 1 from milestones where milestones.project_id = projects.id and milestones.planned_date < ? and milestones.status not in (?, ?)) then 1 else 0 end) as slipping_count, '
+                .'sum(case when exists (select 1 from milestones where milestones.project_id = projects.id and milestones.planned_start_date < ? and milestones.status not in (?, ?)) then 1 else 0 end) as slipping_count, '
                 .'sum(case when exists (select 1 from risks where risks.project_id = projects.id and risks.happened = 1) then 1 else 0 end) as risks_count',
                 [
                     ProjectStatus::Active->value,
@@ -1479,9 +1479,9 @@ new #[Title('titles.projects')] class extends Component {
                     {{-- Same legend grammar as the milestones timeline. --}}
                     <div class="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-secondary-soft px-4 py-3 text-xs text-secondary-medium dark:border-secondary-medium dark:text-secondary-soft" aria-hidden="true">
                         <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-secondary-dark bg-secondary-dark dark:border-white dark:bg-white"></span>{{ MilestoneStatus::Reached->label() }}</span>
-                        <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-secondary-dark bg-white dark:border-white dark:bg-secondary-dark"></span>{{ MilestoneStatus::Pending->label() }}</span>
+                        <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-secondary-dark bg-white dark:border-white dark:bg-secondary-dark"></span>{{ MilestoneStatus::Planned->label() }}</span>
                         <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-primary bg-white dark:bg-secondary-dark"></span>{{ __('programs.timeline_overdue') }}</span>
-                        <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-primary bg-primary"></span>{{ MilestoneStatus::Missed->label() }}</span>
+                        <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-primary bg-primary"></span>{{ __('milestones.missed') }}</span>
                         <span class="inline-flex items-center gap-1.5"><span class="h-3.5 w-0.5 bg-primary"></span>{{ __('programs.timeline_today') }}</span>
                     </div>
 
@@ -1591,23 +1591,22 @@ new #[Title('titles.projects')] class extends Component {
 
                                                 @foreach ($project->milestones as $milestone)
                                                     @php
-                                                        $isOverdueMarker = $milestone->planned_date->lt($today) && $milestone->status === MilestoneStatus::Pending;
+                                                        $isMissedMarker = $milestone->isMissed();
                                                         $markerTone = match (true) {
                                                             $milestone->status === MilestoneStatus::Reached => 'border-secondary-dark bg-secondary-dark dark:border-white dark:bg-white',
-                                                            $milestone->status === MilestoneStatus::Missed => 'border-primary bg-primary',
-                                                            $isOverdueMarker => 'border-primary bg-white dark:bg-secondary-dark',
+                                                            $isMissedMarker || $milestone->isOverdue() => 'border-primary bg-primary',
                                                             default => 'border-secondary-dark bg-white dark:border-white dark:bg-secondary-dark',
                                                         };
                                                         $markerLabel = __('programs.timeline_marker', [
                                                             'name' => $milestone->name,
-                                                            'date' => $milestone->planned_date->translatedFormat(__('formats.date')),
-                                                            'status' => $isOverdueMarker ? __('programs.timeline_overdue') : $milestone->status->label(),
+                                                            'date' => $milestone->planned_start_date->translatedFormat(__('formats.date')),
+                                                            'status' => $isMissedMarker ? __('milestones.missed') : $milestone->status->label(),
                                                         ]);
                                                     @endphp
 
                                                     <span
                                                         class="absolute top-1/2 z-20 block size-3 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[2px] border-2 shadow-sm ring-2 ring-white rtl:translate-x-1/2 dark:ring-secondary-dark {{ $markerTone }}"
-                                                        style="inset-inline-start: {{ $position($milestone->planned_date) }}%"
+                                                        style="inset-inline-start: {{ $position($milestone->planned_start_date) }}%"
                                                         role="img"
                                                         aria-label="{{ $markerLabel }}"
                                                         wire:key="timeline-marker-{{ $milestone->id }}"

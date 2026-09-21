@@ -25,9 +25,10 @@ return [
         'other' => 'أخرى',
     ],
     'milestone_status' => [
-        'pending' => 'قيد الانتظار',
+        'planned' => 'مخطَّطة',
+        'ongoing' => 'قيد التنفيذ',
         'reached' => 'تحققت',
-        'missed' => 'فائتة',
+        'postponed' => 'مؤجَّلة',
         'cancelled' => 'ملغاة',
     ],
     'period' => [

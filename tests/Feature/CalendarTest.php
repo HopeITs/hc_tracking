@@ -39,12 +39,12 @@ test('a linked user sees their own responsible milestones on the correct day, an
     $mine = Milestone::factory()->create([
         'name' => 'My milestone',
         'responsible_user_id' => $employeeId,
-        'planned_date' => Carbon::create(2026, 6, 15),
+        'planned_start_date' => Carbon::create(2026, 6, 15),
     ]);
     $notMine = Milestone::factory()->create([
         'name' => 'Not mine',
         'responsible_user_id' => $otherEmployeeId,
-        'planned_date' => Carbon::create(2026, 6, 15),
+        'planned_start_date' => Carbon::create(2026, 6, 15),
     ]);
 
     Livewire::actingAs($user)
@@ -66,7 +66,7 @@ test('clicking a day pre-fills the add milestone form with that date', function 
     Livewire::actingAs($user)
         ->test('pages::calendar.index')
         ->call('openCreateModal', '2026-06-15')
-        ->assertSet('plannedDate', '2026-06-15')
+        ->assertSet('plannedStartDate', '2026-06-15')
         ->assertSet('showMilestoneModal', true)
         ->assertSet('responsibleUserId', (string) $employeeId);
 });
@@ -87,7 +87,7 @@ test('saving from the calendar creates a milestone on the clicked date', functio
 
     $milestone = Milestone::query()->where('name', 'Kickoff review')->sole();
 
-    expect($milestone->planned_date->toDateString())->toBe('2026-06-15')
+    expect($milestone->planned_start_date->toDateString())->toBe('2026-06-15')
         ->and($milestone->responsible_user_id)->toBe($employeeId);
 });
 
@@ -98,12 +98,12 @@ test('month navigation shows the new month and hides the old one', function () {
     $june = Milestone::factory()->create([
         'name' => 'June gate',
         'responsible_user_id' => $employeeId,
-        'planned_date' => Carbon::create(2026, 6, 10),
+        'planned_start_date' => Carbon::create(2026, 6, 10),
     ]);
     $july = Milestone::factory()->create([
         'name' => 'July gate',
         'responsible_user_id' => $employeeId,
-        'planned_date' => Carbon::create(2026, 7, 10),
+        'planned_start_date' => Carbon::create(2026, 7, 10),
     ]);
 
     Livewire::actingAs($user)
@@ -123,7 +123,7 @@ test('a milestone can be edited and deleted from the calendar', function () {
     $milestone = Milestone::factory()->create([
         'name' => 'Original name',
         'responsible_user_id' => $employeeId,
-        'planned_date' => Carbon::create(2026, 6, 15),
+        'planned_start_date' => Carbon::create(2026, 6, 15),
     ]);
 
     Livewire::actingAs($user)
@@ -278,7 +278,7 @@ test('turning off a type filter hides that type\'s chips without affecting the o
 
     $milestone = Milestone::factory()->create([
         'responsible_user_id' => $employeeId,
-        'planned_date' => Carbon::create(2026, 6, 15),
+        'planned_start_date' => Carbon::create(2026, 6, 15),
     ]);
     $task = Task::factory()->create([
         'due_date' => Carbon::create(2026, 6, 15),
@@ -304,12 +304,12 @@ test('the responsible filter switches the calendar to another employee\'s items,
     $mine = Milestone::factory()->create([
         'name' => 'Mine',
         'responsible_user_id' => $myEmployeeId,
-        'planned_date' => Carbon::create(2026, 6, 15),
+        'planned_start_date' => Carbon::create(2026, 6, 15),
     ]);
     $theirs = Milestone::factory()->create([
         'name' => 'Theirs',
         'responsible_user_id' => $otherEmployeeId,
-        'planned_date' => Carbon::create(2026, 6, 15),
+        'planned_start_date' => Carbon::create(2026, 6, 15),
     ]);
 
     Livewire::actingAs($user)
@@ -343,11 +343,11 @@ test('switching to day view shows only the anchor date, and week view shows its 
 
     $inWeek = Milestone::factory()->create([
         'responsible_user_id' => $employeeId,
-        'planned_date' => Carbon::create(2026, 6, 16),
+        'planned_start_date' => Carbon::create(2026, 6, 16),
     ]);
     $outsideWeek = Milestone::factory()->create([
         'responsible_user_id' => $employeeId,
-        'planned_date' => Carbon::create(2026, 6, 25),
+        'planned_start_date' => Carbon::create(2026, 6, 25),
     ]);
 
     Livewire::actingAs($user)

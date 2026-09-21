@@ -7,18 +7,22 @@ namespace App\Enums;
 use App\Enums\Concerns\HasTranslatedLabel;
 
 /**
- * Whether a milestone was reached, and if not, why it is no longer pending.
+ * Where a milestone stands in its own delivery lifecycle.
  *
  * The value is what lands in `milestones.status` (VARCHAR(50)). Values are
  * lower case and casing is part of the value.
+ *
+ * "Missed" and "overdue" are NOT members here — they are derived, not stored.
+ * See Milestone::isMissed() and Milestone::isOverdue().
  */
 enum MilestoneStatus: string
 {
     use HasTranslatedLabel;
 
-    case Pending = 'pending';
+    case Planned = 'planned';
+    case Ongoing = 'ongoing';
     case Reached = 'reached';
-    case Missed = 'missed';
+    case Postponed = 'postponed';
     case Cancelled = 'cancelled';
 
     /**

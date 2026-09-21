@@ -98,7 +98,7 @@ test('project detail renders its milestones as a single delivery timeline', func
         'project_id' => $project->id,
         'responsible_user_id' => $responsible->id,
         'name' => 'Household survey',
-        'status' => MilestoneStatus::Pending,
+        'status' => MilestoneStatus::Planned,
         'sequence' => 2,
     ]);
 
@@ -108,7 +108,7 @@ test('project detail renders its milestones as a single delivery timeline', func
         ->assertSee('Baseline assessment')
         ->assertSee('Household survey')
         ->assertSee(MilestoneStatus::Reached->label())
-        ->assertSee(MilestoneStatus::Pending->label())
+        ->assertSee(MilestoneStatus::Planned->label())
         ->assertDontSee('data-tree-depth', false);
 });
 
@@ -125,7 +125,7 @@ test('project detail shows weighted milestone progress in the header', function 
     Milestone::factory()->create([
         'project_id' => $project->id,
         'responsible_user_id' => $responsible->id,
-        'status' => MilestoneStatus::Pending,
+        'status' => MilestoneStatus::Planned,
         'weight_percentage' => 40,
     ]);
 

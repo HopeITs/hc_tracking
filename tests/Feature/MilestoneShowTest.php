@@ -53,10 +53,10 @@ test('updating a milestone requires its core delivery fields', function () {
     Livewire::actingAs($user)
         ->test('pages::milestones.show', ['milestone' => $milestone])
         ->set('name', '   ')
-        ->set('plannedDate', '')
+        ->set('plannedStartDate', '')
         ->set('responsibleUserId', '')
         ->call('updateMilestone')
-        ->assertHasErrors(['name', 'plannedDate', 'responsibleUserId']);
+        ->assertHasErrors(['name', 'plannedStartDate', 'responsibleUserId']);
 });
 
 test('the edit parent picker is project local and excludes the milestone and its descendants', function () {
@@ -96,7 +96,7 @@ test('a related milestone can be added from the show page as a child by default'
         ->assertSet('relatedParentMilestoneId', (string) $milestone->id)
         ->set('relatedName', '  Household survey  ')
         ->set('relatedResponsibleUserId', (string) $responsible)
-        ->set('relatedPlannedDate', '2026-06-30')
+        ->set('relatedPlannedStartDate', '2026-06-30')
         ->call('saveRelatedMilestone')
         ->assertHasNoErrors()
         ->assertSet('showRelatedModal', false);
@@ -118,7 +118,7 @@ test('a related milestone can instead be created at the top level of the same pr
         ->call('openRelatedModal')
         ->set('relatedName', 'Standalone gate')
         ->set('relatedResponsibleUserId', (string) $responsible)
-        ->set('relatedPlannedDate', '2026-06-30')
+        ->set('relatedPlannedStartDate', '2026-06-30')
         ->set('relatedParentMilestoneId', '')
         ->call('saveRelatedMilestone')
         ->assertHasNoErrors();
@@ -147,15 +147,15 @@ test('creating a related milestone requires its core delivery fields', function 
         ->test('pages::milestones.show', ['milestone' => $milestone])
         ->call('openRelatedModal')
         ->set('relatedName', '   ')
-        ->set('relatedPlannedDate', '')
+        ->set('relatedPlannedStartDate', '')
         ->set('relatedResponsibleUserId', '')
         ->call('saveRelatedMilestone')
-        ->assertHasErrors(['relatedName', 'relatedPlannedDate', 'relatedResponsibleUserId']);
+        ->assertHasErrors(['relatedName', 'relatedPlannedStartDate', 'relatedResponsibleUserId']);
 });
 
 test('the status can be changed from the edit form', function () {
     $user = User::factory()->create();
-    $milestone = Milestone::factory()->create(['status' => MilestoneStatus::Pending]);
+    $milestone = Milestone::factory()->create(['status' => MilestoneStatus::Planned]);
 
     Livewire::actingAs($user)
         ->test('pages::milestones.show', ['milestone' => $milestone])

@@ -10,9 +10,10 @@
         },
         $case instanceof \App\Enums\MilestoneStatus => match ($case) {
             \App\Enums\MilestoneStatus::Reached => 'good',
-            \App\Enums\MilestoneStatus::Missed => 'accent',
+            \App\Enums\MilestoneStatus::Ongoing => 'solid',
+            \App\Enums\MilestoneStatus::Postponed => 'accent',
             \App\Enums\MilestoneStatus::Cancelled => 'muted',
-            \App\Enums\MilestoneStatus::Pending => 'outline',
+            \App\Enums\MilestoneStatus::Planned => 'outline',
         },
         $case instanceof \App\Enums\ProposalStatus => match ($case) {
             \App\Enums\ProposalStatus::Approved,

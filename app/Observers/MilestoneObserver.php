@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Observers;
 
+use App\Enums\MilestoneStatus;
 use App\Exceptions\InvalidParentException;
 use App\Models\Milestone;
+use Carbon\CarbonImmutable;
 
 /**
  * Keeps the milestone tree well formed.
@@ -40,6 +42,7 @@ final class MilestoneObserver
         }
 
         $this->assignSequence($milestone);
+        $this->stampActualDates($milestone);
     }
 
     /**
@@ -67,5 +70,38 @@ final class MilestoneObserver
             ->max('sequence');
 
         $milestone->sequence = $lastSiblingSequence === null ? 1 : (int) $lastSiblingSequence + 1;
+    }
+
+    /**
+     * actual_start_date and actual_end_date are never entered by hand — they
+     * are stamped with today the moment status crosses into Ongoing or
+     * Reached, and never again, so re-saving an already-ongoing milestone
+     * cannot push its start date forward.
+     *
+     * A milestone that jumps straight to Reached without ever passing through
+     * Ongoing still gets an actual_start_date, because it did start, even
+     * though nobody recorded the moment separately.
+     */
+    private function stampActualDates(Milestone $milestone): void
+    {
+        if (! $milestone->isDirty('status')) {
+            return;
+        }
+
+        $today = CarbonImmutable::now()->toDateString();
+
+        if ($milestone->status === MilestoneStatus::Ongoing && $milestone->actual_start_date === null) {
+            $milestone->actual_start_date = $today;
+        }
+
+        if ($milestone->status === MilestoneStatus::Reached) {
+            if ($milestone->actual_start_date === null) {
+                $milestone->actual_start_date = $today;
+            }
+
+            if ($milestone->actual_end_date === null) {
+                $milestone->actual_end_date = $today;
+            }
+        }
     }
 }

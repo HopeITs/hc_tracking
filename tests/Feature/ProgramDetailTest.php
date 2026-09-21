@@ -170,7 +170,7 @@ test('program detail calculates milestone progress without cancelled milestones'
     ]);
     Milestone::factory()->create([
         'project_id' => $project->id,
-        'status' => MilestoneStatus::Pending,
+        'status' => MilestoneStatus::Planned,
         'weight_percentage' => '60.00',
     ]);
     Milestone::factory()->create([
@@ -221,9 +221,9 @@ test('program delivery timeline shows weighted progress per project', function (
         'start_date' => '2026-01-01',
         'end_date' => '2026-12-31',
     ]);
-    Milestone::factory()->create(['project_id' => $project->id, 'status' => MilestoneStatus::Reached, 'weight_percentage' => '25.00', 'planned_date' => '2026-03-01']);
-    Milestone::factory()->create(['project_id' => $project->id, 'status' => MilestoneStatus::Pending, 'weight_percentage' => '75.00', 'planned_date' => '2026-10-01']);
-    Milestone::factory()->create(['project_id' => $project->id, 'status' => MilestoneStatus::Cancelled, 'weight_percentage' => '50.00', 'planned_date' => '2020-01-01']);
+    Milestone::factory()->create(['project_id' => $project->id, 'status' => MilestoneStatus::Reached, 'weight_percentage' => '25.00', 'planned_start_date' => '2026-03-01']);
+    Milestone::factory()->create(['project_id' => $project->id, 'status' => MilestoneStatus::Planned, 'weight_percentage' => '75.00', 'planned_start_date' => '2026-10-01']);
+    Milestone::factory()->create(['project_id' => $project->id, 'status' => MilestoneStatus::Cancelled, 'weight_percentage' => '50.00', 'planned_start_date' => '2020-01-01']);
 
     $component = Livewire::actingAs(User::factory()->create())
         ->test('pages::programs.show', ['program' => $program])
@@ -243,8 +243,8 @@ test('program delivery timeline flags schedule slippage and milestones outside t
         'start_date' => '2026-01-01',
         'end_date' => '2026-12-31',
     ]);
-    Milestone::factory()->create(['project_id' => $project->id, 'status' => MilestoneStatus::Reached, 'weight_percentage' => '25.00', 'planned_date' => '2026-03-01']);
-    Milestone::factory()->create(['project_id' => $project->id, 'status' => MilestoneStatus::Pending, 'weight_percentage' => '75.00', 'planned_date' => '2027-05-01']);
+    Milestone::factory()->create(['project_id' => $project->id, 'status' => MilestoneStatus::Reached, 'weight_percentage' => '25.00', 'planned_start_date' => '2026-03-01']);
+    Milestone::factory()->create(['project_id' => $project->id, 'status' => MilestoneStatus::Planned, 'weight_percentage' => '75.00', 'planned_start_date' => '2027-05-01']);
 
     $component = Livewire::actingAs(User::factory()->create())
         ->test('pages::programs.show', ['program' => $program])
@@ -265,7 +265,7 @@ test('program delivery timeline marks open projects past their end date', functi
         'start_date' => '2025-01-01',
         'end_date' => '2026-06-30',
     ]);
-    Milestone::factory()->create(['project_id' => $project->id, 'status' => MilestoneStatus::Pending, 'weight_percentage' => '100.00', 'planned_date' => '2026-05-01']);
+    Milestone::factory()->create(['project_id' => $project->id, 'status' => MilestoneStatus::Planned, 'weight_percentage' => '100.00', 'planned_start_date' => '2026-05-01']);
 
     Livewire::actingAs(User::factory()->create())
         ->test('pages::programs.show', ['program' => $program])
@@ -323,7 +323,7 @@ test('program delivery timeline does not rate projects that have not started del
         'start_date' => '2026-01-01',
         'end_date' => '2026-12-31',
     ]);
-    Milestone::factory()->create(['project_id' => $project->id, 'status' => MilestoneStatus::Pending, 'weight_percentage' => '100.00', 'planned_date' => '2026-06-01']);
+    Milestone::factory()->create(['project_id' => $project->id, 'status' => MilestoneStatus::Planned, 'weight_percentage' => '100.00', 'planned_start_date' => '2026-06-01']);
 
     Livewire::actingAs(User::factory()->create())
         ->test('pages::programs.show', ['program' => $program])
@@ -357,7 +357,7 @@ test('program delivery window is not stretched by a mistyped milestone date', fu
         'start_date' => '2026-01-01',
         'end_date' => '2026-12-31',
     ]);
-    Milestone::factory()->create(['project_id' => $project->id, 'status' => MilestoneStatus::Pending, 'weight_percentage' => '100.00', 'planned_date' => '2035-01-01']);
+    Milestone::factory()->create(['project_id' => $project->id, 'status' => MilestoneStatus::Planned, 'weight_percentage' => '100.00', 'planned_start_date' => '2035-01-01']);
 
     $window = Livewire::actingAs(User::factory()->create())
         ->test('pages::programs.show', ['program' => $program])

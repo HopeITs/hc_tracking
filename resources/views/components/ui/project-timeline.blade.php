@@ -26,8 +26,8 @@
 
     $markerTone = fn ($milestone): string => match (true) {
         $milestone->status === MilestoneStatus::Reached => 'border-status-good bg-status-good',
-        $milestone->status === MilestoneStatus::Missed => 'border-primary bg-primary',
-        $milestone->planned_date->lt($today) => 'border-status-warn bg-status-warn',
+        $milestone->isMissed() || $milestone->isOverdue() => 'border-primary bg-primary',
+        $milestone->status === MilestoneStatus::Ongoing => 'border-status-warn bg-status-warn',
         default => 'border-secondary-dark bg-board dark:border-white',
     };
 @endphp
@@ -94,9 +94,9 @@
             {{-- Legend --}}
             <div class="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-board-line px-5 py-3 type-meta text-secondary-medium dark:text-secondary-soft" aria-hidden="true">
                 <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-status-good bg-status-good"></span>{{ MilestoneStatus::Reached->label() }}</span>
-                <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-secondary-dark bg-board dark:border-white"></span>{{ MilestoneStatus::Pending->label() }}</span>
-                <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-status-warn bg-status-warn"></span>{{ __('programs.timeline_overdue') }}</span>
-                <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-primary bg-primary"></span>{{ MilestoneStatus::Missed->label() }}</span>
+                <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-secondary-dark bg-board dark:border-white"></span>{{ MilestoneStatus::Planned->label() }}</span>
+                <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-status-warn bg-status-warn"></span>{{ MilestoneStatus::Ongoing->label() }}</span>
+                <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-primary bg-primary"></span>{{ __('milestones.missed') }} / {{ __('milestones.overdue') }}</span>
                 <span class="inline-flex items-center gap-1.5"><span class="w-4 border-t-2 border-dashed border-status-warn"></span>{{ __('programs.timeline_outside_legend') }}</span>
                 <span class="inline-flex items-center gap-1.5"><span class="relative flex h-3.5 w-7 rounded-sm border border-primary/40 bg-primary/10"><span class="h-full w-3 rounded-s-sm bg-primary"></span><span class="absolute -inset-y-1 start-4 w-0.5 bg-primary"></span></span>{{ __('programs.timeline_legend_progress') }}</span>
                 <span class="inline-flex items-center gap-1.5"><span class="h-3.5 w-0.5 bg-primary"></span>{{ __('programs.timeline_today') }}</span>
@@ -170,7 +170,7 @@
                             default => 'border-board-line bg-secondary-soft/60 dark:bg-secondary-medium/40',
                         };
                         $outside = $hasDates
-                            ? $project->milestones->filter(fn ($milestone): bool => $milestone->planned_date->lt($project->start_date) || $milestone->planned_date->gt($project->end_date))
+                            ? $project->milestones->filter(fn ($milestone): bool => $milestone->planned_start_date->lt($project->start_date) || $milestone->planned_start_date->gt($project->end_date))
                             : collect();
                         $barLabel = ($progress === null ? __('programs.timeline_unmeasured') : $progress.'% '.__('programs.timeline_weighted_complete')).($expectedLabel === null ? '' : ' · '.$expectedLabel);
                     @endphp
@@ -219,8 +219,8 @@
 
                                         @foreach ($outside as $milestone)
                                             @php
-                                                $markerAt = $position($milestone->planned_date);
-                                                $anchorAt = $milestone->planned_date->gt($project->end_date) ? $barEnd : $barStart;
+                                                $markerAt = $position($milestone->planned_start_date);
+                                                $anchorAt = $milestone->planned_start_date->gt($project->end_date) ? $barEnd : $barStart;
                                             @endphp
                                             <span aria-hidden="true" class="absolute top-1/2 z-10 border-t-2 border-dashed border-status-warn" style="inset-inline-start: {{ min($markerAt, $anchorAt) }}%; width: {{ abs($markerAt - $anchorAt) }}%"></span>
                                         @endforeach
@@ -228,15 +228,15 @@
                                         @foreach ($project->milestones as $milestone)
                                             @php
                                                 $isOutside = $outside->contains($milestone);
-                                                $statusLabel = $milestone->planned_date->lt($today) && $milestone->status === MilestoneStatus::Pending ? __('programs.timeline_overdue') : $milestone->status->label();
+                                                $statusLabel = $milestone->isMissed() ? __('milestones.missed') : $milestone->status->label();
                                             @endphp
                                             @php
-                                                $markerDetails = __('programs.timeline_marker', ['name' => $milestone->name, 'date' => $milestone->planned_date->translatedFormat(__('formats.date')), 'status' => $statusLabel]).($isOutside ? ' · '.__('programs.timeline_outside_legend') : '');
+                                                $markerDetails = __('programs.timeline_marker', ['name' => $milestone->name, 'date' => $milestone->planned_start_date->translatedFormat(__('formats.date')), 'status' => $statusLabel]).($isOutside ? ' · '.__('programs.timeline_outside_legend') : '');
                                             @endphp
                                             <button
                                                 type="button"
                                                 class="absolute top-1/2 z-20 flex size-6 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-primary rtl:translate-x-1/2"
-                                                style="inset-inline-start: {{ $position($milestone->planned_date) }}%"
+                                                style="inset-inline-start: {{ $position($milestone->planned_start_date) }}%"
                                                 x-data="{ open: false }"
                                                 x-on:mouseenter="open = true"
                                                 x-on:mouseleave="open = false"
@@ -254,7 +254,7 @@
                                                     class="pointer-events-none absolute bottom-full start-1/2 z-30 mb-1.5 w-max max-w-56 -translate-x-1/2 rounded-md bg-secondary-dark px-2.5 py-1.5 text-start text-xs leading-snug text-white shadow-lg rtl:translate-x-1/2 dark:bg-white dark:text-secondary-dark"
                                                 >
                                                     <span class="block font-semibold">{{ $milestone->name }}</span>
-                                                    <span class="block opacity-80">{{ $milestone->planned_date->translatedFormat(__('formats.date')) }} · {{ $statusLabel }}</span>
+                                                    <span class="block opacity-80">{{ $milestone->planned_start_date->translatedFormat(__('formats.date')) }} · {{ $statusLabel }}</span>
                                                     @if ($isOutside)
                                                         <span class="block font-semibold text-status-warn-soft dark:text-status-warn">{{ __('programs.timeline_outside_legend') }}</span>
                                                     @endif

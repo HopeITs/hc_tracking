@@ -23,8 +23,10 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
  * @property int $project_id
  * @property string $name
  * @property string|null $description
- * @property CarbonImmutable $planned_date
- * @property CarbonImmutable|null $actual_date
+ * @property CarbonImmutable $planned_start_date
+ * @property CarbonImmutable|null $planned_end_date
+ * @property CarbonImmutable|null $actual_start_date
+ * @property CarbonImmutable|null $actual_end_date
  * @property MilestoneStatus $status
  * @property int $sequence
  * @property string $weight_percentage
@@ -37,8 +39,8 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
     'project_id',
     'name',
     'description',
-    'planned_date',
-    'actual_date',
+    'planned_start_date',
+    'planned_end_date',
     'status',
     'sequence',
     'weight_percentage',
@@ -120,11 +122,40 @@ class Milestone extends Model
     protected function casts(): array
     {
         return [
-            'planned_date' => 'date',
-            'actual_date' => 'date',
+            'planned_start_date' => 'date',
+            'planned_end_date' => 'date',
+            'actual_start_date' => 'date',
+            'actual_end_date' => 'date',
             'status' => MilestoneStatus::class,
             'sequence' => 'integer',
             'weight_percentage' => 'decimal:2',
         ];
+    }
+
+    /**
+     * Whether the milestone finished later than planned.
+     *
+     * Derived rather than stored: comparing the two dates directly can never
+     * drift from what actually happened, the way a cached flag could.
+     */
+    public function isOverdue(): bool
+    {
+        return $this->actual_end_date !== null
+            && $this->planned_end_date !== null
+            && $this->actual_end_date->gt($this->planned_end_date);
+    }
+
+    /**
+     * Whether the milestone's planned end date has passed while it is still
+     * sitting in Planned — nobody ever moved it to Ongoing or Reached.
+     *
+     * Also derived rather than stored, so it can never disagree with `status`
+     * the way a separate "missed" status could.
+     */
+    public function isMissed(): bool
+    {
+        return $this->status === MilestoneStatus::Planned
+            && $this->planned_end_date !== null
+            && $this->planned_end_date->isPast();
     }
 }

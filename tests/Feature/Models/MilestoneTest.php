@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\MilestoneStatus;
 use App\Models\HrEmployee;
 use App\Models\Milestone;
 use App\Models\Project;
@@ -44,15 +45,17 @@ test('a milestone has the tasks that deliver it', function () {
 
 test('a milestone casts its dates, sequence and weight', function () {
     $milestone = Milestone::factory()->create([
-        'planned_date' => '2026-03-31',
-        'actual_date' => null,
+        'planned_start_date' => '2026-03-31',
+        'planned_end_date' => '2026-04-30',
         'sequence' => 3,
         'weight_percentage' => '25.5',
     ])->fresh();
 
-    expect($milestone->planned_date)->toBeInstanceOf(CarbonImmutable::class)
-        ->and($milestone->planned_date->toDateString())->toBe('2026-03-31')
-        ->and($milestone->actual_date)->toBeNull()
+    expect($milestone->planned_start_date)->toBeInstanceOf(CarbonImmutable::class)
+        ->and($milestone->planned_start_date->toDateString())->toBe('2026-03-31')
+        ->and($milestone->planned_end_date->toDateString())->toBe('2026-04-30')
+        ->and($milestone->actual_start_date)->toBeNull()
+        ->and($milestone->actual_end_date)->toBeNull()
         ->and($milestone->sequence)->toBe(3)
         ->and($milestone->weight_percentage)->toBe('25.50');
 });
@@ -132,4 +135,80 @@ test('re-nesting a milestone without an explicit sequence appends it after its n
     $mover->save();
 
     expect($mover->fresh()->sequence)->toBe(3);
+});
+
+test('moving a milestone to ongoing stamps actual_start_date once and never again', function () {
+    $milestone = Milestone::factory()->create(['status' => MilestoneStatus::Planned]);
+
+    $this->travelTo('2026-05-10');
+    $milestone->status = MilestoneStatus::Ongoing;
+    $milestone->save();
+
+    expect($milestone->fresh()->actual_start_date->toDateString())->toBe('2026-05-10');
+
+    $this->travelTo('2026-05-20');
+    $milestone->name = 'Renamed';
+    $milestone->save();
+
+    expect($milestone->fresh()->actual_start_date->toDateString())->toBe('2026-05-10');
+});
+
+test('moving a milestone straight to reached stamps both actual dates', function () {
+    $milestone = Milestone::factory()->create(['status' => MilestoneStatus::Planned]);
+
+    $this->travelTo('2026-06-01');
+    $milestone->status = MilestoneStatus::Reached;
+    $milestone->save();
+
+    expect($milestone->fresh()->actual_start_date->toDateString())->toBe('2026-06-01')
+        ->and($milestone->fresh()->actual_end_date->toDateString())->toBe('2026-06-01');
+});
+
+test('reaching a milestone that was already ongoing keeps its original actual_start_date', function () {
+    $milestone = Milestone::factory()->create(['status' => MilestoneStatus::Planned]);
+
+    $this->travelTo('2026-05-01');
+    $milestone->status = MilestoneStatus::Ongoing;
+    $milestone->save();
+
+    $this->travelTo('2026-06-15');
+    $milestone->status = MilestoneStatus::Reached;
+    $milestone->save();
+
+    expect($milestone->fresh()->actual_start_date->toDateString())->toBe('2026-05-01')
+        ->and($milestone->fresh()->actual_end_date->toDateString())->toBe('2026-06-15');
+});
+
+test('an explicitly supplied actual date is never overwritten by the status stamp', function () {
+    $milestone = Milestone::factory()->create(['status' => MilestoneStatus::Planned]);
+
+    $milestone->status = MilestoneStatus::Reached;
+    $milestone->actual_end_date = '2026-01-01';
+    $milestone->save();
+
+    expect($milestone->fresh()->actual_end_date->toDateString())->toBe('2026-01-01');
+});
+
+test('a milestone is missed only while still planned past its planned end date', function () {
+    $this->travelTo('2026-06-10');
+
+    $stillPlanned = Milestone::factory()->create(['status' => MilestoneStatus::Planned, 'planned_end_date' => '2026-06-01']);
+    $notDueYet = Milestone::factory()->create(['status' => MilestoneStatus::Planned, 'planned_end_date' => '2026-07-01']);
+    $ongoingButLate = Milestone::factory()->create(['status' => MilestoneStatus::Ongoing, 'planned_end_date' => '2026-06-01']);
+    $noDeadline = Milestone::factory()->create(['status' => MilestoneStatus::Planned, 'planned_end_date' => null]);
+
+    expect($stillPlanned->isMissed())->toBeTrue()
+        ->and($notDueYet->isMissed())->toBeFalse()
+        ->and($ongoingButLate->isMissed())->toBeFalse()
+        ->and($noDeadline->isMissed())->toBeFalse();
+});
+
+test('a milestone is overdue only when it finished after its planned end date', function () {
+    $finishedLate = Milestone::factory()->create(['planned_end_date' => '2026-06-01', 'actual_end_date' => '2026-06-05']);
+    $finishedOnTime = Milestone::factory()->create(['planned_end_date' => '2026-06-01', 'actual_end_date' => '2026-06-01']);
+    $notFinishedYet = Milestone::factory()->create(['planned_end_date' => '2026-06-01', 'actual_end_date' => null]);
+
+    expect($finishedLate->isOverdue())->toBeTrue()
+        ->and($finishedOnTime->isOverdue())->toBeFalse()
+        ->and($notFinishedYet->isOverdue())->toBeFalse();
 });

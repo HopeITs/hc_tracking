@@ -55,7 +55,7 @@ test('the attention queue lists late work and materialised risks, most overdue f
     $task = Task::factory()->create(['title' => 'Submit the water survey', 'due_date' => '2026-09-10']);
     Task::factory()->create(['title' => 'Finished task', 'due_date' => '2026-09-01', 'status' => TaskStatus::Done]);
     Task::factory()->create(['title' => 'Future task', 'due_date' => '2026-11-20']);
-    Milestone::factory()->create(['name' => 'Handover of wells', 'planned_date' => '2026-08-16']);
+    Milestone::factory()->create(['name' => 'Handover of wells', 'planned_start_date' => '2026-08-16', 'planned_end_date' => '2026-08-16']);
     Risk::factory()->happened()->create(['name' => 'Road closure']);
 
     Livewire::actingAs(User::factory()->create())

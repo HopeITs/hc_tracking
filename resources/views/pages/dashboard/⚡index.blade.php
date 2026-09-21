@@ -70,11 +70,11 @@ new #[Title('titles.dashboard')] class extends Component {
             ));
 
         $milestones = Milestone::query()
-            ->select(['id', 'project_id', 'name', 'planned_date', 'status'])
+            ->select(['id', 'project_id', 'name', 'planned_end_date', 'status'])
             ->with('project:id,name')
-            ->where('status', MilestoneStatus::Pending)
-            ->whereDate('planned_date', '<', $today)
-            ->oldest('planned_date')
+            ->where('status', MilestoneStatus::Planned)
+            ->whereDate('planned_end_date', '<', $today)
+            ->oldest('planned_end_date')
             ->limit(self::AttentionLimit)
             ->get()
             ->map(fn (Milestone $milestone): array => $this->attentionEntry(
@@ -83,8 +83,8 @@ new #[Title('titles.dashboard')] class extends Component {
                 icon: 'flag',
                 title: $milestone->name,
                 context: __('dashboard.milestone_in', ['project' => $milestone->project?->name ?? '—']),
-                daysLate: (int) $milestone->planned_date->diffInDays($today),
-                href: route('milestones.index', ['project' => $milestone->project_id, 'status' => MilestoneStatus::Pending->value]),
+                daysLate: (int) $milestone->planned_end_date->diffInDays($today),
+                href: route('milestones.index', ['project' => $milestone->project_id, 'status' => MilestoneStatus::Planned->value]),
             ));
 
         $transfers = TransfersTracking::query()
@@ -171,7 +171,7 @@ new #[Title('titles.dashboard')] class extends Component {
         $today = CarbonImmutable::today();
 
         $delivery = Task::query()->where('status', '!=', TaskStatus::Done)->whereDate('due_date', '<', $today)->count()
-            + Milestone::query()->where('status', MilestoneStatus::Pending)->whereDate('planned_date', '<', $today)->count();
+            + Milestone::query()->where('status', MilestoneStatus::Planned)->whereDate('planned_end_date', '<', $today)->count();
         $funding = TransfersTracking::query()->where('ar_status', ArStatus::Pending)->whereDate('scheduled_date', '<', $today)->count();
         $risks = Risk::query()->where('happened', true)->count();
 
@@ -408,16 +408,16 @@ new #[Title('titles.dashboard')] class extends Component {
         $horizon = [$today->toDateString(), $today->addDays(30)->toDateString()];
 
         $milestones = Milestone::query()
-            ->select(['id', 'project_id', 'name', 'planned_date'])
+            ->select(['id', 'project_id', 'name', 'planned_end_date'])
             ->with('project:id,name')
-            ->where('status', MilestoneStatus::Pending)
-            ->whereBetween('planned_date', $horizon)
-            ->oldest('planned_date')
+            ->where('status', MilestoneStatus::Planned)
+            ->whereBetween('planned_end_date', $horizon)
+            ->oldest('planned_end_date')
             ->limit(8)
             ->get()
             ->map(fn (Milestone $milestone): array => [
                 'key' => 'milestone-'.$milestone->id,
-                'date' => $milestone->planned_date,
+                'date' => $milestone->planned_end_date,
                 'icon' => 'flag',
                 'tone' => 'neutral',
                 'title' => $milestone->name,

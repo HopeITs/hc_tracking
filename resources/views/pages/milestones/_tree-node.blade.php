@@ -14,9 +14,10 @@
                 <div class="flex flex-wrap items-center gap-2">
                     <p class="min-w-0 font-semibold text-secondary-dark dark:text-white">{{ $milestone->name }}</p>
                     <x-ui.enum-badge :case="$milestone->status" />
+                    <x-ui.milestone-flags :milestone="$milestone" />
                 </div>
                 <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-secondary-medium dark:text-secondary-soft">
-                    <span>{{ __('milestones.planned_date', ['date' => $milestone->planned_date->translatedFormat(__('formats.date'))]) }}</span>
+                    <span>{{ __('milestones.planned_date', ['date' => $milestone->planned_start_date->translatedFormat(__('formats.date'))]) }}</span>
                     <span>{{ __('milestones.weight_weight', ['weight' => $milestone->weight_percentage]) }}</span>
                     <x-ui.employee-chip :employee="$milestone->responsibleUser" compact />
                 </div>

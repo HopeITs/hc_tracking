@@ -46,9 +46,9 @@ new #[Title('titles.calendar')] class extends Component {
     public ?int $editingMilestoneId = null;
     public ?int $deletingMilestoneId = null;
     public string $name = '';
-    public string $plannedDate = '';
-    public string $actualDate = '';
-    public string $milestoneStatus = 'pending';
+    public string $plannedStartDate = '';
+    public string $plannedEndDate = '';
+    public string $milestoneStatus = 'planned';
     public string $sequence = '1';
     public string $weightPercentage = '0';
     public string $responsibleUserId = '';
@@ -232,15 +232,15 @@ new #[Title('titles.calendar')] class extends Component {
         $milestonesByDay = $employeeId === null || ! $this->showMilestones
             ? new Collection
             : Milestone::query()
-                ->select(['id', 'project_id', 'name', 'planned_date', 'status', 'weight_percentage', 'responsible_user_id'])
+                ->select(['id', 'project_id', 'name', 'planned_start_date', 'planned_end_date', 'actual_end_date', 'status', 'weight_percentage', 'responsible_user_id'])
                 ->where('responsible_user_id', $employeeId)
-                ->whereBetween('planned_date', [$gridStart->toDateString(), $gridEnd->toDateString()])
+                ->whereBetween('planned_start_date', [$gridStart->toDateString(), $gridEnd->toDateString()])
                 ->with('project:id,name')
                 ->withCount(['children', 'tasks'])
-                ->orderBy('planned_date')
+                ->orderBy('planned_start_date')
                 ->orderBy('sequence')
                 ->get()
-                ->groupBy(fn (Milestone $milestone): string => $milestone->planned_date->toDateString());
+                ->groupBy(fn (Milestone $milestone): string => $milestone->planned_start_date->toDateString());
 
         $tasksByDay = $employeeId === null || ! $this->showTasks
             ? new Collection
@@ -346,7 +346,7 @@ new #[Title('titles.calendar')] class extends Component {
         $this->resetMilestoneForm();
 
         if ($date !== null) {
-            $this->plannedDate = $date;
+            $this->plannedStartDate = $date;
         }
 
         $this->responsibleUserId = (string) ($this->scopedEmployeeId() ?? '');
@@ -356,14 +356,14 @@ new #[Title('titles.calendar')] class extends Component {
     public function openEditModal(int $milestoneId): void
     {
         $milestone = Milestone::query()
-            ->select(['id', 'project_id', 'name', 'planned_date', 'actual_date', 'status', 'sequence', 'weight_percentage', 'responsible_user_id', 'parent_milestone_id'])
+            ->select(['id', 'project_id', 'name', 'planned_start_date', 'planned_end_date', 'status', 'sequence', 'weight_percentage', 'responsible_user_id', 'parent_milestone_id'])
             ->findOrFail($milestoneId);
 
         $this->resetValidation();
         $this->editingMilestoneId = $milestone->id;
         $this->name = $milestone->name;
-        $this->plannedDate = $milestone->planned_date->toDateString();
-        $this->actualDate = $milestone->actual_date?->toDateString() ?? '';
+        $this->plannedStartDate = $milestone->planned_start_date->toDateString();
+        $this->plannedEndDate = $milestone->planned_end_date?->toDateString() ?? '';
         $this->milestoneStatus = $milestone->status->value;
         $this->sequence = (string) $milestone->sequence;
         $this->weightPercentage = $milestone->weight_percentage;
@@ -385,8 +385,8 @@ new #[Title('titles.calendar')] class extends Component {
 
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:255'],
-            'plannedDate' => ['required', 'date'],
-            'actualDate' => ['nullable', 'date'],
+            'plannedStartDate' => ['required', 'date'],
+            'plannedEndDate' => ['nullable', 'date', 'after_or_equal:plannedStartDate'],
             'milestoneStatus' => ['required', new Enum(MilestoneStatus::class)],
             'sequence' => ['required', 'integer', 'min:0'],
             'weightPercentage' => ['required', 'numeric', 'min:0', 'max:100'],
@@ -407,7 +407,8 @@ new #[Title('titles.calendar')] class extends Component {
             ],
         ], [
             'name.required' => __('milestones.enter_a_milestone_name'),
-            'plannedDate.required' => __('milestones.set_the_planned_date'),
+            'plannedStartDate.required' => __('milestones.set_the_planned_start_date'),
+            'plannedEndDate.after_or_equal' => __('milestones.planned_end_date_must_be_on_or_after_the_planned_start_date'),
             'responsibleUserId.required' => __('milestones.select_the_responsible_staff_member'),
             'milestoneProjectId.required' => __('milestones.select_the_project'),
             'milestoneProjectId.in' => __('milestones.a_milestone_cannot_be_moved_to_another_project'),
@@ -419,8 +420,8 @@ new #[Title('titles.calendar')] class extends Component {
         $milestone = $existingMilestone ?? new Milestone;
         $attributes = [
             'name' => $validated['name'],
-            'planned_date' => $validated['plannedDate'],
-            'actual_date' => $validated['actualDate'] === '' ? null : $validated['actualDate'],
+            'planned_start_date' => $validated['plannedStartDate'],
+            'planned_end_date' => $validated['plannedEndDate'] === '' ? null : $validated['plannedEndDate'],
             'status' => $validated['milestoneStatus'],
             'sequence' => (int) $validated['sequence'],
             'weight_percentage' => $validated['weightPercentage'],
@@ -491,9 +492,9 @@ new #[Title('titles.calendar')] class extends Component {
         $this->resetValidation();
         $this->editingMilestoneId = null;
         $this->name = '';
-        $this->plannedDate = '';
-        $this->actualDate = '';
-        $this->milestoneStatus = 'pending';
+        $this->plannedStartDate = '';
+        $this->plannedEndDate = '';
+        $this->milestoneStatus = 'planned';
         $this->sequence = '1';
         $this->weightPercentage = '0';
         $this->responsibleUserId = '';
@@ -702,11 +703,17 @@ new #[Title('titles.calendar')] class extends Component {
     $today = \Carbon\CarbonImmutable::today();
     $hasEmployee = auth()->user()->employee_id !== null;
 
-    $markerTone = fn (MilestoneStatus $status): string => match ($status) {
-        MilestoneStatus::Reached => 'bg-status-good-soft text-status-good',
-        MilestoneStatus::Missed => 'bg-status-critical-soft text-primary',
-        MilestoneStatus::Cancelled => 'bg-secondary-soft text-secondary-medium dark:bg-secondary-medium dark:text-secondary-soft',
-        MilestoneStatus::Pending => 'bg-white text-secondary-dark ring-1 ring-secondary-soft dark:bg-secondary-dark dark:text-white dark:ring-secondary-medium',
+    $markerTone = function (Milestone $milestone): string {
+        if ($milestone->isMissed() || $milestone->isOverdue()) {
+            return 'bg-status-critical-soft text-primary';
+        }
+
+        return match ($milestone->status) {
+            MilestoneStatus::Reached => 'bg-status-good-soft text-status-good',
+            MilestoneStatus::Ongoing => 'bg-status-warn-soft text-status-warn',
+            MilestoneStatus::Postponed, MilestoneStatus::Cancelled => 'bg-secondary-soft text-secondary-medium dark:bg-secondary-medium dark:text-secondary-soft',
+            MilestoneStatus::Planned => 'bg-white text-secondary-dark ring-1 ring-secondary-soft dark:bg-secondary-dark dark:text-white dark:ring-secondary-medium',
+        };
     };
 
     $taskTone = fn (TaskStatus $status): string => match ($status) {
@@ -1054,8 +1061,8 @@ new #[Title('titles.calendar')] class extends Component {
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.input wire:model="plannedDate" :label="__('milestones.planned_date_2')" type="date" required data-test="calendar-form-planned-date" />
-                <x-ui.input wire:model="actualDate" :label="__('milestones.actual_date')" type="date" />
+                <x-ui.input wire:model="plannedStartDate" :label="__('milestones.planned_start_date')" type="date" required data-test="calendar-form-planned-date" />
+                <x-ui.input wire:model="plannedEndDate" :label="__('milestones.planned_end_date')" type="date" />
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2">
