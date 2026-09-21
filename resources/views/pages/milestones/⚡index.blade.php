@@ -623,6 +623,8 @@ new #[Title('titles.milestones')] class extends Component {
 
             <x-ui.input wire:model="name" :label="__('milestones.milestone_name')" type="text" maxlength="255" required autofocus />
 
+            <flux:textarea wire:model="description" :label="__('common.description')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!" />
+
             <div class="grid gap-4 sm:grid-cols-2">
                 <div class="min-w-0">
                     <label for="milestone-form-project" class="{{ $dropdownLabelClasses }}">{{ __('common.project') }}</label>

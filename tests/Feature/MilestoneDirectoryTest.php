@@ -183,6 +183,28 @@ test('milestones created through the form are sequenced after their existing sib
     expect($milestone->sequence)->toBe(2);
 });
 
+test('the create modal has a description field and saves it', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->create();
+    $responsible = insertHrEmployee();
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.index')
+        ->call('openCreateModal')
+        ->assertSee('wire:model="description"', false)
+        ->set('milestoneProjectId', (string) $project->id)
+        ->set('name', 'Borehole drilling')
+        ->set('description', '  Drill and cap the new borehole.  ')
+        ->set('responsibleUserId', (string) $responsible)
+        ->set('plannedDate', '2026-06-30')
+        ->call('saveMilestone')
+        ->assertHasNoErrors();
+
+    $milestone = Milestone::query()->where('name', 'Borehole drilling')->sole();
+
+    expect($milestone->description)->toBe('Drill and cap the new borehole.');
+});
+
 test('changing the project while creating clears the selected parent', function () {
     $user = User::factory()->create();
     $first = Project::factory()->create();
