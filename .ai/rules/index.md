@@ -11,8 +11,8 @@ Before planning or editing, find the row whose globs match the file's path and r
 | {app/Actions/Fortify/**,app/Console/Commands/**,config/auth.php,database/seeders/**} | .ai/rules/commands-seeders.md |
 | {app/Actions/Fortify/**,app/Console/Commands/**,config/fortify.php} | .ai/rules/commands.md |
 | resources/views/components/navigation/sidebar.blade.php | .ai/rules/components-navigation.md |
-| resources/views/components/ui/** | .ai/rules/components-ui.md |
-| resources/views/components/app-logo.blade.php | .ai/rules/components.md |
+| resources/views/components/ui/**, resources/views/components/ui/{logframe-node.blade.php,logframe.blade.php,target-lineage.blade.php} | .ai/rules/components-ui.md |
+| resources/views/components/app-logo.blade.php, resources/views/layouts/auth/simple.blade.php | .ai/rules/components.md |
 | app/Concerns/HasTree.php | .ai/rules/concerns.md |
 | config/session.php | .ai/rules/config-2.md |
 | {config/database.php,.env.example} | .ai/rules/config.md |

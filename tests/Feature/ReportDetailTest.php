@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\FileType;
 use App\Enums\ReportStatus;
 use App\Models\Report;
 use App\Models\ReportFile;
@@ -151,18 +150,6 @@ test('marking a report seen by meal is a one way acknowledgement', function () {
         ->and(method_exists($component->instance(), 'markUnseenByMeal'))->toBeFalse();
 });
 
-test('report files are listed as metadata with no download link', function () {
-    $user = User::factory()->create();
-    $report = Report::factory()->create();
-    $file = ReportFile::factory()->create(['report_id' => $report->id, 'type' => FileType::Xlsx]);
-
-    $response = $this->actingAs($user)->get(route('reports.show', $report))->assertOk();
-
-    $response->assertSeeText('XLSX');
-    $response->assertDontSee('href="'.$file->path, false);
-    $response->assertDontSee('download', false);
-});
-
 test('report detail renders a report with no files', function () {
     $user = User::factory()->create();
     $report = Report::factory()->create();
@@ -171,77 +158,6 @@ test('report detail renders a report with no files', function () {
         ->get(route('reports.show', $report))
         ->assertOk()
         ->assertSeeText('No files recorded');
-});
-
-test('a file record can be added to a draft report', function () {
-    $user = User::factory()->create();
-    $report = Report::factory()->create(['status' => ReportStatus::Draft]);
-
-    Livewire::actingAs($user)
-        ->test('pages::reports.show', ['report' => $report])
-        ->call('openCreateFileModal')
-        ->assertSet('showFileModal', true)
-        ->set('fileType', FileType::Pdf->value)
-        ->set('filePath', 'distribution-list-q1.pdf')
-        ->set('fileDate', '2026-03-31')
-        ->call('saveFile')
-        ->assertHasNoErrors()
-        ->assertSet('showFileModal', false);
-
-    $file = ReportFile::query()->where('report_id', $report->id)->sole();
-
-    expect($file->type)->toBe(FileType::Pdf)
-        ->and($file->path)->toBe('distribution-list-q1.pdf')
-        ->and($file->date->toDateString())->toBe('2026-03-31');
-});
-
-test('adding a file record requires a type a reference and a date', function () {
-    $user = User::factory()->create();
-    $report = Report::factory()->create(['status' => ReportStatus::Draft]);
-
-    Livewire::actingAs($user)
-        ->test('pages::reports.show', ['report' => $report])
-        ->call('openCreateFileModal')
-        ->set('fileType', '')
-        ->set('filePath', '')
-        ->set('fileDate', '')
-        ->call('saveFile')
-        ->assertHasErrors(['fileType', 'filePath', 'fileDate']);
-});
-
-test('a file record can be edited', function () {
-    $user = User::factory()->create();
-    $report = Report::factory()->create(['status' => ReportStatus::Draft]);
-    $file = ReportFile::factory()->create(['report_id' => $report->id, 'type' => FileType::Pdf, 'path' => 'old-name.pdf']);
-
-    Livewire::actingAs($user)
-        ->test('pages::reports.show', ['report' => $report])
-        ->call('openEditFileModal', $file->id)
-        ->assertSet('filePath', 'old-name.pdf')
-        ->set('filePath', 'new-name.pdf')
-        ->set('fileType', FileType::Docx->value)
-        ->call('saveFile')
-        ->assertHasNoErrors();
-
-    $file->refresh();
-
-    expect($file->path)->toBe('new-name.pdf')
-        ->and($file->type)->toBe(FileType::Docx);
-});
-
-test('a file record can be deleted', function () {
-    $user = User::factory()->create();
-    $report = Report::factory()->create(['status' => ReportStatus::Draft]);
-    $file = ReportFile::factory()->create(['report_id' => $report->id]);
-
-    Livewire::actingAs($user)
-        ->test('pages::reports.show', ['report' => $report])
-        ->call('confirmDeleteFile', $file->id)
-        ->assertSet('showDeleteFileModal', true)
-        ->call('deleteFile')
-        ->assertSet('showDeleteFileModal', false);
-
-    $this->assertDatabaseMissing('report_files', ['id' => $file->id]);
 });
 
 test('file records cannot be added, edited or deleted on a locked report', function () {

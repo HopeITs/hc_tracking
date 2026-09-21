@@ -575,3 +575,44 @@ input[type='search']::-webkit-search-cancel-button {
         stroke-dashoffset: 0;
     }
 }
+
+/* In-page Office previews (resources/js/file-preview.js): a spreadsheet grid and docx-preview's paper pages. */
+.sheet-preview-table {
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+    background: var(--color-white);
+    color: var(--color-secondary-dark);
+}
+
+.sheet-preview-table :is(th, td) {
+    border: 1px solid var(--color-secondary-soft);
+    padding: 0.25rem 0.5rem;
+    white-space: nowrap;
+    max-width: 24rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: start;
+}
+
+.sheet-preview-table tr:first-child > th,
+.sheet-preview-table th:first-child {
+    background: var(--color-board-head);
+    font-weight: 600;
+}
+
+.sheet-preview-table th:first-child {
+    color: var(--color-secondary-light);
+    text-align: end;
+    position: sticky;
+    inset-inline-start: 0;
+}
+
+.docx-preview-wrapper {
+    background: transparent !important;
+    padding: 1rem !important;
+}
+
+.docx-preview-wrapper > section.docx-preview {
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.12) !important;
+    margin-bottom: 1rem !important;
+}

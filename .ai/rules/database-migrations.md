@@ -73,3 +73,6 @@ Covered by "a proposal cannot be deleted while a funding agreement points at it"
 
 ## transfers_tracking received amounts and scheduled_date are nullable
 User decision 2026-09-14: migration 2026_09_14_111851_make_transfers_tracking_received_amounts_nullable makes amount_received, net_amount_received and scheduled_date nullable. A pending tranche has received nothing — NULL means "not yet received". Never default blanks to payment_amount or today: that fakes disbursed money. Disbursed totals must sum only non-null net_amount_received. Rollback caveat: down() fails once NULL rows exist.
+
+## report_files stores real files; legacy rows are reference-only
+Migration 2026_09_21_112152 added disk (default 'local', private), original_name, mime_type, size, uploaded_by (nullable, nullOnDelete) to report_files. Rows with original_name NULL predate real storage: no file on disk, shown as "Reference only", no download (ReportFile::isStored()). Uploads go to report-files/{report_id} on the local disk, max 5MB, FileType extensions only; download via reports.files.download (scoped to the report, IDOR guard). Upload/edit/replace/delete only while the report is Draft; download at any status. A DB cascade delete of a report does not remove its disk files.

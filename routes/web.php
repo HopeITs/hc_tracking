@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\ProjectFileDownloadController;
+use App\Http\Controllers\ReportFileDownloadController;
+use App\Http\Controllers\ReportFilePreviewController;
 use App\Http\Controllers\SwitchLocaleController;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
@@ -96,6 +98,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::livewire('reports/{report}', 'pages::reports.show')
         ->name('reports.show');
+
+    Route::get('reports/{report}/files/{reportFile}/download', ReportFileDownloadController::class)
+        ->name('reports.files.download');
+
+    Route::get('reports/{report}/files/{reportFile}/preview', ReportFilePreviewController::class)
+        ->name('reports.files.preview');
 
     Route::livewire('admin/users', 'pages::admin.users')
         ->can('viewAny', User::class)
