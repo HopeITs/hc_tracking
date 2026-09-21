@@ -149,11 +149,28 @@ test('a risk can be deleted after confirmation', function () {
         ->test('pages::risks.index')
         ->call('confirmDelete', $risk->id)
         ->assertSet('deletingRiskId', $risk->id)
+        ->assertSet('showDeleteModal', true)
         ->call('deleteRisk')
         ->assertHasNoErrors()
-        ->assertSet('deletingRiskId', null);
+        ->assertSet('deletingRiskId', null)
+        ->assertSet('showDeleteModal', false);
 
     $this->assertDatabaseMissing('risks', ['id' => $risk->id]);
+});
+
+test('cancelling a delete closes the modal without deleting the risk', function () {
+    $user = User::factory()->create();
+    $risk = Risk::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::risks.index')
+        ->call('confirmDelete', $risk->id)
+        ->assertSet('showDeleteModal', true)
+        ->call('cancelDelete')
+        ->assertSet('deletingRiskId', null)
+        ->assertSet('showDeleteModal', false);
+
+    $this->assertDatabaseHas('risks', ['id' => $risk->id]);
 });
 
 test('delete is a no-op until a risk is confirmed', function () {
@@ -191,4 +208,77 @@ test('the risk register renders with no risks', function () {
     $user = User::factory()->create();
 
     Livewire::actingAs($user)->test('pages::risks.index')->assertSee('No risks logged');
+});
+
+test('the status strip counts materialised and watching risks regardless of the state filter', function () {
+    $user = User::factory()->create();
+    Risk::factory()->count(2)->create(['happened' => true]);
+    Risk::factory()->create(['happened' => false]);
+
+    $component = Livewire::actingAs($user)->test('pages::risks.index');
+
+    expect($component->get('stateCounts'))->toBe(['materialised' => 2, 'watching' => 1]);
+
+    $component->set('status', 'happened');
+
+    expect($component->get('stateCounts'))->toBe(['materialised' => 2, 'watching' => 1]);
+});
+
+test('the unmitigated toggle filters to risks with no mitigation recorded', function () {
+    $user = User::factory()->create();
+    Risk::factory()->create(['name' => 'Has mitigation', 'solution' => 'A plan.']);
+    Risk::factory()->create(['name' => 'No mitigation', 'solution' => null]);
+    Risk::factory()->create(['name' => 'Blank mitigation', 'solution' => '']);
+
+    $component = Livewire::actingAs($user)->test('pages::risks.index');
+
+    expect($component->get('unmitigatedCount'))->toBe(2);
+
+    $component
+        ->assertSee('Has mitigation')->assertSee('No mitigation')->assertSee('Blank mitigation')
+        ->call('toggleUnmitigated')
+        ->assertSet('unmitigated', true)
+        ->assertDontSee('Has mitigation')->assertSee('No mitigation')->assertSee('Blank mitigation')
+        ->call('toggleUnmitigated')
+        ->assertSet('unmitigated', false)
+        ->assertSee('Has mitigation');
+});
+
+test('clearing filters also clears the unmitigated toggle', function () {
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::risks.index')
+        ->call('toggleUnmitigated')
+        ->assertSet('unmitigated', true)
+        ->call('clearFilters')
+        ->assertSet('unmitigated', false);
+});
+
+test('the project rollup chart groups top risk counts by project and respects the state filter', function () {
+    $user = User::factory()->create();
+    $projectA = Project::factory()->create(['name' => 'Project A']);
+    $projectB = Project::factory()->create(['name' => 'Project B']);
+
+    Risk::factory()->count(2)->create(['project_id' => $projectA->id, 'happened' => true]);
+    Risk::factory()->create(['project_id' => $projectB->id, 'happened' => false]);
+
+    $component = Livewire::actingAs($user)->test('pages::risks.index');
+
+    $chart = $component->get('projectRollupChart');
+
+    expect($chart['categories'])->toContain('Project A', 'Project B');
+
+    $projectAIndex = array_search('Project A', $chart['categories'], true);
+    $projectBIndex = array_search('Project B', $chart['categories'], true);
+
+    expect($chart['series'][0]['data'][$projectAIndex])->toBe(2)
+        ->and($chart['series'][1]['data'][$projectAIndex])->toBe(0)
+        ->and($chart['series'][1]['data'][$projectBIndex])->toBe(1);
+
+    $component->set('status', 'happened');
+    $filteredChart = $component->get('projectRollupChart');
+    $filteredProjectBIndex = array_search('Project B', $filteredChart['categories'], true);
+
+    expect($filteredProjectBIndex)->toBeFalse();
 });

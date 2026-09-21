@@ -8,6 +8,7 @@
     'currency' => null,
     'horizontal' => false,
     'distributed' => false,
+    'stacked' => false,
     'totalLabel' => null,
     'empty' => null,
 ])
@@ -25,6 +26,7 @@
         'currency' => $currency,
         'horizontal' => $horizontal,
         'distributed' => $distributed,
+        'stacked' => $stacked,
         'totalLabel' => $totalLabel,
     ];
 @endphp

@@ -2,6 +2,7 @@
 paths:
   - 'resources/views/components/ui/**'
   - resources/views/components/ui/multi-select-popover.blade.php
+  - resources/views/components/ui/chart.blade.php
 ---
 
 # Components Ui
@@ -21,3 +22,6 @@ Two different binding styles live behind the same shell, both intentional:
 - **Drawer / calendar form**: option rows are plain `<input type="checkbox" wire:model.live="assignedTo" value="...">` — a Livewire-bound array property accumulated before the whole form submits. `.live` (not deferred) is deliberate: without it the trigger's "N selected" label (computed server-side from `$assignedTo` + `$this->userOptions`) would only refresh after the next unrelated Livewire round trip, which reads as broken.
 
 Every option row needs `x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"` on itself to participate in the popover's search box — the component doesn't do this filtering for you, matching the same per-item convention `x-ui.header-filter-multiselect` already uses.
+
+## x-ui.chart gained an opt-in `stacked` bool prop
+Added for the risks-by-project rollup chart (horizontal stacked bar, Materialised/Watching series) — the component previously had no way to stack a multi-series bar chart, only `distributed` (per-category color on a single series). Passes through to ApexCharts as `chart.stacked`. Defaults to false, so every existing caller (dashboard's donut/grouped-bar charts) is unaffected. `tones` still maps one color per series by index for a stacked/grouped bar — it does not recolor per category unless `distributed` is also set.
