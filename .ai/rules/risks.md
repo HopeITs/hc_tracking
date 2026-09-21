@@ -36,3 +36,16 @@ Supersedes the mitigated-vs-unmitigated stacked-bar version of this chart from t
 `filteredQuery()` gained a third toggle, `includeUnmitigated`, alongside `includeProject`/`includeMaterialised` — `risks()`, `materialisedCount()` and `unmitigatedCount()` all go through it now, each excluding only the one filter they themselves drive.
 
 Also reverted the `stacked` bool this added to `x-ui.chart` in the prior pass (components-ui.md) — with the stacked mitigated/unmitigated chart gone, nothing calls it, so it was removed rather than left as dead capability. If a stacked multi-series bar is needed again later, it needs re-adding.
+
+## Mitigation only applies to happened risks ("challenges"); chart compares challenges vs potential per project
+Per explicit user framing: a risk that hasn't happened yet has nothing to mitigate — mitigation/"no mitigation recorded" only makes sense once a risk has actually occurred (a "challenge" for the project). A risk that hasn't happened is a "potential risk," not something needing a solution yet.
+
+Consequences in ⚡index.blade.php:
+- `filteredQuery()`'s `includeUnmitigated` branch now always adds `where('happened', true)` before the null/blank-solution check — the "without a solution" toggle/count can never include a potential risk. Button relabelled via new `risks.challenges_without_solution` choice string (replaces `risks.risks_without_mitigation`, which was removed since nothing else used it).
+- The register card's mitigation block (`common.mitigation` / `risks.no_mitigation_recorded`) is now wrapped in `@if ($risk->happened)` — a potential risk shows no mitigation section at all, not even a nudge.
+- Cards show a "Challenge" chip (`risks.challenge`, filled primary, exclamation-triangle) for `happened = true` and a "Potential risk" chip (`risks.potential_risk`, outline, light-bulb icon) for `happened = false` — every card now carries a state chip (previously only materialised ones did).
+- `materialisedCount()`/`toggleMaterialisedOnly()` button relabelled via new `risks.challenges_count` choice string (replaces `risks.materialised_risks`).
+
+Chart (`projectRiskChart()`, replacing the single-series `projectCountChart()` from the prior pass): two-series horizontal bar per project (top 8) — "Challenges" (happened=true, tone critical) vs "Potential risks" (happened=false, tone neutral) — still runs through the full `filteredQuery()` so it honors every active filter including the project filter. Added `riskLandscape()` (challenges/potential totals under current filters) rendered as a manual colored-dot legend above the chart, since `x-ui.chart` always hides ApexCharts' own legend by design — this is what makes the two series legible without relying on the x-axis alone.
+
+`common.materialised` / `common.watching` are still untouched (projects/⚡show.blade.php uses them for its own risk widget) — this page no longer references either key at all, using page-scoped `risks.challenge` / `risks.potential_risk` instead.

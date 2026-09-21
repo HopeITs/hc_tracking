@@ -1,6 +1,10 @@
 <?php
 
 return [
+    'challenge' => 'Challenge',
+    'challenges' => 'Challenges',
+    'challenges_count' => '{0} No challenges|{1} :count challenge|[2,*] :count challenges',
+    'challenges_without_solution' => '{0} No challenges without a solution|{1} :count challenge without a solution|[2,*] :count challenges without a solution',
     'count_matching_risk' => '{1} :count matching risk|[2,*] :count matching risks',
     'delete_risk' => 'Delete risk',
     'delete_this_risk' => 'Delete this risk?',
@@ -9,9 +13,10 @@ return [
     'enter_a_short_risk_name' => 'Enter a short risk name.',
     'log_risk' => 'Log risk',
     'log_the_first_risk_against_a_project' => 'Log the first risk against a project.',
-    'materialised_risks' => '{0} No materialised risks|{1} :count materialised risk|[2,*] :count materialised risks',
     'no_matching_risks' => 'No matching risks',
     'no_mitigation_recorded' => 'No mitigation recorded',
+    'potential_risk' => 'Potential risk',
+    'potential_risks' => 'Potential risks',
     'record_what_could_go_wrong_what_it_would_cost_and_how_it_is' => 'Record what could go wrong, what it would cost, and how it is mitigated.',
     'risk_deleted' => 'Risk deleted.',
     'risk_impact_or_project' => 'Risk, impact, or project',
@@ -19,9 +24,8 @@ return [
     'risk_name' => 'Risk name',
     'risk_updated' => 'Risk updated.',
     'risks_by_project' => 'Risks by project',
-    'risks_by_project_hint' => 'Risk count per project, matching every active filter below.',
+    'risks_by_project_hint' => 'Challenges already faced vs risks still being anticipated, per project.',
     'risks_logged_against_delivery_projects_materialised_first' => 'Risks logged against delivery projects, materialised first.',
-    'risks_without_mitigation' => '{0} No risks without a mitigation|{1} :count risk without a mitigation|[2,*] :count risks without a mitigation',
     'search_risks' => 'Search risks',
     'select_the_project_this_risk_affects' => 'Select the project this risk affects.',
     'the_risk_and_its_mitigation_notes_are_removed_nothing_else_i' => 'The risk and its mitigation notes are removed. Nothing else is affected.',

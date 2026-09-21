@@ -1,6 +1,10 @@
 <?php
 
 return [
+    'challenge' => 'تحدٍ',
+    'challenges' => 'تحديات',
+    'challenges_count' => '{0} لا توجد تحديات|{1} تحدٍ واحد|{2} تحديان|[3,10] :count تحديات|[11,*] :count تحديًا',
+    'challenges_without_solution' => '{0} لا توجد تحديات بلا حل|{1} تحدٍ واحد بلا حل|{2} تحديان بلا حل|[3,10] :count تحديات بلا حل|[11,*] :count تحديًا بلا حل',
     'count_matching_risk' => '{0} لا توجد مخاطر مطابقة|{1} خطر واحد مطابق|{2} خطران مطابقان|[3,10] :count مخاطر مطابقة|[11,*] :count خطرًا مطابقًا',
     'delete_risk' => 'حذف الخطر',
     'delete_this_risk' => 'حذف هذا الخطر؟',
@@ -9,9 +13,10 @@ return [
     'enter_a_short_risk_name' => 'أدخل اسمًا قصيرًا للخطر.',
     'log_risk' => 'تسجيل خطر',
     'log_the_first_risk_against_a_project' => 'سجّل أول خطر على مشروع.',
-    'materialised_risks' => '{0} لا توجد مخاطر متحققة|{1} خطر واحد متحقق|{2} خطران متحققان|[3,10] :count مخاطر متحققة|[11,*] :count خطرًا متحققًا',
     'no_matching_risks' => 'لا توجد مخاطر مطابقة',
     'no_mitigation_recorded' => 'لا يوجد إجراء تخفيف مسجّل',
+    'potential_risk' => 'خطر محتمل',
+    'potential_risks' => 'مخاطر محتملة',
     'record_what_could_go_wrong_what_it_would_cost_and_how_it_is' => 'سجّل ما قد يسوء، وتكلفته، وكيفية التخفيف منه.',
     'risk_deleted' => 'تم حذف الخطر.',
     'risk_impact_or_project' => 'الخطر أو الأثر أو المشروع',
@@ -19,9 +24,8 @@ return [
     'risk_name' => 'اسم الخطر',
     'risk_updated' => 'تم تحديث الخطر.',
     'risks_by_project' => 'المخاطر حسب المشروع',
-    'risks_by_project_hint' => 'عدد المخاطر لكل مشروع، وفق كل الفلاتر المُفعّلة حاليًا.',
+    'risks_by_project_hint' => 'التحديات التي وقعت فعلًا مقابل المخاطر التي ما زالت محتملة، لكل مشروع.',
     'risks_logged_against_delivery_projects_materialised_first' => 'المخاطر المسجلة على مشاريع التنفيذ، والمتحققة منها أولًا.',
-    'risks_without_mitigation' => '{0} لا توجد مخاطر بلا إجراء تخفيف|{1} خطر واحد بلا إجراء تخفيف|{2} خطران بلا إجراء تخفيف|[3,10] :count مخاطر بلا إجراء تخفيف|[11,*] :count خطرًا بلا إجراء تخفيف',
     'search_risks' => 'البحث في المخاطر',
     'select_the_project_this_risk_affects' => 'اختر المشروع الذي يؤثر عليه هذا الخطر.',
     'the_risk_and_its_mitigation_notes_are_removed_nothing_else_i' => 'سيُحذف الخطر وملاحظات التخفيف الخاصة به. لن يتأثر أي شيء آخر.',

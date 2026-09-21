@@ -189,6 +189,7 @@ test('risk content is escaped in the register', function () {
         'name' => '<script>name()</script>',
         'impact' => '<img src=x onerror=impact()>',
         'solution' => '<svg onload=solution()>',
+        'happened' => true,
     ]);
 
     Livewire::actingAs($user)
@@ -239,11 +240,11 @@ test('toggling materialised-only filters the register to materialised risks', fu
         ->assertSee('Open risk');
 });
 
-test('the unmitigated toggle filters to risks with no mitigation recorded', function () {
+test('the unmitigated toggle filters to challenges with no mitigation recorded', function () {
     $user = User::factory()->create();
-    Risk::factory()->create(['name' => 'Has mitigation', 'solution' => 'A plan.']);
-    Risk::factory()->create(['name' => 'No mitigation', 'solution' => null]);
-    Risk::factory()->create(['name' => 'Blank mitigation', 'solution' => '']);
+    Risk::factory()->create(['name' => 'Has mitigation', 'solution' => 'A plan.', 'happened' => true]);
+    Risk::factory()->create(['name' => 'No mitigation', 'solution' => null, 'happened' => true]);
+    Risk::factory()->create(['name' => 'Blank mitigation', 'solution' => '', 'happened' => true]);
 
     $component = Livewire::actingAs($user)->test('pages::risks.index');
 
@@ -259,6 +260,17 @@ test('the unmitigated toggle filters to risks with no mitigation recorded', func
         ->assertSee('Has mitigation');
 });
 
+test('a potential risk that has not happened never counts toward challenges without a solution', function () {
+    $user = User::factory()->create();
+    Risk::factory()->create(['name' => 'Not yet occurred', 'solution' => null, 'happened' => false]);
+
+    $component = Livewire::actingAs($user)->test('pages::risks.index');
+
+    expect($component->get('unmitigatedCount'))->toBe(0);
+
+    $component->call('toggleUnmitigated')->assertDontSee('Not yet occurred');
+});
+
 test('clearing filters also clears the unmitigated toggle', function () {
     $user = User::factory()->create();
 
@@ -270,23 +282,39 @@ test('clearing filters also clears the unmitigated toggle', function () {
         ->assertSet('unmitigated', false);
 });
 
-test('the project chart counts risks per project', function () {
+test('the project chart splits challenges from potential risks per project', function () {
     $user = User::factory()->create();
     $projectA = Project::factory()->create(['name' => 'Project A']);
     $projectB = Project::factory()->create(['name' => 'Project B']);
 
-    Risk::factory()->count(2)->create(['project_id' => $projectA->id]);
-    Risk::factory()->create(['project_id' => $projectB->id]);
+    Risk::factory()->count(2)->create(['project_id' => $projectA->id, 'happened' => true]);
+    Risk::factory()->create(['project_id' => $projectB->id, 'happened' => false]);
 
     $component = Livewire::actingAs($user)->test('pages::risks.index');
 
-    $chart = $component->get('projectCountChart');
+    $chart = $component->get('projectRiskChart');
 
     $projectAIndex = array_search('Project A', $chart['categories'], true);
     $projectBIndex = array_search('Project B', $chart['categories'], true);
 
     expect($chart['series'][0]['data'][$projectAIndex])->toBe(2)
-        ->and($chart['series'][0]['data'][$projectBIndex])->toBe(1);
+        ->and($chart['series'][1]['data'][$projectAIndex])->toBe(0)
+        ->and($chart['series'][0]['data'][$projectBIndex])->toBe(0)
+        ->and($chart['series'][1]['data'][$projectBIndex])->toBe(1);
+});
+
+test('the risk landscape totals match the currently filtered risks', function () {
+    $user = User::factory()->create();
+    Risk::factory()->count(2)->create(['happened' => true]);
+    Risk::factory()->create(['happened' => false]);
+
+    $component = Livewire::actingAs($user)->test('pages::risks.index');
+
+    expect($component->get('riskLandscape'))->toBe(['challenges' => 2, 'potential' => 1]);
+
+    $component->call('toggleMaterialisedOnly');
+
+    expect($component->get('riskLandscape'))->toBe(['challenges' => 2, 'potential' => 0]);
 });
 
 test('the project chart respects every active filter, including the project filter itself', function () {
@@ -300,14 +328,14 @@ test('the project chart respects every active filter, including the project filt
     $component = Livewire::actingAs($user)->test('pages::risks.index');
 
     $component->call('toggleMaterialisedOnly');
-    $materialisedChart = $component->get('projectCountChart');
+    $materialisedChart = $component->get('projectRiskChart');
     expect(array_search('Project B', $materialisedChart['categories'], true))->toBeFalse();
 
     $component->call('clearFilters')->call('toggleUnmitigated');
-    $unmitigatedChart = $component->get('projectCountChart');
+    $unmitigatedChart = $component->get('projectRiskChart');
     expect(array_search('Project A', $unmitigatedChart['categories'], true))->toBeFalse();
 
     $component->call('clearFilters')->set('project', (string) $projectA->id);
-    $projectFilteredChart = $component->get('projectCountChart');
+    $projectFilteredChart = $component->get('projectRiskChart');
     expect($projectFilteredChart['categories'])->toBe(['Project A']);
 });

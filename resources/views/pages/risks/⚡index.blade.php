@@ -97,7 +97,10 @@ new #[Title('titles.risks')] class extends Component {
             })
             ->when($includeProject && $this->project !== '', fn ($query) => $query->where('project_id', (int) $this->project))
             ->when($includeMaterialised && $this->materialisedOnly, fn ($query) => $query->where('happened', true))
-            ->when($includeUnmitigated && $this->unmitigated, fn ($query) => $query->where(function ($query): void {
+            // A risk only needs a solution once it has actually happened — a
+            // risk that hasn't happened yet has nothing to mitigate, so this
+            // filter implicitly scopes to challenges (happened = true).
+            ->when($includeUnmitigated && $this->unmitigated, fn ($query) => $query->where('happened', true)->where(function ($query): void {
                 $query->whereNull('solution')->orWhere('solution', '');
             }));
     }
@@ -121,42 +124,67 @@ new #[Title('titles.risks')] class extends Component {
         return $this->filteredQuery(includeMaterialised: false)->where('happened', true)->count();
     }
 
-    /** Risks lacking a mitigation, matching every filter except the unmitigated toggle itself. */
+    /** Challenges (happened risks) lacking a solution, matching every filter except the unmitigated toggle itself. A risk that hasn't happened yet has nothing to mitigate, so this is always scoped to happened = true. */
     #[Computed]
     public function unmitigatedCount(): int
     {
         return $this->filteredQuery(includeUnmitigated: false)
+            ->where('happened', true)
             ->where(function ($query): void {
                 $query->whereNull('solution')->orWhere('solution', '');
             })
             ->count();
     }
 
+    /** Challenges vs potential risks matching every active filter, for the chart's headline totals. */
+    #[Computed]
+    public function riskLandscape(): array
+    {
+        return [
+            'challenges' => $this->filteredQuery()->where('happened', true)->count(),
+            'potential' => $this->filteredQuery()->where('happened', false)->count(),
+        ];
+    }
+
     /**
-     * Risk count per project for the top 8 projects, matching every active
-     * filter (search, project, materialised, unmitigated) exactly like the
-     * register list below it.
+     * Challenges (risks that happened) vs potential risks (risks that
+     * haven't) per project, for the top 8 projects by total risk count,
+     * matching every active filter exactly like the register list below it.
      *
      * @return array{categories: array<int, string>, series: array<int, array{name: string, data: array<int, int>}>}
      */
     #[Computed]
-    public function projectCountChart(): array
+    public function projectRiskChart(): array
     {
-        $counts = $this->filteredQuery()
-            ->selectRaw('project_id, count(*) as total')
-            ->groupBy('project_id')
-            ->orderByDesc('total')
-            ->limit(8)
-            ->pluck('total', 'project_id');
+        $rows = $this->filteredQuery()
+            ->selectRaw('project_id, happened, count(*) as total')
+            ->groupBy('project_id', 'happened')
+            ->get()
+            ->groupBy('project_id');
 
-        $projectNames = Project::query()->whereIn('id', $counts->keys())->pluck('name', 'id');
+        $topProjectIds = $rows
+            ->sortByDesc(fn (Collection $group): int => (int) $group->sum('total'))
+            ->take(8)
+            ->keys();
+
+        $projectNames = Project::query()->whereIn('id', $topProjectIds)->pluck('name', 'id');
+
+        $categories = $topProjectIds->map(fn (int $projectId): string => $projectNames[$projectId] ?? '')->values()->all();
+
+        $countFor = fn (int $projectId, bool $happened): int => (int) ($rows->get($projectId)?->first(fn ($row) => (bool) $row->happened === $happened)->total ?? 0);
 
         return [
-            'categories' => $counts->keys()->map(fn (int $projectId): string => $projectNames[$projectId] ?? '')->values()->all(),
-            'series' => [[
-                'name' => __('common.risks'),
-                'data' => $counts->values()->all(),
-            ]],
+            'categories' => $categories,
+            'series' => [
+                [
+                    'name' => __('risks.challenges'),
+                    'data' => $topProjectIds->map(fn (int $projectId): int => $countFor($projectId, true))->values()->all(),
+                ],
+                [
+                    'name' => __('risks.potential_risks'),
+                    'data' => $topProjectIds->map(fn (int $projectId): int => $countFor($projectId, false))->values()->all(),
+                ],
+            ],
         ];
     }
 
@@ -327,7 +355,7 @@ new #[Title('titles.risks')] class extends Component {
                     ])
                 >
                     <flux:icon.exclamation-triangle variant="micro" class="size-3.5" />
-                    {{ trans_choice('risks.materialised_risks', $this->materialisedCount, ['count' => $this->materialisedCount]) }}
+                    {{ trans_choice('risks.challenges_count', $this->materialisedCount, ['count' => $this->materialisedCount]) }}
                 </button>
 
                 <button
@@ -342,13 +370,13 @@ new #[Title('titles.risks')] class extends Component {
                     ])
                 >
                     <flux:icon.shield-exclamation variant="micro" class="size-3.5" />
-                    {{ trans_choice('risks.risks_without_mitigation', $this->unmitigatedCount, ['count' => $this->unmitigatedCount]) }}
+                    {{ trans_choice('risks.challenges_without_solution', $this->unmitigatedCount, ['count' => $this->unmitigatedCount]) }}
                 </button>
             </div>
         </x-slot:summary>
     </x-ui.page-header>
 
-    @php $chart = $this->projectCountChart; @endphp
+    @php $chart = $this->projectRiskChart; $landscape = $this->riskLandscape; @endphp
     @if (count($chart['categories']) > 0)
         <div x-data="{ open: true }" class="overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-secondary-medium dark:bg-secondary-dark dark:shadow-none">
             <button
@@ -365,14 +393,25 @@ new #[Title('titles.risks')] class extends Component {
             </button>
 
             <div x-show="open" x-collapse class="border-t border-secondary-soft px-2 pt-3 pb-2 dark:border-secondary-medium">
+                <div class="flex flex-wrap items-center gap-4 px-2 pb-2" role="group" :aria-label="__('risks.risks_by_project')">
+                    <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-secondary-dark dark:text-white">
+                        <span class="size-2.5 shrink-0 rounded-full bg-primary" aria-hidden="true"></span>
+                        {{ __('risks.challenges') }} · <span class="tabular-nums">{{ $landscape['challenges'] }}</span>
+                    </span>
+                    <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-secondary-medium dark:text-secondary-soft">
+                        <span class="size-2.5 shrink-0 rounded-full bg-secondary-light dark:bg-secondary-medium" aria-hidden="true"></span>
+                        {{ __('risks.potential_risks') }} · <span class="tabular-nums">{{ $landscape['potential'] }}</span>
+                    </span>
+                </div>
+
                 <x-ui.chart
                     type="bar"
                     horizontal
-                    distributed
                     :label="__('risks.risks_by_project')"
                     :series="$chart['series']"
                     :categories="$chart['categories']"
-                    :height="max(count($chart['categories']) * 40, 160)"
+                    :tones="['critical', 'neutral']"
+                    :height="max(count($chart['categories']) * 44, 160)"
                 />
             </div>
         </div>
@@ -408,7 +447,12 @@ new #[Title('titles.risks')] class extends Component {
                                 @if ($risk->happened)
                                     <span class="inline-flex items-center gap-1 rounded-md border border-primary bg-primary px-2 py-0.5 text-xs font-semibold text-white">
                                         <flux:icon.exclamation-triangle variant="micro" class="size-3" />
-                                        {{ __('common.materialised') }}
+                                        {{ __('risks.challenge') }}
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center gap-1 rounded-md border border-secondary-light px-2 py-0.5 text-xs font-semibold text-secondary-medium dark:text-secondary-soft">
+                                        <flux:icon.light-bulb variant="micro" class="size-3" />
+                                        {{ __('risks.potential_risk') }}
                                     </span>
                                 @endif
                             </div>
@@ -431,20 +475,24 @@ new #[Title('titles.risks')] class extends Component {
                                 {{ $risk->impact ?? '—' }}
                             </p>
 
-                            @if ($risk->solution !== null && $risk->solution !== '')
-                                <p class="text-xs text-secondary-medium dark:text-secondary-soft">
-                                    <span class="font-semibold text-secondary-dark dark:text-white">{{ __('common.mitigation') }}:</span>
-                                    {{ $risk->solution }}
-                                </p>
-                            @else
-                                <button
-                                    type="button"
-                                    wire:click="openEditModal({{ $risk->id }})"
-                                    class="inline-flex w-fit items-center gap-1 rounded-md border border-status-warn/30 bg-status-warn-soft px-2 py-0.5 text-xs font-semibold text-status-warn hover:opacity-80"
-                                >
-                                    <flux:icon.exclamation-circle variant="micro" class="size-3.5" />
-                                    {{ __('risks.no_mitigation_recorded') }}
-                                </button>
+                            {{-- A risk only needs a mitigation once it has actually happened; a
+                                 potential risk that hasn't occurred yet has nothing to mitigate. --}}
+                            @if ($risk->happened)
+                                @if ($risk->solution !== null && $risk->solution !== '')
+                                    <p class="text-xs text-secondary-medium dark:text-secondary-soft">
+                                        <span class="font-semibold text-secondary-dark dark:text-white">{{ __('common.mitigation') }}:</span>
+                                        {{ $risk->solution }}
+                                    </p>
+                                @else
+                                    <button
+                                        type="button"
+                                        wire:click="openEditModal({{ $risk->id }})"
+                                        class="inline-flex w-fit items-center gap-1 rounded-md border border-status-warn/30 bg-status-warn-soft px-2 py-0.5 text-xs font-semibold text-status-warn hover:opacity-80"
+                                    >
+                                        <flux:icon.exclamation-circle variant="micro" class="size-3.5" />
+                                        {{ __('risks.no_mitigation_recorded') }}
+                                    </button>
+                                @endif
                             @endif
                         </div>
                     </article>
