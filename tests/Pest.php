@@ -18,6 +18,7 @@ use App\Models\Report;
 use App\Models\Result;
 use App\Models\Strategy;
 use App\Models\Task;
+use App\Models\TaskAssignee;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -191,14 +192,20 @@ function insertMilestone(int $projectId, int $responsibleUserId, ?int $parentId 
  */
 function insertTask(int $proposalId, int $assignedTo, int $createdBy, ?int $milestoneId = null, string $title = 'Draft the distribution plan'): int
 {
-    return Task::factory()->create([
+    $taskId = Task::factory()->create([
         'proposal_id' => $proposalId,
         'milestone_id' => $milestoneId,
         'title' => $title,
         'description' => null,
-        'assigned_to' => $assignedTo,
         'created_by' => $createdBy,
     ])->id;
+
+    TaskAssignee::factory()->create([
+        'task_id' => $taskId,
+        'employee_id' => $assignedTo,
+    ]);
+
+    return $taskId;
 }
 
 /**

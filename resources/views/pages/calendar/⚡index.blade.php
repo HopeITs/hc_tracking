@@ -15,6 +15,7 @@ use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
@@ -66,7 +67,10 @@ new #[Title('titles.calendar')] class extends Component {
     public string $dueDate = '';
     public string $completedDate = '';
     public string $progressPercentage = '0';
-    public string $assignedTo = '';
+
+    /** @var array<int, string> */
+    public array $assignedTo = [];
+
     public string $taskProposalId = '';
     public string $taskMilestoneId = '';
 
@@ -241,8 +245,8 @@ new #[Title('titles.calendar')] class extends Component {
         $tasksByDay = $employeeId === null || ! $this->showTasks
             ? new Collection
             : Task::query()
-                ->select(['id', 'title', 'status', 'due_date', 'assigned_to', 'milestone_id'])
-                ->where('assigned_to', $employeeId)
+                ->select(['id', 'title', 'status', 'due_date', 'milestone_id'])
+                ->whereHas('taskAssignees', fn (Builder $query) => $query->where('employee_id', $employeeId))
                 ->whereNotNull('due_date')
                 ->whereBetween('due_date', [$gridStart->toDateString(), $gridEnd->toDateString()])
                 ->orderBy('due_date')
@@ -534,14 +538,15 @@ new #[Title('titles.calendar')] class extends Component {
             $this->dueDate = $date;
         }
 
-        $this->assignedTo = (string) ($this->scopedEmployeeId() ?? '');
+        $this->assignedTo = $this->scopedEmployeeId() !== null ? [(string) $this->scopedEmployeeId()] : [];
         $this->showTaskModal = true;
     }
 
     public function openEditTaskModal(int $taskId): void
     {
         $task = Task::query()
-            ->select(['id', 'milestone_id', 'proposal_id', 'title', 'description', 'assigned_to', 'status', 'priority', 'start_date', 'due_date', 'completed_date', 'progress_percentage'])
+            ->select(['id', 'milestone_id', 'proposal_id', 'title', 'description', 'status', 'priority', 'start_date', 'due_date', 'completed_date', 'progress_percentage'])
+            ->with('taskAssignees:id,task_id,employee_id')
             ->findOrFail($taskId);
 
         $this->resetValidation();
@@ -554,7 +559,7 @@ new #[Title('titles.calendar')] class extends Component {
         $this->dueDate = $task->due_date?->toDateString() ?? '';
         $this->completedDate = $task->completed_date?->toDateString() ?? '';
         $this->progressPercentage = (string) $task->progress_percentage;
-        $this->assignedTo = (string) $task->assigned_to;
+        $this->assignedTo = $task->taskAssignees->pluck('employee_id')->map(fn (int $id): string => (string) $id)->all();
         $this->taskProposalId = (string) $task->proposal_id;
         $this->taskMilestoneId = (string) ($task->milestone_id ?? '');
         $this->showTaskModal = true;
@@ -574,13 +579,15 @@ new #[Title('titles.calendar')] class extends Component {
             'dueDate' => ['nullable', 'date', Rule::when($this->startDate !== '', ['after_or_equal:startDate'])],
             'completedDate' => ['nullable', 'date'],
             'progressPercentage' => ['required', 'integer', 'min:0', 'max:100'],
-            'assignedTo' => ['required', 'integer', Rule::exists(HrEmployee::class, 'id')],
+            'assignedTo' => ['required', 'array', 'min:1'],
+            'assignedTo.*' => ['integer', Rule::exists(HrEmployee::class, 'id')],
             'taskProposalId' => ['required', 'integer', Rule::exists(Proposal::class, 'id')],
             'taskMilestoneId' => ['nullable', 'integer', Rule::exists(Milestone::class, 'id')],
         ], [
             'title.required' => __('tasks.enter_a_task_title'),
             'assignedTo.required' => __('tasks.assign_this_task_to_someone'),
-            'assignedTo.exists' => __('tasks.the_selected_assignee_is_no_longer_available'),
+            'assignedTo.min' => __('tasks.assign_this_task_to_someone'),
+            'assignedTo.*.exists' => __('tasks.the_selected_assignee_is_no_longer_available'),
             'taskProposalId.required' => __('tasks.select_the_proposal_this_task_delivers_against'),
             'taskProposalId.exists' => __('common.the_selected_proposal_is_no_longer_available'),
             'taskMilestoneId.exists' => __('tasks.the_selected_milestone_is_no_longer_available'),
@@ -600,7 +607,6 @@ new #[Title('titles.calendar')] class extends Component {
             'due_date' => $validated['dueDate'] === '' ? null : $validated['dueDate'],
             'completed_date' => $validated['completedDate'] === '' ? null : $validated['completedDate'],
             'progress_percentage' => (int) $validated['progressPercentage'],
-            'assigned_to' => (int) $validated['assignedTo'],
             'proposal_id' => (int) $validated['taskProposalId'],
             'milestone_id' => $validated['taskMilestoneId'] === '' || $validated['taskMilestoneId'] === null ? null : (int) $validated['taskMilestoneId'],
         ];
@@ -609,7 +615,18 @@ new #[Title('titles.calendar')] class extends Component {
             $attributes['created_by'] = (int) auth()->id();
         }
 
-        $task->fill($attributes)->save();
+        DB::transaction(function () use ($task, $attributes, $validated): void {
+            $task->fill($attributes)->save();
+
+            $employeeIds = collect($validated['assignedTo'])->map(fn ($id): int => (int) $id)->unique()->values();
+
+            $task->taskAssignees()->whereNotIn('employee_id', $employeeIds)->delete();
+            $existingIds = $task->taskAssignees()->pluck('employee_id');
+
+            $employeeIds->diff($existingIds)->each(fn (int $employeeId) => $task->taskAssignees()->create([
+                'employee_id' => $employeeId,
+            ]));
+        });
 
         $this->showTaskModal = false;
         $this->resetTaskForm();
@@ -630,9 +647,26 @@ new #[Title('titles.calendar')] class extends Component {
             return;
         }
 
-        Task::query()->findOrFail($this->deletingTaskId)->delete();
+        $taskId = $this->deletingTaskId;
+        $deleted = DB::transaction(function () use ($taskId): bool {
+            $task = Task::query()->lockForUpdate()->find($taskId);
+
+            if ($task === null || $task->subtasks()->exists()) {
+                return false;
+            }
+
+            return (bool) $task->delete();
+        });
+
         $this->deletingTaskId = null;
         $this->showTaskDeleteModal = false;
+
+        if (! $deleted) {
+            Flux::toast(variant: 'danger', text: __('tasks.this_task_still_has_subtasks_move_or_delete_them_first'));
+
+            return;
+        }
+
         unset($this->calendar);
 
         Flux::toast(variant: 'success', text: __('tasks.task_deleted'));
@@ -656,7 +690,7 @@ new #[Title('titles.calendar')] class extends Component {
         $this->dueDate = '';
         $this->completedDate = '';
         $this->progressPercentage = '0';
-        $this->assignedTo = '';
+        $this->assignedTo = [];
         $this->taskProposalId = '';
         $this->taskMilestoneId = '';
     }
@@ -677,7 +711,6 @@ new #[Title('titles.calendar')] class extends Component {
 
     $taskTone = fn (TaskStatus $status): string => match ($status) {
         TaskStatus::Done => 'bg-status-good-soft text-status-good',
-        TaskStatus::Blocked => 'bg-status-critical-soft text-primary',
         TaskStatus::InProgress, TaskStatus::UnderReview => 'bg-funding-soft text-funding',
         TaskStatus::Todo => 'bg-white text-secondary-dark ring-1 ring-secondary-soft dark:bg-secondary-dark dark:text-white dark:ring-secondary-medium',
     };
@@ -702,7 +735,6 @@ new #[Title('titles.calendar')] class extends Component {
     $selectedResponsibleOption = $responsibleUserId === '' ? null : $this->userOptions->firstWhere('id', (int) $responsibleUserId);
     $selectedTaskProposal = $taskProposalId === '' ? null : $this->proposalOptions->firstWhere('id', (int) $taskProposalId);
     $selectedTaskMilestone = $taskMilestoneId === '' ? null : $this->milestoneOptions->firstWhere('id', (int) $taskMilestoneId);
-    $selectedAssignee = $assignedTo === '' ? null : $this->userOptions->firstWhere('id', (int) $assignedTo);
     $selectedFilterEmployee = $filterEmployeeId === '' ? null : $this->userOptions->firstWhere('id', (int) $filterEmployeeId);
     $dropdownLabelClasses = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-secondary-soft';
 
@@ -1195,25 +1227,15 @@ new #[Title('titles.calendar')] class extends Component {
                 <x-ui.input wire:model="progressPercentage" :label="__('tasks.progress_2')" type="number" min="0" max="100" required />
 
                 <div class="min-w-0">
-                    <label for="task-form-assignee" class="{{ $dropdownLabelClasses }}">{{ __('tasks.assignee') }}</label>
-                    <flux:dropdown position="bottom" align="start" class="filter-picker block! w-full!" x-data="{ optionSearch: '' }">
-                        <flux:button id="task-form-assignee" type="button" variant="outline" icon:trailing="chevron-up-down" class="w-full! justify-between!" :aria-label="__('tasks.assignee')">
-                            <span class="truncate">{{ $selectedAssignee ? $selectedAssignee->name.' · '.$selectedAssignee->secondary_name : __('common.select') }}</span>
-                        </flux:button>
-                        <flux:menu class="filter-menu">
-                            @if ($this->userOptions->count() > 6)
-                                <div class="border-b border-secondary-soft p-1.5 dark:border-secondary-medium">
-                                    <x-ui.input type="search" size="sm" icon="magnifying-glass" x-model="optionSearch" :aria-label="__('milestones.search_responsible')" :placeholder="__('milestones.search_responsible')" />
-                                </div>
-                            @endif
-                            @foreach ($this->userOptions as $userOption)
-                                <flux:menu.item wire:click="$set('assignedTo', {{ $userOption->id }})" x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())" :wire:key="'task-form-assignee-option-'.$userOption->id">
-                                    <span class="min-w-0 truncate">{{ $userOption->name }} · {{ $userOption->secondary_name }}</span>
-                                    @if ((int) $assignedTo === $userOption->id)<flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" />@endif
-                                </flux:menu.item>
-                            @endforeach
-                        </flux:menu>
-                    </flux:dropdown>
+                    <label class="{{ $dropdownLabelClasses }}">{{ __('tasks.assignees') }}</label>
+                    <div class="max-h-48 space-y-0.5 overflow-y-auto rounded-md border border-secondary-light p-1.5 dark:border-secondary-light">
+                        @foreach ($this->userOptions as $userOption)
+                            <label class="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1.5 hover:bg-secondary-soft dark:hover:bg-secondary-medium">
+                                <input type="checkbox" wire:model="assignedTo" value="{{ $userOption->id }}" class="rounded border-secondary-light text-primary focus:ring-primary" />
+                                <span class="min-w-0 truncate text-sm">{{ $userOption->name }} · {{ $userOption->secondary_name }}</span>
+                            </label>
+                        @endforeach
+                    </div>
                     <flux:error name="assignedTo" class="mt-1.5" />
                 </div>
             </div>

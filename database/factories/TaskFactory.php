@@ -46,4 +46,16 @@ class TaskFactory extends Factory
             'completed_date' => fake()->dateTimeBetween('-6 months', 'now')->format('Y-m-d'),
         ]);
     }
+
+    /**
+     * Indicate that the task is a subtask of the given parent.
+     */
+    public function subtaskOf(Task $parent): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'parent_task_id' => $parent->id,
+            'proposal_id' => $parent->proposal_id,
+            'milestone_id' => $parent->milestone_id,
+        ]);
+    }
 }

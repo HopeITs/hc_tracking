@@ -65,7 +65,6 @@ return [
     'risks' => 'Risks',
     'scheduled_transfer' => 'Scheduled transfer',
     'task_in' => 'Task · :parent',
-    'task_updated' => ':user updated :task',
     'today' => 'Today',
     'transfer_from' => ':amount :currency from :donor',
     'view_agreements' => 'All agreements',

@@ -22,7 +22,6 @@ enum TaskStatus: string
     case InProgress = 'in progress';
     case UnderReview = 'under review';
     case Done = 'done';
-    case Blocked = 'blocked';
 
     /**
      * All task status values, for validation rules and console prompts.

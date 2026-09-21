@@ -106,9 +106,9 @@ new #[Title('titles.proposal')] class extends Component {
     public function tasks(): Collection
     {
         return Task::query()
-            ->select(['id', 'proposal_id', 'milestone_id', 'title', 'status', 'priority', 'due_date', 'assigned_to', 'progress_percentage'])
+            ->select(['id', 'proposal_id', 'milestone_id', 'title', 'status', 'priority', 'due_date', 'progress_percentage'])
             ->where('proposal_id', $this->proposalId)
-            ->with('assignee:id,first_name_en,last_name_en,first_name_ar,last_name_ar')
+            ->with('taskAssignees.employee:id,first_name_en,last_name_en,first_name_ar,last_name_ar')
             ->orderByRaw('due_date is null, due_date')
             ->get();
     }
@@ -305,7 +305,8 @@ new #[Title('titles.proposal')] class extends Component {
                         <article class="flex flex-wrap items-center gap-3 p-3.5" wire:key="proposal-task-{{ $task->id }}">
                             <div class="min-w-0 me-auto">
                                 <a href="{{ route('tasks.show', $task) }}" wire:navigate class="text-sm font-semibold hover:underline">{{ $task->title }}</a>
-                                <p class="text-xs text-secondary-medium dark:text-secondary-soft">{{ $task->assignee?->name ?? __('common.not_assigned') }}</p>
+                                @php $proposalTaskAssignees = $task->taskAssignees->pluck('employee')->filter(); @endphp
+                                <p class="text-xs text-secondary-medium dark:text-secondary-soft">{{ $proposalTaskAssignees->isEmpty() ? __('common.not_assigned') : $proposalTaskAssignees->map->name->implode(', ') }}</p>
                             </div>
                             <x-ui.enum-badge :case="$task->status" />
                             <span class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $task->progress_percentage }}%</span>
