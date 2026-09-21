@@ -270,7 +270,26 @@ test('clearing filters also clears the unmitigated toggle', function () {
         ->assertSet('unmitigated', false);
 });
 
-test('the project rollup chart groups mitigated vs unmitigated risk counts by project and respects the materialised filter', function () {
+test('the project chart counts risks per project', function () {
+    $user = User::factory()->create();
+    $projectA = Project::factory()->create(['name' => 'Project A']);
+    $projectB = Project::factory()->create(['name' => 'Project B']);
+
+    Risk::factory()->count(2)->create(['project_id' => $projectA->id]);
+    Risk::factory()->create(['project_id' => $projectB->id]);
+
+    $component = Livewire::actingAs($user)->test('pages::risks.index');
+
+    $chart = $component->get('projectCountChart');
+
+    $projectAIndex = array_search('Project A', $chart['categories'], true);
+    $projectBIndex = array_search('Project B', $chart['categories'], true);
+
+    expect($chart['series'][0]['data'][$projectAIndex])->toBe(2)
+        ->and($chart['series'][0]['data'][$projectBIndex])->toBe(1);
+});
+
+test('the project chart respects every active filter, including the project filter itself', function () {
     $user = User::factory()->create();
     $projectA = Project::factory()->create(['name' => 'Project A']);
     $projectB = Project::factory()->create(['name' => 'Project B']);
@@ -280,20 +299,15 @@ test('the project rollup chart groups mitigated vs unmitigated risk counts by pr
 
     $component = Livewire::actingAs($user)->test('pages::risks.index');
 
-    $chart = $component->get('projectRollupChart');
-
-    expect($chart['categories'])->toContain('Project A', 'Project B');
-
-    $projectAIndex = array_search('Project A', $chart['categories'], true);
-    $projectBIndex = array_search('Project B', $chart['categories'], true);
-
-    expect($chart['series'][0]['data'][$projectAIndex])->toBe(2)
-        ->and($chart['series'][1]['data'][$projectAIndex])->toBe(0)
-        ->and($chart['series'][1]['data'][$projectBIndex])->toBe(1);
-
     $component->call('toggleMaterialisedOnly');
-    $filteredChart = $component->get('projectRollupChart');
-    $filteredProjectBIndex = array_search('Project B', $filteredChart['categories'], true);
+    $materialisedChart = $component->get('projectCountChart');
+    expect(array_search('Project B', $materialisedChart['categories'], true))->toBeFalse();
 
-    expect($filteredProjectBIndex)->toBeFalse();
+    $component->call('clearFilters')->call('toggleUnmitigated');
+    $unmitigatedChart = $component->get('projectCountChart');
+    expect(array_search('Project A', $unmitigatedChart['categories'], true))->toBeFalse();
+
+    $component->call('clearFilters')->set('project', (string) $projectA->id);
+    $projectFilteredChart = $component->get('projectCountChart');
+    expect($projectFilteredChart['categories'])->toBe(['Project A']);
 });

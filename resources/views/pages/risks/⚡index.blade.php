@@ -78,11 +78,11 @@ new #[Title('titles.risks')] class extends Component {
     }
 
     /**
-     * Risks matching search/project/materialised filters. Each filter can be
-     * switched off so summary widgets can share this base query while
-     * excluding the very filter they let the user toggle.
+     * Risks matching search/project/materialised/mitigation filters. Each
+     * filter can be switched off so summary widgets can share this base
+     * query while excluding the very filter they let the user toggle.
      */
-    protected function filteredQuery(bool $includeProject = true, bool $includeMaterialised = true): Builder
+    protected function filteredQuery(bool $includeProject = true, bool $includeMaterialised = true, bool $includeUnmitigated = true): Builder
     {
         $search = trim($this->search);
 
@@ -96,7 +96,10 @@ new #[Title('titles.risks')] class extends Component {
                 });
             })
             ->when($includeProject && $this->project !== '', fn ($query) => $query->where('project_id', (int) $this->project))
-            ->when($includeMaterialised && $this->materialisedOnly, fn ($query) => $query->where('happened', true));
+            ->when($includeMaterialised && $this->materialisedOnly, fn ($query) => $query->where('happened', true))
+            ->when($includeUnmitigated && $this->unmitigated, fn ($query) => $query->where(function ($query): void {
+                $query->whereNull('solution')->orWhere('solution', '');
+            }));
     }
 
     /** @return LengthAwarePaginator<int, Risk> */
@@ -106,26 +109,23 @@ new #[Title('titles.risks')] class extends Component {
         return $this->filteredQuery()
             ->select(['id', 'name', 'impact', 'solution', 'happened', 'project_id', 'updated_at'])
             ->with(['project:id,name,city_id', 'project.city:id,name_en,name_ar'])
-            ->when($this->unmitigated, fn ($query) => $query->where(function ($query): void {
-                $query->whereNull('solution')->orWhere('solution', '');
-            }))
             ->orderByDesc('happened')
             ->orderByDesc('id')
             ->paginate(15);
     }
 
-    /** Materialised risks matching search/project, respecting the materialised toggle itself so the button's own count stays stable. */
+    /** Materialised risks matching every filter except the materialised toggle itself, so the button's own count stays stable. */
     #[Computed]
     public function materialisedCount(): int
     {
         return $this->filteredQuery(includeMaterialised: false)->where('happened', true)->count();
     }
 
-    /** Risks lacking a mitigation, respecting every active filter except the unmitigated toggle itself. */
+    /** Risks lacking a mitigation, matching every filter except the unmitigated toggle itself. */
     #[Computed]
     public function unmitigatedCount(): int
     {
-        return $this->filteredQuery()
+        return $this->filteredQuery(includeUnmitigated: false)
             ->where(function ($query): void {
                 $query->whereNull('solution')->orWhere('solution', '');
             })
@@ -133,44 +133,30 @@ new #[Title('titles.risks')] class extends Component {
     }
 
     /**
-     * Mitigated vs unmitigated risk counts for the top 8 projects by risk
-     * count, respecting search and the materialised-only filter (not the
-     * project filter, since this rollup exists to compare across projects).
+     * Risk count per project for the top 8 projects, matching every active
+     * filter (search, project, materialised, unmitigated) exactly like the
+     * register list below it.
      *
      * @return array{categories: array<int, string>, series: array<int, array{name: string, data: array<int, int>}>}
      */
     #[Computed]
-    public function projectRollupChart(): array
+    public function projectCountChart(): array
     {
-        $rows = $this->filteredQuery(includeProject: false)
-            ->selectRaw("project_id, (CASE WHEN solution IS NULL OR solution = '' THEN 0 ELSE 1 END) as mitigated, count(*) as total")
-            ->groupBy('project_id', 'mitigated')
-            ->get()
-            ->groupBy('project_id');
+        $counts = $this->filteredQuery()
+            ->selectRaw('project_id, count(*) as total')
+            ->groupBy('project_id')
+            ->orderByDesc('total')
+            ->limit(8)
+            ->pluck('total', 'project_id');
 
-        $topProjectIds = $rows
-            ->sortByDesc(fn (Collection $group): int => (int) $group->sum('total'))
-            ->take(8)
-            ->keys();
-
-        $projectNames = Project::query()->whereIn('id', $topProjectIds)->pluck('name', 'id');
-
-        $categories = $topProjectIds->map(fn (int $projectId): string => $projectNames[$projectId] ?? '')->values()->all();
-
-        $countFor = fn (int $projectId, int $mitigated): int => (int) ($rows->get($projectId)?->first(fn ($row) => (int) $row->mitigated === $mitigated)->total ?? 0);
+        $projectNames = Project::query()->whereIn('id', $counts->keys())->pluck('name', 'id');
 
         return [
-            'categories' => $categories,
-            'series' => [
-                [
-                    'name' => __('common.mitigation'),
-                    'data' => $topProjectIds->map(fn (int $projectId): int => $countFor($projectId, 1))->values()->all(),
-                ],
-                [
-                    'name' => __('risks.without_mitigation'),
-                    'data' => $topProjectIds->map(fn (int $projectId): int => $countFor($projectId, 0))->values()->all(),
-                ],
-            ],
+            'categories' => $counts->keys()->map(fn (int $projectId): string => $projectNames[$projectId] ?? '')->values()->all(),
+            'series' => [[
+                'name' => __('common.risks'),
+                'data' => $counts->values()->all(),
+            ]],
         ];
     }
 
@@ -362,8 +348,8 @@ new #[Title('titles.risks')] class extends Component {
         </x-slot:summary>
     </x-ui.page-header>
 
-    @php $rollup = $this->projectRollupChart; @endphp
-    @if (count($rollup['categories']) > 0)
+    @php $chart = $this->projectCountChart; @endphp
+    @if (count($chart['categories']) > 0)
         <div x-data="{ open: true }" class="overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-secondary-medium dark:bg-secondary-dark dark:shadow-none">
             <button
                 type="button"
@@ -382,12 +368,11 @@ new #[Title('titles.risks')] class extends Component {
                 <x-ui.chart
                     type="bar"
                     horizontal
-                    stacked
+                    distributed
                     :label="__('risks.risks_by_project')"
-                    :series="$rollup['series']"
-                    :categories="$rollup['categories']"
-                    :tones="['good', 'warn']"
-                    :height="max(count($rollup['categories']) * 44, 160)"
+                    :series="$chart['series']"
+                    :categories="$chart['categories']"
+                    :height="max(count($chart['categories']) * 40, 160)"
                 />
             </div>
         </div>

@@ -65,7 +65,6 @@ function buildOptions(config) {
         chart: {
             type: config.type,
             height: config.height,
-            stacked: Boolean(config.stacked),
             fontFamily: "'Somar Sans', ui-sans-serif, system-ui, sans-serif",
             toolbar: { show: false },
             zoom: { enabled: false },

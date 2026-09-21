@@ -19,7 +19,7 @@ return [
     'risk_name' => 'Risk name',
     'risk_updated' => 'Risk updated.',
     'risks_by_project' => 'Risks by project',
-    'risks_by_project_hint' => 'Risks with and without a recorded mitigation, for the top projects, matching your search and materialised filter.',
+    'risks_by_project_hint' => 'Risk count per project, matching every active filter below.',
     'risks_logged_against_delivery_projects_materialised_first' => 'Risks logged against delivery projects, materialised first.',
     'risks_without_mitigation' => '{0} No risks without a mitigation|{1} :count risk without a mitigation|[2,*] :count risks without a mitigation',
     'search_risks' => 'Search risks',
@@ -27,5 +27,4 @@ return [
     'the_risk_and_its_mitigation_notes_are_removed_nothing_else_i' => 'The risk and its mitigation notes are removed. Nothing else is affected.',
     'the_selected_project_is_no_longer_available' => 'The selected project is no longer available.',
     'this_risk_has_materialised' => 'This risk has materialised',
-    'without_mitigation' => 'Without mitigation',
 ];

@@ -27,3 +27,12 @@ Changes from the first redesign pass:
 - `common.watching` lang key is UNTOUCHED — projects/⚡show.blade.php still uses it for its own risk widget, which is out of scope here and wasn't touched.
 
 Don't reintroduce a Materialised/Watching chart or filter here without checking with the user first.
+
+## Risks-by-project chart simplified to a plain risk count, respects every filter including project
+Supersedes the mitigated-vs-unmitigated stacked-bar version of this chart from the previous redesign pass — user said the by-project chart "isn't useful as what it is" and asked for a different approach that also respects every active filter.
+
+`projectRollupChart()` was replaced with `projectCountChart()`: a single-series horizontal bar (`distributed`, no `tones` override — falls back to charts.js's `categoricalTones` for one color per project bar), one bar per project = total risk count, top 8 by count. Unlike the old version it is NOT exempted from the project filter — it now runs through the full `filteredQuery()` (search + project + materialisedOnly + unmitigated), so filtering to one project collapses the chart to a single bar. That's intentional: the chart is meant to mirror exactly what the register list below it shows, not to offer an independent cross-project comparison.
+
+`filteredQuery()` gained a third toggle, `includeUnmitigated`, alongside `includeProject`/`includeMaterialised` — `risks()`, `materialisedCount()` and `unmitigatedCount()` all go through it now, each excluding only the one filter they themselves drive.
+
+Also reverted the `stacked` bool this added to `x-ui.chart` in the prior pass (components-ui.md) — with the stacked mitigated/unmitigated chart gone, nothing calls it, so it was removed rather than left as dead capability. If a stacked multi-series bar is needed again later, it needs re-adding.

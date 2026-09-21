@@ -19,7 +19,7 @@ return [
     'risk_name' => 'اسم الخطر',
     'risk_updated' => 'تم تحديث الخطر.',
     'risks_by_project' => 'المخاطر حسب المشروع',
-    'risks_by_project_hint' => 'المخاطر بوجود إجراء تخفيف أو بدونه لأبرز المشاريع، وفق البحث وفلتر التحقق الحاليين.',
+    'risks_by_project_hint' => 'عدد المخاطر لكل مشروع، وفق كل الفلاتر المُفعّلة حاليًا.',
     'risks_logged_against_delivery_projects_materialised_first' => 'المخاطر المسجلة على مشاريع التنفيذ، والمتحققة منها أولًا.',
     'risks_without_mitigation' => '{0} لا توجد مخاطر بلا إجراء تخفيف|{1} خطر واحد بلا إجراء تخفيف|{2} خطران بلا إجراء تخفيف|[3,10] :count مخاطر بلا إجراء تخفيف|[11,*] :count خطرًا بلا إجراء تخفيف',
     'search_risks' => 'البحث في المخاطر',
@@ -27,5 +27,4 @@ return [
     'the_risk_and_its_mitigation_notes_are_removed_nothing_else_i' => 'سيُحذف الخطر وملاحظات التخفيف الخاصة به. لن يتأثر أي شيء آخر.',
     'the_selected_project_is_no_longer_available' => 'المشروع المحدد لم يعد متاحًا.',
     'this_risk_has_materialised' => 'تحقق هذا الخطر',
-    'without_mitigation' => 'بلا إجراء تخفيف',
 ];
