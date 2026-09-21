@@ -77,31 +77,65 @@
                         </p>
                     </td>
                     <td class="px-2">
-                        @php $assignees = $task->taskAssignees->pluck('employee')->filter(); @endphp
-                        <button
-                            type="button"
-                            wire:click="openEditDrawer({{ $task->id }})"
+                        @php
+                            $assignedIds = $task->taskAssignees->pluck('employee_id')->all();
+                            $assignees = $task->taskAssignees->pluck('employee')->filter();
+                        @endphp
+                        <x-ui.multi-select-popover
+                            :label="__('tasks.assignees')"
+                            :trigger-label="__('tasks.assignees').': '.($assignees->isEmpty() ? __('common.not_assigned') : $assignees->map->name->implode(', '))"
                             class="inline-flex cursor-pointer items-center -space-x-2 rtl:space-x-reverse"
-                            aria-label="{{ $assignees->isEmpty() ? __('common.not_assigned') : $assignees->map->name->implode(', ') }} — {{ __('tasks.edit_task') }}"
                             data-test="task-assignee-trigger-{{ $task->id }}"
                         >
-                            @if ($assignees->isEmpty())
-                                <span class="inline-flex size-7 items-center justify-center rounded-full border border-dashed border-secondary-light text-secondary-light">
-                                    <flux:icon.user variant="micro" class="size-3.5" />
-                                </span>
-                            @else
-                                @foreach ($assignees->take(3) as $employee)
-                                    <span class="inline-flex size-7 items-center justify-center rounded-full border-2 border-white bg-secondary-dark text-[11px] font-semibold text-white dark:border-secondary-dark dark:bg-secondary-medium">
-                                        {{ Illuminate\Support\Str::of($employee->name)->explode(' ')->map(fn ($part) => mb_substr($part, 0, 1))->take(2)->implode('') }}
+                            <x-slot:trigger>
+                                @if ($assignees->isEmpty())
+                                    <span class="inline-flex size-7 items-center justify-center rounded-full border border-dashed border-secondary-light text-secondary-light">
+                                        <flux:icon.user-plus variant="micro" class="size-3.5" />
                                     </span>
-                                @endforeach
-                                @if ($assignees->count() > 3)
-                                    <span class="inline-flex size-7 items-center justify-center rounded-full border-2 border-white bg-secondary-soft text-[10px] font-semibold text-secondary-dark dark:border-secondary-dark dark:bg-secondary-medium dark:text-white">
-                                        +{{ $assignees->count() - 3 }}
-                                    </span>
+                                @else
+                                    @foreach ($assignees->take(3) as $employee)
+                                        <div class="group/avatar relative">
+                                            <span class="inline-flex size-7 items-center justify-center rounded-full border-2 border-white bg-secondary-dark text-[11px] font-semibold text-white dark:border-secondary-dark dark:bg-secondary-medium">
+                                                {{ Illuminate\Support\Str::of($employee->name)->explode(' ')->map(fn ($part) => mb_substr($part, 0, 1))->take(2)->implode('') }}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                wire:click.stop="toggleAssignee({{ $task->id }}, {{ $employee->id }})"
+                                                class="absolute -top-1 -end-1 hidden size-4 cursor-pointer items-center justify-center rounded-full bg-secondary-dark text-white hover:bg-primary group-hover/avatar:flex dark:bg-secondary-medium"
+                                                aria-label="{{ __('tasks.remove_assignee_name', ['name' => $employee->name]) }}"
+                                                data-test="task-assignee-remove-{{ $task->id }}-{{ $employee->id }}"
+                                            >
+                                                <flux:icon.x-mark variant="micro" class="size-2.5" />
+                                            </button>
+                                        </div>
+                                    @endforeach
+                                    @if ($assignees->count() > 3)
+                                        <span class="inline-flex size-7 items-center justify-center rounded-full border-2 border-white bg-secondary-soft text-[10px] font-semibold text-secondary-dark dark:border-secondary-dark dark:bg-secondary-medium dark:text-white">
+                                            +{{ $assignees->count() - 3 }}
+                                        </span>
+                                    @endif
                                 @endif
-                            @endif
-                        </button>
+                            </x-slot:trigger>
+
+                            @foreach ($this->userOptions as $userOption)
+                                @php $isAssigned = in_array($userOption->id, $assignedIds, true); @endphp
+                                <button
+                                    type="button"
+                                    role="option"
+                                    aria-selected="{{ $isAssigned ? 'true' : 'false' }}"
+                                    wire:click="toggleAssignee({{ $task->id }}, {{ $userOption->id }})"
+                                    wire:key="task-{{ $task->id }}-assignee-option-{{ $userOption->id }}"
+                                    x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
+                                    class="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm hover:bg-secondary-soft dark:hover:bg-secondary-medium"
+                                    data-test="task-assignee-option-{{ $task->id }}-{{ $userOption->id }}"
+                                >
+                                    <span class="min-w-0 flex-1 truncate">{{ $userOption->name }} · {{ $userOption->secondary_name }}</span>
+                                    @if ($isAssigned)
+                                        <flux:icon.check class="size-4 shrink-0 text-primary" />
+                                    @endif
+                                </button>
+                            @endforeach
+                        </x-ui.multi-select-popover>
                     </td>
                     <td class="px-2">
                         <input

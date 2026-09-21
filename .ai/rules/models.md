@@ -5,6 +5,7 @@ paths:
   - 'app/Models/Hr*.php'
   - app/Models/Program.php
   - app/Models/User.php
+  - app/Models/Task.php
 ---
 
 # Models
@@ -49,3 +50,16 @@ Each programs row mirrors one hchr_programs row with the same id, so local FKs a
 
 ## Mirror DB column defaults in User's $attributes for strict mode
 `User::factory()->create()` without an explicit role never puts `role` in the INSERT payload (it's only set via the `role()` factory state, or `createFromHrAccount()`/`forceFill` in real app code). Under `Model::shouldBeStrict()`, the resulting in-memory model then throws `MissingAttributeException` the moment anything reads `$user->role` (e.g. a Policy). Fixed by adding `'role' => 'Officer'` to `User::$attributes` alongside the existing `'locale' => null` — mirroring the DB column default so a user that hasn't round-tripped through the database still reports it. Apply the same pattern to any other User (or other model) column that has a DB default but isn't always present in factory-created instances.
+
+## Multi-assignee tasks (task_assignees), duplicate removed, task-updates removed entirely
+Three changes landed together on 2026-09-18/21, all by user request:
+
+**Multi-assignee**: `tasks.assigned_to` (single HR employee id) is gone. A task's assignees now live in `task_assignees` (migration `2026_09_18_163104_create_task_assignees_table`, backfilled from the old column then dropped it in the same migration) — `task_id` FK cascades, `employee_id` has NO foreign key (same "HR is a separate read-only connection" convention as the old `assigned_to`, see the HR note in this file elsewhere in models.md). New model `TaskAssignee` (`task()` belongsTo, `employee()` belongsTo HrEmployee — the latter is a plain lookup query, not a join, exactly like `Task::assignee()` used to be). `Task::taskAssignees(): HasMany`. `HrEmployee::assignedTasks()` is now a `hasManyThrough(Task::class, TaskAssignee::class, ...)` — still resolves in one query on the tasks/task_assignees side, parameterized by the employee's id, no actual cross-connection join.
+
+Every place that used to read/write `assigned_to` needed updating: `tasks/⚡index.blade.php`'s drawer (checkbox multi-select, not a `<select>`), `tasks/⚡show.blade.php` (subtask assignee inheritance copies ALL of the parent's `taskAssignees` rows), `calendar/⚡index.blade.php` (its own separate task create/edit form — same checkbox multi-select), `dashboard/⚡index.blade.php`'s "my work" query (`whereHas('taskAssignees', ...)` instead of `where('assigned_to', ...)`), `proposals/⚡show.blade.php`'s related-tasks panel. `TaskFactory` no longer sets `assigned_to`; instead its `configure()`'s `afterCreating` hook auto-creates one `TaskAssignee` row if none exists yet, so `Task::factory()->create()` still yields a task with exactly one assignee by default (tests relying on a single deterministic assignee call `$task->taskAssignees()->delete()` first, then add their own).
+
+Sort-by-assignee (`orderByAssigneeName` in `tasks/⚡index.blade.php`) now orders by each task's alphabetically-first assignee name, computed at the TASK level (not employee level) since a task can map to several employees — resolves via a `TaskAssignee::whereIn('task_id', ...)` query plus a `CASE id WHEN ... END` on `tasks.id`, not `assigned_to`.
+
+**Duplicate action removed**: `duplicateTask()` and every "Duplicate" button/icon in the task list and board are gone. `tasks.duplicate`/`duplicate_title`/`task_duplicated` lang keys removed.
+
+**task_updates removed entirely**: `App\Models\TaskUpdate`, its factory, and the `task_updates` table (migration `2026_09_18_163332_drop_task_updates_table`) are gone — not deprecated, deleted. `Task::updates()` and `User::taskUpdates()` relations removed. The "Updates" panel + `addUpdate()`/`comment` on `tasks/⚡show.blade.php` are gone. The dashboard's recent-activity feed (`activity()` in `dashboard/⚡index.blade.php`) no longer has a task-update source — just proposal-status-notes and report-submissions now. `DeliverySeeder` creates a `TaskAssignee` instead of a `TaskUpdate` per seeded task. If a future "task comments" feature is wanted, it needs to be built fresh — nothing here should be un-deleted or repurposed.

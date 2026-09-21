@@ -117,11 +117,21 @@ test('funding position keeps each currency on its own line', function () {
 });
 
 test('my work counts only the signed-in person\'s open tasks', function () {
+    $employeeId = insertHrEmployee();
     $myTask = Task::factory()->create(['due_date' => '2026-09-01']);
-    Task::factory()->create(['assigned_to' => $myTask->assigned_to, 'due_date' => '2026-09-18']);
-    Task::factory()->create(['assigned_to' => $myTask->assigned_to, 'due_date' => '2026-09-02', 'status' => TaskStatus::Done]);
+    $myTask->taskAssignees()->delete();
+    $myTask->taskAssignees()->create(['employee_id' => $employeeId]);
+
+    $dueThisWeek = Task::factory()->create(['due_date' => '2026-09-18']);
+    $dueThisWeek->taskAssignees()->delete();
+    $dueThisWeek->taskAssignees()->create(['employee_id' => $employeeId]);
+
+    $doneTask = Task::factory()->create(['due_date' => '2026-09-02', 'status' => TaskStatus::Done]);
+    $doneTask->taskAssignees()->delete();
+    $doneTask->taskAssignees()->create(['employee_id' => $employeeId]);
+
     Task::factory()->create(['due_date' => '2026-09-01']);
-    $user = User::factory()->create(['employee_id' => $myTask->assigned_to]);
+    $user = User::factory()->create(['employee_id' => $employeeId]);
 
     $myWork = Livewire::actingAs($user)->test('pages::dashboard.index')->instance()->myWork;
 

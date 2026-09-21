@@ -27,8 +27,11 @@ test('a task resolves its hr employee assignees and its user creator separately'
     $creator = User::factory()->create();
 
     $task = Task::factory()->create(['created_by' => $creator->id]);
+    $task->taskAssignees()->delete();
     $task->taskAssignees()->create(['employee_id' => $assigneeId]);
     $task->taskAssignees()->create(['employee_id' => $secondAssigneeId]);
+
+    $task->load('taskAssignees.employee');
 
     expect($task->taskAssignees)->toHaveCount(2)
         ->and($task->taskAssignees->first()->employee)->toBeInstanceOf(HrEmployee::class)

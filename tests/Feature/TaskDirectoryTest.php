@@ -6,7 +6,6 @@ use App\Models\Milestone;
 use App\Models\Proposal;
 use App\Models\Task;
 use App\Models\TaskAttachment;
-use App\Models\TaskUpdate;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
@@ -26,20 +25,23 @@ test('tasks can be filtered by search status priority and assignee', function ()
     $alice = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
     $bob = insertHrEmployee(firstNameEn: 'Bob', lastNameEn: 'Rahman');
 
-    Task::factory()->create([
+    $draft = Task::factory()->create([
         'title' => 'Draft distribution plan',
         'description' => 'Prepare the delivery sequence.',
-        'assigned_to' => $alice,
         'status' => TaskStatus::Todo,
         'priority' => TaskPriority::High,
     ]);
-    Task::factory()->create([
+    $draft->taskAssignees()->delete();
+    $draft->taskAssignees()->create(['employee_id' => $alice]);
+
+    $verify = Task::factory()->create([
         'title' => 'Verify beneficiary list',
         'description' => 'Check every registration.',
-        'assigned_to' => $bob,
         'status' => TaskStatus::Done,
         'priority' => TaskPriority::Low,
     ]);
+    $verify->taskAssignees()->delete();
+    $verify->taskAssignees()->create(['employee_id' => $bob]);
 
     Livewire::actingAs($user)
         ->test('pages::tasks.index')
@@ -79,7 +81,7 @@ test('a task records its creator and safely normalizes optional values', functio
         ->set('title', '  Prepare the sitrep  ')
         ->set('description', '   ')
         ->set('taskProposalId', (string) $proposal->id)
-        ->set('assignedTo', (string) $assignee)
+        ->set('assignedTo', [(string) $assignee])
         ->set('taskStatus', TaskStatus::Todo->value)
         ->set('taskPriority', TaskPriority::Medium->value)
         ->set('startDate', '')
@@ -93,13 +95,34 @@ test('a task records its creator and safely normalizes optional values', functio
     $task = Task::query()->where('title', 'Prepare the sitrep')->sole();
 
     expect($task->created_by)->toBe($creator->id)
-        ->and($task->assigned_to)->toBe($assignee)
+        ->and($task->taskAssignees->pluck('employee_id')->all())->toBe([$assignee])
         ->and($task->proposal_id)->toBe($proposal->id)
         ->and($task->milestone_id)->toBeNull()
         ->and($task->description)->toBeNull()
         ->and($task->start_date)->toBeNull()
         ->and($task->due_date?->toDateString())->toBe('2026-03-15')
         ->and($task->completed_date)->toBeNull();
+});
+
+test('a task can have several assignees at once', function () {
+    $creator = User::factory()->create();
+    $alice = insertHrEmployee();
+    $bob = insertHrEmployee();
+    $proposal = Proposal::factory()->create();
+
+    Livewire::actingAs($creator)
+        ->test('pages::tasks.index')
+        ->call('openCreateDrawer')
+        ->set('title', 'Coordinate the handover')
+        ->set('taskProposalId', (string) $proposal->id)
+        ->set('assignedTo', [(string) $alice, (string) $bob])
+        ->call('saveTask')
+        ->assertHasNoErrors();
+
+    $task = Task::query()->where('title', 'Coordinate the handover')->sole();
+
+    expect($task->taskAssignees->pluck('employee_id')->sort()->values()->all())
+        ->toBe(collect([$alice, $bob])->sort()->values()->all());
 });
 
 test('creating a task rejects missing and invalid required selections', function () {
@@ -110,10 +133,25 @@ test('creating a task rejects missing and invalid required selections', function
         ->call('openCreateDrawer')
         ->set('title', '   ')
         ->set('taskProposalId', '999999')
-        ->set('assignedTo', '999999')
+        ->set('assignedTo', ['999999'])
         ->set('taskMilestoneId', '999999')
         ->call('saveTask')
-        ->assertHasErrors(['title', 'taskProposalId', 'assignedTo', 'taskMilestoneId']);
+        ->assertHasErrors(['title', 'taskProposalId', 'assignedTo.0', 'taskMilestoneId']);
+
+    expect(Task::query()->count())->toBe(0);
+});
+
+test('creating a task with no assignee at all is rejected', function () {
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->call('openCreateDrawer')
+        ->set('title', 'Valid title')
+        ->set('taskProposalId', (string) Proposal::factory()->create()->id)
+        ->set('assignedTo', [])
+        ->call('saveTask')
+        ->assertHasErrors(['assignedTo']);
 
     expect(Task::query()->count())->toBe(0);
 });
@@ -126,7 +164,7 @@ test('creating a task rejects invalid workflow values and progress', function (s
         ->call('openCreateDrawer')
         ->set('title', 'Valid title')
         ->set('taskProposalId', (string) Proposal::factory()->create()->id)
-        ->set('assignedTo', (string) User::factory()->create()->id)
+        ->set('assignedTo', [(string) insertHrEmployee()])
         ->set($property, $value)
         ->call('saveTask')
         ->assertHasErrors([$property]);
@@ -147,7 +185,7 @@ test('a due date before the start date is rejected', function () {
         ->call('openCreateDrawer')
         ->set('title', 'Schedule delivery')
         ->set('taskProposalId', (string) Proposal::factory()->create()->id)
-        ->set('assignedTo', (string) User::factory()->create()->id)
+        ->set('assignedTo', [(string) insertHrEmployee()])
         ->set('startDate', '2026-03-15')
         ->set('dueDate', '2026-03-14')
         ->call('saveTask')
@@ -181,7 +219,7 @@ test('a task can be fully edited without changing its creator', function () {
         ->set('dueDate', '2026-04-30')
         ->set('completedDate', '2026-04-29')
         ->set('progressPercentage', '80')
-        ->set('assignedTo', (string) $newAssignee)
+        ->set('assignedTo', [(string) $newAssignee])
         ->set('taskProposalId', (string) $newProposal->id)
         ->set('taskMilestoneId', (string) $newMilestone->id)
         ->call('saveTask')
@@ -194,19 +232,91 @@ test('a task can be fully edited without changing its creator', function () {
         ->and($task->status)->toBe(TaskStatus::InProgress)
         ->and($task->priority)->toBe(TaskPriority::High)
         ->and($task->progress_percentage)->toBe(80)
-        ->and($task->assigned_to)->toBe($newAssignee)
+        ->and($task->taskAssignees->pluck('employee_id')->all())->toBe([$newAssignee])
         ->and($task->proposal_id)->toBe($newProposal->id)
         ->and($task->milestone_id)->toBe($newMilestone->id)
         ->and($task->created_by)->toBe($creator->id);
 });
 
-test('a task can be deleted and takes only its own updates and attachments with it', function () {
+test('editing a task to drop an assignee removes only that assignment', function () {
+    $user = User::factory()->create();
+    $alice = insertHrEmployee();
+    $bob = insertHrEmployee();
+    $task = Task::factory()->create();
+    $task->taskAssignees()->delete();
+    $task->taskAssignees()->create(['employee_id' => $alice]);
+    $task->taskAssignees()->create(['employee_id' => $bob]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->call('openEditDrawer', $task->id)
+        ->assertSet('assignedTo', [(string) $alice, (string) $bob])
+        ->set('assignedTo', [(string) $alice])
+        ->call('saveTask')
+        ->assertHasNoErrors();
+
+    expect($task->refresh()->taskAssignees->pluck('employee_id')->all())->toBe([$alice]);
+});
+
+test('toggleAssignee adds and removes an assignee directly from the list row', function () {
+    $user = User::factory()->create();
+    $alice = insertHrEmployee();
+    $bob = insertHrEmployee();
+    $task = Task::factory()->create();
+    $task->taskAssignees()->delete();
+    $task->taskAssignees()->create(['employee_id' => $alice]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->call('toggleAssignee', $task->id, $bob)
+        ->assertHasNoErrors();
+
+    expect($task->refresh()->taskAssignees->pluck('employee_id')->sort()->values()->all())
+        ->toBe(collect([$alice, $bob])->sort()->values()->all());
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->call('toggleAssignee', $task->id, $bob);
+
+    expect($task->refresh()->taskAssignees->pluck('employee_id')->all())->toBe([$alice]);
+});
+
+test('toggleAssignee refuses to remove the last remaining assignee', function () {
+    $user = User::factory()->create();
+    $alice = insertHrEmployee();
+    $task = Task::factory()->create();
+    $task->taskAssignees()->delete();
+    $task->taskAssignees()->create(['employee_id' => $alice]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->call('toggleAssignee', $task->id, $alice)
+        ->assertDispatched('toast-show');
+
+    expect($task->refresh()->taskAssignees->pluck('employee_id')->all())->toBe([$alice]);
+});
+
+test('the list row assignee trigger opens an inline multi select popover of every employee', function () {
+    $user = User::factory()->create();
+    $alice = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
+    $bob = insertHrEmployee(firstNameEn: 'Bob', lastNameEn: 'Rahman');
+    $task = Task::factory()->create();
+    $task->taskAssignees()->delete();
+    $task->taskAssignees()->create(['employee_id' => $alice]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->assertSee('data-test="task-assignee-trigger-'.$task->id.'"', false)
+        ->assertSee('data-test="task-assignee-option-'.$task->id.'-'.$alice.'"', false)
+        ->assertSee('data-test="task-assignee-option-'.$task->id.'-'.$bob.'"', false)
+        ->assertSee('wire:click="toggleAssignee('.$task->id.', '.$bob.')"', false);
+});
+
+test('a task can be deleted and takes only its own attachments with it', function () {
     $user = User::factory()->create();
     $task = Task::factory()->create();
     $otherTask = Task::factory()->create();
-    $update = TaskUpdate::factory()->create(['task_id' => $task->id]);
     $attachment = TaskAttachment::factory()->create(['task_id' => $task->id]);
-    $otherUpdate = TaskUpdate::factory()->create(['task_id' => $otherTask->id]);
     $otherAttachment = TaskAttachment::factory()->create(['task_id' => $otherTask->id]);
 
     Livewire::actingAs($user)
@@ -220,10 +330,9 @@ test('a task can be deleted and takes only its own updates and attachments with 
         ->assertSet('showDeleteModal', false);
 
     expect(DB::table('tasks')->find($task->id))->toBeNull()
-        ->and(DB::table('task_updates')->find($update->id))->toBeNull()
+        ->and(DB::table('task_assignees')->where('task_id', $task->id)->count())->toBe(0)
         ->and(DB::table('task_attachments')->find($attachment->id))->toBeNull()
         ->and(DB::table('tasks')->find($otherTask->id))->not->toBeNull()
-        ->and(DB::table('task_updates')->find($otherUpdate->id))->not->toBeNull()
         ->and(DB::table('task_attachments')->find($otherAttachment->id))->not->toBeNull();
 });
 
@@ -265,12 +374,13 @@ test('task directory content is escaped', function () {
     $assignee = insertHrEmployee(firstNameEn: '<script>assignee()</script>', lastNameEn: '');
     $proposal = Proposal::factory()->create(['name' => '<img src=x onerror=proposal()>']);
     $milestone = Milestone::factory()->create(['name' => '<svg onload=milestone()>']);
-    Task::factory()->create([
+    $task = Task::factory()->create([
         'title' => '<script>task()</script>',
-        'assigned_to' => $assignee,
         'proposal_id' => $proposal->id,
         'milestone_id' => $milestone->id,
     ]);
+    $task->taskAssignees()->delete();
+    $task->taskAssignees()->create(['employee_id' => $assignee]);
 
     Livewire::actingAs($user)
         ->test('pages::tasks.index')
@@ -288,30 +398,6 @@ test('the task directory renders with no tasks', function () {
     $user = User::factory()->create();
 
     Livewire::actingAs($user)->test('pages::tasks.index')->assertSee('No tasks yet');
-});
-
-test('a task can be duplicated with a reset status and progress', function () {
-    $user = User::factory()->create();
-    $task = Task::factory()->create([
-        'title' => 'Deliver hygiene kits',
-        'status' => TaskStatus::Done,
-        'progress_percentage' => 100,
-        'completed_date' => '2026-02-01',
-    ]);
-
-    Livewire::actingAs($user)
-        ->test('pages::tasks.index')
-        ->call('duplicateTask', $task->id)
-        ->assertHasNoErrors();
-
-    $copy = Task::query()->where('title', 'Deliver hygiene kits (copy)')->sole();
-
-    expect($copy->id)->not->toBe($task->id)
-        ->and($copy->status)->toBe(TaskStatus::Todo)
-        ->and($copy->progress_percentage)->toBe(0)
-        ->and($copy->completed_date)->toBeNull()
-        ->and($copy->created_by)->toBe($user->id)
-        ->and(Task::query()->count())->toBe(2);
 });
 
 test('toggling completion marks a task done and back to todo', function () {
@@ -370,8 +456,12 @@ test('sorting by assignee orders by employee name even though it lives on the re
     $user = User::factory()->create();
     $zoe = insertHrEmployee(firstNameEn: 'Zoe', lastNameEn: 'Youssef');
     $amir = insertHrEmployee(firstNameEn: 'Amir', lastNameEn: 'Nasser');
-    Task::factory()->create(['title' => 'Zoe task', 'assigned_to' => $zoe]);
-    Task::factory()->create(['title' => 'Amir task', 'assigned_to' => $amir]);
+    $zoeTask = Task::factory()->create(['title' => 'Zoe task']);
+    $zoeTask->taskAssignees()->delete();
+    $zoeTask->taskAssignees()->create(['employee_id' => $zoe]);
+    $amirTask = Task::factory()->create(['title' => 'Amir task']);
+    $amirTask->taskAssignees()->delete();
+    $amirTask->taskAssignees()->create(['employee_id' => $amir]);
 
     $component = Livewire::actingAs($user)->test('pages::tasks.index')->call('setSort', 'assignee');
 
@@ -428,7 +518,7 @@ test('the list view computes stat tiles with one aggregate query instead of load
     Livewire::actingAs($user)->test('pages::tasks.index');
 
     $taskTableQueries = collect(DB::getQueryLog())
-        ->filter(fn (array $query): bool => str_contains($query['query'], 'tasks'));
+        ->filter(fn (array $query): bool => str_contains($query['query'], '`tasks`') || str_contains($query['query'], 'from "tasks"'));
 
     DB::disableQueryLog();
 
@@ -451,25 +541,6 @@ test('the list view groups tasks by status with a colored collapsible header', f
         ->assertSee('Grouped done task')
         ->assertSee('data-test="task-quick-add-status-todo"', false)
         ->assertSee('data-test="task-quick-add-status-done"', false);
-});
-
-test('quickSetAssignee reassigns a task to a valid hr employee', function () {
-    $user = User::factory()->create();
-    $newAssignee = insertHrEmployee(firstNameEn: 'Nour', lastNameEn: 'Saleh');
-    $task = Task::factory()->create();
-
-    Livewire::actingAs($user)
-        ->test('pages::tasks.index')
-        ->call('quickSetAssignee', $task->id, $newAssignee)
-        ->assertHasNoErrors();
-
-    expect($task->refresh()->assigned_to)->toBe($newAssignee);
-
-    Livewire::actingAs($user)
-        ->test('pages::tasks.index')
-        ->call('quickSetAssignee', $task->id, 999999);
-
-    expect($task->refresh()->assigned_to)->toBe($newAssignee);
 });
 
 test('quickCreateTask opens the drawer pre-filled with the title and the group context', function () {
