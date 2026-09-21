@@ -75,6 +75,18 @@ new #[Title('titles.tasks')] class extends Component {
     public string $taskProposalId = '';
     public string $taskMilestoneId = '';
 
+    /**
+     * Per-parent-task draft values for the list view's inline "add subtask"
+     * row — its due date, priority, status and assignees. Bound with plain
+     * (non-live) wire:model so filling them out costs no network round
+     * trips; they're only read once, when addSubtaskQuick() actually creates
+     * the subtask in the same request as the Enter keypress that submits
+     * the title.
+     *
+     * @var array<int, array{status?: string, priority?: string, due_date?: string, assignees?: array<int, string>}>
+     */
+    public array $subtaskDrafts = [];
+
     public function updatedSearch(): void
     {
         $this->resetPage();
@@ -188,8 +200,10 @@ new #[Title('titles.tasks')] class extends Component {
                 'taskAssignees.employee:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
                 // Loaded alongside the count above so the list/board rows can expand
                 // a subtask panel in place (client-side, no extra round trip) instead
-                // of sending people to the parent task's own page to see them.
+                // of sending people to the parent task's own page to see them. Each
+                // subtask's own assignees are loaded the same way as the parent's.
                 'subtasks:id,parent_task_id,title,status,priority,due_date',
+                'subtasks.taskAssignees.employee:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
             ])
             ->when($search !== '', function (Builder $query) use ($search): void {
                 $query->where(function (Builder $query) use ($search): void {
@@ -585,11 +599,56 @@ new #[Title('titles.tasks')] class extends Component {
     }
 
     /**
+     * The list view's inline "add subtask" row's current draft values for a
+     * parent task, merged with sensible defaults — todo/medium, no due date,
+     * and the parent's own assignees — so the row always renders something
+     * sane before the user touches it. Takes the parent (already loaded with
+     * its assignees by filteredTasksQuery()) rather than an id, so reading
+     * this once per row costs no extra query.
+     *
+     * @return array{status: string, priority: string, due_date: string, assignees: array<int, string>}
+     */
+    public function subtaskDraft(Task $parent): array
+    {
+        $defaults = [
+            'status' => TaskStatus::Todo->value,
+            'priority' => TaskPriority::Medium->value,
+            'due_date' => '',
+            'assignees' => $parent->taskAssignees->pluck('employee_id')->map(fn (int $id): string => (string) $id)->all(),
+        ];
+
+        return array_merge($defaults, $this->subtaskDrafts[$parent->id] ?? []);
+    }
+
+    /**
+     * Adds or removes one employee from a parent task's subtask draft, for
+     * the "add subtask" row's own assignee popover — mirrors toggleAssignee()
+     * but writes to the not-yet-saved draft instead of a real task.
+     */
+    public function toggleSubtaskDraftAssignee(int $parentTaskId, int $employeeId): void
+    {
+        $parent = Task::query()->with('taskAssignees:id,task_id,employee_id')->find($parentTaskId);
+
+        if ($parent === null) {
+            return;
+        }
+
+        $ids = $this->subtaskDraft($parent)['assignees'];
+        $employeeIdString = (string) $employeeId;
+
+        $this->subtaskDrafts[$parentTaskId]['assignees'] = in_array($employeeIdString, $ids, true)
+            ? array_values(array_diff($ids, [$employeeIdString]))
+            : [...$ids, $employeeIdString];
+    }
+
+    /**
      * Adds a one-line subtask under an already-visible parent task, from the
-     * inline input in its expanded row — no drawer, matching the parent's own
-     * proposal, milestone and assignees so only a title is needed. Mirrors the
-     * show page's own addSubtask(), kept separate because this is a different
-     * Livewire component instance.
+     * inline row in its expanded panel — no drawer. Proposal and milestone
+     * always match the parent (a subtask delivers the same thing its parent
+     * does), while due date, priority, status and assignees come from the
+     * row's own draft fields, defaulting to the parent's own assignees when
+     * none were chosen. Mirrors the show page's own addSubtask(), kept
+     * separate because this is a different Livewire component instance.
      */
     public function addSubtaskQuick(int $parentTaskId, string $title): void
     {
@@ -605,22 +664,39 @@ new #[Title('titles.tasks')] class extends Component {
             return;
         }
 
-        DB::transaction(function () use ($parent, $title): void {
+        $draft = $this->subtaskDraft($parent);
+        $status = TaskStatus::tryFrom($draft['status']) ?? TaskStatus::Todo;
+        $priority = TaskPriority::tryFrom($draft['priority']) ?? TaskPriority::Medium;
+        $dueDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', $draft['due_date']) === 1 ? $draft['due_date'] : null;
+
+        $employeeIds = HrEmployee::query()
+            ->whereIn('id', collect($draft['assignees'])->map(fn (string $id): int => (int) $id))
+            ->pluck('id');
+
+        if ($employeeIds->isEmpty()) {
+            $employeeIds = $parent->taskAssignees->pluck('employee_id');
+        }
+
+        DB::transaction(function () use ($parent, $title, $status, $priority, $dueDate, $employeeIds): void {
             $subtask = Task::query()->create([
                 'parent_task_id' => $parent->id,
                 'proposal_id' => $parent->proposal_id,
                 'milestone_id' => $parent->milestone_id,
                 'title' => $title,
-                'status' => TaskStatus::Todo,
-                'priority' => TaskPriority::Medium,
-                'progress_percentage' => 0,
+                'status' => $status,
+                'priority' => $priority,
+                'due_date' => $dueDate,
+                'progress_percentage' => $status === TaskStatus::Done ? 100 : 0,
+                'completed_date' => $status === TaskStatus::Done ? CarbonImmutable::today() : null,
                 'created_by' => (int) auth()->id(),
             ]);
 
-            foreach ($parent->taskAssignees as $assignee) {
-                $subtask->taskAssignees()->create(['employee_id' => $assignee->employee_id]);
+            foreach ($employeeIds as $employeeId) {
+                $subtask->taskAssignees()->create(['employee_id' => $employeeId]);
             }
         });
+
+        unset($this->subtaskDrafts[$parentTaskId]);
 
         Flux::toast(variant: 'success', text: __('tasks.subtask_added'));
     }
