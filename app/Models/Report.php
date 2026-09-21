@@ -116,6 +116,28 @@ class Report extends Model
     }
 
     /**
+     * Whether this report is late: still a draft after the date it covers.
+     *
+     * The one definition of "reporting overdue" shared by every page, and by
+     * the overdue() scope below.
+     */
+    public function isOverdue(): bool
+    {
+        return $this->status === ReportStatus::Draft && $this->planned_date->lessThan(CarbonImmutable::today());
+    }
+
+    /**
+     * Limit the query to drafts past the date they cover.
+     *
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function overdue(Builder $query): void
+    {
+        $query->where('status', ReportStatus::Draft->value)->whereDate('planned_date', '<', CarbonImmutable::today());
+    }
+
+    /**
      * Limit the query to reports that have cleared review.
      *
      * @param  Builder<static>  $query

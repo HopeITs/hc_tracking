@@ -33,12 +33,15 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Observers/**, app/Observers/{MilestoneObserver,ResultObserver}.php | .ai/rules/observers.md |
 | resources/views/pages/** | .ai/rules/pages.md |
 | app/Providers/** | .ai/rules/providers.md |
+| {app/Livewire/Concerns/ManagesReportForm.php,resources/views/pages/reports/**,resources/views/components/reports/**} | .ai/rules/reports.md |
 | resources/views/pages/results/** | .ai/rules/results.md |
+| {app/Models/PlanIndicator.php,resources/views/pages/{results,indicators,targets,reports}/**} | .ai/rules/resultsindicatorstargetsreports.md |
 | routes/web.php | .ai/rules/routes.md |
 | {database/factories/**,database/seeders/**,tests/Pest.php} | .ai/rules/seeders.md |
 | resources/views/pages/strategies/⚡show.blade.php, resources/views/pages/strategies/⚡index.blade.php | .ai/rules/strategies.md |
 | resources/views/pages/tasks/** | .ai/rules/tasks.md |
 | tests/** | .ai/rules/tests.md |
 | resources/views/{components/ui/page-header.blade.php,pages/**}, resources/views/{components/ui/header-filter-select.blade.php,pages/**}, resources/views/components/ui/detail-header.blade.php | .ai/rules/ui.md |
+| {app/Models/PlanIndicator.php,resources/views/pages/{results,indicators,targets}/**,resources/views/components/ui/framework-node.blade.php} | .ai/rules/views-components-ui.md |
 | {lang/**,resources/views/**,app/Enums/**} | .ai/rules/views-enums.md |
 | resources/views/**/*.blade.php | .ai/rules/views.md |

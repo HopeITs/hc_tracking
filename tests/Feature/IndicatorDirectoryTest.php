@@ -9,10 +9,12 @@ use App\Models\AnnualPlan;
 use App\Models\Indicator;
 use App\Models\IndicatorProgress;
 use App\Models\PlanIndicator;
+use App\Models\Program;
 use App\Models\Project;
 use App\Models\Report;
 use App\Models\Result;
 use App\Models\User;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
@@ -372,7 +374,7 @@ test('the directory reads a flat number of queries however many indicators there
     expect($large)->toBeLessThanOrEqual($small + 2);
 });
 
-test('the page shows what was reported against what was committed, not just how many reports there are', function () {
+test('the page shows what was achieved against what was committed, counting approved reports only', function () {
     $user = User::factory()->create();
     $indicator = Indicator::factory()->create(['name' => 'Meals distributed']);
 
@@ -387,12 +389,17 @@ test('the page shows what was reported against what was committed, not just how 
     Report::factory()->create(['plan_indicator_id' => $target->id, 'value' => 150, 'status' => ReportStatus::Draft]);
 
     $component = Livewire::actingAs($user)->test('pages::indicators.index');
-    $overview = $component->get('overview');
+    $row = $component->instance()->rows()[$indicator->id]['targets'][0];
 
-    expect($overview['committed'])->toBe(1000.0)
-        ->and($overview['reported'])->toBe(550.0);
+    expect($row['achieved'])->toBe(400.0)
+        ->and($row['pending'])->toBe(150.0)
+        ->and($row['status'])->toBe('in_progress')
+        ->and($component->get('overview')['targetsAchieved'])->toBe(0);
 
-    $component->assertSee('550 reported of 1,000 committed');
+    $component->call('openInspectModal', $indicator->id)
+        ->assertSee('0 of 1 targets achieved')
+        ->assertSee('150 pending approval')
+        ->assertSeeHtml('href="'.e(route('reports.index', ['create' => 1, 'target' => $target->id])).'"');
 });
 
 test('a draft report past its planned date counts as reporting overdue', function () {
@@ -450,4 +457,172 @@ test('the chain inspector shows the statements this indicator rolls up through',
         // The statement it measures, and the one that statement rolls up into.
         ->assertSee('Grants disbursed.')
         ->assertSee('Livelihoods restored.');
+});
+
+test('the results framework can open the form already tied to a statement, or open one indicator chain', function () {
+    $user = User::factory()->create();
+    $result = Result::factory()->create();
+    $indicator = Indicator::factory()->create();
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['create' => $result->id])
+        ->test('pages::indicators.index')
+        ->assertSet('showIndicatorModal', true)
+        ->assertSet('indicatorResultId', (string) $result->id);
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['inspect' => $indicator->id])
+        ->test('pages::indicators.index')
+        ->assertSet('showInspectModal', true)
+        ->assertSet('inspectingIndicatorId', $indicator->id);
+});
+
+test('only projects delivering the result program are offered, and any other is refused', function () {
+    $user = User::factory()->create();
+    $program = Program::factory()->create();
+    $result = Result::factory()->for($program)->create();
+    $inside = Project::factory()->for($program)->create();
+    $outside = Project::factory()->create();
+
+    $component = Livewire::actingAs($user)
+        ->test('pages::indicators.index')
+        ->call('openCreateModal')
+        ->set('indicatorResultId', (string) $result->id);
+
+    expect($component->instance()->projectOptions()->modelKeys())->toBe([$inside->id]);
+
+    $component
+        ->set('name', 'Outside project indicator')
+        ->set('indicatorProjectId', (string) $outside->id)
+        ->call('saveIndicator')
+        ->assertHasErrors(['indicatorProjectId']);
+
+    expect(Indicator::query()->where('name', 'Outside project indicator')->exists())->toBeFalse();
+});
+
+test('a percentage indicator carries no unit and cannot target more than 100', function () {
+    $user = User::factory()->create();
+    $result = Result::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::indicators.index')
+        ->call('openCreateModal')
+        ->set('name', 'Share of households with latrines')
+        ->set('indicatorResultId', (string) $result->id)
+        ->set('unit', 'households')
+        ->set('indicatorMeasure', IndicatorMeasure::Percentage->value)
+        ->assertSet('unit', '')
+        ->set('target', '120')
+        ->call('saveIndicator')
+        ->assertHasErrors(['target' => 'max'])
+        ->set('target', '80')
+        ->call('saveIndicator')
+        ->assertHasNoErrors();
+
+    expect(Indicator::query()->where('name', 'Share of households with latrines')->sole()->unit)->toBeNull();
+});
+
+test('the measure is locked once a target is committed against the indicator', function () {
+    $user = User::factory()->create();
+    $indicator = Indicator::factory()->create(['measure' => IndicatorMeasure::Numeric]);
+    PlanIndicator::factory()->create(['indicator_id' => $indicator->id]);
+
+    Livewire::actingAs($user)
+        ->test('pages::indicators.index')
+        ->call('openEditModal', $indicator->id)
+        ->set('indicatorMeasure', IndicatorMeasure::Percentage->value)
+        ->set('target', '50')
+        ->set('baseline', '0')
+        ->call('saveIndicator')
+        ->assertHasErrors(['indicatorMeasure']);
+
+    expect($indicator->fresh()->measure)->toBe(IndicatorMeasure::Numeric);
+});
+
+test('an edit that would put a committed target out of its chain is refused', function () {
+    $user = User::factory()->create();
+    $program = Program::factory()->create();
+    $indicator = Indicator::factory()->for(Result::factory()->for($program))->create();
+    PlanIndicator::factory()
+        ->forAnnualPlan(AnnualPlan::factory()->for($program)->create())
+        ->create(['indicator_id' => $indicator->id]);
+    $elsewhere = Result::factory()->for(Program::factory())->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::indicators.index')
+        ->call('openEditModal', $indicator->id)
+        ->set('indicatorResultId', (string) $elsewhere->id)
+        ->call('saveIndicator')
+        ->assertHasErrors(['indicatorResultId']);
+
+    expect($indicator->fresh()->result_id)->not->toBe($elsewhere->id);
+});
+
+test('a reading cannot be dated in the future', function () {
+    $user = User::factory()->create();
+    $indicator = Indicator::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::indicators.index')
+        ->call('openProgressModal', $indicator->id)
+        ->set('progressDate', now()->addDay()->toDateString())
+        ->set('progressValue', '10')
+        ->call('saveProgress')
+        ->assertHasErrors(['progressDate' => 'before_or_equal']);
+
+    expect(IndicatorProgress::query()->where('indicator_id', $indicator->id)->exists())->toBeFalse();
+});
+
+test('a logged reading can be corrected and deleted, keeping who recorded it', function () {
+    $user = User::factory()->create();
+    $recorder = User::factory()->create();
+    $reading = IndicatorProgress::factory()->create(['value' => 10, 'recorded_by' => $recorder->id, 'date' => now()->subWeek()->toDateString()]);
+
+    $component = Livewire::actingAs($user)
+        ->test('pages::indicators.index')
+        ->call('openInspectModal', $reading->indicator_id)
+        ->call('openEditReadingModal', $reading->id)
+        ->assertSet('progressValue', '10.00')
+        ->set('progressValue', '12')
+        ->call('saveProgress')
+        ->assertHasNoErrors();
+
+    $row = DB::table('indicator_progress')->find($reading->id);
+    expect((float) $row->value)->toBe(12.0)
+        ->and((int) $row->recorded_by)->toBe($recorder->id)
+        ->and(DB::table('indicator_progress')->count())->toBe(1);
+
+    $component->call('confirmDeleteReading', $reading->id)
+        ->assertSeeHtml('data-test="confirm-delete-reading-'.$reading->id.'"')
+        ->call('deleteReading');
+
+    expect(DB::table('indicator_progress')->find($reading->id))->toBeNull();
+});
+
+test('a reading of another indicator cannot be deleted from this one', function () {
+    $user = User::factory()->create();
+    $inspected = Indicator::factory()->create();
+    $foreign = IndicatorProgress::factory()->create();
+
+    $component = Livewire::actingAs($user)
+        ->test('pages::indicators.index')
+        ->call('openInspectModal', $inspected->id)
+        ->call('confirmDeleteReading', $foreign->id);
+
+    expect(fn () => $component->call('deleteReading'))->toThrow(ModelNotFoundException::class)
+        ->and(DB::table('indicator_progress')->find($foreign->id))->not->toBeNull();
+});
+
+test('an inspected target that does not fit its chain says why', function () {
+    $user = User::factory()->create();
+    $indicator = Indicator::factory()->for(Result::factory()->for(Program::factory()))->create();
+    PlanIndicator::factory()
+        ->forAnnualPlan(AnnualPlan::factory()->create())
+        ->create(['indicator_id' => $indicator->id]);
+
+    Livewire::actingAs($user)
+        ->test('pages::indicators.index')
+        ->assertSee('1 target out of step')
+        ->call('openInspectModal', $indicator->id)
+        ->assertSee(__('targets.issue_plan_program_differs_from_result'));
 });

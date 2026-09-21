@@ -5,6 +5,7 @@ use App\Enums\RagStatus;
 use App\Enums\ReportStatus;
 use App\Enums\ResultType;
 use App\Models\AnnualPlan;
+use App\Models\Indicator;
 use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Proposal;
@@ -13,6 +14,7 @@ use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Collection as BaseCollection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
@@ -114,10 +116,11 @@ new #[Title('titles.results_framework')] class extends Component {
                         'progress:id,indicator_id,date,value',
                         'planIndicators' => fn ($query) => $query
                             ->select(['id', 'indicator_id', 'source_type', 'source_id', 'target', 'project_id', 'period'])
-                            ->with('project:id,name')
-                            ->withCount([
-                                'reports',
-                                'reports as approved_reports_count' => fn ($query) => $query->where('status', ReportStatus::Approved->value),
+                            ->with([
+                                'project:id,name',
+                                // Rows, not counts: achievement is measured from the
+                                // approved values themselves (PlanIndicator::achievedValue()).
+                                'reports:id,plan_indicator_id,status,planned_date,value',
                             ])
                             ->orderBy('id'),
                         // source_type/source_id carry no foreign key, so morphTo
@@ -171,11 +174,14 @@ new #[Title('titles.results_framework')] class extends Component {
      * How a target reads on the page: where it was committed, by whom, against
      * which project, and what has been reported against it.
      *
-     * @return array{target: PlanIndicator, sourceType: string, sourceLabel: string|null, donors: list<string>, project: string|null, reports: int, approved: int}
+     * @return array{target: PlanIndicator, sourceType: string, sourceLabel: string|null, donors: list<string>, project: string|null, reports: int, approved: int, percent: float|null, status: string}
      */
-    protected function describeTarget(PlanIndicator $target): array
+    protected function describeTarget(PlanIndicator $target, Indicator $indicator): array
     {
         $source = $target->source;
+
+        // Already in memory; handing it over saves achievedValue() a query per target.
+        $target->setRelation('indicator', $indicator);
 
         return [
             'target' => $target,
@@ -190,8 +196,10 @@ new #[Title('titles.results_framework')] class extends Component {
                 ? $source->donors->pluck('name')->values()->all()
                 : [],
             'project' => $target->project?->name,
-            'reports' => (int) $target->reports_count,
-            'approved' => (int) $target->approved_reports_count,
+            'reports' => $target->reports->count(),
+            'approved' => $target->reports->where('status', ReportStatus::Approved)->count(),
+            'percent' => $target->percentAchieved(),
+            'status' => $target->achievementStatus(),
         ];
     }
 
@@ -241,7 +249,7 @@ new #[Title('titles.results_framework')] class extends Component {
                 $targetRows = [];
 
                 foreach ($indicator->planIndicators as $target) {
-                    $described = $this->describeTarget($target);
+                    $described = $this->describeTarget($target, $indicator);
                     $targetRows[] = $described;
                     $targets++;
                     $committed += (float) $target->target;
@@ -608,17 +616,37 @@ new #[Title('titles.results_framework')] class extends Component {
     }
 
     /**
-     * Results this one may contribute to.
+     * The level a statement of this type contributes to, or null for an impact,
+     * which sits at the top of the chain.
+     */
+    protected function parentLevelOf(string $type): ?ResultType
+    {
+        return match (ResultType::tryFrom($type)) {
+            ResultType::Output => ResultType::Outcome,
+            ResultType::Outcome => ResultType::Impact,
+            default => null,
+        };
+    }
+
+    /**
+     * Results this one may contribute to: only statements one level up the
+     * chain — an output under an outcome, an outcome under an impact.
      *
      * Excludes the node and its descendants so ResultObserver's
      * InvalidParentException stays a backstop. Unlike milestones there is no
-     * project constraint: any other result is a legal parent.
+     * project constraint.
      *
      * @return Collection<int, Result>
      */
     #[Computed]
     public function parentOptions(): Collection
     {
+        $parentLevel = $this->parentLevelOf($this->resultType);
+
+        if ($parentLevel === null) {
+            return new Collection;
+        }
+
         $excludedIds = [];
 
         if ($this->editingResultId !== null) {
@@ -634,9 +662,42 @@ new #[Title('titles.results_framework')] class extends Component {
 
         return Result::query()
             ->select(['id', 'statement', 'type', 'program_id'])
+            ->with('program:id,name')
+            ->where('type', $parentLevel->value)
             ->when($excludedIds !== [], fn ($query) => $query->whereNotIn('id', $excludedIds))
+            ->orderBy('program_id')
             ->orderBy('id')
             ->get();
+    }
+
+    /**
+     * A parent chosen for the old level cannot hold the new one, so a change
+     * of type drops it rather than carrying an illegal link to the save.
+     */
+    public function updatedResultType(): void
+    {
+        unset($this->parentOptions);
+
+        if ($this->parentId !== '' && ! $this->parentOptions->contains('id', (int) $this->parentId)) {
+            $this->parentId = '';
+        }
+    }
+
+    /**
+     * A contributing statement lives in its parent's program, so choosing a
+     * parent sets the program to match.
+     */
+    public function updatedParentId(): void
+    {
+        if ($this->parentId === '') {
+            return;
+        }
+
+        $parent = Result::query()->select(['id', 'program_id'])->find((int) $this->parentId);
+
+        if ($parent !== null) {
+            $this->resultProgramId = (string) ($parent->program_id ?? '');
+        }
     }
 
     /**
@@ -668,13 +729,13 @@ new #[Title('titles.results_framework')] class extends Component {
                 ->select(['id', 'program_id', 'type'])
                 ->find($parentResultId);
 
-            if ($parent !== null) {
+            // An output is the bottom of the chain: nothing can contribute to it.
+            if ($parent !== null && $parent->type !== ResultType::Output) {
                 $this->parentId = (string) $parent->id;
                 $this->resultProgramId = (string) ($parent->program_id ?? '');
-                $this->resultType = match ($parent->type) {
-                    ResultType::Impact => ResultType::Outcome->value,
-                    default => ResultType::Output->value,
-                };
+                $this->resultType = $parent->type === ResultType::Impact
+                    ? ResultType::Outcome->value
+                    : ResultType::Output->value;
             }
         }
 
@@ -717,17 +778,60 @@ new #[Title('titles.results_framework')] class extends Component {
             ? new Result
             : Result::query()->findOrFail($this->editingResultId);
 
-        $result->fill([
-            'statement' => $validated['statement'],
-            'type' => $validated['resultType'],
-            'checkout_period' => $validated['checkoutPeriod'],
-            'program_id' => $validated['resultProgramId'] === '' || $validated['resultProgramId'] === null
-                ? null
-                : (int) $validated['resultProgramId'],
-            'parent_id' => $validated['parentId'] === '' || $validated['parentId'] === null
-                ? null
-                : (int) $validated['parentId'],
-        ])->save();
+        $parentId = $validated['parentId'] === '' || $validated['parentId'] === null ? null : (int) $validated['parentId'];
+        $programId = $validated['resultProgramId'] === '' || $validated['resultProgramId'] === null ? null : (int) $validated['resultProgramId'];
+        $type = ResultType::from($validated['resultType']);
+
+        if ($parentId !== null) {
+            $parent = Result::query()->select(['id', 'type', 'program_id'])->findOrFail($parentId);
+
+            if ($parent->type !== $this->parentLevelOf($type->value)) {
+                $this->addError('parentId', __('results_framework.a_result_contributes_only_to_the_level_directly_above'));
+
+                return;
+            }
+
+            // A contributing statement always lives in its parent's program.
+            $programId = $parent->program_id;
+        }
+
+        $subtreeIds = [];
+
+        if ($result->exists) {
+            $children = Result::query()->select(['id', 'type'])->where('parent_id', $result->id)->get();
+
+            if ($children->isNotEmpty() && $type !== $result->type
+                && $children->contains(fn (Result $child): bool => $this->parentLevelOf($child->type->value) !== $type)) {
+                $this->addError('resultType', __('results_framework.nested_results_still_sit_at_the_level_below'));
+
+                return;
+            }
+
+            if ($programId !== $result->program_id) {
+                $subtreeIds = $result->descendants()->pluck('id')->push($result->id)->all();
+
+                if ($programId !== null && $this->programChangeBreaksChain($subtreeIds, $programId)) {
+                    $this->addError('resultProgramId', __('results_framework.moving_this_result_would_break_its_indicators_or_targets'));
+
+                    return;
+                }
+            }
+        }
+
+        DB::transaction(function () use ($result, $validated, $type, $programId, $parentId, $subtreeIds): void {
+            $result->fill([
+                'statement' => $validated['statement'],
+                'type' => $type,
+                'checkout_period' => $validated['checkoutPeriod'],
+                'program_id' => $programId,
+                'parent_id' => $parentId,
+            ])->save();
+
+            // The statements below move with it, so the tree never straddles programs.
+            if ($subtreeIds !== []) {
+                Result::query()->whereIn('id', $subtreeIds)->whereKeyNot($result->id)->update(['program_id' => $programId]);
+            }
+        });
 
         $wasRecentlyCreated = $result->wasRecentlyCreated;
 
@@ -739,6 +843,31 @@ new #[Title('titles.results_framework')] class extends Component {
             variant: 'success',
             text: $wasRecentlyCreated ? __('results_framework.result_added') : __('results_framework.result_updated'),
         );
+    }
+
+    /**
+     * Whether moving these statements into a program would strand what hangs
+     * off them: an indicator scoped to a project in another program, or a
+     * target committed in another program's annual plan.
+     *
+     * @param  list<int>  $resultIds
+     */
+    protected function programChangeBreaksChain(array $resultIds, int $programId): bool
+    {
+        $indicatorIds = Indicator::query()->whereIn('result_id', $resultIds)->select('id');
+
+        $strandedIndicator = Indicator::query()
+            ->whereIn('result_id', $resultIds)
+            ->whereHas('project', fn ($query) => $query->where('program_id', '!=', $programId))
+            ->exists();
+
+        $strandedTarget = PlanIndicator::query()
+            ->whereIn('indicator_id', $indicatorIds)
+            ->where('source_type', 'annual_plan')
+            ->whereIn('source_id', AnnualPlan::query()->select('id')->where('program_id', '!=', $programId))
+            ->exists();
+
+        return $strandedIndicator || $strandedTarget;
     }
 
     public function confirmDelete(int $resultId): void
@@ -1271,7 +1400,7 @@ new #[Title('titles.results_framework')] class extends Component {
             <flux:textarea wire:model="statement" :label="__('results_framework.statement')" rows="3" required class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
 
             <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.select wire:model="resultType" :label="__('common.type')" required>
+                <x-ui.select wire:model.live="resultType" :label="__('common.type')" required>
                     @foreach (ResultType::cases() as $typeCase)
                         <flux:select.option :value="$typeCase->value" :wire:key="'result-type-option-'.$typeCase->value">{{ $typeCase->label() }}</flux:select.option>
                     @endforeach
@@ -1285,21 +1414,33 @@ new #[Title('titles.results_framework')] class extends Component {
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.select wire:model="resultProgramId" :label="__('common.program')">
-                    <flux:select.option value="">{{ __('common.unassigned') }}</flux:select.option>
-                    @foreach ($this->programOptions as $programOption)
-                        <flux:select.option :value="$programOption->id" :wire:key="'result-program-option-'.$programOption->id">{{ $programOption->name }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
+                <div>
+                    <x-ui.select wire:model.live="parentId" :label="__('results_framework.contributes_to')" :disabled="$resultType === ResultType::Impact->value">
+                        <flux:select.option value="">{{ __('common.top_level') }}</flux:select.option>
+                        @foreach ($this->parentOptions as $parentOption)
+                            <flux:select.option :value="$parentOption->id" :wire:key="'result-parent-'.$parentOption->id">
+                                {{ Str::limit($parentOption->statement, 60) }} · {{ $parentOption->program?->name ?? __('common.unassigned') }}
+                            </flux:select.option>
+                        @endforeach
+                    </x-ui.select>
+                    <p class="mt-1.5 type-meta text-secondary-medium dark:text-secondary-soft">
+                        {{ $resultType === ResultType::Impact->value ? __('results_framework.an_impact_sits_at_the_top_of_the_chain') : __('results_framework.only_the_level_directly_above_is_offered') }}
+                    </p>
+                </div>
 
-                <x-ui.select wire:model="parentId" :label="__('results_framework.contributes_to')">
-                    <flux:select.option value="">{{ __('common.top_level') }}</flux:select.option>
-                    @foreach ($this->parentOptions as $parentOption)
-                        <flux:select.option :value="$parentOption->id" :wire:key="'result-parent-'.$parentOption->id">
-                            {{ Str::limit($parentOption->statement, 60) }}
-                        </flux:select.option>
-                    @endforeach
-                </x-ui.select>
+                <div>
+                    <x-ui.select wire:model="resultProgramId" :label="__('common.program')" :disabled="$parentId !== ''">
+                        <flux:select.option value="">{{ __('common.unassigned') }}</flux:select.option>
+                        @foreach ($this->programOptions as $programOption)
+                            <flux:select.option :value="$programOption->id" :wire:key="'result-program-option-'.$programOption->id">{{ $programOption->name }}</flux:select.option>
+                        @endforeach
+                    </x-ui.select>
+                    @if ($parentId !== '')
+                        <p class="mt-1.5 type-meta text-secondary-medium dark:text-secondary-soft">{{ __('results_framework.follows_the_program_of_the_result_it_contributes_to') }}</p>
+                    @elseif ($editingResultId !== null)
+                        <p class="mt-1.5 type-meta text-secondary-medium dark:text-secondary-soft">{{ __('results_framework.nested_results_move_with_it') }}</p>
+                    @endif
+                </div>
             </div>
 
             <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">

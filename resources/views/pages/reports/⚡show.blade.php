@@ -1,7 +1,9 @@
 <?php
 
 use App\Enums\FileType;
+use App\Enums\IndicatorMeasure;
 use App\Enums\ReportStatus;
+use App\Livewire\Concerns\ManagesReportForm;
 use App\Models\Report;
 use App\Models\ReportFile;
 use Flux\Flux;
@@ -16,6 +18,7 @@ use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 
 new #[Title('titles.report')] class extends Component {
+    use ManagesReportForm;
     use WithFileUploads;
 
     public int $reportId;
@@ -55,13 +58,25 @@ new #[Title('titles.report')] class extends Component {
             ])
             ->with([
                 'planIndicator:id,indicator_id,target,period,source_type,source_id,project_id',
-                'planIndicator.indicator:id,name,result_id,measure',
+                'planIndicator.indicator:id,name,result_id,measure,unit',
                 'planIndicator.indicator.result:id,statement,type',
                 'planIndicator.project:id,name',
                 'planIndicator.source',
+                // Every figure on the target, for its achievement by the shared rule.
+                'planIndicator.reports:id,plan_indicator_id,status,planned_date,value',
                 'user:id,name,email',
             ])
             ->findOrFail($this->reportId);
+    }
+
+    protected function reportSaved(Report $report, bool $isCreate): void
+    {
+        unset($this->report, $this->history, $this->achievement, $this->achievementTone);
+    }
+
+    protected function reportDeleted(): void
+    {
+        $this->redirectRoute('reports.index', navigate: true);
     }
 
     /** @return Collection<int, ReportFile> */
@@ -78,21 +93,20 @@ new #[Title('titles.report')] class extends Component {
     }
 
     /**
-     * The share of the target this figure reaches, capped for display.
+     * How far the target this report belongs to has been achieved.
      *
-     * Returns null when the target is zero, so the tile renders an em dash
-     * rather than dividing by nothing.
+     * The target's own figure by the one shared rule (PlanIndicator::
+     * achievedValue(): approved reports only, numeric summed, percentage the
+     * latest level) — the same number the targets, indicators and results
+     * pages show. One quarterly figure divided by an annual target is not
+     * achievement. Null when the target is zero.
      */
     #[Computed]
     public function achievement(): ?int
     {
-        $target = (float) $this->report->planIndicator->target;
+        $percent = $this->report->planIndicator->percentAchieved();
 
-        if ($target <= 0.0) {
-            return null;
-        }
-
-        return (int) floor(((float) $this->report->value / $target) * 100);
+        return $percent === null ? null : (int) floor($percent);
     }
 
     /**
@@ -184,7 +198,8 @@ new #[Title('titles.report')] class extends Component {
      *
      * Editability is derived from status (Report::isEditable()), so returning
      * to draft is what reopens a report for editing — there is no separate
-     * lock/unlock action any more.
+     * lock/unlock action any more. submit_date is cleared with it: a draft
+     * has not been submitted, and submitting again stamps a fresh date.
      */
     public function returnToDraft(): void
     {
@@ -194,7 +209,7 @@ new #[Title('titles.report')] class extends Component {
             return;
         }
 
-        $report->fill(['status' => ReportStatus::Draft])->save();
+        $report->fill(['status' => ReportStatus::Draft, 'submit_date' => null])->save();
 
         unset($this->report);
 
@@ -463,23 +478,33 @@ new #[Title('titles.report')] class extends Component {
         default => null,
     };
 
+    $unit = $planIndicator->indicator->measure === IndicatorMeasure::Percentage ? '%' : '';
+    $formatFigure = fn (float $value): string => number_format($value, fmod($value, 1.0) === 0.0 ? 0 : 2);
+
     // Every node the reader can act on carries a real href: no dead-end labels
-    // dressed up as links. Indicators and results have no page of their own
-    // yet, so "Output" is the closest working connection — the filtered
-    // indicators list for that same result.
+    // dressed up as links. The chain reads the way the workflow runs — result,
+    // indicator, target — then who delivers it and where it was committed.
     $chain = [
         [
             'label' => $planIndicator->indicator->result->type->label(),
             'value' => Str::limit($planIndicator->indicator->result->statement, 64),
-            'href' => Route::has('indicators.index') ? route('indicators.index', ['result' => $planIndicator->indicator->result_id]) : null,
+            'href' => route('results.index', ['search' => Str::limit($planIndicator->indicator->result->statement, 60, '')]),
         ],
-        ['label' => __('common.indicator_name'), 'value' => $planIndicator->indicator->name, 'href' => null],
+        [
+            'label' => __('common.indicator_name'),
+            'value' => $planIndicator->indicator->name,
+            'href' => route('indicators.index', ['inspect' => $planIndicator->indicator_id]),
+        ],
+        [
+            'label' => __('reports.target'),
+            'value' => $formatFigure((float) $planIndicator->target).$unit.' · '.$planIndicator->period->label(),
+            'href' => route('targets.index', ['indicator' => $planIndicator->indicator_id]),
+        ],
         [
             'label' => __('common.project'),
             'value' => $planIndicator->project?->name ?? __('common.organisation_wide'),
             'href' => $planIndicator->project !== null ? route('projects.show', $planIndicator->project) : null,
         ],
-        ['label' => __('common.period'), 'value' => $planIndicator->period->label(), 'href' => null],
         ['label' => __('reports.committed_via'), 'value' => $sourceValue, 'href' => $sourceHref],
     ];
 @endphp
@@ -521,21 +546,39 @@ new #[Title('titles.report')] class extends Component {
 
         <x-slot:actions>
             <x-ui.user-chip :user="$report->user" class="rounded-lg border border-secondary-soft p-2.5 dark:border-secondary-medium" />
+            @if ($planIndicator->source !== null)
+                <x-ui.button icon="document-plus" wire:click="openCreateModal({{ $planIndicator->id }})" data-test="record-next-report-button">{{ __('reports.record_next_report') }}</x-ui.button>
+            @endif
         </x-slot:actions>
     </x-ui.detail-header>
 
-    {{-- The hero: the figure the page exists to show, set directly on the page rather than boxed into cards. --}}
+    {{-- The hero: this figure, the target it counts toward, and how far that target has come. --}}
     <div class="flex flex-col gap-8 border-y border-secondary-soft py-8 dark:border-secondary-medium @lg/detail:flex-row @lg/detail:items-center">
-        <x-ui.progress-ring :value="$this->achievement" size="lg" :tone="$this->achievementTone" :label="__('reports.achievement')" class="shrink-0" />
+        <div class="flex shrink-0 items-center gap-4">
+            <x-ui.progress-ring :value="$this->achievement" size="lg" :tone="$this->achievementTone" :label="__('reports.target_achieved')" />
+            <div class="@lg/detail:hidden">
+                <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('reports.target_achieved') }}</p>
+                <p class="mt-1 type-meta text-secondary-medium dark:text-secondary-soft">{{ __('reports.approved_reports_only') }}</p>
+            </div>
+        </div>
 
         <div class="flex flex-1 flex-wrap items-stretch gap-y-6">
             <div class="min-w-32 flex-1">
-                <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('reports.reported') }}</p>
-                <p class="mt-1.5 text-4xl leading-none font-extrabold tabular-nums">{{ number_format((float) $report->value, 2) }}</p>
+                <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('reports.this_report') }}</p>
+                <p class="mt-1.5 text-4xl leading-none font-extrabold tabular-nums">{{ $formatFigure((float) $report->value) }}{{ $unit }}</p>
+                <p class="mt-1.5 type-meta text-secondary-medium dark:text-secondary-soft">
+                    {{ $report->status === ReportStatus::Approved ? __('reports.counted_toward_the_target') : __('reports.counts_toward_the_target_once_approved') }}
+                </p>
+            </div>
+            <div class="min-w-32 flex-1 border-s border-secondary-soft ps-8 dark:border-secondary-medium">
+                <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('reports.achieved_so_far') }}</p>
+                <p class="mt-1.5 text-4xl leading-none font-extrabold tabular-nums">{{ $formatFigure($planIndicator->achievedValue()) }}{{ $unit }}</p>
+                <p class="mt-1.5 type-meta text-secondary-medium dark:text-secondary-soft">{{ __('reports.approved_reports_only') }}</p>
             </div>
             <div class="min-w-32 flex-1 border-s border-secondary-soft ps-8 dark:border-secondary-medium">
                 <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('reports.target') }}</p>
-                <p class="mt-1.5 text-4xl leading-none font-extrabold tabular-nums text-secondary-medium dark:text-secondary-soft">{{ number_format((float) $planIndicator->target, 2) }}</p>
+                <p class="mt-1.5 text-4xl leading-none font-extrabold tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $formatFigure((float) $planIndicator->target) }}{{ $unit }}</p>
+                <p class="mt-1.5 type-meta text-secondary-medium dark:text-secondary-soft">{{ $planIndicator->period->label() }}</p>
             </div>
         </div>
     </div>
@@ -632,6 +675,11 @@ new #[Title('titles.report')] class extends Component {
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
+                    @if ($report->isEditable())
+                        <x-ui.button size="sm" icon="pencil-square" wire:click="openEditModal({{ $report->id }})" data-test="edit-report-button">{{ __('reports.edit_report') }}</x-ui.button>
+                        <x-ui.button size="sm" icon="trash" wire:click="confirmDeleteReport({{ $report->id }})" data-test="delete-report-button">{{ __('reports.delete_report') }}</x-ui.button>
+                    @endif
+
                     @if ($report->status === ReportStatus::Draft)
                         <x-ui.button size="sm" tone="primary" icon="paper-airplane" wire:click="submitForReview" data-test="submit-for-review-button">{{ __('reports.submit_for_review') }}</x-ui.button>
                     @endif
@@ -819,6 +867,14 @@ new #[Title('titles.report')] class extends Component {
             </ul>
         @endif
     </x-ui.panel>
+
+    <x-reports.form-modal
+        :open="$showReportModal"
+        :editing="$editingReportId !== null"
+        :target-options="$showReportModal ? $this->targetOptions : []"
+        :form-target="$showReportModal ? $this->formTarget : null"
+        :window="$showReportModal ? $this->formWindow() : null"
+    />
 
     <flux:modal wire:model="showFileModal" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
         @if ($showFileModal)

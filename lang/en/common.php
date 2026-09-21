@@ -124,4 +124,6 @@ return [
     'watching' => 'Watching',
     'zoom_in' => 'Zoom in',
     'zoom_out' => 'Zoom out',
+    'delete' => 'Delete',
+    'close' => 'Close',
 ];

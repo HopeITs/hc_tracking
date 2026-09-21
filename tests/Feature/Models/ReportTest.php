@@ -68,3 +68,12 @@ test('the approved scope returns only signed off reports', function () {
 test('a report casts its value to two decimal places', function () {
     expect(Report::factory()->create(['value' => '9500.5'])->fresh()->value)->toBe('9500.50');
 });
+
+test('only a draft past the date it covers is overdue', function () {
+    $late = Report::factory()->create(['planned_date' => now()->subDay()->toDateString()]);
+    Report::factory()->create(['planned_date' => now()->addDay()->toDateString()]);
+    Report::factory()->reviewed()->create(['planned_date' => now()->subMonth()->toDateString()]);
+
+    expect($late->isOverdue())->toBeTrue()
+        ->and(Report::query()->overdue()->pluck('id')->all())->toBe([$late->id]);
+});

@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\IndicatorMeasure;
 use App\Enums\Period;
 use App\Models\Donor;
 use App\Models\Indicator;
@@ -64,6 +65,19 @@ new #[Title('titles.targets')] class extends Component {
     #[Url(except: '')]
     public string $year = '';
 
+    /**
+     * Narrows the page to one indicator, or to every indicator on one result.
+     *
+     * Set by deep links from the results framework and the indicator
+     * directory rather than by a header picker, so it is shown as a removable
+     * chip above the list.
+     */
+    #[Url(except: '')]
+    public string $indicator = '';
+
+    #[Url(except: '')]
+    public string $result = '';
+
     public bool $showTargetModal = false;
     public ?int $editingTargetId = null;
     public ?int $deletingTargetId = null;
@@ -77,8 +91,31 @@ new #[Title('titles.targets')] class extends Component {
     public string $targetProjectId = '';
     public string $targetPeriod = 'quarterly';
 
+    /**
+     * `?create=1` (with `?indicator=`) opens the commit form, already tied to
+     * that indicator — the "Commit a target" step from the indicator chain.
+     */
+    public function mount(): void
+    {
+        if (request()->boolean('create')) {
+            $this->openCreateModal();
+
+            if ($this->indicator !== '' && Indicator::query()->whereKey((int) $this->indicator)->exists()) {
+                $this->targetIndicatorId = $this->indicator;
+                $this->updatedTargetIndicatorId();
+            }
+        }
+    }
+
     public function updatedSearch(): void
     {
+        $this->resetPage();
+    }
+
+    public function clearIndicatorScope(): void
+    {
+        $this->indicator = '';
+        $this->result = '';
         $this->resetPage();
     }
 
@@ -128,6 +165,8 @@ new #[Title('titles.targets')] class extends Component {
     public function updatedTargetSourceType(): void
     {
         $this->targetSourceId = '';
+        unset($this->sourceOptions, $this->formProjectOptions);
+        $this->syncFormProject();
     }
 
     public function clearFilters(): void
@@ -140,46 +179,19 @@ new #[Title('titles.targets')] class extends Component {
         $this->donor = '';
         $this->program = '';
         $this->year = '';
+        $this->indicator = '';
+        $this->result = '';
         $this->resetPage();
     }
 
     /**
-     * The achieved value of a target, as a correlated SQL expression.
-     *
-     * Only approved reports count. A numeric indicator accumulates, so its
-     * approved values are summed; a percentage indicator is a level, so the
-     * latest approved value stands on its own — summing 40% and 55% is not 95%.
-     */
-    private function actualSql(): string
-    {
-        $sum = "(select coalesce(sum(r.value), 0) from reports r where r.plan_indicator_id = plan_indicators.id and r.status = 'approved')";
-        $latest = "coalesce((select r.value from reports r where r.plan_indicator_id = plan_indicators.id and r.status = 'approved' order by r.period_end desc, r.id desc limit 1), 0)";
-
-        return "(case when (select i.measure from indicators i where i.id = plan_indicators.indicator_id) = 'percentage' then {$latest} else {$sum} end)";
-    }
-
-    /**
-     * Value reported but not yet approved; shown as a lighter segment.
-     *
-     * Zero for percentage indicators, where an unapproved level does not add.
-     */
-    private function pendingSql(): string
-    {
-        return "(case when (select i.measure from indicators i where i.id = plan_indicators.indicator_id) = 'percentage' then 0 else (select coalesce(sum(r.value), 0) from reports r where r.plan_indicator_id = plan_indicators.id and r.status <> 'approved') end)";
-    }
-
-    /**
-     * The SQL condition for one achievement status.
+     * Achievement is PlanIndicator's one shared rule — approved reports only;
+     * numeric summed, percentage the latest level — in its SQL form, so the
+     * status filter and the pulse can count on it.
      */
     private function statusSql(string $status): string
     {
-        $actual = $this->actualSql();
-
-        return match ($status) {
-            'achieved' => "({$actual} > 0 and {$actual} >= plan_indicators.target)",
-            'in_progress' => "({$actual} > 0 and {$actual} < plan_indicators.target)",
-            default => "({$actual} <= 0)",
-        };
+        return PlanIndicator::achievementStatusSql($status);
     }
 
     /**
@@ -192,9 +204,21 @@ new #[Title('titles.targets')] class extends Component {
         $search = trim($this->search);
 
         return PlanIndicator::query()
+            // The indicator, the result it measures, or the proposal it was committed in.
             ->when($search !== '', function ($query) use ($search): void {
-                $query->whereHas('indicator', fn ($query) => $query->where('name', 'like', '%'.$search.'%'));
+                $like = '%'.$search.'%';
+
+                $query->where(fn ($query) => $query
+                    ->whereHas('indicator', fn ($query) => $query
+                        ->where('name', 'like', $like)
+                        ->orWhereHas('result', fn ($query) => $query->where('statement', 'like', $like)))
+                    ->orWhere(fn ($query) => $query
+                        ->where('source_type', 'proposal')
+                        ->whereIn('source_id', Proposal::query()->select('id')->where('name', 'like', $like))));
             })
+            ->when($this->indicator !== '', fn ($query) => $query->where('indicator_id', (int) $this->indicator))
+            ->when($this->result !== '', fn ($query) => $query
+                ->whereIn('indicator_id', Indicator::query()->select('id')->where('result_id', (int) $this->result)))
             ->when($this->sourceType !== '', fn ($query) => $query->where('source_type', $this->sourceType))
             ->when($this->project === 'none', fn ($query) => $query->whereNull('project_id'))
             ->when(
@@ -206,13 +230,20 @@ new #[Title('titles.targets')] class extends Component {
             ->when($this->donor !== '', fn ($query) => $query
                 ->where('source_type', 'proposal')
                 ->whereIn('source_id', DB::table('donor_proposal')->select('proposal_id')->where('donor_id', (int) $this->donor)))
-            // A program owns a target through its annual plan, or through the project delivering it.
+            // A program owns a target through its annual plan, the project delivering
+            // it, or the result it measures — so an organisation-wide proposal target
+            // still shows under the program whose logframe it serves.
             ->when($this->program !== '', fn ($query) => $query->where(function ($query): void {
+                $programId = (int) $this->program;
+
                 $query
                     ->where(fn ($query) => $query
                         ->where('source_type', 'annual_plan')
-                        ->whereIn('source_id', AnnualPlan::query()->select('id')->where('program_id', (int) $this->program)))
-                    ->orWhereIn('project_id', Project::query()->select('id')->where('program_id', (int) $this->program));
+                        ->whereIn('source_id', AnnualPlan::query()->select('id')->where('program_id', $programId)))
+                    ->orWhereIn('project_id', Project::query()->select('id')->where('program_id', $programId))
+                    ->orWhereIn('indicator_id', Indicator::query()->select('indicators.id')
+                        ->join('results', 'results.id', '=', 'indicators.result_id')
+                        ->where('results.program_id', $programId));
             }))
             // A plan belongs to one year; a proposal covers every year its planned dates span.
             ->when($this->year !== '', fn ($query) => $query->where(function ($query): void {
@@ -350,8 +381,8 @@ new #[Title('titles.targets')] class extends Component {
 
         return $this->matchingTargets()
             ->select(['id', 'source_type', 'source_id', 'indicator_id', 'target', 'project_id', 'period', 'updated_at'])
-            ->selectRaw($this->actualSql().' as actual_value')
-            ->selectRaw($this->pendingSql().' as pending_value')
+            ->selectRaw(PlanIndicator::achievedValueSql().' as actual_value')
+            ->selectRaw(PlanIndicator::pendingValueSql().' as pending_value')
             ->selectRaw("(select count(*) from reports r where r.plan_indicator_id = plan_indicators.id and r.status = 'reviewed') as reviewed_count")
             ->selectRaw("(select count(*) from reports r where r.plan_indicator_id = plan_indicators.id and r.status = 'draft') as draft_count")
             ->whereIn('indicator_id', Indicator::query()->select('id')->whereIn('result_id', $resultIds))
@@ -360,11 +391,12 @@ new #[Title('titles.targets')] class extends Component {
                 // the source was removed by a write that fired no model events.
                 'source' => fn (MorphTo $morphTo) => $morphTo->morphWith([
                     AnnualPlan::class => ['program:id,name'],
-                    Proposal::class => ['donors:id,name'],
+                    // projects: which projects the proposal funds, for chainIssues().
+                    Proposal::class => ['donors:id,name', 'projects:id'],
                 ]),
-                'indicator:id,name,result_id,measure,unit,baseline',
-                'indicator.result:id,statement,type',
-                'project:id,name,city_id',
+                'indicator:id,name,result_id,project_id,measure,unit,baseline',
+                'indicator.result:id,statement,type,program_id',
+                'project:id,name,city_id,program_id',
                 'project.city:id,name_en,name_ar',
             ])
             ->withCount('reports')
@@ -406,7 +438,26 @@ new #[Title('titles.targets')] class extends Component {
     }
 
     /**
+     * The indicator chosen in the form, with the result it measures.
+     */
+    #[Computed]
+    public function formIndicator(): ?Indicator
+    {
+        if ($this->targetIndicatorId === '') {
+            return null;
+        }
+
+        return Indicator::query()
+            ->select(['id', 'name', 'result_id', 'project_id', 'measure', 'unit', 'frequency'])
+            ->with(['result:id,statement,program_id', 'project:id,name'])
+            ->find((int) $this->targetIndicatorId);
+    }
+
+    /**
      * The sources selectable under the currently chosen source type.
+     *
+     * An annual plan belongs to one program, so once the indicator's result
+     * sits in a program only that program's plans are offered.
      *
      * @return array<int, array{id: int, label: string}>
      */
@@ -422,9 +473,12 @@ new #[Title('titles.targets')] class extends Component {
                 ->all();
         }
 
+        $programId = $this->formIndicator?->result?->program_id;
+
         return AnnualPlan::query()
             ->select(['id', 'program_id', 'year'])
             ->with('program:id,name')
+            ->when($programId !== null, fn ($query) => $query->where('program_id', $programId))
             ->orderByDesc('year')
             ->get()
             ->map(fn (AnnualPlan $plan): array => [
@@ -438,7 +492,84 @@ new #[Title('titles.targets')] class extends Component {
     #[Computed]
     public function indicatorOptions(): Collection
     {
-        return Indicator::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get();
+        return Indicator::query()
+            ->select(['id', 'name', 'result_id', 'measure'])
+            ->with('result:id,statement')
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
+     * Projects that may deliver the target being committed.
+     *
+     * An indicator scoped to one project allows only that project. Otherwise
+     * an annual-plan target is delivered inside the plan's program, and a
+     * proposal target by a project the proposal funds.
+     *
+     * @return Collection<int, Project>
+     */
+    #[Computed]
+    public function formProjectOptions(): Collection
+    {
+        $indicator = $this->formIndicator;
+        $sourceId = $this->targetSourceId === '' ? null : (int) $this->targetSourceId;
+
+        return Project::query()
+            ->select(['id', 'name', 'program_id'])
+            ->when($indicator?->project_id !== null, fn ($query) => $query->whereKey($indicator->project_id))
+            ->when($sourceId !== null && $this->targetSourceType === 'annual_plan', fn ($query) => $query
+                ->whereIn('program_id', AnnualPlan::query()->select('program_id')->whereKey($sourceId)))
+            ->when($sourceId !== null && $this->targetSourceType === 'proposal', fn ($query) => $query
+                ->whereIn('id', DB::table('project_proposal')->select('project_id')->where('proposal_id', $sourceId)))
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
+     * Choosing an indicator narrows the plans and projects that fit it: a
+     * project-scoped indicator fixes the project, and a source or project
+     * that no longer fits is dropped rather than carried to the save.
+     */
+    public function updatedTargetIndicatorId(): void
+    {
+        unset($this->formIndicator, $this->sourceOptions, $this->formProjectOptions);
+
+        if ($this->targetSourceId !== '' && ! collect($this->sourceOptions)->contains('id', (int) $this->targetSourceId)) {
+            $this->targetSourceId = '';
+        }
+
+        // A new target reports on the indicator's own cadence unless told otherwise.
+        if ($this->editingTargetId === null && $this->formIndicator !== null) {
+            $this->targetPeriod = $this->formIndicator->frequency->value;
+        }
+
+        $this->syncFormProject();
+    }
+
+    public function updatedTargetSourceId(): void
+    {
+        unset($this->formProjectOptions);
+
+        $this->syncFormProject();
+    }
+
+    /**
+     * Keep the chosen project inside the options that fit, and fill it in
+     * when the indicator leaves exactly one.
+     */
+    protected function syncFormProject(): void
+    {
+        $options = $this->formProjectOptions;
+
+        if ($this->targetProjectId !== '' && ! $options->contains('id', (int) $this->targetProjectId)) {
+            $this->targetProjectId = '';
+        }
+
+        if ($this->formIndicator?->project_id !== null && $options->count() === 1) {
+            $this->targetProjectId = (string) $options->first()->id;
+        }
     }
 
     /** @return Collection<int, Project> */
@@ -508,6 +639,7 @@ new #[Title('titles.targets')] class extends Component {
         $this->targetValue = (string) $target->target;
         $this->targetProjectId = (string) ($target->project_id ?? '');
         $this->targetPeriod = $target->period->value;
+        unset($this->formIndicator, $this->sourceOptions, $this->formProjectOptions);
         $this->showTargetModal = true;
     }
 
@@ -532,31 +664,85 @@ new #[Title('titles.targets')] class extends Component {
 
         // The chosen source must actually exist under the chosen type. A single
         // exists rule cannot express this, because the table depends on the type.
-        $sourceExists = $validated['targetSourceType'] === 'proposal'
-            ? Proposal::query()->whereKey((int) $validated['targetSourceId'])->exists()
-            : AnnualPlan::query()->whereKey((int) $validated['targetSourceId'])->exists();
+        $source = $validated['targetSourceType'] === 'proposal'
+            ? Proposal::query()->with('projects:id')->find((int) $validated['targetSourceId'])
+            : AnnualPlan::query()->find((int) $validated['targetSourceId']);
 
-        if (! $sourceExists) {
+        if ($source === null) {
             $this->addError('targetSourceId', __('targets.the_selected_source_is_no_longer_available'));
+
+            return;
+        }
+
+        $indicator = Indicator::query()->with('result:id,program_id')->findOrFail((int) $validated['targetIndicatorId']);
+        $projectId = $validated['targetProjectId'] === '' || $validated['targetProjectId'] === null
+            ? null
+            : (int) $validated['targetProjectId'];
+        $project = $projectId === null ? null : Project::query()->select(['id', 'program_id'])->find($projectId);
+
+        // A percentage is read against 100; a target above it can never be met.
+        if ($indicator->measure === IndicatorMeasure::Percentage && (float) $validated['targetValue'] > 100) {
+            $this->addError('targetValue', __('targets.a_percentage_target_cannot_exceed_100'));
 
             return;
         }
 
         $target = $this->editingTargetId === null
             ? new PlanIndicator
-            : PlanIndicator::query()->findOrFail($this->editingTargetId);
+            : PlanIndicator::query()->withCount('reports')->findOrFail($this->editingTargetId);
 
         $target->fill([
             // The map key, never the class name.
             'source_type' => $validated['targetSourceType'],
-            'source_id' => (int) $validated['targetSourceId'],
-            'indicator_id' => (int) $validated['targetIndicatorId'],
+            'source_id' => $source->id,
+            'indicator_id' => $indicator->id,
             'target' => $validated['targetValue'],
-            'project_id' => $validated['targetProjectId'] === '' || $validated['targetProjectId'] === null
-                ? null
-                : (int) $validated['targetProjectId'],
+            'project_id' => $projectId,
             'period' => $validated['targetPeriod'],
-        ])->save();
+        ]);
+
+        // Reports were filed against this indicator in this plan or proposal;
+        // moving the target would re-label every one of them.
+        if ($target->exists && $target->reports_count > 0 && $target->isDirty(['indicator_id', 'source_type', 'source_id'])) {
+            $this->addError('targetIndicatorId', __('targets.the_indicator_and_source_are_locked_once_reported_against'));
+
+            return;
+        }
+
+        $issues = PlanIndicator::chainIssuesFor($source, $indicator, $project);
+
+        // Only what this edit introduces: a row already out of step can still
+        // have its value or period corrected.
+        if ($target->exists && $issues !== []) {
+            $original = PlanIndicator::query()
+                ->with(['source' => fn (MorphTo $morphTo) => $morphTo->morphWith([Proposal::class => ['projects:id']]), 'project:id,program_id'])
+                ->findOrFail($target->id);
+            $issues = array_values(array_diff($issues, PlanIndicator::chainIssuesFor($original->source, $indicator, $original->project)));
+        }
+
+        if ($issues !== []) {
+            foreach ($issues as $issue) {
+                $this->addError($issue === 'targets.issue_plan_program_differs_from_result' ? 'targetSourceId' : 'targetProjectId', __($issue));
+            }
+
+            return;
+        }
+
+        $duplicate = PlanIndicator::query()
+            ->where('source_type', $target->source_type)
+            ->where('source_id', $target->source_id)
+            ->where('indicator_id', $target->indicator_id)
+            ->where(fn ($query) => $projectId === null ? $query->whereNull('project_id') : $query->where('project_id', $projectId))
+            ->when($target->exists, fn ($query) => $query->whereKeyNot($target->id))
+            ->exists();
+
+        if ($duplicate) {
+            $this->addError('targetIndicatorId', __('targets.this_indicator_already_has_a_target_here'));
+
+            return;
+        }
+
+        $target->save();
 
         $wasRecentlyCreated = $target->wasRecentlyCreated;
 
@@ -623,12 +809,18 @@ new #[Title('titles.targets')] class extends Component {
         $this->targetValue = '';
         $this->targetProjectId = '';
         $this->targetPeriod = 'quarterly';
+        unset($this->formIndicator, $this->sourceOptions, $this->formProjectOptions);
     }
 };
 ?>
 
 @php
-    $filtersAreActive = $search !== '' || $sourceType !== '' || $project !== '' || $period !== '' || $status !== '' || $donor !== '' || $program !== '' || $year !== '';
+    $filtersAreActive = $search !== '' || $sourceType !== '' || $project !== '' || $period !== '' || $status !== '' || $donor !== '' || $program !== '' || $year !== '' || $indicator !== '' || $result !== '';
+    $scopeLabel = match (true) {
+        $indicator !== '' => __('targets.indicator_scope', ['name' => App\Models\Indicator::query()->whereKey((int) $indicator)->value('name') ?? '—']),
+        $result !== '' => __('targets.result_scope', ['statement' => Str::limit(App\Models\Result::query()->whereKey((int) $result)->value('statement') ?? '—', 60)]),
+        default => null,
+    };
     $sourceTypeLabels = ['annual_plan' => __('common.annual_plan'), 'proposal' => __('common.proposal')];
     $pulse = $this->pulse;
     $statusMeta = [
@@ -779,6 +971,13 @@ new #[Title('titles.targets')] class extends Component {
                     · {{ __('targets.results_page', ['from' => $this->resultPage->firstItem(), 'to' => $this->resultPage->lastItem(), 'total' => $this->resultPage->total()]) }}
                 @endif
             </p>
+            @if ($scopeLabel !== null)
+                <button type="button" wire:click="clearIndicatorScope" class="inline-flex max-w-full items-center gap-1.5 rounded-full border border-secondary-dark bg-secondary-dark px-3 py-1 text-xs font-semibold text-white hover:opacity-90 dark:border-white dark:bg-white dark:text-secondary-dark" data-test="indicator-scope-chip">
+                    <span class="truncate">{{ $scopeLabel }}</span>
+                    <flux:icon.x-mark variant="micro" class="size-3.5 shrink-0" aria-hidden="true" />
+                    <span class="sr-only">{{ __('common.reset_filters') }}</span>
+                </button>
+            @endif
             <div class="flex items-center gap-4">
                 <span class="hidden items-center gap-4 text-xs text-secondary-medium @3xl/directory:inline-flex dark:text-secondary-soft">
                     <span class="inline-flex items-center gap-1.5"><span aria-hidden="true" class="h-1.5 w-4 rounded-full bg-secondary-dark dark:bg-white"></span>{{ __('targets.legend_approved') }}</span>
@@ -800,17 +999,17 @@ new #[Title('titles.targets')] class extends Component {
             <div class="flex flex-col gap-10 pt-6 transition-opacity duration-200" wire:loading.class="opacity-50" wire:target="search,sourceType,project,period,donor,program,year,filterStatus,clearFilters,gotoPage,nextPage,previousPage">
                 @foreach ($groups as $resultId => $groupTargets)
                     @php
-                        $result = $groupTargets->first()->indicator->result;
+                        $groupResult = $groupTargets->first()->indicator->result;
                     @endphp
-                    <section class="target-group flex flex-col" style="--group-order: {{ $loop->index }}" wire:key="target-group-{{ $resultId }}" aria-label="{{ $result->statement }}">
+                    <section class="target-group flex flex-col" style="--group-order: {{ $loop->index }}" wire:key="target-group-{{ $resultId }}" aria-label="{{ $groupResult->statement }}">
                         <header class="flex items-start gap-3 pb-3">
-                            <span aria-hidden="true" class="mt-1 size-3 shrink-0 rounded-full ring-2 ring-inset {{ $resultMark($result->type) }}"></span>
+                            <span aria-hidden="true" class="mt-1 size-3 shrink-0 rounded-full ring-2 ring-inset {{ $resultMark($groupResult->type) }}"></span>
                             <div class="flex min-w-0 flex-col gap-0.5">
                                 <p class="type-label text-secondary-medium dark:text-secondary-soft">
-                                    {{ $result->type?->label() }}
+                                    {{ $groupResult->type?->label() }}
                                     <span class="normal-case tracking-normal">· {{ trans_choice('targets.count_target', $groupTargets->count(), ['count' => $groupTargets->count()]) }}</span>
                                 </p>
-                                <p class="max-w-4xl text-pretty text-base font-semibold leading-snug">{{ $result->statement }}</p>
+                                <p class="max-w-4xl text-pretty text-base font-semibold leading-snug">{{ $groupResult->statement }}</p>
                             </div>
                         </header>
 
@@ -826,10 +1025,10 @@ new #[Title('titles.targets')] class extends Component {
                                         $source instanceof Proposal => route('proposals.show', $source),
                                         default => null,
                                     };
-                                    $indicator = $target->indicator;
-                                    $isPercentage = $indicator->measure?->value === 'percentage';
+                                    $targetIndicator = $target->indicator;
+                                    $isPercentage = $targetIndicator->measure?->value === 'percentage';
                                     $unitSuffix = $isPercentage ? '%' : '';
-                                    $unitWord = $isPercentage ? null : (filled($indicator->unit) ? $indicator->unit : null);
+                                    $unitWord = $isPercentage ? null : (filled($targetIndicator->unit) ? $targetIndicator->unit : null);
                                     $targetAmount = (float) $target->target;
                                     $actualAmount = (float) $target->actual_value;
                                     $pendingAmount = (float) $target->pending_value;
@@ -838,6 +1037,7 @@ new #[Title('titles.targets')] class extends Component {
                                     $approvedWidth = min(100, $achievedPercent);
                                     $pendingWidth = $targetAmount > 0 ? max(0, min(100 - $approvedWidth, $pendingAmount / $targetAmount * 100)) : 0;
                                     $isExpanded = $expandedTargetId === $target->id;
+                                    $chainIssues = $sourceLabel === null ? [] : $target->chainIssues();
                                     $linkClass = 'rounded-sm font-medium text-secondary-dark underline decoration-secondary-soft decoration-1 underline-offset-[3px] transition-colors hover:decoration-current focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-white dark:decoration-secondary-medium';
                                 @endphp
                                 <li class="relative" wire:key="target-{{ $target->id }}">
@@ -850,9 +1050,17 @@ new #[Title('titles.targets')] class extends Component {
                                     ])>
                                         <div class="flex min-w-0 flex-col gap-2">
                                             <div class="flex flex-wrap items-center gap-2">
-                                                <p class="text-[15px] font-semibold leading-snug">{{ $indicator->name }}</p>
+                                                <a href="{{ route('indicators.index', ['inspect' => $targetIndicator->id]) }}" wire:navigate class="text-[15px] font-semibold leading-snug hover:text-primary hover:underline">{{ $targetIndicator->name }}</a>
                                                 <x-ui.enum-badge :case="$target->period" />
                                             </div>
+
+                                            {{-- A row saved before the chain rules existed, or changed around them. --}}
+                                            @foreach ($chainIssues as $issue)
+                                                <p class="flex items-start gap-1.5 text-xs font-semibold text-primary" data-test="chain-issue-{{ $target->id }}">
+                                                    <flux:icon.link-slash variant="micro" class="mt-px size-3.5 shrink-0" aria-hidden="true" />
+                                                    {{ __($issue) }}
+                                                </p>
+                                            @endforeach
 
                                             {{-- Lineage: where it was committed, the money or plan behind it, then who delivers it. --}}
                                             <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-secondary-medium dark:text-secondary-soft">
@@ -920,7 +1128,7 @@ new #[Title('titles.targets')] class extends Component {
                                                     @endif
                                                 </span>
                                             </div>
-                                            <div class="flex h-2 w-full overflow-hidden rounded-full bg-secondary-soft/60 dark:bg-secondary-medium/50" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ (int) round($approvedWidth) }}" aria-label="{{ __('targets.achievement_of', ['indicator' => $indicator->name]) }}">
+                                            <div class="flex h-2 w-full overflow-hidden rounded-full bg-secondary-soft/60 dark:bg-secondary-medium/50" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ (int) round($approvedWidth) }}" aria-label="{{ __('targets.achievement_of', ['indicator' => $targetIndicator->name]) }}">
                                                 <span class="target-bar h-full rounded-full {{ $statusMeta[$rowStatus]['fill'] }}" style="width: {{ $approvedWidth }}%"></span>
                                                 @if ($pendingWidth > 0)
                                                     <span class="target-pending h-full" style="width: {{ $pendingWidth }}%"></span>
@@ -953,14 +1161,19 @@ new #[Title('titles.targets')] class extends Component {
                                                     @if ($target->draft_count > 0)
                                                         <span>{{ trans_choice('targets.count_draft', $target->draft_count, ['count' => $target->draft_count]) }}</span>
                                                     @endif
-                                                    @if (filled($indicator->baseline))
-                                                        <span>{{ __('targets.baseline_value', ['value' => $indicator->baseline.$unitSuffix]) }}</span>
+                                                    @if (filled($targetIndicator->baseline))
+                                                        <span>{{ __('targets.baseline_value', ['value' => $targetIndicator->baseline.$unitSuffix]) }}</span>
                                                     @endif
                                                 </span>
                                             </div>
                                         </div>
 
                                         <div class="flex items-center gap-1 justify-self-end">
+                                            @if ($sourceLabel !== null)
+                                                <flux:tooltip :content="__('targets.record_a_report')">
+                                                    <x-ui.button tone="ghost" size="sm" icon="document-plus" class="size-9!" :href="route('reports.index', ['create' => 1, 'target' => $target->id])" wire:navigate :aria-label="__('targets.record_a_report_for', ['indicator' => $targetIndicator->name])" data-test="record-report-{{ $target->id }}" />
+                                                </flux:tooltip>
+                                            @endif
                                             <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $target->id }})" :aria-label="__('targets.edit_target')" />
 
                                             @if ($target->reports_count === 0)
@@ -1035,6 +1248,29 @@ new #[Title('titles.targets')] class extends Component {
                 <flux:subheading>{{ __('targets.a_target_is_committed_either_in_an_annual_operational_plan_o') }}</flux:subheading>
             </div>
 
+            @php
+                $formIndicator = $this->formIndicator;
+                $formIsPercentage = $formIndicator?->measure === IndicatorMeasure::Percentage;
+            @endphp
+
+            {{-- The indicator comes first: it decides which plans and projects fit. --}}
+            <div>
+                <x-ui.select wire:model.live="targetIndicatorId" :label="__('targets.indicator')" required>
+                    <flux:select.option value="">{{ __('targets.select_an_indicator') }}</flux:select.option>
+                    @foreach ($this->indicatorOptions as $indicatorOption)
+                        <flux:select.option :value="$indicatorOption->id" :wire:key="'tgt-indicator-'.$indicatorOption->id">{{ $indicatorOption->name }} — {{ Str::limit($indicatorOption->result?->statement, 50) }}</flux:select.option>
+                    @endforeach
+                </x-ui.select>
+                @if ($formIndicator !== null)
+                    <p class="mt-1.5 type-meta text-secondary-medium dark:text-secondary-soft">
+                        {{ $formIndicator->measure->label() }}
+                        @if ($formIndicator->project !== null)
+                            · {{ __('targets.scoped_to_project', ['project' => $formIndicator->project->name]) }}
+                        @endif
+                    </p>
+                @endif
+            </div>
+
             <div class="grid gap-4 sm:grid-cols-2">
                 <x-ui.select wire:model.live="targetSourceType" :label="__('targets.committed_in')" required>
                     @foreach ($sourceTypeLabels as $sourceKey => $sourceLabel)
@@ -1042,25 +1278,23 @@ new #[Title('titles.targets')] class extends Component {
                     @endforeach
                 </x-ui.select>
 
-                <x-ui.select wire:model="targetSourceId" :label="$targetSourceType === 'proposal' ? __('common.proposal') : __('common.annual_plan')" required>
-                    <flux:select.option value="">{{ __('targets.select_a_source') }}</flux:select.option>
-                    @foreach ($this->sourceOptions as $sourceOption)
-                        <flux:select.option :value="$sourceOption['id']" :wire:key="'tgt-src-'.$targetSourceType.'-'.$sourceOption['id']">
-                            {{ $sourceOption['label'] }}
-                        </flux:select.option>
-                    @endforeach
-                </x-ui.select>
+                <div>
+                    <x-ui.select wire:model.live="targetSourceId" :label="$targetSourceType === 'proposal' ? __('common.proposal') : __('common.annual_plan')" required>
+                        <flux:select.option value="">{{ __('targets.select_a_source') }}</flux:select.option>
+                        @foreach ($this->sourceOptions as $sourceOption)
+                            <flux:select.option :value="$sourceOption['id']" :wire:key="'tgt-src-'.$targetSourceType.'-'.$sourceOption['id']">
+                                {{ $sourceOption['label'] }}
+                            </flux:select.option>
+                        @endforeach
+                    </x-ui.select>
+                    @if ($targetSourceType === 'annual_plan' && $formIndicator?->result?->program_id !== null)
+                        <p class="mt-1.5 type-meta text-secondary-medium dark:text-secondary-soft">{{ __('targets.only_plans_of_the_result_program_are_offered') }}</p>
+                    @endif
+                </div>
             </div>
 
-            <x-ui.select wire:model="targetIndicatorId" :label="__('targets.indicator')" required>
-                <flux:select.option value="">{{ __('targets.select_an_indicator') }}</flux:select.option>
-                @foreach ($this->indicatorOptions as $indicatorOption)
-                    <flux:select.option :value="$indicatorOption->id" :wire:key="'tgt-indicator-'.$indicatorOption->id">{{ $indicatorOption->name }}</flux:select.option>
-                @endforeach
-            </x-ui.select>
-
             <div class="grid gap-4 sm:grid-cols-3">
-                <x-ui.input wire:model="targetValue" :label="__('targets.target_value')" type="number" step="0.01" min="0" required />
+                <x-ui.input wire:model="targetValue" :label="$formIsPercentage ? __('targets.target_value_percent') : __('targets.target_value')" type="number" step="0.01" min="0" :max="$formIsPercentage ? 100 : null" required />
 
                 <x-ui.select wire:model="targetPeriod" :label="__('targets.reporting_period')" required>
                     @foreach (Period::cases() as $periodCase)
@@ -1068,13 +1302,21 @@ new #[Title('titles.targets')] class extends Component {
                     @endforeach
                 </x-ui.select>
 
-                <x-ui.select wire:model="targetProjectId" :label="__('common.project')">
-                    <flux:select.option value="">{{ __('common.organisation_wide') }}</flux:select.option>
-                    @foreach ($this->projectOptions as $projectOption)
+                <x-ui.select wire:model="targetProjectId" :label="__('common.project')" :disabled="$formIndicator?->project_id !== null">
+                    @if ($formIndicator?->project_id === null)
+                        <flux:select.option value="">{{ __('common.organisation_wide') }}</flux:select.option>
+                    @endif
+                    @foreach ($this->formProjectOptions as $projectOption)
                         <flux:select.option :value="$projectOption->id" :wire:key="'tgt-project-option-'.$projectOption->id">{{ $projectOption->name }}</flux:select.option>
                     @endforeach
                 </x-ui.select>
             </div>
+
+            @if ($targetSourceId !== '')
+                <p class="-mt-2 type-meta text-secondary-medium dark:text-secondary-soft">
+                    {{ $targetSourceType === 'proposal' ? __('targets.only_projects_the_proposal_funds_are_offered') : __('targets.only_projects_in_the_plan_program_are_offered') }}
+                </p>
+            @endif
 
             <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
                 <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeTargetModal">{{ __('common.cancel') }}</x-ui.button>

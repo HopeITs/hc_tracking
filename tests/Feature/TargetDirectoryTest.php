@@ -1,13 +1,16 @@
 <?php
 
+use App\Enums\IndicatorMeasure;
 use App\Enums\Period;
 use App\Models\AnnualPlan;
 use App\Models\Donor;
 use App\Models\Indicator;
 use App\Models\PlanIndicator;
 use App\Models\Program;
+use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Report;
+use App\Models\Result;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
@@ -375,4 +378,194 @@ test('the report trail shows evidence files and MEAL visibility', function () {
         ->call('toggleReports', $target->id)
         ->assertSee('No evidence files')
         ->assertSee('Seen by MEAL');
+});
+
+test('the indicator chain can open the commit form already tied to an indicator', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->create();
+    $indicator = Indicator::factory()->create(['project_id' => $project->id, 'frequency' => Period::Monthly]);
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['indicator' => $indicator->id, 'create' => 1])
+        ->test('pages::targets.index')
+        ->assertSet('showTargetModal', true)
+        ->assertSet('targetIndicatorId', (string) $indicator->id)
+        ->assertSet('targetPeriod', Period::Monthly->value)
+        ->assertSet('targetProjectId', (string) $project->id);
+});
+
+test('the form offers only the plans and projects that fit the chosen indicator and source', function () {
+    $user = User::factory()->create();
+    $program = Program::factory()->create();
+    $indicator = Indicator::factory()->for(Result::factory()->for($program))->create();
+    $fittingPlan = AnnualPlan::factory()->for($program)->create();
+    AnnualPlan::factory()->create();
+    $programProject = Project::factory()->for($program)->create();
+    Project::factory()->create();
+
+    $proposal = Proposal::factory()->create();
+    $funded = Project::factory()->create();
+    $proposal->projects()->attach($funded);
+
+    $component = Livewire::actingAs($user)
+        ->test('pages::targets.index')
+        ->call('openCreateModal')
+        ->set('targetIndicatorId', (string) $indicator->id);
+
+    expect(collect($component->instance()->sourceOptions())->pluck('id')->all())->toBe([$fittingPlan->id]);
+
+    $component->set('targetSourceId', (string) $fittingPlan->id);
+    expect($component->instance()->formProjectOptions()->modelKeys())->toBe([$programProject->id]);
+
+    $component->set('targetSourceType', 'proposal')->set('targetSourceId', (string) $proposal->id);
+    expect($component->instance()->formProjectOptions()->modelKeys())->toBe([$funded->id]);
+});
+
+test('a target that does not fit its chain is refused', function () {
+    $user = User::factory()->create();
+    $indicator = Indicator::factory()->for(Result::factory()->for(Program::factory()))->create();
+    $otherPlan = AnnualPlan::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::targets.index')
+        ->call('openCreateModal')
+        ->set('targetIndicatorId', (string) $indicator->id)
+        ->set('targetSourceType', 'annual_plan')
+        ->set('targetSourceId', (string) $otherPlan->id)
+        ->set('targetValue', '100')
+        ->call('saveTarget')
+        ->assertHasErrors(['targetSourceId']);
+
+    $proposal = Proposal::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::targets.index')
+        ->call('openCreateModal')
+        ->set('targetIndicatorId', (string) Indicator::factory()->create()->id)
+        ->set('targetSourceType', 'proposal')
+        ->set('targetSourceId', (string) $proposal->id)
+        ->set('targetProjectId', (string) Project::factory()->create()->id)
+        ->set('targetValue', '100')
+        ->call('saveTarget')
+        ->assertHasErrors(['targetProjectId']);
+
+    expect(PlanIndicator::query()->count())->toBe(0);
+});
+
+test('a percentage target above 100 is refused', function () {
+    $user = User::factory()->create();
+    $indicator = Indicator::factory()->create(['measure' => IndicatorMeasure::Percentage]);
+
+    Livewire::actingAs($user)
+        ->test('pages::targets.index')
+        ->call('openCreateModal')
+        ->set('targetIndicatorId', (string) $indicator->id)
+        ->set('targetSourceId', (string) AnnualPlan::factory()->create()->id)
+        ->set('targetValue', '120')
+        ->call('saveTarget')
+        ->assertHasErrors(['targetValue']);
+
+    expect(PlanIndicator::query()->exists())->toBeFalse();
+});
+
+test('the same indicator cannot be targeted twice in one source for one project', function () {
+    $user = User::factory()->create();
+    $existing = PlanIndicator::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::targets.index')
+        ->call('openCreateModal')
+        ->set('targetIndicatorId', (string) $existing->indicator_id)
+        ->set('targetSourceType', 'annual_plan')
+        ->set('targetSourceId', (string) $existing->source_id)
+        ->set('targetValue', '500')
+        ->call('saveTarget')
+        ->assertHasErrors(['targetIndicatorId']);
+
+    expect(PlanIndicator::query()->count())->toBe(1);
+});
+
+test('a reported target keeps its indicator and source but its value can still change', function () {
+    $user = User::factory()->create();
+    $target = PlanIndicator::factory()->create(['target' => 100]);
+    Report::factory()->for($target)->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::targets.index')
+        ->call('openEditModal', $target->id)
+        ->set('targetIndicatorId', (string) Indicator::factory()->create()->id)
+        ->call('saveTarget')
+        ->assertHasErrors(['targetIndicatorId']);
+
+    Livewire::actingAs($user)
+        ->test('pages::targets.index')
+        ->call('openEditModal', $target->id)
+        ->set('targetValue', '250')
+        ->call('saveTarget')
+        ->assertHasNoErrors();
+
+    expect((float) DB::table('plan_indicators')->find($target->id)->target)->toBe(250.0);
+});
+
+test('a target already out of step is flagged but its value can still be corrected', function () {
+    $user = User::factory()->create();
+    $indicator = Indicator::factory()->for(Result::factory()->for(Program::factory()))->create();
+    $target = PlanIndicator::factory()
+        ->forAnnualPlan(AnnualPlan::factory()->create())
+        ->create(['indicator_id' => $indicator->id, 'target' => 100]);
+
+    Livewire::actingAs($user)
+        ->test('pages::targets.index')
+        ->assertSeeHtml('data-test="chain-issue-'.$target->id.'"')
+        ->assertSee(__('targets.issue_plan_program_differs_from_result'))
+        ->call('openEditModal', $target->id)
+        ->set('targetValue', '150')
+        ->call('saveTarget')
+        ->assertHasNoErrors();
+
+    expect((float) DB::table('plan_indicators')->find($target->id)->target)->toBe(150.0);
+});
+
+test('targets can be scoped to one indicator or one result from a deep link', function () {
+    $user = User::factory()->create();
+    $shown = Indicator::factory()->create(['name' => 'Scoped indicator']);
+    $hidden = Indicator::factory()->create(['name' => 'Other indicator']);
+    PlanIndicator::factory()->create(['indicator_id' => $shown->id]);
+    PlanIndicator::factory()->create(['indicator_id' => $hidden->id]);
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['indicator' => $shown->id])
+        ->test('pages::targets.index')
+        ->assertSee('Scoped indicator')
+        ->assertDontSee('Other indicator')
+        ->assertSeeHtml('data-test="indicator-scope-chip"')
+        ->call('clearIndicatorScope')
+        ->assertSee('Other indicator');
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['result' => $shown->result_id])
+        ->test('pages::targets.index')
+        ->assertSee('Scoped indicator')
+        ->assertDontSee('Other indicator');
+});
+
+test('the program filter reaches an organisation-wide proposal target through its result', function () {
+    $user = User::factory()->create();
+    $program = Program::factory()->create();
+    $indicator = Indicator::factory()->for(Result::factory()->for($program))->create(['name' => 'Program logframe indicator']);
+    PlanIndicator::factory()->forProposal(Proposal::factory()->create())->create(['indicator_id' => $indicator->id]);
+
+    Livewire::actingAs($user)
+        ->test('pages::targets.index')
+        ->set('program', (string) $program->id)
+        ->assertSee('Program logframe indicator');
+});
+
+test('each target links to recording a report against it', function () {
+    $user = User::factory()->create();
+    $target = PlanIndicator::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::targets.index')
+        ->assertSeeHtml('href="'.e(route('reports.index', ['create' => 1, 'target' => $target->id])).'"');
 });

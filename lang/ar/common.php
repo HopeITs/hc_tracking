@@ -124,4 +124,6 @@ return [
     'watching' => 'قيد المتابعة',
     'zoom_in' => 'تكبير',
     'zoom_out' => 'تصغير',
+    'delete' => 'حذف',
+    'close' => 'إغلاق',
 ];

@@ -1,9 +1,12 @@
 <?php
 
 use App\Enums\ReportStatus;
+use App\Models\AnnualPlan;
+use App\Models\PlanIndicator;
 use App\Models\Report;
 use App\Models\ReportFile;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 test('guests are redirected from report detail', function () {
@@ -20,7 +23,7 @@ test('report detail shows the figure its target and its author', function () {
     $this->actingAs($user)
         ->get(route('reports.show', $report))
         ->assertOk()
-        ->assertSeeText('9,500.00')
+        ->assertSeeText('9,500')
         ->assertSeeText('Layla Haddad')
         ->assertSeeText($report->planIndicator->indicator->name);
 });
@@ -182,4 +185,76 @@ test('the add file action is hidden once a report is locked', function () {
         ->get(route('reports.show', $report))
         ->assertOk()
         ->assertDontSee('wire:click="openCreateFileModal"', false);
+});
+
+test('returning a report to draft clears its submit date', function () {
+    $user = User::factory()->create();
+    $report = Report::factory()->reviewed()->create(['submit_date' => '2026-04-02']);
+
+    Livewire::actingAs($user)
+        ->test('pages::reports.show', ['report' => $report])
+        ->call('returnToDraft');
+
+    $row = DB::table('reports')->find($report->id);
+
+    expect($row->status)->toBe(ReportStatus::Draft->value)
+        ->and($row->submit_date)->toBeNull();
+});
+
+test('a draft can be edited from its own page, and deleting it returns to the directory', function () {
+    $user = User::factory()->create();
+    $report = Report::factory()
+        ->for(PlanIndicator::factory()->forAnnualPlan(AnnualPlan::factory()->create(['year' => 2026])))
+        ->create(['value' => 100, 'planned_date' => '2026-06-30']);
+
+    $component = Livewire::actingAs($user)
+        ->test('pages::reports.show', ['report' => $report])
+        ->assertSeeHtml('data-test="edit-report-button"')
+        ->call('openEditModal', $report->id)
+        ->set('value', '150')
+        ->call('saveReport')
+        ->assertHasNoErrors()
+        ->assertSee('150');
+
+    expect((float) DB::table('reports')->find($report->id)->value)->toBe(150.0);
+
+    $component->call('confirmDeleteReport', $report->id)
+        ->call('deleteReport')
+        ->assertRedirect(route('reports.index'));
+
+    expect(DB::table('reports')->find($report->id))->toBeNull();
+});
+
+test('a locked report offers neither edit nor delete', function () {
+    $user = User::factory()->create();
+    $report = Report::factory()->approved()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::reports.show', ['report' => $report])
+        ->assertDontSeeHtml('data-test="edit-report-button"')
+        ->assertDontSeeHtml('data-test="delete-report-button"');
+});
+
+test('the detail page rates the whole target from approved reports, not this one figure', function () {
+    $user = User::factory()->create();
+    $target = PlanIndicator::factory()->create(['target' => 1000]);
+    Report::factory()->approved()->for($target)->create(['value' => 300]);
+    $draft = Report::factory()->for($target)->create(['value' => 900]);
+
+    $component = Livewire::actingAs($user)->test('pages::reports.show', ['report' => $draft]);
+
+    expect($component->instance()->achievement())->toBe(30);
+    $component->assertSee(__('reports.counts_toward_the_target_once_approved'));
+});
+
+test('the detail page links back along the chain to the indicator and its targets', function () {
+    $user = User::factory()->create();
+    $report = Report::factory()->create();
+    $indicatorId = $report->planIndicator->indicator_id;
+
+    $this->actingAs($user)
+        ->get(route('reports.show', $report))
+        ->assertOk()
+        ->assertSee(route('indicators.index', ['inspect' => $indicatorId]), false)
+        ->assertSee(route('targets.index', ['indicator' => $indicatorId]), false);
 });

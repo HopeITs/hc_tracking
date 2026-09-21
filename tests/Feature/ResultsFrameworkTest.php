@@ -8,6 +8,7 @@ use App\Models\Indicator;
 use App\Models\IndicatorProgress;
 use App\Models\PlanIndicator;
 use App\Models\Program;
+use App\Models\Project;
 use App\Models\Report;
 use App\Models\Result;
 use App\Models\User;
@@ -79,7 +80,7 @@ test('results can be filtered by program and type', function () {
 test('a result can be created under a parent', function () {
     $user = User::factory()->create();
     $program = Program::factory()->create();
-    $parent = Result::factory()->create(['program_id' => $program->id]);
+    $parent = Result::factory()->create(['program_id' => $program->id, 'type' => ResultType::Outcome]);
 
     Livewire::actingAs($user)
         ->test('pages::results.index')
@@ -101,9 +102,9 @@ test('a result can be created under a parent', function () {
 test('the parent picker excludes the edited result and its own descendants', function () {
     $user = User::factory()->create();
 
-    $root = Result::factory()->create(['statement' => 'Root statement.']);
-    Result::factory()->create(['parent_id' => $root->id, 'statement' => 'Child statement.']);
-    Result::factory()->create(['statement' => 'Unrelated statement.']);
+    $root = Result::factory()->create(['statement' => 'Root statement.', 'type' => ResultType::Outcome]);
+    Result::factory()->create(['parent_id' => $root->id, 'statement' => 'Child statement.', 'type' => ResultType::Output]);
+    Result::factory()->create(['statement' => 'Unrelated statement.', 'type' => ResultType::Impact]);
 
     $component = Livewire::actingAs($user)
         ->test('pages::results.index')
@@ -373,4 +374,159 @@ test('a level in the results chain toggles the type filter', function () {
         ->assertSet('type', ResultType::Output->value)
         ->call('setType', ResultType::Output->value)
         ->assertSet('type', '');
+});
+
+test('the parent picker offers only statements one level up the chain', function () {
+    $user = User::factory()->create();
+    Result::factory()->type(ResultType::Impact)->create(['statement' => 'An impact.']);
+    Result::factory()->type(ResultType::Outcome)->create(['statement' => 'An outcome.']);
+    Result::factory()->type(ResultType::Output)->create(['statement' => 'An output.']);
+
+    $component = Livewire::actingAs($user)
+        ->test('pages::results.index')
+        ->call('openCreateModal')
+        ->set('resultType', ResultType::Output->value);
+
+    expect($component->instance()->parentOptions()->pluck('statement')->all())->toBe(['An outcome.']);
+
+    $component->set('resultType', ResultType::Outcome->value);
+    expect($component->instance()->parentOptions()->pluck('statement')->all())->toBe(['An impact.']);
+
+    $component->set('resultType', ResultType::Impact->value);
+    expect($component->instance()->parentOptions())->toBeEmpty();
+});
+
+test('a result cannot contribute to a statement that is not directly above it', function () {
+    $user = User::factory()->create();
+    $impact = Result::factory()->type(ResultType::Impact)->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::results.index')
+        ->call('openCreateModal')
+        ->set('statement', 'Wells repaired.')
+        ->set('resultType', ResultType::Output->value)
+        ->set('parentId', (string) $impact->id)
+        ->call('saveResult')
+        ->assertHasErrors(['parentId']);
+
+    expect(Result::query()->where('statement', 'Wells repaired.')->exists())->toBeFalse();
+});
+
+test('changing the level clears a parent that can no longer hold it', function () {
+    $user = User::factory()->create();
+    $outcome = Result::factory()->type(ResultType::Outcome)->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::results.index')
+        ->call('openCreateModal', $outcome->id)
+        ->assertSet('parentId', (string) $outcome->id)
+        ->set('resultType', ResultType::Outcome->value)
+        ->assertSet('parentId', '');
+});
+
+test('nothing can be added under an output', function () {
+    $user = User::factory()->create();
+    $output = Result::factory()->type(ResultType::Output)->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::results.index')
+        ->assertDontSeeHtml('data-test="add-child-result-'.$output->id.'"')
+        ->call('openCreateModal', $output->id)
+        ->assertSet('parentId', '');
+});
+
+test('a contributing result always takes its parent program', function () {
+    $user = User::factory()->create();
+    $program = Program::factory()->create();
+    $outcome = Result::factory()->type(ResultType::Outcome)->create(['program_id' => $program->id]);
+
+    Livewire::actingAs($user)
+        ->test('pages::results.index')
+        ->call('openCreateModal')
+        ->set('resultType', ResultType::Output->value)
+        ->set('statement', 'Latrines built.')
+        ->set('parentId', (string) $outcome->id)
+        ->assertSet('resultProgramId', (string) $program->id)
+        ->set('resultProgramId', (string) Program::factory()->create()->id)
+        ->call('saveResult')
+        ->assertHasNoErrors();
+
+    expect(Result::query()->where('statement', 'Latrines built.')->sole()->program_id)->toBe($program->id);
+});
+
+test('a level change is refused while nested results sit at the old level below it', function () {
+    $user = User::factory()->create();
+    $outcome = Result::factory()->type(ResultType::Outcome)->create();
+    Result::factory()->type(ResultType::Output)->create(['parent_id' => $outcome->id]);
+
+    Livewire::actingAs($user)
+        ->test('pages::results.index')
+        ->call('openEditModal', $outcome->id)
+        ->set('resultType', ResultType::Impact->value)
+        ->call('saveResult')
+        ->assertHasErrors(['resultType']);
+
+    expect($outcome->fresh()->type)->toBe(ResultType::Outcome);
+});
+
+test('moving a statement to another program moves its whole subtree', function () {
+    $user = User::factory()->create();
+    $from = Program::factory()->create();
+    $to = Program::factory()->create();
+    $impact = Result::factory()->type(ResultType::Impact)->create(['program_id' => $from->id]);
+    $outcome = Result::factory()->type(ResultType::Outcome)->create(['program_id' => $from->id, 'parent_id' => $impact->id]);
+    $output = Result::factory()->type(ResultType::Output)->create(['program_id' => $from->id, 'parent_id' => $outcome->id]);
+
+    Livewire::actingAs($user)
+        ->test('pages::results.index')
+        ->call('openEditModal', $impact->id)
+        ->set('resultProgramId', (string) $to->id)
+        ->call('saveResult')
+        ->assertHasNoErrors();
+
+    expect(DB::table('results')->whereIn('id', [$impact->id, $outcome->id, $output->id])->pluck('program_id')->unique()->values()->all())
+        ->toBe([$to->id]);
+});
+
+test('a program move is refused when it would strand an indicator or a plan target', function () {
+    $user = User::factory()->create();
+    $from = Program::factory()->create();
+    $to = Program::factory()->create();
+
+    $scoped = Result::factory()->type(ResultType::Outcome)->create(['program_id' => $from->id]);
+    Indicator::factory()->create(['result_id' => $scoped->id, 'project_id' => Project::factory()->create(['program_id' => $from->id])->id]);
+
+    $planned = Result::factory()->type(ResultType::Outcome)->create(['program_id' => $from->id]);
+    PlanIndicator::factory()
+        ->forAnnualPlan(AnnualPlan::factory()->create(['program_id' => $from->id]))
+        ->create(['indicator_id' => Indicator::factory()->create(['result_id' => $planned->id])->id]);
+
+    foreach ([$scoped, $planned] as $result) {
+        Livewire::actingAs($user)
+            ->test('pages::results.index')
+            ->call('openEditModal', $result->id)
+            ->set('resultProgramId', (string) $to->id)
+            ->call('saveResult')
+            ->assertHasErrors(['resultProgramId']);
+
+        expect($result->fresh()->program_id)->toBe($from->id);
+    }
+});
+
+test('a target reads its achievement from approved reports only, and an unmeasured statement links to adding an indicator', function () {
+    $user = User::factory()->create();
+    $measured = Result::factory()->type(ResultType::Outcome)->create();
+    $unmeasured = Result::factory()->type(ResultType::Outcome)->create();
+    $target = PlanIndicator::factory()->create([
+        'indicator_id' => Indicator::factory()->create(['result_id' => $measured->id])->id,
+        'target' => 200,
+    ]);
+    Report::factory()->approved()->for($target)->create(['value' => 50]);
+    Report::factory()->for($target)->create(['value' => 150]);
+
+    Livewire::actingAs($user)
+        ->test('pages::results.index')
+        ->assertSee('25% achieved')
+        ->assertDontSee('100% achieved')
+        ->assertSeeHtml('href="'.route('indicators.index', ['create' => $unmeasured->id]).'"');
 });

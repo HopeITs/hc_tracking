@@ -85,6 +85,8 @@ new #[Title('titles.indicators')] class extends Component {
 
     public bool $showProgressModal = false;
     public ?int $progressIndicatorId = null;
+    public ?int $editingReadingId = null;
+    public ?int $deletingReadingId = null;
     public string $progressDate = '';
     public string $progressValue = '';
     public string $progressNotes = '';
@@ -92,6 +94,30 @@ new #[Title('titles.indicators')] class extends Component {
 
     public bool $showInspectModal = false;
     public ?int $inspectingIndicatorId = null;
+
+    /**
+     * Deep links from the rest of the chain.
+     *
+     * `?create=<result id>` opens the indicator form already tied to that
+     * statement (the results framework's "Add indicator"); `?inspect=<id>`
+     * opens one indicator's chain. Read once here rather than bound with #[Url],
+     * so closing the dialog and refreshing does not reopen it.
+     */
+    public function mount(): void
+    {
+        $createForResult = request()->integer('create');
+
+        if ($createForResult > 0 && Result::query()->whereKey($createForResult)->exists()) {
+            $this->openCreateModal();
+            $this->indicatorResultId = (string) $createForResult;
+        }
+
+        $inspect = request()->integer('inspect');
+
+        if ($inspect > 0 && Indicator::query()->whereKey($inspect)->exists()) {
+            $this->openInspectModal($inspect);
+        }
+    }
 
     public function updatedSearch(): void
     {
@@ -179,7 +205,7 @@ new #[Title('titles.indicators')] class extends Component {
                 'planIndicators' => fn ($query) => $query
                     ->select(['id', 'indicator_id', 'source_type', 'source_id', 'target', 'project_id', 'period'])
                     ->with([
-                        'project:id,name',
+                        'project:id,name,program_id',
                         // The reported actuals themselves, not just how many
                         // there are: what was told to the donor is the figure
                         // the funding side is asked about.
@@ -193,7 +219,7 @@ new #[Title('titles.indicators')] class extends Component {
                 // resolve to null; the view renders that explicitly.
                 'planIndicators.source' => fn (MorphTo $morphTo) => $morphTo->morphWith([
                     AnnualPlan::class => [],
-                    Proposal::class => ['donors'],
+                    Proposal::class => ['donors', 'projects:id'],
                 ]),
             ])
             ->orderBy('name')
@@ -206,18 +232,20 @@ new #[Title('titles.indicators')] class extends Component {
      * which project, what has actually been reported against it, and whether
      * any of that reporting is late.
      *
-     * `reported` counts every report regardless of review state and
-     * `approvedValue` only the approved ones, because those are two different
-     * answers to "what have we delivered" — one internal, one defensible to
-     * the donor.
+     * `achieved` is PlanIndicator::achievedValue() — approved reports only, the
+     * figure defensible to the donor — and `pending` what is reported but not
+     * yet approved, drawn as a lighter band beside it. Every page reads a target
+     * by that one rule.
      *
-     * @return array{target: PlanIndicator, sourceType: string, sourceLabel: string|null, donors: list<string>, project: string|null, reports: int, approved: int, committed: float, reported: float, approvedValue: float, overdue: int, reportRows: \Illuminate\Database\Eloquent\Collection<int, \App\Models\Report>}
+     * @return array{target: PlanIndicator, sourceType: string, sourceLabel: string|null, donors: list<string>, project: string|null, reports: int, approved: int, committed: float, achieved: float, pending: float, percent: float|null, status: string, overdue: int, issues: list<string>, reportRows: \Illuminate\Database\Eloquent\Collection<int, \App\Models\Report>}
      */
-    protected function describeTarget(PlanIndicator $target): array
+    protected function describeTarget(PlanIndicator $target, Indicator $indicator): array
     {
         $source = $target->source;
         $reports = $target->reports;
-        $today = CarbonImmutable::today();
+
+        // Already in memory; handing it over saves a query per target.
+        $target->setRelation('indicator', $indicator);
 
         return [
             'target' => $target,
@@ -235,15 +263,14 @@ new #[Title('titles.indicators')] class extends Component {
             'reports' => $reports->count(),
             'approved' => $reports->where('status', ReportStatus::Approved)->count(),
             'committed' => (float) $target->target,
-            'reported' => (float) $reports->sum(fn (Report $report): float => (float) $report->value),
-            'approvedValue' => (float) $reports
-                ->where('status', ReportStatus::Approved)
-                ->sum(fn (Report $report): float => (float) $report->value),
-            // A report still in draft past the date it was planned for is the
-            // reporting obligation the manager is actually late on.
-            'overdue' => $reports
-                ->filter(fn (Report $report): bool => $report->status === ReportStatus::Draft && $report->planned_date->lessThan($today))
-                ->count(),
+            'achieved' => $target->achievedValue(),
+            'pending' => $target->pendingValue(),
+            'percent' => $target->percentAchieved(),
+            'status' => $target->achievementStatus(),
+            // A report still in draft past the date it covers is the reporting
+            // obligation the manager is actually late on.
+            'overdue' => $reports->filter(fn (Report $report): bool => $report->isOverdue())->count(),
+            'issues' => $target->chainIssues(),
             'reportRows' => $reports,
         ];
     }
@@ -309,23 +336,21 @@ new #[Title('titles.indicators')] class extends Component {
             $previous = $previousReading === null ? null : (float) $previousReading->value;
 
             $targetRows = [];
-            $committed = 0.0;
-            $reported = 0.0;
-            $approvedValue = 0.0;
+            $targetsAchieved = 0;
             $reports = 0;
             $approved = 0;
             $overdueReports = 0;
+            $chainIssues = 0;
             $funders = [];
 
             foreach ($indicator->planIndicators as $target) {
-                $described = $this->describeTarget($target);
+                $described = $this->describeTarget($target, $indicator);
                 $targetRows[] = $described;
-                $committed += $described['committed'];
-                $reported += $described['reported'];
-                $approvedValue += $described['approvedValue'];
+                $targetsAchieved += $described['status'] === 'achieved' ? 1 : 0;
                 $reports += $described['reports'];
                 $approved += $described['approved'];
                 $overdueReports += $described['overdue'];
+                $chainIssues += $described['issues'] === [] ? 0 : 1;
 
                 foreach ($described['donors'] as $donor) {
                     $funders[$donor] = ['label' => $donor, 'type' => 'donor'];
@@ -357,9 +382,8 @@ new #[Title('titles.indicators')] class extends Component {
                 'stale' => $daysSinceReading === null || $daysSinceReading > $this->freshnessDays($indicator->frequency),
                 'daysSinceReading' => $daysSinceReading,
                 'targets' => $targetRows,
-                'committed' => $committed,
-                'reported' => $reported,
-                'approvedValue' => $approvedValue,
+                'targetsAchieved' => $targetsAchieved,
+                'chainIssues' => $chainIssues,
                 'reports' => $reports,
                 'approved' => $approved,
                 'overdueReports' => $overdueReports,
@@ -487,7 +511,11 @@ new #[Title('titles.indicators')] class extends Component {
      * Counted across every indicator the filters leave, so the headline always
      * describes what is on screen rather than the whole database.
      *
-     * @return array{indicators: int, results: int, readings: int, lastReading: CarbonImmutable|null, achieved: float|null, rated: int, rag: array<string, int>, unrated: int, targets: int, reports: int, approved: int, committed: float, reported: float, overdueReports: int, funders: list<array{label: string, type: string}>, elapsed: float}
+     * Targets are counted achieved or not rather than summed: they span
+     * different indicators, units and measures, so adding their values
+     * together would produce a number that means nothing.
+     *
+     * @return array{indicators: int, results: int, readings: int, lastReading: CarbonImmutable|null, achieved: float|null, rated: int, rag: array<string, int>, unrated: int, targets: int, targetsAchieved: int, reports: int, approved: int, overdueReports: int, funders: list<array{label: string, type: string}>, elapsed: float}
      */
     #[Computed]
     public function overview(): array
@@ -497,10 +525,9 @@ new #[Title('titles.indicators')] class extends Component {
         $achievements = [];
         $readings = 0;
         $targets = 0;
+        $targetsAchieved = 0;
         $reports = 0;
         $approved = 0;
-        $committed = 0.0;
-        $reported = 0.0;
         $overdueReports = 0;
         $unrated = 0;
         $funders = [];
@@ -509,10 +536,9 @@ new #[Title('titles.indicators')] class extends Component {
         foreach ($rows as $row) {
             $readings += $row['readings'];
             $targets += count($row['targets']);
+            $targetsAchieved += $row['targetsAchieved'];
             $reports += $row['reports'];
             $approved += $row['approved'];
-            $committed += $row['committed'];
-            $reported += $row['reported'];
             $overdueReports += $row['overdueReports'];
 
             if ($row['rag'] === null) {
@@ -536,7 +562,7 @@ new #[Title('titles.indicators')] class extends Component {
 
         $start = now()->startOfYear();
         $end = now()->endOfYear();
-        $elapsed = (($now = now()->getTimestamp()) - $start->getTimestamp()) / max($end->getTimestamp() - $start->getTimestamp(), 1) * 100;
+        $elapsed = (now()->getTimestamp() - $start->getTimestamp()) / max($end->getTimestamp() - $start->getTimestamp(), 1) * 100;
 
         return [
             'indicators' => $rows->count(),
@@ -548,10 +574,9 @@ new #[Title('titles.indicators')] class extends Component {
             'rag' => $rag,
             'unrated' => $unrated,
             'targets' => $targets,
+            'targetsAchieved' => $targetsAchieved,
             'reports' => $reports,
             'approved' => $approved,
-            'committed' => $committed,
-            'reported' => $reported,
             'overdueReports' => $overdueReports,
             'funders' => array_values($funders),
             'elapsed' => min(max($elapsed, 0.0), 100.0),
@@ -633,11 +658,60 @@ new #[Title('titles.indicators')] class extends Component {
         return Program::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get();
     }
 
-    /** @return Collection<int, Project> */
+    /**
+     * The program of the result chosen in the form, or null when the result
+     * belongs to none (or none is chosen yet).
+     */
+    protected function formResultProgramId(): ?int
+    {
+        if ($this->indicatorResultId === '') {
+            return null;
+        }
+
+        return Result::query()->whereKey((int) $this->indicatorResultId)->value('program_id');
+    }
+
+    /**
+     * Projects an indicator on the chosen result may be scoped to: those
+     * delivering the result's program, or every project when the result sits
+     * in no program.
+     *
+     * @return Collection<int, Project>
+     */
     #[Computed]
     public function projectOptions(): Collection
     {
-        return Project::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get();
+        $programId = $this->formResultProgramId();
+
+        return Project::query()
+            ->select(['id', 'name', 'program_id'])
+            ->when($programId !== null, fn ($query) => $query->where('program_id', $programId))
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
+     * A project chosen for the old result may not deliver the new one's
+     * program, so it is dropped rather than carried to the save.
+     */
+    public function updatedIndicatorResultId(): void
+    {
+        unset($this->projectOptions);
+
+        if ($this->indicatorProjectId !== '' && ! $this->projectOptions->contains('id', (int) $this->indicatorProjectId)) {
+            $this->indicatorProjectId = '';
+        }
+    }
+
+    /**
+     * A percentage is always read against 100, so it carries no unit of its own.
+     */
+    public function updatedIndicatorMeasure(): void
+    {
+        if ($this->indicatorMeasure === IndicatorMeasure::Percentage->value) {
+            $this->unit = '';
+        }
     }
 
     /**
@@ -682,14 +756,16 @@ new #[Title('titles.indicators')] class extends Component {
     {
         $this->name = trim($this->name);
         $this->unit = trim($this->unit);
+        $isPercentage = $this->indicatorMeasure === IndicatorMeasure::Percentage->value;
+        $valueCeiling = $isPercentage ? 'max:100' : 'max:9999999999.99';
 
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:255'],
             'indicatorResultId' => ['required', 'integer', Rule::exists(Result::class, 'id')],
             'indicatorMeasure' => ['required', new Enum(IndicatorMeasure::class)],
             'unit' => ['nullable', 'string', 'max:50'],
-            'baseline' => ['nullable', 'numeric', 'max:9999999999.99'],
-            'target' => ['nullable', 'numeric', 'max:9999999999.99'],
+            'baseline' => ['nullable', 'numeric', 'min:0', $valueCeiling],
+            'target' => ['nullable', 'numeric', 'min:0', $valueCeiling],
             'frequency' => ['required', new Enum(Period::class)],
             'indicatorProjectId' => ['nullable', 'integer', Rule::exists(Project::class, 'id')],
         ], [
@@ -697,24 +773,43 @@ new #[Title('titles.indicators')] class extends Component {
             'indicatorResultId.required' => __('indicators.select_the_result_this_indicator_measures'),
             'indicatorMeasure.required' => __('indicators.choose_whether_this_counts_or_is_a_percentage'),
             'frequency.required' => __('common.choose_how_often_this_is_checked'),
-        ]);
+        ] + ($isPercentage ? [
+            'baseline.max' => __('indicators.a_percentage_cannot_exceed_100'),
+            'target.max' => __('indicators.a_percentage_cannot_exceed_100'),
+        ] : []));
 
         $indicator = $this->editingIndicatorId === null
             ? new Indicator
             : Indicator::query()->findOrFail($this->editingIndicatorId);
 
+        $result = Result::query()->select(['id', 'program_id'])->findOrFail((int) $validated['indicatorResultId']);
+        $projectId = $validated['indicatorProjectId'] === '' || $validated['indicatorProjectId'] === null
+            ? null
+            : (int) $validated['indicatorProjectId'];
+
+        if ($projectId !== null && $result->program_id !== null
+            && Project::query()->whereKey($projectId)->value('program_id') !== $result->program_id) {
+            $this->addError('indicatorProjectId', __('indicators.this_project_does_not_deliver_the_result_program'));
+
+            return;
+        }
+
         $indicator->fill([
             'name' => $validated['name'],
-            'result_id' => (int) $validated['indicatorResultId'],
+            'result_id' => $result->id,
             'measure' => $validated['indicatorMeasure'],
-            'unit' => $validated['unit'] === '' || $validated['unit'] === null ? null : $validated['unit'],
+            'unit' => $isPercentage || $validated['unit'] === '' || $validated['unit'] === null ? null : $validated['unit'],
             'baseline' => $validated['baseline'] === '' || $validated['baseline'] === null ? null : $validated['baseline'],
             'target' => $validated['target'] === '' || $validated['target'] === null ? null : $validated['target'],
             'frequency' => $validated['frequency'],
-            'project_id' => $validated['indicatorProjectId'] === '' || $validated['indicatorProjectId'] === null
-                ? null
-                : (int) $validated['indicatorProjectId'],
-        ])->save();
+            'project_id' => $projectId,
+        ]);
+
+        if ($indicator->exists && ! $this->changeKeepsTargetsInChain($indicator, $result)) {
+            return;
+        }
+
+        $indicator->save();
 
         $wasRecentlyCreated = $indicator->wasRecentlyCreated;
 
@@ -727,6 +822,62 @@ new #[Title('titles.indicators')] class extends Component {
             variant: 'success',
             text: $wasRecentlyCreated ? __('indicators.indicator_created') : __('indicators.indicator_updated'),
         );
+    }
+
+    /**
+     * Whether an edit leaves every target on this indicator fitting its chain.
+     *
+     * The measure is locked once targets exist: it decides how their reports
+     * add up (summed or latest), so switching it would silently rewrite every
+     * achievement figure. A new result or project is checked against each
+     * target with PlanIndicator::chainIssuesFor(), and refused only when it
+     * introduces a problem the target did not already have — a row that was
+     * already out of step must not block an unrelated fix.
+     */
+    protected function changeKeepsTargetsInChain(Indicator $indicator, Result $result): bool
+    {
+        $targets = PlanIndicator::query()
+            ->where('indicator_id', $indicator->id)
+            ->with([
+                'project:id,program_id',
+                'source' => fn (MorphTo $morphTo) => $morphTo->morphWith([Proposal::class => ['projects:id']]),
+            ])
+            ->get();
+
+        if ($targets->isEmpty()) {
+            return true;
+        }
+
+        if ($indicator->isDirty('measure')) {
+            $this->addError('indicatorMeasure', __('indicators.the_measure_is_locked_while_targets_exist'));
+
+            return false;
+        }
+
+        if (! $indicator->isDirty(['result_id', 'project_id'])) {
+            return true;
+        }
+
+        $before = Indicator::query()->with('result:id,program_id')->findOrFail($indicator->id);
+        $after = (clone $indicator)->setRelation('result', $result);
+
+        foreach ($targets as $target) {
+            $introduced = array_diff(
+                PlanIndicator::chainIssuesFor($target->source, $after, $target->project),
+                PlanIndicator::chainIssuesFor($target->source, $before, $target->project),
+            );
+
+            if ($introduced !== []) {
+                $this->addError(
+                    $indicator->isDirty('result_id') ? 'indicatorResultId' : 'indicatorProjectId',
+                    __('indicators.this_change_would_break_a_committed_target', ['issue' => __(reset($introduced))]),
+                );
+
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public function confirmDelete(int $indicatorId): void
@@ -777,6 +928,7 @@ new #[Title('titles.indicators')] class extends Component {
     {
         $this->resetValidation();
         $this->progressIndicatorId = $indicatorId;
+        $this->editingReadingId = null;
         $this->progressDate = now()->toDateString();
         $this->progressValue = '';
         $this->progressNotes = '';
@@ -784,42 +936,108 @@ new #[Title('titles.indicators')] class extends Component {
         $this->showProgressModal = true;
     }
 
+    /**
+     * Correct a reading already logged: a mistyped figure should not be
+     * permanent, and is not a reason to log a second, contradicting one.
+     */
+    public function openEditReadingModal(int $readingId): void
+    {
+        $reading = IndicatorProgress::query()->findOrFail($readingId);
+
+        $this->resetValidation();
+        $this->progressIndicatorId = $reading->indicator_id;
+        $this->editingReadingId = $reading->id;
+        $this->progressDate = $reading->date->toDateString();
+        $this->progressValue = (string) $reading->value;
+        $this->progressNotes = (string) ($reading->notes ?? '');
+        $this->progressSourceOfVerification = (string) ($reading->source_of_verification ?? '');
+        $this->showProgressModal = true;
+    }
+
     public function saveProgress(): void
     {
-        $validated = $this->validate([
-            'progressDate' => ['required', 'date'],
-            'progressValue' => ['required', 'numeric', 'max:9999999999.99'],
-            'progressNotes' => ['nullable', 'string'],
-            'progressSourceOfVerification' => ['nullable', 'string', 'max:255'],
-        ], [
-            'progressDate.required' => __('indicators.enter_the_date_of_this_reading'),
-            'progressValue.required' => __('indicators.enter_the_value_recorded'),
-        ]);
-
         if ($this->progressIndicatorId === null) {
             return;
         }
 
-        IndicatorProgress::query()->create([
-            'indicator_id' => $this->progressIndicatorId,
+        $isPercentage = Indicator::query()->whereKey($this->progressIndicatorId)->value('measure') === IndicatorMeasure::Percentage->value;
+
+        $validated = $this->validate([
+            // A reading records something that has happened, never a forecast.
+            'progressDate' => ['required', 'date', 'before_or_equal:today'],
+            'progressValue' => ['required', 'numeric', 'min:0', $isPercentage ? 'max:100' : 'max:9999999999.99'],
+            'progressNotes' => ['nullable', 'string'],
+            'progressSourceOfVerification' => ['nullable', 'string', 'max:255'],
+        ], [
+            'progressDate.required' => __('indicators.enter_the_date_of_this_reading'),
+            'progressDate.before_or_equal' => __('indicators.a_reading_cannot_be_dated_in_the_future'),
+            'progressValue.required' => __('indicators.enter_the_value_recorded'),
+        ] + ($isPercentage ? ['progressValue.max' => __('indicators.a_percentage_cannot_exceed_100')] : []));
+
+        $attributes = [
             'date' => $validated['progressDate'],
             'value' => $validated['progressValue'],
             'notes' => $validated['progressNotes'] === '' ? null : $validated['progressNotes'],
             'source_of_verification' => $validated['progressSourceOfVerification'] === '' ? null : $validated['progressSourceOfVerification'],
-            'recorded_by' => auth()->id(),
-        ]);
+        ];
 
-        $this->showProgressModal = false;
-        $this->progressIndicatorId = null;
+        if ($this->editingReadingId === null) {
+            IndicatorProgress::query()->create($attributes + [
+                'indicator_id' => $this->progressIndicatorId,
+                'recorded_by' => auth()->id(),
+            ]);
+        } else {
+            // Scoped to the indicator so a tampered id cannot edit another indicator's reading.
+            IndicatorProgress::query()
+                ->where('indicator_id', $this->progressIndicatorId)
+                ->findOrFail($this->editingReadingId)
+                ->fill($attributes)
+                ->save();
+        }
+
+        $wasEdit = $this->editingReadingId !== null;
+
+        $this->closeProgressModal();
         $this->forgetIndicators();
 
-        Flux::toast(variant: 'success', text: __('indicators.reading_logged'));
+        Flux::toast(variant: 'success', text: $wasEdit ? __('indicators.reading_updated') : __('indicators.reading_logged'));
     }
 
     public function closeProgressModal(): void
     {
         $this->showProgressModal = false;
         $this->progressIndicatorId = null;
+        $this->editingReadingId = null;
+    }
+
+    /**
+     * Ask, inline in the reading history, whether to remove one reading.
+     */
+    public function confirmDeleteReading(int $readingId): void
+    {
+        $this->deletingReadingId = $readingId;
+    }
+
+    public function cancelDeleteReading(): void
+    {
+        $this->deletingReadingId = null;
+    }
+
+    public function deleteReading(): void
+    {
+        if ($this->deletingReadingId === null || $this->inspectingIndicatorId === null) {
+            return;
+        }
+
+        IndicatorProgress::query()
+            ->where('indicator_id', $this->inspectingIndicatorId)
+            ->findOrFail($this->deletingReadingId)
+            ->delete();
+
+        $this->deletingReadingId = null;
+        $this->forgetIndicators();
+
+        Flux::toast(variant: 'success', text: __('indicators.reading_deleted'));
     }
 
     public function openInspectModal(int $indicatorId): void
@@ -832,6 +1050,7 @@ new #[Title('titles.indicators')] class extends Component {
     {
         $this->showInspectModal = false;
         $this->inspectingIndicatorId = null;
+        $this->deletingReadingId = null;
     }
 
     /**
@@ -1167,12 +1386,9 @@ new #[Title('titles.indicators')] class extends Component {
                         · {{ __('indicators.count_of_total_reports_approved', ['count' => $overview['approved'], 'total' => $overview['reports']]) }}
                     </p>
 
-                    {{-- What was committed against what has actually been reported back. --}}
+                    {{-- Counted, not summed: the targets span different units and measures. --}}
                     <p class="mt-0.5 type-meta tabular-nums text-secondary-medium dark:text-secondary-soft">
-                        {{ __('indicators.reported_of_committed', [
-                            'reported' => $figure($overview['reported']),
-                            'committed' => $figure($overview['committed']),
-                        ]) }}
+                        {{ __('indicators.count_of_total_targets_achieved', ['count' => $overview['targetsAchieved'], 'total' => $overview['targets']]) }}
                         @if ($overview['overdueReports'] > 0)
                             · <span class="font-semibold text-status-warn">{{ trans_choice('indicators.count_report_overdue', $overview['overdueReports'], ['count' => $overview['overdueReports']]) }}</span>
                         @endif
@@ -1283,6 +1499,7 @@ new #[Title('titles.indicators')] class extends Component {
                                 $tone = $ragTone($row['rag']);
                                 $sparkline = $spark($row['series'], $row['baseline'], $row['targetValue']);
                                 $achievedPct = $row['achieved'] === null ? null : max(0.0, min(100.0, $row['achieved']));
+                                $unit = $indicator->measure === IndicatorMeasure::Percentage ? '%' : $indicator->unit;
                             @endphp
                             <div class="grid grid-cols-[minmax(0,1fr)_8rem_7rem_7rem_9rem_5.5rem_5rem_9rem] items-center gap-3 px-4 py-3" wire:key="indicator-row-{{ $indicator->id }}">
                                 <div class="min-w-0">
@@ -1298,8 +1515,8 @@ new #[Title('titles.indicators')] class extends Component {
 
                                 <p class="type-meta tabular-nums text-secondary-medium dark:text-secondary-soft">
                                     {{ $figure($row['baseline']) }} <flux:icon.arrow-long-right variant="micro" class="inline size-3 rtl:rotate-180" aria-hidden="true" /> {{ $figure($row['targetValue']) }}
-                                    @if ($indicator->unit !== null)
-                                        <span class="text-secondary-light">{{ $indicator->unit }}</span>
+                                    @if ($unit !== null)
+                                        <span class="text-secondary-light">{{ $unit }}</span>
                                     @endif
                                 </p>
 
@@ -1339,7 +1556,15 @@ new #[Title('titles.indicators')] class extends Component {
 
                                 <x-ui.enum-badge :case="$row['rag']" />
 
-                                <p class="text-end text-sm tabular-nums text-secondary-medium dark:text-secondary-soft">{{ count($row['targets']) }}</p>
+                                <p class="text-end text-sm tabular-nums text-secondary-medium dark:text-secondary-soft">
+                                    @if ($row['targets'] === [])
+                                        0
+                                    @else
+                                        <a href="{{ route('targets.index', ['indicator' => $indicator->id]) }}" wire:navigate class="hover:text-primary hover:underline" title="{{ __('indicators.count_of_total_targets_achieved', ['count' => $row['targetsAchieved'], 'total' => count($row['targets'])]) }}">
+                                            {{ $row['targetsAchieved'] }}/{{ count($row['targets']) }}
+                                        </a>
+                                    @endif
+                                </p>
 
                                 <div class="flex items-center justify-end gap-0.5">
                                     <x-ui.button tone="ghost" size="sm" icon="arrows-pointing-out" class="size-9!" wire:click="openInspectModal({{ $indicator->id }})" :aria-label="__('indicators.view_the_chain_for_name', ['name' => $indicator->name])" />
@@ -1490,23 +1715,24 @@ new #[Title('titles.indicators')] class extends Component {
                         </div>
 
                         {{-- What was committed to funders, and what has been reported back. --}}
+                        {{-- Counted per target: two targets on one indicator can sit in different plans and years. --}}
                         @if ($row['targets'] !== [])
-                            <div>
+                            <a href="{{ route('targets.index', ['indicator' => $indicator->id]) }}" wire:navigate class="group/targets block rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
                                 <div class="flex items-baseline justify-between gap-2">
-                                    <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('indicators.reported_to_funders') }}</p>
+                                    <p class="type-label text-secondary-medium group-hover/targets:text-primary dark:text-secondary-soft">{{ __('indicators.targets_achieved') }}</p>
                                     <p class="type-meta tabular-nums text-secondary-medium dark:text-secondary-soft">
-                                        {{ $figure($row['reported']) }} / {{ $figure($row['committed']) }}
+                                        {{ $row['targetsAchieved'] }} / {{ count($row['targets']) }}
                                     </p>
                                 </div>
                                 <x-ui.progress-bar
                                     class="mt-1.5"
-                                    :value="$row['reported']"
-                                    :max="max($row['committed'], 0.01)"
+                                    :value="$row['targetsAchieved']"
+                                    :max="count($row['targets'])"
                                     tone="funding"
-                                    :label="__('indicators.reported_to_funders')"
+                                    :label="__('indicators.targets_achieved')"
                                     label-hidden
                                 />
-                            </div>
+                            </a>
                         @endif
 
                         {{-- Cadence, commitments and the money behind them. --}}
@@ -1528,10 +1754,10 @@ new #[Title('titles.indicators')] class extends Component {
                                 </span>
                             @endif
 
-                            @if ($row['targets'] !== [])
-                                <span class="inline-flex items-center gap-1 rounded-md border border-secondary-light px-2 py-0.5 text-xs font-semibold text-secondary-medium dark:text-secondary-soft">
-                                    <flux:icon.flag variant="micro" class="size-3" aria-hidden="true" />
-                                    {{ trans_choice('common.count_target', count($row['targets']), ['count' => count($row['targets'])]) }}
+                            @if ($row['chainIssues'] > 0)
+                                <span class="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-status-critical-soft px-2 py-0.5 text-xs font-semibold text-primary">
+                                    <flux:icon.link-slash variant="micro" class="size-3" aria-hidden="true" />
+                                    {{ trans_choice('indicators.count_target_out_of_step', $row['chainIssues'], ['count' => $row['chainIssues']]) }}
                                 </span>
                             @endif
 
@@ -1680,11 +1906,26 @@ new #[Title('titles.indicators')] class extends Component {
                                             <p class="mt-0.5 type-meta text-secondary-medium dark:text-secondary-soft">{{ $entry['reading']->notes }}</p>
                                         @endif
 
-                                        @if ($entry['reading']->recorder !== null)
-                                            <p class="mt-0.5 type-meta text-secondary-light">
-                                                {{ __('indicators.recorded_by_name', ['name' => $entry['reading']->recorder->name]) }}
-                                            </p>
-                                        @endif
+                                        <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                                            @if ($entry['reading']->recorder !== null)
+                                                <p class="me-auto type-meta text-secondary-light">
+                                                    {{ __('indicators.recorded_by_name', ['name' => $entry['reading']->recorder->name]) }}
+                                                </p>
+                                            @endif
+
+                                            @if ($deletingReadingId === $entry['reading']->id)
+                                                <span class="ms-auto inline-flex items-center gap-1.5 type-meta">
+                                                    <span class="font-semibold text-primary">{{ __('indicators.delete_this_reading') }}</span>
+                                                    <x-ui.button size="sm" tone="primary" class="min-h-7! px-2!" wire:click="deleteReading" data-test="confirm-delete-reading-{{ $entry['reading']->id }}">{{ __('common.delete') }}</x-ui.button>
+                                                    <x-ui.button size="sm" class="min-h-7! px-2!" wire:click="cancelDeleteReading">{{ __('common.cancel') }}</x-ui.button>
+                                                </span>
+                                            @else
+                                                <span class="ms-auto inline-flex items-center gap-0.5">
+                                                    <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-7!" wire:click="openEditReadingModal({{ $entry['reading']->id }})" :aria-label="__('indicators.edit_reading_from_date', ['date' => $entry['reading']->date->translatedFormat(__('formats.date'))])" data-test="edit-reading-{{ $entry['reading']->id }}" />
+                                                    <x-ui.button tone="ghost" size="sm" icon="trash" class="size-7!" wire:click="confirmDeleteReading({{ $entry['reading']->id }})" :aria-label="__('indicators.delete_reading_from_date', ['date' => $entry['reading']->date->translatedFormat(__('formats.date'))])" data-test="delete-reading-{{ $entry['reading']->id }}" />
+                                                </span>
+                                            @endif
+                                        </div>
                                     </li>
                                 @endforeach
                             </ol>
@@ -1692,19 +1933,29 @@ new #[Title('titles.indicators')] class extends Component {
                     </section>
 
                     <section aria-labelledby="inspect-targets-heading">
-                        <h3 id="inspect-targets-heading" class="type-label text-secondary-medium dark:text-secondary-soft">
-                            {{ __('indicators.committed_targets') }}
-                            <span class="ms-1 tabular-nums">{{ count($row['targets']) }}</span>
-                        </h3>
+                        <div class="flex items-center justify-between gap-2">
+                            <h3 id="inspect-targets-heading" class="type-label text-secondary-medium dark:text-secondary-soft">
+                                {{ __('indicators.committed_targets') }}
+                                <span class="ms-1 tabular-nums">{{ count($row['targets']) }}</span>
+                            </h3>
+                            @if ($row['targets'] !== [])
+                                <a href="{{ route('targets.index', ['indicator' => $indicator->id]) }}" wire:navigate class="type-meta font-semibold text-secondary-medium hover:text-primary hover:underline dark:text-secondary-soft">
+                                    {{ __('indicators.open_in_targets') }}
+                                </a>
+                            @endif
+                        </div>
 
                         @if ($row['targets'] === [])
-                            <p class="mt-3 rounded-lg border border-dashed border-secondary-light p-4 text-center type-meta text-secondary-medium dark:text-secondary-soft">
-                                {{ __('indicators.no_targets_committed_against_this_indicator_yet') }}
-                            </p>
+                            <div class="mt-3 flex flex-col items-center gap-3 rounded-lg border border-dashed border-secondary-light p-4 text-center">
+                                <p class="type-meta text-secondary-medium dark:text-secondary-soft">{{ __('indicators.no_targets_committed_against_this_indicator_yet') }}</p>
+                                <x-ui.button size="sm" tone="primary" icon="flag" :href="route('targets.index', ['indicator' => $indicator->id, 'create' => 1])" wire:navigate data-test="commit-target-for-indicator">
+                                    {{ __('indicators.commit_a_target') }}
+                                </x-ui.button>
+                            </div>
                         @else
-                            <ul class="mt-3 max-h-80 space-y-2 overflow-y-auto">
+                            <ul class="mt-3 max-h-96 space-y-2 overflow-y-auto">
                                 @foreach ($row['targets'] as $target)
-                                    <li class="rounded-lg border border-secondary-soft bg-board-head p-3 dark:border-secondary-medium " wire:key="target-{{ $target['target']->id }}">
+                                    <li class="rounded-lg border border-secondary-soft bg-board-head p-3 dark:border-secondary-medium" wire:key="target-{{ $target['target']->id }}">
                                         <div class="flex items-baseline justify-between gap-2">
                                             <p class="min-w-0 truncate text-sm font-semibold">
                                                 {{ $target['sourceLabel'] ?? __('indicators.source_no_longer_available') }}
@@ -1728,55 +1979,74 @@ new #[Title('titles.indicators')] class extends Component {
                                             </div>
                                         @endif
 
-                                        {{-- What has actually been reported back against this commitment. --}}
+                                        @foreach ($target['issues'] as $issue)
+                                            <p class="mt-2 flex items-start gap-1.5 type-meta font-semibold text-primary">
+                                                <flux:icon.link-slash variant="micro" class="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                                                {{ __($issue) }}
+                                            </p>
+                                        @endforeach
+
+                                        {{-- Approved reports only (PlanIndicator::achievedValue()); the rest is shown as pending. --}}
                                         <div class="mt-2.5 border-t border-secondary-soft pt-2.5 dark:border-secondary-medium">
                                             <div class="flex items-baseline justify-between gap-2">
-                                                <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('indicators.reported_to_funders') }}</p>
+                                                <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('indicators.achieved') }}</p>
                                                 <p class="type-meta tabular-nums text-secondary-medium dark:text-secondary-soft">
-                                                    {{ $figure($target['reported']) }} / {{ $figure($target['committed']) }}
-                                                    · {{ __('indicators.count_of_total_reports_approved', ['count' => $target['approved'], 'total' => $target['reports']]) }}
+                                                    <span class="font-semibold text-secondary-dark dark:text-white">{{ $figure($target['achieved']) }}</span> / {{ $figure($target['committed']) }}
+                                                    @if ($target['percent'] !== null)
+                                                        · {{ number_format($target['percent'], 0) }}%
+                                                    @endif
                                                 </p>
                                             </div>
 
                                             <x-ui.progress-bar
                                                 class="mt-1.5"
-                                                :value="$target['reported']"
+                                                :value="min($target['achieved'], $target['committed'])"
                                                 :max="max($target['committed'], 0.01)"
                                                 tone="funding"
-                                                :label="__('indicators.reported_to_funders')"
+                                                :label="__('indicators.achieved')"
                                                 label-hidden
                                             />
+
+                                            <p class="mt-1 type-meta tabular-nums text-secondary-medium dark:text-secondary-soft">
+                                                {{ __('indicators.count_of_total_reports_approved', ['count' => $target['approved'], 'total' => $target['reports']]) }}
+                                                @if ($target['pending'] > 0)
+                                                    · {{ __('indicators.value_pending_approval', ['value' => $figure($target['pending'])]) }}
+                                                @endif
+                                            </p>
 
                                             @if ($target['reportRows']->isEmpty())
                                                 <p class="mt-2 type-meta text-secondary-light">{{ __('indicators.no_reports_filed_yet') }}</p>
                                             @else
-                                                <ul class="mt-2 space-y-1">
+                                                <ul class="mt-2 space-y-0.5">
                                                     @foreach ($target['reportRows'] as $report)
-                                                        @php
-                                                            $isOverdue = $report->status === App\Enums\ReportStatus::Draft
-                                                                && $report->planned_date->lessThan(\Carbon\CarbonImmutable::today());
-                                                        @endphp
-                                                        <li class="flex items-center gap-2 type-meta" wire:key="report-{{ $report->id }}">
-                                                            <span class="inline-flex shrink-0 items-center rounded border px-1.5 py-px text-[10px] font-semibold {{ $reportStatusChip($report->status) }}">
-                                                                {{ $report->status->label() }}
-                                                            </span>
-                                                            <span class="tabular-nums font-semibold text-secondary-dark dark:text-white">{{ $figure((float) $report->value) }}</span>
-                                                            <span class="min-w-0 truncate text-secondary-medium dark:text-secondary-soft">
-                                                                @if ($report->period_start !== null && $report->period_end !== null)
-                                                                    {{ $report->period_start->translatedFormat(__('formats.date_short')) }}–{{ $report->period_end->translatedFormat(__('formats.date_short')) }}
-                                                                @else
-                                                                    {{ $report->planned_date->translatedFormat(__('formats.date')) }}
-                                                                @endif
-                                                            </span>
-                                                            @if ($isOverdue)
-                                                                <span class="ms-auto shrink-0 font-semibold text-primary">
-                                                                    {{ __('ui.schedule_due_date', ['date' => $report->planned_date->translatedFormat(__('formats.date_short'))]) }}
+                                                        <li wire:key="report-{{ $report->id }}">
+                                                            <a href="{{ route('reports.show', $report) }}" wire:navigate class="-mx-1 flex items-center gap-2 rounded px-1 py-0.5 type-meta transition-colors hover:bg-white dark:hover:bg-white/5">
+                                                                <span class="inline-flex shrink-0 items-center rounded border px-1.5 py-px text-[10px] font-semibold {{ $reportStatusChip($report->status) }}">
+                                                                    {{ $report->status->label() }}
                                                                 </span>
-                                                            @endif
+                                                                <span class="tabular-nums font-semibold text-secondary-dark dark:text-white">{{ $figure((float) $report->value) }}</span>
+                                                                <span class="min-w-0 truncate text-secondary-medium dark:text-secondary-soft">
+                                                                    @if ($report->period_start !== null && $report->period_end !== null)
+                                                                        {{ $report->period_start->translatedFormat(__('formats.date_short')) }}–{{ $report->period_end->translatedFormat(__('formats.date_short')) }}
+                                                                    @else
+                                                                        {{ $report->planned_date->translatedFormat(__('formats.date')) }}
+                                                                    @endif
+                                                                </span>
+                                                                @if ($report->isOverdue())
+                                                                    <span class="ms-auto shrink-0 font-semibold text-primary">
+                                                                        {{ __('ui.schedule_due_date', ['date' => $report->planned_date->translatedFormat(__('formats.date_short'))]) }}
+                                                                    </span>
+                                                                @endif
+                                                            </a>
                                                         </li>
                                                     @endforeach
                                                 </ul>
                                             @endif
+
+                                            <a href="{{ route('reports.index', ['create' => 1, 'target' => $target['target']->id]) }}" wire:navigate class="mt-2 inline-flex items-center gap-1 type-meta font-semibold text-primary hover:underline" data-test="record-report-for-target-{{ $target['target']->id }}">
+                                                <flux:icon.plus variant="micro" class="size-3.5" aria-hidden="true" />
+                                                {{ __('indicators.record_a_report') }}
+                                            </a>
                                         </div>
                                     </li>
                                 @endforeach
@@ -1786,7 +2056,12 @@ new #[Title('titles.indicators')] class extends Component {
                 </div>
 
                 <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                    <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeInspectModal">{{ __('common.cancel') }}</x-ui.button>
+                    <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:me-auto sm:w-auto" wire:click="closeInspectModal">{{ __('common.close') }}</x-ui.button>
+                    @if ($row['targets'] !== [])
+                        <x-ui.button icon="flag" class="min-h-11 w-full sm:min-h-10 sm:w-auto" :href="route('targets.index', ['indicator' => $indicator->id, 'create' => 1])" wire:navigate>
+                            {{ __('indicators.commit_a_target') }}
+                        </x-ui.button>
+                    @endif
                     <x-ui.button type="button" tone="primary" icon="plus-circle" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="openProgressModal({{ $indicator->id }})">
                         {{ __('indicators.log_reading') }}
                     </x-ui.button>
@@ -1806,14 +2081,14 @@ new #[Title('titles.indicators')] class extends Component {
             <x-ui.input wire:model="name" :label="__('common.indicator_name')" type="text" maxlength="255" required autofocus />
 
             <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.select wire:model="indicatorResultId" :label="__('indicators.result')" required>
+                <x-ui.select wire:model.live="indicatorResultId" :label="__('indicators.result')" required>
                     <flux:select.option value="">{{ __('indicators.select_a_result') }}</flux:select.option>
                     @foreach ($this->resultOptions as $resultOption)
-                        <flux:select.option :value="$resultOption->id" :wire:key="'ind-result-option-'.$resultOption->id">{{ Str::limit($resultOption->statement, 60) }}</flux:select.option>
+                        <flux:select.option :value="$resultOption->id" :wire:key="'ind-result-option-'.$resultOption->id">{{ $resultOption->type->label() }} · {{ Str::limit($resultOption->statement, 60) }}</flux:select.option>
                     @endforeach
                 </x-ui.select>
 
-                <x-ui.select wire:model="indicatorMeasure" :label="__('indicators.measure')" required>
+                <x-ui.select wire:model.live="indicatorMeasure" :label="__('indicators.measure')" required>
                     @foreach (IndicatorMeasure::cases() as $measureCase)
                         <flux:select.option :value="$measureCase->value" :wire:key="'ind-measure-option-'.$measureCase->value">{{ $measureCase->label() }}</flux:select.option>
                     @endforeach
@@ -1827,18 +2102,28 @@ new #[Title('titles.indicators')] class extends Component {
                     @endforeach
                 </x-ui.select>
 
-                <x-ui.select wire:model="indicatorProjectId" :label="__('common.project')">
-                    <flux:select.option value="">{{ __('common.organisation_wide') }}</flux:select.option>
-                    @foreach ($this->projectOptions as $projectOption)
-                        <flux:select.option :value="$projectOption->id" :wire:key="'ind-project-'.$projectOption->id">{{ $projectOption->name }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
+                <div>
+                    <x-ui.select wire:model="indicatorProjectId" :label="__('common.project')">
+                        <flux:select.option value="">{{ __('common.organisation_wide') }}</flux:select.option>
+                        @foreach ($this->projectOptions as $projectOption)
+                            <flux:select.option :value="$projectOption->id" :wire:key="'ind-project-'.$projectOption->id">{{ $projectOption->name }}</flux:select.option>
+                        @endforeach
+                    </x-ui.select>
+                    @if ($indicatorResultId !== '')
+                        <p class="mt-1.5 type-meta text-secondary-medium dark:text-secondary-soft">{{ __('indicators.only_projects_delivering_the_result_program_are_offered') }}</p>
+                    @endif
+                </div>
             </div>
 
-            <div class="grid gap-4 sm:grid-cols-3">
-                <x-ui.input wire:model="unit" :label="__('indicators.unit')" type="text" maxlength="50" />
-                <x-ui.input wire:model="baseline" :label="__('indicators.baseline')" type="number" step="0.01" />
-                <x-ui.input wire:model="target" :label="__('indicators.lifetime_target')" type="number" step="0.01" />
+            @php
+                $formIsPercentage = $indicatorMeasure === IndicatorMeasure::Percentage->value;
+            @endphp
+            <div @class(['grid gap-4', 'sm:grid-cols-3' => ! $formIsPercentage, 'sm:grid-cols-2' => $formIsPercentage])>
+                @unless ($formIsPercentage)
+                    <x-ui.input wire:model="unit" :label="__('indicators.unit')" type="text" maxlength="50" :placeholder="__('indicators.unit_placeholder')" />
+                @endunless
+                <x-ui.input wire:model="baseline" :label="$formIsPercentage ? __('indicators.baseline_percent') : __('indicators.baseline')" type="number" step="0.01" min="0" :max="$formIsPercentage ? 100 : null" />
+                <x-ui.input wire:model="target" :label="$formIsPercentage ? __('indicators.lifetime_target_percent') : __('indicators.lifetime_target')" type="number" step="0.01" min="0" :max="$formIsPercentage ? 100 : null" />
             </div>
 
             <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
@@ -1866,12 +2151,12 @@ new #[Title('titles.indicators')] class extends Component {
         @if ($showProgressModal)
         <form wire:submit="saveProgress" class="space-y-5">
             <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ __('indicators.log_a_reading') }}</flux:heading>
+                <flux:heading size="lg">{{ $editingReadingId === null ? __('indicators.log_a_reading') : __('indicators.edit_reading') }}</flux:heading>
                 <flux:subheading>{{ __('indicators.one_dated_number_with_the_evidence_it_came_from') }}</flux:subheading>
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.input wire:model="progressDate" :label="__('indicators.date')" type="date" required />
+                <x-ui.input wire:model="progressDate" :label="__('indicators.date')" type="date" :max="now()->toDateString()" required />
                 <x-ui.input wire:model="progressValue" :label="__('indicators.value')" type="number" step="0.01" required />
             </div>
 
@@ -1882,7 +2167,7 @@ new #[Title('titles.indicators')] class extends Component {
             <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
                 <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeProgressModal">{{ __('common.cancel') }}</x-ui.button>
                 <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-progress-button">
-                    {{ __('indicators.log_reading') }}
+                    {{ $editingReadingId === null ? __('indicators.log_reading') : __('common.save_changes') }}
                 </x-ui.button>
             </div>
         </form>

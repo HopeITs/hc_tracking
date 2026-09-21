@@ -1,15 +1,18 @@
 <?php
 
 use App\Enums\ReportStatus;
+use App\Livewire\Concerns\ManagesReportForm;
+use App\Models\AnnualPlan;
 use App\Models\PlanIndicator;
+use App\Models\Project;
+use App\Models\Proposal;
 use App\Models\Report;
 use App\Models\User;
-use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Collection as SupportCollection;
-use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -17,6 +20,7 @@ use Livewire\Component;
 use Livewire\WithPagination;
 
 new #[Title('titles.reports')] class extends Component {
+    use ManagesReportForm;
     use WithPagination;
 
     #[Url(except: '')]
@@ -31,6 +35,20 @@ new #[Title('titles.reports')] class extends Component {
     #[Url(except: '')]
     public string $author = '';
 
+    #[Url(except: '')]
+    public string $project = '';
+
+    /**
+     * Narrows the feed to one target. Set by the "Record a report" and report
+     * trail links on the targets page, so it shows as a removable chip.
+     */
+    #[Url(except: '')]
+    public string $target = '';
+
+    /** '1' narrows the feed to drafts past the date they cover. */
+    #[Url(except: '')]
+    public string $overdue = '';
+
     /**
      * Which shape the report feed renders in: a flat searchable list, or
      * reports grouped by project and indicator to surface the connections
@@ -39,21 +57,23 @@ new #[Title('titles.reports')] class extends Component {
     #[Url(except: 'list')]
     public string $view = 'list';
 
-    public bool $showReportModal = false;
-    public ?int $editingReportId = null;
+    /**
+     * `?create=1` (with `?target=`) opens the form already tied to a target —
+     * the "Record a report" step from the targets page and the indicator
+     * chain. `?edit=<id>` opens a draft for editing.
+     */
+    public function mount(): void
+    {
+        if (request()->boolean('create')) {
+            $this->openCreateModal($this->target === '' ? null : (int) $this->target);
+        }
 
-    public string $reportTargetId = '';
-    public string $plannedDate = '';
-    public string $periodStart = '';
-    public string $periodEnd = '';
-    public string $value = '';
-    public string $narrativeNotes = '';
-    public string $executiveSummary = '';
-    public string $keyAchievements = '';
-    public string $challenges = '';
-    public string $lessonsLearned = '';
-    public string $nextPeriodPlans = '';
-    public string $submitDate = '';
+        $edit = request()->integer('edit');
+
+        if ($edit > 0 && Report::query()->whereKey($edit)->exists()) {
+            $this->openEditModal($edit);
+        }
+    }
 
     public function updatedSearch(): void
     {
@@ -75,23 +95,43 @@ new #[Title('titles.reports')] class extends Component {
         $this->resetPage();
     }
 
+    public function updatedProject(): void
+    {
+        $this->resetPage();
+    }
+
+    public function toggleOverdue(): void
+    {
+        $this->overdue = $this->overdue === '' ? '1' : '';
+        $this->resetPage();
+    }
+
+    public function clearTarget(): void
+    {
+        $this->target = '';
+        $this->resetPage();
+    }
+
     public function clearFilters(): void
     {
         $this->search = '';
         $this->status = '';
         $this->seenByMeal = '';
         $this->author = '';
+        $this->project = '';
+        $this->target = '';
+        $this->overdue = '';
         $this->resetPage();
     }
 
     /**
-     * Reports matching the search and author filters only.
+     * Reports matching the search, author, project and target filters only.
      *
-     * Status and MEAL visibility are deliberately left off this base query: it
-     * is shared by the paginated list (which applies them) and the portfolio
-     * pulse (which counts every status and both MEAL states side by side, so
-     * the strip stays a full breakdown rather than shrinking to whichever
-     * status is currently selected).
+     * Status, MEAL visibility and the overdue chip are deliberately left off
+     * this base query: it is shared by the paginated list (which applies them)
+     * and the portfolio pulse (which counts every status and both MEAL states
+     * side by side, so the strip stays a full breakdown rather than shrinking
+     * to whichever status is currently selected).
      *
      * @return Builder<Report>
      */
@@ -101,49 +141,79 @@ new #[Title('titles.reports')] class extends Component {
 
         return Report::query()
             ->when($search !== '', function ($query) use ($search): void {
-                $query->where(function ($query) use ($search): void {
+                $like = '%'.$search.'%';
+
+                $query->where(function ($query) use ($like): void {
                     $query
-                        ->where('narrative_report_notes', 'like', '%'.$search.'%')
-                        ->orWhereHas(
-                            'planIndicator.indicator',
-                            fn ($query) => $query->where('name', 'like', '%'.$search.'%')
-                        );
+                        ->where('narrative_report_notes', 'like', $like)
+                        ->orWhereHas('planIndicator.indicator', fn ($query) => $query->where('name', 'like', $like))
+                        ->orWhereHas('planIndicator.project', fn ($query) => $query->where('name', 'like', $like));
                 });
             })
-            ->when($this->author !== '', fn ($query) => $query->where('user_id', (int) $this->author));
+            ->when($this->author !== '', fn ($query) => $query->where('user_id', (int) $this->author))
+            ->when($this->project === 'none', fn ($query) => $query->whereHas('planIndicator', fn ($query) => $query->whereNull('project_id')))
+            ->when($this->project !== '' && $this->project !== 'none', fn ($query) => $query
+                ->whereHas('planIndicator', fn ($query) => $query->where('project_id', (int) $this->project)))
+            ->when($this->target !== '', fn ($query) => $query->where('plan_indicator_id', (int) $this->target));
+    }
+
+    /**
+     * scopedReports() with the status, MEAL and overdue filters applied: what
+     * the list and the portfolio actually show.
+     *
+     * @return Builder<Report>
+     */
+    private function visibleReports(): Builder
+    {
+        return $this->scopedReports()
+            ->when($this->status !== '', fn ($query) => $query->where('status', $this->status))
+            ->when($this->seenByMeal === 'seen', fn ($query) => $query->where('is_seen_by_meal', true))
+            ->when($this->seenByMeal === 'unseen', fn ($query) => $query->where('is_seen_by_meal', false))
+            ->when($this->overdue !== '', fn ($query) => $query->overdue());
+    }
+
+    /**
+     * The target each report is filed against, with everything reported on it
+     * — not just the rows on this page — so its achievement is the target's
+     * own, by PlanIndicator::achievedValue(), the rule every page shares.
+     *
+     * @return array<int, mixed>
+     */
+    private function targetRelations(): array
+    {
+        return [
+            'planIndicator:id,indicator_id,target,period,source_type,source_id,project_id',
+            'planIndicator.indicator:id,name,measure,unit',
+            'planIndicator.project:id,name',
+            'planIndicator.reports:id,plan_indicator_id,status,planned_date,value',
+            'planIndicator.source' => fn (MorphTo $morphTo) => $morphTo->morphWith([AnnualPlan::class => [], Proposal::class => []]),
+        ];
     }
 
     /** @return LengthAwarePaginator<int, Report> */
     #[Computed]
     public function reports(): LengthAwarePaginator
     {
-        return $this->scopedReports()
+        return $this->visibleReports()
             ->select(['id', 'plan_indicator_id', 'user_id', 'status', 'planned_date', 'value', 'submit_date', 'is_seen_by_meal'])
-            ->with([
-                'planIndicator:id,indicator_id,target,period,source_type,source_id,project_id',
-                'planIndicator.indicator:id,name,measure',
-                'planIndicator.project:id,name',
-                'user:id,name,email',
-            ])
+            ->with([...$this->targetRelations(), 'user:id,name,email'])
             ->withCount('files')
-            ->when($this->status !== '', fn ($query) => $query->where('status', $this->status))
-            ->when($this->seenByMeal === 'seen', fn ($query) => $query->where('is_seen_by_meal', true))
-            ->when($this->seenByMeal === 'unseen', fn ($query) => $query->where('is_seen_by_meal', false))
             ->orderByDesc('planned_date')
             ->orderByDesc('id')
             ->paginate(15);
     }
 
     /**
-     * The portfolio pulse: how the reports matching search/author break down
-     * by status and MEAL visibility, plus the average achievement across every
-     * reported figure that carries a positive target.
+     * The portfolio pulse: how the reports matching the filters break down by
+     * status and MEAL visibility, how many drafts are late, and the average
+     * achievement of the targets they report against.
      *
-     * Each contributing report's own achievement is capped at 150% before
-     * averaging, so one wildly over-achieved figure cannot single-handedly
-     * drag the portfolio average somewhere meaningless.
+     * Achievement is averaged per target, not per report — a target reported
+     * quarterly must not weigh four times as much as one reported yearly — and
+     * each target is capped at 150% first, so one wildly over-achieved target
+     * cannot drag the average somewhere meaningless.
      *
-     * @return array{total: int, statusCounts: SupportCollection<string, int>, seen: int, unseen: int, avgAchievement: int|null}
+     * @return array{total: int, statusCounts: SupportCollection<string, int>, seen: int, unseen: int, overdue: int, avgAchievement: int|null}
      */
     #[Computed]
     public function insights(): array
@@ -155,41 +225,41 @@ new #[Title('titles.reports')] class extends Component {
 
         $total = (int) $statusCounts->sum();
         $unseen = (int) $this->scopedReports()->where('is_seen_by_meal', false)->count();
+        $overdue = (int) $this->scopedReports()->overdue()->count();
 
-        $achievementRows = $this->scopedReports()
-            ->join('plan_indicators', 'plan_indicators.id', '=', 'reports.plan_indicator_id')
-            ->where('plan_indicators.target', '>', 0)
-            ->select('reports.value as value', 'plan_indicators.target as target')
-            ->get();
-
-        $avgAchievement = $achievementRows->isEmpty()
-            ? null
-            : (int) round($achievementRows->avg(fn ($row) => min(150.0, ((float) $row->value / (float) $row->target) * 100)));
+        $achievements = PlanIndicator::query()
+            ->whereIn('id', $this->scopedReports()->select('plan_indicator_id'))
+            ->where('target', '>', 0)
+            ->selectRaw('target, '.PlanIndicator::achievedValueSql().' as achieved')
+            ->toBase()
+            ->get()
+            ->map(fn (object $row): float => min(150.0, (float) $row->achieved / (float) $row->target * 100));
 
         return [
             'total' => $total,
             'statusCounts' => $statusCounts,
             'seen' => $total - $unseen,
             'unseen' => $unseen,
-            'avgAchievement' => $avgAchievement,
+            'overdue' => $overdue,
+            'avgAchievement' => $achievements->isEmpty() ? null : (int) round($achievements->avg()),
         ];
     }
 
     /**
-     * Reports grouped by project, then by indicator, for the portfolio view.
+     * Reports grouped by project, then by target, for the portfolio view.
      *
      * Both levels sort worst-achievement-first: a manager opening the
      * portfolio should see what needs attention before anything else,
-     * without having to hunt for it. A project or indicator with no scorable
+     * without having to hunt for it. A project or target with no scorable
      * achievement (no positive target) sorts after every scored one, then
      * alphabetically, so it is never mistaken for a top performer.
      *
      * Only queried when that view is active: the list view's paginated
      * `reports()` stays the cheap default. Every filter the list respects
-     * (search, status, MEAL visibility, author) applies here too, so switching
-     * views never changes what is being looked at, only how it is shaped.
+     * applies here too, so switching views never changes what is being looked
+     * at, only how it is shaped.
      *
-     * @return SupportCollection<int, array{project: \App\Models\Project|null, reportCount: int, avgAchievement: int|null, indicators: SupportCollection<int, array{planIndicator: PlanIndicator, reports: SupportCollection<int, Report>, latest: Report, achievement: int|null, trend: array<int, float>}>}>
+     * @return SupportCollection<int, array{project: Project|null, reportCount: int, avgAchievement: int|null, indicators: SupportCollection<int, array{planIndicator: PlanIndicator, reports: SupportCollection<int, Report>, latest: Report, achievement: int|null, trend: array<int, float>}>}>
      */
     #[Computed]
     public function portfolio(): SupportCollection
@@ -198,16 +268,9 @@ new #[Title('titles.reports')] class extends Component {
             return collect();
         }
 
-        $reports = $this->scopedReports()
+        $reports = $this->visibleReports()
             ->select(['id', 'plan_indicator_id', 'user_id', 'status', 'planned_date', 'value', 'submit_date', 'is_seen_by_meal'])
-            ->with([
-                'planIndicator:id,indicator_id,target,period,source_type,project_id',
-                'planIndicator.indicator:id,name,measure',
-                'planIndicator.project:id,name',
-            ])
-            ->when($this->status !== '', fn ($query) => $query->where('status', $this->status))
-            ->when($this->seenByMeal === 'seen', fn ($query) => $query->where('is_seen_by_meal', true))
-            ->when($this->seenByMeal === 'unseen', fn ($query) => $query->where('is_seen_by_meal', false))
+            ->with($this->targetRelations())
             ->orderByDesc('planned_date')
             ->orderByDesc('id')
             ->get();
@@ -220,20 +283,19 @@ new #[Title('titles.reports')] class extends Component {
                     ->map(function (Collection $rows): array {
                         /** @var PlanIndicator $planIndicator */
                         $planIndicator = $rows->first()->planIndicator;
-                        $latest = $rows->first();
-                        $target = (float) $planIndicator->target;
+                        $percent = $planIndicator->percentAchieved();
 
                         return [
                             'planIndicator' => $planIndicator,
                             'reports' => $rows->values(),
-                            'latest' => $latest,
+                            'latest' => $rows->first(),
                             // Oldest first, for a sparkline that reads left-to-right in time.
                             'trend' => $rows->sortBy('planned_date')->pluck('value')->map(fn ($value): float => (float) $value)->values()->all(),
-                            'achievement' => $target > 0 ? (int) floor(((float) $latest->value / $target) * 100) : null,
+                            'achievement' => $percent === null ? null : (int) floor($percent),
                         ];
                     })
                     // A stable sort: the alphabetical pass runs first so ties in
-                    // achievement (including every unscored indicator) fall back
+                    // achievement (including every unscored target) fall back
                     // to it, then the achievement pass reorders around that.
                     ->sortBy(fn (array $group): string => $group['planIndicator']->indicator->name)
                     ->sortBy(fn (array $group): int => $group['achievement'] ?? PHP_INT_MAX)
@@ -253,17 +315,6 @@ new #[Title('titles.reports')] class extends Component {
             ->values();
     }
 
-    /** @return Collection<int, PlanIndicator> */
-    #[Computed]
-    public function targetOptions(): Collection
-    {
-        return PlanIndicator::query()
-            ->select(['id', 'indicator_id', 'target', 'period'])
-            ->with('indicator:id,name')
-            ->orderByDesc('id')
-            ->get();
-    }
-
     /** @return Collection<int, User> */
     #[Computed]
     public function authorOptions(): Collection
@@ -271,171 +322,49 @@ new #[Title('titles.reports')] class extends Component {
         return User::query()->select(['id', 'name', 'email'])->orderBy('name')->orderBy('id')->get();
     }
 
-    public function openCreateModal(): void
+    /** @return Collection<int, Project> */
+    #[Computed]
+    public function projectOptions(): Collection
     {
-        $this->resetReportForm();
-        $this->showReportModal = true;
+        return Project::query()
+            ->select(['id', 'name'])
+            ->whereIn('id', PlanIndicator::query()->select('project_id')->whereNotNull('project_id'))
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get();
     }
 
-    public function openEditModal(int $reportId): void
+    /**
+     * The target the feed is narrowed to, labelled as the form labels it.
+     */
+    #[Computed]
+    public function scopedTargetLabel(): ?string
     {
-        $report = Report::query()
-            ->select([
-                'id', 'status', 'plan_indicator_id', 'planned_date', 'period_start', 'period_end', 'value',
-                'narrative_report_notes', 'executive_summary', 'key_achievements', 'challenges',
-                'lessons_learned', 'next_period_plans', 'submit_date',
-            ])
-            ->findOrFail($reportId);
-
-        if (! $report->isEditable()) {
-            Flux::toast(
-                variant: 'danger',
-                text: __('reports.only_draft_reports_can_be_edited_return_it_to_draft_on_the_r'),
-            );
-
-            return;
+        if ($this->target === '') {
+            return null;
         }
 
-        $this->resetValidation();
-        $this->editingReportId = $report->id;
-        $this->reportTargetId = (string) $report->plan_indicator_id;
-        $this->plannedDate = $report->planned_date?->toDateString() ?? '';
-        $this->periodStart = $report->period_start?->toDateString() ?? '';
-        $this->periodEnd = $report->period_end?->toDateString() ?? '';
-        $this->value = (string) $report->value;
-        $this->narrativeNotes = $report->narrative_report_notes ?? '';
-        $this->executiveSummary = $report->executive_summary ?? '';
-        $this->keyAchievements = $report->key_achievements ?? '';
-        $this->challenges = $report->challenges ?? '';
-        $this->lessonsLearned = $report->lessons_learned ?? '';
-        $this->nextPeriodPlans = $report->next_period_plans ?? '';
-        $this->submitDate = $report->submit_date?->toDateString() ?? '';
-        $this->showReportModal = true;
+        $target = PlanIndicator::query()
+            ->with(['indicator:id,name,measure', 'project:id,name', 'source'])
+            ->find((int) $this->target);
+
+        return $target === null ? null : $this->targetLabel($target);
     }
 
-    public function saveReport(): void
+    protected function reportSaved(Report $report, bool $isCreate): void
     {
-        $this->narrativeNotes = trim($this->narrativeNotes);
-        $this->executiveSummary = trim($this->executiveSummary);
-        $this->keyAchievements = trim($this->keyAchievements);
-        $this->challenges = trim($this->challenges);
-        $this->lessonsLearned = trim($this->lessonsLearned);
-        $this->nextPeriodPlans = trim($this->nextPeriodPlans);
-
-        $isCreate = $this->editingReportId === null;
-
-        $report = $isCreate
-            ? new Report
-            : Report::query()->select(['id', 'status', 'user_id'])->findOrFail($this->editingReportId);
-
-        if (! $isCreate && ! $report->isEditable()) {
-            $this->showReportModal = false;
-            $this->resetReportForm();
-
-            Flux::toast(
-                variant: 'danger',
-                text: __('reports.only_draft_reports_can_be_edited_return_it_to_draft_on_the_r'),
-            );
-
-            return;
-        }
-
-        // periodEnd's after_or_equal comparison is only meaningful once
-        // periodStart is actually set — an empty periodStart cannot be parsed
-        // as a date, so the rule is added only when there is something to
-        // compare against.
-        $periodEndRules = ['nullable', 'date'];
-
-        if ($this->periodStart !== '') {
-            $periodEndRules[] = 'after_or_equal:periodStart';
-        }
-
-        $validated = $this->validate([
-            'reportTargetId' => ['required', 'integer', Rule::exists(PlanIndicator::class, 'id')],
-            'plannedDate' => ['required', 'date'],
-            'periodStart' => ['nullable', 'date'],
-            'periodEnd' => $periodEndRules,
-            'value' => ['required', 'numeric', 'min:0', 'max:9999999999.99'],
-            'narrativeNotes' => ['nullable', 'string'],
-            'executiveSummary' => ['nullable', 'string'],
-            'keyAchievements' => ['nullable', 'string'],
-            'challenges' => ['nullable', 'string'],
-            'lessonsLearned' => ['nullable', 'string'],
-            'nextPeriodPlans' => ['nullable', 'string'],
-            'submitDate' => ['nullable', 'date'],
-        ], [
-            'reportTargetId.required' => __('reports.select_the_target_this_reports_against'),
-            'plannedDate.required' => __('reports.set_the_period_this_figure_covers'),
-            'value.required' => __('reports.enter_the_reported_value'),
-            'value.min' => __('reports.a_reported_value_cannot_be_negative'),
-            'value.max' => __('reports.the_reported_value_is_too_large_to_record'),
-            'periodEnd.after_or_equal' => __('reports.the_narrative_window_end_cannot_be_before_its_start'),
-        ]);
-
-        $attributes = [
-            'plan_indicator_id' => (int) $validated['reportTargetId'],
-            'planned_date' => $validated['plannedDate'],
-            'period_start' => $validated['periodStart'] === '' ? null : $validated['periodStart'],
-            'period_end' => $validated['periodEnd'] === '' ? null : $validated['periodEnd'],
-            'value' => $validated['value'],
-            'narrative_report_notes' => $validated['narrativeNotes'] === '' ? null : $validated['narrativeNotes'],
-            'executive_summary' => $validated['executiveSummary'] === '' ? null : $validated['executiveSummary'],
-            'key_achievements' => $validated['keyAchievements'] === '' ? null : $validated['keyAchievements'],
-            'challenges' => $validated['challenges'] === '' ? null : $validated['challenges'],
-            'lessons_learned' => $validated['lessonsLearned'] === '' ? null : $validated['lessonsLearned'],
-            'next_period_plans' => $validated['nextPeriodPlans'] === '' ? null : $validated['nextPeriodPlans'],
-            'submit_date' => $validated['submitDate'] === '' ? null : $validated['submitDate'],
-        ];
-
-        // Authorship is set once. reports.user_id RESTRICTs on delete because
-        // who reported a figure is part of the record.
-        // status is deliberately absent here: it is written only by the
-        // explicit workflow actions on the detail page (submitForReview,
-        // approve, returnToDraft), never from this form.
-        if ($isCreate) {
-            $attributes['user_id'] = (int) auth()->id();
-        }
-
-        $report->fill($attributes)->save();
-
-        $this->showReportModal = false;
-        $this->resetReportForm();
         $this->resetPage();
-
-        Flux::toast(
-            variant: 'success',
-            text: $isCreate ? __('reports.report_recorded') : __('reports.report_updated'),
-        );
     }
 
-    public function closeReportModal(): void
+    protected function reportDeleted(): void
     {
-        $this->showReportModal = false;
-        $this->resetReportForm();
-    }
-
-    protected function resetReportForm(): void
-    {
-        $this->resetValidation();
-        $this->editingReportId = null;
-        $this->reportTargetId = '';
-        $this->plannedDate = '';
-        $this->periodStart = '';
-        $this->periodEnd = '';
-        $this->value = '';
-        $this->narrativeNotes = '';
-        $this->executiveSummary = '';
-        $this->keyAchievements = '';
-        $this->challenges = '';
-        $this->lessonsLearned = '';
-        $this->nextPeriodPlans = '';
-        $this->submitDate = '';
+        $this->resetPage();
     }
 };
 ?>
 
 @php
-    $filtersAreActive = $search !== '' || $status !== '' || $seenByMeal !== '' || $author !== '';
+    $filtersAreActive = $search !== '' || $status !== '' || $seenByMeal !== '' || $author !== '' || $project !== '' || $target !== '' || $overdue !== '';
     $insights = $this->insights;
 
     $statusSegments = collect(ReportStatus::cases())->map(fn (ReportStatus $case): array => [
@@ -478,7 +407,15 @@ new #[Title('titles.reports')] class extends Component {
         default => 'bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white',
     };
 
-    $sourceLabel = fn (string $sourceType): string => $sourceType === 'annual_plan' ? __('common.annual_plan') : __('common.proposal');
+    // Where the target was committed: the plan year or the proposal's name, not just its kind.
+    $sourceLabel = fn (App\Models\PlanIndicator $planIndicator): string => match (true) {
+        $planIndicator->source instanceof App\Models\AnnualPlan => __('common.fy_year', ['year' => $planIndicator->source->year]),
+        $planIndicator->source instanceof App\Models\Proposal => $planIndicator->source->name,
+        default => __('targets.source_no_longer_available'),
+    };
+
+    $formatFigure = fn (float $value): string => number_format($value, fmod($value, 1.0) === 0.0 ? 0 : 2);
+    $unitOf = fn (App\Models\PlanIndicator $planIndicator): string => $planIndicator->indicator->measure === App\Enums\IndicatorMeasure::Percentage ? '%' : '';
 
     // A tiny inline sparkline: values normalised into a fixed 100x28 box, no
     // axes or chrome. Fewer than two points has no line to draw.
@@ -497,13 +434,12 @@ new #[Title('titles.reports')] class extends Component {
             ->implode(' ');
     };
 
-    $approvedCount = (int) ($insights['statusCounts'][ReportStatus::Approved->value] ?? 0);
-
     $figures = [
         ['key' => 'total', 'label' => __('reports.total_reports'), 'value' => $insights['total'], 'suffix' => '', 'sub' => null, 'tone' => ''],
-        ['key' => 'achievement', 'label' => __('reports.avg_achievement'), 'value' => $insights['avgAchievement'] ?? 0, 'suffix' => $insights['avgAchievement'] === null ? '' : '%', 'sub' => $insights['avgAchievement'] === null ? __('ui.no_records') : null, 'tone' => $achievementTextClass($insights['avgAchievement'])],
+        ['key' => 'achievement', 'label' => __('reports.avg_target_achievement'), 'value' => $insights['avgAchievement'] ?? 0, 'suffix' => $insights['avgAchievement'] === null ? '' : '%', 'sub' => $insights['avgAchievement'] === null ? __('ui.no_records') : __('reports.approved_reports_only'), 'tone' => $achievementTextClass($insights['avgAchievement'])],
         ['key' => 'awaiting', 'label' => __('reports.awaiting_meal_review'), 'value' => $insights['unseen'], 'suffix' => '', 'sub' => __('reports.of_total', ['total' => $insights['total']]), 'tone' => $insights['unseen'] > 0 ? 'text-status-warn' : 'text-status-good'],
-        ['key' => 'approved', 'label' => __('reports.approved_reports'), 'value' => $approvedCount, 'suffix' => '', 'sub' => __('reports.of_total', ['total' => $insights['total']]), 'tone' => 'text-status-good'],
+        // Status counts already sit in the strip below; what a manager is late on does not.
+        ['key' => 'overdue', 'label' => __('reports.overdue_drafts'), 'value' => $insights['overdue'], 'suffix' => '', 'sub' => __('reports.drafts_past_the_period_they_cover'), 'tone' => $insights['overdue'] > 0 ? 'text-primary' : 'text-status-good'],
     ];
 @endphp
 
@@ -520,6 +456,14 @@ new #[Title('titles.reports')] class extends Component {
                 <flux:select.option value="">{{ __('common.anyone') }}</flux:select.option>
                 @foreach ($this->authorOptions as $authorOption)
                     <flux:select.option :value="$authorOption->id" :wire:key="'rpt-author-'.$authorOption->id">{{ $authorOption->name }}</flux:select.option>
+                @endforeach
+            </x-ui.header-filter-select>
+
+            <x-ui.header-filter-select :label="__('common.project')" wire:model.live="project" :value="$project">
+                <flux:select.option value="">{{ __('targets.any_project') }}</flux:select.option>
+                <flux:select.option value="none">{{ __('common.organisation_wide') }}</flux:select.option>
+                @foreach ($this->projectOptions as $projectOption)
+                    <flux:select.option :value="$projectOption->id" :wire:key="'rpt-project-'.$projectOption->id">{{ $projectOption->name }}</flux:select.option>
                 @endforeach
             </x-ui.header-filter-select>
         </x-slot:filters>
@@ -557,6 +501,22 @@ new #[Title('titles.reports')] class extends Component {
                     <x-ui.status-strip :label="__('common.status')" :segments="$statusSegments" :active="$status" wire-model="status" class="min-w-0 flex-1" />
 
                     <div class="flex flex-wrap items-center gap-2">
+                        <button
+                            type="button"
+                            wire:click="toggleOverdue"
+                            aria-pressed="{{ $overdue !== '' ? 'true' : 'false' }}"
+                            data-test="overdue-chip"
+                            @class([
+                                'inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 type-meta font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                                'border-primary bg-primary text-white' => $overdue !== '',
+                                'border-secondary-soft bg-white text-secondary-medium hover:border-secondary-light hover:text-secondary-dark dark:border-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft dark:hover:text-white' => $overdue === '',
+                            ])
+                        >
+                            <flux:icon.clock variant="micro" class="size-3.5" aria-hidden="true" />
+                            {{ __('reports.overdue_drafts') }}
+                            <span class="tabular-nums">{{ $insights['overdue'] }}</span>
+                        </button>
+
                         <x-ui.view-toggle
                             :label="__('reports.meal_review')"
                             wire-model="seenByMeal"
@@ -582,6 +542,18 @@ new #[Title('titles.reports')] class extends Component {
             </div>
         </x-slot:summary>
     </x-ui.page-header>
+
+    @if ($this->scopedTargetLabel !== null)
+        <div class="flex flex-wrap items-center gap-2">
+            <button type="button" wire:click="clearTarget" class="inline-flex max-w-full items-center gap-1.5 rounded-full border border-secondary-dark bg-secondary-dark px-3 py-1 text-xs font-semibold text-white hover:opacity-90 dark:border-white dark:bg-white dark:text-secondary-dark" data-test="target-scope-chip">
+                <flux:icon.flag variant="micro" class="size-3.5 shrink-0" aria-hidden="true" />
+                <span class="truncate">{{ $this->scopedTargetLabel }}</span>
+                <flux:icon.x-mark variant="micro" class="size-3.5 shrink-0" aria-hidden="true" />
+                <span class="sr-only">{{ __('common.reset_filters') }}</span>
+            </button>
+            <x-ui.button size="sm" icon="plus" wire:click="openCreateModal({{ (int) $target }})">{{ __('reports.record_another_for_this_target') }}</x-ui.button>
+        </div>
+    @endif
 
     @if ($view === 'portfolio')
         <x-ui.panel :subtitle="__('reports.reports_grouped_by_project_and_indicator_so_the_connection_b')">
@@ -617,7 +589,7 @@ new #[Title('titles.reports')] class extends Component {
 
                                 @if ($group['avgAchievement'] !== null)
                                     <span class="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold tabular-nums {{ $achievementBadgeClass($group['avgAchievement']) }}">
-                                        {{ __('reports.avg_achievement') }} {{ $group['avgAchievement'] }}%
+                                        {{ __('reports.avg_target_achievement') }} {{ $group['avgAchievement'] }}%
                                     </span>
                                 @endif
                             </div>
@@ -630,6 +602,7 @@ new #[Title('titles.reports')] class extends Component {
                                         $achievement = $indicatorGroup['achievement'];
                                         $points = $sparklinePoints($indicatorGroup['trend']);
                                         $barWidth = $achievement === null ? 0 : max(2, min(100, $achievement));
+                                        $unit = $unitOf($planIndicator);
                                     @endphp
                                     <a
                                         href="{{ route('reports.show', $latest) }}"
@@ -639,7 +612,7 @@ new #[Title('titles.reports')] class extends Component {
                                     >
                                         <div class="min-w-0">
                                             <p class="type-meta text-secondary-medium dark:text-secondary-soft">
-                                                {{ $sourceLabel($planIndicator->source_type) }} · {{ $planIndicator->period->label() }} · {{ trans_choice('common.count_report', $indicatorGroup['reports']->count(), ['count' => $indicatorGroup['reports']->count()]) }}
+                                                {{ $sourceLabel($planIndicator) }} · {{ $planIndicator->period->label() }} · {{ trans_choice('common.count_report', $indicatorGroup['reports']->count(), ['count' => $indicatorGroup['reports']->count()]) }}
                                             </p>
                                             <p class="truncate text-base font-bold group-hover:underline">{{ $planIndicator->indicator->name }}</p>
 
@@ -674,7 +647,7 @@ new #[Title('titles.reports')] class extends Component {
                                             <div class="text-end">
                                                 <p class="text-xl leading-none font-extrabold tabular-nums {{ $achievementTextClass($achievement) }}">{{ $achievement === null ? '—' : $achievement.'%' }}</p>
                                                 <p class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">
-                                                    {{ __('reports.latest_of_target', ['value' => number_format((float) $latest->value, 2), 'target' => number_format((float) $planIndicator->target, 2)]) }}
+                                                    {{ __('reports.achieved_of_target', ['value' => $formatFigure($planIndicator->achievedValue()).$unit, 'target' => $formatFigure((float) $planIndicator->target).$unit]) }}
                                                 </p>
                                             </div>
 
@@ -714,20 +687,32 @@ new #[Title('titles.reports')] class extends Component {
                 <div class="divide-y divide-secondary-soft dark:divide-secondary-medium">
                     @foreach ($this->reports as $report)
                         @php
-                            $rowTarget = (float) $report->planIndicator->target;
-                            $rowAchievement = $rowTarget > 0 ? (int) floor(((float) $report->value / $rowTarget) * 100) : null;
+                            $rowTarget = $report->planIndicator;
+                            $rowUnit = $unitOf($rowTarget);
+                            // The target's own achievement (approved reports only), not this one figure against it.
+                            $rowPercent = $rowTarget->percentAchieved();
+                            $rowAchievement = $rowPercent === null ? null : (int) floor($rowPercent);
+                            $rowIsOverdue = $report->isOverdue();
                         @endphp
                         <article class="group flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-4 transition-colors duration-150 hover:bg-board-head" wire:key="report-{{ $report->id }}">
                             <div class="min-w-0 flex-1">
-                                <p class="type-meta text-secondary-medium dark:text-secondary-soft">
-                                    {{ $sourceLabel($report->planIndicator->source_type) }} · {{ $report->planned_date?->translatedFormat(__('formats.date')) }}
+                                <p class="flex flex-wrap items-center gap-x-1.5 type-meta text-secondary-medium dark:text-secondary-soft">
+                                    <span>{{ $sourceLabel($rowTarget) }}</span>
+                                    <span aria-hidden="true">·</span>
+                                    <span>{{ $report->planned_date?->translatedFormat(__('formats.date')) }}</span>
+                                    @if ($rowIsOverdue)
+                                        <span class="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-status-critical-soft px-1.5 text-[11px] font-semibold text-primary">
+                                            <flux:icon.clock variant="micro" class="size-3" aria-hidden="true" />
+                                            {{ __('reports.overdue') }}
+                                        </span>
+                                    @endif
                                 </p>
                                 <a href="{{ route('reports.show', $report) }}" wire:navigate class="block text-base font-bold group-hover:underline">
-                                    {{ $report->planIndicator->indicator->name }}
+                                    {{ $rowTarget->indicator->name }}
                                 </a>
                                 <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">
-                                    @if ($report->planIndicator->project !== null)
-                                        <a href="{{ route('projects.show', $report->planIndicator->project) }}" wire:navigate class="hover:text-secondary-dark hover:underline dark:hover:text-white">{{ $report->planIndicator->project->name }}</a>
+                                    @if ($rowTarget->project !== null)
+                                        <a href="{{ route('projects.show', $rowTarget->project) }}" wire:navigate class="hover:text-secondary-dark hover:underline dark:hover:text-white">{{ $rowTarget->project->name }}</a>
                                     @else
                                         {{ __('common.organisation_wide') }}
                                     @endif
@@ -736,11 +721,11 @@ new #[Title('titles.reports')] class extends Component {
                             </div>
 
                             <div class="text-end">
-                                <p class="text-xl leading-none font-extrabold tabular-nums">{{ number_format((float) $report->value, 2) }}</p>
+                                <p class="text-xl leading-none font-extrabold tabular-nums">{{ $formatFigure((float) $report->value) }}{{ $rowUnit }}</p>
                                 <p class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">
-                                    {{ __('reports.of_target', ['target' => number_format((float) $report->planIndicator->target, 2)]) }}
+                                    {{ __('reports.of_target', ['target' => $formatFigure((float) $rowTarget->target).$rowUnit]) }}
                                     @if ($rowAchievement !== null)
-                                        <span class="font-semibold {{ $achievementTextClass($rowAchievement) }}">· {{ $rowAchievement }}%</span>
+                                        <span class="font-semibold {{ $achievementTextClass($rowAchievement) }}" title="{{ __('reports.target_achieved_approved_only') }}">· {{ __('reports.percent_achieved', ['percent' => $rowAchievement]) }}</span>
                                     @endif
                                 </p>
                             </div>
@@ -755,16 +740,19 @@ new #[Title('titles.reports')] class extends Component {
 
                             <x-ui.user-chip :user="$report->user" compact class="w-40" />
 
-                            {{-- No delete: a measurement is the record. --}}
-                            @if ($report->isEditable())
-                                <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $report->id }})" :aria-label="__('reports.edit_report')" />
-                            @else
-                                <flux:tooltip :content="__('reports.only_draft_reports_can_be_edited')">
-                                    <span class="inline-flex size-9 cursor-not-allowed items-center justify-center text-secondary-light" aria-disabled="true">
-                                        <flux:icon.lock-closed class="size-4" />
-                                    </span>
-                                </flux:tooltip>
-                            @endif
+                            {{-- Only a draft can change or go: a reviewed or approved figure is the record. --}}
+                            <div class="flex items-center gap-0.5">
+                                @if ($report->isEditable())
+                                    <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $report->id }})" :aria-label="__('reports.edit_report')" />
+                                    <x-ui.button tone="ghost" size="sm" icon="trash" class="size-9!" wire:click="confirmDeleteReport({{ $report->id }})" :aria-label="__('reports.delete_report')" data-test="delete-report-{{ $report->id }}" />
+                                @else
+                                    <flux:tooltip :content="__('reports.only_draft_reports_can_be_edited')">
+                                        <span class="inline-flex size-9 cursor-not-allowed items-center justify-center text-secondary-light" aria-disabled="true">
+                                            <flux:icon.lock-closed class="size-4" />
+                                        </span>
+                                    </flux:tooltip>
+                                @endif
+                            </div>
                         </article>
                     @endforeach
                 </div>
@@ -776,49 +764,11 @@ new #[Title('titles.reports')] class extends Component {
         </x-ui.panel>
     @endif
 
-    <flux:modal wire:model="showReportModal" class="w-full max-w-2xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        @if ($showReportModal)
-        <form wire:submit="saveReport" class="space-y-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ $editingReportId === null ? __('reports.record_report') : __('reports.edit_report') }}</flux:heading>
-                <flux:subheading>{{ __('reports.status_and_meal_review_are_recorded_on_the_report_page_not_h') }}</flux:subheading>
-            </div>
-
-            <x-ui.select wire:model="reportTargetId" :label="__('reports.target')" required>
-                <flux:select.option value="">{{ __('reports.select_a_target') }}</flux:select.option>
-                @foreach ($this->targetOptions as $targetOption)
-                    <flux:select.option :value="$targetOption->id" :wire:key="'rpt-target-'.$targetOption->id">
-                        {{ $targetOption->indicator->name }} — {{ number_format((float) $targetOption->target, 2) }}
-                    </flux:select.option>
-                @endforeach
-            </x-ui.select>
-
-            <div class="grid gap-4 sm:grid-cols-3">
-                <x-ui.input wire:model="plannedDate" :label="__('reports.period_covered')" type="date" required />
-                <x-ui.input wire:model="value" :label="__('reports.reported_value')" type="number" step="0.01" required />
-                <x-ui.input wire:model="submitDate" :label="__('reports.submitted_on')" type="date" />
-            </div>
-
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.input wire:model="periodStart" :label="__('reports.narrative_window_start')" type="date" />
-                <x-ui.input wire:model="periodEnd" :label="__('reports.narrative_window_end')" type="date" />
-            </div>
-
-            <flux:textarea wire:model="narrativeNotes" :label="__('reports.narrative_notes')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
-
-            <flux:textarea wire:model="executiveSummary" :label="__('reports.executive_summary')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
-            <flux:textarea wire:model="keyAchievements" :label="__('reports.key_achievements')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
-            <flux:textarea wire:model="challenges" :label="__('reports.challenges')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
-            <flux:textarea wire:model="lessonsLearned" :label="__('reports.lessons_learned')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
-            <flux:textarea wire:model="nextPeriodPlans" :label="__('reports.next_period_plans')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
-
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeReportModal">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-report-button">
-                    {{ $editingReportId === null ? __('reports.record_report') : __('common.save_changes') }}
-                </x-ui.button>
-            </div>
-        </form>
-        @endif
-    </flux:modal>
+    <x-reports.form-modal
+        :open="$showReportModal"
+        :editing="$editingReportId !== null"
+        :target-options="$showReportModal ? $this->targetOptions : []"
+        :form-target="$showReportModal ? $this->formTarget : null"
+        :window="$showReportModal ? $this->formWindow() : null"
+    />
 </section>

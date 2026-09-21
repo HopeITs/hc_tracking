@@ -73,17 +73,20 @@
             </span>
 
             <div class="ms-auto flex shrink-0 items-center gap-0.5">
-                <flux:tooltip :content="__('results_framework.add_a_contributing_result')">
-                    <x-ui.button
-                        tone="ghost"
-                        size="sm"
-                        icon="plus"
-                        class="size-8!"
-                        wire:click="openCreateModal({{ $result->id }})"
-                        :aria-label="__('results_framework.add_a_contributing_result')"
-                        data-test="add-child-result-{{ $result->id }}"
-                    />
-                </flux:tooltip>
+                {{-- An output is the bottom of the chain: nothing contributes to it. --}}
+                @unless ($result->type === ResultType::Output)
+                    <flux:tooltip :content="__('results_framework.add_a_contributing_result')">
+                        <x-ui.button
+                            tone="ghost"
+                            size="sm"
+                            icon="plus"
+                            class="size-8!"
+                            wire:click="openCreateModal({{ $result->id }})"
+                            :aria-label="__('results_framework.add_a_contributing_result')"
+                            data-test="add-child-result-{{ $result->id }}"
+                        />
+                    </flux:tooltip>
+                @endunless
 
                 <flux:tooltip :content="__('results_framework.edit_result')">
                     <x-ui.button
@@ -153,6 +156,16 @@
                     <flux:icon.exclamation-triangle variant="micro" class="size-3.5" aria-hidden="true" />
                     {{ __('results_framework.no_indicator_yet') }}
                 </span>
+                {{-- The next step, one click away: the indicator form opens already tied to this statement. --}}
+                <a
+                    href="{{ route('indicators.index', ['create' => $result->id]) }}"
+                    wire:navigate
+                    class="inline-flex items-center gap-1 rounded-md type-meta font-semibold text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    data-test="add-indicator-for-result-{{ $result->id }}"
+                >
+                    <flux:icon.plus variant="micro" class="size-3.5" aria-hidden="true" />
+                    {{ __('results_framework.add_indicator') }}
+                </a>
             @endif
 
             <span class="inline-flex items-center gap-1.5 type-meta text-secondary-medium dark:text-secondary-soft">
@@ -233,7 +246,7 @@
                           <div class="flex flex-col gap-2.5 @2xl/directory:flex-row @2xl/directory:items-center @2xl/directory:gap-4">
                             <div class="min-w-0 @2xl/directory:flex-1">
                                 <p class="flex flex-wrap items-center gap-2">
-                                    <span class="truncate text-sm font-semibold text-secondary-dark dark:text-white">{{ $indicator->name }}</span>
+                                    <a href="{{ route('indicators.index', ['inspect' => $indicator->id]) }}" wire:navigate class="truncate text-sm font-semibold text-secondary-dark hover:text-primary hover:underline dark:text-white">{{ $indicator->name }}</a>
                                     <x-ui.enum-badge :case="$indicator->measure" class="shrink-0" />
                                     @if ($indicator->project !== null)
                                         <span class="inline-flex shrink-0 items-center gap-1 type-meta text-secondary-medium dark:text-secondary-soft">
@@ -327,6 +340,16 @@
 
                                             <span class="shrink-0 text-sm font-bold tabular-nums text-secondary-dark dark:text-white">{{ $formatValue($targetRow['target']->target) }}</span>
 
+                                            {{-- Approved achievement, by the one rule every page shares (PlanIndicator::achievedValue()). --}}
+                                            @if ($targetRow['percent'] !== null)
+                                                <span @class([
+                                                    'shrink-0 type-meta font-semibold tabular-nums',
+                                                    'text-status-good' => $targetRow['status'] === 'achieved',
+                                                    'text-secondary-dark dark:text-white' => $targetRow['status'] === 'in_progress',
+                                                    'text-secondary-medium dark:text-secondary-soft' => $targetRow['status'] === 'not_started',
+                                                ])>{{ __('results_framework.percent_achieved', ['percent' => number_format($targetRow['percent'], 0)]) }}</span>
+                                            @endif
+
                                             <flux:tooltip :content="$targetRow['reports'] > 0 ? __('results_framework.count_reports_count_approved', ['count' => $targetRow['reports'], 'approved' => $targetRow['approved']]) : __('projects.target_no_reports_yet')">
                                                 <span @class([
                                                     'ms-auto inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums',
@@ -346,10 +369,19 @@
                     @endforeach
                 </ul>
 
-                <div class="border-t border-secondary-soft px-4 py-2 dark:border-secondary-medium">
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-secondary-soft px-4 py-2 dark:border-secondary-medium">
                     <a href="{{ route('indicators.index', ['result' => $result->id]) }}" wire:navigate class="type-meta font-semibold text-secondary-medium hover:text-primary hover:underline dark:text-secondary-soft">
                         {{ __('results_framework.manage_indicators') }}
                     </a>
+                    <a href="{{ route('indicators.index', ['create' => $result->id]) }}" wire:navigate class="inline-flex items-center gap-1 type-meta font-semibold text-secondary-medium hover:text-primary hover:underline dark:text-secondary-soft">
+                        <flux:icon.plus variant="micro" class="size-3.5" aria-hidden="true" />
+                        {{ __('results_framework.add_indicator') }}
+                    </a>
+                    @if ($measurement['targets'] > 0)
+                        <a href="{{ route('targets.index', ['result' => $result->id]) }}" wire:navigate class="type-meta font-semibold text-secondary-medium hover:text-primary hover:underline dark:text-secondary-soft">
+                            {{ __('results_framework.view_targets') }}
+                        </a>
+                    @endif
                 </div>
             </div>
         @endif
