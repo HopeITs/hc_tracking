@@ -1,7 +1,6 @@
 <?php
 
 return [
-    'all_risks' => 'All risks',
     'count_matching_risk' => '{1} :count matching risk|[2,*] :count matching risks',
     'delete_risk' => 'Delete risk',
     'delete_this_risk' => 'Delete this risk?',
@@ -10,6 +9,7 @@ return [
     'enter_a_short_risk_name' => 'Enter a short risk name.',
     'log_risk' => 'Log risk',
     'log_the_first_risk_against_a_project' => 'Log the first risk against a project.',
+    'materialised_risks' => '{0} No materialised risks|{1} :count materialised risk|[2,*] :count materialised risks',
     'no_matching_risks' => 'No matching risks',
     'no_mitigation_recorded' => 'No mitigation recorded',
     'record_what_could_go_wrong_what_it_would_cost_and_how_it_is' => 'Record what could go wrong, what it would cost, and how it is mitigated.',
@@ -19,7 +19,7 @@ return [
     'risk_name' => 'Risk name',
     'risk_updated' => 'Risk updated.',
     'risks_by_project' => 'Risks by project',
-    'risks_by_project_hint' => 'Materialised and watching risks for the top projects, matching your search and state filters.',
+    'risks_by_project_hint' => 'Risks with and without a recorded mitigation, for the top projects, matching your search and materialised filter.',
     'risks_logged_against_delivery_projects_materialised_first' => 'Risks logged against delivery projects, materialised first.',
     'risks_without_mitigation' => '{0} No risks without a mitigation|{1} :count risk without a mitigation|[2,*] :count risks without a mitigation',
     'search_risks' => 'Search risks',
@@ -27,4 +27,5 @@ return [
     'the_risk_and_its_mitigation_notes_are_removed_nothing_else_i' => 'The risk and its mitigation notes are removed. Nothing else is affected.',
     'the_selected_project_is_no_longer_available' => 'The selected project is no longer available.',
     'this_risk_has_materialised' => 'This risk has materialised',
+    'without_mitigation' => 'Without mitigation',
 ];

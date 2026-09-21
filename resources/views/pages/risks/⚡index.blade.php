@@ -22,8 +22,8 @@ new #[Title('titles.risks')] class extends Component {
     #[Url(except: '')]
     public string $project = '';
 
-    #[Url(except: '')]
-    public string $status = '';
+    #[Url(except: false)]
+    public bool $materialisedOnly = false;
 
     #[Url(except: false)]
     public bool $unmitigated = false;
@@ -56,8 +56,9 @@ new #[Title('titles.risks')] class extends Component {
         $this->resetPage();
     }
 
-    public function updatedStatus(): void
+    public function toggleMaterialisedOnly(): void
     {
+        $this->materialisedOnly = ! $this->materialisedOnly;
         $this->resetPage();
     }
 
@@ -71,17 +72,17 @@ new #[Title('titles.risks')] class extends Component {
     {
         $this->search = '';
         $this->project = '';
-        $this->status = '';
+        $this->materialisedOnly = false;
         $this->unmitigated = false;
         $this->resetPage();
     }
 
     /**
-     * Risks matching search/project/state filters. Each filter can be
+     * Risks matching search/project/materialised filters. Each filter can be
      * switched off so summary widgets can share this base query while
      * excluding the very filter they let the user toggle.
      */
-    protected function filteredQuery(bool $includeProject = true, bool $includeStatus = true): Builder
+    protected function filteredQuery(bool $includeProject = true, bool $includeMaterialised = true): Builder
     {
         $search = trim($this->search);
 
@@ -95,8 +96,7 @@ new #[Title('titles.risks')] class extends Component {
                 });
             })
             ->when($includeProject && $this->project !== '', fn ($query) => $query->where('project_id', (int) $this->project))
-            ->when($includeStatus && $this->status === 'happened', fn ($query) => $query->where('happened', true))
-            ->when($includeStatus && $this->status === 'watching', fn ($query) => $query->where('happened', false));
+            ->when($includeMaterialised && $this->materialisedOnly, fn ($query) => $query->where('happened', true));
     }
 
     /** @return LengthAwarePaginator<int, Risk> */
@@ -114,24 +114,11 @@ new #[Title('titles.risks')] class extends Component {
             ->paginate(15);
     }
 
-    /**
-     * Materialised/watching counts respecting search and project, but not the
-     * state filter itself, so the status strip's segments never disappear.
-     *
-     * @return array{materialised: int, watching: int}
-     */
+    /** Materialised risks matching search/project, respecting the materialised toggle itself so the button's own count stays stable. */
     #[Computed]
-    public function stateCounts(): array
+    public function materialisedCount(): int
     {
-        $rows = $this->filteredQuery(includeStatus: false)
-            ->selectRaw('happened, count(*) as total')
-            ->groupBy('happened')
-            ->get();
-
-        return [
-            'materialised' => (int) ($rows->firstWhere('happened', true)->total ?? 0),
-            'watching' => (int) ($rows->firstWhere('happened', false)->total ?? 0),
-        ];
+        return $this->filteredQuery(includeMaterialised: false)->where('happened', true)->count();
     }
 
     /** Risks lacking a mitigation, respecting every active filter except the unmitigated toggle itself. */
@@ -146,9 +133,9 @@ new #[Title('titles.risks')] class extends Component {
     }
 
     /**
-     * Materialised/watching risk counts for the top 8 projects by risk
-     * count, respecting search and state filters (not the project filter,
-     * since this rollup exists to compare across projects).
+     * Mitigated vs unmitigated risk counts for the top 8 projects by risk
+     * count, respecting search and the materialised-only filter (not the
+     * project filter, since this rollup exists to compare across projects).
      *
      * @return array{categories: array<int, string>, series: array<int, array{name: string, data: array<int, int>}>}
      */
@@ -156,8 +143,8 @@ new #[Title('titles.risks')] class extends Component {
     public function projectRollupChart(): array
     {
         $rows = $this->filteredQuery(includeProject: false)
-            ->selectRaw('project_id, happened, count(*) as total')
-            ->groupBy('project_id', 'happened')
+            ->selectRaw("project_id, (CASE WHEN solution IS NULL OR solution = '' THEN 0 ELSE 1 END) as mitigated, count(*) as total")
+            ->groupBy('project_id', 'mitigated')
             ->get()
             ->groupBy('project_id');
 
@@ -170,18 +157,18 @@ new #[Title('titles.risks')] class extends Component {
 
         $categories = $topProjectIds->map(fn (int $projectId): string => $projectNames[$projectId] ?? '')->values()->all();
 
-        $countFor = fn (int $projectId, bool $happened): int => (int) ($rows->get($projectId)?->firstWhere('happened', $happened)->total ?? 0);
+        $countFor = fn (int $projectId, int $mitigated): int => (int) ($rows->get($projectId)?->first(fn ($row) => (int) $row->mitigated === $mitigated)->total ?? 0);
 
         return [
             'categories' => $categories,
             'series' => [
                 [
-                    'name' => __('common.materialised'),
-                    'data' => $topProjectIds->map(fn (int $projectId): int => $countFor($projectId, true))->values()->all(),
+                    'name' => __('common.mitigation'),
+                    'data' => $topProjectIds->map(fn (int $projectId): int => $countFor($projectId, 1))->values()->all(),
                 ],
                 [
-                    'name' => __('common.watching'),
-                    'data' => $topProjectIds->map(fn (int $projectId): int => $countFor($projectId, false))->values()->all(),
+                    'name' => __('risks.without_mitigation'),
+                    'data' => $topProjectIds->map(fn (int $projectId): int => $countFor($projectId, 0))->values()->all(),
                 ],
             ],
         ];
@@ -314,7 +301,7 @@ new #[Title('titles.risks')] class extends Component {
 ?>
 
 @php
-    $filtersAreActive = $search !== '' || $project !== '' || $status !== '' || $unmitigated;
+    $filtersAreActive = $search !== '' || $project !== '' || $materialisedOnly || $unmitigated;
 @endphp
 
 <section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="risk-register-heading">
@@ -332,12 +319,6 @@ new #[Title('titles.risks')] class extends Component {
                     <flux:select.option :value="$projectOption->id" :wire:key="'risk-project-filter-'.$projectOption->id">{{ $projectOption->name }}</flux:select.option>
                 @endforeach
             </x-ui.header-filter-select>
-
-            <x-ui.header-filter-select :label="__('common.state')" wire:model.live="status" :value="$status">
-                <flux:select.option value="">{{ __('risks.all_risks') }}</flux:select.option>
-                <flux:select.option value="happened">{{ __('common.materialised') }}</flux:select.option>
-                <flux:select.option value="watching">{{ __('common.watching') }}</flux:select.option>
-            </x-ui.header-filter-select>
         </x-slot:filters>
 
         <x-slot:actions>
@@ -347,18 +328,21 @@ new #[Title('titles.risks')] class extends Component {
         </x-slot:actions>
 
         <x-slot:summary>
-            @php $stateCounts = $this->stateCounts; @endphp
-            <div class="flex flex-col gap-3 @2xl:flex-row @2xl:items-center @2xl:justify-between">
-                <x-ui.status-strip
-                    class="min-w-0 @2xl:max-w-md"
-                    :label="__('common.risks')"
-                    wire-model="status"
-                    :active="$status"
-                    :segments="[
-                        ['key' => 'happened', 'label' => __('common.materialised'), 'count' => $stateCounts['materialised'], 'tone' => 'critical'],
-                        ['key' => 'watching', 'label' => __('common.watching'), 'count' => $stateCounts['watching'], 'tone' => 'warn'],
-                    ]"
-                />
+            <div class="flex flex-wrap items-center gap-2">
+                <button
+                    type="button"
+                    wire:click="toggleMaterialisedOnly"
+                    aria-pressed="{{ $materialisedOnly ? 'true' : 'false' }}"
+                    data-test="materialised-toggle"
+                    @class([
+                        'inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-primary',
+                        'border-primary bg-primary text-white' => $materialisedOnly,
+                        'border-secondary-light text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium' => ! $materialisedOnly,
+                    ])
+                >
+                    <flux:icon.exclamation-triangle variant="micro" class="size-3.5" />
+                    {{ trans_choice('risks.materialised_risks', $this->materialisedCount, ['count' => $this->materialisedCount]) }}
+                </button>
 
                 <button
                     type="button"
@@ -402,7 +386,7 @@ new #[Title('titles.risks')] class extends Component {
                     :label="__('risks.risks_by_project')"
                     :series="$rollup['series']"
                     :categories="$rollup['categories']"
-                    :tones="['critical', 'warn']"
+                    :tones="['good', 'warn']"
                     :height="max(count($rollup['categories']) * 44, 160)"
                 />
             </div>
@@ -440,11 +424,6 @@ new #[Title('titles.risks')] class extends Component {
                                     <span class="inline-flex items-center gap-1 rounded-md border border-primary bg-primary px-2 py-0.5 text-xs font-semibold text-white">
                                         <flux:icon.exclamation-triangle variant="micro" class="size-3" />
                                         {{ __('common.materialised') }}
-                                    </span>
-                                @else
-                                    <span class="inline-flex items-center gap-1 rounded-md border border-status-warn/40 px-2 py-0.5 text-xs font-semibold text-status-warn">
-                                        <flux:icon.eye variant="micro" class="size-3" />
-                                        {{ __('common.watching') }}
                                     </span>
                                 @endif
                             </div>

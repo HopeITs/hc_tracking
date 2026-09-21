@@ -1,7 +1,6 @@
 <?php
 
 return [
-    'all_risks' => 'كل المخاطر',
     'count_matching_risk' => '{0} لا توجد مخاطر مطابقة|{1} خطر واحد مطابق|{2} خطران مطابقان|[3,10] :count مخاطر مطابقة|[11,*] :count خطرًا مطابقًا',
     'delete_risk' => 'حذف الخطر',
     'delete_this_risk' => 'حذف هذا الخطر؟',
@@ -10,6 +9,7 @@ return [
     'enter_a_short_risk_name' => 'أدخل اسمًا قصيرًا للخطر.',
     'log_risk' => 'تسجيل خطر',
     'log_the_first_risk_against_a_project' => 'سجّل أول خطر على مشروع.',
+    'materialised_risks' => '{0} لا توجد مخاطر متحققة|{1} خطر واحد متحقق|{2} خطران متحققان|[3,10] :count مخاطر متحققة|[11,*] :count خطرًا متحققًا',
     'no_matching_risks' => 'لا توجد مخاطر مطابقة',
     'no_mitigation_recorded' => 'لا يوجد إجراء تخفيف مسجّل',
     'record_what_could_go_wrong_what_it_would_cost_and_how_it_is' => 'سجّل ما قد يسوء، وتكلفته، وكيفية التخفيف منه.',
@@ -19,7 +19,7 @@ return [
     'risk_name' => 'اسم الخطر',
     'risk_updated' => 'تم تحديث الخطر.',
     'risks_by_project' => 'المخاطر حسب المشروع',
-    'risks_by_project_hint' => 'المخاطر المتحققة والمُراقَبة لأبرز المشاريع، وفق البحث وفلتر الحالة الحاليين.',
+    'risks_by_project_hint' => 'المخاطر بوجود إجراء تخفيف أو بدونه لأبرز المشاريع، وفق البحث وفلتر التحقق الحاليين.',
     'risks_logged_against_delivery_projects_materialised_first' => 'المخاطر المسجلة على مشاريع التنفيذ، والمتحققة منها أولًا.',
     'risks_without_mitigation' => '{0} لا توجد مخاطر بلا إجراء تخفيف|{1} خطر واحد بلا إجراء تخفيف|{2} خطران بلا إجراء تخفيف|[3,10] :count مخاطر بلا إجراء تخفيف|[11,*] :count خطرًا بلا إجراء تخفيف',
     'search_risks' => 'البحث في المخاطر',
@@ -27,4 +27,5 @@ return [
     'the_risk_and_its_mitigation_notes_are_removed_nothing_else_i' => 'سيُحذف الخطر وملاحظات التخفيف الخاصة به. لن يتأثر أي شيء آخر.',
     'the_selected_project_is_no_longer_available' => 'المشروع المحدد لم يعد متاحًا.',
     'this_risk_has_materialised' => 'تحقق هذا الخطر',
+    'without_mitigation' => 'بلا إجراء تخفيف',
 ];
