@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 
@@ -192,13 +193,18 @@ class HrEmployee extends HrModel
     }
 
     /**
-     * The tasks assigned to this employee.
+     * The tasks assigned to this employee (a task may have several assignees).
      *
-     * @return HasMany<Task, $this>
+     * A task and its task_assignees pivot both live on the default connection,
+     * so this still resolves in one query even though HrEmployee itself is on
+     * the separate `hr` connection — the join happens entirely on the far
+     * side, parameterised by this employee's id rather than joined to it.
+     *
+     * @return HasManyThrough<Task, TaskAssignee, $this>
      */
-    public function assignedTasks(): HasMany
+    public function assignedTasks(): HasManyThrough
     {
-        return $this->hasMany(Task::class, 'assigned_to');
+        return $this->hasManyThrough(Task::class, TaskAssignee::class, 'employee_id', 'id', 'id', 'task_id');
     }
 
     /**

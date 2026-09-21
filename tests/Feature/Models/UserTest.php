@@ -7,7 +7,6 @@ use App\Models\Program;
 use App\Models\Project;
 use App\Models\Report;
 use App\Models\Task;
-use App\Models\TaskUpdate;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 
@@ -60,21 +59,21 @@ test('tasks are assigned to hr employees but raised by users', function () {
     $employee = HrEmployee::find(insertHrEmployee());
     $user = User::factory()->create();
 
-    Task::factory(2)->create(['assigned_to' => $employee->id, 'created_by' => $user->id]);
+    $tasks = Task::factory(2)->create(['created_by' => $user->id]);
+    foreach ($tasks as $task) {
+        $task->taskAssignees()->create(['employee_id' => $employee->id]);
+    }
     Task::factory()->create();
 
     expect($employee->assignedTasks)->toHaveCount(2)
         ->and($user->createdTasks)->toHaveCount(2);
 });
 
-test('a user has the task updates and reports they submitted', function () {
+test('a user has the reports they submitted', function () {
     $user = User::factory()->create();
 
-    TaskUpdate::factory(2)->create(['user_id' => $user->id]);
-    TaskUpdate::factory()->create();
     Report::factory()->create(['user_id' => $user->id]);
     Report::factory()->create();
 
-    expect($user->taskUpdates)->toHaveCount(2)
-        ->and($user->reports)->toHaveCount(1);
+    expect($user->reports)->toHaveCount(1);
 });

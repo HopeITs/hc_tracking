@@ -41,10 +41,10 @@ test('deleting a proposal deletes the tasks under it', function () {
     $this->assertDatabaseCount('tasks', 0);
 });
 
-test('a task stores its assignee hr employee id with no foreign key to users', function () {
-    $foreignKeyColumns = collect(Schema::getForeignKeys('tasks'))->pluck('columns')->flatten();
+test('a task assignment stores its hr employee id with no foreign key to users', function () {
+    $foreignKeyColumns = collect(Schema::getForeignKeys('task_assignees'))->pluck('columns')->flatten();
 
-    expect($foreignKeyColumns)->not->toContain('assigned_to');
+    expect($foreignKeyColumns)->not->toContain('employee_id');
 });
 
 test('a user is not deletable while a task they created still exists', function () {

@@ -6,7 +6,6 @@
         $case instanceof \App\Enums\TaskStatus => match ($case) {
             \App\Enums\TaskStatus::Done => 'solid',
             \App\Enums\TaskStatus::InProgress, \App\Enums\TaskStatus::UnderReview => 'solid',
-            \App\Enums\TaskStatus::Blocked => 'accent',
             \App\Enums\TaskStatus::Todo => 'outline',
         },
         $case instanceof \App\Enums\MilestoneStatus => match ($case) {

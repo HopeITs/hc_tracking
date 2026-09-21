@@ -10,7 +10,7 @@ use App\Models\Proposal;
 use App\Models\Risk;
 use App\Models\Task;
 use App\Models\TaskAttachment;
-use App\Models\TaskUpdate;
+use App\Models\TaskAssignee;
 use App\Models\User;
 use Database\Seeders\Concerns\PicksHrRecords;
 use Illuminate\Database\Seeder;
@@ -106,21 +106,19 @@ class DeliverySeeder extends Seeder
         $open = Task::factory(2)->create([
             'proposal_id' => $proposal->id,
             'milestone_id' => $milestone->id,
-            'assigned_to' => fn (): int => $employeeIds->random(),
             'created_by' => fn (): int => $users->random()->id,
         ]);
 
         $done = Task::factory()->completed()->create([
             'proposal_id' => $proposal->id,
             'milestone_id' => $milestone->id,
-            'assigned_to' => $employeeIds->random(),
             'created_by' => $users->random()->id,
         ]);
 
         foreach ($open->push($done) as $task) {
-            TaskUpdate::factory(2)->create([
+            TaskAssignee::factory()->create([
                 'task_id' => $task->id,
-                'user_id' => $users->random()->id,
+                'employee_id' => $employeeIds->random(),
             ]);
 
             TaskAttachment::factory()->create([

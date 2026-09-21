@@ -20,8 +20,8 @@ use App\Models\Result;
 use App\Models\Risk;
 use App\Models\Strategy;
 use App\Models\Task;
+use App\Models\TaskAssignee;
 use App\Models\TaskAttachment;
-use App\Models\TaskUpdate;
 use App\Models\TransfersTracking;
 use App\Models\User;
 use Database\Seeders\CoreDataSeeder;
@@ -42,7 +42,7 @@ test('the seeders populate every table in the schema', function () {
         Risk::class,
         Milestone::class,
         Task::class,
-        TaskUpdate::class,
+        TaskAssignee::class,
         TaskAttachment::class,
         Media::class,
         Result::class,
