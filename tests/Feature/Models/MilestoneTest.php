@@ -106,3 +106,30 @@ test('an eager-loaded milestone subtree is ordered by sequence too', function ()
 
     expect($loaded->descendants()->pluck('name')->all())->toBe(['Earlier', 'Later']);
 });
+
+test('a milestone left without an explicit sequence is placed after its existing siblings', function () {
+    $project = Project::factory()->create();
+
+    $first = Milestone::factory()->create(['project_id' => $project->id]);
+    $second = Milestone::factory()->create(['project_id' => $project->id]);
+
+    $child = Milestone::factory()->childOf($first)->create();
+    $grandchild = Milestone::factory()->childOf($child)->create();
+
+    expect($first->sequence)->toBe(1)
+        ->and($second->sequence)->toBe(2)
+        ->and($child->sequence)->toBe(1)
+        ->and($grandchild->sequence)->toBe(1);
+});
+
+test('re-nesting a milestone without an explicit sequence appends it after its new siblings', function () {
+    $root = Milestone::factory()->create();
+    Milestone::factory()->childOf($root)->create(['sequence' => 1]);
+    Milestone::factory()->childOf($root)->create(['sequence' => 2]);
+
+    $mover = Milestone::factory()->create(['project_id' => $root->project_id, 'sequence' => 9]);
+    $mover->parent_milestone_id = $root->id;
+    $mover->save();
+
+    expect($mover->fresh()->sequence)->toBe(3);
+});

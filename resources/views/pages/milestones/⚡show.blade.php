@@ -21,7 +21,6 @@ new #[Title('titles.milestone')] class extends Component {
     public string $plannedDate = '';
     public string $actualDate = '';
     public string $milestoneStatus = 'pending';
-    public string $sequence = '1';
     public string $weightPercentage = '0';
     public string $responsibleUserId = '';
     public string $parentMilestoneId = '';
@@ -32,7 +31,6 @@ new #[Title('titles.milestone')] class extends Component {
     public string $relatedPlannedDate = '';
     public string $relatedActualDate = '';
     public string $relatedStatus = 'pending';
-    public string $relatedSequence = '1';
     public string $relatedWeightPercentage = '0';
     public string $relatedResponsibleUserId = '';
     public string $relatedParentMilestoneId = '';
@@ -47,7 +45,6 @@ new #[Title('titles.milestone')] class extends Component {
         $this->plannedDate = $freshMilestone->planned_date->toDateString();
         $this->actualDate = $freshMilestone->actual_date?->toDateString() ?? '';
         $this->milestoneStatus = $freshMilestone->status->value;
-        $this->sequence = (string) $freshMilestone->sequence;
         $this->weightPercentage = $freshMilestone->weight_percentage;
         $this->responsibleUserId = (string) $freshMilestone->responsible_user_id;
         $this->parentMilestoneId = (string) ($freshMilestone->parent_milestone_id ?? '');
@@ -124,7 +121,6 @@ new #[Title('titles.milestone')] class extends Component {
             'plannedDate' => ['required', 'date'],
             'actualDate' => ['nullable', 'date'],
             'milestoneStatus' => ['required', new Enum(MilestoneStatus::class)],
-            'sequence' => ['required', 'integer', 'min:0'],
             'weightPercentage' => ['required', 'numeric', 'min:0', 'max:100'],
             'responsibleUserId' => ['required', 'integer', Rule::exists(HrEmployee::class, 'id')],
             'parentMilestoneId' => [
@@ -150,7 +146,6 @@ new #[Title('titles.milestone')] class extends Component {
             'planned_date' => $validated['plannedDate'],
             'actual_date' => $validated['actualDate'] === '' ? null : $validated['actualDate'],
             'status' => $validated['milestoneStatus'],
-            'sequence' => (int) $validated['sequence'],
             'weight_percentage' => $validated['weightPercentage'],
             'responsible_user_id' => (int) $validated['responsibleUserId'],
             'parent_milestone_id' => $validated['parentMilestoneId'] === '' || $validated['parentMilestoneId'] === null
@@ -172,7 +167,6 @@ new #[Title('titles.milestone')] class extends Component {
         $this->relatedPlannedDate = '';
         $this->relatedActualDate = '';
         $this->relatedStatus = 'pending';
-        $this->relatedSequence = '1';
         $this->relatedWeightPercentage = '0';
         $this->relatedResponsibleUserId = '';
         $this->relatedParentMilestoneId = (string) $this->milestoneId;
@@ -197,7 +191,6 @@ new #[Title('titles.milestone')] class extends Component {
             'relatedPlannedDate' => ['required', 'date'],
             'relatedActualDate' => ['nullable', 'date'],
             'relatedStatus' => ['required', new Enum(MilestoneStatus::class)],
-            'relatedSequence' => ['required', 'integer', 'min:0'],
             'relatedWeightPercentage' => ['required', 'numeric', 'min:0', 'max:100'],
             'relatedResponsibleUserId' => ['required', 'integer', Rule::exists(HrEmployee::class, 'id')],
             'relatedParentMilestoneId' => [
@@ -222,7 +215,6 @@ new #[Title('titles.milestone')] class extends Component {
             'planned_date' => $validated['relatedPlannedDate'],
             'actual_date' => $validated['relatedActualDate'] === '' ? null : $validated['relatedActualDate'],
             'status' => $validated['relatedStatus'],
-            'sequence' => (int) $validated['relatedSequence'],
             'weight_percentage' => $validated['relatedWeightPercentage'],
             'responsible_user_id' => (int) $validated['relatedResponsibleUserId'],
             'parent_milestone_id' => $validated['relatedParentMilestoneId'] === '' || $validated['relatedParentMilestoneId'] === null
@@ -323,7 +315,7 @@ new #[Title('titles.milestone')] class extends Component {
                         <flux:error name="milestoneStatus" class="mt-1.5" />
                     </div>
 
-                    <x-ui.input wire:model="sequence" :label="__('milestones.sequence')" type="number" min="0" required />
+                    <x-ui.input wire:model="weightPercentage" :label="__('milestones.weight')" type="number" min="0" max="100" step="0.01" required />
                 </div>
             </div>
 
@@ -331,7 +323,6 @@ new #[Title('titles.milestone')] class extends Component {
                 <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('milestones.assignment') }}</p>
 
                 <div class="min-w-0">
-                    <x-ui.input wire:model="weightPercentage" :label="__('milestones.weight')" type="number" min="0" max="100" step="0.01" required />
                     <x-ui.progress-bar :value="(float) $weightPercentage" :max="100" show-value class="mt-2" />
                 </div>
 
@@ -477,12 +468,10 @@ new #[Title('titles.milestone')] class extends Component {
                     <flux:error name="relatedStatus" class="mt-1.5" />
                 </div>
 
-                <x-ui.input wire:model="relatedSequence" :label="__('milestones.sequence')" type="number" min="0" required />
+                <x-ui.input wire:model="relatedWeightPercentage" :label="__('milestones.weight')" type="number" min="0" max="100" step="0.01" required />
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.input wire:model="relatedWeightPercentage" :label="__('milestones.weight')" type="number" min="0" max="100" step="0.01" required />
-
                 <div class="min-w-0">
                     <label for="related-milestone-form-responsible" class="{{ $dropdownLabelClasses }}">{{ __('milestones.responsible') }}</label>
                     <flux:dropdown position="bottom" align="start" class="filter-picker block! w-full!" x-data="{ optionSearch: '' }">

@@ -30,12 +30,11 @@ test('the milestone show page renders the edit form with the current values', fu
 
 test('a milestone can be updated from its own page', function () {
     $user = User::factory()->create();
-    $milestone = Milestone::factory()->create(['name' => 'Initial gate']);
+    $milestone = Milestone::factory()->create(['name' => 'Initial gate', 'sequence' => 5]);
 
     Livewire::actingAs($user)
         ->test('pages::milestones.show', ['milestone' => $milestone])
         ->set('name', '  Revised gate  ')
-        ->set('sequence', '8')
         ->set('weightPercentage', '35.50')
         ->call('updateMilestone')
         ->assertHasNoErrors();
@@ -43,7 +42,7 @@ test('a milestone can be updated from its own page', function () {
     $milestone->refresh();
 
     expect($milestone->name)->toBe('Revised gate')
-        ->and($milestone->sequence)->toBe(8)
+        ->and($milestone->sequence)->toBe(5)
         ->and($milestone->weight_percentage)->toBe('35.50');
 });
 
