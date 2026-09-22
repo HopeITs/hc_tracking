@@ -34,6 +34,7 @@ return [
     'targets' => 'المستهدفات',
     'task' => 'المهمة',
     'tasks' => 'المهام',
+    'timeline' => 'الخط الزمني',
     'transfers' => 'التحويلات',
     'user_directory' => 'دليل المستخدمين',
 ];

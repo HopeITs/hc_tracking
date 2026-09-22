@@ -8,6 +8,7 @@ use App\Concerns\HasTree;
 use App\Enums\MilestoneStatus;
 use App\Observers\MediaOwnerObserver;
 use App\Observers\MilestoneObserver;
+use App\Observers\ScheduleItemObserver;
 use Carbon\CarbonImmutable;
 use Database\Factories\MilestoneFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -46,7 +47,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
     'responsible_user_id',
     'parent_milestone_id',
 ])]
-#[ObservedBy([MilestoneObserver::class, MediaOwnerObserver::class])]
+#[ObservedBy([MilestoneObserver::class, MediaOwnerObserver::class, ScheduleItemObserver::class])]
 class Milestone extends Model
 {
     /** @use HasFactory<MilestoneFactory> */

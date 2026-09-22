@@ -50,6 +50,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('projects/{project}/files/{media}/download', ProjectFileDownloadController::class)
         ->name('projects.files.download');
 
+    Route::livewire('timeline', 'pages::timeline.index')
+        ->name('timeline.index');
+
     Route::livewire('risks', 'pages::risks.index')
         ->name('risks.index');
 

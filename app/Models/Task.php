@@ -6,9 +6,11 @@ namespace App\Models;
 
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Observers\ScheduleItemObserver;
 use Carbon\CarbonImmutable;
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -46,6 +48,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
     'progress_percentage',
     'created_by',
 ])]
+#[ObservedBy(ScheduleItemObserver::class)]
 class Task extends Model
 {
     /** @use HasFactory<TaskFactory> */

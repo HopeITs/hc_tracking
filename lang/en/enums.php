@@ -28,6 +28,12 @@ return [
         'evidence' => 'Evidence',
         'other' => 'Other',
     ],
+    'dependency_type' => [
+        'fs' => 'Finish to start',
+        'ss' => 'Start to start',
+        'ff' => 'Finish to finish',
+        'sf' => 'Start to finish',
+    ],
     'milestone_status' => [
         'planned' => 'Planned',
         'ongoing' => 'Ongoing',

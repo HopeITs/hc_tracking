@@ -6,6 +6,8 @@ use App\Enums\MediaCollection;
 use App\Enums\MilestoneStatus;
 use App\Enums\ProposalPhase;
 use App\Enums\ResultType;
+use App\Livewire\Concerns\BuildsProjectGantt;
+use App\Livewire\Concerns\EditsProjectGantt;
 use App\Models\DonorProposal;
 use App\Models\Indicator;
 use App\Models\Media;
@@ -28,6 +30,8 @@ use Livewire\Component;
 use Livewire\WithFileUploads;
 
 new #[Title('titles.project')] class extends Component {
+    use BuildsProjectGantt;
+    use EditsProjectGantt;
     use WithFileUploads;
 
     public int $projectId;
@@ -69,6 +73,7 @@ new #[Title('titles.project')] class extends Component {
                 'status',
                 'start_date',
                 'end_date',
+                'schedule_weekend',
                 'target_beneficiaries',
                 'target_men',
                 'target_women',
@@ -589,12 +594,25 @@ new #[Title('titles.project')] class extends Component {
         Flux::toast(variant: 'success', text: __('projects.proposal_unlinked_from_this_project'));
     }
 
-    /** @return array<int, array{key: string, label: string, count: int}> */
+    /**
+     * The Plan tab's Gantt payload: fundraising, delivery and donor
+     * obligations for this project as one WBS row list.
+     *
+     * @return array{rows: list<array<string, mixed>>, from: string, to: string, today: string}
+     */
+    #[Computed]
+    public function ganttPayload(): array
+    {
+        return $this->projectGanttPayload($this->project, $this->ganttBaselineId);
+    }
+
+    /** @return array<int, array{key: string, label: string, count: int|null}> */
     #[Computed]
     public function tabs(): array
     {
         return [
             ['key' => 'milestones', 'label' => __('common.milestones'), 'count' => $this->project->milestones_count],
+            ['key' => 'plan', 'label' => __('gantt.plan'), 'count' => null],
             ['key' => 'risks', 'label' => __('common.risks'), 'count' => $this->project->risks_count],
             ['key' => 'targets', 'label' => __('common.targets'), 'count' => $this->project->plan_indicators_count],
             ['key' => 'proposals', 'label' => __('common.proposals'), 'count' => $this->project->proposals_count],
@@ -708,6 +726,14 @@ new #[Title('titles.project')] class extends Component {
                 <x-ui.empty-state icon="flag" :heading="__('common.no_milestones_yet')" :body="__('projects.milestones_planned_for_this_project_will_appear_here')" />
             @else
                 <x-ui.milestone-timeline :milestones="$this->milestonesFlat" :window="$this->milestoneWindow" />
+            @endif
+        </x-ui.panel>
+    @elseif ($tab === 'plan')
+        <x-ui.panel :title="__('gantt.plan')" :subtitle="__('gantt.plan_subtitle')">
+            @if ($this->ganttPayload['rows'] === [])
+                <x-ui.empty-state icon="chart-bar" :heading="__('gantt.nothing_to_plan')" :body="__('gantt.nothing_to_plan_body')" />
+            @else
+                <x-ui.gantt :payload="$this->ganttPayload" :scope="'project-'.$this->projectId" editable wire:ignore wire:key="project-gantt-{{ $this->projectId }}" />
             @endif
         </x-ui.panel>
     @elseif ($tab === 'risks')

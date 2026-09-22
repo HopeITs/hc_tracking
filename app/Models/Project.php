@@ -34,6 +34,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
  * @property int $city_id
  * @property int $program_id
  * @property int $user_id
+ * @property string $schedule_weekend
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
@@ -51,6 +52,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
     'city_id',
     'program_id',
     'user_id',
+    'schedule_weekend',
 ])]
 #[ObservedBy(MediaOwnerObserver::class)]
 class Project extends Model
@@ -70,6 +72,7 @@ class Project extends Model
      */
     protected $attributes = [
         'status' => 'draft',
+        'schedule_weekend' => 'sat-sun',
     ];
 
     /**

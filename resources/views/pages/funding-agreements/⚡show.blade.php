@@ -4,6 +4,7 @@ use App\Enums\ArStatus;
 use App\Enums\DonorReportType;
 use App\Enums\MediaCollection;
 use App\Enums\MilestoneStatus;
+use App\Livewire\Concerns\BuildsPortfolioGantt;
 use App\Livewire\Concerns\ManagesAgreementForm;
 use App\Livewire\Concerns\ManagesTransferForm;
 use App\Models\DonorProposal;
@@ -22,6 +23,7 @@ use Livewire\Attributes\Title;
 use Livewire\Component;
 
 new #[Title('titles.funding_agreement')] class extends Component {
+    use BuildsPortfolioGantt;
     use ManagesAgreementForm;
     use ManagesTransferForm {
         saveTransfer as private saveTransferForAgreement;
@@ -57,6 +59,18 @@ new #[Title('titles.funding_agreement')] class extends Component {
     public function mount(DonorProposal $donorProposal): void
     {
         $this->agreementId = $donorProposal->id;
+    }
+
+    /**
+     * The agreement on one Gantt: the proposal that won it, the delivery it
+     * funds, and every tranche and donor report it owes.
+     *
+     * @return array<string, mixed>
+     */
+    #[Computed]
+    public function ganttPayload(): array
+    {
+        return $this->agreementGanttPayload($this->agreement);
     }
 
     #[Computed]
@@ -1103,6 +1117,24 @@ new #[Title('titles.funding_agreement')] class extends Component {
             @endif
         </div>
     </div>
+
+    {{-- The whole agreement in time: proposal, funded delivery, tranches and reports. --}}
+    <section class="mt-14 border-t pt-8 {{ $hairline }}" aria-labelledby="agreement-timeline-heading" data-agreement-timeline x-data="{ open: true }">
+        <button type="button" x-on:click="open = ! open" x-bind:aria-expanded="open.toString()" class="flex w-full flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-start">
+            <span>
+                <span id="agreement-timeline-heading" class="block text-xl font-bold tracking-tight {{ $inkText }}">{{ __('gantt.timeline') }}</span>
+                <span class="block text-sm {{ $mutedText }}">{{ __('gantt.timeline_subtitle') }}</span>
+            </span>
+            <flux:icon.chevron-down variant="micro" class="size-4 shrink-0 transition-transform {{ $mutedText }}" x-bind:class="open && 'rotate-180'" />
+        </button>
+        <div x-show="open" x-collapse class="mt-5 overflow-hidden rounded-xl border {{ $hairline }}">
+            @if ($this->ganttPayload['rows'] === [])
+                <x-ui.empty-state icon="chart-bar" :heading="__('gantt.nothing_to_plan')" :body="__('gantt.nothing_to_plan_body')" />
+            @else
+                <x-ui.gantt :payload="$this->ganttPayload" :scope="'agreement-'.$this->agreementId" height="h-[min(60vh,32rem)]" wire:ignore wire:key="agreement-gantt-{{ $this->agreementId }}" />
+            @endif
+        </div>
+    </section>
 
     {{-- Below the promise: each tranche's journey beside the records this money is tied to. --}}
     <div class="mt-14 grid gap-x-12 gap-y-14 border-t pt-8 @5xl/detail:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] {{ $hairline }}">

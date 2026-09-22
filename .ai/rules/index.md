@@ -28,6 +28,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/views/pages/funding-agreements/** | .ai/rules/funding-agreements.md |
 | {app/Livewire/Concerns/**,resources/views/components/funding/**} | .ai/rules/funding.md |
 | resources/views/pages/indicators/** | .ai/rules/indicators.md |
+| {resources/views/components/ui/gantt.blade.php,resources/js/gantt/**,app/Livewire/Concerns/*Gantt.php} | .ai/rules/livewire-concerns.md |
 | {config/database.php,.env.example,database/migrations/**} | .ai/rules/migrations.md |
 | resources/views/pages/milestones/** | .ai/rules/milestones.md |
 | app/Models/**, app/Models/Account.php, app/Models/Hr*.php, app/Models/Program.php, app/Models/User.php, app/Models/Task.php | .ai/rules/models.md |

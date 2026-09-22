@@ -145,6 +145,16 @@
             </flux:sidebar.item>
 
             <flux:sidebar.item
+                icon="chart-bar-square"
+                :href="route('timeline.index')"
+                :current="request()->routeIs('timeline.*')"
+                :class="$navigationItemClasses"
+                wire:navigate
+            >
+                {{ __('titles.timeline') }}
+            </flux:sidebar.item>
+
+            <flux:sidebar.item
                 icon="flag"
                 :href="route('milestones.index')"
                 :current="request()->routeIs('milestones.*')"

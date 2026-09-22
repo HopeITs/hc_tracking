@@ -34,6 +34,7 @@ return [
     'targets' => 'Targets',
     'task' => 'Task',
     'tasks' => 'Tasks',
+    'timeline' => 'Timeline',
     'transfers' => 'Transfers',
     'user_directory' => 'User directory',
 ];
