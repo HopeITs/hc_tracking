@@ -16,3 +16,6 @@ tests/Feature/Models/** is the other half: those use models directly and assert 
 
 ## Enum-cast tests live at the tests/Feature root, not under Models/
 `tests/Feature/UserRoleTest.php`, `tests/Feature/EnumCastTest.php` and `tests/Feature/ProposalPhaseTest.php` test a cast, which looks like it belongs under `tests/Feature/Models/**` by the rule above. It doesn't move: all three test an enum's contract with its column (or, for `ProposalPhaseTest.php`, an accessor derived from one) rather than a model's relations, and `UserRoleTest.php` established this location before any other enum existed. Do not "fix" these into query-builder tests reading raw strings, and do not relocate them under `tests/Feature/Models/**`.
+
+## Proposal/funding/transfer writes are permission-gated; one forbidden call per Livewire test instance
+Proposal pages authorize through ProposalPolicy (proposals.*), and the shared ManagesAgreementForm / ManagesTransferForm check funding-agreements.* / transfers.*. Tests that write must seed RolesAndPermissionsSeeder and use User::factory()->role('Financial'). After ->assertForbidden() the Livewire Testable snapshot is invalid ("Invalid Livewire snapshot structure"), so build a fresh component for each denied call: $fresh = fn () => Livewire::actingAs($u)->test(...).

@@ -8,14 +8,19 @@ use App\Models\DonorProposal;
 use App\Models\Proposal;
 use App\Models\TransfersTracking;
 use App\Models\User;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Livewire\Livewire;
+
+beforeEach(function () {
+    $this->seed(RolesAndPermissionsSeeder::class);
+});
 
 test('guests are redirected from funding agreements', function () {
     $this->get(route('funding-agreements.index'))->assertRedirect(route('login'));
 });
 
 test('agreements can be filtered by donor and currency', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $unicef = Donor::factory()->create(['name' => 'UNICEF']);
     $echo = Donor::factory()->create(['name' => 'ECHO']);
 
@@ -44,7 +49,7 @@ test('agreements can be filtered by donor and currency', function () {
 });
 
 test('an agreement can be created with a budget and currency', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $donor = Donor::factory()->create();
     $proposal = Proposal::factory()->create();
 
@@ -66,7 +71,7 @@ test('an agreement can be created with a budget and currency', function () {
 });
 
 test('a negative budget is rejected', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
 
     Livewire::actingAs($user)
         ->test('pages::funding-agreements.index')
@@ -80,7 +85,7 @@ test('a negative budget is rejected', function () {
 });
 
 test('funding agreements offer no delete because transfers would cascade', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     DonorProposal::factory()->create();
 
     $component = Livewire::actingAs($user)->test('pages::funding-agreements.index');
@@ -91,7 +96,7 @@ test('funding agreements offer no delete because transfers would cascade', funct
 });
 
 test('agreement detail lists its tranches and totals received per currency', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $agreement = DonorProposal::factory()->create([
         'budget' => '500000.00',
         'currency' => Currency::Usd,
@@ -117,11 +122,27 @@ test('agreement detail lists its tranches and totals received per currency', fun
 });
 
 test('agreement detail renders an agreement with no tranches', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $agreement = DonorProposal::factory()->create();
 
     $this->actingAs($user)
         ->get(route('funding-agreements.show', $agreement))
         ->assertOk()
         ->assertSeeText('No tranches scheduled');
+});
+
+test('a user without funding agreement permissions cannot record one', function () {
+    $viewer = User::factory()->role('Managers')->create();
+
+    $fresh = fn () => Livewire::actingAs($viewer)->test('pages::funding-agreements.index');
+
+    $fresh()->assertDontSeeHtml('data-test="create-agreement-button"');
+    $fresh()->call('openCreateModal')->assertForbidden();
+    $fresh()->set('agreementDonorId', (string) Donor::factory()->create()->id)
+        ->set('agreementProposalId', (string) Proposal::factory()->create()->id)
+        ->set('budget', '100')
+        ->set('agreementCurrency', 'USD')
+        ->call('saveAgreement')->assertForbidden();
+
+    expect(DonorProposal::query()->count())->toBe(0);
 });

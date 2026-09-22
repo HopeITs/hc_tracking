@@ -22,3 +22,6 @@ Found via the login page: `<flux:input class="...">` puts those classes on Flux'
 To style the real input control, pass `input:class="..."` instead — Flux's own source (`flux/input/index.blade.php`) explicitly extracts anything prefixed `input:` via `Flux::attributesAfter('input:', $attributes, [])` and merges it onto the `<input>` tag itself (after Flux's own default classes, so `!`-suffixed utilities are still needed to override conflicts like `bg-white`/`rounded-lg`/`h-10`). Blade doesn't support `:input:class="$var"` (colon-prefixed dynamic binding doesn't compose with a colon already inside the attribute name) — write it as a plain attribute with an inline expression instead: `input:class="{{ $fieldClasses }}"`.
 
 This same wrapper-vs-control split likely applies to other `flux:with-field`-based components (`flux:select`, `flux:textarea`, etc.) — check for an `input:`/equivalent-prefixed passthrough before assuming a plain `class` prop reaches the visible control.
+
+## Red text uses text-status-critical, not text-primary
+--color-primary (#be1f24) is unreadable as text on the dark ground. --color-status-critical equals primary in light mode and switches to #f2756f in dark, so use text-status-critical for alarm/overdue TEXT. Keep bg-primary/border-primary for dots, buttons and rules. Applied across proposals/⚡show, _task-row and _file-row on 2026-09-21.

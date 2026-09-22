@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\ProposalPhase;
 use App\Enums\ProposalStatus;
+use App\Observers\MediaOwnerObserver;
 use App\Observers\PlanIndicatorSourceObserver;
 use Carbon\CarbonImmutable;
 use Database\Factories\ProposalFactory;
@@ -41,7 +42,7 @@ use Illuminate\Support\Facades\DB;
     'status',
     'notes',
 ])]
-#[ObservedBy(PlanIndicatorSourceObserver::class)]
+#[ObservedBy([PlanIndicatorSourceObserver::class, MediaOwnerObserver::class])]
 class Proposal extends Model
 {
     /** @use HasFactory<ProposalFactory> */
@@ -149,6 +150,17 @@ class Proposal extends Model
     public function planIndicators(): MorphMany
     {
         return $this->morphMany(PlanIndicator::class, 'source');
+    }
+
+    /**
+     * The documents filed on this proposal itself: concept note, proposal,
+     * signed agreement, MOU.
+     *
+     * @return MorphMany<Media, $this>
+     */
+    public function media(): MorphMany
+    {
+        return $this->morphMany(Media::class, 'mediable');
     }
 
     /**

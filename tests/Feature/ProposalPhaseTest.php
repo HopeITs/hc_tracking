@@ -86,3 +86,23 @@ test('proposals are queryable by the statuses of a phase', function () {
     expect($implementation)->toHaveCount(1)
         ->and($implementation->first()->status)->toBe(ProposalStatus::Approved);
 });
+
+test('each status names the stage it normally moves on to', function (ProposalStatus $status, ?ProposalStatus $next) {
+    expect($status->next())->toBe($next);
+})->with([
+    'concept note' => [ProposalStatus::ConceptNote, ProposalStatus::ProposalDraft],
+    'proposal draft' => [ProposalStatus::ProposalDraft, ProposalStatus::Submitted],
+    'submitted' => [ProposalStatus::Submitted, ProposalStatus::Approved],
+    'approved' => [ProposalStatus::Approved, ProposalStatus::Active],
+    'rejected' => [ProposalStatus::Rejected, null],
+    'active' => [ProposalStatus::Active, ProposalStatus::FinalReports],
+    'final reports' => [ProposalStatus::FinalReports, ProposalStatus::Completed],
+    'completed' => [ProposalStatus::Completed, null],
+]);
+
+test('the lifecycle is every status except the rejected branch, in order', function () {
+    expect(ProposalStatus::lifecycle())->toBe(array_values(array_filter(
+        ProposalStatus::cases(),
+        fn (ProposalStatus $status): bool => $status !== ProposalStatus::Rejected,
+    )));
+});

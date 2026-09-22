@@ -18,12 +18,14 @@ Before planning or editing, find the row whose globs match the file's path and r
 | {config/database.php,.env.example} | .ai/rules/config.md |
 | resources/css/app.css | .ai/rules/css.md |
 | database/migrations/** | .ai/rules/database-migrations.md |
+| {app/Livewire/Concerns/ManagesDonorForm.php,resources/views/components/donors/**,resources/views/pages/donors/**} | .ai/rules/donors.md |
 | {config/fortify.php,app/Console/Commands/**,app/Enums/**} | .ai/rules/enums.md |
 | resources/views/pages/executive-summary/** | .ai/rules/executive-summary.md |
 | database/factories/** | .ai/rules/factories.md |
 | {database/migrations/**,tests/Feature/DatabaseEncodingTest.php} | .ai/rules/feature.md |
 | {config/blaze.php,resources/views/flux/**} | .ai/rules/flux.md |
 | {app/Providers/FortifyServiceProvider.php,app/Actions/Fortify/**,config/fortify.php} | .ai/rules/fortify.md |
+| {app/Livewire/Concerns/**,resources/views/components/funding/**} | .ai/rules/funding.md |
 | resources/views/pages/indicators/** | .ai/rules/indicators.md |
 | {config/database.php,.env.example,database/migrations/**} | .ai/rules/migrations.md |
 | resources/views/pages/milestones/** | .ai/rules/milestones.md |

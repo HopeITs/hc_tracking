@@ -32,6 +32,7 @@ return [
     'sent_fees_and_received_each_carry_their_own_currency_they_ar' => 'لكل من المبلغ المرسل والرسوم والمبلغ المستلم عملته الخاصة، وتُسجل منفصلة ولا تُجمع أبدًا.',
     'sent_on' => 'تاريخ الإرسال',
     'sent_on_this_page' => 'المرسل في هذه الصفحة',
+    'that_account_is_closed_choose_an_active_one' => 'هذا الحساب مغلق. اختر حسابًا نشطًا.',
     'transfer_recorded' => 'تم تسجيل التحويل.',
     'transfer_updated' => 'تم تحديث التحويل.',
 ];

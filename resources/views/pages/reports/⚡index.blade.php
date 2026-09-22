@@ -604,17 +604,15 @@ new #[Title('titles.reports')] class extends Component {
                                         $barWidth = $achievement === null ? 0 : max(2, min(100, $achievement));
                                         $unit = $unitOf($planIndicator);
                                     @endphp
-                                    <a
-                                        href="{{ route('reports.show', $latest) }}"
-                                        wire:navigate
+                                    <div
                                         wire:key="portfolio-indicator-{{ $planIndicator->id }}"
-                                        class="group grid grid-cols-1 gap-3 px-4 py-4 transition-colors duration-150 hover:bg-board-head focus-visible:bg-board-head focus-visible:outline-none @lg/directory:grid-cols-[1fr_auto] @lg/directory:items-center @lg/directory:gap-6"
+                                        class="group grid grid-cols-1 gap-3 px-4 py-4 transition-colors duration-150 hover:bg-board-head @lg/directory:grid-cols-[1fr_auto] @lg/directory:items-center @lg/directory:gap-6"
                                     >
                                         <div class="min-w-0">
                                             <p class="type-meta text-secondary-medium dark:text-secondary-soft">
                                                 {{ $sourceLabel($planIndicator) }} · {{ $planIndicator->period->label() }} · {{ trans_choice('common.count_report', $indicatorGroup['reports']->count(), ['count' => $indicatorGroup['reports']->count()]) }}
                                             </p>
-                                            <p class="truncate text-base font-bold group-hover:underline">{{ $planIndicator->indicator->name }}</p>
+                                            <p class="truncate text-base font-bold">{{ $planIndicator->indicator->name }}</p>
 
                                             <div class="mt-2.5 flex items-center gap-3">
                                                 <div
@@ -653,6 +651,7 @@ new #[Title('titles.reports')] class extends Component {
 
                                             <div class="flex shrink-0 items-center gap-1.5">
                                                 <x-ui.enum-badge :case="$latest->status" />
+                                                <x-ui.button tone="ghost" size="sm" icon="eye" class="size-9!" :href="route('reports.show', $latest)" wire:navigate :aria-label="__('common.view_name', ['name' => $planIndicator->indicator->name])" />
                                                 @if ($latest->is_seen_by_meal)
                                                     <flux:tooltip :content="__('reports.seen_by_meal')">
                                                         <flux:icon.eye variant="micro" class="size-4 text-status-good" />
@@ -661,7 +660,7 @@ new #[Title('titles.reports')] class extends Component {
                                                 <flux:icon.chevron-right variant="micro" class="size-4 shrink-0 text-secondary-light transition-transform duration-200 group-hover:translate-x-0.5 rtl:-scale-x-100 rtl:group-hover:-translate-x-0.5" />
                                             </div>
                                         </div>
-                                    </a>
+                                    </div>
                                 @endforeach
                             </div>
                         </div>
@@ -707,9 +706,9 @@ new #[Title('titles.reports')] class extends Component {
                                         </span>
                                     @endif
                                 </p>
-                                <a href="{{ route('reports.show', $report) }}" wire:navigate class="block text-base font-bold group-hover:underline">
+                                <p class="text-base font-bold">
                                     {{ $rowTarget->indicator->name }}
-                                </a>
+                                </p>
                                 <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">
                                     @if ($rowTarget->project !== null)
                                         <a href="{{ route('projects.show', $rowTarget->project) }}" wire:navigate class="hover:text-secondary-dark hover:underline dark:hover:text-white">{{ $rowTarget->project->name }}</a>
@@ -742,6 +741,7 @@ new #[Title('titles.reports')] class extends Component {
 
                             {{-- Only a draft can change or go: a reviewed or approved figure is the record. --}}
                             <div class="flex items-center gap-0.5">
+                                <x-ui.button tone="ghost" size="sm" icon="eye" class="size-9!" :href="route('reports.show', $report)" wire:navigate :aria-label="__('common.view_name', ['name' => $rowTarget->indicator->name])" />
                                 @if ($report->isEditable())
                                     <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $report->id }})" :aria-label="__('reports.edit_report')" />
                                     <x-ui.button tone="ghost" size="sm" icon="trash" class="size-9!" wire:click="confirmDeleteReport({{ $report->id }})" :aria-label="__('reports.delete_report')" data-test="delete-report-{{ $report->id }}" />

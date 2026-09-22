@@ -1,0 +1,48 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers;
+
+use App\Enums\FileType;
+use App\Models\Media;
+use App\Models\Proposal;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+
+class ProposalFilePreviewController extends Controller
+{
+    /**
+     * Stream a document inline for the proposal page's preview modal.
+     *
+     * Serves a file filed on this proposal, or one filed on a project this
+     * proposal funds — the two lists the documents tab shows. Anything else
+     * is a 404, whatever id the URL carries. As on the report preview, only
+     * PDFs and images are served inline, the Content-Type comes from the
+     * validated FileType rather than the stored client MIME, and nosniff
+     * stops the browser reinterpreting the body.
+     */
+    public function __invoke(Proposal $proposal, Media $media): StreamedResponse
+    {
+        $belongsHere = match ($media->mediable_type) {
+            'proposal' => $media->mediable_id === $proposal->id,
+            'project' => $proposal->projects()->whereKey($media->mediable_id)->exists(),
+            default => false,
+        };
+
+        abort_unless($belongsHere, 404);
+        abort_unless($media->isPreviewable() && $media->isStored(), 404);
+
+        $contentType = match ($media->type) {
+            FileType::Pdf => 'application/pdf',
+            FileType::Png => 'image/png',
+            default => 'image/jpeg',
+        };
+
+        return Storage::disk($media->disk)->response($media->path, $media->original_name, [
+            'Content-Type' => $contentType,
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, max-age=300',
+        ], 'inline');
+    }
+}

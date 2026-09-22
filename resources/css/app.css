@@ -580,6 +580,243 @@ input[type='search']::-webkit-search-cancel-button {
     }
 }
 
+/* Proposals funding flow (resources/js/funding-flow.js) and money bars. */
+.money-pending {
+    background-color: color-mix(in srgb, var(--color-status-warn) 22%, transparent);
+    background-image: repeating-linear-gradient(135deg, var(--color-status-warn) 0 2px, transparent 2px 6px);
+}
+
+.flow-ribbon {
+    fill: var(--color-funding);
+    fill-opacity: 0.32;
+    transition: fill-opacity 200ms cubic-bezier(0.16, 1, 0.3, 1), fill 200ms ease-out;
+}
+
+.flow-ribbon[data-state='lit'] {
+    fill-opacity: 0.55;
+}
+
+.flow-ribbon[data-state='dim'] {
+    fill-opacity: 0.06;
+}
+
+.flow-thread {
+    fill: none;
+    stroke: var(--color-secondary-light);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    transition: stroke-opacity 200ms cubic-bezier(0.16, 1, 0.3, 1), stroke 200ms ease-out;
+}
+
+.flow-thread[data-state='lit'] {
+    stroke: var(--color-primary);
+    stroke-width: 2;
+}
+
+.flow-thread[data-state='dim'] {
+    stroke-opacity: 0.15;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    /* The river pours in once from the donors' side; bars fill from the start edge. */
+    .flow-reveal {
+        animation: flow-pour 1100ms cubic-bezier(0.16, 1, 0.3, 1) both;
+        animation-delay: 150ms;
+    }
+
+    [dir='rtl'] .flow-reveal {
+        animation-name: flow-pour-rtl;
+    }
+
+    .money-grow {
+        transform-origin: left center;
+        animation: target-bar-grow 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+        animation-delay: 200ms;
+    }
+
+    [dir='rtl'] .money-grow {
+        transform-origin: right center;
+    }
+
+    /* Donors share-of-wallet: segments rise into place one after another. */
+    .wallet-grow {
+        animation: wallet-rise 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+        animation-delay: calc(120ms + var(--wallet-order, 0) * 60ms);
+    }
+}
+
+@keyframes wallet-rise {
+    from {
+        opacity: 0;
+        clip-path: inset(100% 0 0 0);
+    }
+    to {
+        opacity: 1;
+        clip-path: inset(0 0 0 0);
+    }
+}
+
+@keyframes flow-pour {
+    from {
+        clip-path: inset(0 100% 0 0);
+    }
+    to {
+        clip-path: inset(0 0 0 0);
+    }
+}
+
+@keyframes flow-pour-rtl {
+    from {
+        clip-path: inset(0 0 0 100%);
+    }
+    to {
+        clip-path: inset(0 0 0 0);
+    }
+}
+
+/*
+ * A proposal's chronology (resources/views/pages/proposals/⚡show.blade.php and
+ * resources/js/proposal-clock.js): one time axis with the money above the line
+ * and the delivery below it.
+ *
+ * Everything positions with `inset-inline-start`, so the axis mirrors with the
+ * page in RTL for free. The only exception is the plot SVG, which holds no text
+ * and is therefore flipped whole.
+ */
+.chrono-plot {
+    overflow: visible;
+}
+
+[dir='rtl'] .chrono-plot {
+    transform: scaleX(-1);
+}
+
+.chrono-area {
+    fill: var(--color-funding);
+    fill-opacity: 0.16;
+}
+
+.chrono-line {
+    fill: none;
+    stroke: var(--color-funding);
+    stroke-width: 2;
+    /* The plot is scaled non-uniformly, so the stroke must not scale with it. */
+    vector-effect: non-scaling-stroke;
+    stroke-linejoin: round;
+}
+
+/* What was committed, as a ceiling the arrivals climb towards. */
+.chrono-ceiling {
+    stroke: var(--color-secondary-light);
+    stroke-width: 1;
+    stroke-dasharray: 3 4;
+    vector-effect: non-scaling-stroke;
+}
+
+.chrono-cursor {
+    background: var(--color-secondary-dark);
+}
+
+.dark .chrono-cursor {
+    background: var(--color-white);
+}
+
+/*
+ * The scrub handle sits centred on its day and on the track, the same
+ * convention the marks above it use. Without this it hung half a handle below
+ * the rail and ran off the end at 100%.
+ */
+.chrono-handle {
+    translate: -50% -50%;
+}
+
+[dir='rtl'] .chrono-handle {
+    translate: 50% -50%;
+}
+
+/* The money climbs its plot once, in the direction the page reads. */
+@media (prefers-reduced-motion: no-preference) {
+    .chrono-plot {
+        animation: chrono-draw 1000ms cubic-bezier(0.16, 1, 0.3, 1) both;
+        animation-delay: 120ms;
+    }
+
+    [dir='rtl'] .chrono-plot {
+        animation-name: chrono-draw-rtl;
+    }
+}
+
+@keyframes chrono-draw {
+    from {
+        clip-path: inset(0 100% 0 0);
+    }
+    to {
+        clip-path: inset(0 0 0 0);
+    }
+}
+
+@keyframes chrono-draw-rtl {
+    from {
+        clip-path: inset(0 0 0 100%);
+    }
+    to {
+        clip-path: inset(0 0 0 0);
+    }
+}
+
+/*
+ * Browser surfaces the dossier did not draw but still owns, scoped to it so the
+ * rest of the app is untouched: selection, caret and its scrollbars take the
+ * brand palette rather than the browser's defaults.
+ */
+.dossier ::selection {
+    background: color-mix(in srgb, var(--color-primary) 22%, transparent);
+    color: var(--color-secondary-dark);
+}
+
+.dark .dossier ::selection {
+    color: var(--color-white);
+}
+
+.dossier {
+    caret-color: var(--color-primary);
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-secondary-light) transparent;
+}
+
+/*
+ * Proposal dossier (resources/views/pages/proposals/⚡show.blade.php).
+ *
+ * The page's one authored moment is the money arriving: each agreement's cash
+ * thread pours downwards in turn, its bar grows from the start edge and its
+ * headline figures count up. Everything else on the page enters plainly, so
+ * the motion still means something.
+ */
+@media (prefers-reduced-motion: no-preference) {
+    .cash-thread {
+        animation: cash-thread-pour 760ms cubic-bezier(0.16, 1, 0.3, 1) both;
+        animation-delay: calc(var(--thread-order, 0) * 90ms + 260ms);
+    }
+}
+
+@keyframes cash-thread-pour {
+    from {
+        clip-path: inset(0 0 100% 0);
+    }
+    to {
+        clip-path: inset(0 0 0 0);
+    }
+}
+
+/*
+ * The connector between two tranches that have not arrived yet. A dashed
+ * border rather than a background image, so it stays one hairline at every
+ * zoom level and mirrors with the page in RTL.
+ */
+.thread-pending {
+    border-inline-start: 1px dashed var(--color-secondary-light);
+}
+
 /* In-page Office previews (resources/js/file-preview.js): a spreadsheet grid and docx-preview's paper pages. */
 .sheet-preview-table {
     border-collapse: collapse;

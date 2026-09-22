@@ -355,7 +355,7 @@ test('the active triage lens renders a complete inset border', function () {
     $activeLens = $xpath->query('//button[@data-test="lens-overdue" and @aria-pressed="true"]')->item(0);
 
     expect($activeLens)->not->toBeNull()
-        ->and($activeLens->getAttribute('class'))->toContain('ring-2', 'ring-inset', 'ring-primary');
+        ->and($activeLens->getAttribute('class'))->toContain('box-border', 'border-2', 'border-primary');
 });
 
 test('lifecycle counts ignore the status filter but respect every other filter', function () {

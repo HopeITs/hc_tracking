@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\ProjectFileDownloadController;
+use App\Http\Controllers\ProposalFileDownloadController;
+use App\Http\Controllers\ProposalFilePreviewController;
 use App\Http\Controllers\ReportFileDownloadController;
 use App\Http\Controllers\ReportFilePreviewController;
 use App\Http\Controllers\SwitchLocaleController;
@@ -77,6 +79,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::livewire('proposals/{proposal}', 'pages::proposals.show')
         ->name('proposals.show');
+
+    Route::get('proposals/{proposal}/files/{media}/download', ProposalFileDownloadController::class)
+        ->name('proposals.files.download');
+
+    Route::get('proposals/{proposal}/files/{media}/preview', ProposalFilePreviewController::class)
+        ->name('proposals.files.preview');
+
+    // TEMPORARY dossier preview — remove before merge.
+    Route::livewire('proposals/{proposal}/dossier-preview', 'pages::proposals.dossier')
+        ->name('proposals.dossier-preview');
 
     Route::livewire('donors', 'pages::donors.index')
         ->name('donors.index');
