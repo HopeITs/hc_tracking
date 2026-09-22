@@ -1,10 +1,10 @@
 {{--
-    The coverage map: a schematic (not surveyed) layout of every governorate,
-    sized and coloured by delivery signal, with a click-to-select detail panel
-    beside it. Every city's detail panel is fully server-rendered — with a
-    real "View projects" link — and Alpine only ever toggles which one is
-    visible, so the page carries real content and working links even before
-    JavaScript runs.
+    The coverage map: Syria's real national outline (see HrCity::MapOutlinePath),
+    with every governorate plotted at an approximate position on it, sized and
+    coloured by delivery signal, and a click-to-select detail panel beside it.
+    Every city's detail panel is fully server-rendered — with a real "View
+    projects" link — and Alpine only ever toggles which one is visible, so the
+    page carries real content and working links even before JavaScript runs.
 
     @var \Illuminate\Support\Collection $mappedCities
     @var \Illuminate\Support\Collection $unmappedCities
@@ -13,6 +13,7 @@
     @var int $matchingMapCount
     @var bool $mapFiltersActive
     @var array<int, string> $avatarTones
+    @var string $mapOutlinePath
 --}}
 
 @if ($mapFiltersActive)
@@ -26,18 +27,11 @@
     x-data="{ selected: {{ \Illuminate\Support\Js::from($defaultSelectedCityId) }} }"
 >
     <x-ui.panel :title="__('cities.coverage_map')" :subtitle="__('cities.tap_a_city_hint')">
-        <div class="bg-board-head p-4 dark:bg-black/20">
-            <div class="relative mx-auto aspect-[640/440] w-full max-w-2xl">
-                <svg viewBox="0 0 640 440" class="absolute inset-0 h-full w-full" aria-hidden="true" preserveAspectRatio="xMidYMid meet">
-                    <defs>
-                        <linearGradient id="city-map-sea" x1="0" y1="0" x2="1" y2="0">
-                            <stop offset="0%" stop-color="var(--color-status-active)" stop-opacity="0.18" />
-                            <stop offset="100%" stop-color="var(--color-status-active)" stop-opacity="0" />
-                        </linearGradient>
-                    </defs>
-
-                    {{-- A soft western tint, orienting the layout toward the coast without drawing a single political border. --}}
-                    <rect x="0" y="0" width="160" height="440" fill="url(#city-map-sea)" />
+        <div class="bg-board-head p-4 pt-16 dark:bg-black/20">
+            <div class="relative mx-auto aspect-square w-full max-w-xl">
+                {{-- Syria's real outline, not a schematic shape — see HrCity::MapOutlinePath for source and licence. --}}
+                <svg viewBox="0 0 1024 1024" class="absolute inset-0 h-full w-full text-secondary-soft dark:text-secondary-medium/70" aria-hidden="true" preserveAspectRatio="xMidYMid meet">
+                    {!! $mapOutlinePath !!}
 
                     {{-- Delivery lines fan out from HQ to every city currently running a project — the literal "connections" in the data. --}}
                     @if ($hqCity !== null)
@@ -49,10 +43,10 @@
                                 x2="{{ $lineCity['x'] }}"
                                 y2="{{ $lineCity['y'] }}"
                                 stroke="var(--color-status-active)"
-                                stroke-width="1.5"
-                                stroke-dasharray="2 5"
+                                stroke-width="3"
+                                stroke-dasharray="3 9"
                                 stroke-linecap="round"
-                                opacity="{{ $lineCity['matches'] ? '0.45' : '0.12' }}"
+                                opacity="{{ $lineCity['matches'] ? '0.55' : '0.15' }}"
                             />
                         @endforeach
                     @endif
@@ -61,8 +55,8 @@
                 @foreach ($mappedCities as $city)
                     @php
                         $markerSize = max(16, min(36, 16 + $city['total'] * 5));
-                        $leftPct = $city['x'] / 640 * 100;
-                        $topPct = $city['y'] / 440 * 100;
+                        $leftPct = $city['x'] / 1024 * 100;
+                        $topPct = $city['y'] / 1024 * 100;
                         $avatarTone = $avatarTones[$city['id'] % count($avatarTones)];
                     @endphp
                     <button
@@ -71,10 +65,23 @@
                         x-on:click="selected = {{ $city['id'] }}"
                         :aria-pressed="selected === {{ $city['id'] }} ? 'true' : 'false'"
                         aria-label="{{ __('cities.view_projects_in_name', ['name' => $city['name']]) }}"
-                        class="absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full p-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        class="group absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full p-2 hover:z-30 focus-visible:z-30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                         style="left: {{ $leftPct }}%; top: {{ $topPct }}%;"
                         :class="selected === {{ $city['id'] }} ? 'z-10' : 'z-0'"
                     >
+                        {{-- Hover/focus tooltip: the same governorate story the click-to-select panel shows, glanceable without committing to a click. --}}
+                        <span
+                            role="tooltip"
+                            class="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 flex -translate-x-1/2 flex-col items-center opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
+                        >
+                            <span class="rounded-lg bg-secondary-dark px-3 py-1.5 text-start whitespace-nowrap shadow-lg dark:bg-white">
+                                <span class="block text-xs font-bold text-white dark:text-secondary-dark">{{ $city['name'] }}</span>
+                                <span class="block text-[11px] text-secondary-soft dark:text-secondary-medium" dir="auto">{{ $city['secondaryName'] }}</span>
+                                <span class="block text-[11px] text-secondary-soft dark:text-secondary-medium">{{ $city['statusLabel'] }} · {{ $city['projectsLabel'] }}</span>
+                            </span>
+                            <span class="-mt-1 size-2 rotate-45 bg-secondary-dark dark:bg-white"></span>
+                        </span>
+
                         <span
                             :class="selected === {{ $city['id'] }} ? 'ring-2 ring-primary ring-offset-2 dark:ring-offset-secondary-dark' : ''"
                             class="{{ $avatarTone }} {{ $city['isActive'] ? 'border-status-good' : 'border-secondary-light dark:border-secondary-medium' }} {{ $city['matches'] ? '' : 'opacity-30' }} flex shrink-0 items-center justify-center rounded-full border-2 transition-all duration-150 hover:scale-110"

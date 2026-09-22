@@ -41,6 +41,7 @@ test('the directory searches english and arabic names and clears the search', fu
 
     Livewire::actingAs(User::factory()->create())
         ->test('pages::admin.cities')
+        ->set('view', 'grid') // the map keeps every city visible; this exercises the grid's own hide-on-search behaviour
         ->set('search', 'Damas')
         ->assertSee('Damascus')
         ->assertDontSee('Aleppo')
@@ -106,6 +107,7 @@ test('the directory filters by active status', function () {
 
     Livewire::actingAs(User::factory()->create())
         ->test('pages::admin.cities')
+        ->set('view', 'grid') // the map keeps every city visible; this exercises the grid's own hide-on-filter behaviour
         ->set('status', 'active')
         ->assertSee('Damascus')
         ->assertDontSee('Tartus')
@@ -161,4 +163,13 @@ test('a city with no plotted position falls into the "not shown on map" tray', f
         ->set('view', 'map')
         ->assertSee('Neverland')
         ->assertSee(__('cities.not_shown_on_map'));
+});
+
+test('the coverage map is the default view', function () {
+    insertHrCity('Aleppo');
+
+    Livewire::actingAs(User::factory()->create())
+        ->test('pages::admin.cities')
+        ->assertSet('view', 'map')
+        ->assertSee(__('cities.coverage_map'));
 });

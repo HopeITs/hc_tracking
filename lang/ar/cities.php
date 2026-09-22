@@ -26,7 +26,7 @@ return [
     'open' => 'جارٍ',
     'open_projects' => 'المشاريع الجارية',
     'open_projects_hint' => 'قيد التنفيذ حاليًا',
-    'schematic_note' => 'تخطيط تقريبي وليس بمقياس رسم دقيق',
+    'schematic_note' => 'مواقع المحافظات تقريبية',
     'search_cities' => 'البحث في المدن',
     'sort_active_first' => 'النشطة أولاً',
     'sort_by' => 'الترتيب حسب',

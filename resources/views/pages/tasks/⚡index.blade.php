@@ -1200,42 +1200,131 @@ new #[Title('titles.tasks')] class extends Component {
         @endswitch
     @endif
 
-    <x-ui.drawer wire:model="showTaskDrawer" :title="$editingTaskId === null ? __('tasks.add_task') : __('tasks.edit_task')" :subtitle="__('tasks.every_task_delivers_against_a_proposal_a_milestone_is_option')">
-        <form wire:submit="saveTask" id="task-drawer-form" class="flex flex-col gap-5">
-            <x-ui.input wire:model="title" :label="__('tasks.task_title')" type="text" maxlength="255" required autofocus />
-            <flux:textarea wire:model="description" :label="__('common.description')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!" />
-
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.select wire:model="taskProposalId" :label="__('common.proposal')" required>
-                    <flux:select.option value="">{{ __('common.select_a_proposal') }}</flux:select.option>
-                    @foreach ($this->proposalOptions as $proposalOption)
-                        <flux:select.option :value="$proposalOption['id']" :wire:key="'task-proposal-option-'.$proposalOption['id']">{{ $proposalOption['name'] }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
-                <x-ui.select wire:model="taskMilestoneId" :label="__('tasks.milestone')">
-                    <flux:select.option value="">{{ __('tasks.no_milestone') }}</flux:select.option>
-                    @foreach ($this->milestoneOptions as $milestoneOption)
-                        <flux:select.option :value="$milestoneOption['id']" :wire:key="'task-milestone-option-'.$milestoneOption['id']">{{ $milestoneOption['name'] }} · {{ $milestoneOption['project_name'] }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
+    <x-ui.drawer wire:model="showTaskDrawer" max-width="max-w-2xl" :title="$editingTaskId === null ? __('tasks.add_task') : __('tasks.edit_task')" :subtitle="__('tasks.every_task_delivers_against_a_proposal_a_milestone_is_option')">
+        <form wire:submit="saveTask" id="task-drawer-form" class="flex flex-col gap-7">
+            <div class="flex flex-col gap-4">
+                <x-ui.input wire:model="title" :label="__('tasks.task_title')" type="text" maxlength="255" required autofocus />
+                <flux:textarea wire:model="description" :label="__('common.description')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!" />
             </div>
 
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.select wire:model="taskStatus" :label="__('common.status')" required>
-                    @foreach (TaskStatus::cases() as $statusCase)
-                        <flux:select.option :value="$statusCase->value" :wire:key="'task-status-option-'.$statusCase->value">{{ $statusCase->label() }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
-                <x-ui.select wire:model="taskPriority" :label="__('tasks.priority')" required>
-                    @foreach (TaskPriority::cases() as $priorityCase)
-                        <flux:select.option :value="$priorityCase->value" :wire:key="'task-priority-option-'.$priorityCase->value">{{ $priorityCase->label() }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
+            <div class="flex flex-col gap-3 border-t border-secondary-soft pt-5 dark:border-secondary-medium">
+                <p class="text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('tasks.delivery_details') }}</p>
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <x-ui.select wire:model="taskProposalId" :label="__('common.proposal')" required>
+                        <flux:select.option value="">{{ __('common.select_a_proposal') }}</flux:select.option>
+                        @foreach ($this->proposalOptions as $proposalOption)
+                            <flux:select.option :value="$proposalOption['id']" :wire:key="'task-proposal-option-'.$proposalOption['id']">{{ $proposalOption['name'] }}</flux:select.option>
+                        @endforeach
+                    </x-ui.select>
+                    <x-ui.select wire:model="taskMilestoneId" :label="__('tasks.milestone')">
+                        <flux:select.option value="">{{ __('tasks.no_milestone') }}</flux:select.option>
+                        @foreach ($this->milestoneOptions as $milestoneOption)
+                            <flux:select.option :value="$milestoneOption['id']" :wire:key="'task-milestone-option-'.$milestoneOption['id']">{{ $milestoneOption['name'] }} · {{ $milestoneOption['project_name'] }}</flux:select.option>
+                        @endforeach
+                    </x-ui.select>
+                </div>
             </div>
 
-            <x-ui.input wire:model="progressPercentage" :label="__('tasks.progress_2')" type="number" min="0" max="100" required />
+            <div class="grid gap-5 border-t border-secondary-soft pt-5 sm:grid-cols-2 dark:border-secondary-medium">
+                <div class="min-w-0">
+                    <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft" id="task-drawer-status-label">{{ __('common.status') }}</label>
+                    <div class="grid grid-cols-2 gap-1.5" role="radiogroup" aria-labelledby="task-drawer-status-label">
+                        @foreach (TaskStatus::cases() as $statusCase)
+                            @php
+                                $isStatusSelected = $taskStatus === $statusCase->value;
+                                [$statusSelectedClasses, $statusIcon] = match ($statusCase) {
+                                    TaskStatus::Todo => ['border-secondary-dark bg-white text-secondary-dark dark:border-white dark:bg-secondary-dark dark:text-white', 'stop'],
+                                    TaskStatus::InProgress => ['border-status-active bg-status-active text-white', 'play'],
+                                    TaskStatus::UnderReview => ['border-status-warn bg-status-warn text-white', 'eye'],
+                                    TaskStatus::Done => ['border-status-good bg-status-good text-white', 'check'],
+                                };
+                            @endphp
+                            <button
+                                type="button"
+                                role="radio"
+                                aria-checked="{{ $isStatusSelected ? 'true' : 'false' }}"
+                                wire:click="$set('taskStatus', '{{ $statusCase->value }}')"
+                                @class([
+                                    'inline-flex min-h-10 cursor-pointer touch-manipulation items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-semibold whitespace-nowrap transition-colors',
+                                    $statusSelectedClasses => $isStatusSelected,
+                                    'border-secondary-light text-secondary-medium hover:border-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => ! $isStatusSelected,
+                                ])
+                                data-test="task-drawer-status-{{ $statusCase->value }}"
+                            >
+                                <flux:icon :name="$statusIcon" variant="micro" class="size-3.5 shrink-0" aria-hidden="true" />
+                                {{ $statusCase->label() }}
+                            </button>
+                        @endforeach
+                    </div>
+                    <flux:error name="taskStatus" class="mt-1.5" />
+                </div>
 
-            <div class="min-w-0">
+                <div class="min-w-0">
+                    <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft" id="task-drawer-priority-label">{{ __('tasks.priority') }}</label>
+                    <div class="grid grid-cols-3 gap-1.5" role="radiogroup" aria-labelledby="task-drawer-priority-label">
+                        @foreach (TaskPriority::cases() as $priorityCase)
+                            @php
+                                $isPrioritySelected = $taskPriority === $priorityCase->value;
+                                $priorityTone = match ($priorityCase) {
+                                    TaskPriority::High => 'text-primary',
+                                    TaskPriority::Medium => 'text-status-warn',
+                                    TaskPriority::Low => 'text-secondary-light',
+                                };
+                            @endphp
+                            <button
+                                type="button"
+                                role="radio"
+                                aria-checked="{{ $isPrioritySelected ? 'true' : 'false' }}"
+                                wire:click="$set('taskPriority', '{{ $priorityCase->value }}')"
+                                @class([
+                                    'inline-flex min-h-10 cursor-pointer touch-manipulation items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-semibold whitespace-nowrap transition-colors',
+                                    'border-secondary-dark bg-secondary-dark text-white dark:border-secondary-medium dark:bg-secondary-medium' => $isPrioritySelected,
+                                    'border-secondary-light text-secondary-medium hover:border-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => ! $isPrioritySelected,
+                                ])
+                                data-test="task-drawer-priority-{{ $priorityCase->value }}"
+                            >
+                                <flux:icon.flag :variant="$priorityCase === TaskPriority::Low ? 'outline' : 'solid'" class="size-3.5 shrink-0 {{ $priorityTone }}" />
+                                {{ $priorityCase->label() }}
+                            </button>
+                        @endforeach
+                    </div>
+                    <flux:error name="taskPriority" class="mt-1.5" />
+                </div>
+            </div>
+
+            <div class="border-t border-secondary-soft pt-5 dark:border-secondary-medium">
+                <div class="mb-1.5 flex items-center justify-between">
+                    <label class="text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft" for="task-drawer-progress-slider">{{ __('tasks.progress_2') }}</label>
+                </div>
+                <div class="flex items-center gap-3">
+                    <input
+                        id="task-drawer-progress-slider"
+                        type="range"
+                        wire:model="progressPercentage"
+                        min="0"
+                        max="100"
+                        step="1"
+                        class="h-1.5 w-full flex-1 cursor-pointer accent-primary"
+                        data-test="task-drawer-progress-slider"
+                    />
+                    <div class="relative w-16 shrink-0">
+                        <input
+                            type="number"
+                            wire:model="progressPercentage"
+                            min="0"
+                            max="100"
+                            required
+                            class="w-full rounded-lg border border-secondary-light bg-white py-1.5 ps-2 pe-6 text-end text-sm font-semibold tabular-nums text-secondary-dark focus:ring-1 focus:ring-primary focus:outline-none dark:border-secondary-light dark:bg-secondary-medium dark:text-white"
+                            aria-label="{{ __('tasks.progress_2') }}"
+                            data-test="task-drawer-progress-input"
+                        />
+                        <span class="pointer-events-none absolute inset-y-0 end-2 flex items-center text-sm text-secondary-medium dark:text-secondary-soft">%</span>
+                    </div>
+                </div>
+                <flux:error name="progressPercentage" class="mt-1.5" />
+            </div>
+
+            <div class="min-w-0 border-t border-secondary-soft pt-5 dark:border-secondary-medium">
                 <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('tasks.assignees') }}</label>
                 @php
                     $selectedAssigneeOptions = collect($this->userOptions)->whereIn('id', collect($assignedTo)->map(fn ($id) => (int) $id));
@@ -1268,10 +1357,23 @@ new #[Title('titles.tasks')] class extends Component {
                 <flux:error name="assignedTo" class="mt-1.5" />
             </div>
 
-            <div class="grid gap-4 sm:grid-cols-3">
-                <x-ui.input wire:model="startDate" :label="__('common.start_date')" type="date" />
-                <x-ui.input wire:model="dueDate" :label="__('tasks.due_date_2')" type="date" />
-                <x-ui.input wire:model="completedDate" :label="__('tasks.completed_date')" type="date" />
+            <div class="border-t border-secondary-soft pt-5 dark:border-secondary-medium">
+                @php
+                    $isOverdueDraft = preg_match('/^\d{4}-\d{2}-\d{2}$/', $dueDate) === 1
+                        && $taskStatus !== \App\Enums\TaskStatus::Done->value
+                        && \Carbon\CarbonImmutable::parse($dueDate)->lt(\Carbon\CarbonImmutable::today());
+                @endphp
+                <div class="mb-1.5 flex items-center gap-2">
+                    <p class="text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('tasks.timeline') }}</p>
+                    @if ($isOverdueDraft)
+                        <span class="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold tracking-wide text-primary uppercase">{{ __('tasks.overdue') }}</span>
+                    @endif
+                </div>
+                <div class="grid gap-4 sm:grid-cols-3">
+                    <x-ui.input wire:model="startDate" :label="__('common.start_date')" type="date" />
+                    <x-ui.input wire:model="dueDate" :label="__('tasks.due_date_2')" type="date" />
+                    <x-ui.input wire:model="completedDate" :label="__('tasks.completed_date')" type="date" />
+                </div>
             </div>
         </form>
 

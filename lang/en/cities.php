@@ -26,7 +26,7 @@ return [
     'open' => 'open',
     'open_projects' => 'Open projects',
     'open_projects_hint' => 'Being delivered right now',
-    'schematic_note' => 'Schematic layout, not to scale',
+    'schematic_note' => 'Governorate markers are approximate',
     'search_cities' => 'Search cities',
     'sort_active_first' => 'Active cities first',
     'sort_by' => 'Sort by',
