@@ -4,6 +4,7 @@ use App\Models\HrCity;
 use App\Models\Project;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Number;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -14,6 +15,40 @@ new #[Title('titles.city_directory')] class extends Component {
     use WithPagination;
 
     private const PerPage = 12;
+
+    /**
+     * Approximate schematic position for each governorate on the coverage
+     * map, in a 640×440 canvas — a stylised layout for orientation, not
+     * surveyed coordinates. Keyed by the untranslated `name_en` column,
+     * since {@see HrCity::name} switches to Arabic under the Arabic locale.
+     * "Syria" (nationwide, tied to no single governorate) is deliberately
+     * absent; any HR city with no entry here — that one included — falls
+     * back to the map's "not shown" tray instead of guessing a position.
+     *
+     * @var array<string, array{0: int, 1: int}>
+     */
+    private const MapPositions = [
+        'Latakia' => [60, 130],
+        'Idleb' => [140, 100],
+        'Aleppo' => [195, 55],
+        'Ar-raqqa' => [345, 90],
+        'Al-Hasakah' => [555, 75],
+        'Deir Az-zor' => [450, 190],
+        'Tartus' => [75, 220],
+        'Hama' => [175, 175],
+        'Homs' => [220, 245],
+        'Homs Rural' => [300, 260],
+        'Rif Dimashq' => [200, 300],
+        'Damascus' => [160, 340],
+        'Qounaitra' => [70, 380],
+        'Daraa' => [140, 425],
+        'Suwaida' => [280, 410],
+    ];
+
+    /**
+     * The governorate the connection lines on the map radiate from.
+     */
+    private const HeadquartersCity = 'Damascus';
 
     #[Url(except: '')]
     public string $search = '';
@@ -29,6 +64,12 @@ new #[Title('titles.city_directory')] class extends Component {
      */
     #[Url(except: 'name')]
     public string $sort = 'name';
+
+    /**
+     * 'grid' or 'map' — which body the page renders below the summary strip.
+     */
+    #[Url(except: 'grid')]
+    public string $view = 'grid';
 
     public function updatedSearch(): void
     {
@@ -154,6 +195,82 @@ new #[Title('titles.city_directory')] class extends Component {
             'beneficiaries' => (int) $stats->sum('beneficiaries'),
         ];
     }
+
+    /**
+     * Every HR city, unpaginated — the coverage map plots the whole
+     * portfolio at once rather than one page of results, since removing
+     * cities from view when the list scrolls would break the geography.
+     *
+     * @return Collection<int, HrCity>
+     */
+    #[Computed]
+    public function allCities(): Collection
+    {
+        return HrCity::query()
+            ->select(['id', 'name_en', 'name_ar', 'is_active'])
+            ->orderBy(HrCity::nameColumn())
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
+     * Every city's full delivery picture, ready to hand to the map's Alpine
+     * component as one JSON blob — every label pre-translated and every
+     * count pre-pluralised server-side, so the client only ever swaps which
+     * city's already-correct strings are on screen.
+     *
+     * Cities the search or status filter would exclude stay on the map
+     * (removing one would leave a hole in the geography) but are flagged
+     * `matches: false` so the template can dim them instead.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    #[Computed]
+    public function mapCities(): array
+    {
+        $stats = $this->projectStatsByCity;
+        $search = mb_strtolower(trim($this->search));
+
+        return $this->allCities
+            ->map(function (HrCity $city) use ($stats, $search): array {
+                $name = trim($city->name_en);
+                $position = self::MapPositions[$name] ?? null;
+                $cityStats = $stats->get($city->id, ['total' => 0, 'open' => 0, 'closed' => 0, 'programs' => 0, 'beneficiaries' => 0]);
+
+                $matchesSearch = $search === ''
+                    || str_contains(mb_strtolower($city->name_en), $search)
+                    || str_contains(mb_strtolower($city->name_ar), $search);
+                $matchesStatus = $this->status === '' || ($this->status === 'active') === $city->is_active;
+
+                return [
+                    'id' => $city->id,
+                    'name' => $city->name,
+                    'secondaryName' => $city->secondary_name,
+                    'isActive' => $city->is_active,
+                    'statusLabel' => $city->is_active ? __('common.active') : __('cities.inactive'),
+                    'nationwide' => $name === 'Syria',
+                    'x' => $position[0] ?? null,
+                    'y' => $position[1] ?? null,
+                    'isHq' => $name === self::HeadquartersCity,
+                    'total' => $cityStats['total'],
+                    'open' => $cityStats['open'],
+                    'closed' => $cityStats['closed'],
+                    'openPct' => $cityStats['total'] > 0 ? (int) round(($cityStats['open'] / $cityStats['total']) * 100) : 0,
+                    'projectsLabel' => trans_choice('common.count_project', $cityStats['total'], ['count' => $cityStats['total']]),
+                    'programsLabel' => $cityStats['total'] > 0
+                        ? trans_choice('cities.count_program', $cityStats['programs'], ['count' => $cityStats['programs']])
+                        : null,
+                    'beneficiariesLine' => $cityStats['beneficiaries'] > 0
+                        ? Number::format($cityStats['beneficiaries']).' '.__('cities.beneficiaries_reached')
+                        : null,
+                    'noProjectsLabel' => __('cities.no_projects_here_yet'),
+                    'href' => route('projects.index', ['city' => $city->id]),
+                    'matches' => $matchesSearch && $matchesStatus,
+                ];
+            })
+            ->values()
+            ->all();
+    }
 };
 ?>
 
@@ -191,6 +308,14 @@ new #[Title('titles.city_directory')] class extends Component {
         ['key' => 'active', 'label' => __('common.active')],
         ['key' => 'inactive', 'label' => __('cities.inactive')],
     ];
+
+    $mapCities = collect($this->mapCities);
+    $mappedCities = $mapCities->filter(fn (array $city): bool => $city['x'] !== null)->values();
+    $unmappedCities = $mapCities->reject(fn (array $city): bool => $city['x'] !== null)->values();
+    $hqCity = $mappedCities->firstWhere('isHq', true);
+    $defaultSelectedCityId = optional($mappedCities->sortByDesc('total')->first())['id'] ?? optional($mappedCities->first())['id'] ?? null;
+    $matchingMapCount = $mapCities->where('matches', true)->count();
+    $mapFiltersActive = $search !== '' || $status !== '';
 @endphp
 
 <section
@@ -216,12 +341,24 @@ new #[Title('titles.city_directory')] class extends Component {
         </x-slot:filters>
 
         <x-slot:actions>
-            <x-ui.view-toggle
-                wire-model="status"
-                :active="$status"
-                :options="$statusOptions"
-                :label="__('cities.status')"
-            />
+            <div class="flex flex-wrap items-center gap-2">
+                <x-ui.view-toggle
+                    wire-model="view"
+                    :active="$view"
+                    :options="[
+                        ['key' => 'map', 'label' => __('cities.view_map'), 'icon' => 'map'],
+                        ['key' => 'grid', 'label' => __('cities.view_grid'), 'icon' => 'squares-2x2'],
+                    ]"
+                    :label="__('cities.view_as')"
+                />
+
+                <x-ui.view-toggle
+                    wire-model="status"
+                    :active="$status"
+                    :options="$statusOptions"
+                    :label="__('cities.status')"
+                />
+            </div>
         </x-slot:actions>
 
         <x-slot:summary>
@@ -246,6 +383,17 @@ new #[Title('titles.city_directory')] class extends Component {
         </x-slot:summary>
     </x-ui.page-header>
 
+    @if ($view === 'map')
+        @include('pages.admin._cities-map', [
+            'mappedCities' => $mappedCities,
+            'unmappedCities' => $unmappedCities,
+            'hqCity' => $hqCity,
+            'defaultSelectedCityId' => $defaultSelectedCityId,
+            'matchingMapCount' => $matchingMapCount,
+            'mapFiltersActive' => $mapFiltersActive,
+            'avatarTones' => $avatarTones,
+        ])
+    @else
     <div class="flex min-h-8 flex-wrap items-center justify-between gap-2">
         <p class="text-xs font-semibold text-secondary-medium dark:text-secondary-soft">
             {{ trans_choice('cities.count_matching_cities', $this->cities->total(), ['count' => $this->cities->total()]) }}
@@ -374,5 +522,6 @@ new #[Title('titles.city_directory')] class extends Component {
             class="text-secondary-medium! [&_button]:text-secondary-medium! [&_button:hover]:bg-secondary-soft! dark:text-secondary-soft! dark:[&_button]:text-secondary-soft! dark:[&_button:hover]:bg-secondary-medium!"
             scroll-to="#city-directory-heading"
         />
+    @endif
     @endif
 </section>

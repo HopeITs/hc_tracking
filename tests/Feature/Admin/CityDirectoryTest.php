@@ -139,3 +139,26 @@ test('a city links straight to its filtered project list', function () {
         ->test('pages::admin.cities')
         ->assertSee(route('projects.index', ['city' => $aleppo]), false);
 });
+
+test('the map view plots every city with a real link, even one the search would hide in the grid', function () {
+    insertHrCity('Aleppo');
+    $homs = insertHrCity('Homs');
+
+    Livewire::actingAs(User::factory()->create())
+        ->test('pages::admin.cities')
+        ->set('view', 'map')
+        ->set('search', 'Homs')
+        ->assertSee('Aleppo') // dimmed on the map, but never removed from it
+        ->assertSee('Homs')
+        ->assertSee(route('projects.index', ['city' => $homs]), false);
+});
+
+test('a city with no plotted position falls into the "not shown on map" tray', function () {
+    insertHrCity('Neverland');
+
+    Livewire::actingAs(User::factory()->create())
+        ->test('pages::admin.cities')
+        ->set('view', 'map')
+        ->assertSee('Neverland')
+        ->assertSee(__('cities.not_shown_on_map'));
+});
