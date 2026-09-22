@@ -541,7 +541,7 @@ new #[Title('titles.tasks')] class extends Component {
      * pre-filled with the title and whatever the row's own context and
      * draft already had, so nothing is ever silently dropped.
      */
-    public function quickCreateTask(string $title, ?string $status = null, ?string $milestoneId = null, ?string $rowKey = null): void
+    public function quickCreateTask(string $title, ?string $status = null, ?string $milestoneId = null, ?string $rowKey = null, ?string $dueDate = null): void
     {
         $title = trim($title);
 
@@ -557,13 +557,16 @@ new #[Title('titles.tasks')] class extends Component {
             : collect(array_filter([$this->resolveInlineAssigneeId()]));
 
         if ($proposalId === null || $employeeIds->isEmpty()) {
-            $this->openCreateDrawer(status: $draft !== null ? $draft['status'] : $status, milestoneId: $milestoneId);
+            $this->openCreateDrawer(dueDate: $dueDate, status: $draft !== null ? $draft['status'] : $status, milestoneId: $milestoneId);
             $this->title = $title;
 
             if ($draft !== null) {
                 $this->taskPriority = $draft['priority'];
-                $this->dueDate = $draft['due_date'];
                 $this->assignedTo = $draft['assignees'];
+
+                if ($dueDate === null && $draft['due_date'] !== '') {
+                    $this->dueDate = $draft['due_date'];
+                }
             }
 
             return;
@@ -571,14 +574,19 @@ new #[Title('titles.tasks')] class extends Component {
 
         $statusCase = TaskStatus::tryFrom(($draft !== null ? $draft['status'] : $status) ?? '') ?? TaskStatus::Todo;
         $priorityCase = $draft !== null ? (TaskPriority::tryFrom($draft['priority']) ?? TaskPriority::Medium) : TaskPriority::Medium;
-        $dueDate = $draft !== null && preg_match('/^\d{4}-\d{2}-\d{2}$/', $draft['due_date']) === 1 ? $draft['due_date'] : null;
 
-        DB::transaction(function () use ($title, $statusCase, $priorityCase, $dueDate, $milestoneId, $proposalId, $employeeIds): void {
+        // A calendar day's row passes its own day as $dueDate, which always
+        // wins — that row has no due-date field of its own precisely because
+        // the cell it's in already fixes the date. Every other row's due
+        // date, if any, comes from its own draft.
+        $resolvedDueDate = $dueDate ?? ($draft !== null && preg_match('/^\d{4}-\d{2}-\d{2}$/', $draft['due_date']) === 1 ? $draft['due_date'] : null);
+
+        DB::transaction(function () use ($title, $statusCase, $priorityCase, $resolvedDueDate, $milestoneId, $proposalId, $employeeIds): void {
             $task = Task::query()->create([
                 'title' => $title,
                 'status' => $statusCase,
                 'priority' => $priorityCase,
-                'due_date' => $dueDate,
+                'due_date' => $resolvedDueDate,
                 'progress_percentage' => $statusCase === TaskStatus::Done ? 100 : 0,
                 'completed_date' => $statusCase === TaskStatus::Done ? CarbonImmutable::today() : null,
                 'proposal_id' => $proposalId,

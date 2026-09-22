@@ -694,6 +694,28 @@ test('toggleTaskDraftAssignee toggles an employee in and out of the add-task dra
     expect($component->instance()->taskDraft('row-1')['assignees'])->toBe([]);
 });
 
+test('quickCreateTask uses the calendar days own due date over any draft due date', function () {
+    $employeeId = insertHrEmployee();
+    $user = User::factory()->create(['employee_id' => $employeeId]);
+    $proposal = Proposal::factory()->create();
+    $project = Project::factory()->create();
+    $project->proposals()->attach($proposal->id);
+    $milestone = Milestone::factory()->create(['project_id' => $project->id]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->set('milestone', (string) $milestone->id)
+        ->set('taskDrafts.calendar|2026-08-30.due_date', '2099-01-01')
+        ->set('taskDrafts.calendar|2026-08-30.priority', TaskPriority::High->value)
+        ->call('quickCreateTask', 'Calendar task', null, null, 'calendar|2026-08-30', '2026-08-30')
+        ->assertSet('showTaskDrawer', false);
+
+    $task = Task::query()->where('title', 'Calendar task')->sole();
+
+    expect($task->due_date->toDateString())->toBe('2026-08-30')
+        ->and($task->priority)->toBe(TaskPriority::High);
+});
+
 test('addSubtaskQuick creates a subtask inheriting the parent proposal milestone and assignees', function () {
     $user = User::factory()->create();
     $alice = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');

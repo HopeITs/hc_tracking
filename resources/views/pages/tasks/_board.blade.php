@@ -313,6 +313,7 @@
                 $boardRowKey = 'board|'.$case->value;
                 $boardTaskDraft = $this->taskDraft($boardRowKey, $case->value);
                 $boardTaskDraftAssignees = collect($this->userOptions)->whereIn('id', collect($boardTaskDraft['assignees'])->map(fn ($id) => (int) $id));
+                $boardDraftPriority = TaskPriority::from($boardTaskDraft['priority']);
             @endphp
             <div class="flex flex-col gap-1.5 rounded-lg border border-dashed border-secondary-light px-2 py-1.5 dark:border-secondary-medium" data-test="task-board-add-row-{{ $case->value }}">
                 <label class="flex items-center gap-2">
@@ -380,16 +381,20 @@
                         data-test="task-board-add-due-date-{{ $case->value }}"
                     />
 
-                    <select
-                        wire:model="taskDrafts.{{ $boardRowKey }}.priority"
-                        aria-label="{{ __('tasks.priority') }}"
-                        class="shrink-0 rounded-md border border-secondary-soft bg-white px-1 py-0.5 text-[11px] text-secondary-dark dark:border-secondary-medium dark:bg-secondary-dark dark:text-white"
-                        data-test="task-board-add-priority-{{ $case->value }}"
-                    >
-                        @foreach (TaskPriority::cases() as $priorityCase)
-                            <option value="{{ $priorityCase->value }}" @selected($boardTaskDraft['priority'] === $priorityCase->value)>{{ $priorityCase->label() }}</option>
-                        @endforeach
-                    </select>
+                    <flux:dropdown position="bottom" align="start">
+                        <button type="button" aria-label="{{ __('tasks.priority') }}: {{ $boardDraftPriority->label() }}" class="inline-flex size-6 cursor-pointer items-center justify-center rounded hover:bg-secondary-soft dark:hover:bg-secondary-medium" data-test="task-board-add-priority-trigger-{{ $case->value }}">
+                            <flux:icon.flag :variant="$boardDraftPriority === TaskPriority::Low ? 'outline' : 'solid'" class="size-3.5 {{ $priorityIconClasses($boardDraftPriority) }}" />
+                        </button>
+                        <flux:menu>
+                            @foreach (TaskPriority::cases() as $priorityCase)
+                                <flux:menu.item wire:click="$set('taskDrafts.{{ $boardRowKey }}.priority', '{{ $priorityCase->value }}')" :wire:key="'task-board-add-'.$case->value.'-priority-'.$priorityCase->value">
+                                    <flux:icon.flag :variant="$priorityCase === TaskPriority::Low ? 'outline' : 'solid'" class="size-4 shrink-0 {{ $priorityIconClasses($priorityCase) }}" />
+                                    <span class="min-w-0 truncate">{{ $priorityCase->label() }}</span>
+                                    @if ($boardDraftPriority === $priorityCase)<flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" />@endif
+                                </flux:menu.item>
+                            @endforeach
+                        </flux:menu>
+                    </flux:dropdown>
                 </div>
             </div>
         </div>
