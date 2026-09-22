@@ -1,10 +1,11 @@
 {{--
-    The coverage map: Syria's real national outline (see HrCity::MapOutlinePath),
-    with every governorate plotted at an approximate position on it, sized and
-    coloured by delivery signal, and a click-to-select detail panel beside it.
-    Every city's detail panel is fully server-rendered — with a real "View
-    projects" link — and Alpine only ever toggles which one is visible, so the
-    page carries real content and working links even before JavaScript runs.
+    The coverage map: Syria's real governorate boundaries (see
+    HrCity::MapOutlinePath), with every city plotted at its governorate's real
+    geometric centroid, sized and coloured by delivery signal, and a
+    click-to-select detail panel beside it. Every city's detail panel is
+    fully server-rendered — with a real "View projects" link — and Alpine
+    only ever toggles which one is visible, so the page carries real content
+    and working links even before JavaScript runs.
 
     @var \Illuminate\Support\Collection $mappedCities
     @var \Illuminate\Support\Collection $unmappedCities
@@ -27,10 +28,10 @@
     x-data="{ selected: {{ \Illuminate\Support\Js::from($defaultSelectedCityId) }} }"
 >
     <x-ui.panel :title="__('cities.coverage_map')" :subtitle="__('cities.tap_a_city_hint')">
-        <div class="bg-board-head p-4 pt-16 dark:bg-black/20">
-            <div class="relative mx-auto aspect-square w-full max-w-xl">
-                {{-- Syria's real outline, not a schematic shape — see HrCity::MapOutlinePath for source and licence. --}}
-                <svg viewBox="0 0 1024 1024" class="absolute inset-0 h-full w-full text-secondary-soft dark:text-secondary-medium/70" aria-hidden="true" preserveAspectRatio="xMidYMid meet">
+        <div class="bg-board-head p-4 pt-16">
+            <div class="relative mx-auto w-full max-w-xl" style="aspect-ratio: 670.92236 / 590.26318;">
+                {{-- Syria's real governorate boundaries — see HrCity::MapOutlinePath for source and licence. Each governorate strokes with the wrapper's own background colour, so borders read as a gap rather than a drawn line. --}}
+                <svg viewBox="0 0 670.92236 590.26318" class="absolute inset-0 h-full w-full text-secondary-soft [&_path]:stroke-[var(--color-board-head)] dark:text-secondary-medium/70" aria-hidden="true" preserveAspectRatio="xMidYMid meet" fill="currentColor" stroke-width="1.3">
                     {!! $mapOutlinePath !!}
 
                     {{-- Delivery lines fan out from HQ to every city currently running a project — the literal "connections" in the data. --}}
@@ -43,8 +44,8 @@
                                 x2="{{ $lineCity['x'] }}"
                                 y2="{{ $lineCity['y'] }}"
                                 stroke="var(--color-status-active)"
-                                stroke-width="3"
-                                stroke-dasharray="3 9"
+                                stroke-width="2"
+                                stroke-dasharray="2 6"
                                 stroke-linecap="round"
                                 opacity="{{ $lineCity['matches'] ? '0.55' : '0.15' }}"
                             />
@@ -55,8 +56,8 @@
                 @foreach ($mappedCities as $city)
                     @php
                         $markerSize = max(16, min(36, 16 + $city['total'] * 5));
-                        $leftPct = $city['x'] / 1024 * 100;
-                        $topPct = $city['y'] / 1024 * 100;
+                        $leftPct = $city['x'] / 670.92236 * 100;
+                        $topPct = $city['y'] / 590.26318 * 100;
                         $avatarTone = $avatarTones[$city['id'] % count($avatarTones)];
                     @endphp
                     <button
