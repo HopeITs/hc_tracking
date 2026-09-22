@@ -54,9 +54,9 @@ test('temp preview render', function () {
             $project->proposals()->attach($proposal);
         }
 
-        Milestone::factory()->reached()->create(['project_id' => $project->id, 'weight_percentage' => '40.00', 'planned_date' => today()->subDays(120)]);
-        Milestone::factory()->create(['project_id' => $project->id, 'weight_percentage' => '35.00', 'planned_date' => today()->subDays(10), 'status' => MilestoneStatus::Pending]);
-        Milestone::factory()->create(['project_id' => $project->id, 'weight_percentage' => '25.00', 'planned_date' => today()->addDays(60)]);
+        Milestone::factory()->reached()->create(['project_id' => $project->id, 'weight_percentage' => '40.00', 'planned_start_date' => today()->subDays(120)]);
+        Milestone::factory()->create(['project_id' => $project->id, 'weight_percentage' => '35.00', 'planned_start_date' => today()->subDays(10), 'status' => MilestoneStatus::Planned]);
+        Milestone::factory()->create(['project_id' => $project->id, 'weight_percentage' => '25.00', 'planned_start_date' => today()->addDays(60)]);
 
         Risk::factory()->count(2)->create(['project_id' => $project->id]);
         Risk::factory()->happened()->create(['project_id' => $project->id]);

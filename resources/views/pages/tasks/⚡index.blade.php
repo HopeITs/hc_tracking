@@ -75,6 +75,29 @@ new #[Title('titles.tasks')] class extends Component {
     public string $taskProposalId = '';
     public string $taskMilestoneId = '';
 
+    /**
+     * Per-parent-task draft values for the list view's inline "add subtask"
+     * row — its due date, priority, status and assignees. Bound with plain
+     * (non-live) wire:model so filling them out costs no network round
+     * trips; they're only read once, when addSubtaskQuick() actually creates
+     * the subtask in the same request as the Enter keypress that submits
+     * the title.
+     *
+     * @var array<int, array{status?: string, priority?: string, due_date?: string, assignees?: array<int, string>}>
+     */
+    public array $subtaskDrafts = [];
+
+    /**
+     * Per-group draft values for the list view's inline "+ Add task" row —
+     * one per group heading (keyed by "{group}|{groupKeyString}", since each
+     * heading renders its own composer row independently), covering the
+     * same due date, priority, status and assignees a real row edits. Mirrors
+     * subtaskDrafts in every other respect.
+     *
+     * @var array<string, array{status?: string, priority?: string, due_date?: string, assignees?: array<int, string>}>
+     */
+    public array $taskDrafts = [];
+
     public function updatedSearch(): void
     {
         $this->resetPage();
@@ -180,12 +203,23 @@ new #[Title('titles.tasks')] class extends Component {
 
         return Task::query()
             ->select(['id', 'milestone_id', 'parent_task_id', 'proposal_id', 'title', 'description', 'status', 'priority', 'start_date', 'due_date', 'completed_date', 'progress_percentage'])
+            // Subtasks are shown nested under their parent (each parent's own
+            // `subtasks` eager load below), never as their own top-level row —
+            // so the list/board/calendar and the stat tiles all count and
+            // display only top-level tasks.
+            ->whereNull('parent_task_id')
             ->withCount('subtasks')
             ->with([
                 'milestone:id,name,project_id',
                 'milestone.project:id,name',
                 'proposal:id,name',
                 'taskAssignees.employee:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
+                // Loaded alongside the count above so the list/board rows can expand
+                // a subtask panel in place (client-side, no extra round trip) instead
+                // of sending people to the parent task's own page to see them. Each
+                // subtask's own assignees are loaded the same way as the parent's.
+                'subtasks:id,parent_task_id,title,status,priority,due_date',
+                'subtasks.taskAssignees.employee:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
             ])
             ->when($search !== '', function (Builder $query) use ($search): void {
                 $query->where(function (Builder $query) use ($search): void {
@@ -412,31 +446,53 @@ new #[Title('titles.tasks')] class extends Component {
      * across users and expires with the page (5 minutes is just a safety
      * bound against an unusually long-lived tab, not a real staleness risk).
      *
-     * @return Collection<int, HrEmployee>
+     * Returned as plain arrays, not Eloquent collections/models: the cache
+     * store's `serializable_classes` is `false` (intentionally, to block
+     * gadget-chain attacks — see config/cache.php), so any object graph
+     * silently fails to unserialize on every read. `persist` would then
+     * re-run the query AND re-write the cache on every single request,
+     * which is slower than no caching at all — this is what actually made
+     * every quick action take seconds.
+     *
+     * @return array<int, array{id: int, name: string, secondary_name: string}>
      */
     #[Computed(persist: true, seconds: 300)]
-    public function userOptions(): Collection
+    public function userOptions(): array
     {
-        return HrEmployee::pickerOptions();
+        return HrEmployee::pickerOptions()
+            ->map(fn (HrEmployee $employee): array => [
+                'id' => $employee->id,
+                'name' => $employee->name,
+                'secondary_name' => $employee->secondary_name,
+            ])
+            ->all();
     }
 
-    /** @return Collection<int, Proposal> */
+    /** @return array<int, array{id: int, name: string}> */
     #[Computed(persist: true, seconds: 300)]
-    public function proposalOptions(): Collection
+    public function proposalOptions(): array
     {
-        return Proposal::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get();
+        return Proposal::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get()
+            ->map(fn (Proposal $proposal): array => ['id' => $proposal->id, 'name' => $proposal->name])
+            ->all();
     }
 
-    /** @return Collection<int, Milestone> */
+    /** @return array<int, array{id: int, name: string, project_name: string}> */
     #[Computed(persist: true, seconds: 300)]
-    public function milestoneOptions(): Collection
+    public function milestoneOptions(): array
     {
         return Milestone::query()
             ->select(['id', 'name', 'project_id'])
             ->with('project:id,name')
             ->orderBy('name')
             ->orderBy('id')
-            ->get();
+            ->get()
+            ->map(fn (Milestone $milestone): array => [
+                'id' => $milestone->id,
+                'name' => $milestone->name,
+                'project_name' => $milestone->project->name,
+            ])
+            ->all();
     }
 
     #[Computed]
@@ -469,11 +525,23 @@ new #[Title('titles.tasks')] class extends Component {
     }
 
     /**
-     * A group's inline "+ Add task" row only captures a title — proposal and
-     * assignee are required fields, so this opens the drawer pre-filled with
-     * the title and the group's own context instead of saving directly.
+     * A group's inline "+ Add task" row only captures a title, but a task
+     * always needs a proposal and an assignee. The proposal is inferred from
+     * context so the row can create the task directly, with no drawer:
+     *  - proposal: the one proposal funding the resolved milestone's project
+     *    (its own milestoneId, falling back to the active milestone filter),
+     *    only when that project is funded by exactly one — a project funded
+     *    by several, or no milestone context at all, is genuinely ambiguous.
+     *  - assignee: whichever employees the row's own draft (see taskDraft())
+     *    has picked, falling back to the signed-in user's own HR employee
+     *    record when the row hasn't been touched.
+     * Due date, priority and status also come from that same draft, same as
+     * addSubtaskQuick()'s own draft. When the proposal or every assignee
+     * can't be resolved, this falls back to the drawer exactly as before,
+     * pre-filled with the title and whatever the row's own context and
+     * draft already had, so nothing is ever silently dropped.
      */
-    public function quickCreateTask(string $title, ?string $status = null, ?string $milestoneId = null): void
+    public function quickCreateTask(string $title, ?string $status = null, ?string $milestoneId = null, ?string $rowKey = null, ?string $dueDate = null): void
     {
         $title = trim($title);
 
@@ -481,8 +549,241 @@ new #[Title('titles.tasks')] class extends Component {
             return;
         }
 
-        $this->openCreateDrawer(status: $status, milestoneId: $milestoneId);
-        $this->title = $title;
+        $draft = $rowKey !== null ? $this->taskDraft($rowKey, $status) : null;
+
+        $proposalId = $this->resolveInlineProposalId($milestoneId);
+        $employeeIds = $draft !== null && $draft['assignees'] !== []
+            ? HrEmployee::query()->whereIn('id', collect($draft['assignees'])->map(fn (string $id): int => (int) $id))->pluck('id')
+            : collect(array_filter([$this->resolveInlineAssigneeId()]));
+
+        if ($proposalId === null || $employeeIds->isEmpty()) {
+            $this->openCreateDrawer(dueDate: $dueDate, status: $draft !== null ? $draft['status'] : $status, milestoneId: $milestoneId);
+            $this->title = $title;
+
+            if ($draft !== null) {
+                $this->taskPriority = $draft['priority'];
+                $this->assignedTo = $draft['assignees'];
+
+                if ($dueDate === null && $draft['due_date'] !== '') {
+                    $this->dueDate = $draft['due_date'];
+                }
+            }
+
+            return;
+        }
+
+        $statusCase = TaskStatus::tryFrom(($draft !== null ? $draft['status'] : $status) ?? '') ?? TaskStatus::Todo;
+        $priorityCase = $draft !== null ? (TaskPriority::tryFrom($draft['priority']) ?? TaskPriority::Medium) : TaskPriority::Medium;
+
+        // A calendar day's row passes its own day as $dueDate, which always
+        // wins — that row has no due-date field of its own precisely because
+        // the cell it's in already fixes the date. Every other row's due
+        // date, if any, comes from its own draft.
+        $resolvedDueDate = $dueDate ?? ($draft !== null && preg_match('/^\d{4}-\d{2}-\d{2}$/', $draft['due_date']) === 1 ? $draft['due_date'] : null);
+
+        DB::transaction(function () use ($title, $statusCase, $priorityCase, $resolvedDueDate, $milestoneId, $proposalId, $employeeIds): void {
+            $task = Task::query()->create([
+                'title' => $title,
+                'status' => $statusCase,
+                'priority' => $priorityCase,
+                'due_date' => $resolvedDueDate,
+                'progress_percentage' => $statusCase === TaskStatus::Done ? 100 : 0,
+                'completed_date' => $statusCase === TaskStatus::Done ? CarbonImmutable::today() : null,
+                'proposal_id' => $proposalId,
+                'milestone_id' => $milestoneId !== null ? (int) $milestoneId : null,
+                'created_by' => (int) auth()->id(),
+            ]);
+
+            foreach ($employeeIds as $employeeId) {
+                $task->taskAssignees()->create(['employee_id' => $employeeId]);
+            }
+        });
+
+        if ($rowKey !== null) {
+            unset($this->taskDrafts[$rowKey]);
+        }
+
+        $this->resetPage();
+
+        Flux::toast(variant: 'success', text: __('tasks.task_created'));
+    }
+
+    /**
+     * The list view's inline "+ Add task" row's current draft values for one
+     * group heading, merged with sensible defaults so the row always renders
+     * something sane before the user touches it. $defaultStatus lets a
+     * status-grouped heading default its own row to that column's status
+     * instead of always "todo" — mirrors subtaskDraft() in every other
+     * respect.
+     *
+     * @return array{status: string, priority: string, due_date: string, assignees: array<int, string>}
+     */
+    public function taskDraft(string $rowKey, ?string $defaultStatus = null): array
+    {
+        $defaults = [
+            'status' => $defaultStatus ?? TaskStatus::Todo->value,
+            'priority' => TaskPriority::Medium->value,
+            'due_date' => '',
+            'assignees' => [],
+        ];
+
+        return array_merge($defaults, $this->taskDrafts[$rowKey] ?? []);
+    }
+
+    /**
+     * Adds or removes one employee from a group heading's "+ Add task" draft
+     * — mirrors toggleSubtaskDraftAssignee() but for a not-yet-created
+     * top-level task instead of a subtask.
+     */
+    public function toggleTaskDraftAssignee(string $rowKey, int $employeeId): void
+    {
+        $ids = $this->taskDraft($rowKey)['assignees'];
+        $employeeIdString = (string) $employeeId;
+
+        $this->taskDrafts[$rowKey]['assignees'] = in_array($employeeIdString, $ids, true)
+            ? array_values(array_diff($ids, [$employeeIdString]))
+            : [...$ids, $employeeIdString];
+    }
+
+    /**
+     * Resolves the single proposal a group's inline "+ Add task" row can
+     * safely default to, or null when that would be a guess.
+     *
+     * @return int|null
+     */
+    protected function resolveInlineProposalId(?string $milestoneId): ?int
+    {
+        $resolvedMilestoneId = $milestoneId ?? (
+            $this->milestone !== '' && $this->milestone !== 'none' ? $this->milestone : null
+        );
+
+        if ($resolvedMilestoneId === null) {
+            return null;
+        }
+
+        $milestone = Milestone::query()->select(['id', 'project_id'])->find((int) $resolvedMilestoneId);
+
+        if ($milestone === null) {
+            return null;
+        }
+
+        $proposalIds = Proposal::query()
+            ->whereHas('projects', fn (Builder $query) => $query->whereKey($milestone->project_id))
+            ->pluck('id');
+
+        return $proposalIds->count() === 1 ? $proposalIds->first() : null;
+    }
+
+    /** The signed-in user's own HR employee id, when their account is linked to one. */
+    protected function resolveInlineAssigneeId(): ?int
+    {
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        return $user->employee_id;
+    }
+
+    /**
+     * The list view's inline "add subtask" row's current draft values for a
+     * parent task, merged with sensible defaults — todo/medium, no due date,
+     * and the parent's own assignees — so the row always renders something
+     * sane before the user touches it. Takes the parent (already loaded with
+     * its assignees by filteredTasksQuery()) rather than an id, so reading
+     * this once per row costs no extra query.
+     *
+     * @return array{status: string, priority: string, due_date: string, assignees: array<int, string>}
+     */
+    public function subtaskDraft(Task $parent): array
+    {
+        $defaults = [
+            'status' => TaskStatus::Todo->value,
+            'priority' => TaskPriority::Medium->value,
+            'due_date' => '',
+            'assignees' => $parent->taskAssignees->pluck('employee_id')->map(fn (int $id): string => (string) $id)->all(),
+        ];
+
+        return array_merge($defaults, $this->subtaskDrafts[$parent->id] ?? []);
+    }
+
+    /**
+     * Adds or removes one employee from a parent task's subtask draft, for
+     * the "add subtask" row's own assignee popover — mirrors toggleAssignee()
+     * but writes to the not-yet-saved draft instead of a real task.
+     */
+    public function toggleSubtaskDraftAssignee(int $parentTaskId, int $employeeId): void
+    {
+        $parent = Task::query()->with('taskAssignees:id,task_id,employee_id')->find($parentTaskId);
+
+        if ($parent === null) {
+            return;
+        }
+
+        $ids = $this->subtaskDraft($parent)['assignees'];
+        $employeeIdString = (string) $employeeId;
+
+        $this->subtaskDrafts[$parentTaskId]['assignees'] = in_array($employeeIdString, $ids, true)
+            ? array_values(array_diff($ids, [$employeeIdString]))
+            : [...$ids, $employeeIdString];
+    }
+
+    /**
+     * Adds a one-line subtask under an already-visible parent task, from the
+     * inline row in its expanded panel — no drawer. Proposal and milestone
+     * always match the parent (a subtask delivers the same thing its parent
+     * does), while due date, priority, status and assignees come from the
+     * row's own draft fields, defaulting to the parent's own assignees when
+     * none were chosen. Mirrors the show page's own addSubtask(), kept
+     * separate because this is a different Livewire component instance.
+     */
+    public function addSubtaskQuick(int $parentTaskId, string $title): void
+    {
+        $title = trim($title);
+
+        if ($title === '') {
+            return;
+        }
+
+        $parent = Task::query()->with('taskAssignees:id,task_id,employee_id')->find($parentTaskId);
+
+        if ($parent === null || $parent->parent_task_id !== null) {
+            return;
+        }
+
+        $draft = $this->subtaskDraft($parent);
+        $status = TaskStatus::tryFrom($draft['status']) ?? TaskStatus::Todo;
+        $priority = TaskPriority::tryFrom($draft['priority']) ?? TaskPriority::Medium;
+        $dueDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', $draft['due_date']) === 1 ? $draft['due_date'] : null;
+
+        $employeeIds = HrEmployee::query()
+            ->whereIn('id', collect($draft['assignees'])->map(fn (string $id): int => (int) $id))
+            ->pluck('id');
+
+        if ($employeeIds->isEmpty()) {
+            $employeeIds = $parent->taskAssignees->pluck('employee_id');
+        }
+
+        DB::transaction(function () use ($parent, $title, $status, $priority, $dueDate, $employeeIds): void {
+            $subtask = Task::query()->create([
+                'parent_task_id' => $parent->id,
+                'proposal_id' => $parent->proposal_id,
+                'milestone_id' => $parent->milestone_id,
+                'title' => $title,
+                'status' => $status,
+                'priority' => $priority,
+                'due_date' => $dueDate,
+                'progress_percentage' => $status === TaskStatus::Done ? 100 : 0,
+                'completed_date' => $status === TaskStatus::Done ? CarbonImmutable::today() : null,
+                'created_by' => (int) auth()->id(),
+            ]);
+
+            foreach ($employeeIds as $employeeId) {
+                $subtask->taskAssignees()->create(['employee_id' => $employeeId]);
+            }
+        });
+
+        unset($this->subtaskDrafts[$parentTaskId]);
+
+        Flux::toast(variant: 'success', text: __('tasks.subtask_added'));
     }
 
     public function openEditDrawer(int $taskId): void
@@ -792,14 +1093,14 @@ new #[Title('titles.tasks')] class extends Component {
             <x-ui.header-filter-select :label="__('tasks.assignee')" wire:model.live="assignee" :value="$assignee">
                 <flux:select.option value="">{{ __('common.anyone') }}</flux:select.option>
                 @foreach ($this->userOptions as $userOption)
-                    <flux:select.option :value="$userOption->id" :wire:key="'task-assignee-filter-'.$userOption->id">{{ $userOption->name }} · {{ $userOption->secondary_name }}</flux:select.option>
+                    <flux:select.option :value="$userOption['id']" :wire:key="'task-assignee-filter-'.$userOption['id']">{{ $userOption['name'] }} · {{ $userOption['secondary_name'] }}</flux:select.option>
                 @endforeach
             </x-ui.header-filter-select>
             <x-ui.header-filter-select :label="__('tasks.milestone')" wire:model.live="milestone" :value="$milestone">
                 <flux:select.option value="">{{ __('tasks.any_milestone') }}</flux:select.option>
                 <flux:select.option value="none">{{ __('tasks.no_milestone') }}</flux:select.option>
                 @foreach ($this->milestoneOptions as $milestoneOption)
-                    <flux:select.option :value="$milestoneOption->id" :wire:key="'task-milestone-filter-'.$milestoneOption->id">{{ $milestoneOption->name }} · {{ $milestoneOption->project->name }}</flux:select.option>
+                    <flux:select.option :value="$milestoneOption['id']" :wire:key="'task-milestone-filter-'.$milestoneOption['id']">{{ $milestoneOption['name'] }} · {{ $milestoneOption['project_name'] }}</flux:select.option>
                 @endforeach
             </x-ui.header-filter-select>
         </x-slot:filters>
@@ -899,48 +1200,137 @@ new #[Title('titles.tasks')] class extends Component {
         @endswitch
     @endif
 
-    <x-ui.drawer wire:model="showTaskDrawer" :title="$editingTaskId === null ? __('tasks.add_task') : __('tasks.edit_task')" :subtitle="__('tasks.every_task_delivers_against_a_proposal_a_milestone_is_option')">
-        <form wire:submit="saveTask" id="task-drawer-form" class="flex flex-col gap-5">
-            <x-ui.input wire:model="title" :label="__('tasks.task_title')" type="text" maxlength="255" required autofocus />
-            <flux:textarea wire:model="description" :label="__('common.description')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!" />
-
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.select wire:model="taskProposalId" :label="__('common.proposal')" required>
-                    <flux:select.option value="">{{ __('common.select_a_proposal') }}</flux:select.option>
-                    @foreach ($this->proposalOptions as $proposalOption)
-                        <flux:select.option :value="$proposalOption->id" :wire:key="'task-proposal-option-'.$proposalOption->id">{{ $proposalOption->name }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
-                <x-ui.select wire:model="taskMilestoneId" :label="__('tasks.milestone')">
-                    <flux:select.option value="">{{ __('tasks.no_milestone') }}</flux:select.option>
-                    @foreach ($this->milestoneOptions as $milestoneOption)
-                        <flux:select.option :value="$milestoneOption->id" :wire:key="'task-milestone-option-'.$milestoneOption->id">{{ $milestoneOption->name }} · {{ $milestoneOption->project->name }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
+    <x-ui.drawer wire:model="showTaskDrawer" max-width="max-w-2xl" :title="$editingTaskId === null ? __('tasks.add_task') : __('tasks.edit_task')" :subtitle="__('tasks.every_task_delivers_against_a_proposal_a_milestone_is_option')">
+        <form wire:submit="saveTask" id="task-drawer-form" class="flex flex-col gap-7">
+            <div class="flex flex-col gap-4">
+                <x-ui.input wire:model="title" :label="__('tasks.task_title')" type="text" maxlength="255" required autofocus />
+                <flux:textarea wire:model="description" :label="__('common.description')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!" />
             </div>
 
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.select wire:model="taskStatus" :label="__('common.status')" required>
-                    @foreach (TaskStatus::cases() as $statusCase)
-                        <flux:select.option :value="$statusCase->value" :wire:key="'task-status-option-'.$statusCase->value">{{ $statusCase->label() }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
-                <x-ui.select wire:model="taskPriority" :label="__('tasks.priority')" required>
-                    @foreach (TaskPriority::cases() as $priorityCase)
-                        <flux:select.option :value="$priorityCase->value" :wire:key="'task-priority-option-'.$priorityCase->value">{{ $priorityCase->label() }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
+            <div class="flex flex-col gap-3 border-t border-secondary-soft pt-5 dark:border-secondary-medium">
+                <p class="text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('tasks.delivery_details') }}</p>
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <x-ui.select wire:model="taskProposalId" :label="__('common.proposal')" required>
+                        <flux:select.option value="">{{ __('common.select_a_proposal') }}</flux:select.option>
+                        @foreach ($this->proposalOptions as $proposalOption)
+                            <flux:select.option :value="$proposalOption['id']" :wire:key="'task-proposal-option-'.$proposalOption['id']">{{ $proposalOption['name'] }}</flux:select.option>
+                        @endforeach
+                    </x-ui.select>
+                    <x-ui.select wire:model="taskMilestoneId" :label="__('tasks.milestone')">
+                        <flux:select.option value="">{{ __('tasks.no_milestone') }}</flux:select.option>
+                        @foreach ($this->milestoneOptions as $milestoneOption)
+                            <flux:select.option :value="$milestoneOption['id']" :wire:key="'task-milestone-option-'.$milestoneOption['id']">{{ $milestoneOption['name'] }} · {{ $milestoneOption['project_name'] }}</flux:select.option>
+                        @endforeach
+                    </x-ui.select>
+                </div>
             </div>
 
-            <x-ui.input wire:model="progressPercentage" :label="__('tasks.progress_2')" type="number" min="0" max="100" required />
+            <div class="grid gap-5 border-t border-secondary-soft pt-5 sm:grid-cols-2 dark:border-secondary-medium">
+                <div class="min-w-0">
+                    <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft" id="task-drawer-status-label">{{ __('common.status') }}</label>
+                    <div class="grid grid-cols-2 gap-1.5" role="radiogroup" aria-labelledby="task-drawer-status-label">
+                        @foreach (TaskStatus::cases() as $statusCase)
+                            @php
+                                $isStatusSelected = $taskStatus === $statusCase->value;
+                                [$statusSelectedClasses, $statusIcon] = match ($statusCase) {
+                                    TaskStatus::Todo => ['border-secondary-dark bg-white text-secondary-dark dark:border-white dark:bg-secondary-dark dark:text-white', 'stop'],
+                                    TaskStatus::InProgress => ['border-status-active bg-status-active text-white', 'play'],
+                                    TaskStatus::UnderReview => ['border-status-warn bg-status-warn text-white', 'eye'],
+                                    TaskStatus::Done => ['border-status-good bg-status-good text-white', 'check'],
+                                };
+                            @endphp
+                            <button
+                                type="button"
+                                role="radio"
+                                aria-checked="{{ $isStatusSelected ? 'true' : 'false' }}"
+                                wire:click="$set('taskStatus', '{{ $statusCase->value }}')"
+                                @class([
+                                    'inline-flex min-h-10 cursor-pointer touch-manipulation items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-semibold whitespace-nowrap transition-colors',
+                                    $statusSelectedClasses => $isStatusSelected,
+                                    'border-secondary-light text-secondary-medium hover:border-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => ! $isStatusSelected,
+                                ])
+                                data-test="task-drawer-status-{{ $statusCase->value }}"
+                            >
+                                <flux:icon :name="$statusIcon" variant="micro" class="size-3.5 shrink-0" aria-hidden="true" />
+                                {{ $statusCase->label() }}
+                            </button>
+                        @endforeach
+                    </div>
+                    <flux:error name="taskStatus" class="mt-1.5" />
+                </div>
 
-            <div class="min-w-0">
+                <div class="min-w-0">
+                    <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft" id="task-drawer-priority-label">{{ __('tasks.priority') }}</label>
+                    <div class="grid grid-cols-3 gap-1.5" role="radiogroup" aria-labelledby="task-drawer-priority-label">
+                        @foreach (TaskPriority::cases() as $priorityCase)
+                            @php
+                                $isPrioritySelected = $taskPriority === $priorityCase->value;
+                                $priorityTone = match ($priorityCase) {
+                                    TaskPriority::High => 'text-primary',
+                                    TaskPriority::Medium => 'text-status-warn',
+                                    TaskPriority::Low => 'text-secondary-light',
+                                };
+                            @endphp
+                            <button
+                                type="button"
+                                role="radio"
+                                aria-checked="{{ $isPrioritySelected ? 'true' : 'false' }}"
+                                wire:click="$set('taskPriority', '{{ $priorityCase->value }}')"
+                                @class([
+                                    'inline-flex min-h-10 cursor-pointer touch-manipulation items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-semibold whitespace-nowrap transition-colors',
+                                    'border-secondary-dark bg-secondary-dark text-white dark:border-secondary-medium dark:bg-secondary-medium' => $isPrioritySelected,
+                                    'border-secondary-light text-secondary-medium hover:border-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => ! $isPrioritySelected,
+                                ])
+                                data-test="task-drawer-priority-{{ $priorityCase->value }}"
+                            >
+                                <flux:icon.flag :variant="$priorityCase === TaskPriority::Low ? 'outline' : 'solid'" class="size-3.5 shrink-0 {{ $priorityTone }}" />
+                                {{ $priorityCase->label() }}
+                            </button>
+                        @endforeach
+                    </div>
+                    <flux:error name="taskPriority" class="mt-1.5" />
+                </div>
+            </div>
+
+            <div class="border-t border-secondary-soft pt-5 dark:border-secondary-medium">
+                <div class="mb-1.5 flex items-center justify-between">
+                    <label class="text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft" for="task-drawer-progress-slider">{{ __('tasks.progress_2') }}</label>
+                </div>
+                <div class="flex items-center gap-3">
+                    <input
+                        id="task-drawer-progress-slider"
+                        type="range"
+                        wire:model="progressPercentage"
+                        min="0"
+                        max="100"
+                        step="1"
+                        class="h-1.5 w-full flex-1 cursor-pointer accent-primary"
+                        data-test="task-drawer-progress-slider"
+                    />
+                    <div class="relative w-16 shrink-0">
+                        <input
+                            type="number"
+                            wire:model="progressPercentage"
+                            min="0"
+                            max="100"
+                            required
+                            class="w-full rounded-lg border border-secondary-light bg-white py-1.5 ps-2 pe-6 text-end text-sm font-semibold tabular-nums text-secondary-dark focus:ring-1 focus:ring-primary focus:outline-none dark:border-secondary-light dark:bg-secondary-medium dark:text-white"
+                            aria-label="{{ __('tasks.progress_2') }}"
+                            data-test="task-drawer-progress-input"
+                        />
+                        <span class="pointer-events-none absolute inset-y-0 end-2 flex items-center text-sm text-secondary-medium dark:text-secondary-soft">%</span>
+                    </div>
+                </div>
+                <flux:error name="progressPercentage" class="mt-1.5" />
+            </div>
+
+            <div class="min-w-0 border-t border-secondary-soft pt-5 dark:border-secondary-medium">
                 <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('tasks.assignees') }}</label>
                 @php
-                    $selectedAssigneeOptions = $this->userOptions->whereIn('id', collect($assignedTo)->map(fn ($id) => (int) $id));
+                    $selectedAssigneeOptions = collect($this->userOptions)->whereIn('id', collect($assignedTo)->map(fn ($id) => (int) $id));
                     $assigneeTriggerLabel = match (true) {
                         $selectedAssigneeOptions->isEmpty() => __('common.select'),
-                        $selectedAssigneeOptions->count() <= 2 => $selectedAssigneeOptions->map->name->implode(', '),
+                        $selectedAssigneeOptions->count() <= 2 => $selectedAssigneeOptions->pluck('name')->implode(', '),
                         default => __('common.count_selected', ['count' => $selectedAssigneeOptions->count()]),
                     };
                 @endphp
@@ -959,18 +1349,31 @@ new #[Title('titles.tasks')] class extends Component {
                             x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
                             class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-secondary-soft dark:hover:bg-secondary-medium"
                         >
-                            <input type="checkbox" wire:model.live="assignedTo" value="{{ $userOption->id }}" class="rounded border-secondary-light text-primary focus:ring-primary" data-test="task-assignee-checkbox-{{ $userOption->id }}" />
-                            <span class="min-w-0 truncate">{{ $userOption->name }} · {{ $userOption->secondary_name }}</span>
+                            <input type="checkbox" wire:model.live="assignedTo" value="{{ $userOption['id'] }}" class="rounded border-secondary-light text-primary focus:ring-primary" data-test="task-assignee-checkbox-{{ $userOption['id'] }}" />
+                            <span class="min-w-0 truncate">{{ $userOption['name'] }} · {{ $userOption['secondary_name'] }}</span>
                         </label>
                     @endforeach
                 </x-ui.multi-select-popover>
                 <flux:error name="assignedTo" class="mt-1.5" />
             </div>
 
-            <div class="grid gap-4 sm:grid-cols-3">
-                <x-ui.input wire:model="startDate" :label="__('common.start_date')" type="date" />
-                <x-ui.input wire:model="dueDate" :label="__('tasks.due_date_2')" type="date" />
-                <x-ui.input wire:model="completedDate" :label="__('tasks.completed_date')" type="date" />
+            <div class="border-t border-secondary-soft pt-5 dark:border-secondary-medium">
+                @php
+                    $isOverdueDraft = preg_match('/^\d{4}-\d{2}-\d{2}$/', $dueDate) === 1
+                        && $taskStatus !== \App\Enums\TaskStatus::Done->value
+                        && \Carbon\CarbonImmutable::parse($dueDate)->lt(\Carbon\CarbonImmutable::today());
+                @endphp
+                <div class="mb-1.5 flex items-center gap-2">
+                    <p class="text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('tasks.timeline') }}</p>
+                    @if ($isOverdueDraft)
+                        <span class="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold tracking-wide text-primary uppercase">{{ __('tasks.overdue') }}</span>
+                    @endif
+                </div>
+                <div class="grid gap-4 sm:grid-cols-3">
+                    <x-ui.input wire:model="startDate" :label="__('common.start_date')" type="date" />
+                    <x-ui.input wire:model="dueDate" :label="__('tasks.due_date_2')" type="date" />
+                    <x-ui.input wire:model="completedDate" :label="__('tasks.completed_date')" type="date" />
+                </div>
             </div>
         </form>
 

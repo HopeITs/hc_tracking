@@ -51,7 +51,7 @@ test('milestones can be filtered by project and status', function () {
     $second = Project::factory()->create();
 
     Milestone::factory()->create(['project_id' => $first->id, 'name' => 'First gate', 'status' => MilestoneStatus::Reached]);
-    Milestone::factory()->create(['project_id' => $second->id, 'name' => 'Second gate', 'status' => MilestoneStatus::Pending]);
+    Milestone::factory()->create(['project_id' => $second->id, 'name' => 'Second gate', 'status' => MilestoneStatus::Planned]);
 
     Livewire::actingAs($user)
         ->test('pages::milestones.index')
@@ -59,7 +59,7 @@ test('milestones can be filtered by project and status', function () {
         ->assertSee('First gate')
         ->assertDontSee('Second gate')
         ->call('clearFilters')
-        ->set('status', MilestoneStatus::Pending->value)
+        ->set('status', MilestoneStatus::Planned->value)
         ->assertDontSee('First gate')
         ->assertSee('Second gate');
 });
@@ -94,7 +94,7 @@ test('a matching child remains visible with its necessary ancestors for status a
         'project_id' => $project->id,
         'responsible_user_id' => $parentOwner->id,
         'name' => 'Parent context',
-        'status' => MilestoneStatus::Pending,
+        'status' => MilestoneStatus::Planned,
     ]);
     Milestone::factory()->childOf($parent)->create([
         'responsible_user_id' => $childOwner->id,
@@ -105,7 +105,7 @@ test('a matching child remains visible with its necessary ancestors for status a
         'project_id' => $project->id,
         'responsible_user_id' => $parentOwner->id,
         'name' => 'Unrelated root',
-        'status' => MilestoneStatus::Pending,
+        'status' => MilestoneStatus::Planned,
     ]);
 
     Livewire::actingAs($user)
@@ -146,8 +146,8 @@ test('a milestone can be created under a parent in the same project', function (
         ->set('name', '  Water quality testing  ')
         ->set('responsibleUserId', (string) $responsible)
         ->set('parentMilestoneId', (string) $parent->id)
-        ->set('milestoneStatus', MilestoneStatus::Pending->value)
-        ->set('plannedDate', '2026-06-30')
+        ->set('milestoneStatus', MilestoneStatus::Planned->value)
+        ->set('plannedStartDate', '2026-06-30')
         ->call('saveMilestone')
         ->assertHasNoErrors()
         ->assertSet('showMilestoneModal', false);
@@ -157,6 +157,52 @@ test('a milestone can be created under a parent in the same project', function (
     expect($milestone->parent_milestone_id)->toBe($parent->id)
         ->and($milestone->project_id)->toBe($project->id)
         ->and($milestone->responsible_user_id)->toBe($responsible);
+});
+
+test('milestones created through the form are sequenced after their existing siblings, not entered by hand', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->create();
+    $responsible = insertHrEmployee();
+    $parent = Milestone::factory()->create(['project_id' => $project->id]);
+    Milestone::factory()->childOf($parent)->create(['sequence' => 1]);
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.index')
+        ->call('openCreateModal')
+        ->set('milestoneProjectId', (string) $project->id)
+        ->set('name', 'Second nested gate')
+        ->set('responsibleUserId', (string) $responsible)
+        ->set('parentMilestoneId', (string) $parent->id)
+        ->set('plannedStartDate', '2026-06-30')
+        ->assertDontSee('wire:model="sequence"', false)
+        ->call('saveMilestone')
+        ->assertHasNoErrors();
+
+    $milestone = Milestone::query()->where('name', 'Second nested gate')->sole();
+
+    expect($milestone->sequence)->toBe(2);
+});
+
+test('the create modal has a description field and saves it', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->create();
+    $responsible = insertHrEmployee();
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.index')
+        ->call('openCreateModal')
+        ->assertSee('wire:model="description"', false)
+        ->set('milestoneProjectId', (string) $project->id)
+        ->set('name', 'Borehole drilling')
+        ->set('description', '  Drill and cap the new borehole.  ')
+        ->set('responsibleUserId', (string) $responsible)
+        ->set('plannedStartDate', '2026-06-30')
+        ->call('saveMilestone')
+        ->assertHasNoErrors();
+
+    $milestone = Milestone::query()->where('name', 'Borehole drilling')->sole();
+
+    expect($milestone->description)->toBe('Drill and cap the new borehole.');
 });
 
 test('changing the project while creating clears the selected parent', function () {
@@ -228,11 +274,11 @@ test('creating a milestone requires its core delivery fields', function () {
         ->test('pages::milestones.index')
         ->call('openCreateModal')
         ->set('name', '   ')
-        ->set('plannedDate', '')
+        ->set('plannedStartDate', '')
         ->set('responsibleUserId', '')
         ->set('milestoneProjectId', '')
         ->call('saveMilestone')
-        ->assertHasErrors(['name', 'plannedDate', 'responsibleUserId', 'milestoneProjectId']);
+        ->assertHasErrors(['name', 'plannedStartDate', 'responsibleUserId', 'milestoneProjectId']);
 });
 
 test('the create parent picker is limited to the selected project', function () {
@@ -343,15 +389,15 @@ test('a milestone carrying tasks is not deleted because tasks would be orphaned'
         ->and(DB::table('tasks')->find($task->id)->milestone_id)->toBe($milestone->id);
 });
 
-test('the stat cards summarise reached, overdue, missed and upcoming milestones', function () {
+test('the stat cards summarise reached, missed and upcoming milestones', function () {
     $user = User::factory()->create();
     $today = now()->startOfDay();
 
-    Milestone::factory()->create(['status' => MilestoneStatus::Reached, 'planned_date' => $today->copy()->subDays(10)]);
-    Milestone::factory()->create(['status' => MilestoneStatus::Missed, 'planned_date' => $today->copy()->subDays(5)]);
-    Milestone::factory()->create(['status' => MilestoneStatus::Pending, 'planned_date' => $today->copy()->subDay()]);
-    Milestone::factory()->create(['status' => MilestoneStatus::Pending, 'planned_date' => $today->copy()->addDays(3)]);
-    Milestone::factory()->create(['status' => MilestoneStatus::Pending, 'planned_date' => $today->copy()->addDays(30)]);
+    Milestone::factory()->create(['status' => MilestoneStatus::Reached, 'planned_start_date' => $today->copy()->subDays(10)]);
+    Milestone::factory()->create(['status' => MilestoneStatus::Planned, 'planned_end_date' => $today->copy()->subDays(5)]);
+    Milestone::factory()->create(['status' => MilestoneStatus::Planned, 'planned_end_date' => $today->copy()->subDay()]);
+    Milestone::factory()->create(['status' => MilestoneStatus::Planned, 'planned_end_date' => $today->copy()->addDays(3)]);
+    Milestone::factory()->create(['status' => MilestoneStatus::Planned, 'planned_end_date' => $today->copy()->addDays(30)]);
 
     $stats = Livewire::actingAs($user)
         ->test('pages::milestones.index')
@@ -361,8 +407,7 @@ test('the stat cards summarise reached, overdue, missed and upcoming milestones'
     expect($stats)->toBe([
         'total' => 5,
         'reached' => 1,
-        'overdue' => 1,
-        'missed' => 1,
+        'missed' => 2,
         'due_soon' => 1,
     ]);
 });
@@ -373,7 +418,7 @@ test('the milestone directory distinguishes empty and filtered states', function
     Livewire::actingAs($user)
         ->test('pages::milestones.index')
         ->assertSeeText('No milestones yet')
-        ->set('status', MilestoneStatus::Missed->value)
+        ->set('status', MilestoneStatus::Cancelled->value)
         ->assertSeeText('No matching milestones')
         ->assertSeeText('Reset filters');
 });
@@ -384,7 +429,7 @@ test('the timeline view plots milestones as clickable markers grouped by project
     $milestone = Milestone::factory()->create([
         'project_id' => $project->id,
         'name' => 'Foundation poured',
-        'planned_date' => '2026-04-01',
+        'planned_start_date' => '2026-04-01',
     ]);
 
     Livewire::actingAs($user)
@@ -488,7 +533,7 @@ test('a deletable milestone shows a delete action in the board view, and a locke
 test('the board view renders a card per milestone and honours the status filter', function () {
     $user = User::factory()->create();
     $reached = Milestone::factory()->create(['name' => 'Reached gate', 'status' => MilestoneStatus::Reached]);
-    $pending = Milestone::factory()->create(['name' => 'Pending gate', 'status' => MilestoneStatus::Pending]);
+    $pending = Milestone::factory()->create(['name' => 'Pending gate', 'status' => MilestoneStatus::Planned]);
 
     Livewire::actingAs($user)
         ->test('pages::milestones.index')
@@ -502,32 +547,34 @@ test('the board view renders a card per milestone and honours the status filter'
 
 test('the board view wires each card to be dragged and each column to accept a drop', function () {
     $user = User::factory()->create();
-    $milestone = Milestone::factory()->create(['name' => 'Pending gate', 'status' => MilestoneStatus::Pending]);
+    $milestone = Milestone::factory()->create(['name' => 'Planned gate', 'status' => MilestoneStatus::Planned]);
 
     Livewire::actingAs($user)
         ->test('pages::milestones.index')
         ->set('view', 'board')
         // The card is a genuine HTML5 drag source carrying its id and current status.
         ->assertSee('draggable="true"', false)
-        ->assertSee('{ id: '.$milestone->id.", status: 'pending' }", false)
+        ->assertSee('{ id: '.$milestone->id.", status: 'planned' }", false)
         // Each column is a drop target that calls quickSetStatus with its own status.
+        ->assertSee('$wire.quickSetStatus(dragged.id, \'ongoing\')', false)
         ->assertSee('$wire.quickSetStatus(dragged.id, \'reached\')', false)
-        ->assertSee('$wire.quickSetStatus(dragged.id, \'missed\')', false)
+        ->assertSee('$wire.quickSetStatus(dragged.id, \'postponed\')', false)
         ->assertSee('$wire.quickSetStatus(dragged.id, \'cancelled\')', false);
 });
 
 test('the board view wires each column to open the create modal with that status when its empty space is clicked', function () {
     $user = User::factory()->create();
-    Milestone::factory()->create(['status' => MilestoneStatus::Pending]);
+    Milestone::factory()->create(['status' => MilestoneStatus::Planned]);
 
     Livewire::actingAs($user)
         ->test('pages::milestones.index')
         ->set('view', 'board')
         ->assertSee('data-milestone-card', false)
+        ->assertSee("\$wire.openCreateModal(null, 'planned')", false)
+        ->assertSee("\$wire.openCreateModal(null, 'ongoing')", false)
         ->assertSee("\$wire.openCreateModal(null, 'reached')", false)
-        ->assertSee("\$wire.openCreateModal(null, 'missed')", false)
-        ->assertSee("\$wire.openCreateModal(null, 'cancelled')", false)
-        ->assertSee("\$wire.openCreateModal(null, 'pending')", false);
+        ->assertSee("\$wire.openCreateModal(null, 'postponed')", false)
+        ->assertSee("\$wire.openCreateModal(null, 'cancelled')", false);
 });
 
 test('opening the create modal with a status prefills it, and an invalid status is ignored', function () {
@@ -540,12 +587,12 @@ test('opening the create modal with a status prefills it, and an invalid status 
         ->assertSet('milestoneStatus', MilestoneStatus::Reached->value)
         ->call('closeMilestoneModal')
         ->call('openCreateModal', null, 'not-a-real-status')
-        ->assertSet('milestoneStatus', 'pending');
+        ->assertSet('milestoneStatus', 'planned');
 });
 
 test('a milestone status can be changed from the board view', function () {
     $user = User::factory()->create();
-    $milestone = Milestone::factory()->create(['status' => MilestoneStatus::Pending]);
+    $milestone = Milestone::factory()->create(['status' => MilestoneStatus::Planned]);
 
     Livewire::actingAs($user)
         ->test('pages::milestones.index')
@@ -557,13 +604,13 @@ test('a milestone status can be changed from the board view', function () {
 
 test('an invalid quick status change is ignored', function () {
     $user = User::factory()->create();
-    $milestone = Milestone::factory()->create(['status' => MilestoneStatus::Pending]);
+    $milestone = Milestone::factory()->create(['status' => MilestoneStatus::Planned]);
 
     Livewire::actingAs($user)
         ->test('pages::milestones.index')
         ->call('quickSetStatus', $milestone->id, 'not-a-real-status');
 
-    expect($milestone->refresh()->status)->toBe(MilestoneStatus::Pending);
+    expect($milestone->refresh()->status)->toBe(MilestoneStatus::Planned);
 });
 
 test('the calendar view places milestones on their planned date and honours the project filter', function () {
@@ -574,12 +621,12 @@ test('the calendar view places milestones on their planned date and honours the 
     $milestone = Milestone::factory()->create([
         'project_id' => $inMonth->id,
         'name' => 'Foundation poured',
-        'planned_date' => '2026-04-15',
+        'planned_start_date' => '2026-04-15',
     ]);
     $excluded = Milestone::factory()->create([
         'project_id' => $otherProject->id,
         'name' => 'Other gate',
-        'planned_date' => '2026-04-16',
+        'planned_start_date' => '2026-04-16',
     ]);
 
     Livewire::actingAs($user)
@@ -618,13 +665,13 @@ test('clicking a day in the calendar view opens the create modal with that date 
         ->set('month', '2026-04')
         ->call('openCreateModal', '2026-04-15')
         ->assertSet('showMilestoneModal', true)
-        ->assertSet('plannedDate', '2026-04-15');
+        ->assertSet('plannedStartDate', '2026-04-15');
 });
 
 test('a deletable milestone shows a delete action in the calendar view, and a locked one does not', function () {
     $user = User::factory()->create();
-    $parent = Milestone::factory()->create(['name' => 'Root gate', 'planned_date' => '2026-04-10']);
-    $child = Milestone::factory()->childOf($parent)->create(['name' => 'Child gate', 'planned_date' => '2026-04-11']);
+    $parent = Milestone::factory()->create(['name' => 'Root gate', 'planned_start_date' => '2026-04-10']);
+    $child = Milestone::factory()->childOf($parent)->create(['name' => 'Child gate', 'planned_start_date' => '2026-04-11']);
 
     Livewire::actingAs($user)
         ->test('pages::milestones.index')

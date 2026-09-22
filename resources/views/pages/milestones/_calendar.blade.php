@@ -5,11 +5,17 @@
     $calendar = $this->calendarGrid;
     $today = \Carbon\CarbonImmutable::today();
 
-    $markerTone = fn (MilestoneStatus $status): string => match ($status) {
-        MilestoneStatus::Reached => 'bg-status-good-soft text-status-good',
-        MilestoneStatus::Missed => 'bg-status-critical-soft text-primary',
-        MilestoneStatus::Cancelled => 'bg-secondary-soft text-secondary-medium dark:bg-secondary-medium dark:text-secondary-soft',
-        MilestoneStatus::Pending => 'bg-white text-secondary-dark ring-1 ring-secondary-soft dark:bg-secondary-dark dark:text-white dark:ring-secondary-medium',
+    $markerTone = function (\App\Models\Milestone $milestone): string {
+        if ($milestone->isMissed() || $milestone->isOverdue()) {
+            return 'bg-status-critical-soft text-primary';
+        }
+
+        return match ($milestone->status) {
+            MilestoneStatus::Reached => 'bg-status-good-soft text-status-good',
+            MilestoneStatus::Ongoing => 'bg-status-warn-soft text-status-warn',
+            MilestoneStatus::Postponed, MilestoneStatus::Cancelled => 'bg-secondary-soft text-secondary-medium dark:bg-secondary-medium dark:text-secondary-soft',
+            MilestoneStatus::Planned => 'bg-white text-secondary-dark ring-1 ring-secondary-soft dark:bg-secondary-dark dark:text-white dark:ring-secondary-medium',
+        };
     };
 @endphp
 
@@ -59,7 +65,7 @@
                     </span>
 
                     @foreach ($dayMilestones as $milestone)
-                        <div data-milestone-chip wire:key="milestone-calendar-chip-{{ $milestone->id }}" class="group flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] {{ $markerTone($milestone->status) }}">
+                        <div data-milestone-chip wire:key="milestone-calendar-chip-{{ $milestone->id }}" class="group flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] {{ $markerTone($milestone) }}">
                             <flux:icon.flag variant="micro" class="size-3 shrink-0" />
                             <a href="{{ route('milestones.show', $milestone) }}" wire:navigate class="min-w-0 flex-1 truncate text-start font-medium hover:underline" data-test="milestone-calendar-chip-{{ $milestone->id }}">
                                 {{ $milestone->name }}

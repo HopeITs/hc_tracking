@@ -1,10 +1,7 @@
 @php
     use App\Enums\MilestoneStatus;
-    use Carbon\CarbonImmutable;
 
     /** @var \Illuminate\Database\Eloquent\Collection<int, \App\Models\Project> $projects */
-
-    $today = CarbonImmutable::today();
 
     $allMilestones = $projects
         ->flatMap(fn ($projectRow) => $this->flattenMilestones($projectRow->milestones)->map(function ($milestone) use ($projectRow) {
@@ -12,14 +9,15 @@
 
             return $milestone;
         }))
-        ->sortBy('planned_date')
+        ->sortBy('planned_start_date')
         ->values();
 
     $columnTone = fn (MilestoneStatus $case): string => match ($case) {
         MilestoneStatus::Reached => 'border-status-good/30 bg-status-good-soft',
-        MilestoneStatus::Missed => 'border-primary/30 bg-status-critical-soft',
+        MilestoneStatus::Ongoing => 'border-status-warn/30 bg-status-warn-soft',
+        MilestoneStatus::Postponed => 'border-primary/30 bg-status-critical-soft',
         MilestoneStatus::Cancelled => 'border-secondary-light bg-secondary-soft/60 dark:bg-secondary-medium/40',
-        MilestoneStatus::Pending => 'border-board-line bg-board',
+        MilestoneStatus::Planned => 'border-board-line bg-board',
     };
 @endphp
 
@@ -52,7 +50,7 @@
             <div class="flex flex-col gap-2">
                 @forelse ($columnMilestones as $milestone)
                     @php
-                        $isOverdue = $milestone->status === MilestoneStatus::Pending && $milestone->planned_date->lt($today);
+                        $milestoneDueDate = $milestone->planned_end_date ?? $milestone->planned_start_date;
                     @endphp
                     <div
                         class="flex flex-col gap-2 rounded-lg border border-secondary-soft bg-white p-3 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-opacity dark:border-secondary-medium dark:bg-secondary-dark"
@@ -64,9 +62,12 @@
                         x-on:dragend="$event.currentTarget.classList.remove('opacity-40')"
                     >
                         <div class="flex items-start justify-between gap-2">
-                            <a href="{{ route('milestones.show', $milestone) }}" wire:navigate class="min-w-0 truncate text-sm font-semibold text-secondary-dark hover:underline dark:text-white" data-test="milestone-board-card-{{ $milestone->id }}">
-                                {{ $milestone->name }}
-                            </a>
+                            <div class="flex min-w-0 flex-wrap items-center gap-1.5">
+                                <a href="{{ route('milestones.show', $milestone) }}" wire:navigate class="min-w-0 truncate text-sm font-semibold text-secondary-dark hover:underline dark:text-white" data-test="milestone-board-card-{{ $milestone->id }}">
+                                    {{ $milestone->name }}
+                                </a>
+                                <x-ui.milestone-flags :milestone="$milestone" />
+                            </div>
 
                             @if ($milestone->children_count === 0 && $milestone->tasks_count === 0)
                                 <x-ui.button tone="ghost" size="sm" icon="trash" class="size-8! shrink-0" wire:click="confirmDelete({{ $milestone->id }})" :aria-label="__('common.delete_name', ['name' => $milestone->name])" />
@@ -82,12 +83,11 @@
                         <a href="{{ route('projects.show', $milestone->project) }}" wire:navigate class="truncate text-xs text-secondary-medium hover:underline dark:text-secondary-soft">{{ $milestone->project->name }}</a>
 
                         <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                            <span @class(['tabular-nums', 'font-semibold text-status-warn' => $isOverdue, 'text-secondary-medium dark:text-secondary-soft' => ! $isOverdue])>
-                                {{ __('milestones.planned_date', ['date' => $milestone->planned_date->translatedFormat(__('formats.date'))]) }}
-                                @if ($isOverdue)
-                                    · {{ __('milestones.timeline_overdue') }}
-                                @endif
-                            </span>
+                            @if ($milestoneDueDate !== null)
+                                <span @class(['tabular-nums', 'font-semibold text-status-warn' => $milestone->isMissed(), 'text-secondary-medium dark:text-secondary-soft' => ! $milestone->isMissed()])>
+                                    {{ __('milestones.planned_date', ['date' => $milestoneDueDate->translatedFormat(__('formats.date'))]) }}
+                                </span>
+                            @endif
                             <span class="text-secondary-medium tabular-nums dark:text-secondary-soft">{{ __('milestones.weight_weight', ['weight' => $milestone->weight_percentage]) }}</span>
                         </div>
 

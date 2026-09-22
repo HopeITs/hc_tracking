@@ -25,9 +25,10 @@ return [
         'other' => 'Other',
     ],
     'milestone_status' => [
-        'pending' => 'Pending',
+        'planned' => 'Planned',
+        'ongoing' => 'Ongoing',
         'reached' => 'Reached',
-        'missed' => 'Missed',
+        'postponed' => 'Postponed',
         'cancelled' => 'Cancelled',
     ],
     'period' => [

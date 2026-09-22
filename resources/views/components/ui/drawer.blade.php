@@ -1,4 +1,4 @@
-@props(['title' => null, 'subtitle' => null])
+@props(['title' => null, 'subtitle' => null, 'maxWidth' => 'max-w-xl'])
 
 {{-- A right-side slide-over. Bind visibility with wire:model on this component, e.g. <x-ui.drawer wire:model="showTaskDrawer">. --}}
 <div
@@ -20,7 +20,7 @@
     ></div>
 
     <div
-        class="fixed inset-y-0 end-0 flex w-full max-w-xl flex-col border-s border-secondary-soft bg-white shadow-2xl dark:border-secondary-medium dark:bg-secondary-dark"
+        class="fixed inset-y-0 end-0 flex w-full {{ $maxWidth }} flex-col border-s border-secondary-soft bg-white shadow-2xl dark:border-secondary-medium dark:bg-secondary-dark"
         x-show="open"
         x-transition:enter="transition ease-out duration-300"
         x-transition:enter-start="translate-x-full rtl:-translate-x-full"

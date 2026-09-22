@@ -181,6 +181,30 @@ test('delete is a no-op until a risk is confirmed', function () {
     $this->assertDatabaseHas('risks', ['id' => $risk->id]);
 });
 
+test('a risk can be marked materialised directly from its card', function () {
+    $user = User::factory()->create();
+    $risk = Risk::factory()->create(['happened' => false]);
+
+    Livewire::actingAs($user)
+        ->test('pages::risks.index')
+        ->call('setHappened', $risk->id, true)
+        ->assertHasNoErrors();
+
+    expect($risk->refresh()->happened)->toBeTrue();
+});
+
+test('a risk can be moved back to potential directly from its card', function () {
+    $user = User::factory()->create();
+    $risk = Risk::factory()->create(['happened' => true]);
+
+    Livewire::actingAs($user)
+        ->test('pages::risks.index')
+        ->call('setHappened', $risk->id, false)
+        ->assertHasNoErrors();
+
+    expect($risk->refresh()->happened)->toBeFalse();
+});
+
 test('risk content is escaped in the register', function () {
     $user = User::factory()->create();
     $project = Project::factory()->create(['name' => '<script>project()</script>']);

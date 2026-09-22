@@ -29,7 +29,7 @@ class MilestoneFactory extends Factory
             'project_id' => Project::factory(),
             'name' => fake()->randomElement(['Baseline assessment', 'Community mobilisation', 'Works handover', 'Endline survey']),
             'description' => fake()->sentence(),
-            'planned_date' => fake()->dateTimeBetween('-1 year', '+1 year')->format('Y-m-d'),
+            'planned_start_date' => fake()->dateTimeBetween('-1 year', '+1 year')->format('Y-m-d'),
             'responsible_user_id' => fn (): int => $this->createHrEmployee(),
         ];
     }
@@ -50,17 +50,20 @@ class MilestoneFactory extends Factory
     }
 
     /**
-     * Indicate that the milestone was reached on its planned date.
+     * Indicate that the milestone was reached on its planned end date.
      *
-     * The derived column is a closure rather than a value read from
-     * $attributes directly, so it is resolved after the array passed to
-     * create() has been merged and stays consistent with it.
+     * The derived columns are closures rather than values read from
+     * $attributes directly, so they are resolved after the array passed to
+     * create() has been merged and stay consistent with it. MilestoneObserver
+     * only back-fills actual dates when they are left unset, so a state that
+     * declares 'reached' without them would otherwise leave both null.
      */
     public function reached(): static
     {
         return $this->state([
             'status' => MilestoneStatus::Reached,
-            'actual_date' => fn (array $attributes): string => $attributes['planned_date'],
+            'actual_start_date' => fn (array $attributes): string => $attributes['planned_start_date'],
+            'actual_end_date' => fn (array $attributes): string => $attributes['planned_end_date'] ?? $attributes['planned_start_date'],
         ]);
     }
 }

@@ -23,9 +23,9 @@
 
     $markerTone = fn ($milestone): string => match (true) {
         $milestone->status === MilestoneStatus::Reached => 'border-status-good bg-status-good',
-        $milestone->status === MilestoneStatus::Missed => 'border-primary bg-primary',
         $milestone->status === MilestoneStatus::Cancelled => 'border-secondary-light bg-secondary-soft dark:border-secondary-medium dark:bg-secondary-medium/40',
-        $milestone->planned_date !== null && $milestone->planned_date->lt($today) => 'border-status-warn bg-status-warn',
+        $milestone->isMissed() || $milestone->isOverdue() => 'border-primary bg-primary',
+        $milestone->status === MilestoneStatus::Ongoing => 'border-status-warn bg-status-warn',
         default => 'border-secondary-dark bg-board dark:border-white',
     };
 @endphp
@@ -35,9 +35,9 @@
         {{-- Legend --}}
         <div class="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-board-line px-3.5 pt-3.5 pb-3 type-meta text-secondary-medium dark:text-secondary-soft" aria-hidden="true">
             <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-status-good bg-status-good"></span>{{ MilestoneStatus::Reached->label() }}</span>
-            <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-secondary-dark bg-board dark:border-white"></span>{{ MilestoneStatus::Pending->label() }}</span>
-            <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-status-warn bg-status-warn"></span>{{ __('milestones.timeline_overdue') }}</span>
-            <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-primary bg-primary"></span>{{ MilestoneStatus::Missed->label() }}</span>
+            <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-secondary-dark bg-board dark:border-white"></span>{{ MilestoneStatus::Planned->label() }}</span>
+            <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-status-warn bg-status-warn"></span>{{ MilestoneStatus::Ongoing->label() }}</span>
+            <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-primary bg-primary"></span>{{ __('milestones.missed') }} / {{ __('milestones.overdue') }}</span>
             <span class="inline-flex items-center gap-1.5"><span class="h-3.5 w-0.5 bg-primary"></span>{{ __('ui.today') }}</span>
         </div>
 
@@ -85,14 +85,14 @@
                             @endforeach
                             <span aria-hidden="true" class="absolute inset-y-0 z-10 w-0.5 -translate-x-1/2 bg-primary/70 rtl:translate-x-1/2" style="inset-inline-start: {{ $todayAt }}%"></span>
 
-                            @if ($milestone->planned_date !== null)
+                            @if ($milestone->planned_start_date !== null)
                                 @php
-                                    $markerDetails = $milestone->name.' · '.$milestone->planned_date->translatedFormat(__('formats.date')).' · '.$milestone->status->label();
+                                    $markerDetails = $milestone->name.' · '.$milestone->planned_start_date->translatedFormat(__('formats.date')).' · '.$milestone->status->label();
                                 @endphp
                                 <button
                                     type="button"
                                     class="absolute top-1/2 z-20 flex size-6 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-primary rtl:translate-x-1/2"
-                                    style="inset-inline-start: {{ $position($milestone->planned_date) }}%"
+                                    style="inset-inline-start: {{ $position($milestone->planned_start_date) }}%"
                                     x-data="{ open: false }"
                                     x-on:mouseenter="open = true"
                                     x-on:mouseleave="open = false"
@@ -110,7 +110,7 @@
                                         class="pointer-events-none absolute bottom-full start-1/2 z-30 mb-1.5 w-max max-w-56 -translate-x-1/2 rounded-md bg-secondary-dark px-2.5 py-1.5 text-start text-xs leading-snug text-white shadow-lg rtl:translate-x-1/2 dark:bg-white dark:text-secondary-dark"
                                     >
                                         <span class="block font-semibold">{{ $milestone->name }}</span>
-                                        <span class="block opacity-80">{{ $milestone->planned_date->translatedFormat(__('formats.date')) }} · {{ $milestone->status->label() }}</span>
+                                        <span class="block opacity-80">{{ $milestone->planned_start_date->translatedFormat(__('formats.date')) }} · {{ $milestone->status->label() }}</span>
                                     </span>
                                 </button>
                             @endif
@@ -119,9 +119,9 @@
                         @endif
                     </div>
                     <p class="mt-1 type-meta text-secondary-medium tabular-nums dark:text-secondary-soft">
-                        <bdi>{{ $milestone->planned_date?->translatedFormat(__('formats.date')) ?? __('common.unscheduled') }}</bdi>
-                        @if ($milestone->actual_date !== null)
-                            <span aria-hidden="true">·</span> {{ __('milestones.actual_date') }}: {{ $milestone->actual_date->translatedFormat(__('formats.date')) }}
+                        <bdi>{{ $milestone->planned_start_date?->translatedFormat(__('formats.date')) ?? __('common.unscheduled') }}</bdi>
+                        @if ($milestone->actual_end_date !== null)
+                            <span aria-hidden="true">·</span> {{ __('milestones.actual_end_date') }}: {{ $milestone->actual_end_date->translatedFormat(__('formats.date')) }}
                         @endif
                     </p>
                 </div>
@@ -129,8 +129,8 @@
                 {{-- Schedule verdict --}}
                 <div class="flex items-center gap-2 @4xl/detail:flex-col @4xl/detail:items-end @4xl/detail:gap-1">
                     <x-ui.schedule-status
-                        :planned="$milestone->planned_date"
-                        :actual="$milestone->actual_date"
+                        :planned="$milestone->planned_end_date ?? $milestone->planned_start_date"
+                        :actual="$milestone->actual_end_date"
                         :done="$milestone->status === MilestoneStatus::Reached"
                     />
                 </div>

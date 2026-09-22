@@ -31,10 +31,10 @@ test('the enum badge labels a case and tones it', function () {
         ->and($html)->toContain('bg-secondary-dark');
 });
 
-test('the enum badge tones a terminal negative state with the primary colour', function () {
-    $html = Blade::render('<x-ui.enum-badge :case="$case" />', ['case' => MilestoneStatus::Missed]);
+test('the enum badge tones a stalled state with the primary colour', function () {
+    $html = Blade::render('<x-ui.enum-badge :case="$case" />', ['case' => MilestoneStatus::Postponed]);
 
-    expect($html)->toContain('Missed')
+    expect($html)->toContain('Postponed')
         ->and($html)->toContain('bg-primary');
 });
 

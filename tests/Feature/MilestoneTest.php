@@ -4,16 +4,18 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-test('a new milestone is pending, first in sequence and carries no weight', function () {
+test('a new milestone is planned, first in sequence and carries no weight', function () {
     $user = User::factory()->create();
     $projectId = insertProject(insertCity(), insertProgram(insertStrategy(), $user->id), $user->id);
 
     $milestone = DB::table('milestones')->find(insertMilestone($projectId, $user->id));
 
-    expect($milestone->status)->toBe('pending')
+    expect($milestone->status)->toBe('planned')
         ->and((int) $milestone->sequence)->toBe(1)
         ->and($milestone->weight_percentage)->toBe('0.00')
-        ->and($milestone->actual_date)->toBeNull()
+        ->and($milestone->planned_end_date)->toBeNull()
+        ->and($milestone->actual_start_date)->toBeNull()
+        ->and($milestone->actual_end_date)->toBeNull()
         ->and($milestone->description)->toBeNull()
         ->and($milestone->parent_milestone_id)->toBeNull();
 });

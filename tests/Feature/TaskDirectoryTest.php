@@ -3,6 +3,7 @@
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Models\Milestone;
+use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Task;
 use App\Models\TaskAttachment;
@@ -523,10 +524,11 @@ test('the list view computes stat tiles with one aggregate query instead of load
     DB::disableQueryLog();
 
     // paginate() itself issues a count query plus the page's select query;
-    // the stat tiles add one aggregate select on top of that — three total,
-    // not a second full (board-sized) fetch of every task with its relations
-    // just to count a handful of numbers.
-    expect($taskTableQueries)->toHaveCount(3);
+    // the stat tiles add one aggregate select on top of that, and the eager
+    // load of each row's own subtasks (for the inline expand panel) adds a
+    // fourth — four total, not a second full (board-sized) fetch of every
+    // task with its relations just to count a handful of numbers.
+    expect($taskTableQueries)->toHaveCount(4);
 });
 
 test('the list view groups tasks by status with a colored collapsible header', function () {
@@ -570,6 +572,268 @@ test('quickCreateTask does nothing for a blank title', function () {
         ->test('pages::tasks.index')
         ->call('quickCreateTask', '   ')
         ->assertSet('showTaskDrawer', false);
+});
+
+test('quickCreateTask creates the task directly with no drawer when the proposal and assignee are both inferable', function () {
+    $employeeId = insertHrEmployee();
+    $user = User::factory()->create(['employee_id' => $employeeId]);
+    $proposal = Proposal::factory()->create();
+    $project = Project::factory()->create();
+    $project->proposals()->attach($proposal->id);
+    $milestone = Milestone::factory()->create(['project_id' => $project->id]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->call('quickCreateTask', '  Inline task  ', TaskStatus::InProgress->value, (string) $milestone->id)
+        ->assertSet('showTaskDrawer', false);
+
+    $task = Task::query()->where('title', 'Inline task')->sole();
+
+    expect($task->status)->toBe(TaskStatus::InProgress)
+        ->and($task->milestone_id)->toBe($milestone->id)
+        ->and($task->proposal_id)->toBe($proposal->id)
+        ->and($task->taskAssignees->pluck('employee_id')->all())->toBe([$employeeId]);
+});
+
+test('quickCreateTask falls back to the drawer when the milestone project funds several proposals', function () {
+    $employeeId = insertHrEmployee();
+    $user = User::factory()->create(['employee_id' => $employeeId]);
+    $project = Project::factory()->create();
+    $project->proposals()->attach(Proposal::factory()->count(2)->create()->pluck('id'));
+    $milestone = Milestone::factory()->create(['project_id' => $project->id]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->call('quickCreateTask', 'Ambiguous task', null, (string) $milestone->id)
+        ->assertSet('showTaskDrawer', true)
+        ->assertSet('title', 'Ambiguous task');
+
+    expect(Task::query()->count())->toBe(0);
+});
+
+test('quickCreateTask falls back to the drawer when the signed-in user has no linked HR employee', function () {
+    $user = User::factory()->create(['employee_id' => null]);
+    $proposal = Proposal::factory()->create();
+    $project = Project::factory()->create();
+    $project->proposals()->attach($proposal->id);
+    $milestone = Milestone::factory()->create(['project_id' => $project->id]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->call('quickCreateTask', 'Unassignable task', null, (string) $milestone->id)
+        ->assertSet('showTaskDrawer', true);
+
+    expect(Task::query()->count())->toBe(0);
+});
+
+test('the list view inline add task row honours its own due date priority status and assignees', function () {
+    // The row's own signed-in user (Alice) is only the *fallback* assignee —
+    // once the draft explicitly picks someone (Bob), that pick wins outright
+    // rather than being merged with the fallback.
+    $alice = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
+    $bob = insertHrEmployee(firstNameEn: 'Bob', lastNameEn: 'Rahman');
+    $user = User::factory()->create(['employee_id' => $alice]);
+    $proposal = Proposal::factory()->create();
+    $project = Project::factory()->create();
+    $project->proposals()->attach($proposal->id);
+    $milestone = Milestone::factory()->create(['project_id' => $project->id]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->set('taskDrafts.row-1.due_date', '2026-11-05')
+        ->set('taskDrafts.row-1.priority', TaskPriority::High->value)
+        ->set('taskDrafts.row-1.status', TaskStatus::Done->value)
+        ->call('toggleTaskDraftAssignee', 'row-1', $bob)
+        ->call('quickCreateTask', 'Custom task', null, (string) $milestone->id, 'row-1')
+        ->assertSet('showTaskDrawer', false);
+
+    $task = Task::query()->where('title', 'Custom task')->sole();
+
+    expect($task->due_date->toDateString())->toBe('2026-11-05')
+        ->and($task->priority)->toBe(TaskPriority::High)
+        ->and($task->status)->toBe(TaskStatus::Done)
+        ->and($task->progress_percentage)->toBe(100)
+        ->and($task->completed_date)->not->toBeNull()
+        ->and($task->milestone_id)->toBe($milestone->id)
+        ->and($task->proposal_id)->toBe($proposal->id)
+        ->and($task->taskAssignees->pluck('employee_id')->all())->toBe([$bob]);
+});
+
+test('quickCreateTask falling back to the drawer carries the row draft into the drawer fields', function () {
+    $bob = insertHrEmployee(firstNameEn: 'Bob', lastNameEn: 'Rahman');
+    $user = User::factory()->create(['employee_id' => null]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->set('taskDrafts.row-1.due_date', '2026-12-01')
+        ->set('taskDrafts.row-1.priority', TaskPriority::Low->value)
+        ->set('taskDrafts.row-1.status', TaskStatus::UnderReview->value)
+        ->call('toggleTaskDraftAssignee', 'row-1', $bob)
+        ->call('quickCreateTask', 'Needs the drawer', null, null, 'row-1')
+        ->assertSet('showTaskDrawer', true)
+        ->assertSet('title', 'Needs the drawer')
+        ->assertSet('taskPriority', TaskPriority::Low->value)
+        ->assertSet('dueDate', '2026-12-01')
+        ->assertSet('assignedTo', [(string) $bob]);
+
+    expect(Task::query()->count())->toBe(0);
+});
+
+test('toggleTaskDraftAssignee toggles an employee in and out of the add-task draft', function () {
+    $alice = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
+    $user = User::factory()->create();
+
+    $component = Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->call('toggleTaskDraftAssignee', 'row-1', $alice);
+
+    expect($component->instance()->taskDraft('row-1')['assignees'])->toBe([(string) $alice]);
+
+    $component->call('toggleTaskDraftAssignee', 'row-1', $alice);
+
+    expect($component->instance()->taskDraft('row-1')['assignees'])->toBe([]);
+});
+
+test('quickCreateTask uses the calendar days own due date over any draft due date', function () {
+    $employeeId = insertHrEmployee();
+    $user = User::factory()->create(['employee_id' => $employeeId]);
+    $proposal = Proposal::factory()->create();
+    $project = Project::factory()->create();
+    $project->proposals()->attach($proposal->id);
+    $milestone = Milestone::factory()->create(['project_id' => $project->id]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->set('milestone', (string) $milestone->id)
+        ->set('taskDrafts.calendar|2026-08-30.due_date', '2099-01-01')
+        ->set('taskDrafts.calendar|2026-08-30.priority', TaskPriority::High->value)
+        ->call('quickCreateTask', 'Calendar task', null, null, 'calendar|2026-08-30', '2026-08-30')
+        ->assertSet('showTaskDrawer', false);
+
+    $task = Task::query()->where('title', 'Calendar task')->sole();
+
+    expect($task->due_date->toDateString())->toBe('2026-08-30')
+        ->and($task->priority)->toBe(TaskPriority::High);
+});
+
+test('addSubtaskQuick creates a subtask inheriting the parent proposal milestone and assignees', function () {
+    $user = User::factory()->create();
+    $alice = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
+    $milestone = Milestone::factory()->create();
+    $parent = Task::factory()->create(['milestone_id' => $milestone->id]);
+    $parent->taskAssignees()->delete();
+    $parent->taskAssignees()->create(['employee_id' => $alice]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->call('addSubtaskQuick', $parent->id, '  Follow up call  ');
+
+    $subtask = Task::query()->where('title', 'Follow up call')->sole();
+
+    expect($subtask->parent_task_id)->toBe($parent->id)
+        ->and($subtask->proposal_id)->toBe($parent->proposal_id)
+        ->and($subtask->milestone_id)->toBe($milestone->id)
+        ->and($subtask->taskAssignees->pluck('employee_id')->all())->toBe([$alice]);
+});
+
+test('addSubtaskQuick refuses to nest a subtask under another subtask', function () {
+    $user = User::factory()->create();
+    $parent = Task::factory()->create();
+    $subtask = Task::factory()->create(['parent_task_id' => $parent->id]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->call('addSubtaskQuick', $subtask->id, 'Grandchild task');
+
+    expect(Task::query()->where('title', 'Grandchild task')->exists())->toBeFalse();
+});
+
+test('addSubtaskQuick does nothing for a blank title', function () {
+    $user = User::factory()->create();
+    $parent = Task::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->call('addSubtaskQuick', $parent->id, '   ');
+
+    expect($parent->subtasks()->count())->toBe(0);
+});
+
+test('subtaskDraft defaults to todo medium priority no due date and the parents own assignees', function () {
+    $user = User::factory()->create();
+    $alice = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
+    $parent = Task::factory()->create();
+    $parent->taskAssignees()->delete();
+    $parent->taskAssignees()->create(['employee_id' => $alice]);
+
+    $draft = Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->instance()
+        ->subtaskDraft($parent->fresh(['taskAssignees']));
+
+    expect($draft)->toBe([
+        'status' => TaskStatus::Todo->value,
+        'priority' => TaskPriority::Medium->value,
+        'due_date' => '',
+        'assignees' => [(string) $alice],
+    ]);
+});
+
+test('the list view inline add subtask row honours its own due date priority status and assignees', function () {
+    $user = User::factory()->create();
+    $alice = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
+    $bob = insertHrEmployee(firstNameEn: 'Bob', lastNameEn: 'Rahman');
+    $parent = Task::factory()->create();
+    $parent->taskAssignees()->delete();
+    $parent->taskAssignees()->create(['employee_id' => $alice]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->set("subtaskDrafts.{$parent->id}.due_date", '2026-11-05')
+        ->set("subtaskDrafts.{$parent->id}.priority", TaskPriority::High->value)
+        ->set("subtaskDrafts.{$parent->id}.status", TaskStatus::Done->value)
+        ->call('toggleSubtaskDraftAssignee', $parent->id, $bob)
+        ->call('addSubtaskQuick', $parent->id, 'Custom subtask');
+
+    $subtask = Task::query()->where('title', 'Custom subtask')->sole();
+
+    expect($subtask->due_date->toDateString())->toBe('2026-11-05')
+        ->and($subtask->priority)->toBe(TaskPriority::High)
+        ->and($subtask->status)->toBe(TaskStatus::Done)
+        ->and($subtask->progress_percentage)->toBe(100)
+        ->and($subtask->completed_date)->not->toBeNull()
+        ->and($subtask->taskAssignees->pluck('employee_id')->sort()->values()->all())->toBe([$alice, $bob]);
+});
+
+test('toggleSubtaskDraftAssignee removes an employee already in the draft', function () {
+    $user = User::factory()->create();
+    $alice = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
+    $parent = Task::factory()->create();
+    $parent->taskAssignees()->delete();
+    $parent->taskAssignees()->create(['employee_id' => $alice]);
+
+    $component = Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->call('toggleSubtaskDraftAssignee', $parent->id, $alice);
+
+    expect($component->instance()->subtaskDraft($parent->fresh(['taskAssignees']))['assignees'])->toBe([]);
+});
+
+test('addSubtaskQuick falls back to the parents own assignees when the draft has none', function () {
+    $user = User::factory()->create();
+    $alice = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
+    $parent = Task::factory()->create();
+    $parent->taskAssignees()->delete();
+    $parent->taskAssignees()->create(['employee_id' => $alice]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->call('toggleSubtaskDraftAssignee', $parent->id, $alice)
+        ->call('addSubtaskQuick', $parent->id, 'Untouched assignees');
+
+    $subtask = Task::query()->where('title', 'Untouched assignees')->sole();
+
+    expect($subtask->taskAssignees->pluck('employee_id')->all())->toBe([$alice]);
 });
 
 test('dropping a task into a different board column persists the status change', function () {

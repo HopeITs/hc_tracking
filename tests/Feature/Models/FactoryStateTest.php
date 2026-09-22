@@ -92,10 +92,11 @@ test('a narrative report bounds its period from the planned date passed in', fun
         ->and($report->period_start->toDateString())->toBe('2025-12-31');
 });
 
-test('a reached milestone takes its actual date from the planned date passed in', function () {
-    $milestone = Milestone::factory()->reached()->create(['planned_date' => '2026-06-30'])->fresh();
+test('a reached milestone takes its actual dates from the planned dates passed in', function () {
+    $milestone = Milestone::factory()->reached()->create(['planned_start_date' => '2026-06-30'])->fresh();
 
-    expect($milestone->actual_date->toDateString())->toBe('2026-06-30');
+    expect($milestone->actual_start_date->toDateString())->toBe('2026-06-30')
+        ->and($milestone->actual_end_date->toDateString())->toBe('2026-06-30');
 });
 
 test('a running proposal starts on the planned begin date passed in', function () {

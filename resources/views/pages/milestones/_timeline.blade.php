@@ -8,9 +8,9 @@
 
     $markerTone = fn (\App\Models\Milestone $milestone): string => match (true) {
         $milestone->status === MilestoneStatus::Reached => 'bg-status-good text-white',
-        $milestone->status === MilestoneStatus::Missed => 'bg-primary text-white',
         $milestone->status === MilestoneStatus::Cancelled => 'bg-secondary-light text-white',
-        $milestone->planned_date->lt($today) => 'bg-status-warn text-white',
+        $milestone->isMissed() || $milestone->isOverdue() => 'bg-primary text-white',
+        $milestone->status === MilestoneStatus::Ongoing => 'bg-status-warn text-white',
         default => 'bg-white text-secondary-dark ring-2 ring-secondary-dark dark:bg-secondary-dark dark:text-white dark:ring-white',
     };
 
@@ -23,9 +23,9 @@
 <x-ui.panel>
     <div class="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-secondary-soft px-4 py-3 text-xs text-secondary-medium dark:border-secondary-medium dark:text-secondary-soft" aria-hidden="true">
         <span class="inline-flex items-center gap-1.5"><span class="flex size-4 items-center justify-center rounded-full bg-status-good"><flux:icon.flag variant="micro" class="size-2.5 text-white" /></span>{{ MilestoneStatus::Reached->label() }}</span>
-        <span class="inline-flex items-center gap-1.5"><span class="flex size-4 items-center justify-center rounded-full bg-white ring-2 ring-secondary-dark dark:bg-secondary-dark dark:ring-white"><flux:icon.flag variant="micro" class="size-2.5 text-secondary-dark dark:text-white" /></span>{{ MilestoneStatus::Pending->label() }}</span>
-        <span class="inline-flex items-center gap-1.5"><span class="flex size-4 items-center justify-center rounded-full bg-status-warn"><flux:icon.flag variant="micro" class="size-2.5 text-white" /></span>{{ __('milestones.timeline_overdue') }}</span>
-        <span class="inline-flex items-center gap-1.5"><span class="flex size-4 items-center justify-center rounded-full bg-primary"><flux:icon.flag variant="micro" class="size-2.5 text-white" /></span>{{ MilestoneStatus::Missed->label() }}</span>
+        <span class="inline-flex items-center gap-1.5"><span class="flex size-4 items-center justify-center rounded-full bg-white ring-2 ring-secondary-dark dark:bg-secondary-dark dark:ring-white"><flux:icon.flag variant="micro" class="size-2.5 text-secondary-dark dark:text-white" /></span>{{ MilestoneStatus::Planned->label() }}</span>
+        <span class="inline-flex items-center gap-1.5"><span class="flex size-4 items-center justify-center rounded-full bg-status-warn"><flux:icon.flag variant="micro" class="size-2.5 text-white" /></span>{{ MilestoneStatus::Ongoing->label() }}</span>
+        <span class="inline-flex items-center gap-1.5"><span class="flex size-4 items-center justify-center rounded-full bg-primary"><flux:icon.flag variant="micro" class="size-2.5 text-white" /></span>{{ __('milestones.missed') }} / {{ __('milestones.overdue') }}</span>
         <span class="inline-flex items-center gap-1.5"><span class="flex size-4 items-center justify-center rounded-full bg-secondary-light"><flux:icon.flag variant="micro" class="size-2.5 text-white" /></span>{{ MilestoneStatus::Cancelled->label() }}</span>
         <span class="inline-flex items-center gap-1.5"><span class="h-3.5 w-0.5 bg-primary"></span>{{ __('milestones.timeline_today') }}</span>
         <span class="inline-flex items-center gap-1.5">
@@ -44,10 +44,10 @@
 
 @foreach ($projects as $projectRow)
     @php
-        $milestones = $this->flattenMilestones($projectRow->milestones)->sortBy('planned_date')->values();
+        $milestones = $this->flattenMilestones($projectRow->milestones)->sortBy('planned_start_date')->values();
         $milestonesById = $milestones->keyBy('id');
-        $windowStart = $milestones->min('planned_date');
-        $windowEnd = $milestones->max('planned_date');
+        $windowStart = $milestones->min('planned_start_date');
+        $windowEnd = $milestones->max('planned_start_date');
         $hasWindow = $windowStart !== null && $windowEnd !== null;
         $span = $hasWindow ? max(1, $windowStart->diffInDays($windowEnd)) : 1;
         if ($hasWindow && $windowStart->eq($windowEnd)) {
@@ -132,8 +132,8 @@
 
                 return [
                     'key' => $milestone->id,
-                    'parent_x' => $position($parent->planned_date),
-                    'child_x' => $position($milestone->planned_date),
+                    'parent_x' => $position($parent->planned_start_date),
+                    'child_x' => $position($milestone->planned_start_date),
                     'parent_y' => $topPad + $depthById[$parent->id] * $rowStep,
                     'child_y' => $topPad + $depthById[$milestone->id] * $rowStep,
                 ];
@@ -273,14 +273,13 @@
                             {{-- markers --}}
                             @foreach ($milestones as $milestone)
                                 @php
-                                    $isOverdue = $milestone->planned_date->lt($today) && $milestone->status === MilestoneStatus::Pending;
                                     $canDeleteMarker = $milestone->children_count === 0 && $milestone->tasks_count === 0;
                                     $depth = $depthById[$milestone->id];
                                 @endphp
                                 <div
                                     wire:key="milestone-node-{{ $milestone->id }}"
                                     class="group/marker absolute z-10 -translate-x-1/2 rtl:translate-x-1/2"
-                                    style="inset-inline-start: {{ $position($milestone->planned_date) }}%; top: {{ $topPad + $depth * $rowStep }}px"
+                                    style="inset-inline-start: {{ $position($milestone->planned_start_date) }}%; top: {{ $topPad + $depth * $rowStep }}px"
                                     data-milestone-depth="{{ $depth }}"
                                 >
                                     <a
@@ -317,12 +316,10 @@
 
                                             <div class="mt-1.5 flex flex-wrap items-center gap-1">
                                                 <x-ui.enum-badge :case="$milestone->status" class="px-1.5! py-0.5! text-[10px]!" />
-                                                @if ($isOverdue)
-                                                    <span class="text-[10px] font-semibold text-status-warn">{{ __('milestones.timeline_overdue') }}</span>
-                                                @endif
+                                                <x-ui.milestone-flags :milestone="$milestone" class="px-1.5! py-0.5! text-[10px]!" />
                                             </div>
 
-                                            <p class="mt-1 tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $milestone->planned_date->translatedFormat(__('formats.date')) }}</p>
+                                            <p class="mt-1 tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $milestone->planned_start_date->translatedFormat(__('formats.date')) }}</p>
 
                                             <x-ui.employee-chip :employee="$milestone->responsibleUser" compact class="mt-1" />
 

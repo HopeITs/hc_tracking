@@ -294,7 +294,7 @@ function projectsForEachLens(): array
     $overdue = $fund(Project::factory()->active()->create(['name' => 'Overdue Clinic', 'start_date' => today()->subYears(2), 'end_date' => today()->subDay()]));
 
     $slipping = $fund(Project::factory()->active()->create(['name' => 'Slipping Shelter', 'end_date' => today()->addYear()]));
-    Milestone::factory()->create(['project_id' => $slipping->id, 'planned_date' => today()->subWeek(), 'status' => MilestoneStatus::Pending]);
+    Milestone::factory()->create(['project_id' => $slipping->id, 'planned_start_date' => today()->subWeek(), 'status' => MilestoneStatus::Planned]);
 
     $risky = $fund(Project::factory()->active()->create(['name' => 'Risky Bakery', 'end_date' => today()->addYear()]));
     Risk::factory()->happened()->create(['project_id' => $risky->id]);
@@ -569,7 +569,7 @@ test('a board card rates an overdue project critical and an on-track project goo
         'start_date' => now()->subYear(),
         'end_date' => now()->subMonth(),
     ]);
-    Milestone::factory()->create(['project_id' => $overdue->id, 'weight_percentage' => 100, 'status' => MilestoneStatus::Pending]);
+    Milestone::factory()->create(['project_id' => $overdue->id, 'weight_percentage' => 100, 'status' => MilestoneStatus::Planned]);
 
     Livewire::actingAs($user)->test('pages::projects.index')
         // Critical fills solid so white type carries it in both themes.

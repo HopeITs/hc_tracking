@@ -18,10 +18,9 @@ new #[Title('titles.milestone')] class extends Component {
 
     public string $name = '';
     public string $description = '';
-    public string $plannedDate = '';
-    public string $actualDate = '';
-    public string $milestoneStatus = 'pending';
-    public string $sequence = '1';
+    public string $plannedStartDate = '';
+    public string $plannedEndDate = '';
+    public string $milestoneStatus = 'planned';
     public string $weightPercentage = '0';
     public string $responsibleUserId = '';
     public string $parentMilestoneId = '';
@@ -29,10 +28,9 @@ new #[Title('titles.milestone')] class extends Component {
     public bool $showRelatedModal = false;
     public string $relatedName = '';
     public string $relatedDescription = '';
-    public string $relatedPlannedDate = '';
-    public string $relatedActualDate = '';
-    public string $relatedStatus = 'pending';
-    public string $relatedSequence = '1';
+    public string $relatedPlannedStartDate = '';
+    public string $relatedPlannedEndDate = '';
+    public string $relatedStatus = 'planned';
     public string $relatedWeightPercentage = '0';
     public string $relatedResponsibleUserId = '';
     public string $relatedParentMilestoneId = '';
@@ -44,10 +42,9 @@ new #[Title('titles.milestone')] class extends Component {
         $freshMilestone = $this->milestone;
         $this->name = $freshMilestone->name;
         $this->description = $freshMilestone->description ?? '';
-        $this->plannedDate = $freshMilestone->planned_date->toDateString();
-        $this->actualDate = $freshMilestone->actual_date?->toDateString() ?? '';
+        $this->plannedStartDate = $freshMilestone->planned_start_date->toDateString();
+        $this->plannedEndDate = $freshMilestone->planned_end_date?->toDateString() ?? '';
         $this->milestoneStatus = $freshMilestone->status->value;
-        $this->sequence = (string) $freshMilestone->sequence;
         $this->weightPercentage = $freshMilestone->weight_percentage;
         $this->responsibleUserId = (string) $freshMilestone->responsible_user_id;
         $this->parentMilestoneId = (string) ($freshMilestone->parent_milestone_id ?? '');
@@ -57,7 +54,7 @@ new #[Title('titles.milestone')] class extends Component {
     public function milestone(): Milestone
     {
         return Milestone::query()
-            ->select(['id', 'project_id', 'name', 'description', 'planned_date', 'actual_date', 'status', 'sequence', 'weight_percentage', 'responsible_user_id', 'parent_milestone_id', 'updated_at'])
+            ->select(['id', 'project_id', 'name', 'description', 'planned_start_date', 'planned_end_date', 'actual_start_date', 'actual_end_date', 'status', 'sequence', 'weight_percentage', 'responsible_user_id', 'parent_milestone_id', 'updated_at'])
             ->with(['project:id,name', 'responsibleUser:id,first_name_en,last_name_en,first_name_ar,last_name_ar', 'parent:id,name'])
             ->findOrFail($this->milestoneId);
     }
@@ -67,7 +64,7 @@ new #[Title('titles.milestone')] class extends Component {
     public function relatedMilestones(): Collection
     {
         return Milestone::query()
-            ->select(['id', 'name', 'status', 'planned_date', 'sequence'])
+            ->select(['id', 'name', 'status', 'planned_start_date', 'planned_end_date', 'actual_end_date', 'sequence'])
             ->where('parent_milestone_id', $this->milestoneId)
             ->orderBy('sequence')
             ->orderBy('name')
@@ -121,10 +118,9 @@ new #[Title('titles.milestone')] class extends Component {
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
-            'plannedDate' => ['required', 'date'],
-            'actualDate' => ['nullable', 'date'],
+            'plannedStartDate' => ['required', 'date'],
+            'plannedEndDate' => ['nullable', 'date', 'after_or_equal:plannedStartDate'],
             'milestoneStatus' => ['required', new Enum(MilestoneStatus::class)],
-            'sequence' => ['required', 'integer', 'min:0'],
             'weightPercentage' => ['required', 'numeric', 'min:0', 'max:100'],
             'responsibleUserId' => ['required', 'integer', Rule::exists(HrEmployee::class, 'id')],
             'parentMilestoneId' => [
@@ -137,7 +133,8 @@ new #[Title('titles.milestone')] class extends Component {
             ],
         ], [
             'name.required' => __('milestones.enter_a_milestone_name'),
-            'plannedDate.required' => __('milestones.set_the_planned_date'),
+            'plannedStartDate.required' => __('milestones.set_the_planned_start_date'),
+            'plannedEndDate.after_or_equal' => __('milestones.planned_end_date_must_be_on_or_after_the_planned_start_date'),
             'responsibleUserId.required' => __('milestones.select_the_responsible_staff_member'),
             'parentMilestoneId.exists' => __('milestones.select_a_milestone_from_this_project'),
             'parentMilestoneId.not_in' => __('milestones.a_milestone_cannot_be_nested_under_itself_or_its_descendants'),
@@ -147,10 +144,9 @@ new #[Title('titles.milestone')] class extends Component {
         $milestone->fill([
             'name' => $validated['name'],
             'description' => $validated['description'] === '' ? null : $validated['description'],
-            'planned_date' => $validated['plannedDate'],
-            'actual_date' => $validated['actualDate'] === '' ? null : $validated['actualDate'],
+            'planned_start_date' => $validated['plannedStartDate'],
+            'planned_end_date' => $validated['plannedEndDate'] === '' ? null : $validated['plannedEndDate'],
             'status' => $validated['milestoneStatus'],
-            'sequence' => (int) $validated['sequence'],
             'weight_percentage' => $validated['weightPercentage'],
             'responsible_user_id' => (int) $validated['responsibleUserId'],
             'parent_milestone_id' => $validated['parentMilestoneId'] === '' || $validated['parentMilestoneId'] === null
@@ -169,10 +165,9 @@ new #[Title('titles.milestone')] class extends Component {
         $this->resetValidation();
         $this->relatedName = '';
         $this->relatedDescription = '';
-        $this->relatedPlannedDate = '';
-        $this->relatedActualDate = '';
-        $this->relatedStatus = 'pending';
-        $this->relatedSequence = '1';
+        $this->relatedPlannedStartDate = '';
+        $this->relatedPlannedEndDate = '';
+        $this->relatedStatus = 'planned';
         $this->relatedWeightPercentage = '0';
         $this->relatedResponsibleUserId = '';
         $this->relatedParentMilestoneId = (string) $this->milestoneId;
@@ -194,10 +189,9 @@ new #[Title('titles.milestone')] class extends Component {
         $validated = $this->validate([
             'relatedName' => ['required', 'string', 'max:255'],
             'relatedDescription' => ['nullable', 'string'],
-            'relatedPlannedDate' => ['required', 'date'],
-            'relatedActualDate' => ['nullable', 'date'],
+            'relatedPlannedStartDate' => ['required', 'date'],
+            'relatedPlannedEndDate' => ['nullable', 'date', 'after_or_equal:relatedPlannedStartDate'],
             'relatedStatus' => ['required', new Enum(MilestoneStatus::class)],
-            'relatedSequence' => ['required', 'integer', 'min:0'],
             'relatedWeightPercentage' => ['required', 'numeric', 'min:0', 'max:100'],
             'relatedResponsibleUserId' => ['required', 'integer', Rule::exists(HrEmployee::class, 'id')],
             'relatedParentMilestoneId' => [
@@ -209,7 +203,8 @@ new #[Title('titles.milestone')] class extends Component {
             ],
         ], [
             'relatedName.required' => __('milestones.enter_a_milestone_name'),
-            'relatedPlannedDate.required' => __('milestones.set_the_planned_date'),
+            'relatedPlannedStartDate.required' => __('milestones.set_the_planned_start_date'),
+            'relatedPlannedEndDate.after_or_equal' => __('milestones.planned_end_date_must_be_on_or_after_the_planned_start_date'),
             'relatedResponsibleUserId.required' => __('milestones.select_the_responsible_staff_member'),
             'relatedParentMilestoneId.exists' => __('milestones.select_a_milestone_from_this_project'),
             'relatedWeightPercentage.max' => __('milestones.weight_cannot_exceed_100_percent'),
@@ -219,10 +214,9 @@ new #[Title('titles.milestone')] class extends Component {
             'project_id' => $projectId,
             'name' => $validated['relatedName'],
             'description' => $validated['relatedDescription'] === '' ? null : $validated['relatedDescription'],
-            'planned_date' => $validated['relatedPlannedDate'],
-            'actual_date' => $validated['relatedActualDate'] === '' ? null : $validated['relatedActualDate'],
+            'planned_start_date' => $validated['relatedPlannedStartDate'],
+            'planned_end_date' => $validated['relatedPlannedEndDate'] === '' ? null : $validated['relatedPlannedEndDate'],
             'status' => $validated['relatedStatus'],
-            'sequence' => (int) $validated['relatedSequence'],
             'weight_percentage' => $validated['relatedWeightPercentage'],
             'responsible_user_id' => (int) $validated['relatedResponsibleUserId'],
             'parent_milestone_id' => $validated['relatedParentMilestoneId'] === '' || $validated['relatedParentMilestoneId'] === null
@@ -275,6 +269,7 @@ new #[Title('titles.milestone')] class extends Component {
     >
         <x-slot:meta>
             <x-ui.enum-badge :case="$this->milestone->status" />
+            <x-ui.milestone-flags :milestone="$this->milestone" />
             @if ($this->milestone->parent !== null)
                 <span>{{ __('milestones.nested_milestone') }}: {{ $this->milestone->parent->name }}</span>
             @endif
@@ -283,10 +278,12 @@ new #[Title('titles.milestone')] class extends Component {
         </x-slot:meta>
     </x-ui.detail-header>
 
-    <div class="grid gap-3 @2xl/detail:grid-cols-4">
+    <div class="grid gap-3 @2xl/detail:grid-cols-3 @4xl/detail:grid-cols-6">
         <x-ui.stat-tile :label="__('milestones.weight')" :value="rtrim(rtrim(number_format((float) $this->milestone->weight_percentage, 2), '0'), '.').'%'" icon="scale" />
-        <x-ui.stat-tile :label="__('milestones.planned_date_2')" :value="$this->milestone->planned_date->translatedFormat(__('formats.date'))" icon="calendar" />
-        <x-ui.stat-tile :label="__('milestones.actual_date')" :value="$this->milestone->actual_date?->translatedFormat(__('formats.date')) ?? '—'" icon="calendar-days" />
+        <x-ui.stat-tile :label="__('milestones.planned_start_date')" :value="$this->milestone->planned_start_date->translatedFormat(__('formats.date'))" icon="calendar" />
+        <x-ui.stat-tile :label="__('milestones.planned_end_date')" :value="$this->milestone->planned_end_date?->translatedFormat(__('formats.date')) ?? '—'" icon="calendar" />
+        <x-ui.stat-tile :label="__('milestones.actual_start_date')" :value="$this->milestone->actual_start_date?->translatedFormat(__('formats.date')) ?? '—'" icon="calendar-days" />
+        <x-ui.stat-tile :label="__('milestones.actual_end_date')" :value="$this->milestone->actual_end_date?->translatedFormat(__('formats.date')) ?? '—'" icon="calendar-days" />
         <x-ui.stat-tile :label="__('milestones.sequence')" :value="$this->milestone->sequence" icon="hashtag" />
     </div>
 
@@ -300,8 +297,8 @@ new #[Title('titles.milestone')] class extends Component {
                 <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('milestones.schedule_and_status') }}</p>
 
                 <div class="grid gap-4 sm:grid-cols-2">
-                    <x-ui.input wire:model="plannedDate" :label="__('milestones.planned_date_2')" type="date" required />
-                    <x-ui.input wire:model="actualDate" :label="__('milestones.actual_date')" type="date" />
+                    <x-ui.input wire:model="plannedStartDate" :label="__('milestones.planned_start_date')" type="date" required />
+                    <x-ui.input wire:model="plannedEndDate" :label="__('milestones.planned_end_date')" type="date" />
                 </div>
 
                 <div class="grid gap-4 sm:grid-cols-2">
@@ -323,7 +320,7 @@ new #[Title('titles.milestone')] class extends Component {
                         <flux:error name="milestoneStatus" class="mt-1.5" />
                     </div>
 
-                    <x-ui.input wire:model="sequence" :label="__('milestones.sequence')" type="number" min="0" required />
+                    <x-ui.input wire:model="weightPercentage" :label="__('milestones.weight')" type="number" min="0" max="100" step="0.01" required />
                 </div>
             </div>
 
@@ -331,7 +328,6 @@ new #[Title('titles.milestone')] class extends Component {
                 <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('milestones.assignment') }}</p>
 
                 <div class="min-w-0">
-                    <x-ui.input wire:model="weightPercentage" :label="__('milestones.weight')" type="number" min="0" max="100" step="0.01" required />
                     <x-ui.progress-bar :value="(float) $weightPercentage" :max="100" show-value class="mt-2" />
                 </div>
 
@@ -409,8 +405,9 @@ new #[Title('titles.milestone')] class extends Component {
                     <li class="flex items-center justify-between gap-3 p-3.5" wire:key="related-milestone-{{ $related->id }}">
                         <a href="{{ route('milestones.show', $related) }}" wire:navigate class="min-w-0 truncate text-sm font-semibold hover:underline">{{ $related->name }}</a>
                         <div class="flex shrink-0 items-center gap-3">
-                            <span class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $related->planned_date->translatedFormat(__('formats.date')) }}</span>
+                            <span class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $related->planned_start_date->translatedFormat(__('formats.date')) }}</span>
                             <x-ui.enum-badge :case="$related->status" />
+                            <x-ui.milestone-flags :milestone="$related" />
                         </div>
                     </li>
                 @endforeach
@@ -454,8 +451,8 @@ new #[Title('titles.milestone')] class extends Component {
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.input wire:model="relatedPlannedDate" :label="__('milestones.planned_date_2')" type="date" required />
-                <x-ui.input wire:model="relatedActualDate" :label="__('milestones.actual_date')" type="date" />
+                <x-ui.input wire:model="relatedPlannedStartDate" :label="__('milestones.planned_start_date')" type="date" required />
+                <x-ui.input wire:model="relatedPlannedEndDate" :label="__('milestones.planned_end_date')" type="date" />
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2">
@@ -477,12 +474,10 @@ new #[Title('titles.milestone')] class extends Component {
                     <flux:error name="relatedStatus" class="mt-1.5" />
                 </div>
 
-                <x-ui.input wire:model="relatedSequence" :label="__('milestones.sequence')" type="number" min="0" required />
+                <x-ui.input wire:model="relatedWeightPercentage" :label="__('milestones.weight')" type="number" min="0" max="100" step="0.01" required />
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.input wire:model="relatedWeightPercentage" :label="__('milestones.weight')" type="number" min="0" max="100" step="0.01" required />
-
                 <div class="min-w-0">
                     <label for="related-milestone-form-responsible" class="{{ $dropdownLabelClasses }}">{{ __('milestones.responsible') }}</label>
                     <flux:dropdown position="bottom" align="start" class="filter-picker block! w-full!" x-data="{ optionSearch: '' }">

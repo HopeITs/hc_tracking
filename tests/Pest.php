@@ -181,7 +181,7 @@ function insertMilestone(int $projectId, int $responsibleUserId, ?int $parentId 
         'project_id' => $projectId,
         'name' => $name,
         'description' => null,
-        'planned_date' => '2026-03-31',
+        'planned_start_date' => '2026-03-31',
         'responsible_user_id' => $responsibleUserId,
         'parent_milestone_id' => $parentId,
     ])->id;
