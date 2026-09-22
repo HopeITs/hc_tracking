@@ -264,15 +264,110 @@ test('a negative budget is rejected', function () {
         ->assertHasErrors(['budget']);
 });
 
-test('funding agreements offer no delete because transfers would cascade', function () {
+test('an agreement with nothing under it can be deleted', function () {
     $user = User::factory()->role('Financial')->create();
-    DonorProposal::factory()->create();
+    $agreement = DonorProposal::factory()->create();
 
-    $component = Livewire::actingAs($user)->test('pages::funding-agreements.index');
+    Livewire::actingAs($user)->test('pages::funding-agreements.index')
+        ->call('openAgreementEdit', $agreement->id)
+        ->call('confirmAgreementDelete')
+        ->assertSet('confirmingAgreementDelete', true)
+        ->call('deleteAgreement')
+        ->assertSet('showAgreementModal', false);
 
-    $component->assertDontSee('wire:click="confirmDelete')->assertDontSee('Delete agreement');
+    expect(DonorProposal::query()->whereKey($agreement->id)->exists())->toBeFalse();
+});
 
-    expect(method_exists($component->instance(), 'deleteAgreement'))->toBeFalse();
+test('an agreement holding tranches or donor reports is never deleted', function (string $holding) {
+    $user = User::factory()->role('Financial')->create();
+    $agreement = DonorProposal::factory()->create();
+    $holding === 'tranche'
+        ? TransfersTracking::factory()->create(['donor_proposal_id' => $agreement->id])
+        : DonorReport::factory()->create(['donor_proposal_id' => $agreement->id]);
+
+    Livewire::actingAs($user)->test('pages::funding-agreements.index')
+        ->call('openAgreementEdit', $agreement->id)
+        ->assertSeeHtml('data-agreement-delete-blocked')
+        ->call('deleteAgreement');
+
+    expect(DonorProposal::query()->whereKey($agreement->id)->exists())->toBeTrue();
+})->with(['tranche', 'report']);
+
+test('deleting an agreement needs the delete permission', function () {
+    $user = User::factory()->create();
+    $agreement = DonorProposal::factory()->create();
+
+    Livewire::actingAs($user)->test('pages::funding-agreements.index')
+        ->call('deleteAgreement')
+        ->assertForbidden();
+
+    expect(DonorProposal::query()->whereKey($agreement->id)->exists())->toBeTrue();
+});
+
+test('deleting the agreement from its own page returns to the directory', function () {
+    $user = User::factory()->role('Financial')->create();
+    $agreement = DonorProposal::factory()->create();
+
+    Livewire::actingAs($user)->test('pages::funding-agreements.show', ['donorProposal' => $agreement])
+        ->call('openAgreementEdit', $agreement->id)
+        ->call('deleteAgreement')
+        ->assertRedirect(route('funding-agreements.index'));
+});
+
+test('the agreement currency is fixed once tranches exist', function () {
+    $user = User::factory()->role('Financial')->create();
+    $agreement = DonorProposal::factory()->create(['currency' => Currency::Usd]);
+    TransfersTracking::factory()->create(['donor_proposal_id' => $agreement->id]);
+
+    Livewire::actingAs($user)->test('pages::funding-agreements.index')
+        ->call('openAgreementEdit', $agreement->id)
+        ->set('agreementCurrency', 'EUR')
+        ->call('saveAgreement')
+        ->assertHasErrors(['agreementCurrency']);
+
+    expect($agreement->fresh()->currency)->toBe(Currency::Usd);
+});
+
+test('a budget larger than its column is rejected, not sent to the database', function () {
+    $user = User::factory()->role('Financial')->create();
+    $agreement = DonorProposal::factory()->create();
+
+    Livewire::actingAs($user)->test('pages::funding-agreements.index')
+        ->call('openAgreementEdit', $agreement->id)
+        ->set('budget', '10000000000000')
+        ->call('saveAgreement')
+        ->assertHasErrors(['budget' => 'max']);
+});
+
+test('recording an agreement against an unapproved proposal warns but is allowed', function () {
+    $user = User::factory()->role('Financial')->create();
+    $donor = Donor::factory()->create();
+    $proposal = Proposal::factory()->create(['status' => 'concept note']);
+
+    Livewire::actingAs($user)->test('pages::funding-agreements.index')
+        ->call('openAgreementCreate')
+        ->set('agreementDonorId', (string) $donor->id)
+        ->set('agreementProposalId', (string) $proposal->id)
+        ->assertSeeHtml('data-agreement-proposal-warning')
+        ->set('budget', '1000')
+        ->call('saveAgreement')
+        ->assertHasNoErrors();
+
+    expect(DonorProposal::query()->where('proposal_id', $proposal->id)->exists())->toBeTrue();
+});
+
+test('the agreement page links to its tranches in the transfers ledger', function () {
+    $user = User::factory()->role('Financial')->create();
+    $agreement = DonorProposal::factory()->create();
+    TransfersTracking::factory()->create(['donor_proposal_id' => $agreement->id]);
+    $other = TransfersTracking::factory()->create();
+
+    Livewire::actingAs($user)->test('pages::funding-agreements.show', ['donorProposal' => $agreement])
+        ->assertSeeHtml(e(route('transfers.index', ['agreement' => $agreement->id])));
+
+    Livewire::actingAs($user)->withQueryParams(['agreement' => (string) $agreement->id])->test('pages::transfers.index')
+        ->assertDontSeeHtml('wire:key="transfer-'.$other->id.'"')
+        ->assertSeeHtml('data-agreement-chip');
 });
 
 test('agreement detail lists its tranches and totals received per currency', function () {

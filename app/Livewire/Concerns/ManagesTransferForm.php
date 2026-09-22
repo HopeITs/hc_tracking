@@ -29,7 +29,18 @@ use Livewire\Attributes\Computed;
  */
 trait ManagesTransferForm
 {
+    /** payment/received/net columns are DECIMAL(14,2). */
+    public const MAX_AMOUNT = 999999999999.99;
+
+    /** transfers_tracking.fees is DECIMAL(10,2). */
+    public const MAX_FEES = 99999999.99;
+
+    /** transfers_tracking.exchange_rate is DECIMAL(12,6). */
+    public const MAX_EXCHANGE_RATE = 999999.999999;
+
     public bool $showTransferModal = false;
+
+    public bool $confirmingTransferDelete = false;
 
     public ?int $editingTransferId = null;
 
@@ -67,6 +78,11 @@ trait ManagesTransferForm
     abstract protected function transferSaved(TransfersTracking $transfer, bool $isCreate): void;
 
     /**
+     * Called after a tranche is deleted.
+     */
+    abstract protected function transferDeleted(int $transferId): void;
+
+    /**
      * The proposal whose agreements this page may schedule against, or null
      * when any agreement is allowed.
      */
@@ -87,7 +103,7 @@ trait ManagesTransferForm
     public function agreementOptions(): Collection
     {
         return $this->scopedAgreements()
-            ->select(['id', 'donor_id', 'proposal_id', 'project_num', 'currency'])
+            ->select(['id', 'donor_id', 'proposal_id', 'project_num', 'currency', 'budget'])
             ->with(['donor:id,name', 'proposal:id,name'])
             ->orderBy('id')
             ->get();
@@ -123,12 +139,35 @@ trait ManagesTransferForm
             $agreement = $this->scopedAgreements()->select(['id', 'currency'])->findOrFail($agreementId);
 
             $this->transferAgreementId = (string) $agreement->id;
-            $this->transferredCurrency = $agreement->currency->value;
-            $this->feesCurrency = $agreement->currency->value;
-            $this->receivedCurrency = $agreement->currency->value;
+            $this->useAgreementCurrency($agreement);
         }
 
         $this->showTransferModal = true;
+    }
+
+    /**
+     * Picking an agreement for a new tranche sets every currency to the
+     * agreement's own, as opening the form from that agreement would. An
+     * existing tranche keeps the currencies it was recorded in.
+     */
+    public function updatedTransferAgreementId(): void
+    {
+        if ($this->editingTransferId !== null || $this->transferAgreementId === '') {
+            return;
+        }
+
+        $agreement = $this->scopedAgreements()->select(['id', 'currency'])->find((int) $this->transferAgreementId);
+
+        if ($agreement !== null) {
+            $this->useAgreementCurrency($agreement);
+        }
+    }
+
+    private function useAgreementCurrency(DonorProposal $agreement): void
+    {
+        $this->transferredCurrency = $agreement->currency->value;
+        $this->feesCurrency = $agreement->currency->value;
+        $this->receivedCurrency = $agreement->currency->value;
     }
 
     public function openTransferEdit(int $transferId): void
@@ -138,6 +177,7 @@ trait ManagesTransferForm
         $transfer = $this->scopedTransfer($transferId);
 
         $this->resetValidation();
+        $this->confirmingTransferDelete = false;
         $this->editingTransferId = $transfer->id;
         $this->transferAgreementId = (string) $transfer->donor_proposal_id;
         $this->transferAccountId = (string) ($transfer->account_id ?? '');
@@ -188,21 +228,41 @@ trait ManagesTransferForm
                     }
                 },
             ],
-            'paymentAmount' => ['required', 'numeric', 'min:0'],
+            'paymentAmount' => ['required', 'numeric', 'min:0', 'max:'.self::MAX_AMOUNT],
             'transferredCurrency' => ['required', new Enum(Currency::class)],
             'scheduledDate' => ['nullable', 'date'],
-            'transferDate' => ['nullable', 'date'],
-            'fees' => ['required', 'numeric', 'min:0'],
+            // Money cannot have left the donor, or landed, on a day yet to come.
+            'transferDate' => ['nullable', 'date', 'before_or_equal:today'],
+            'fees' => ['required', 'numeric', 'min:0', 'max:'.self::MAX_FEES],
             'feesCurrency' => ['required', new Enum(Currency::class)],
-            'amountReceived' => ['nullable', 'numeric', 'min:0'],
-            'exchangeRate' => ['required', 'numeric', 'min:0'],
+            'amountReceived' => ['nullable', 'numeric', 'min:0', 'max:'.self::MAX_AMOUNT],
+            'exchangeRate' => ['required', 'numeric', 'gt:0', 'max:'.self::MAX_EXCHANGE_RATE],
             // Received money only counts once someone records what landed and
             // when; a blank net is never read as the payment amount.
-            'netAmountReceived' => ['nullable', 'required_if:transferArStatus,'.ArStatus::Received->value, 'numeric', 'min:0'],
+            'netAmountReceived' => ['nullable', 'required_if:transferArStatus,'.ArStatus::Received->value, 'numeric', 'min:0', 'max:'.self::MAX_AMOUNT],
             'receivedCurrency' => ['required', new Enum(Currency::class)],
-            'receiveDate' => ['nullable', 'required_if:transferArStatus,'.ArStatus::Received->value, 'date'],
+            // A landing date on a tranche still pending contradicts it: the
+            // money has either arrived (received) or it has not.
+            'receiveDate' => [
+                'nullable',
+                'required_if:transferArStatus,'.ArStatus::Received->value,
+                'prohibited_if:transferArStatus,'.ArStatus::Pending->value,
+                'date',
+                'before_or_equal:today',
+                ...($this->transferDate !== '' ? ['after_or_equal:transferDate'] : []),
+            ],
             'transferArStatus' => ['required', new Enum(ArStatus::class)],
         ], [
+            'paymentAmount.max' => __('transfers.an_amount_is_too_large'),
+            'amountReceived.max' => __('transfers.an_amount_is_too_large'),
+            'netAmountReceived.max' => __('transfers.an_amount_is_too_large'),
+            'fees.max' => __('transfers.an_amount_is_too_large'),
+            'exchangeRate.max' => __('transfers.an_amount_is_too_large'),
+            'exchangeRate.gt' => __('transfers.an_exchange_rate_must_be_above_zero'),
+            'transferDate.before_or_equal' => __('transfers.money_cannot_be_sent_in_the_future'),
+            'receiveDate.before_or_equal' => __('transfers.money_cannot_land_in_the_future'),
+            'receiveDate.after_or_equal' => __('transfers.money_cannot_land_before_it_was_sent'),
+            'receiveDate.prohibited_if' => __('transfers.a_pending_tranche_has_no_landing_date'),
             'transferAgreementId.required' => __('transfers.select_the_funding_agreement_this_tranche_belongs_to'),
             'paymentAmount.required' => __('transfers.enter_the_payment_amount'),
             'paymentAmount.min' => __('transfers.a_payment_amount_cannot_be_negative'),
@@ -245,6 +305,42 @@ trait ManagesTransferForm
         );
     }
 
+    /**
+     * Ask for confirmation inside the open edit form.
+     */
+    public function confirmTransferDelete(): void
+    {
+        Gate::authorize('transfers.delete');
+
+        $this->confirmingTransferDelete = $this->editingTransferId !== null;
+    }
+
+    public function cancelTransferDelete(): void
+    {
+        $this->confirmingTransferDelete = false;
+    }
+
+    /**
+     * Delete the tranche being edited: a mistaken or duplicate entry.
+     */
+    public function deleteTransfer(): void
+    {
+        Gate::authorize('transfers.delete');
+
+        if ($this->editingTransferId === null) {
+            return;
+        }
+
+        $transfer = $this->scopedTransfer($this->editingTransferId);
+        $transfer->delete();
+
+        $this->showTransferModal = false;
+        $this->resetTransferForm();
+        $this->transferDeleted($transfer->id);
+
+        Flux::toast(variant: 'success', text: __('transfers.transfer_deleted'));
+    }
+
     public function closeTransferModal(): void
     {
         $this->showTransferModal = false;
@@ -265,6 +361,7 @@ trait ManagesTransferForm
     {
         $this->resetValidation();
         $this->editingTransferId = null;
+        $this->confirmingTransferDelete = false;
         $this->transferAgreementId = '';
         $this->transferAccountId = '';
         $this->paymentAmount = '';

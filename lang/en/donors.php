@@ -123,4 +123,7 @@ return [
     'report_number' => 'Report #:number',
     'and_count_older_reports' => '{1} and :count older report|[2,*] and :count older reports',
     'every_tranche_in_detail' => '{1} The tranche in detail|[2,*] All :count tranches in detail',
+    'count_reports_owed_to_donor' => '{1} :count report owed to the donor|[2,*] :count reports owed to the donor',
+    'report_overdue_since' => 'Overdue since :date',
+    'report_due_on' => 'Due :date',
 ];

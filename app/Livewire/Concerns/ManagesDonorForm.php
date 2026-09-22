@@ -6,6 +6,7 @@ namespace App\Livewire\Concerns;
 
 use App\Enums\DonorType;
 use App\Models\Donor;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 
 /**
@@ -73,12 +74,16 @@ trait ManagesDonorForm
             return;
         }
 
+        Gate::authorize('donors.create');
+
         $this->resetDonorForm();
         $this->showDonorModal = true;
     }
 
     public function openEditModal(int $donorId): void
     {
+        Gate::authorize('donors.update');
+
         $donorId = $this->donorFormScope() ?? $donorId;
 
         $donor = Donor::query()
@@ -104,6 +109,8 @@ trait ManagesDonorForm
     {
         $this->name = trim($this->name);
         $this->editingDonorId = $this->donorFormScope() ?? $this->editingDonorId;
+
+        Gate::authorize($this->editingDonorId === null ? 'donors.create' : 'donors.update');
 
         // Deliberately no unique rule: donors.name is a plain non-unique
         // VARCHAR by standing decision.

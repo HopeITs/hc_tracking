@@ -3,6 +3,7 @@
 use App\Enums\ArStatus;
 use App\Enums\Currency;
 use App\Livewire\Concerns\ManagesTransferForm;
+use App\Models\DonorProposal;
 use App\Models\TransfersTracking;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -53,6 +54,13 @@ new #[Title('titles.transfers')] class extends Component {
     public string $sort = 'attention';
 
     /**
+     * One funding agreement to narrow the ledger to, set by the "see in the
+     * transfers ledger" link on an agreement page.
+     */
+    #[Url(except: '')]
+    public string $agreement = '';
+
+    /**
      * `sort` and `stage` arrive from the URL, so a hand-typed value would
      * otherwise leave the page sorted by `attention` with no pill pressed, or
      * showing "Reset filters" with nothing filtered. Normalise on the way in.
@@ -89,7 +97,21 @@ new #[Title('titles.transfers')] class extends Component {
         $this->arStatus = '';
         $this->account = '';
         $this->stage = '';
+        $this->agreement = '';
         $this->resetPage();
+    }
+
+    /**
+     * The agreement the ledger is narrowed to, for the filter chip.
+     */
+    #[Computed]
+    public function agreementFilter(): ?DonorProposal
+    {
+        $agreementId = (int) $this->agreement;
+
+        return $agreementId > 0
+            ? DonorProposal::query()->with(['donor:id,name', 'proposal:id,name'])->find($agreementId, ['id', 'donor_id', 'proposal_id', 'project_num'])
+            : null;
     }
 
     /**
@@ -167,6 +189,7 @@ new #[Title('titles.transfers')] class extends Component {
             })
             ->when($this->arStatus !== '', fn (Builder $query) => $query->where('ar_status', $this->arStatus))
             ->when($this->account !== '', fn (Builder $query) => $query->where('account_id', (int) $this->account))
+            ->when((int) $this->agreement > 0, fn (Builder $query) => $query->where('donor_proposal_id', (int) $this->agreement))
             ->when(
                 $withStage && array_key_exists($this->stage, $stages),
                 fn (Builder $query) => $query->whereRaw($stages[$this->stage]),
@@ -363,11 +386,16 @@ new #[Title('titles.transfers')] class extends Component {
     {
         $this->resetPage();
     }
+
+    protected function transferDeleted(int $transferId): void
+    {
+        $this->resetPage();
+    }
 };
 ?>
 
 @php
-    $filtersAreActive = $search !== '' || $arStatus !== '' || $account !== '' || $stage !== '';
+    $filtersAreActive = $search !== '' || $arStatus !== '' || $account !== '' || $stage !== '' || $agreement !== '';
 
     $mutedText = 'text-secondary-medium dark:text-secondary-soft';
     $inkText = 'text-secondary-dark dark:text-white';
@@ -763,6 +791,12 @@ new #[Title('titles.transfers')] class extends Component {
                 <span class="text-xs tabular-nums {{ $mutedText }}">
                     {{ trans_choice('transfers.count_matching_transfer', $this->transfers->total(), ['count' => $this->transfers->total()]) }}
                 </span>
+                @if ($this->agreementFilter !== null)
+                    <button type="button" wire:click="$set('agreement', '')" class="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-funding-soft ps-3 pe-2 text-xs font-semibold text-funding transition-colors hover:bg-funding hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-white" data-agreement-chip>
+                        {{ __('transfers.agreement_filter_chip', ['donor' => $this->agreementFilter->donor->name, 'proposal' => $this->agreementFilter->proposal->name]) }}
+                        <flux:icon.x-mark variant="micro" class="size-3.5" />
+                    </button>
+                @endif
                 @if ($filtersAreActive)
                     <flux:button size="sm" variant="ghost" class="text-secondary-medium! dark:text-secondary-soft!" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
                 @endif
@@ -880,14 +914,16 @@ new #[Title('titles.transfers')] class extends Component {
                                         default => 'money-pending',
                                     }]) aria-hidden="true"></span>
                                     <div class="min-w-0">
-                                        <p class="truncate text-sm font-semibold {{ $inkText }}">
-                                            {{ $transfer->donorProposal->donor->name }}
-                                        </p>
                                         <a
-                                            href="{{ route('funding-agreements.show', $transfer->donorProposal) }}"
+                                            href="{{ route('donors.show', $transfer->donorProposal->donor_id) }}"
                                             wire:navigate
-                                            class="truncate text-xs text-secondary-medium underline-offset-2 hover:underline dark:text-secondary-soft"
-                                        >{{ $transfer->donorProposal->proposal->name }}</a>
+                                            class="block truncate text-sm font-semibold underline-offset-2 hover:underline {{ $inkText }}"
+                                        >{{ $transfer->donorProposal->donor->name }}</a>
+                                        <p class="flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs text-secondary-medium dark:text-secondary-soft">
+                                            <a href="{{ route('proposals.show', $transfer->donorProposal->proposal_id) }}" wire:navigate class="truncate underline-offset-2 hover:underline">{{ $transfer->donorProposal->proposal->name }}</a>
+                                            <span aria-hidden="true">·</span>
+                                            <a href="{{ route('funding-agreements.show', $transfer->donorProposal) }}" wire:navigate class="shrink-0 underline-offset-2 hover:underline" data-agreement-link>{{ filled($transfer->donorProposal->project_num) ? __('proposals.agreement_number', ['number' => $transfer->donorProposal->project_num]) : __('proposals.view_agreement') }}</a>
+                                        </p>
                                     </div>
                                 </div>
 
@@ -1081,5 +1117,6 @@ new #[Title('titles.transfers')] class extends Component {
         :editing="$editingTransferId !== null"
         :agreement-options="$showTransferModal ? $this->agreementOptions : []"
         :account-options="$showTransferModal ? $this->accountOptions : []"
+        :confirming-delete="$confirmingTransferDelete"
     />
 </section>

@@ -65,6 +65,16 @@ enum ProposalStatus: string
     }
 
     /**
+     * Whether the donor has said yes, so money signed against the proposal is
+     * expected. An agreement filed earlier or after a rejection is allowed but
+     * warned about.
+     */
+    public function isApprovedByDonor(): bool
+    {
+        return in_array($this, [self::Approved, self::Active, self::FinalReports, self::Completed], true);
+    }
+
+    /**
      * The lifecycle in order, without the Rejected branch.
      *
      * @return list<self>

@@ -11,6 +11,7 @@ use App\Enums\TaskStatus;
 use App\Livewire\Concerns\ManagesAgreementForm;
 use App\Livewire\Concerns\ManagesTransferForm;
 use App\Models\DonorProposal;
+use App\Models\DonorReport;
 use App\Models\Media;
 use App\Models\PlanIndicator;
 use App\Models\Project;
@@ -174,7 +175,7 @@ new #[Title('titles.proposal')] class extends Component {
      * it is left out of the sums and counted in `foreignCount` instead. A
      * tranche is overdue from the day after its scheduled date, never on it.
      *
-     * @return array<int, array{budget: float, received: float, pending: float, unscheduled: float, overdue: float, overdueCount: int, failedCount: int, foreignCount: int, nextDue: CarbonImmutable|null}>
+     * @return array<int, array{budget: float, received: float, pending: float, unscheduled: float, overdue: float, overdueCount: int, failedCount: int, foreignCount: int, missingNetCount: int, nextDue: CarbonImmutable|null}>
      */
     #[Computed]
     public function agreementMoney(): array
@@ -208,9 +209,10 @@ new #[Title('titles.proposal')] class extends Component {
                 'overdue' => (float) $overdueTransfers->sum('payment_amount'),
                 'overdueCount' => $overdueTransfers->count(),
                 'failedCount' => $agreement->transfers->where('ar_status', ArStatus::Failed)->count(),
+                'missingNetCount' => $receivedTransfers->filter(fn (TransfersTracking $transfer): bool => $transfer->isMissingNetAmount())->count(),
                 'foreignCount' => $receivedTransfers->filter(fn (TransfersTracking $transfer): bool => $transfer->amount_received_currency?->value !== $currency)->count()
                     + $pendingAll->count() - $pendingTransfers->count(),
-                'nextDue' => $pendingTransfers->whereNotNull('scheduled_date')->sortBy('scheduled_date')->first()?->scheduled_date,
+                'nextDue' => $pendingTransfers->whereNull('transfer_date')->whereNotNull('scheduled_date')->sortBy('scheduled_date')->first()?->scheduled_date,
             ];
         }
 
@@ -218,14 +220,13 @@ new #[Title('titles.proposal')] class extends Component {
     }
 
     /**
-     * A pending tranche whose scheduled date has passed. Due today is not yet
-     * late.
+     * An unsent tranche whose scheduled date has passed, in the vocabulary
+     * every funding page shares: money the donor has already sent is in
+     * transit, never overdue, and due today is not yet late.
      */
     public function transferIsOverdue(TransfersTracking $transfer): bool
     {
-        return $transfer->ar_status === ArStatus::Pending
-            && $transfer->scheduled_date !== null
-            && $transfer->scheduled_date->lt(CarbonImmutable::today());
+        return $transfer->state() === 'late';
     }
 
     /**
@@ -387,6 +388,24 @@ new #[Title('titles.proposal')] class extends Component {
     }
 
     /**
+     * The reports owed to donors under this proposal's agreements, carrying
+     * their agreement and donor so a row can name who is owed.
+     *
+     * @return Collection<int, DonorReport>
+     */
+    #[Computed]
+    public function donorReports(): Collection
+    {
+        return DonorReport::query()
+            ->select(['id', 'donor_proposal_id', 'title', 'type', 'due_on', 'submitted_on'])
+            ->whereIn('donor_proposal_id', $this->agreements->modelKeys())
+            ->orderBy('due_on')
+            ->orderBy('id')
+            ->get()
+            ->each(fn (DonorReport $report) => $report->setRelation('donorProposal', $this->agreements->find($report->donor_proposal_id)));
+    }
+
+    /**
      * Whether a report is still owed: drafted but never submitted for review.
      */
     public function reportIsOwed(Report $report): bool
@@ -480,7 +499,9 @@ new #[Title('titles.proposal')] class extends Component {
 
         foreach ($this->agreements as $agreement) {
             foreach ($agreement->transfers as $transfer) {
-                if ($transfer->ar_status !== ArStatus::Pending || $transfer->scheduled_date === null) {
+                // Only money the donor has still to send is a deadline; a sent
+                // tranche is in transit and waits on the bank, not the donor.
+                if (! in_array($transfer->state(), ['late', 'upcoming'], true) || $transfer->scheduled_date === null) {
                     continue;
                 }
 
@@ -494,6 +515,22 @@ new #[Title('titles.proposal')] class extends Component {
                     'funding',
                 );
             }
+        }
+
+        foreach ($this->donorReports as $donorReport) {
+            if ($donorReport->isSubmitted()) {
+                continue;
+            }
+
+            $push(
+                'donor-report-'.$donorReport->id,
+                'donor-report',
+                $donorReport->due_on,
+                $donorReport->title,
+                __('proposals.donor_report_for', ['donor' => $donorReport->donorProposal->donor->name, 'type' => $donorReport->type->label()]),
+                route('funding-agreements.show', $donorReport->donor_proposal_id),
+                'funding',
+            );
         }
 
         foreach ($this->reports as $report) {
@@ -598,6 +635,28 @@ new #[Title('titles.proposal')] class extends Component {
                     'critical' => false,
                 ];
             }
+        }
+
+        $missingNet = collect($this->agreementMoney)->sum('missingNetCount');
+
+        if ($missingNet > 0) {
+            $warnings[] = [
+                'key' => 'missing-net',
+                'text' => trans_choice('funding_agreements.received_tranches_missing_net', $missingNet, ['count' => $missingNet]),
+                'tab' => 'funding',
+                'critical' => false,
+            ];
+        }
+
+        $overdueDonorReports = collect($this->deadlines)->where('kind', 'donor-report')->where('state', 'overdue')->count();
+
+        if ($overdueDonorReports > 0) {
+            $warnings[] = [
+                'key' => 'overdue-donor-reports',
+                'text' => trans_choice('proposals.warning_overdue_donor_reports', $overdueDonorReports, ['count' => $overdueDonorReports]),
+                'tab' => 'deadlines',
+                'critical' => true,
+            ];
         }
 
         $overdueReports = collect($this->deadlines)->where('kind', 'report')->where('state', 'overdue')->count();
@@ -1570,6 +1629,16 @@ new #[Title('titles.proposal')] class extends Component {
         $this->forgetReadings();
     }
 
+    protected function agreementDeleted(int $agreementId): void
+    {
+        $this->forgetReadings();
+    }
+
+    protected function transferDeleted(int $transferId): void
+    {
+        $this->forgetReadings();
+    }
+
     /**
      * Drop every memoised reading so the next render recomputes from the
      * database. Everything on this page derives from these, so a write
@@ -1578,7 +1647,7 @@ new #[Title('titles.proposal')] class extends Component {
     private function forgetReadings(): void
     {
         unset(
-            $this->proposal, $this->statusNotes, $this->agreements, $this->agreementMoney, $this->moneyByCurrency,
+            $this->proposal, $this->statusNotes, $this->agreements, $this->donorReports, $this->agreementMoney, $this->moneyByCurrency,
             $this->projects, $this->linkableProjects, $this->tasks, $this->targets, $this->reports,
             $this->projectFiles, $this->documents, $this->deadlines, $this->warnings, $this->lifecycle, $this->chronology,
             $this->arrivals, $this->vitals, $this->term, $this->tabs,
@@ -1852,6 +1921,8 @@ new #[Title('titles.proposal')] class extends Component {
                                                     <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs tabular-nums {{ $mutedText }}">
                                                         @if ($transfer->receive_date !== null)
                                                             <span>{{ __('proposals.received_on', ['date' => $transfer->receive_date->translatedFormat(__('formats.date'))]) }}</span>
+                                                        @elseif ($transfer->transfer_date !== null)
+                                                            <span>{{ __('proposals.sent_on', ['date' => $transfer->transfer_date->translatedFormat(__('formats.date'))]) }}</span>
                                                         @elseif ($transfer->scheduled_date !== null)
                                                             <span @class(['font-semibold text-status-critical' => $isOverdue])>{{ __('proposals.scheduled_for', ['date' => $transfer->scheduled_date->translatedFormat(__('formats.date'))]) }}</span>
                                                         @else
@@ -1869,6 +1940,10 @@ new #[Title('titles.proposal')] class extends Component {
                                                 <div class="flex shrink-0 items-center gap-2">
                                                     @if ($isOverdue)
                                                         <span class="text-[11px] font-bold tracking-wide text-status-critical uppercase">{{ __('proposals.overdue') }}</span>
+                                                    @elseif ($transfer->state() === 'transit')
+                                                        <span class="text-[11px] font-bold tracking-wide text-status-warn uppercase" data-transit>{{ __('funding_agreements.tranche_state_transit') }}</span>
+                                                    @elseif ($transfer->isMissingNetAmount())
+                                                        <span class="text-[11px] font-bold tracking-wide text-status-warn uppercase" data-missing-net>{{ __('funding_agreements.received_net_not_recorded') }}</span>
                                                     @endif
                                                     <x-ui.enum-badge :case="$transfer->ar_status" />
                                                     @can('transfers.update')
@@ -2407,12 +2482,13 @@ new #[Title('titles.proposal')] class extends Component {
                     $deadlineGroups = collect($this->deadlines)->groupBy('state');
                     $kindLabel = [
                         'transfer' => __('proposals.deadline_kind_transfer'),
+                        'donor-report' => __('proposals.deadline_kind_donor_report'),
                         'report' => __('proposals.deadline_kind_report'),
                         'task' => __('proposals.deadline_kind_task'),
                         'project' => __('proposals.deadline_kind_project'),
                         'grant' => __('proposals.deadline_kind_grant'),
                     ];
-                    $kindIcon = ['transfer' => 'banknotes', 'report' => 'document-chart-bar', 'task' => 'clipboard-document-check', 'project' => 'rectangle-stack', 'grant' => 'flag'];
+                    $kindIcon = ['transfer' => 'banknotes', 'donor-report' => 'paper-airplane', 'report' => 'document-chart-bar', 'task' => 'clipboard-document-check', 'project' => 'rectangle-stack', 'grant' => 'flag'];
                 @endphp
                 <div class="flex flex-col gap-8" data-deadlines>
                     @foreach (['overdue', 'soon', 'later'] as $state)
@@ -2674,6 +2750,9 @@ new #[Title('titles.proposal')] class extends Component {
     <x-funding.agreement-modal
         :editing="$editingAgreementId !== null"
         :donor-options="$showAgreementModal ? $this->donorOptions : []"
+        :warning="$showAgreementModal ? $this->agreementProposalWarning : null"
+        :delete-blocker="$showAgreementModal ? $this->agreementDeleteBlocker : null"
+        :confirming-delete="$confirmingAgreementDelete"
         :locked-proposal-name="$this->proposal->name"
     />
 
@@ -2681,6 +2760,7 @@ new #[Title('titles.proposal')] class extends Component {
         :editing="$editingTransferId !== null"
         :agreement-options="$showTransferModal ? $this->agreementOptions : []"
         :account-options="$showTransferModal ? $this->accountOptions : []"
+        :confirming-delete="$confirmingTransferDelete"
     />
 
     <flux:modal wire:model="showUnlinkModal" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">

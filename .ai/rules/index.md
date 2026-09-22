@@ -36,6 +36,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Observers/**, app/Observers/{MilestoneObserver,ResultObserver}.php | .ai/rules/observers.md |
 | {database/migrations/**,app/Models/DonorReport.php,resources/views/pages/funding-agreements/**} | .ai/rules/pages-funding-agreements.md |
 | resources/views/pages/** | .ai/rules/pages.md |
+| resources/views/pages/proposals/** | .ai/rules/proposals.md |
 | app/Providers/** | .ai/rules/providers.md |
 | {app/Livewire/Concerns/ManagesReportForm.php,resources/views/pages/reports/**,resources/views/components/reports/**} | .ai/rules/reports.md |
 | resources/views/pages/results/** | .ai/rules/results.md |

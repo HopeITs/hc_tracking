@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\ArStatus;
+use App\Livewire\Concerns\ManagesAgreementForm;
 use App\Livewire\Concerns\ManagesDonorForm;
 use App\Models\Donor;
 use App\Models\DonorProposal;
@@ -15,6 +16,7 @@ use Livewire\Attributes\Title;
 use Livewire\Component;
 
 new #[Title('titles.donor')] class extends Component {
+    use ManagesAgreementForm;
     use ManagesDonorForm;
 
     /** How many reports each agreement lists before pointing at the rest. */
@@ -57,22 +59,32 @@ new #[Title('titles.donor')] class extends Component {
                     ->orderByRaw('coalesce(receive_date, scheduled_date)')
                     ->orderBy('id'),
                 'transfers.account:id,name',
+                // The reports this donor is still owed under each agreement.
+                'reports' => fn ($query) => $query
+                    ->select(['id', 'donor_proposal_id', 'title', 'type', 'due_on', 'submitted_on'])
+                    ->whereNull('submitted_on')
+                    ->orderBy('due_on')
+                    ->orderBy('id'),
             ])
             ->orderBy('id')
             ->get();
     }
 
     /**
-     * Where one tranche stands: landed, failed, late, due ahead, or not yet dated.
+     * Where one tranche stands, read from the vocabulary every funding page
+     * shares (TransfersTracking::state()): money the donor has sent is in
+     * transit however far past its date, and only unsent money is overdue.
+     *
+     * @return 'received'|'failed'|'transit'|'overdue'|'due'|'undated'
      */
     public function transferState(TransfersTracking $transfer): string
     {
-        return match (true) {
-            $transfer->ar_status === ArStatus::Received => 'received',
-            $transfer->ar_status === ArStatus::Failed => 'failed',
-            $transfer->scheduled_date === null => 'undated',
-            $transfer->scheduled_date->lt(CarbonImmutable::today()) => 'overdue',
-            default => 'due',
+        return match ($transfer->state()) {
+            'received' => 'received',
+            'failed' => 'failed',
+            'transit' => 'transit',
+            'late' => 'overdue',
+            default => $transfer->scheduled_date === null ? 'undated' : 'due',
         };
     }
 
@@ -81,28 +93,33 @@ new #[Title('titles.donor')] class extends Component {
      *
      * Received counts only tranches with status "received" that landed in the
      * agreement's currency; a pending tranche already carries a net amount, so
-     * that column alone is not proof of money in. Unscheduled is the part of
-     * the budget no live tranche covers yet.
+     * that column alone is not proof of money in. A received tranche with no
+     * net recorded counts as nothing landed and is counted in `missingNet`.
+     * Money in transit is still due, never overdue. Only tranches sent in the
+     * agreement's own currency are set against its budget; unscheduled is the
+     * part of the budget no live tranche covers yet.
      *
-     * @return array{committed: float, received: float, due: float, overdue: float, unscheduled: float}
+     * @return array{committed: float, received: float, due: float, overdue: float, unscheduled: float, missingNet: int}
      */
     public function agreementMoney(DonorProposal $agreement): array
     {
         $committed = (float) $agreement->budget;
-        $money = ['committed' => $committed, 'received' => 0.0, 'due' => 0.0, 'overdue' => 0.0, 'unscheduled' => 0.0];
+        $money = ['committed' => $committed, 'received' => 0.0, 'due' => 0.0, 'overdue' => 0.0, 'unscheduled' => 0.0, 'missingNet' => 0];
         $covered = 0.0;
 
         foreach ($agreement->transfers as $transfer) {
             $state = $this->transferState($transfer);
 
-            if ($state === 'failed') {
+            if ($state === 'failed' || $transfer->amount_transfered_currency !== $agreement->currency) {
                 continue;
             }
 
             $covered += (float) $transfer->payment_amount;
 
             if ($state === 'received') {
-                if ($transfer->amount_received_currency === $agreement->currency) {
+                if ($transfer->isMissingNetAmount()) {
+                    $money['missingNet']++;
+                } elseif ($transfer->amount_received_currency === $agreement->currency) {
                     $money['received'] += (float) $transfer->net_amount_received;
                 }
             } elseif ($state === 'overdue') {
@@ -120,7 +137,7 @@ new #[Title('titles.donor')] class extends Component {
     /**
      * The money position per currency. Grouped, never summed across currencies.
      *
-     * @return array<string, array{committed: float, received: float, due: float, overdue: float, unscheduled: float}>
+     * @return array<string, array{committed: float, received: float, due: float, overdue: float, unscheduled: float, missingNet: int}>
      */
     #[Computed]
     public function moneyByCurrency(): array
@@ -129,7 +146,7 @@ new #[Title('titles.donor')] class extends Component {
 
         foreach ($this->agreements as $agreement) {
             $currency = $agreement->currency->value;
-            $totals[$currency] ??= ['committed' => 0.0, 'received' => 0.0, 'due' => 0.0, 'overdue' => 0.0, 'unscheduled' => 0.0];
+            $totals[$currency] ??= ['committed' => 0.0, 'received' => 0.0, 'due' => 0.0, 'overdue' => 0.0, 'unscheduled' => 0.0, 'missingNet' => 0];
 
             foreach ($this->agreementMoney($agreement) as $key => $value) {
                 $totals[$currency][$key] += $value;
@@ -159,7 +176,7 @@ new #[Title('titles.donor')] class extends Component {
     }
 
     /**
-     * Pending tranches whose scheduled date has passed, oldest first.
+     * Unsent tranches whose scheduled date has passed, oldest first.
      *
      * @return list<array{agreement: DonorProposal, transfer: TransfersTracking, days: int}>
      */
@@ -182,7 +199,7 @@ new #[Title('titles.donor')] class extends Component {
     }
 
     /**
-     * The next pending tranche due today or later.
+     * The next unsent tranche due today or later.
      *
      * @return array{agreement: DonorProposal, transfer: TransfersTracking}|null
      */
@@ -325,6 +342,26 @@ new #[Title('titles.donor')] class extends Component {
         return $this->donorId;
     }
 
+    /**
+     * Open the agreement form with this donor already chosen: the fundraiser
+     * who just closed a deal records it from the donor they closed it with.
+     */
+    public function recordAgreementForDonor(): void
+    {
+        $this->openAgreementCreate();
+        $this->agreementDonorId = (string) $this->donorId;
+    }
+
+    protected function agreementSaved(DonorProposal $agreement, bool $isCreate): void
+    {
+        unset($this->donor, $this->agreements, $this->moneyByCurrency, $this->receivedElsewhere, $this->overdueTranches, $this->nextTranche, $this->projects, $this->projectCounts, $this->reportsByProposal, $this->reportsSubmittedCount, $this->calendar);
+    }
+
+    protected function agreementDeleted(int $agreementId): void
+    {
+        $this->agreementSaved(new DonorProposal, false);
+    }
+
     protected function donorSaved(Donor $donor, bool $isCreate): void
     {
         unset($this->donor);
@@ -348,6 +385,7 @@ new #[Title('titles.donor')] class extends Component {
         'overdue' => __('donors.overdue'),
         'failed' => ArStatus::Failed->label(),
         'undated' => __('common.unscheduled'),
+        'transit' => __('funding_agreements.tranche_state_transit'),
     ];
 @endphp
 
@@ -373,9 +411,11 @@ new #[Title('titles.donor')] class extends Component {
         </x-slot:meta>
 
         <x-slot:actions>
+            @can('donors.update')
             <x-ui.button tone="primary" icon="pencil-square" class="min-h-11 shrink-0 touch-manipulation @3xl/detail:order-last @3xl/detail:min-h-10" wire:click="openEditModal({{ $donor->id }})" data-test="edit-donor-button">
                 {{ __('donors.edit_donor') }}
             </x-ui.button>
+            @endcan
             <address class="flex flex-col gap-1 text-sm not-italic @3xl/detail:items-end" data-donor-contact>
                 @if (filled($donor->contact_person) || filled($donor->email) || filled($donor->phone))
                     @if (filled($donor->contact_person))
@@ -423,6 +463,11 @@ new #[Title('titles.donor')] class extends Component {
     @if ($this->agreements->isEmpty())
         <div class="mt-10">
             <x-ui.empty-state icon="banknotes" :heading="__('common.no_agreements_yet')" :body="__('donors.agreements_signed_by_this_donor_will_appear_here')" />
+            @can('funding-agreements.create')
+                <div class="mt-4 flex justify-center">
+                    <x-ui.button tone="primary" size="sm" icon="plus" class="min-h-10 touch-manipulation" wire:click="recordAgreementForDonor" data-test="record-agreement-for-donor">{{ __('funding_agreements.record_agreement') }}</x-ui.button>
+                </div>
+            @endcan
         </div>
     @else
         {{-- Late money first: every overdue tranche, each opening the agreement that holds it. --}}
@@ -578,7 +623,7 @@ new #[Title('titles.donor')] class extends Component {
                                                 'bg-funding' => $point['state'] === 'received',
                                                 'bg-primary ring-4 ring-primary/15' => $point['state'] === 'overdue',
                                                 'border-2 border-dashed border-status-critical bg-white dark:bg-secondary-dark' => $point['state'] === 'failed',
-                                                'border-[3px] border-status-warn bg-white dark:bg-secondary-dark' => $point['state'] === 'due',
+                                                'border-[3px] border-status-warn bg-white dark:bg-secondary-dark' => in_array($point['state'], ['due', 'transit', 'undated'], true),
                                             ]) style="width: {{ $point['size'] }}rem; height: {{ $point['size'] }}rem"></span>
                                             <span @class(['pointer-events-none absolute hidden', 'top-full mt-2' => $loop->parent->first, 'bottom-full mb-2' => ! $loop->parent->first, 'start-0' => $point['position'] < 20, 'end-0' => $point['position'] > 80, 'start-1/2 -translate-x-1/2 rtl:translate-x-1/2' => $point['position'] >= 20 && $point['position'] <= 80, 'rounded-md bg-secondary-dark px-2.5 py-1.5 text-start text-[11px] whitespace-nowrap text-white shadow-[0_6px_16px_-6px_rgb(0_0_0/0.4)] group-hover:block group-focus-visible:block dark:bg-white dark:text-secondary-dark'])>
                                                 <span class="block font-bold tabular-nums">{{ $amount($point['amount']) }} {{ $point['currency'] }}</span>
@@ -606,7 +651,12 @@ new #[Title('titles.donor')] class extends Component {
 
         {{-- Each agreement threaded to the projects it funds and the reports filed against its targets. --}}
         <section class="mt-10 pb-10" aria-labelledby="agreements-heading" data-agreements>
-            <h2 id="agreements-heading" class="text-lg font-bold {{ $inkText }}">{{ __('donors.agreements_and_what_they_fund') }}</h2>
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <h2 id="agreements-heading" class="text-lg font-bold {{ $inkText }}">{{ __('donors.agreements_and_what_they_fund') }}</h2>
+                @can('funding-agreements.create')
+                <x-ui.button size="sm" icon="plus" class="min-h-10 touch-manipulation" wire:click="recordAgreementForDonor" data-test="record-agreement-for-donor">{{ __('funding_agreements.record_agreement') }}</x-ui.button>
+                @endcan
+            </div>
 
             <div class="mt-2 flex flex-col">
                 @foreach ($this->agreements as $agreement)
@@ -653,6 +703,9 @@ new #[Title('titles.donor')] class extends Component {
                                 @if ($money['overdue'] > 0)
                                     <span><span class="font-bold text-status-critical">{{ $amount($money['overdue']) }}</span> {{ __('donors.overdue_lower') }}</span>
                                 @endif
+                                @if ($money['missingNet'] > 0)
+                                    <span class="font-semibold text-status-warn" data-missing-net>{{ trans_choice('funding_agreements.received_tranches_missing_net', $money['missingNet'], ['count' => $money['missingNet']]) }}</span>
+                                @endif
                             </p>
                         </div>
 
@@ -681,6 +734,29 @@ new #[Title('titles.donor')] class extends Component {
                                         </li>
                                     @endforeach
                                 </ol>
+                            @endif
+                            @if ($agreement->reports->isNotEmpty())
+                                <div class="mt-5" data-owed-donor-reports>
+                                    <h3 class="type-label inline-flex items-center gap-1.5 {{ $mutedText }}">
+                                        <flux:icon.paper-airplane variant="micro" class="size-4 rtl:-scale-x-100" aria-hidden="true" />
+                                        {{ trans_choice('donors.count_reports_owed_to_donor', $agreement->reports->count(), ['count' => $agreement->reports->count()]) }}
+                                    </h3>
+                                    <ul class="mt-2 flex flex-col" role="list">
+                                        @foreach ($agreement->reports as $owedReport)
+                                            <li wire:key="agreement-{{ $agreement->id }}-owed-{{ $owedReport->id }}" data-owed-donor-report="{{ $owedReport->id }}">
+                                                <a href="{{ route('funding-agreements.show', $agreement) }}#reports-heading" wire:navigate class="group flex min-h-9 items-center justify-between gap-3 border-b py-1.5 text-sm focus-visible:outline-2 focus-visible:outline-primary {{ $hairline }}">
+                                                    <span class="min-w-0">
+                                                        <span class="block truncate font-medium underline-offset-4 group-hover:underline {{ $inkText }}">{{ $owedReport->title }}</span>
+                                                        <span class="block text-[11px] {{ $mutedText }}">{{ $owedReport->type->label() }}</span>
+                                                    </span>
+                                                    <span @class(['shrink-0 text-xs font-semibold tabular-nums', 'text-status-critical' => $owedReport->isOverdue(), $mutedText => ! $owedReport->isOverdue()])>
+                                                        {{ $owedReport->isOverdue() ? __('donors.report_overdue_since', ['date' => $formatDate($owedReport->due_on)]) : __('donors.report_due_on', ['date' => $formatDate($owedReport->due_on)]) }}
+                                                    </span>
+                                                </a>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </div>
                             @endif
                             <div class="mt-5" data-agreement-reports>
                                 <h3 class="type-label inline-flex items-center gap-1.5 {{ $mutedText }}">
@@ -729,7 +805,7 @@ new #[Title('titles.donor')] class extends Component {
                                                     $state = $this->transferState($transfer);
                                                 @endphp
                                                 <tr class="border-b last:border-b-0 {{ $hairline }}" wire:key="tranche-row-{{ $transfer->id }}" data-tranche-row="{{ $state }}">
-                                                    <td @class(['py-2 pe-4 font-semibold whitespace-nowrap', 'text-funding' => $state === 'received', 'text-status-warn' => $state === 'due', 'text-status-critical' => in_array($state, ['overdue', 'failed'], true), $mutedText => $state === 'undated'])>{{ $stateLabels[$state] }}</td>
+                                                    <td @class(['py-2 pe-4 font-semibold whitespace-nowrap', 'text-funding' => $state === 'received', 'text-status-warn' => in_array($state, ['due', 'transit'], true), 'text-status-critical' => in_array($state, ['overdue', 'failed'], true), $mutedText => $state === 'undated'])>{{ $stateLabels[$state] }}</td>
                                                     <td class="py-2 pe-4 whitespace-nowrap">{{ $formatDate($transfer->scheduled_date) }}</td>
                                                     <td class="py-2 pe-4 whitespace-nowrap">{{ $formatDate($transfer->transfer_date) }}</td>
                                                     <td class="py-2 pe-4 font-semibold whitespace-nowrap {{ $inkText }}">{{ $amount((float) $transfer->payment_amount) }} <span class="font-normal {{ $mutedText }}">{{ $transfer->amount_transfered_currency?->value }}</span></td>
@@ -752,4 +828,13 @@ new #[Title('titles.donor')] class extends Component {
     @endif
 
     <x-donors.form-modal :editing="true" :type-options="$this->donorTypeOptions" />
+
+    <x-funding.agreement-modal
+        :editing="$editingAgreementId !== null"
+        :donor-options="$showAgreementModal ? $this->donorOptions : []"
+        :proposal-options="$showAgreementModal ? $this->proposalOptions : []"
+        :warning="$showAgreementModal ? $this->agreementProposalWarning : null"
+        :delete-blocker="$showAgreementModal ? $this->agreementDeleteBlocker : null"
+        :confirming-delete="$confirmingAgreementDelete"
+    />
 </section>

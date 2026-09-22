@@ -13,15 +13,20 @@ use App\Models\Proposal;
 use App\Models\Report;
 use App\Models\TransfersTracking;
 use App\Models\User;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
+
+beforeEach(function () {
+    $this->seed(RolesAndPermissionsSeeder::class);
+});
 
 test('guests are redirected from the donor directory', function () {
     $this->get(route('donors.index'))->assertRedirect(route('login'));
 });
 
 test('donors can be searched', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     Donor::factory()->create(['name' => 'UNICEF', 'country' => null, 'contact_person' => null]);
     Donor::factory()->create(['name' => 'ECHO', 'country' => null, 'contact_person' => null]);
 
@@ -35,7 +40,7 @@ test('donors can be searched', function () {
 });
 
 test('a donor can be created and two donors may share a name', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     Donor::factory()->create(['name' => 'Country Office']);
 
     Livewire::actingAs($user)
@@ -49,7 +54,7 @@ test('a donor can be created and two donors may share a name', function () {
 });
 
 test('creating a donor requires a name', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
 
     Livewire::actingAs($user)
         ->test('pages::donors.index')
@@ -60,7 +65,7 @@ test('creating a donor requires a name', function () {
 });
 
 test('a donor with no agreements can be deleted', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $donor = Donor::factory()->create();
 
     Livewire::actingAs($user)
@@ -73,7 +78,7 @@ test('a donor with no agreements can be deleted', function () {
 });
 
 test('a donor holding an agreement is not deleted', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $donor = Donor::factory()->create();
     DonorProposal::factory()->create([
         'donor_id' => $donor->id,
@@ -89,7 +94,7 @@ test('a donor holding an agreement is not deleted', function () {
 });
 
 test('donor detail totals committed budget per currency', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $donor = Donor::factory()->create(['name' => 'UNICEF']);
 
     DonorProposal::factory()->create([
@@ -117,7 +122,7 @@ test('donor detail totals committed budget per currency', function () {
 });
 
 test('donor detail renders a donor with no agreements', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $donor = Donor::factory()->create(['name' => 'Quiet Donor']);
 
     $this->actingAs($user)
@@ -128,7 +133,7 @@ test('donor detail renders a donor with no agreements', function () {
 });
 
 test('donor detail shows total disbursed and reports submitted separately from total committed', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $donor = Donor::factory()->create(['name' => 'UNICEF']);
 
     $proposal = Proposal::factory()->create(['name' => 'First Proposal']);
@@ -174,7 +179,7 @@ test('donor detail shows total disbursed and reports submitted separately from t
 });
 
 test('donor detail counts only received tranches as money in and flags overdue ones', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $donor = Donor::factory()->create();
     $agreement = DonorProposal::factory()->create([
         'donor_id' => $donor->id,
@@ -219,7 +224,7 @@ test('donor detail counts only received tranches as money in and flags overdue o
 });
 
 test('opening the delete confirmation opens its dialog and cancelling closes it', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $donor = Donor::factory()->create();
 
     Livewire::actingAs($user)
@@ -232,7 +237,7 @@ test('opening the delete confirmation opens its dialog and cancelling closes it'
 });
 
 test('donors can be filtered by type from the rail and by relationship', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $funder = Donor::factory()->create(['name' => 'Funding Foundation', 'type' => DonorType::Foundation]);
     Donor::factory()->create(['name' => 'Quiet Foundation', 'type' => DonorType::Foundation]);
     Donor::factory()->create(['name' => 'Unclassified Office', 'type' => null]);
@@ -255,7 +260,7 @@ test('donors can be filtered by type from the rail and by relationship', functio
 });
 
 test('the share of wallet splits each currency by donor and never adds currencies together', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $echo = Donor::factory()->create(['name' => 'ECHO']);
     $giz = Donor::factory()->create(['name' => 'GIZ']);
 
@@ -282,7 +287,7 @@ test('the share of wallet splits each currency by donor and never adds currencie
 });
 
 test('sorting by next transfer due puts the soonest scheduled donor first', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $later = Donor::factory()->create(['name' => 'Alpha Donor']);
     $sooner = Donor::factory()->create(['name' => 'Zulu Donor']);
 
@@ -302,7 +307,7 @@ test('sorting by next transfer due puts the soonest scheduled donor first', func
 });
 
 test('the overview sizes itself to the funders on screen', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $donor = Donor::factory()->create(['type' => DonorType::Bilateral]);
     DonorProposal::factory()->create(['donor_id' => $donor->id, 'proposal_id' => Proposal::factory()->create()->id, 'currency' => Currency::Usd]);
 
@@ -313,7 +318,7 @@ test('the overview sizes itself to the funders on screen', function () {
 });
 
 test('a donor opens from its eye button, not from a linked name', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $donor = Donor::factory()->create(['name' => 'UNICEF']);
 
     Livewire::actingAs($user)
@@ -324,7 +329,7 @@ test('a donor opens from its eye button, not from a linked name', function () {
 });
 
 test('a pending tranche with no scheduled date does not break the transfers ahead', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $agreement = DonorProposal::factory()->create(['donor_id' => Donor::factory()->create()->id]);
     TransfersTracking::factory()->create([
         'donor_proposal_id' => $agreement->id,
@@ -339,7 +344,7 @@ test('a pending tranche with no scheduled date does not break the transfers ahea
 });
 
 test('donors can be found by email', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     Donor::factory()->create(['name' => 'Mail Found', 'email' => 'grants@found.org']);
     Donor::factory()->create(['name' => 'Other Funder', 'email' => 'x@other.org']);
 
@@ -351,7 +356,7 @@ test('donors can be found by email', function () {
 });
 
 test('a donor phone link dials digits only', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     Donor::factory()->create(['phone' => '+961 (1) 234-567']);
 
     Livewire::actingAs($user)
@@ -360,7 +365,7 @@ test('a donor phone link dials digits only', function () {
 });
 
 test('a donor country longer than its column is rejected, not sent to the database', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
 
     Livewire::actingAs($user)
         ->test('pages::donors.index')
@@ -372,7 +377,7 @@ test('a donor country longer than its column is rejected, not sent to the databa
 });
 
 test('the follow-up is recorded with the donor and needs a due date', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
 
     $component = Livewire::actingAs($user)
         ->test('pages::donors.index')
@@ -395,7 +400,7 @@ test('the follow-up is recorded with the donor and needs a due date', function (
 });
 
 test('overdue follow-ups are counted and sort first', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     Donor::factory()->create(['name' => 'Aardvark Fund']);
     Donor::factory()->create(['name' => 'Zebra Trust', 'next_step' => 'Call back', 'next_step_due_on' => now()->subDays(3)->toDateString()]);
 
@@ -408,7 +413,7 @@ test('overdue follow-ups are counted and sort first', function () {
 });
 
 test('a donor can be edited from its own page and only that donor', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $donor = Donor::factory()->create(['name' => 'Before']);
     $other = Donor::factory()->create(['name' => 'Untouched']);
 
@@ -430,7 +435,7 @@ test('a donor can be edited from its own page and only that donor', function () 
 });
 
 test('donor detail lists each tranche in full and each report against its targets', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $donor = Donor::factory()->create();
     $proposal = Proposal::factory()->create();
     $agreement = DonorProposal::factory()->create(['donor_id' => $donor->id, 'proposal_id' => $proposal->id, 'currency' => Currency::Usd]);

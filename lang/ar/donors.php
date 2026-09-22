@@ -123,4 +123,7 @@ return [
     'report_number' => 'التقرير رقم :number',
     'and_count_older_reports' => '{1} وتقرير أقدم|{2} وتقريران أقدم|[3,10] و:count تقارير أقدم|[11,*] و:count تقريراً أقدم',
     'every_tranche_in_detail' => '{1} تفاصيل الدفعة|{2} تفاصيل الدفعتين|[3,10] تفاصيل الدفعات الـ:count|[11,*] تفاصيل الدفعات الـ:count',
+    'count_reports_owed_to_donor' => '{1} تقرير واحد مستحق للمانح|{2} تقريران مستحقان للمانح|[3,10] :count تقارير مستحقة للمانح|[11,*] :count تقريرًا مستحقًا للمانح',
+    'report_overdue_since' => 'متأخر منذ :date',
+    'report_due_on' => 'مستحق في :date',
 ];

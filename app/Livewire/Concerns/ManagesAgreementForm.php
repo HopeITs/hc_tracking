@@ -8,6 +8,7 @@ use App\Enums\Currency;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\Proposal;
+use Closure;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Gate;
@@ -26,9 +27,14 @@ use Livewire\Attributes\Computed;
  */
 trait ManagesAgreementForm
 {
+    /** donor_proposal.budget is DECIMAL(14,2). */
+    public const MAX_BUDGET = 999999999999.99;
+
     public bool $showAgreementModal = false;
 
     public ?int $editingAgreementId = null;
+
+    public bool $confirmingAgreementDelete = false;
 
     public string $agreementDonorId = '';
 
@@ -44,6 +50,12 @@ trait ManagesAgreementForm
      * Called after an agreement is recorded or edited.
      */
     abstract protected function agreementSaved(DonorProposal $agreement, bool $isCreate): void;
+
+    /**
+     * Called after an agreement is deleted. A page that shows only that
+     * agreement leaves; a list refreshes.
+     */
+    abstract protected function agreementDeleted(int $agreementId): void;
 
     /**
      * The proposal every agreement on this page must belong to, or null when
@@ -65,7 +77,56 @@ trait ManagesAgreementForm
     #[Computed]
     public function proposalOptions(): Collection
     {
-        return Proposal::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get();
+        return Proposal::query()->select(['id', 'name', 'status'])->orderBy('name')->orderBy('id')->get();
+    }
+
+    /**
+     * A warning when the chosen proposal has not been approved by a donor, or
+     * was rejected. Recording is still allowed: paperwork is sometimes signed
+     * before the status catches up.
+     */
+    #[Computed]
+    public function agreementProposalWarning(): ?string
+    {
+        $proposalId = (int) ($this->agreementProposalScope() ?? $this->agreementProposalId);
+
+        if ($proposalId === 0) {
+            return null;
+        }
+
+        $status = Proposal::query()->whereKey($proposalId)->first(['id', 'status'])?->status;
+
+        if ($status === null || $status->isApprovedByDonor()) {
+            return null;
+        }
+
+        return __('funding_agreements.proposal_not_approved_warning', ['status' => $status->label()]);
+    }
+
+    /**
+     * Why the agreement being edited cannot be deleted, or null when it can.
+     *
+     * An agreement that carries tranches or donor reports is history: deleting
+     * it would cascade into every record of money that moved under it.
+     */
+    #[Computed]
+    public function agreementDeleteBlocker(): ?string
+    {
+        if ($this->editingAgreementId === null) {
+            return null;
+        }
+
+        $agreement = DonorProposal::query()
+            ->whereKey($this->editingAgreementId)
+            ->withCount(['transfers', 'reports'])
+            ->first(['id']);
+
+        return match (true) {
+            $agreement === null => null,
+            $agreement->transfers_count > 0 => trans_choice('funding_agreements.cannot_delete_agreement_with_tranches', $agreement->transfers_count, ['count' => $agreement->transfers_count]),
+            $agreement->reports_count > 0 => trans_choice('funding_agreements.cannot_delete_agreement_with_reports', $agreement->reports_count, ['count' => $agreement->reports_count]),
+            default => null,
+        };
     }
 
     public function openAgreementCreate(): void
@@ -80,12 +141,10 @@ trait ManagesAgreementForm
     {
         Gate::authorize('funding-agreements.update');
 
-        $agreement = DonorProposal::query()
-            ->select(['id', 'donor_id', 'proposal_id', 'budget', 'currency', 'project_num'])
-            ->when($this->agreementProposalScope() !== null, fn ($query) => $query->where('proposal_id', $this->agreementProposalScope()))
-            ->findOrFail($agreementId);
+        $agreement = $this->scopedAgreement($agreementId);
 
         $this->resetValidation();
+        $this->confirmingAgreementDelete = false;
         $this->editingAgreementId = $agreement->id;
         $this->agreementDonorId = (string) $agreement->donor_id;
         $this->agreementProposalId = (string) $agreement->proposal_id;
@@ -105,25 +164,34 @@ trait ManagesAgreementForm
             $this->agreementProposalId = (string) $this->agreementProposalScope();
         }
 
+        $existing = $this->editingAgreementId === null ? null : $this->scopedAgreement($this->editingAgreementId);
+
         $validated = $this->validate([
             'agreementDonorId' => ['required', 'integer', Rule::exists(Donor::class, 'id')],
             'agreementProposalId' => ['required', 'integer', Rule::exists(Proposal::class, 'id')],
-            'budget' => ['required', 'numeric', 'min:0'],
-            'agreementCurrency' => ['required', new Enum(Currency::class)],
+            'budget' => ['required', 'numeric', 'min:0', 'max:'.self::MAX_BUDGET],
+            'agreementCurrency' => [
+                'required',
+                new Enum(Currency::class),
+                // Every tranche is measured against the budget in its own
+                // currency, so the currency is fixed once money is scheduled.
+                function (string $attribute, mixed $value, Closure $fail) use ($existing): void {
+                    if ($existing !== null && $existing->currency->value !== $value && $existing->transfers()->exists()) {
+                        $fail(__('funding_agreements.currency_is_fixed_once_tranches_exist'));
+                    }
+                },
+            ],
             'projectNum' => ['nullable', 'string', 'max:50'],
         ], [
             'agreementDonorId.required' => __('funding_agreements.select_the_donor'),
             'agreementProposalId.required' => __('funding_agreements.select_the_proposal_being_funded'),
             'budget.required' => __('funding_agreements.enter_the_agreed_budget'),
             'budget.min' => __('funding_agreements.a_budget_cannot_be_negative'),
+            'budget.max' => __('funding_agreements.a_budget_is_too_large'),
             'agreementCurrency.required' => __('funding_agreements.select_the_currency_this_budget_is_stated_in'),
         ]);
 
-        $agreement = $this->editingAgreementId === null
-            ? new DonorProposal
-            : DonorProposal::query()
-                ->when($this->agreementProposalScope() !== null, fn ($query) => $query->where('proposal_id', $this->agreementProposalScope()))
-                ->findOrFail($this->editingAgreementId);
+        $agreement = $existing ?? new DonorProposal;
 
         $agreement->fill([
             'donor_id' => (int) $validated['agreementDonorId'],
@@ -145,20 +213,77 @@ trait ManagesAgreementForm
         );
     }
 
+    /**
+     * Ask for confirmation inside the open edit form.
+     */
+    public function confirmAgreementDelete(): void
+    {
+        Gate::authorize('funding-agreements.delete');
+
+        $this->confirmingAgreementDelete = $this->editingAgreementId !== null;
+    }
+
+    public function cancelAgreementDelete(): void
+    {
+        $this->confirmingAgreementDelete = false;
+    }
+
+    /**
+     * Delete the agreement being edited, only while nothing hangs off it.
+     */
+    public function deleteAgreement(): void
+    {
+        Gate::authorize('funding-agreements.delete');
+
+        if ($this->editingAgreementId === null) {
+            return;
+        }
+
+        $agreement = $this->scopedAgreement($this->editingAgreementId);
+
+        if ($this->agreementDeleteBlocker !== null) {
+            $this->confirmingAgreementDelete = false;
+
+            Flux::toast(variant: 'danger', text: $this->agreementDeleteBlocker);
+
+            return;
+        }
+
+        $agreement->delete();
+
+        $this->showAgreementModal = false;
+        $this->resetAgreementForm();
+        $this->agreementDeleted($agreement->id);
+
+        Flux::toast(variant: 'success', text: __('funding_agreements.funding_agreement_deleted'));
+    }
+
     public function closeAgreementModal(): void
     {
         $this->showAgreementModal = false;
         $this->resetAgreementForm();
     }
 
+    /**
+     * An agreement by id, re-scoped to the proposal this page is pinned to.
+     */
+    protected function scopedAgreement(int $agreementId): DonorProposal
+    {
+        return DonorProposal::query()
+            ->when($this->agreementProposalScope() !== null, fn ($query) => $query->where('proposal_id', $this->agreementProposalScope()))
+            ->findOrFail($agreementId);
+    }
+
     protected function resetAgreementForm(): void
     {
         $this->resetValidation();
         $this->editingAgreementId = null;
+        $this->confirmingAgreementDelete = false;
         $this->agreementDonorId = '';
         $this->agreementProposalId = $this->agreementProposalScope() === null ? '' : (string) $this->agreementProposalScope();
         $this->budget = '';
         $this->agreementCurrency = 'USD';
         $this->projectNum = '';
+        unset($this->agreementDeleteBlocker, $this->agreementProposalWarning);
     }
 }

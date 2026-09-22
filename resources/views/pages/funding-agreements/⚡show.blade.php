@@ -452,6 +452,14 @@ new #[Title('titles.funding_agreement')] class extends Component {
             }
         }
 
+        if (! $this->agreement->proposal->status->isApprovedByDonor()) {
+            $items[] = [
+                'key' => 'proposal-status',
+                'text' => __('funding_agreements.proposal_not_approved_warning', ['status' => $this->agreement->proposal->status->label()]),
+                'critical' => false,
+            ];
+        }
+
         if ($money['unrecordedCount'] > 0) {
             $items[] = [
                 'key' => 'net-missing',
@@ -875,6 +883,20 @@ new #[Title('titles.funding_agreement')] class extends Component {
     }
 
     /**
+     * This page shows one agreement, so once it is gone there is nothing left
+     * to show: go back to the agreement directory.
+     */
+    protected function agreementDeleted(int $agreementId): void
+    {
+        $this->redirectRoute('funding-agreements.index', navigate: true);
+    }
+
+    protected function transferDeleted(int $transferId): void
+    {
+        $this->forgetReadings();
+    }
+
+    /**
      * Drop every memoised reading so the next render recomputes from the
      * database. Everything on this page derives from the agreement and its
      * tranches, so a write anywhere clears them all.
@@ -1090,7 +1112,12 @@ new #[Title('titles.funding_agreement')] class extends Component {
                     {{ __('funding_agreements.tranches') }}
                     <span class="ms-1 text-base font-semibold tabular-nums {{ $mutedText }}">{{ count($journeys) }}</span>
                 </h2>
-                <p class="text-xs {{ $mutedText }}">{{ __('funding_agreements.from_schedule_to_account') }}</p>
+                <p class="flex flex-wrap items-baseline gap-x-3 text-xs {{ $mutedText }}">
+                    <span>{{ __('funding_agreements.from_schedule_to_account') }}</span>
+                    @if ($journeys !== [])
+                        <a href="{{ route('transfers.index', ['agreement' => $agreement->id]) }}" wire:navigate class="font-semibold underline-offset-4 hover:underline {{ $inkText }}" data-transfers-ledger-link>{{ __('funding_agreements.open_in_transfers_ledger') }}</a>
+                    @endif
+                </p>
             </div>
 
             @if ($journeys === [])
@@ -1464,6 +1491,9 @@ new #[Title('titles.funding_agreement')] class extends Component {
     <x-funding.agreement-modal
         :editing="$editingAgreementId !== null"
         :donor-options="$showAgreementModal ? $this->donorOptions : []"
+        :warning="$showAgreementModal ? $this->agreementProposalWarning : null"
+        :delete-blocker="$showAgreementModal ? $this->agreementDeleteBlocker : null"
+        :confirming-delete="$confirmingAgreementDelete"
         :locked-proposal-name="$proposal->name"
     />
 
@@ -1510,5 +1540,6 @@ new #[Title('titles.funding_agreement')] class extends Component {
         :editing="$editingTransferId !== null"
         :agreement-options="$showTransferModal ? $this->agreementOptions : []"
         :account-options="$showTransferModal ? $this->accountOptions : []"
+        :confirming-delete="$confirmingTransferDelete"
     />
 </section>

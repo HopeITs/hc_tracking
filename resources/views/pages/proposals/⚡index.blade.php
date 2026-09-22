@@ -139,7 +139,7 @@ new #[Title('titles.proposals')] class extends Component {
             ->with([
                 'donorProposals' => fn ($query) => $query->select(['id', 'proposal_id', 'donor_id', 'budget', 'currency', 'project_num'])->orderBy('id'),
                 'donorProposals.donor:id,name',
-                'donorProposals.transfers:id,donor_proposal_id,ar_status,payment_amount,amount_transfered_currency,net_amount_received,amount_received_currency,scheduled_date',
+                'donorProposals.transfers:id,donor_proposal_id,ar_status,payment_amount,amount_transfered_currency,net_amount_received,amount_received_currency,scheduled_date,transfer_date',
                 'projects' => fn ($query) => $query->select(['projects.id', 'projects.name', 'projects.status'])->orderBy('projects.name'),
                 'statusNotes' => fn ($query) => $query->select(['id', 'proposal_id', 'status', 'context', 'date'])->orderByDesc('date')->orderByDesc('id')->limit(1),
             ])
@@ -416,7 +416,8 @@ new #[Title('titles.proposals')] class extends Component {
                 ->groupBy(fn (TransfersTracking $transfer): string => (string) $transfer->amount_received_currency?->value)
                 ->map(fn (Collection $group): float => (float) $group->sum('net_amount_received'))
                 ->all(),
-            'nextDue' => $pending->whereNotNull('scheduled_date')->sortBy('scheduled_date')->first()?->scheduled_date,
+            // Only money still to be sent has a due date; a sent tranche is in transit.
+            'nextDue' => $pending->whereNull('transfer_date')->whereNotNull('scheduled_date')->sortBy('scheduled_date')->first()?->scheduled_date,
         ];
     }
 
@@ -449,7 +450,7 @@ new #[Title('titles.proposals')] class extends Component {
     public function openEditModal(int $proposalId): void
     {
         $proposal = Proposal::query()
-            ->select(['id', 'name', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end', 'status', 'notes'])
+            ->select(['id', 'name', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end', 'notes'])
             ->findOrFail($proposalId);
 
         Gate::authorize('update', $proposal);
@@ -461,7 +462,6 @@ new #[Title('titles.proposals')] class extends Component {
         $this->plannedDateEnd = $proposal->planned_date_end?->toDateString() ?? '';
         $this->actualDateBegin = $proposal->actual_date_begin?->toDateString() ?? '';
         $this->actualDateEnd = $proposal->actual_date_end?->toDateString() ?? '';
-        $this->proposalStatus = $proposal->status->value;
         $this->notes = $proposal->notes ?? '';
         $this->showProposalModal = true;
     }
@@ -477,7 +477,7 @@ new #[Title('titles.proposals')] class extends Component {
             'plannedDateEnd' => ['required', 'date', 'after_or_equal:plannedDateBegin'],
             'actualDateBegin' => ['nullable', 'date'],
             'actualDateEnd' => ['nullable', 'date', 'after_or_equal:actualDateBegin'],
-            'proposalStatus' => ['required', new Enum(ProposalStatus::class)],
+            'proposalStatus' => [$this->editingProposalId === null ? 'required' : 'nullable', new Enum(ProposalStatus::class)],
             'notes' => ['nullable', 'string'],
         ], [
             'name.required' => __('proposals.enter_a_proposal_name'),
@@ -493,15 +493,34 @@ new #[Title('titles.proposals')] class extends Component {
 
         Gate::authorize($proposal->exists ? 'update' : 'create', $proposal->exists ? $proposal : Proposal::class);
 
-        $proposal->fill([
-            'name' => $validated['name'],
-            'planned_date_begin' => $validated['plannedDateBegin'],
-            'planned_date_end' => $validated['plannedDateEnd'],
-            'actual_date_begin' => $validated['actualDateBegin'] === '' ? null : $validated['actualDateBegin'],
-            'actual_date_end' => $validated['actualDateEnd'] === '' ? null : $validated['actualDateEnd'],
-            'status' => $validated['proposalStatus'],
-            'notes' => $validated['notes'] === '' ? null : $validated['notes'],
-        ])->save();
+        // Status is only chosen when the proposal is first recorded. After that
+        // it moves through recordStageChange(), which writes the audit note
+        // alongside it, so the edit form never touches it.
+        DB::transaction(function () use ($proposal, $validated): void {
+            $proposal->fill([
+                'name' => $validated['name'],
+                'planned_date_begin' => $validated['plannedDateBegin'],
+                'planned_date_end' => $validated['plannedDateEnd'],
+                'actual_date_begin' => $validated['actualDateBegin'] === '' ? null : $validated['actualDateBegin'],
+                'actual_date_end' => $validated['actualDateEnd'] === '' ? null : $validated['actualDateEnd'],
+                'notes' => $validated['notes'] === '' ? null : $validated['notes'],
+            ]);
+
+            if (! $proposal->exists) {
+                $proposal->status = ProposalStatus::from($validated['proposalStatus']);
+            }
+
+            $proposal->save();
+
+            if ($proposal->wasRecentlyCreated) {
+                ProposalStatusNote::query()->create([
+                    'proposal_id' => $proposal->id,
+                    'status' => $proposal->status,
+                    'context' => __('proposals.proposal_recorded_note'),
+                    'date' => now()->toDateString(),
+                ]);
+            }
+        });
 
         $wasRecentlyCreated = $proposal->wasRecentlyCreated;
 
@@ -658,6 +677,10 @@ new #[Title('titles.proposals')] class extends Component {
     $amount = fn (float $value): string => Number::format($value, maxPrecision: 0);
     $shortAmount = fn (float $value): string => Number::abbreviate($value, maxPrecision: 1);
     $matchingCount = $this->filteredProposalIds->count();
+    // The flow names every matching proposal but the list below shows one page
+    // of them: a proposal on this page is scrolled to, any other one opened.
+    $pageProposalIds = $this->proposals->getCollection()->modelKeys();
+    $proposalHref = fn (int $id): string => in_array($id, $pageProposalIds, true) ? '#proposal-'.$id : route('proposals.show', $id);
 @endphp
 
 <section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="proposal-pipeline-heading">
@@ -865,7 +888,7 @@ new #[Title('titles.proposals')] class extends Component {
                                     @foreach ($graph['proposals'] as $node)
                                         <li class="flex min-h-15" style="flex: {{ max(1, round($node['total'] / max($graph['total'], 1) * 100, 2)) }} 1 0%" wire:key="flow-proposal-{{ $graph['currency'] }}-{{ $node['id'] }}">
                                             <a
-                                                href="#proposal-{{ $node['id'] }}"
+                                                href="{{ $proposalHref($node['id']) }}"
                                                 x-on:mouseenter="$store.proposalFlow.focus = '{{ $node['key'] }}'"
                                                 x-on:mouseleave="$store.proposalFlow.focus = null"
                                                 x-on:focus="$store.proposalFlow.focus = '{{ $node['key'] }}'"
@@ -933,7 +956,7 @@ new #[Title('titles.proposals')] class extends Component {
                                                     $target = collect($graph['proposals'])->firstWhere('key', $ribbon['to']);
                                                 @endphp
                                                 <li class="flex items-center gap-2 text-sm" wire:key="flow-stack-{{ $graph['currency'] }}-{{ $ribbon['from'] }}-{{ $ribbon['to'] }}">
-                                                    <a href="#proposal-{{ $target['id'] }}" class="min-w-0 flex-1 truncate py-2.5 font-semibold hover:underline {{ $inkText }}">{{ $target['name'] }}</a>
+                                                    <a href="{{ $proposalHref($target['id']) }}" class="min-w-0 flex-1 truncate py-2.5 font-semibold hover:underline {{ $inkText }}">{{ $target['name'] }}</a>
                                                     <span class="shrink-0 text-xs tabular-nums {{ $mutedText }}">{{ $amount($ribbon['amount']) }}</span>
                                                 </li>
                                             @endif
@@ -949,7 +972,7 @@ new #[Title('titles.proposals')] class extends Component {
                     <p class="mt-6 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-dashed pt-4 text-xs {{ $hairline }} {{ $mutedText }}" data-unfunded>
                         <span class="font-semibold">{{ __('proposals.not_yet_funded') }}</span>
                         @foreach ($this->flow['unfunded'] as $unfunded)
-                            <a href="#proposal-{{ $unfunded['id'] }}" class="inline-flex min-h-8 items-center gap-1.5 font-semibold hover:underline {{ $inkText }}" wire:key="unfunded-{{ $unfunded['id'] }}">
+                            <a href="{{ $proposalHref($unfunded['id']) }}" class="inline-flex min-h-8 items-center gap-1.5 font-semibold hover:underline {{ $inkText }}" wire:key="unfunded-{{ $unfunded['id'] }}">
                                 <span class="size-2 rounded-full border border-dashed border-secondary-medium dark:border-secondary-soft" aria-hidden="true"></span>
                                 {{ $unfunded['name'] }}
                             </a>
@@ -1197,20 +1220,22 @@ new #[Title('titles.proposals')] class extends Component {
                 <x-ui.input wire:model="actualDateEnd" :label="__('proposals.actual_end')" type="date" />
             </div>
 
-            <x-ui.select wire:model="proposalStatus" :label="__('common.status')" required>
+            @if ($editingProposalId === null)
+            <x-ui.select wire:model="proposalStatus" :label="__('proposals.starting_status')" required>
                 @foreach (ProposalStatus::cases() as $statusCase)
                     <flux:select.option :value="$statusCase->value" :wire:key="'proposal-status-option-'.$statusCase->value">
                         {{ $statusCase->label() }} — {{ $statusCase->phase()->label() }}
                     </flux:select.option>
                 @endforeach
             </x-ui.select>
+            @endif
 
             <flux:textarea wire:model="notes" :label="__('common.notes')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
 
             <div class="rounded-lg border border-secondary-soft bg-secondary-soft/50 p-3 text-sm text-secondary-medium dark:border-secondary-medium dark:bg-secondary-medium/50 dark:text-secondary-soft">
                 <div class="flex items-start gap-2.5">
                     <flux:icon.information-circle class="mt-0.5 size-4 shrink-0" />
-                    <p>{{ __('proposals.changing_status_here_does_not_write_an_audit_note_use_the_move') }}</p>
+                    <p>{{ $editingProposalId === null ? __('proposals.the_starting_status_opens_the_status_history') : __('proposals.status_moves_only_through_change_status') }}</p>
                 </div>
             </div>
 

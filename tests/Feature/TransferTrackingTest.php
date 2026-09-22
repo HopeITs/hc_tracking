@@ -137,15 +137,58 @@ test('a negative payment amount is rejected', function () {
         ->assertHasErrors(['paymentAmount']);
 });
 
-test('transfers offer no delete', function () {
+test('a tranche can be deleted from its edit form', function () {
     $user = User::factory()->role('Financial')->create();
-    TransfersTracking::factory()->create();
+    $transfer = TransfersTracking::factory()->create();
 
-    $component = Livewire::actingAs($user)->test('pages::transfers.index');
+    Livewire::actingAs($user)->test('pages::transfers.index')
+        ->call('openTransferEdit', $transfer->id)
+        ->call('confirmTransferDelete')
+        ->assertSet('confirmingTransferDelete', true)
+        ->call('deleteTransfer')
+        ->assertSet('showTransferModal', false);
 
-    $component->assertDontSee('wire:click="confirmDelete');
+    expect(TransfersTracking::query()->whereKey($transfer->id)->exists())->toBeFalse();
+});
 
-    expect(method_exists($component->instance(), 'deleteTransfer'))->toBeFalse();
+test('deleting a tranche needs the delete permission', function () {
+    $user = User::factory()->create();
+    $transfer = TransfersTracking::factory()->create();
+
+    Livewire::actingAs($user)->test('pages::transfers.index')
+        ->call('deleteTransfer')
+        ->assertForbidden();
+
+    expect(TransfersTracking::query()->whereKey($transfer->id)->exists())->toBeTrue();
+});
+
+test('tranche dates and status must agree', function (array $input, string $error) {
+    $user = User::factory()->role('Financial')->create();
+    $agreement = DonorProposal::factory()->create();
+
+    Livewire::actingAs($user)->test('pages::transfers.index')
+        ->call('openTransferCreate', $agreement->id)
+        ->set(['paymentAmount' => '100', ...$input])
+        ->call('saveTransfer')
+        ->assertHasErrors([$error]);
+})->with([
+    'pending with a landing date' => [['transferArStatus' => 'pending', 'receiveDate' => '2026-01-01'], 'receiveDate'],
+    'landed before it was sent' => [['transferArStatus' => 'received', 'netAmountReceived' => '100', 'transferDate' => '2026-02-01', 'receiveDate' => '2026-01-01'], 'receiveDate'],
+    'sent in the future' => [['transferDate' => '2999-01-01'], 'transferDate'],
+    'zero exchange rate' => [['exchangeRate' => '0'], 'exchangeRate'],
+    'amount above its column' => [['paymentAmount' => '10000000000000'], 'paymentAmount'],
+]);
+
+test('choosing an agreement for a new tranche takes its currency', function () {
+    $user = User::factory()->role('Financial')->create();
+    $agreement = DonorProposal::factory()->create(['currency' => Currency::Eur]);
+
+    Livewire::actingAs($user)->test('pages::transfers.index')
+        ->call('openTransferCreate')
+        ->set('transferAgreementId', (string) $agreement->id)
+        ->assertSet('transferredCurrency', 'EUR')
+        ->assertSet('feesCurrency', 'EUR')
+        ->assertSet('receivedCurrency', 'EUR');
 });
 
 test('transfer totals are never summed across currencies', function () {

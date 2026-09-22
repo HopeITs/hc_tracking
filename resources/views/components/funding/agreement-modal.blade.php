@@ -9,6 +9,9 @@
     'donorOptions' => [],
     'proposalOptions' => [],
     'lockedProposalName' => null,
+    'warning' => null,
+    'deleteBlocker' => null,
+    'confirmingDelete' => false,
 ])
 
 <flux:modal wire:model="showAgreementModal" wire:close="closeAgreementModal" class="w-full max-w-2xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
@@ -35,7 +38,7 @@
                     <p class="mt-2 truncate text-sm text-secondary-medium dark:text-secondary-soft" data-locked-proposal>{{ $lockedProposalName }}</p>
                 </div>
             @else
-                <x-ui.select wire:model="agreementProposalId" :label="__('common.proposal')" required>
+                <x-ui.select wire:model.live="agreementProposalId" :label="__('common.proposal')" required>
                     <flux:select.option value="">{{ __('common.select_a_proposal') }}</flux:select.option>
                     @foreach ($proposalOptions as $proposalOption)
                         <flux:select.option :value="$proposalOption->id" :wire:key="'agr-proposal-option-'.$proposalOption->id">{{ $proposalOption->name }}</flux:select.option>
@@ -56,18 +59,42 @@
             <x-ui.input wire:model="projectNum" :label="__('funding_agreements.donor_reference')" type="text" maxlength="50" />
         </div>
 
-        <div class="rounded-lg border border-secondary-soft bg-secondary-soft/50 p-3 text-sm text-secondary-medium dark:border-secondary-medium dark:bg-secondary-medium/50 dark:text-secondary-soft">
-            <div class="flex items-start gap-2.5">
-                <flux:icon.information-circle class="mt-0.5 size-4 shrink-0" />
-                <p>{{ __('funding_agreements.agreements_cannot_be_deleted_from_this_system_every_transfer') }}</p>
+        @if ($warning !== null)
+            <div class="flex items-start gap-2.5 rounded-lg border border-status-warn/40 bg-status-warn/10 p-3 text-sm text-secondary-dark dark:text-white" role="status" data-agreement-proposal-warning>
+                <flux:icon.exclamation-triangle class="mt-0.5 size-4 shrink-0 text-status-warn" />
+                <p>{{ $warning }}</p>
             </div>
-        </div>
+        @endif
 
-        <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
+        @if ($editing && $confirmingDelete)
+            <div class="flex flex-col gap-3 rounded-lg border border-primary/40 bg-primary/5 p-3 text-sm sm:flex-row sm:items-center sm:justify-between" role="alert" data-confirm-agreement-delete>
+                <p class="text-secondary-dark dark:text-white">{{ __('funding_agreements.delete_this_agreement_confirm') }}</p>
+                <div class="flex shrink-0 gap-2">
+                    <x-ui.button type="button" size="sm" wire:click="cancelAgreementDelete">{{ __('common.cancel') }}</x-ui.button>
+                    <x-ui.button type="button" size="sm" tone="primary" wire:click="deleteAgreement" data-test="confirm-delete-agreement">{{ __('funding_agreements.delete_agreement') }}</x-ui.button>
+                </div>
+            </div>
+        @endif
+
+        <div class="flex flex-col-reverse gap-2 border-t border-secondary-soft pt-4 sm:flex-row sm:items-center dark:border-secondary-medium">
+            @if ($editing)
+                @can('funding-agreements.delete')
+                    @if ($deleteBlocker === null)
+                        <x-ui.button type="button" tone="ghost" icon="trash" class="min-h-11 w-full text-status-critical! sm:me-auto sm:min-h-10 sm:w-auto" wire:click="confirmAgreementDelete" data-test="delete-agreement-button">{{ __('funding_agreements.delete_agreement') }}</x-ui.button>
+                    @else
+                        <p class="flex items-center gap-1.5 text-xs text-secondary-medium sm:me-auto dark:text-secondary-soft" data-agreement-delete-blocked>
+                            <flux:icon.lock-closed variant="micro" class="size-3.5 shrink-0" />
+                            {{ $deleteBlocker }}
+                        </p>
+                    @endif
+                @endcan
+            @endif
+            <div class="grid grid-cols-2 gap-2 sm:ms-auto sm:flex">
             <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeAgreementModal">{{ __('common.cancel') }}</x-ui.button>
             <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-agreement-button">
                 {{ $editing ? __('common.save_changes') : __('funding_agreements.record_agreement') }}
             </x-ui.button>
+            </div>
         </div>
     </form>
 </flux:modal>

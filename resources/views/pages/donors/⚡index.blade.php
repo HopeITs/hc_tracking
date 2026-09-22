@@ -12,6 +12,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -125,7 +126,7 @@ new #[Title('titles.donors')] class extends Component {
                 'donorProposals' => fn ($query) => $query->select(['id', 'donor_id', 'proposal_id', 'budget', 'currency', 'project_num'])->orderByDesc('budget'),
                 'donorProposals.proposal' => fn ($query) => $query->select(['id', 'name', 'status']),
                 'donorProposals.proposal.projects' => fn ($query) => $query->select(['projects.id', 'projects.name']),
-                'donorProposals.transfers' => fn ($query) => $query->select(['id', 'donor_proposal_id', 'ar_status', 'payment_amount', 'amount_transfered_currency', 'net_amount_received', 'amount_received_currency', 'scheduled_date', 'receive_date']),
+                'donorProposals.transfers' => fn ($query) => $query->select(['id', 'donor_proposal_id', 'ar_status', 'payment_amount', 'amount_transfered_currency', 'net_amount_received', 'amount_received_currency', 'scheduled_date', 'transfer_date', 'receive_date']),
             ])
             ->when($this->sort === 'agreements', fn (Builder $query) => $query->orderByDesc('donor_proposals_count'))
             ->when($this->sort === 'next_due', fn (Builder $query) => $query->orderByRaw('next_due_date is null')->orderBy('next_due_date'))
@@ -169,7 +170,8 @@ new #[Title('titles.donors')] class extends Component {
                 ->whereIn('proposal_id', (clone $agreements)->select('proposal_id'))
                 ->distinct()
                 ->count('project_id'),
-            'overdue' => $pendingTransfers()->whereDate('scheduled_date', '<', today())->count(),
+            // Sent money is in transit, not overdue, however late it is.
+            'overdue' => $pendingTransfers()->whereNull('transfer_date')->whereDate('scheduled_date', '<', today())->count(),
             'followUps' => Donor::query()->whereIn('id', $ids)->whereDate('next_step_due_on', '<=', today())->count(),
         ];
     }
@@ -298,7 +300,7 @@ new #[Title('titles.donors')] class extends Component {
     public function upcomingTransfers(): Collection
     {
         return TransfersTracking::query()
-            ->select(['id', 'donor_proposal_id', 'payment_amount', 'amount_transfered_currency', 'scheduled_date'])
+            ->select(['id', 'donor_proposal_id', 'payment_amount', 'amount_transfered_currency', 'scheduled_date', 'transfer_date', 'ar_status'])
             ->where('ar_status', ArStatus::Pending)
             ->whereNotNull('scheduled_date')
             ->whereHas('donorProposal', fn (Builder $query) => $query->whereIn('donor_id', $this->filteredDonorIds))
@@ -314,7 +316,7 @@ new #[Title('titles.donors')] class extends Component {
                 'amount' => (float) $transfer->payment_amount,
                 'currency' => $transfer->amount_transfered_currency->value,
                 'date' => $transfer->scheduled_date,
-                'overdue' => $transfer->scheduled_date->isBefore(today()),
+                'overdue' => $transfer->state() === 'late',
             ]);
     }
 
@@ -367,9 +369,9 @@ new #[Title('titles.donors')] class extends Component {
                 'amount' => (float) $next->payment_amount,
                 'currency' => (string) $next->amount_transfered_currency?->value,
                 'date' => $next->scheduled_date,
-                'overdue' => $next->scheduled_date->isBefore(today()),
+                'overdue' => $next->state() === 'late',
             ],
-            'overdue' => $pendingTransfers->filter(fn (TransfersTracking $transfer): bool => $transfer->scheduled_date?->isBefore(today()) ?? false)->count(),
+            'overdue' => $pendingTransfers->filter(fn (TransfersTracking $transfer): bool => $transfer->state() === 'late')->count(),
             'lastReceived' => $receivedDates->sortDesc()->first(),
             'projects' => $donor->donorProposals->flatMap(fn (DonorProposal $agreement) => $agreement->proposal?->projects->pluck('id') ?? [])->unique()->count(),
         ];
@@ -399,6 +401,8 @@ new #[Title('titles.donors')] class extends Component {
 
     public function confirmDelete(int $donorId): void
     {
+        Gate::authorize('donors.delete');
+
         $this->deletingDonorId = $donorId;
         $this->showDeleteModal = true;
     }
@@ -427,6 +431,8 @@ new #[Title('titles.donors')] class extends Component {
 
             return;
         }
+
+        Gate::authorize('donors.delete');
 
         Donor::query()->findOrFail($this->deletingDonorId)->delete();
 
@@ -486,9 +492,11 @@ new #[Title('titles.donors')] class extends Component {
         </x-slot:filters>
 
         <x-slot:actions>
+            @can('donors.create')
             <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-donor-button">
                 {{ __('donors.add_donor') }}
             </x-ui.button>
+            @endcan
         </x-slot:actions>
     </x-ui.page-header>
 
@@ -829,7 +837,10 @@ new #[Title('titles.donors')] class extends Component {
                             {{-- Actions --}}
                             <div class="flex items-center gap-0.5 @4xl/directory:justify-end">
                                 <x-ui.button tone="ghost" size="sm" icon="eye" icon:variant="outline" class="size-9! touch-manipulation" :href="route('donors.show', $donor)" wire:navigate :aria-label="__('common.view_name', ['name' => $donor->name])" />
+                                @can('donors.update')
                                 <x-ui.button tone="ghost" size="sm" icon="pencil-square" icon:variant="outline" class="size-9! touch-manipulation" wire:click="openEditModal({{ $donor->id }})" :aria-label="__('common.edit_name', ['name' => $donor->name])" />
+                                @endcan
+                                @can('donors.delete')
                                 @if ($isProspect)
                                     <x-ui.button tone="ghost" size="sm" icon="trash" icon:variant="outline" class="size-9! touch-manipulation" wire:click="confirmDelete({{ $donor->id }})" :aria-label="__('common.delete_name', ['name' => $donor->name])" />
                                 @else
@@ -839,6 +850,7 @@ new #[Title('titles.donors')] class extends Component {
                                         </span>
                                     </flux:tooltip>
                                 @endif
+                                @endcan
                             </div>
                         </article>
                     @endforeach

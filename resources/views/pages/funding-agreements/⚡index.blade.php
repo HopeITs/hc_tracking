@@ -540,6 +540,11 @@ new #[Title('titles.funding_agreements')] class extends Component {
     {
         $this->resetPage();
     }
+
+    protected function agreementDeleted(int $agreementId): void
+    {
+        $this->resetPage();
+    }
 };
 ?>
 
@@ -1343,6 +1348,9 @@ new #[Title('titles.funding_agreements')] class extends Component {
         :open="$showAgreementModal"
         :editing="$editingAgreementId !== null"
         :donor-options="$showAgreementModal ? $this->donorOptions : []"
+        :warning="$showAgreementModal ? $this->agreementProposalWarning : null"
+        :delete-blocker="$showAgreementModal ? $this->agreementDeleteBlocker : null"
+        :confirming-delete="$confirmingAgreementDelete"
         :proposal-options="$showAgreementModal ? $this->proposalOptions : []"
     />
 </section>

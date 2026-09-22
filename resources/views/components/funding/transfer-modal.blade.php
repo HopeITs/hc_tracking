@@ -6,6 +6,7 @@
     'editing' => false,
     'agreementOptions' => [],
     'accountOptions' => [],
+    'confirmingDelete' => false,
 ])
 
 <flux:modal wire:model="showTransferModal" wire:close="closeTransferModal" class="w-full max-w-4xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
@@ -16,11 +17,11 @@
         </div>
 
         <div class="grid gap-4 sm:grid-cols-2">
-            <x-ui.select wire:model="transferAgreementId" :label="__('transfers.funding_agreement')" required>
+            <x-ui.select wire:model.live="transferAgreementId" :label="__('transfers.funding_agreement')" required>
                 <flux:select.option value="">{{ __('transfers.select_an_agreement') }}</flux:select.option>
                 @foreach ($agreementOptions as $agreementOption)
                     <flux:select.option :value="$agreementOption->id" :wire:key="'tr-agr-'.$agreementOption->id">
-                        {{ $agreementOption->donor->name }} · {{ $agreementOption->proposal->name }}
+                        {{ $agreementOption->donor->name }} · {{ $agreementOption->proposal->name }}@if (filled($agreementOption->project_num)) · {{ $agreementOption->project_num }}@endif · {{ number_format((float) $agreementOption->budget, 0) }} {{ $agreementOption->currency->value }}
                     </flux:select.option>
                 @endforeach
             </x-ui.select>
@@ -33,6 +34,15 @@
                     </flux:select.option>
                 @endforeach
             </x-ui.select>
+        </div>
+
+        <div class="grid gap-4 sm:grid-cols-2">
+            <x-ui.select wire:model="transferArStatus" :label="__('transfers.receipt_status')" required>
+                @foreach (App\Enums\ArStatus::cases() as $statusCase)
+                    <flux:select.option :value="$statusCase->value" :wire:key="'tr-ar-'.$statusCase->value">{{ $statusCase->label() }}</flux:select.option>
+                @endforeach
+            </x-ui.select>
+            <p class="self-end pb-2 text-xs text-secondary-medium dark:text-secondary-soft">{{ __('transfers.receipt_status_hint') }}</p>
         </div>
 
         <fieldset class="grid gap-4 rounded-lg border border-secondary-soft p-3 sm:grid-cols-2 lg:grid-cols-4 dark:border-secondary-medium">
@@ -70,17 +80,28 @@
             <x-ui.input wire:model="receiveDate" :label="__('transfers.received_on')" type="date" />
         </fieldset>
 
-        <x-ui.select wire:model="transferArStatus" :label="__('transfers.receipt_status')" required>
-            @foreach (App\Enums\ArStatus::cases() as $statusCase)
-                <flux:select.option :value="$statusCase->value" :wire:key="'tr-ar-'.$statusCase->value">{{ $statusCase->label() }}</flux:select.option>
-            @endforeach
-        </x-ui.select>
+        @if ($editing && $confirmingDelete)
+            <div class="flex flex-col gap-3 rounded-lg border border-primary/40 bg-primary/5 p-3 text-sm sm:flex-row sm:items-center sm:justify-between" role="alert" data-confirm-transfer-delete>
+                <p class="text-secondary-dark dark:text-white">{{ __('transfers.delete_this_tranche_confirm') }}</p>
+                <div class="flex shrink-0 gap-2">
+                    <x-ui.button type="button" size="sm" wire:click="cancelTransferDelete">{{ __('common.cancel') }}</x-ui.button>
+                    <x-ui.button type="button" size="sm" tone="primary" wire:click="deleteTransfer" data-test="confirm-delete-transfer">{{ __('transfers.delete_tranche') }}</x-ui.button>
+                </div>
+            </div>
+        @endif
 
-        <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-            <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeTransferModal">{{ __('common.cancel') }}</x-ui.button>
-            <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-transfer-button">
-                {{ $editing ? __('common.save_changes') : __('transfers.record_transfer') }}
-            </x-ui.button>
+        <div class="flex flex-col-reverse gap-2 border-t border-secondary-soft pt-4 sm:flex-row sm:items-center dark:border-secondary-medium">
+            @if ($editing)
+                @can('transfers.delete')
+                    <x-ui.button type="button" tone="ghost" icon="trash" class="min-h-11 w-full text-status-critical! sm:me-auto sm:min-h-10 sm:w-auto" wire:click="confirmTransferDelete" data-test="delete-transfer-button">{{ __('transfers.delete_tranche') }}</x-ui.button>
+                @endcan
+            @endif
+            <div class="grid grid-cols-2 gap-2 sm:ms-auto sm:flex">
+                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeTransferModal">{{ __('common.cancel') }}</x-ui.button>
+                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-transfer-button">
+                    {{ $editing ? __('common.save_changes') : __('transfers.record_transfer') }}
+                </x-ui.button>
+            </div>
         </div>
     </form>
 </flux:modal>
