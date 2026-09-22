@@ -241,7 +241,7 @@ test('the funding position splits committed, received and pending per currency f
     DonorProposal::factory()->create(['donor_id' => $donor->id, 'proposal_id' => $shown->id, 'budget' => 500, 'currency' => 'EUR']);
     DonorProposal::factory()->create(['donor_id' => $donor->id, 'proposal_id' => $hidden->id, 'budget' => 9000, 'currency' => 'USD']);
 
-    TransfersTracking::factory()->create(['donor_proposal_id' => $usd->id, 'ar_status' => 'received', 'net_amount_received' => 300, 'amount_received_currency' => 'USD']);
+    TransfersTracking::factory()->create(['donor_proposal_id' => $usd->id, 'ar_status' => 'received', 'payment_amount' => 300, 'amount_transfered_currency' => 'USD', 'net_amount_received' => 300, 'amount_received_currency' => 'USD']);
     TransfersTracking::factory()->create(['donor_proposal_id' => $usd->id, 'ar_status' => 'pending', 'payment_amount' => 200, 'amount_transfered_currency' => 'USD']);
 
     $position = Livewire::actingAs($user)

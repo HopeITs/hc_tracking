@@ -199,6 +199,17 @@ new #[Title('titles.proposals')] class extends Component {
             ->get()
             ->keyBy('currency');
 
+        // What the tranches sent in each agreement's own currency already
+        // cover of its budget, whatever became of them: fees, a missing net
+        // amount or a failed transfer never turn money back into unscheduled.
+        $scheduled = TransfersTracking::query()
+            ->join('donor_proposal', 'donor_proposal.id', '=', 'transfers_tracking.donor_proposal_id')
+            ->whereIn('donor_proposal.proposal_id', $ids)
+            ->whereColumn('transfers_tracking.amount_transfered_currency', 'donor_proposal.currency')
+            ->selectRaw('donor_proposal.currency as currency, sum(transfers_tracking.payment_amount) as total')
+            ->groupBy('donor_proposal.currency')
+            ->pluck('total', 'currency');
+
         return $committed->keys()
             ->concat($received->keys())
             ->concat($pending->keys())
@@ -206,7 +217,7 @@ new #[Title('titles.proposals')] class extends Component {
             ->unique()
             ->sort()
             ->values()
-            ->map(function (string $currency) use ($committed, $received, $pending): array {
+            ->map(function (string $currency) use ($committed, $received, $pending, $scheduled): array {
                 $committedTotal = (float) ($committed[$currency] ?? 0);
                 $receivedTotal = (float) ($received[$currency] ?? 0);
                 $pendingTotal = (float) ($pending[$currency]->total ?? 0);
@@ -217,7 +228,7 @@ new #[Title('titles.proposals')] class extends Component {
                     'received' => $receivedTotal,
                     'pending' => $pendingTotal,
                     'pendingCount' => (int) ($pending[$currency]->transfers ?? 0),
-                    'unscheduled' => max(0, $committedTotal - $receivedTotal - $pendingTotal),
+                    'unscheduled' => max(0, $committedTotal - (float) ($scheduled[$currency] ?? 0)),
                 ];
             });
     }
@@ -409,7 +420,11 @@ new #[Title('titles.proposals')] class extends Component {
         return [
             'received' => $receivedHere,
             'pending' => $pendingHere,
-            'unscheduled' => max(0, $budget - $receivedHere - $pendingHere),
+            // Every tranche sent in this currency covers part of the budget,
+            // whatever became of it; fees and failures are not "unscheduled".
+            'unscheduled' => max(0, $budget - (float) $agreement->transfers
+                ->filter(fn (TransfersTracking $transfer): bool => $transfer->amount_transfered_currency?->value === $currency)
+                ->sum('payment_amount')),
             'share' => $budget > 0 ? (int) floor($receivedHere / $budget * 100) : 0,
             'otherCurrencies' => $received
                 ->reject(fn (TransfersTracking $transfer): bool => $transfer->amount_received_currency?->value === $currency)
@@ -744,7 +759,7 @@ new #[Title('titles.proposals')] class extends Component {
                     $barBase = max($line['committed'], $line['received'] + $line['pending'], 1);
                     $figures = [
                         ['key' => 'committed', 'label' => __('proposals.committed'), 'value' => $line['committed'], 'tone' => $inkText, 'note' => trans_choice('proposals.across_count_proposals', $matchingCount, ['count' => $matchingCount])],
-                        ['key' => 'received', 'label' => __('proposals.received'), 'value' => $line['received'], 'tone' => $receivedText, 'note' => __('proposals.percent_of_committed', ['percent' => $line['committed'] > 0 ? (int) floor($line['received'] / $line['committed'] * 100) : 0])],
+                        ['key' => 'received', 'label' => __('proposals.received'), 'value' => $line['received'], 'tone' => $receivedText, 'note' => __('proposals.percent_of_committed', ['percent' => App\Models\DonorProposal::percentLabel($line['received'], $line['committed'])])],
                         ['key' => 'pending', 'label' => __('proposals.pending'), 'value' => $line['pending'], 'tone' => 'text-status-warn', 'note' => trans_choice('proposals.count_transfers_scheduled', $line['pendingCount'], ['count' => $line['pendingCount']])],
                         ['key' => 'unscheduled', 'label' => __('proposals.not_yet_scheduled'), 'value' => $line['unscheduled'], 'tone' => $mutedText, 'note' => __('proposals.committed_with_no_transfer_yet')],
                     ];
@@ -1117,10 +1132,10 @@ new #[Title('titles.proposals')] class extends Component {
                                                 <span class="money-grow money-pending h-full" style="width: {{ $budget > 0 ? min(100, round($money['pending'] / $budget * 100, 2)) : 0 }}%"></span>
                                             </div>
                                             <p class="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs tabular-nums {{ $mutedText }}">
-                                                <span><span class="font-bold {{ $receivedText }}">{{ $amount($money['received']) }}</span> {{ __('proposals.received_percent', ['percent' => $money['share']]) }}</span>
+                                                <span><span class="font-bold {{ $receivedText }}">{{ $amount($money['received']) }}</span> {{ __('proposals.received_percent', ['percent' => App\Models\DonorProposal::percentLabel($money['received'], $budget)]) }}</span>
                                                 <span><span class="font-bold text-status-warn">{{ $amount($money['pending']) }}</span> {{ __('proposals.pending_lower') }}</span>
                                                 @if ($money['nextDue'] !== null)
-                                                    <span @class(['font-semibold text-primary' => $money['nextDue']->isPast()])>{{ __('proposals.next_transfer_on', ['date' => $money['nextDue']->translatedFormat(__('formats.date'))]) }}</span>
+                                                    <span @class(['font-semibold text-primary' => $money['nextDue']->lt(today())])>{{ __('proposals.next_transfer_on', ['date' => $money['nextDue']->translatedFormat(__('formats.date'))]) }}</span>
                                                 @endif
                                                 @foreach ($money['otherCurrencies'] as $otherCurrency => $otherAmount)
                                                     <span>{{ __('proposals.also_received_in', ['amount' => $amount($otherAmount), 'currency' => $otherCurrency]) }}</span>

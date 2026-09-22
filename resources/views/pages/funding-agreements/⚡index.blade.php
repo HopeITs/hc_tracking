@@ -467,13 +467,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
      */
     public function percentLabel(float $value, float $of): string
     {
-        if ($of <= 0.0 || $value <= 0.0) {
-            return '0';
-        }
-
-        $percent = (int) floor($value / $of * 100);
-
-        return $percent === 0 ? '<1' : (string) $percent;
+        return DonorProposal::percentLabel($value, $of);
     }
 
     /**
@@ -1350,6 +1344,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
         :donor-options="$showAgreementModal ? $this->donorOptions : []"
         :warning="$showAgreementModal ? $this->agreementProposalWarning : null"
         :delete-blocker="$showAgreementModal ? $this->agreementDeleteBlocker : null"
+        :locked-currency="$showAgreementModal && $this->agreementCurrencyLocked ? $agreementCurrency : null"
         :confirming-delete="$confirmingAgreementDelete"
         :proposal-options="$showAgreementModal ? $this->proposalOptions : []"
     />

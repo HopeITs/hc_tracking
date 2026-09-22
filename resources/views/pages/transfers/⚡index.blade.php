@@ -372,9 +372,15 @@ new #[Title('titles.transfers')] class extends Component {
         return TransfersTracking::query()->exists();
     }
 
+    /**
+     * A ledger narrowed to one agreement opens the new tranche on it, with its
+     * currency, as recording one from the agreement page would.
+     */
     public function openCreateModal(): void
     {
-        $this->openTransferCreate();
+        $agreementId = (int) $this->agreement;
+
+        $this->openTransferCreate($agreementId > 0 && DonorProposal::query()->whereKey($agreementId)->exists() ? $agreementId : null);
     }
 
     public function openEditModal(int $transferId): void

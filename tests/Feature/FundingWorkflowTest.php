@@ -146,3 +146,125 @@ test('the funding flow opens a proposal that is not on the current page', functi
     Livewire::actingAs($user)->test('pages::proposals.index')
         ->assertSeeHtml('href="'.route('proposals.show', $missing).'"');
 });
+
+test('a landed share under one percent reads <1, never 0, and a near-full one is never rounded up', function () {
+    expect(DonorProposal::percentLabel(0, 1000))->toBe('0')
+        ->and(DonorProposal::percentLabel(30, 100000))->toBe('<1')
+        ->and(DonorProposal::percentLabel(996, 1000))->toBe('99')
+        ->and(DonorProposal::percentLabel(5, 0))->toBe('0');
+});
+
+test('fees, a missing net amount and a failed transfer never turn money back into unscheduled', function () {
+    $user = User::factory()->role('Financial')->create();
+    $agreement = DonorProposal::factory()->create(['currency' => Currency::Usd, 'budget' => '1000.00']);
+    $tranche = fn (array $attributes) => TransfersTracking::factory()->create([
+        'donor_proposal_id' => $agreement->id,
+        'amount_transfered_currency' => Currency::Usd,
+        'amount_received_currency' => Currency::Usd,
+        'scheduled_date' => CarbonImmutable::today()->subMonth(),
+        'transfer_date' => CarbonImmutable::today()->subDays(20),
+        ...$attributes,
+    ]);
+    $tranche(['payment_amount' => '400.00', 'receive_date' => CarbonImmutable::today()->subDays(10), 'net_amount_received' => '380.00', 'ar_status' => ArStatus::Received]);
+    $tranche(['payment_amount' => '300.00', 'receive_date' => CarbonImmutable::today()->subDays(10), 'net_amount_received' => null, 'ar_status' => ArStatus::Received]);
+    $tranche(['payment_amount' => '200.00', 'ar_status' => ArStatus::Failed]);
+
+    $show = Livewire::actingAs($user)->test('pages::proposals.show', ['proposal' => $agreement->proposal_id])->instance();
+    $index = Livewire::actingAs($user)->test('pages::proposals.index')->instance();
+    $dossier = Livewire::actingAs($user)->test('pages::proposals.dossier', ['proposal' => $agreement->proposal_id])->instance();
+    $donor = Livewire::actingAs($user)->test('pages::donors.show', ['donor' => $agreement->donor_id])->instance();
+
+    expect($show->agreementMoney[$agreement->id]['unscheduled'])->toBe(100.0)
+        ->and($index->fundingPosition->firstWhere('currency', 'USD')['unscheduled'])->toBe(100.0)
+        ->and($index->agreementMoney($index->proposals->first()->donorProposals->first())['unscheduled'])->toBe(100.0)
+        ->and($dossier->money[0]['unscheduled'])->toBe(100.0)
+        ->and($donor->agreementMoney($donor->agreements->first()))->toMatchArray(['failed' => 200.0, 'unscheduled' => 100.0]);
+});
+
+test('the dossier reads a sent tranche past its date as in transit, never overdue', function () {
+    $user = User::factory()->role('Financial')->create();
+    $agreement = DonorProposal::factory()->create(['currency' => Currency::Usd]);
+    $sent = TransfersTracking::factory()->create([
+        'donor_proposal_id' => $agreement->id,
+        'amount_transfered_currency' => Currency::Usd,
+        'scheduled_date' => CarbonImmutable::today()->subDays(10),
+        'transfer_date' => CarbonImmutable::today()->subDays(5),
+        'ar_status' => ArStatus::Pending,
+    ]);
+
+    $dossier = Livewire::actingAs($user)->test('pages::proposals.dossier', ['proposal' => $agreement->proposal_id])
+        ->assertSeeHtml('data-tranche-state="transit"');
+
+    expect($dossier->instance()->trancheState($sent))->toBe('transit')
+        ->and($dossier->instance()->agreementMoney($dossier->instance()->agreements->first())['nextDue'])->toBeNull();
+});
+
+test('the donor directory never lists money already sent as the next transfer due', function () {
+    $user = User::factory()->role('Financial')->create();
+    $agreement = DonorProposal::factory()->create(['currency' => Currency::Usd]);
+    TransfersTracking::factory()->create([
+        'donor_proposal_id' => $agreement->id,
+        'payment_amount' => '700.00',
+        'amount_transfered_currency' => Currency::Usd,
+        'scheduled_date' => CarbonImmutable::today()->subDays(30),
+        'transfer_date' => CarbonImmutable::today()->subDays(25),
+        'ar_status' => ArStatus::Pending,
+    ]);
+    $unsent = TransfersTracking::factory()->create([
+        'donor_proposal_id' => $agreement->id,
+        'payment_amount' => '300.00',
+        'amount_transfered_currency' => Currency::Usd,
+        'scheduled_date' => CarbonImmutable::today()->addDays(10),
+        'ar_status' => ArStatus::Pending,
+    ]);
+
+    $page = Livewire::actingAs($user)->test('pages::donors.index')->instance();
+    $donor = $page->donors->first();
+
+    expect($page->donorMoney($donor)['next']['amount'])->toBe(300.0)
+        ->and($donor->next_due_date)->toBe($unsent->scheduled_date->toDateString())
+        ->and($page->upcomingTransfers->pluck('amount')->all())->toBe([300.0]);
+});
+
+test('an agreement recorded from a donor page always belongs to that donor', function () {
+    $user = User::factory()->role('Financial')->create();
+    $donor = Donor::factory()->create();
+    $otherDonor = Donor::factory()->create();
+    $proposal = Proposal::factory()->create();
+
+    Livewire::actingAs($user)->test('pages::donors.show', ['donor' => $donor->id])
+        ->call('recordAgreementForDonor')
+        ->assertSeeHtml('data-locked-donor')
+        ->set('agreementDonorId', (string) $otherDonor->id)
+        ->set('agreementProposalId', (string) $proposal->id)
+        ->set('budget', '5000')
+        ->call('saveAgreement')
+        ->assertHasNoErrors();
+
+    expect(DonorProposal::query()->where('proposal_id', $proposal->id)->pluck('donor_id')->all())->toBe([$donor->id]);
+});
+
+test('an agreement with tranches shows its currency locked instead of offering a choice', function () {
+    $user = User::factory()->role('Financial')->create();
+    $agreement = DonorProposal::factory()->create(['currency' => Currency::Eur]);
+
+    Livewire::actingAs($user)->test('pages::funding-agreements.index')
+        ->call('openEditModal', $agreement->id)
+        ->assertDontSeeHtml('data-locked-currency');
+
+    TransfersTracking::factory()->create(['donor_proposal_id' => $agreement->id, 'amount_transfered_currency' => Currency::Eur]);
+
+    Livewire::actingAs($user)->test('pages::funding-agreements.index')
+        ->call('openEditModal', $agreement->id)
+        ->assertSeeHtml('data-locked-currency');
+});
+
+test('the transfers ledger narrowed to one agreement opens a new tranche on it', function () {
+    $user = User::factory()->role('Financial')->create();
+    $agreement = DonorProposal::factory()->create(['currency' => Currency::Eur]);
+
+    Livewire::actingAs($user)->withQueryParams(['agreement' => (string) $agreement->id])->test('pages::transfers.index')
+        ->call('openCreateModal')
+        ->assertSet('transferAgreementId', (string) $agreement->id)
+        ->assertSet('transferredCurrency', 'EUR');
+});

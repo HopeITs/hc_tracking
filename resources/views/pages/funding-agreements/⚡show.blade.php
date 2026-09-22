@@ -199,7 +199,7 @@ new #[Title('titles.funding_agreement')] class extends Component {
             'overScheduled' => max(0.0, $scheduled + $parts['failed'] - $budget),
             'stillToCome' => max(0.0, $budget - $parts['receivedGross']),
             'percent' => $budget > 0.0 ? (int) floor($parts['landed'] / $budget * 100) : 0,
-            'percentLabel' => $budget > 0.0 && $parts['landed'] > 0.0 && $parts['landed'] < $budget / 100 ? '<1' : (string) ($budget > 0.0 ? (int) floor($parts['landed'] / $budget * 100) : 0),
+            'percentLabel' => DonorProposal::percentLabel($parts['landed'], $budget),
             'unrecordedCount' => $unrecordedCount,
             'foreignCount' => $foreignCount,
             'foreignLandings' => $foreignLandings,
@@ -1493,6 +1493,7 @@ new #[Title('titles.funding_agreement')] class extends Component {
         :donor-options="$showAgreementModal ? $this->donorOptions : []"
         :warning="$showAgreementModal ? $this->agreementProposalWarning : null"
         :delete-blocker="$showAgreementModal ? $this->agreementDeleteBlocker : null"
+        :locked-currency="$showAgreementModal && $this->agreementCurrencyLocked ? $agreementCurrency : null"
         :confirming-delete="$confirmingAgreementDelete"
         :locked-proposal-name="$proposal->name"
     />

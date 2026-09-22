@@ -95,28 +95,31 @@ new #[Title('titles.donor')] class extends Component {
      * agreement's currency; a pending tranche already carries a net amount, so
      * that column alone is not proof of money in. A received tranche with no
      * net recorded counts as nothing landed and is counted in `missingNet`.
-     * Money in transit is still due, never overdue. Only tranches sent in the
-     * agreement's own currency are set against its budget; unscheduled is the
-     * part of the budget no live tranche covers yet.
+     * Money in transit is still due, never overdue. Failed money is its own
+     * figure: it was scheduled, so it is not "unscheduled", and it did not
+     * land. Only tranches sent in the agreement's own currency are set against
+     * its budget; unscheduled is the part of the budget no tranche covers yet.
      *
-     * @return array{committed: float, received: float, due: float, overdue: float, unscheduled: float, missingNet: int}
+     * @return array{committed: float, received: float, due: float, overdue: float, failed: float, unscheduled: float, missingNet: int}
      */
     public function agreementMoney(DonorProposal $agreement): array
     {
         $committed = (float) $agreement->budget;
-        $money = ['committed' => $committed, 'received' => 0.0, 'due' => 0.0, 'overdue' => 0.0, 'unscheduled' => 0.0, 'missingNet' => 0];
+        $money = ['committed' => $committed, 'received' => 0.0, 'due' => 0.0, 'overdue' => 0.0, 'failed' => 0.0, 'unscheduled' => 0.0, 'missingNet' => 0];
         $covered = 0.0;
 
         foreach ($agreement->transfers as $transfer) {
             $state = $this->transferState($transfer);
 
-            if ($state === 'failed' || $transfer->amount_transfered_currency !== $agreement->currency) {
+            if ($transfer->amount_transfered_currency !== $agreement->currency) {
                 continue;
             }
 
             $covered += (float) $transfer->payment_amount;
 
-            if ($state === 'received') {
+            if ($state === 'failed') {
+                $money['failed'] += (float) $transfer->payment_amount;
+            } elseif ($state === 'received') {
                 if ($transfer->isMissingNetAmount()) {
                     $money['missingNet']++;
                 } elseif ($transfer->amount_received_currency === $agreement->currency) {
@@ -137,7 +140,7 @@ new #[Title('titles.donor')] class extends Component {
     /**
      * The money position per currency. Grouped, never summed across currencies.
      *
-     * @return array<string, array{committed: float, received: float, due: float, overdue: float, unscheduled: float, missingNet: int}>
+     * @return array<string, array{committed: float, received: float, due: float, overdue: float, failed: float, unscheduled: float, missingNet: int}>
      */
     #[Computed]
     public function moneyByCurrency(): array
@@ -146,7 +149,7 @@ new #[Title('titles.donor')] class extends Component {
 
         foreach ($this->agreements as $agreement) {
             $currency = $agreement->currency->value;
-            $totals[$currency] ??= ['committed' => 0.0, 'received' => 0.0, 'due' => 0.0, 'overdue' => 0.0, 'unscheduled' => 0.0, 'missingNet' => 0];
+            $totals[$currency] ??= ['committed' => 0.0, 'received' => 0.0, 'due' => 0.0, 'overdue' => 0.0, 'failed' => 0.0, 'unscheduled' => 0.0, 'missingNet' => 0];
 
             foreach ($this->agreementMoney($agreement) as $key => $value) {
                 $totals[$currency][$key] += $value;
@@ -343,13 +346,20 @@ new #[Title('titles.donor')] class extends Component {
     }
 
     /**
+     * Agreements recorded here belong to this donor, whatever the payload says.
+     */
+    protected function agreementDonorScope(): ?int
+    {
+        return $this->donorId;
+    }
+
+    /**
      * Open the agreement form with this donor already chosen: the fundraiser
      * who just closed a deal records it from the donor they closed it with.
      */
     public function recordAgreementForDonor(): void
     {
         $this->openAgreementCreate();
-        $this->agreementDonorId = (string) $this->donorId;
     }
 
     protected function agreementSaved(DonorProposal $agreement, bool $isCreate): void
@@ -493,11 +503,12 @@ new #[Title('titles.donor')] class extends Component {
         <section class="mt-9 flex flex-col gap-10" aria-label="{{ __('donors.money_position') }}" data-money-river>
             @foreach ($this->moneyByCurrency as $currency => $line)
                 @php
-                    $landedPercent = $line['committed'] > 0 ? round($line['received'] / $line['committed'] * 100) : 0;
+                    $landedPercent = App\Models\DonorProposal::percentLabel($line['received'], $line['committed']);
                     $parts = [
                         ['key' => 'received', 'label' => __('donors.received'), 'value' => $line['received'], 'bar' => 'bg-funding', 'dot' => 'bg-funding', 'text' => 'text-funding'],
                         ['key' => 'due', 'label' => __('donors.due_ahead'), 'value' => $line['due'], 'bar' => 'money-pending', 'dot' => 'money-pending', 'text' => 'text-status-warn'],
                         ['key' => 'overdue', 'label' => __('donors.overdue'), 'value' => $line['overdue'], 'bar' => 'bg-primary', 'dot' => 'bg-primary', 'text' => 'text-status-critical'],
+                        ...($line['failed'] > 0 ? [['key' => 'failed', 'label' => ArStatus::Failed->label(), 'value' => $line['failed'], 'bar' => 'money-failed', 'dot' => 'money-failed', 'text' => 'text-status-critical']] : []),
                         ['key' => 'unscheduled', 'label' => __('donors.not_yet_scheduled'), 'value' => $line['unscheduled'], 'bar' => '', 'dot' => 'bg-secondary-soft dark:bg-secondary-medium', 'text' => $mutedText],
                     ];
                 @endphp
@@ -528,7 +539,7 @@ new #[Title('titles.donor')] class extends Component {
                         @endforeach
                     </div>
 
-                    <dl class="mt-5 grid grid-cols-2 gap-x-6 gap-y-5 @3xl/detail:grid-cols-4">
+                    <dl @class(['mt-5 grid grid-cols-2 gap-x-6 gap-y-5', '@3xl/detail:grid-cols-4' => count($parts) === 4, '@3xl/detail:grid-cols-5' => count($parts) === 5])>
                         @foreach ($parts as $part)
                             <div class="min-w-0 border-t pt-3 {{ $hairline }}" data-river-part="{{ $part['key'] }}">
                                 <dt class="flex items-center gap-2 text-xs font-semibold {{ $mutedText }}">
@@ -831,10 +842,11 @@ new #[Title('titles.donor')] class extends Component {
 
     <x-funding.agreement-modal
         :editing="$editingAgreementId !== null"
-        :donor-options="$showAgreementModal ? $this->donorOptions : []"
+        :locked-donor-name="$donor->name"
         :proposal-options="$showAgreementModal ? $this->proposalOptions : []"
         :warning="$showAgreementModal ? $this->agreementProposalWarning : null"
         :delete-blocker="$showAgreementModal ? $this->agreementDeleteBlocker : null"
+        :locked-currency="$showAgreementModal && $this->agreementCurrencyLocked ? $agreementCurrency : null"
         :confirming-delete="$confirmingAgreementDelete"
     />
 </section>

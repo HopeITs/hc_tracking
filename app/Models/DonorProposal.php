@@ -82,6 +82,24 @@ class DonorProposal extends Model
     }
 
     /**
+     * A whole percentage of $of, floored so nothing is claimed early, but
+     * never shown as 0 while something has landed: under 1% reads "<1".
+     *
+     * Every funding page prints its landed and committed shares through this,
+     * so the same money never reads 0% on one page and <1% on the next.
+     */
+    public static function percentLabel(float $value, float $of): string
+    {
+        if ($of <= 0.0 || $value <= 0.0) {
+            return '0';
+        }
+
+        $percent = (int) floor($value / $of * 100);
+
+        return $percent === 0 ? '<1' : (string) $percent;
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string|class-string>

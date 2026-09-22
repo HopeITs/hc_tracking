@@ -143,6 +143,15 @@ new #[Title('titles.proposal')] class extends Component {
                 && $transfer->amount_transfered_currency !== null)
             ->groupBy(fn (TransfersTracking $transfer): string => $transfer->amount_transfered_currency->value);
 
+        // What the tranches sent in each agreement's own currency already cover
+        // of its budget, whatever became of them: a fee or a failed transfer
+        // does not turn money back into "not yet scheduled".
+        $scheduled = $this->agreements
+            ->groupBy(fn (DonorProposal $agreement): string => $agreement->currency->value)
+            ->map(fn (EloquentCollection $group): float => (float) $group->sum(fn (DonorProposal $agreement): float => (float) $agreement->transfers
+                ->filter(fn (TransfersTracking $transfer): bool => $transfer->amount_transfered_currency === $agreement->currency)
+                ->sum(fn (TransfersTracking $transfer): float => (float) $transfer->payment_amount)));
+
         return $committed->keys()
             ->concat($received->keys())
             ->concat($pending->keys())
@@ -150,7 +159,7 @@ new #[Title('titles.proposal')] class extends Component {
             ->unique()
             ->sort()
             ->values()
-            ->map(function (string $currency) use ($committed, $received, $pending): array {
+            ->map(function (string $currency) use ($committed, $received, $pending, $scheduled): array {
                 $committedLine = $committed->get($currency, new Collection);
                 $receivedLine = $received->get($currency, new Collection);
                 $pendingLine = $pending->get($currency, new Collection);
@@ -164,7 +173,7 @@ new #[Title('titles.proposal')] class extends Component {
                     'committed' => $committedTotal,
                     'received' => $receivedTotal,
                     'pending' => $pendingTotal,
-                    'unscheduled' => max(0, $committedTotal - $receivedTotal - $pendingTotal),
+                    'unscheduled' => max(0, $committedTotal - (float) ($scheduled[$currency] ?? 0)),
                     'agreements' => $committedLine->count(),
                     'pendingCount' => $pendingLine->count(),
                 ];
@@ -198,9 +207,12 @@ new #[Title('titles.proposal')] class extends Component {
         return [
             'received' => $receivedHere,
             'pending' => $pendingHere,
-            'unscheduled' => max(0, $budget - $receivedHere - $pendingHere),
+            'unscheduled' => max(0, $budget - (float) $agreement->transfers
+                ->filter(fn (TransfersTracking $transfer): bool => $transfer->amount_transfered_currency?->value === $currency)
+                ->sum(fn (TransfersTracking $transfer): float => (float) $transfer->payment_amount)),
             'share' => $budget > 0 ? (int) floor($receivedHere / $budget * 100) : 0,
-            'nextDue' => $pending->whereNotNull('scheduled_date')->sortBy('scheduled_date')->first()?->scheduled_date,
+            // Only money still to be sent has a due date; a sent tranche is in transit.
+            'nextDue' => $pending->whereNull('transfer_date')->whereNotNull('scheduled_date')->sortBy('scheduled_date')->first()?->scheduled_date,
             'otherCurrencies' => $received
                 ->reject(fn (TransfersTracking $transfer): bool => $transfer->amount_received_currency?->value === $currency)
                 ->filter(fn (TransfersTracking $transfer): bool => $transfer->net_amount_received !== null)
@@ -220,12 +232,12 @@ new #[Title('titles.proposal')] class extends Component {
      */
     public function trancheState(TransfersTracking $transfer): string
     {
-        return match (true) {
-            $transfer->ar_status === ArStatus::Failed => 'failed',
-            $transfer->ar_status === ArStatus::Received => 'received',
-            $transfer->scheduled_date === null => 'unscheduled',
-            $transfer->scheduled_date->lt(today()) => 'overdue',
-            default => 'pending',
+        return match ($transfer->state()) {
+            'received' => 'received',
+            'failed' => 'failed',
+            'transit' => 'transit',
+            'late' => 'overdue',
+            default => $transfer->scheduled_date === null ? 'unscheduled' : 'pending',
         };
     }
 
@@ -676,7 +688,7 @@ new #[Title('titles.proposal')] class extends Component {
                 $barBase = max($line['committed'], $line['received'] + $line['pending'], 1);
                 $figures = [
                     ['key' => 'committed', 'label' => __('proposals.committed'), 'value' => $line['committed'], 'tone' => $inkText, 'note' => trans_choice('common.count_agreement', $line['agreements'], ['count' => $line['agreements']])],
-                    ['key' => 'received', 'label' => __('proposals.received'), 'value' => $line['received'], 'tone' => $receivedText, 'note' => __('proposals.percent_of_committed', ['percent' => $line['committed'] > 0 ? (int) floor($line['received'] / $line['committed'] * 100) : 0])],
+                    ['key' => 'received', 'label' => __('proposals.received'), 'value' => $line['received'], 'tone' => $receivedText, 'note' => __('proposals.percent_of_committed', ['percent' => App\Models\DonorProposal::percentLabel($line['received'], $line['committed'])])],
                     ['key' => 'pending', 'label' => __('proposals.pending'), 'value' => $line['pending'], 'tone' => 'text-status-warn', 'note' => trans_choice('proposals.count_transfers_scheduled', $line['pendingCount'], ['count' => $line['pendingCount']])],
                     ['key' => 'unscheduled', 'label' => __('proposals.not_yet_scheduled'), 'value' => $line['unscheduled'], 'tone' => $mutedText, 'note' => __('proposals.committed_with_no_transfer_yet')],
                 ];
@@ -728,7 +740,7 @@ new #[Title('titles.proposal')] class extends Component {
                 </div>
 
                 <p class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs tabular-nums {{ $mutedText }}">
-                    <span><span class="font-bold {{ $receivedText }}">{{ $amount($agreementMoney['received']) }}</span> {{ __('proposals.received_percent', ['percent' => $agreementMoney['share']]) }}</span>
+                    <span><span class="font-bold {{ $receivedText }}">{{ $amount($agreementMoney['received']) }}</span> {{ __('proposals.received_percent', ['percent' => App\Models\DonorProposal::percentLabel($agreementMoney['received'], (float) $agreement->budget)]) }}</span>
                     <span><span class="font-bold text-status-warn">{{ $amount($agreementMoney['pending']) }}</span> {{ __('proposals.pending_lower') }}</span>
                     <span>{{ __('proposals.tranches_arrived_of', ['arrived' => $arrived, 'total' => $tranches->count()]) }}</span>
                     @foreach ($agreementMoney['otherCurrencies'] as $otherCurrency => $otherAmount)
@@ -760,6 +772,7 @@ new #[Title('titles.proposal')] class extends Component {
                                     'absolute start-0 top-4 size-2.5 rounded-full',
                                     'bg-funding' => $state === 'received',
                                     'border-2 border-status-warn bg-white dark:bg-secondary-dark' => $state === 'pending',
+                                    'border-2 border-status-warn bg-status-warn' => $state === 'transit',
                                     'border-2 border-primary bg-white ring-4 ring-primary/15 dark:bg-secondary-dark' => $state === 'overdue',
                                     'bg-primary' => $state === 'failed',
                                     'border-2 border-dashed border-secondary-light bg-white dark:bg-secondary-dark' => $state === 'unscheduled',
@@ -772,6 +785,8 @@ new #[Title('titles.proposal')] class extends Component {
                                             <span class="ms-1.5 text-xs font-bold text-primary">{{ trans_choice('proposals.count_days_overdue', $daysOverdue, ['count' => $daysOverdue]) }}</span>
                                         @elseif ($state === 'failed')
                                             <span class="ms-1.5 text-xs font-bold text-primary">{{ __('proposals.transfer_failed') }}</span>
+                                        @elseif ($state === 'transit')
+                                            <span class="ms-1.5 text-xs font-bold text-status-warn">{{ __('funding_agreements.tranche_state_transit') }}</span>
                                         @endif
                                     </p>
                                     <p class="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs {{ $mutedText }}">

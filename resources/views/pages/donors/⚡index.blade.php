@@ -116,7 +116,9 @@ new #[Title('titles.donors')] class extends Component {
             ->selectRaw('min(transfers_tracking.scheduled_date)')
             ->join('donor_proposal', 'donor_proposal.id', '=', 'transfers_tracking.donor_proposal_id')
             ->whereColumn('donor_proposal.donor_id', 'donors.id')
-            ->where('transfers_tracking.ar_status', ArStatus::Pending);
+            ->where('transfers_tracking.ar_status', ArStatus::Pending)
+            // Money already sent is in transit; only unsent money falls due.
+            ->whereNull('transfers_tracking.transfer_date');
 
         return $this->filteredQuery()
             ->select(['donors.id', 'donors.name', 'donors.type', 'donors.contact_person', 'donors.email', 'donors.phone', 'donors.country', 'donors.next_step', 'donors.next_step_due_on', 'donors.last_contacted_on', 'donors.updated_at'])
@@ -302,6 +304,7 @@ new #[Title('titles.donors')] class extends Component {
         return TransfersTracking::query()
             ->select(['id', 'donor_proposal_id', 'payment_amount', 'amount_transfered_currency', 'scheduled_date', 'transfer_date', 'ar_status'])
             ->where('ar_status', ArStatus::Pending)
+            ->whereNull('transfer_date')
             ->whereNotNull('scheduled_date')
             ->whereHas('donorProposal', fn (Builder $query) => $query->whereIn('donor_id', $this->filteredDonorIds))
             ->with(['donorProposal:id,donor_id,proposal_id', 'donorProposal.donor:id,name', 'donorProposal.proposal:id,name'])
@@ -361,7 +364,7 @@ new #[Title('titles.donors')] class extends Component {
             $lines[$currency]['share'] = $line['committed'] > 0 ? (int) floor($line['received'] / $line['committed'] * 100) : 0;
         }
 
-        $next = $pendingTransfers->whereNotNull('scheduled_date')->sortBy('scheduled_date')->first();
+        $next = $pendingTransfers->whereNull('transfer_date')->whereNotNull('scheduled_date')->sortBy('scheduled_date')->first();
 
         return [
             'lines' => $lines,
@@ -545,7 +548,7 @@ new #[Title('titles.donors')] class extends Component {
                         @php
                             $largest = max(collect($line['segments'])->max('committed'), 1);
                             $isRoomy = count($line['segments']) <= 4;
-                            $currencyShare = $line['committed'] > 0 ? (int) floor($line['received'] / $line['committed'] * 100) : 0;
+                            $currencyShare = App\Models\DonorProposal::percentLabel($line['received'], $line['committed']);
                         @endphp
                         <div @class(['mt-5', 'border-t pt-5 '.$hairline => ! $loop->first]) wire:key="wallet-{{ $line['currency'] }}" data-wallet-currency="{{ $line['currency'] }}">
                             <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-1">
@@ -767,7 +770,7 @@ new #[Title('titles.donors')] class extends Component {
                                     <div class="[&+&]:mt-3" wire:key="donor-{{ $donor->id }}-money-{{ $currency }}">
                                         <p class="flex items-baseline justify-between gap-3">
                                             <span class="text-lg leading-none font-extrabold tracking-tight tabular-nums {{ $inkText }}">{{ $amount($line['committed']) }} <span class="text-[11px] font-semibold tracking-normal {{ $mutedText }}">{{ $currency }}</span></span>
-                                            <span class="text-xs font-bold tabular-nums text-funding">{{ $line['share'] }}%</span>
+                                            <span class="text-xs font-bold tabular-nums text-funding">{{ App\Models\DonorProposal::percentLabel($line['received'], $line['committed']) }}%</span>
                                         </p>
                                         <div class="mt-2 flex h-1.5 w-full gap-0.5 overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium" role="img" aria-label="{{ __('donors.money_bar_label', ['currency' => $currency, 'received' => $amount($line['received']), 'pending' => $amount($line['pending']), 'committed' => $amount($line['committed'])]) }}">
                                             <span class="money-grow h-full rounded-s-full bg-funding" style="width: {{ $line['committed'] > 0 ? min(100, round($line['received'] / $line['committed'] * 100, 2)) : 0 }}%"></span>

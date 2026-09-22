@@ -23,7 +23,8 @@ use Livewire\Attributes\Computed;
  * The using component renders resources/views/components/funding/agreement-modal
  * and decides what happens after a save through agreementSaved(). A page that
  * lives inside one proposal pins the form to it through agreementProposalScope(),
- * so a tampered payload cannot file the agreement against another proposal.
+ * and a page that lives inside one donor pins it through agreementDonorScope(),
+ * so a tampered payload cannot file the agreement against another record.
  */
 trait ManagesAgreementForm
 {
@@ -62,6 +63,15 @@ trait ManagesAgreementForm
      * the page may file against any proposal.
      */
     protected function agreementProposalScope(): ?int
+    {
+        return null;
+    }
+
+    /**
+     * The donor every agreement on this page must belong to, or null when the
+     * page may file for any donor.
+     */
+    protected function agreementDonorScope(): ?int
     {
         return null;
     }
@@ -129,6 +139,17 @@ trait ManagesAgreementForm
         };
     }
 
+    /**
+     * Whether the agreement being edited already has tranches, so its currency
+     * is fixed and the form shows it rather than offering a choice.
+     */
+    #[Computed]
+    public function agreementCurrencyLocked(): bool
+    {
+        return $this->editingAgreementId !== null
+            && DonorProposal::query()->whereKey($this->editingAgreementId)->whereHas('transfers')->exists();
+    }
+
     public function openAgreementCreate(): void
     {
         Gate::authorize('funding-agreements.create');
@@ -162,6 +183,10 @@ trait ManagesAgreementForm
 
         if ($this->agreementProposalScope() !== null) {
             $this->agreementProposalId = (string) $this->agreementProposalScope();
+        }
+
+        if ($this->agreementDonorScope() !== null) {
+            $this->agreementDonorId = (string) $this->agreementDonorScope();
         }
 
         $existing = $this->editingAgreementId === null ? null : $this->scopedAgreement($this->editingAgreementId);
@@ -271,6 +296,7 @@ trait ManagesAgreementForm
     {
         return DonorProposal::query()
             ->when($this->agreementProposalScope() !== null, fn ($query) => $query->where('proposal_id', $this->agreementProposalScope()))
+            ->when($this->agreementDonorScope() !== null, fn ($query) => $query->where('donor_id', $this->agreementDonorScope()))
             ->findOrFail($agreementId);
     }
 
@@ -279,11 +305,11 @@ trait ManagesAgreementForm
         $this->resetValidation();
         $this->editingAgreementId = null;
         $this->confirmingAgreementDelete = false;
-        $this->agreementDonorId = '';
+        $this->agreementDonorId = $this->agreementDonorScope() === null ? '' : (string) $this->agreementDonorScope();
         $this->agreementProposalId = $this->agreementProposalScope() === null ? '' : (string) $this->agreementProposalScope();
         $this->budget = '';
         $this->agreementCurrency = 'USD';
         $this->projectNum = '';
-        unset($this->agreementDeleteBlocker, $this->agreementProposalWarning);
+        unset($this->agreementDeleteBlocker, $this->agreementProposalWarning, $this->agreementCurrencyLocked);
     }
 }

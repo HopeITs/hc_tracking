@@ -205,7 +205,12 @@ new #[Title('titles.proposal')] class extends Component {
                 'budget' => $budget,
                 'received' => $received,
                 'pending' => $pending,
-                'unscheduled' => max(0.0, $budget - $received - $pending),
+                // Every tranche sent in this currency covers part of the budget,
+                // whatever became of it: fees or a missing net amount do not make
+                // money "unscheduled", and failed money is counted in failedCount.
+                'unscheduled' => max(0.0, $budget - (float) $agreement->transfers
+                    ->filter(fn (TransfersTracking $transfer): bool => $transfer->amount_transfered_currency?->value === $currency)
+                    ->sum('payment_amount')),
                 'overdue' => (float) $overdueTransfers->sum('payment_amount'),
                 'overdueCount' => $overdueTransfers->count(),
                 'failedCount' => $agreement->transfers->where('ar_status', ArStatus::Failed)->count(),
@@ -789,7 +794,7 @@ new #[Title('titles.proposal')] class extends Component {
             $others[] = [
                 'currency' => $otherCurrency,
                 'text' => __('proposals.other_currency_landed', [
-                    'percent' => $otherLine['percent'],
+                    'percent' => DonorProposal::percentLabel($otherLine['received'], $otherLine['committed']),
                     'received' => number_format($otherLine['received'], 0),
                     'committed' => number_format($otherLine['committed'], 0),
                     'currency' => $otherCurrency,
@@ -802,7 +807,7 @@ new #[Title('titles.proposal')] class extends Component {
             'key' => 'money',
             'tab' => 'funding',
             'label' => __('proposals.money_landed'),
-            'figure' => (string) $line['percent'],
+            'figure' => DonorProposal::percentLabel($line['received'], $line['committed']),
             'suffix' => '%',
             'caption' => __('proposals.received_of_committed', [
                 'received' => number_format($line['received'], 0),
@@ -2752,6 +2757,7 @@ new #[Title('titles.proposal')] class extends Component {
         :donor-options="$showAgreementModal ? $this->donorOptions : []"
         :warning="$showAgreementModal ? $this->agreementProposalWarning : null"
         :delete-blocker="$showAgreementModal ? $this->agreementDeleteBlocker : null"
+        :locked-currency="$showAgreementModal && $this->agreementCurrencyLocked ? $agreementCurrency : null"
         :confirming-delete="$confirmingAgreementDelete"
         :locked-proposal-name="$this->proposal->name"
     />
