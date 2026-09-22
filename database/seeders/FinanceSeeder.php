@@ -2,17 +2,19 @@
 
 namespace Database\Seeders;
 
+use App\Enums\DonorReportType;
 use App\Enums\ProposalStatus;
 use App\Models\Account;
 use App\Models\DonorProposal;
+use App\Models\DonorReport;
 use App\Models\Proposal;
 use App\Models\ProposalStatusNote;
 use App\Models\TransfersTracking;
 use Illuminate\Database\Seeder;
 
 /**
- * The finance layer: bank accounts, payment tranches and the proposal status
- * audit trail.
+ * The finance layer: bank accounts, payment tranches, the reports owed to
+ * donors and the proposal status audit trail.
  *
  * Depends on ProgrammeSeeder.
  */
@@ -28,6 +30,19 @@ class FinanceSeeder extends Seeder
         Account::factory()->closed()->create(['name' => 'Legacy USD']);
 
         DonorProposal::query()->each(function (DonorProposal $agreement) use ($operations): void {
+            DonorReport::factory()->submitted()->create([
+                'donor_proposal_id' => $agreement->id,
+                'title' => 'Interim narrative report',
+                'due_on' => now()->subMonths(2)->toDateString(),
+            ]);
+
+            DonorReport::factory()->create([
+                'donor_proposal_id' => $agreement->id,
+                'title' => 'Interim financial report',
+                'type' => DonorReportType::Financial,
+                'due_on' => now()->addMonth()->toDateString(),
+            ]);
+
             TransfersTracking::factory()->received($operations)->create([
                 'donor_proposal_id' => $agreement->id,
                 'payment_amount' => round((float) $agreement->budget * 0.4, 2),

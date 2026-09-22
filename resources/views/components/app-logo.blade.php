@@ -23,8 +23,8 @@
         `flux:sidebar.brand`: a `w-10` box with `justify-center`), matching
         the same box model `flux:sidebar.item` uses for its icons — that's
         what lines the logo mark up with the nav icons below it. The collapse
-        toggle now floats separately at the rail's outer edge (`-end-4
-        top-7`), clear of this row, so nothing forces the mark off-centre
+        toggle floats separately, straddling the rail's outer edge (`-end-4
+        top-[15.5px]`), outside the brand's box, so nothing forces the mark off-centre
         anymore.
     --}}
     <flux:sidebar.brand {{ $attributes }}>

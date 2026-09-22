@@ -25,6 +25,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | {database/migrations/**,tests/Feature/DatabaseEncodingTest.php} | .ai/rules/feature.md |
 | {config/blaze.php,resources/views/flux/**} | .ai/rules/flux.md |
 | {app/Providers/FortifyServiceProvider.php,app/Actions/Fortify/**,config/fortify.php} | .ai/rules/fortify.md |
+| resources/views/pages/funding-agreements/** | .ai/rules/funding-agreements.md |
 | {app/Livewire/Concerns/**,resources/views/components/funding/**} | .ai/rules/funding.md |
 | resources/views/pages/indicators/** | .ai/rules/indicators.md |
 | {config/database.php,.env.example,database/migrations/**} | .ai/rules/migrations.md |
@@ -33,6 +34,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | {app/Http/Middleware/SetLocale.php,app/Http/Controllers/SwitchLocaleController.php,resources/views/components/navigation/sidebar.blade.php,resources/css/app.css} | .ai/rules/navigation-css.md |
 | resources/views/components/{navigation/sidebar.blade.php,ui/panel.blade.php,ui/stat-tile.blade.php,ui/data-table.blade.php,ui/timeline.blade.php} | .ai/rules/navigation.md |
 | app/Observers/**, app/Observers/{MilestoneObserver,ResultObserver}.php | .ai/rules/observers.md |
+| {database/migrations/**,app/Models/DonorReport.php,resources/views/pages/funding-agreements/**} | .ai/rules/pages-funding-agreements.md |
 | resources/views/pages/** | .ai/rules/pages.md |
 | app/Providers/** | .ai/rules/providers.md |
 | {app/Livewire/Concerns/ManagesReportForm.php,resources/views/pages/reports/**,resources/views/components/reports/**} | .ai/rules/reports.md |
@@ -44,6 +46,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/views/pages/strategies/⚡show.blade.php, resources/views/pages/strategies/⚡index.blade.php | .ai/rules/strategies.md |
 | resources/views/pages/tasks/**, resources/views/pages/tasks/_list-group.blade.php | .ai/rules/tasks.md |
 | tests/** | .ai/rules/tests.md |
+| resources/views/pages/transfers/** | .ai/rules/transfers.md |
 | resources/views/{components/ui/page-header.blade.php,pages/**}, resources/views/{components/ui/header-filter-select.blade.php,pages/**}, resources/views/components/ui/detail-header.blade.php | .ai/rules/ui.md |
 | {app/Models/PlanIndicator.php,resources/views/pages/{results,indicators,targets}/**,resources/views/components/ui/framework-node.blade.php} | .ai/rules/views-components-ui.md |
 | {lang/**,resources/views/**,app/Enums/**} | .ai/rules/views-enums.md |

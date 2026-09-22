@@ -196,9 +196,11 @@ trait ManagesTransferForm
             'feesCurrency' => ['required', new Enum(Currency::class)],
             'amountReceived' => ['nullable', 'numeric', 'min:0'],
             'exchangeRate' => ['required', 'numeric', 'min:0'],
-            'netAmountReceived' => ['nullable', 'numeric', 'min:0'],
+            // Received money only counts once someone records what landed and
+            // when; a blank net is never read as the payment amount.
+            'netAmountReceived' => ['nullable', 'required_if:transferArStatus,'.ArStatus::Received->value, 'numeric', 'min:0'],
             'receivedCurrency' => ['required', new Enum(Currency::class)],
-            'receiveDate' => ['nullable', 'date'],
+            'receiveDate' => ['nullable', 'required_if:transferArStatus,'.ArStatus::Received->value, 'date'],
             'transferArStatus' => ['required', new Enum(ArStatus::class)],
         ], [
             'transferAgreementId.required' => __('transfers.select_the_funding_agreement_this_tranche_belongs_to'),
@@ -206,6 +208,8 @@ trait ManagesTransferForm
             'paymentAmount.min' => __('transfers.a_payment_amount_cannot_be_negative'),
             'fees.min' => __('transfers.fees_cannot_be_negative'),
             'exchangeRate.min' => __('transfers.an_exchange_rate_cannot_be_negative'),
+            'netAmountReceived.required_if' => __('transfers.enter_the_net_amount_that_landed'),
+            'receiveDate.required_if' => __('transfers.enter_the_date_the_money_landed'),
         ]);
 
         $transfer = $existing ?? new TransfersTracking;

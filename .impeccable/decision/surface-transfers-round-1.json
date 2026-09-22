@@ -1,0 +1,136 @@
+{
+  "title": "Choose the new composition for Transfers",
+  "question": "The look is already settled and does not change: white ground, Somar Sans, tabular numerals, hairlines, no boxed cards — funding teal for money that landed, amber for pending and fees, HC red only for overdue, failed and the today line. This choice is how the page is BUILT. You pinned one thing: the gap between what a donor sent and what actually landed must be visible. All three cards obey that; they disagree about what the page is made of. The roll dealt these three and put the first one in the lead. Lock one, steer it, or re-roll.",
+  "options": [
+    {
+      "id": "shrink-ladder",
+      "label": "The Shortfall Ledger",
+      "kicker": "THE ROLL",
+      "lineage": "an auditor's measured ledger, where every promised amount is drawn at full length and you can see the bites taken out of it",
+      "thesis": "Every tranche is one full-width measured bar drawn at the amount the donor promised, with the fee bite and the exchange bite cut out of it and only what truly landed left solid — so the page ranks payments by what they actually delivered, not by status.",
+      "palette": ["#2b5f6b", "#9a6412", "#be1f24", "#58595b", "#ffffff"],
+      "materials": [
+        "one measured bar per tranche, drawn at the promised amount",
+        "solid teal = landed, amber hatch = fees, grey ghost = exchange gap",
+        "unreceived tranches drawn as empty ghost measures, never an em dash",
+        "huge tabular figures against tiny mono labels",
+        "a three-node date thread (scheduled / sent / landed) per row",
+        "no boxed cards, no KPI tiles"
+      ],
+      "viewport": "Header with search, receipt status, account and Record transfer. Below it one ledger line per currency in huge figures — Sent, Fees, Exchange gap, Landed, and the shortfall as a percentage — split by a single thin shrink hairline rather than any chart. Then the ladder fills the screen: each row carries donor and proposal on the left with a small three-node date thread showing how many days it took, and on the right a bar the full width of the promised amount with the fee and exchange bites cut out of it. Sort by shortfall, date, or amount.",
+      "risk": "A ladder sorted by shortfall is a judgement: a small tranche with high fees outranks a huge clean one. If the sort is not obvious, the manager reads the order as importance.",
+      "raised": [
+        {
+          "from": "seven-segment display",
+          "raise": "Absence is drawn as deliberately as light: an unreceived tranche renders as a ghost measure with its slots waiting to fill, never as a blank cell or a dash."
+        },
+        {
+          "from": "variable type specimen",
+          "raise": "Hierarchy comes from scale contrast alone — enormous tabular figures against tiny monospace labels — so the page needs no boxes to build rank."
+        },
+        {
+          "from": "tensegrity column",
+          "raise": "Every figure is traceable to its counterforce: expanding a row shows the actual arithmetic on a leader line, sent minus fees at this rate equals what landed."
+        }
+      ],
+      "wireframe": {
+        "cols": 12,
+        "rows": 12,
+        "regions": [
+          {"label": "header · search · status · account · Record transfer", "x": 0, "y": 0, "w": 12, "h": 1},
+          {"label": "per-currency ledger line — huge figures + one shrink hairline", "x": 0, "y": 1, "w": 12, "h": 2, "accent": true},
+          {"label": "sort: shortfall · date · amount", "x": 0, "y": 3, "w": 5, "h": 1},
+          {"label": "donor · proposal + date thread", "x": 0, "y": 4, "w": 4, "h": 2},
+          {"label": "measured bar: landed / fees / exchange gap", "x": 4, "y": 4, "w": 8, "h": 2, "accent": true},
+          {"label": "donor · proposal + date thread", "x": 0, "y": 6, "w": 4, "h": 2},
+          {"label": "measured bar", "x": 4, "y": 6, "w": 8, "h": 2},
+          {"label": "ghost measure — scheduled, nothing landed yet", "x": 0, "y": 8, "w": 12, "h": 2},
+          {"label": "expanded row: sent − fees × rate = landed · account", "x": 0, "y": 10, "w": 12, "h": 2, "accent": true}
+        ]
+      },
+      "comp": ".impeccable/mocks/decision/shrink-ladder.webp"
+    },
+    {
+      "id": "the-wire",
+      "label": "The Wire",
+      "lineage": "a wire-transfer trace: money drawn as a thread in motion between two dates, not a row in a list",
+      "thesis": "Each tranche is a thread running across one shared time axis — a scheduled node, a sent node, a landed node — so lateness and transit time are distances you see rather than dates you compare, and every thread is read against a single red today line.",
+      "palette": ["#2b5f6b", "#9a6412", "#be1f24", "#58595b", "#ffffff"],
+      "materials": [
+        "one hairline thread per tranche on a shared time axis",
+        "thread weight = amount, thinning at the end = what leaked",
+        "dashed ghost = upcoming, amber = in transit, teal ring = landed",
+        "overdue threads run unterminated past the red today line",
+        "sticky identity column, no boxed cards"
+      ],
+      "viewport": "Header with the same filters and Record transfer. A thin per-currency strip of big figures — in transit, overdue, landed this month. Then the wire field fills the screen: a time axis across the top with today as one red line, a sticky left column naming donor, proposal and account, and one thread per tranche running from its scheduled tick to where it landed. Overdue threads keep running past today unterminated; landed threads close on a filled ring that is visibly thinner than where they started.",
+      "risk": "The adjacent Funding Agreements page is already a time-axis calendar. Two neighbouring pages built on a shared horizontal time axis start to read as one page, and this is the weaker of the two at chasing.",
+      "raised": [
+        {
+          "from": "tensegrity column",
+          "raise": "Every thread's tension is traceable: hovering a thread pins its force values — promised, fees, rate, landed — to the node that produced each one."
+        },
+        {
+          "from": "seven-segment display",
+          "raise": "A thread that has not run yet is still drawn, as a ghost track in its slot, so an empty future looks deliberate instead of missing."
+        }
+      ],
+      "wireframe": {
+        "cols": 12,
+        "rows": 11,
+        "regions": [
+          {"label": "header · filters · Record transfer", "x": 0, "y": 0, "w": 12, "h": 1},
+          {"label": "per-currency strip: in transit · overdue · landed", "x": 0, "y": 1, "w": 12, "h": 1},
+          {"label": "time axis with red today line", "x": 3, "y": 2, "w": 9, "h": 1, "accent": true},
+          {"label": "sticky identity column — donor · proposal · account", "x": 0, "y": 3, "w": 3, "h": 8},
+          {"label": "thread field — one wire per tranche, thinning as it lands", "x": 3, "y": 3, "w": 9, "h": 8, "accent": true}
+        ]
+      },
+      "comp": ".impeccable/mocks/decision/the-wire.webp"
+    },
+    {
+      "id": "the-corridor",
+      "label": "The Corridor",
+      "lineage": "a clearing-house routing diagram: who sent it, which corridor it crossed, which of our accounts it reached",
+      "thesis": "The page is a routing map rather than a list: donors on the left, our accounts on the right, and every tranche is a bead travelling the corridor between them, its position showing exactly how far along the journey the money has actually got.",
+      "palette": ["#2b5f6b", "#9a6412", "#be1f24", "#58595b", "#ffffff"],
+      "materials": [
+        "donor column sized by money committed",
+        "one ribbon per donor-to-account corridor, per currency, never merged across currencies",
+        "beads on the ribbon: position = progress, size = amount, colour = state",
+        "overdue beads stall visibly before the gate",
+        "the selected corridor's tranche ledger opens underneath"
+      ],
+      "viewport": "Header with the same filters and Record transfer. Then three columns filling the screen: donors on the left with what each has committed, our accounts on the right with what has actually landed in each per currency, and between them the corridors — one ribbon per donor-to-account route, thickness set by money moved, with each tranche riding it as a bead placed at its real stage. Clicking a corridor opens its tranche ledger underneath.",
+      "risk": "Routing maps are the most impressive to look at and the worst to work in. Chasing a late payment means hunting a stalled bead, and with a few hundred tranches the corridors turn into a knot.",
+      "raised": [
+        {
+          "from": "seven-segment display",
+          "raise": "An empty corridor is still drawn as an unlit route rather than omitted, so a donor who has sent nothing is visibly a donor who has sent nothing."
+        },
+        {
+          "from": "variable type specimen",
+          "raise": "The account totals are set at specimen scale against tiny mono labels, so the destinations read before the ribbons do."
+        }
+      ],
+      "wireframe": {
+        "cols": 12,
+        "rows": 11,
+        "regions": [
+          {"label": "header · filters · Record transfer", "x": 0, "y": 0, "w": 12, "h": 1},
+          {"label": "donors — committed", "x": 0, "y": 1, "w": 3, "h": 7},
+          {"label": "corridors — ribbons with tranche beads at their real stage", "x": 3, "y": 1, "w": 6, "h": 7, "accent": true},
+          {"label": "our accounts — landed per currency", "x": 9, "y": 1, "w": 3, "h": 7, "accent": true},
+          {"label": "selected corridor's tranche ledger", "x": 0, "y": 8, "w": 12, "h": 3}
+        ]
+      },
+      "comp": ".impeccable/mocks/decision/the-corridor.webp"
+    }
+  ],
+  "reroll": true,
+  "steer": true,
+  "buildPath": {
+    "value": "code",
+    "toggle": true
+  }
+}

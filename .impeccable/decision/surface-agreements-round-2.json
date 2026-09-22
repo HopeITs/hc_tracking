@@ -1,0 +1,84 @@
+{
+  "title": "Choose the new composition for Funding Agreements",
+  "question": "The look stays the same as Proposals and Donors (white ground, Somar Sans, funding teal for landed money, amber for pending, HC red only for overdue). The waterfall bars go. This choice is how the page is laid out. The roll dealt these three. Lock one, steer it, or re-roll.",
+  "options": [
+    {
+      "id": "agreement-spine",
+      "label": "The Money Calendar",
+      "kicker": "THE ROLL",
+      "lineage": "a treasurer's cash-flow calendar: months across, every expected payment pinned to its week, today as a live line",
+      "thesis": "The page is one living cash-flow calendar. Each agreement is a lane, each tranche is a pill on its date, and one monthly inflow line on top shows what is landing when. Late, next and landed money are all read against today in one view.",
+      "palette": ["#be1f24", "#2b5f6b", "#9a6412", "#58595b", "#ffffff"],
+      "materials": ["one compact ledger line of huge tabular figures per currency", "month columns with a today line", "tranche pills sized by amount", "monthly inflow sparkline", "no boxed cards"],
+      "viewport": "Header with filters and Record agreement. Under it, one line per currency with big typographic figures: Committed · Received (with share) · Pending · Overdue in red · Not scheduled, split by one thin collection line instead of bars. Then the calendar fills the rest of the screen: a sticky left column naming each agreement (donor · proposal, budget, received ring, linked projects and accounts). Months run to the right and the view opens scrolled so today sits a third of the way in. Each tranche is a pill on its date showing its amount, teal when received, amber stripes when upcoming, solid red when overdue. A top row adds up the expected inflow per month. Clicking a lane opens that agreement's tranche ledger inline.",
+      "risk": "Wide time ranges need horizontal scrolling, so the view must open centred on today and support month / quarter zoom. On phones the lanes become stacked agreement cards with a mini thread.",
+      "case": "Answers 'where is the money', 'what is late' and 'what lands next month' in one view, and the agreements start in the first viewport, so there is no long scroll to reach them.",
+      "wireframe": {
+        "cols": 12, "rows": 10,
+        "regions": [
+          { "label": "title · count · search / donor / currency · record agreement", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "ledger line: committed · received % · pending · overdue · not scheduled", "x": 0, "y": 1, "w": 12, "h": 1, "accent": true },
+          { "label": "expected inflow per month", "x": 4, "y": 2, "w": 8, "h": 1 },
+          { "label": "agreement lane: donor · proposal · budget · ring · projects", "x": 0, "y": 3, "w": 4, "h": 2 },
+          { "label": "tranche pills on dates · today line", "x": 4, "y": 3, "w": 8, "h": 2, "accent": true },
+          { "label": "agreement lane", "x": 0, "y": 5, "w": 4, "h": 2 },
+          { "label": "tranche pills", "x": 4, "y": 5, "w": 8, "h": 2 },
+          { "label": "agreement lane", "x": 0, "y": 7, "w": 4, "h": 2 },
+          { "label": "tranche pills", "x": 4, "y": 7, "w": 8, "h": 2 },
+          { "label": "pagination", "x": 0, "y": 9, "w": 12, "h": 1 }
+        ]
+      },
+      "comp": ".impeccable/mocks/decision/surface-agreements-r2-calendar.png"
+    },
+    {
+      "id": "chase-desk",
+      "label": "The Chase Desk",
+      "lineage": "a collections desk: the call list beside the ledger",
+      "thesis": "The first thing the manager sees is who owes what and how late, ranked by money at risk. Next to it, the full portfolio of agreements, each showing how much of its promise has landed.",
+      "palette": ["#be1f24", "#2b5f6b", "#9a6412", "#58595b", "#ffffff"],
+      "materials": ["ranked chase queue with days-late counters", "segmented collection meters", "compact agreement rows", "hairlines"],
+      "viewport": "Header and filters. A left column titled 'Needs you' lists overdue tranches first (donor, agreement, amount, days late in red), then tranches due in the next 30 days, then agreements with money not scheduled. Each item has one-click Open and Edit. The right two-thirds shows the portfolio: per currency, one headline figure (received of committed) over a single segmented meter, then compact agreement rows with a received ring, next due date and linked projects.",
+      "risk": "When nothing is late the queue is short, so its empty state must feel like good news, not a blank column.",
+      "case": "The most action-oriented option: it tells the manager who to call today. It is weaker on the timing picture across many months.",
+      "wireframe": {
+        "cols": 12, "rows": 10,
+        "regions": [
+          { "label": "title · filters · record agreement", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "needs you: overdue (red)", "x": 0, "y": 1, "w": 4, "h": 3, "accent": true },
+          { "label": "due in 30 days", "x": 0, "y": 4, "w": 4, "h": 3 },
+          { "label": "not scheduled", "x": 0, "y": 7, "w": 4, "h": 3 },
+          { "label": "per currency: received of committed + segmented meter", "x": 4, "y": 1, "w": 8, "h": 2, "accent": true },
+          { "label": "agreement rows: ring · next due · projects", "x": 4, "y": 3, "w": 8, "h": 7 }
+        ]
+      },
+      "comp": ".impeccable/mocks/decision/surface-agreements-r2-chase.png"
+    },
+    {
+      "id": "money-map",
+      "label": "The Money Map",
+      "lineage": "a flow map (Sankey): where every dollar comes from and what it funds",
+      "thesis": "Every connection is drawn as a flowing band: donors on the left, agreements in the middle, projects and bank accounts on the right. Band thickness is money, and each band's colour shows how much has landed, is on its way, or is late.",
+      "palette": ["#be1f24", "#2b5f6b", "#9a6412", "#58595b", "#ffffff"],
+      "materials": ["flow bands (Sankey) with received / pending / overdue fill", "hover highlights the whole chain", "compact rows with tranche beads below"],
+      "viewport": "Header and filters. A full-width flow map: donors, then agreements (each with its budget and received %), then projects funded. Hovering or focusing any node lights its full chain and dims the rest. Clicking one filters the rows below. Beneath the map, compact agreement rows with a tranche thread against today.",
+      "risk": "Stays readable up to about 30 agreements; beyond that it needs grouping by donor. Currencies can never share one flow, so the map switches currency with tabs.",
+      "case": "The most striking view and the only one that shows the whole donor → agreement → project web at once. The late-payment signal is secondary.",
+      "wireframe": {
+        "cols": 12, "rows": 10,
+        "regions": [
+          { "label": "title · filters · record agreement", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "donors", "x": 0, "y": 1, "w": 2, "h": 5 },
+          { "label": "flow bands (received / pending / overdue)", "x": 2, "y": 1, "w": 3, "h": 5, "accent": true },
+          { "label": "agreements · budget · %", "x": 5, "y": 1, "w": 2, "h": 5 },
+          { "label": "flow bands", "x": 7, "y": 1, "w": 3, "h": 5 },
+          { "label": "projects funded", "x": 10, "y": 1, "w": 2, "h": 5 },
+          { "label": "agreement rows with tranche thread", "x": 0, "y": 6, "w": 12, "h": 4 }
+        ]
+      },
+      "comp": ".impeccable/mocks/decision/surface-agreements-r2-map.png"
+    }
+  ],
+  "reroll": true,
+  "buildPath": { "value": "code", "toggle": true },
+  "steer": true
+}

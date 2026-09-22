@@ -111,6 +111,7 @@ test('the three currency columns are recorded independently', function () {
         ->set('receivedCurrency', Currency::Syp->value)
         ->set('exchangeRate', '1.000000')
         ->set('scheduledDate', '2026-05-01')
+        ->set('receiveDate', '2026-05-03')
         ->set('transferArStatus', ArStatus::Received->value)
         ->call('saveTransfer')
         ->assertHasNoErrors();
@@ -187,4 +188,339 @@ test('a user without transfer permissions cannot schedule a tranche', function (
         ->call('saveTransfer')->assertForbidden();
 
     expect(TransfersTracking::query()->count())->toBe(0);
+});
+
+test('the ledger counts shortfall only on money that finished its journey', function () {
+    $user = User::factory()->role('Financial')->create();
+
+    // Landed short: 100,000 left the donor, 97,500 arrived, 1,500 of it in fees.
+    TransfersTracking::factory()->create([
+        'payment_amount' => '100000.00',
+        'amount_transfered_currency' => Currency::Usd,
+        'fees' => '1500.00',
+        'fees_currency' => Currency::Usd,
+        'amount_received' => '99000.00',
+        'net_amount_received' => '97500.00',
+        'amount_received_currency' => Currency::Usd,
+        'scheduled_date' => '2026-01-05',
+        'transfer_date' => '2026-01-06',
+        'receive_date' => '2026-01-10',
+        'ar_status' => ArStatus::Received,
+    ]);
+
+    // Still travelling. Nothing has been lost yet, so nothing may be reported as lost.
+    TransfersTracking::factory()->create([
+        'payment_amount' => '40000.00',
+        'amount_transfered_currency' => Currency::Usd,
+        'net_amount_received' => null,
+        'scheduled_date' => '2026-01-08',
+        'transfer_date' => '2026-01-09',
+        'receive_date' => null,
+        'ar_status' => ArStatus::Pending,
+    ]);
+
+    $line = Livewire::actingAs($user)
+        ->test('pages::transfers.index')
+        ->instance()
+        ->ledger
+        ->firstWhere('currency', Currency::Usd->value);
+
+    expect($line['sent'])->toBe(140000.0)
+        ->and($line['settledSent'])->toBe(100000.0)
+        ->and($line['landed'])->toBe(97500.0)
+        ->and($line['shrink'])->toBe(2500.0)
+        ->and($line['fees'])->toBe(1500.0)
+        ->and($line['exchangeGap'])->toBe(1000.0)
+        ->and($line['inFlight'])->toBe(40000.0);
+});
+
+test('a tranche that landed in another currency is never subtracted from what was sent', function () {
+    $user = User::factory()->role('Financial')->create();
+
+    TransfersTracking::factory()->create([
+        'payment_amount' => '100000.00',
+        'amount_transfered_currency' => Currency::Usd,
+        'fees' => '0.00',
+        'fees_currency' => Currency::Usd,
+        'amount_received' => '90000.00',
+        'net_amount_received' => '90000.00',
+        'amount_received_currency' => Currency::Eur,
+        'scheduled_date' => '2026-01-05',
+        'transfer_date' => '2026-01-06',
+        'receive_date' => '2026-01-10',
+        'ar_status' => ArStatus::Received,
+    ]);
+
+    $line = Livewire::actingAs($user)
+        ->test('pages::transfers.index')
+        ->instance()
+        ->ledger
+        ->firstWhere('currency', Currency::Usd->value);
+
+    // 100,000 USD and 90,000 EUR are not comparable, so there is no shortfall
+    // to report — only a converted tranche to disclose.
+    expect($line['sent'])->toBe(100000.0)
+        ->and($line['settledSent'])->toBe(0.0)
+        ->and($line['landed'])->toBe(0.0)
+        ->and($line['shrink'])->toBe(0.0)
+        ->and($line['convertedCount'])->toBe(1);
+});
+
+/**
+ * Two pending tranches whose only difference is which side of today they fall
+ * on, so a stage or a sort is the only thing that can tell them apart.
+ *
+ * @return array{0: TransfersTracking, 1: TransfersTracking}
+ */
+function overdueAndUpcomingTranche(): array
+{
+    $overdue = TransfersTracking::factory()->create([
+        'payment_amount' => '111111.00',
+        'scheduled_date' => now()->subMonth()->toDateString(),
+        'transfer_date' => null,
+        'ar_status' => ArStatus::Pending,
+    ]);
+    $upcoming = TransfersTracking::factory()->create([
+        'payment_amount' => '222222.00',
+        'scheduled_date' => now()->addMonth()->toDateString(),
+        'transfer_date' => null,
+        'ar_status' => ArStatus::Pending,
+    ]);
+
+    return [$overdue, $upcoming];
+}
+
+test('a ledger figure narrows the ladder to that stage and clears when chosen again', function () {
+    $user = User::factory()->role('Financial')->create();
+    [$overdue, $upcoming] = overdueAndUpcomingTranche();
+
+    $component = Livewire::actingAs($user)->test('pages::transfers.index');
+
+    // Asserted on the ladder rows, not on the figures: the ledger above keeps
+    // describing the whole filtered set on purpose while a stage narrows only
+    // the ladder, so both amounts stay on the page either way.
+    expect($component->instance()->transfers->total())->toBe(2);
+
+    $component
+        ->call('toggleStage', 'overdue')
+        ->assertSet('stage', 'overdue')
+        ->assertSeeHtml('wire:key="transfer-'.$overdue->id.'"')
+        ->assertDontSeeHtml('wire:key="transfer-'.$upcoming->id.'"');
+
+    expect($component->instance()->transfers->total())->toBe(1);
+
+    $component
+        ->call('toggleStage', 'overdue')
+        ->assertSet('stage', '')
+        ->assertSeeHtml('wire:key="transfer-'.$upcoming->id.'"');
+});
+
+test('the default ladder order leads with money that is overdue', function () {
+    $user = User::factory()->role('Financial')->create();
+    [$overdue, $upcoming] = overdueAndUpcomingTranche();
+
+    $overdueRow = 'wire:key="transfer-'.$overdue->id.'"';
+    $upcomingRow = 'wire:key="transfer-'.$upcoming->id.'"';
+
+    Livewire::actingAs($user)
+        ->test('pages::transfers.index')
+        ->assertSet('sort', 'attention')
+        ->assertSeeHtmlInOrder([$overdueRow, $upcomingRow])
+        // Largest amount reverses the pair, so the order is the sort's doing
+        // and not the order the rows happened to be created in.
+        ->call('setSort', 'amount')
+        ->assertSeeHtmlInOrder([$upcomingRow, $overdueRow]);
+});
+
+test('a tranche that arrived over never cancels one that arrived short', function () {
+    $user = User::factory()->role('Financial')->create();
+
+    $settled = fn (string $sent, string $landed): array => [
+        'payment_amount' => $sent,
+        'amount_transfered_currency' => Currency::Usd,
+        'fees' => '0.00',
+        'fees_currency' => Currency::Usd,
+        'amount_received' => $landed,
+        'net_amount_received' => $landed,
+        'amount_received_currency' => Currency::Usd,
+        'scheduled_date' => '2026-01-05',
+        'transfer_date' => '2026-01-06',
+        'receive_date' => '2026-01-10',
+        'ar_status' => ArStatus::Received,
+    ];
+
+    // 10,000 genuinely never arrived.
+    TransfersTracking::factory()->create($settled('100000.00', '90000.00'));
+    // A favourable rate on a different tranche. Real, but it did not put the
+    // missing 10,000 back, so it must not be allowed to erase it.
+    TransfersTracking::factory()->create($settled('50000.00', '80000.00'));
+
+    $line = Livewire::actingAs($user)
+        ->test('pages::transfers.index')
+        ->instance()
+        ->ledger
+        ->firstWhere('currency', Currency::Usd->value);
+
+    expect($line['shrink'])->toBe(10000.0)
+        ->and($line['overage'])->toBe(30000.0);
+});
+
+test('a tranche marked received with no net amount is not reported as landed', function () {
+    $user = User::factory()->role('Financial')->create();
+
+    TransfersTracking::factory()->create([
+        'payment_amount' => '100000.00',
+        'amount_transfered_currency' => Currency::Usd,
+        'net_amount_received' => null,
+        'amount_received' => null,
+        'amount_received_currency' => Currency::Usd,
+        'scheduled_date' => '2026-01-05',
+        'transfer_date' => '2026-01-06',
+        'receive_date' => '2026-01-10',
+        'ar_status' => ArStatus::Received,
+    ]);
+
+    // The measure's own label is the assertion: it described this tranche as
+    // "Sent 100,000.00 USD · Landed" while nothing had been recorded.
+    Livewire::actingAs($user)
+        ->test('pages::transfers.index')
+        ->assertSeeHtml('aria-label="Sent 100,000.00 USD · Not recorded yet"')
+        ->assertDontSeeHtml('aria-label="Sent 100,000.00 USD · Landed"');
+});
+
+test('an exchange rate of zero is shown as zero rather than an empty cell', function () {
+    $user = User::factory()->role('Financial')->create();
+
+    TransfersTracking::factory()->create([
+        'payment_amount' => '1000.00',
+        'exchange_rate' => '0.000000',
+        'ar_status' => ArStatus::Pending,
+        'scheduled_date' => '2026-01-05',
+        'transfer_date' => null,
+    ]);
+
+    // Trimming the raw decimal:6 string turned "0.000000" into "".
+    Livewire::actingAs($user)
+        ->test('pages::transfers.index')
+        ->assertSeeHtml('<dd class="mt-0.5 font-semibold tabular-nums">0</dd>');
+});
+
+test('a receive date before the transfer date never reports a negative transit time', function () {
+    $user = User::factory()->role('Financial')->create();
+
+    TransfersTracking::factory()->create([
+        'payment_amount' => '1000.00',
+        'amount_transfered_currency' => Currency::Usd,
+        'net_amount_received' => '1000.00',
+        'amount_received' => '1000.00',
+        'amount_received_currency' => Currency::Usd,
+        'scheduled_date' => '2026-01-05',
+        'transfer_date' => '2026-01-10',
+        'receive_date' => '2026-01-07',
+        'ar_status' => ArStatus::Received,
+    ]);
+
+    // It falls back to the plain state rather than reporting the typo as a fact.
+    Livewire::actingAs($user)
+        ->test('pages::transfers.index')
+        ->assertDontSee('-3 day')
+        ->assertDontSee('−3 day')
+        ->assertSeeHtml('aria-label="Sent 1,000.00 USD, landed 1,000.00 USD"');
+});
+
+test('the headline separates what is expected from what has actually been sent', function () {
+    $user = User::factory()->role('Financial')->create();
+
+    // Not sent: no transfer date.
+    TransfersTracking::factory()->create([
+        'payment_amount' => '100000.00',
+        'amount_transfered_currency' => Currency::Usd,
+        'scheduled_date' => now()->subMonth()->toDateString(),
+        'transfer_date' => null,
+        'ar_status' => ArStatus::Pending,
+    ]);
+    // Sent, still moving.
+    TransfersTracking::factory()->create([
+        'payment_amount' => '40000.00',
+        'amount_transfered_currency' => Currency::Usd,
+        'scheduled_date' => now()->subDays(5)->toDateString(),
+        'transfer_date' => now()->subDays(4)->toDateString(),
+        'ar_status' => ArStatus::Pending,
+    ]);
+
+    $line = Livewire::actingAs($user)
+        ->test('pages::transfers.index')
+        ->instance()
+        ->ledger
+        ->firstWhere('currency', Currency::Usd->value);
+
+    // The headline used to call all 140,000 "Sent" while the rows below said
+    // "Nothing has left the donor yet" about most of it.
+    expect($line['expected'])->toBe(140000.0)
+        ->and($line['sent'])->toBe(40000.0);
+});
+
+test('a small fee is never reported as a zero percent shortfall', function () {
+    $user = User::factory()->role('Financial')->create();
+
+    // 30 on 100,000 is 0.03% — the ordinary wire-fee case.
+    TransfersTracking::factory()->create([
+        'payment_amount' => '100000.00',
+        'amount_transfered_currency' => Currency::Usd,
+        'fees' => '30.00',
+        'fees_currency' => Currency::Usd,
+        'amount_received' => '99970.00',
+        'net_amount_received' => '99970.00',
+        'amount_received_currency' => Currency::Usd,
+        'scheduled_date' => '2026-01-05',
+        'transfer_date' => '2026-01-06',
+        'receive_date' => '2026-01-07',
+        'ar_status' => ArStatus::Received,
+    ]);
+
+    Livewire::actingAs($user)
+        ->test('pages::transfers.index')
+        ->assertDontSee('−0%')
+        ->assertDontSee('-0%')
+        ->assertSee('<0.1%');
+});
+
+test('landed in full is never claimed while money is still outstanding', function () {
+    $user = User::factory()->role('Financial')->create();
+
+    $settled = [
+        'payment_amount' => '5000.00',
+        'amount_transfered_currency' => Currency::Usd,
+        'fees' => '0.00',
+        'fees_currency' => Currency::Usd,
+        'amount_received' => '5000.00',
+        'net_amount_received' => '5000.00',
+        'amount_received_currency' => Currency::Usd,
+        'scheduled_date' => '2026-01-05',
+        'transfer_date' => '2026-01-06',
+        'receive_date' => '2026-01-07',
+        'ar_status' => ArStatus::Received,
+    ];
+
+    TransfersTracking::factory()->create($settled);
+
+    Livewire::actingAs($user)
+        ->test('pages::transfers.index')
+        ->assertSee('Landed in full')
+        ->assertDontSee('Settled money landed in full');
+
+    // One overdue tranche, and the unqualified claim must stop.
+    TransfersTracking::factory()->create([
+        'payment_amount' => '5000000.00',
+        'amount_transfered_currency' => Currency::Usd,
+        'scheduled_date' => now()->subMonth()->toDateString(),
+        'transfer_date' => null,
+        'ar_status' => ArStatus::Pending,
+    ]);
+
+    // The row badge may still say "Landed in full" — that tranche did. It is
+    // the currency-wide headline that must no longer make the claim.
+    Livewire::actingAs($user)
+        ->test('pages::transfers.index')
+        ->assertSee('Settled money landed in full');
 });

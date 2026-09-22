@@ -6,6 +6,10 @@ return [
         'received' => 'Received',
         'failed' => 'Failed',
     ],
+    'donor_report_type' => [
+        'narrative' => 'Narrative',
+        'financial' => 'Financial',
+    ],
     'donor_type' => [
         'bilateral' => 'Bilateral',
         'foundation' => 'Foundation',

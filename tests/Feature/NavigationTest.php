@@ -108,3 +108,37 @@ test('the sidebar collapse toggle carries a translated accessible name, not an A
     expect($toggle->getAttribute('aria-label'))->toBe(__('navigation.toggle_sidebar'))
         ->and($toggle->hasAttribute(':aria-label'))->toBeFalse();
 });
+
+test('the sidebar stacks above the desktop top header so its edge toggle is not covered', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->get(route('dashboard'))->assertOk();
+
+    $document = new DOMDocument;
+    $document->loadHTML($response->getContent(), LIBXML_NOERROR | LIBXML_NOWARNING);
+    $xpath = new DOMXPath($document);
+
+    $sidebarClasses = explode(' ', $xpath->query('//*[@data-navigation-sidebar]')->item(0)->getAttribute('class'));
+    $headerClasses = explode(' ', $xpath->query('//*[@data-desktop-navigation-header]')->item(0)->getAttribute('class'));
+
+    // The toggle straddles the sidebar edge into the header row; the header is z-40.
+    expect($sidebarClasses)->toContain('z-50!')
+        ->and($headerClasses)->toContain('z-40');
+});
+
+test('the sidebar header matches the desktop top header height so their bottom borders form one line', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->get(route('dashboard'))->assertOk();
+
+    $document = new DOMDocument;
+    $document->loadHTML($response->getContent(), LIBXML_NOERROR | LIBXML_NOWARNING);
+    $xpath = new DOMXPath($document);
+
+    $sidebarHeaderClasses = explode(' ', $xpath->query('//*[@data-navigation-sidebar]//*[@data-flux-sidebar-header]')->item(0)->getAttribute('class'));
+    $headerClasses = explode(' ', $xpath->query('//*[@data-desktop-navigation-header]')->item(0)->getAttribute('class'));
+
+    // The negative margins cancel the sidebar's p-3 so the border reaches both edges.
+    expect($sidebarHeaderClasses)->toContain('h-16', '-mx-3', '-mt-3', 'border-b')
+        ->and($headerClasses)->toContain('min-h-16', 'border-b');
+});

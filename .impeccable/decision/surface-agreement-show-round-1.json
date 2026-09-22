@@ -1,0 +1,77 @@
+{
+  "title": "Choose the new layout for one Funding Agreement",
+  "question": "The look stays the same as Proposals and Donors: white background, Somar Sans, funding teal for money received, amber for pending, HC red only for overdue. What you are choosing is how this agreement's page is laid out: its money, its tranches, and every link to the donor, proposal, projects, accounts and co-funders. The roll dealt these three. Lock one, steer it, or re-roll.",
+  "options": [
+    {
+      "id": "collection-dial",
+      "label": "The Collection Dial",
+      "kicker": "THE ROLL",
+      "lineage": "a large meter dial: the whole promise as one ring, each tranche a slice of it",
+      "thesis": "The agreement's full budget is drawn as one large ring. Each tranche is a slice sized by its amount: teal when received, amber when on its way, red when late, and a pale gap for money nobody has scheduled yet. The centre gives the answer: 40% landed, $894K late. Every other connection sits around the dial as a short, clickable reading.",
+      "palette": ["#be1f24", "#2b5f6b", "#9a6412", "#58595b", "#ffffff"],
+      "materials": ["one large segmented ring, one arc per tranche", "big tabular figures in the centre", "a readings column of plain typographic figures", "hairlines, no boxed cards"],
+      "viewport": "Breadcrumb, donor · proposal at display size, project number, currency and proposal status. The left half shows the dial at hero size, with % collected and the amount still owed in the centre. Hovering an arc lights its tranche row and hovering a row lights its arc. The right half holds the readings on hairlines: Committed, Received, On its way, Late (red), Not scheduled, Fees lost. Under them the linked records: donor with contact and next follow-up, proposal with term and status, funded projects, accounts used, and co-funders. Below the fold is the tranche list, each row with a 4-step tracker: scheduled → sent → received → in account.",
+      "risk": "Rings are a familiar pattern. They earn their place here only because every arc is a real tranche you can click. With one or two tranches the ring looks sparse, so the not-scheduled gap has to read clearly as missing money, not as empty space.",
+      "case": "Answers 'how much of this promise has landed, and what is late' at a glance, the fastest read of the three. The connections are in view but secondary.",
+      "wireframe": {
+        "cols": 12, "rows": 10,
+        "regions": [
+          { "label": "breadcrumb · donor · proposal · project no. · status · actions", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "collection dial: one arc per tranche, % landed + owed in centre", "x": 0, "y": 1, "w": 5, "h": 5, "accent": true },
+          { "label": "readings: committed · received · on its way · late · not scheduled · fees", "x": 5, "y": 1, "w": 7, "h": 2 },
+          { "label": "linked: donor + follow-up · proposal + term · projects · accounts · co-funders", "x": 5, "y": 3, "w": 7, "h": 3 },
+          { "label": "tranche rows with 4-step tracker (scheduled → sent → received → in account)", "x": 0, "y": 6, "w": 12, "h": 4, "accent": true }
+        ]
+      }
+    },
+    {
+      "id": "connection-map",
+      "label": "The Connection Map",
+      "lineage": "a network map with the agreement at its centre and every linked record around it",
+      "thesis": "This page exists because the agreement connects many things, so the first thing shown is the connections themselves. The agreement sits at the centre. The donor is on one side and the proposal on the other, with the funded projects, bank accounts and co-funders branching off them. Tranches are beads on the line from donor to agreement. Click any node and its details open in a side drawer without leaving the page.",
+      "palette": ["#be1f24", "#2b5f6b", "#9a6412", "#58595b", "#ffffff"],
+      "materials": ["dot-and-thread network drawn in SVG", "tranche beads on the donor line coloured by status", "a slide-in detail drawer", "a money ledger line above the map"],
+      "viewport": "Header: donor · proposal, project number and status. One ledger line of large figures (committed · received · on its way · late · not scheduled) with a thin collection bar. Then a full-width map: the donor node on the start side, carrying contact and next follow-up; the agreement node in the centre, carrying budget and % landed; the proposal node on the end side, carrying status and term. Projects fan out from the proposal, co-funding agreements hang off the proposal, and accounts hang off the tranche beads. Hovering a node lights its thread. Below the map is the tranche ledger.",
+      "risk": "The most visually striking option, and the most dependent on how many connections exist. With one project and one account the map is small, so it has to scale down gracefully. The money story sits in the line above rather than in the map.",
+      "case": "Answers 'what is this agreement connected to' better than anything else, and every connection is one click away. It is weaker on the timing of payments.",
+      "wireframe": {
+        "cols": 12, "rows": 10,
+        "regions": [
+          { "label": "breadcrumb · donor · proposal · status · actions", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "ledger line: committed · received · on its way · late · not scheduled + bar", "x": 0, "y": 1, "w": 12, "h": 1, "accent": true },
+          { "label": "donor node + follow-up", "x": 0, "y": 2, "w": 3, "h": 2 },
+          { "label": "tranche beads on the donor line", "x": 3, "y": 2, "w": 2, "h": 2, "accent": true },
+          { "label": "agreement node: budget · % landed", "x": 5, "y": 2, "w": 2, "h": 2 },
+          { "label": "proposal node: status · term", "x": 8, "y": 2, "w": 4, "h": 2 },
+          { "label": "accounts (off the beads)", "x": 0, "y": 4, "w": 5, "h": 2 },
+          { "label": "funded projects · co-funders (off the proposal)", "x": 7, "y": 4, "w": 5, "h": 2 },
+          { "label": "tranche ledger", "x": 0, "y": 6, "w": 12, "h": 4 }
+        ]
+      }
+    },
+    {
+      "id": "settlement-statement",
+      "label": "The Settlement Statement",
+      "lineage": "a bank settlement statement: every payment traced from promise to money in the account, with a running balance",
+      "thesis": "The page reads like a statement a finance officer trusts. Each tranche is a line that traces its money: amount sent, minus fees, times the exchange rate, equals net received, with how many days it arrived early or late. A running balance column counts down what is still owed on the promise. The linked records sit in a narrow side column like a statement's account details.",
+      "palette": ["#be1f24", "#2b5f6b", "#9a6412", "#58595b", "#ffffff"],
+      "materials": ["statement lines with a small sent → fees → net trace", "running 'still owed' balance column", "days early/late counters", "a sticky side column of linked records", "tabular numerals throughout"],
+      "viewport": "Header: donor · proposal, project number, status. A statement head with large figures: Promised, Landed, Still owed, with the late amount in red beside it. Then the statement fills the main column: one line per tranche in date order showing the date, a sent → fees → net trace with the fee leak visible, the exchange rate, the account, days early/late, status, and the running still-owed balance. The last line shows what has not been scheduled yet. A sticky side column holds the donor with contact and next follow-up, the proposal with term and status, the funded projects, the co-funders, and the agreement files.",
+      "risk": "The most familiar-feeling option, since it is structured and list-like. It has to avoid looking like a plain table by keeping the trace visuals and the running balance as the stars.",
+      "case": "The most precise and auditable option: fees, exchange rates and delays are all visible on every payment. It suits the finance side of the manager's job best.",
+      "wireframe": {
+        "cols": 12, "rows": 10,
+        "regions": [
+          { "label": "breadcrumb · donor · proposal · status · actions", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "statement head: promised · landed · still owed · late", "x": 0, "y": 1, "w": 8, "h": 2, "accent": true },
+          { "label": "tranche lines: date · sent→fees→net trace · rate · account · days late · balance", "x": 0, "y": 3, "w": 8, "h": 6, "accent": true },
+          { "label": "not yet scheduled (closing line)", "x": 0, "y": 9, "w": 8, "h": 1 },
+          { "label": "side column: donor + follow-up · proposal + term · projects · co-funders · files", "x": 8, "y": 1, "w": 4, "h": 9 }
+        ]
+      }
+    }
+  ],
+  "reroll": true,
+  "buildPath": { "value": "code", "toggle": false },
+  "steer": true
+}

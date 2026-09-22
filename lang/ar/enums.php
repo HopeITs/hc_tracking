@@ -6,6 +6,10 @@ return [
         'received' => 'مستلم',
         'failed' => 'فشل',
     ],
+    'donor_report_type' => [
+        'narrative' => 'سردي',
+        'financial' => 'مالي',
+    ],
     'donor_type' => [
         'bilateral' => 'ثنائي',
         'foundation' => 'مؤسسة',

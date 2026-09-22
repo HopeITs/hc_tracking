@@ -20,3 +20,20 @@ The directory index pages (programs, strategies) get their filter-bar look from 
 
 ## Open a record's show page with an eye button, not a linked title
 User decision (2026-09-22): on list/board/calendar views the record's own name or title is plain text, and its show page opens from a ghost eye button placed first in the actions group: `<x-ui.button tone="ghost" size="sm" icon="eye" :href="route('x.show', $record)" wire:navigate :aria-label="__('common.view_name', ['name' => ...])" />`. Applied to donors, proposals, funding-agreements and reports; milestones and tasks views were deliberately left unchanged at the user's request. Links to *related* records inside a row (e.g. a proposal name inside a donor row) stay as underlined links. Whole-tile links (programs cards, annual-plan year cells) were left as they are.
+
+## Bind x-ui.header-filter-select :value to the RESOLVED value, not the raw property
+x-ui.header-filter-select picks its trigger label with firstWhere('value', $value) and falls back to `$options[0]` when nothing matches. So a filter whose empty/unknown state resolves server-side to a real default (e.g. `#[Url(except: '')] public string $year = ''` plus a `selectedYear()` that falls back to now()->year) renders the FIRST option while the page computes a different one.
+
+This shipped broken on executive-summary: the picker showed 2027 while every figure on the page was 2026. Fixed by exposing the resolved year as a `#[Computed] fiscalYear()` and passing `:value="(string) $this->fiscalYear"` while `wire:model.live` still writes the raw `year`.
+
+Rule: whenever the component resolves the bound property before using it, pass the resolved value to `:value`. A Livewire test asserting only the computed value passes while the trigger lies, so also assert the rendered label (assertSeeHtml('&lt;span class="truncate"&gt;'.$expected.'&lt;/span&gt;')). Filters whose '' genuinely means "All" and render an explicit All option are unaffected.
+
+## Preview an auth-gated page in a browser without signing in
+To look at a rendered page when you have no session (and must not type a password), render it server-side and serve the HTML:
+
+1. Boot the HTTP kernel in a standalone script (`$kernel->bootstrap()` BEFORE any Eloquent call, or Model::resolveConnection() throws on a null resolver), log in the first User, `$kernel->handle(Request::create('/the-path'))`, write `getContent()` to `public/__preview.html`.
+2. The rendered head points at APP_URL (`http://localhost/...`) and the Vite dev server (`http://[::1]:5173`). Rewrite both to the running ports with sed, or CSS/JS 404s and the page renders unstyled.
+3. Open http://localhost:8000/__preview.html. Livewire round trips do not work, but any `#[Url]` property can be driven from the query string (e.g. `?openRow=targets`) to render an expanded/filtered state.
+4. Delete the file from public/ afterwards.
+
+Use C:\php85\php.exe, not XAMPP's PHP. Good for layout, typography, contrast, light/dark and responsive checks; not for interaction.

@@ -2,6 +2,7 @@
 
 use App\Enums\ArStatus;
 use App\Models\Account;
+use App\Models\DonorReport;
 use App\Models\Milestone;
 use App\Models\Proposal;
 use App\Models\Report;
@@ -110,4 +111,10 @@ test('a closed account closes no earlier than the opening date passed in', funct
 
     expect($account->closed_at->toDateString())->toBeGreaterThanOrEqual('2025-01-01')
         ->and($account->is_active)->toBeFalse();
+});
+
+test('a submitted donor report takes its submission date from the due date passed in', function () {
+    $report = DonorReport::factory()->submitted()->create(['due_on' => '2035-03-31'])->fresh();
+
+    expect($report->submitted_on->toDateString())->toBe('2035-03-31');
 });

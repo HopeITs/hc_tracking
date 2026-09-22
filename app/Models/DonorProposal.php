@@ -72,6 +72,16 @@ class DonorProposal extends Model
     }
 
     /**
+     * The reports owed to the donor under this agreement.
+     *
+     * @return HasMany<DonorReport, $this>
+     */
+    public function reports(): HasMany
+    {
+        return $this->hasMany(DonorReport::class);
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string|class-string>

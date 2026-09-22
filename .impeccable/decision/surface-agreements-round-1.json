@@ -1,0 +1,83 @@
+{
+  "title": "Choose the composition for Funding Agreements",
+  "question": "The visual world is settled (the Proposals page's world: white ground, Somar Sans, funding teal, amber pending, HC red only for overdue). This choice is how the agreements page is composed. The roll dealt these three; lock one, steer it, or re-roll.",
+  "options": [
+    {
+      "id": "collection-waterfall",
+      "label": "The Collection Waterfall",
+      "kicker": "THE ROLL",
+      "lineage": "a treasurer's cash-collection staircase: promised, scheduled, sent, landed, kept",
+      "thesis": "Every dollar a donor promised walks down one staircase — committed, scheduled, sent, received, net after fees — and the page shows exactly where money is stuck.",
+      "palette": ["#be1f24", "#2b5f6b", "#9a6412", "#58595b", "#ffffff"],
+      "materials": ["oversized tabular figures", "stepped waterfall bars", "tranche beads on a thread", "no boxes"],
+      "viewport": "Header and filters; then per currency a five-step waterfall across the full width — 6.3M committed stepping down to scheduled, sent, received and net, each drop labelled with its reason (unscheduled, overdue, fees). Clicking a step filters the agreements below to the ones whose money is stuck there. Below: each agreement as a row with donor · proposal, its own tranche beads on a time thread (overdue beads in red), received share, next due date, linked projects and accounts.",
+      "risk": "If the five steps read as a bar chart rather than a story, it becomes decoration; each drop must carry its plain-language reason and count.",
+      "case": "Strongest at answering the manager's real question — 'where is our money and what is late?' — in one glance, then drilling into the exact agreements responsible.",
+      "wireframe": {
+        "cols": 12, "rows": 10,
+        "regions": [
+          { "label": "title · count · search / donor / currency · record agreement", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "committed", "x": 0, "y": 1, "w": 2, "h": 3, "accent": true },
+          { "label": "scheduled", "x": 2, "y": 1, "w": 3, "h": 3 },
+          { "label": "sent", "x": 5, "y": 1, "w": 2, "h": 3 },
+          { "label": "received", "x": 7, "y": 1, "w": 3, "h": 3, "accent": true },
+          { "label": "net after fees", "x": 10, "y": 1, "w": 2, "h": 3 },
+          { "label": "attention: overdue · due in 30 days", "x": 0, "y": 4, "w": 12, "h": 1 },
+          { "label": "agreement row — tranche beads on a time thread · projects · accounts", "x": 0, "y": 5, "w": 12, "h": 2 },
+          { "label": "agreement row", "x": 0, "y": 7, "w": 12, "h": 2 },
+          { "label": "pagination", "x": 0, "y": 9, "w": 12, "h": 1 }
+        ]
+      },
+      "comp": ".impeccable/mocks/decision/surface-agreements-waterfall.png"
+    },
+    {
+      "id": "agreement-inspector",
+      "label": "The Agreement Inspector",
+      "lineage": "a mail client / trading blotter: list on one side, the open record on the other",
+      "thesis": "A dense, scannable list of every agreement on the left; the selected agreement opens beside it as a full live ledger — tranches, fees, rates, accounts, proposal and projects — without leaving the page.",
+      "palette": ["#be1f24", "#2b5f6b", "#9a6412", "#58595b", "#ffffff"],
+      "materials": ["split pane", "fill meters", "tranche timeline", "hairline dividers"],
+      "viewport": "Header and a thin portfolio strip (committed / received / pending per currency). Below, a 40/60 split: left, agreements as compact lines with donor, proposal, budget and a received-share meter, overdue ones flagged red; right, the opened agreement — big budget figure, a tranche timeline from first to last payment with today marked, the fees and exchange-rate trail, and its connections (donor, proposal, projects, accounts).",
+      "risk": "The right pane repeats the show page; it must be faster and richer than clicking through, or it is just a slower eye button.",
+      "case": "Best for an officer working through many agreements in one sitting. Weaker at the portfolio-level 'where is the money' picture.",
+      "wireframe": {
+        "cols": 12, "rows": 10,
+        "regions": [
+          { "label": "title · filters · record agreement", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "portfolio strip per currency", "x": 0, "y": 1, "w": 12, "h": 1, "accent": true },
+          { "label": "agreement list with fill meters", "x": 0, "y": 2, "w": 5, "h": 8 },
+          { "label": "opened agreement: budget · received share", "x": 5, "y": 2, "w": 7, "h": 2, "accent": true },
+          { "label": "tranche timeline with today", "x": 5, "y": 4, "w": 7, "h": 3 },
+          { "label": "connections: donor · proposal · projects · accounts", "x": 5, "y": 7, "w": 7, "h": 3 }
+        ]
+      },
+      "comp": ".impeccable/mocks/decision/surface-agreements-inspector.png"
+    },
+    {
+      "id": "collection-board",
+      "label": "The Collection Board",
+      "lineage": "an accounts-receivable aging board",
+      "thesis": "Agreements sorted by what they need from you: overdue, due in 30 days, scheduled later, fully received, nothing scheduled — each column carrying its money total.",
+      "palette": ["#be1f24", "#2b5f6b", "#9a6412", "#58595b", "#ffffff"],
+      "materials": ["aging columns", "column money totals", "agreement slips with fill bars"],
+      "viewport": "Header; a row of five column heads each with a count and total per currency (Overdue in red). Beneath, each agreement as a slip in the column of its most urgent tranche: donor · proposal, budget, received bar, next due date, tranche count.",
+      "risk": "Columns squeeze on laptops and stack on phones; with few agreements most columns look empty.",
+      "case": "Most action-oriented — tells the manager who to chase today. Hides the full funding picture of any single agreement behind its slip.",
+      "wireframe": {
+        "cols": 12, "rows": 10,
+        "regions": [
+          { "label": "title · filters · record agreement", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "overdue", "x": 0, "y": 1, "w": 3, "h": 9, "accent": true },
+          { "label": "due in 30 days", "x": 3, "y": 1, "w": 3, "h": 9 },
+          { "label": "scheduled later", "x": 6, "y": 1, "w": 2, "h": 9 },
+          { "label": "fully received", "x": 8, "y": 1, "w": 2, "h": 9 },
+          { "label": "nothing scheduled", "x": 10, "y": 1, "w": 2, "h": 9 }
+        ]
+      },
+      "comp": ".impeccable/mocks/decision/surface-agreements-board.png"
+    }
+  ],
+  "reroll": true,
+  "buildPath": { "value": "code", "toggle": true },
+  "steer": true
+}

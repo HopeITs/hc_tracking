@@ -21,13 +21,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int|null $account_id
  * @property string $payment_amount
  * @property Currency $amount_transfered_currency
- * @property CarbonImmutable $scheduled_date
+ * @property CarbonImmutable|null $scheduled_date
  * @property CarbonImmutable|null $transfer_date
  * @property string $fees
  * @property Currency $fees_currency
- * @property string $amount_received
+ * @property string|null $amount_received
  * @property string $exchange_rate
- * @property string $net_amount_received
+ * @property string|null $net_amount_received
  * @property Currency $amount_received_currency
  * @property CarbonImmutable|null $receive_date
  * @property ArStatus $ar_status
@@ -80,6 +80,35 @@ class TransfersTracking extends Model
     public function account(): BelongsTo
     {
         return $this->belongsTo(Account::class);
+    }
+
+    /**
+     * Where this tranche stands, in the one vocabulary every funding page uses.
+     *
+     * Money the donor has sent is in transit until it lands, however far past
+     * its scheduled date. A tranche is late only while it is still unsent, and
+     * only from the day after its date, never on it.
+     *
+     * @return 'received'|'failed'|'transit'|'late'|'upcoming'
+     */
+    public function state(): string
+    {
+        return match (true) {
+            $this->ar_status === ArStatus::Received => 'received',
+            $this->ar_status === ArStatus::Failed => 'failed',
+            $this->transfer_date !== null => 'transit',
+            $this->scheduled_date !== null && $this->scheduled_date->lt(CarbonImmutable::today()) => 'late',
+            default => 'upcoming',
+        };
+    }
+
+    /**
+     * Received, but nobody has recorded what actually landed. Such a tranche
+     * counts as nothing landed until its net amount is filled in.
+     */
+    public function isMissingNetAmount(): bool
+    {
+        return $this->ar_status === ArStatus::Received && $this->net_amount_received === null;
     }
 
     /**

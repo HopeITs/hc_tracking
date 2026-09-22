@@ -9,12 +9,12 @@
     aria-label="{{ __('navigation.application_navigation') }}"
     data-navigation-sidebar
     x-on:keydown.escape.window="if (window.matchMedia('(max-width: 63.999rem)').matches && ! $el.hasAttribute('data-flux-sidebar-collapsed-mobile')) { $dispatch('flux-sidebar-toggle') }"
-    class="relative gap-3! overflow-visible! border-e border-secondary-soft bg-white p-3! text-secondary-dark shadow-[1px_0_0_0_rgba(0,0,0,0.02)] duration-200 ease-out motion-reduce:duration-0 motion-reduce:transition-none max-lg:w-[min(18rem,calc(100vw_-_2.75rem))]! max-lg:shadow-2xl lg:w-[clamp(16rem,18vw,18rem)]! dark:border-secondary-medium dark:bg-secondary-dark dark:text-white dark:shadow-none data-[flux-sidebar-collapsed-desktop]:lg:w-[4.5rem]! data-[flux-sidebar-collapsed-desktop]:px-2! data-[flux-sidebar-collapsed-desktop]:cursor-default! data-[flux-sidebar-collapsed-desktop]:gap-4!"
+    class="relative z-50! gap-3! overflow-visible! border-e border-secondary-soft bg-white p-3! text-secondary-dark shadow-[1px_0_0_0_rgba(0,0,0,0.02)] duration-200 ease-out motion-reduce:duration-0 motion-reduce:transition-none max-lg:w-[min(18rem,calc(100vw_-_2.75rem))]! max-lg:shadow-2xl lg:w-[clamp(16rem,18vw,18rem)]! dark:border-secondary-medium dark:bg-secondary-dark dark:text-white dark:shadow-none data-[flux-sidebar-collapsed-desktop]:lg:w-[4.5rem]! data-[flux-sidebar-collapsed-desktop]:px-2! data-[flux-sidebar-collapsed-desktop]:cursor-default! data-[flux-sidebar-collapsed-desktop]:gap-4!"
 >
     <div
         x-data
         x-on:click="$dispatch('flux-sidebar-toggle')"
-        class="absolute -end-4 top-7 z-20 hidden size-8 shrink-0 cursor-pointer touch-manipulation items-center justify-center rounded-full border border-secondary-soft bg-white text-secondary-medium shadow-[0_1px_2px_rgba(16,24,40,0.08)] hover:text-secondary-dark lg:flex dark:border-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft dark:hover:text-white"
+        class="absolute -end-4 top-[15.5px] z-20 hidden size-8 shrink-0 cursor-pointer touch-manipulation items-center justify-center rounded-full border border-secondary-soft bg-white text-secondary-medium shadow-[0_1px_2px_rgba(16,24,40,0.08)] hover:text-secondary-dark lg:flex dark:border-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft dark:hover:text-white"
         role="button"
         tabindex="0"
         x-on:keydown.enter="$dispatch('flux-sidebar-toggle')"
@@ -26,7 +26,7 @@
         <flux:icon.chevron-left class="size-4 in-data-flux-sidebar-collapsed-desktop:rotate-180 rtl:rotate-180 in-data-flux-sidebar-collapsed-desktop:rtl:rotate-0 transition-transform" />
     </div>
 
-    <flux:sidebar.header class="min-h-11 border-b border-secondary-soft pb-3 in-data-flux-sidebar-collapsed-desktop:pb-4! dark:border-secondary-medium/60">
+    <flux:sidebar.header class="-mx-3 -mt-3 h-16 shrink-0 border-b border-secondary-soft px-3 in-data-flux-sidebar-collapsed-desktop:-mx-2 in-data-flux-sidebar-collapsed-desktop:px-2 dark:border-secondary-medium">
         <x-app-logo
             :sidebar="true"
             :href="route('dashboard')"
