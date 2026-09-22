@@ -1,6 +1,4 @@
 @php
-    use Illuminate\Support\Js;
-
     /** @var \Illuminate\Support\Collection<int, \App\Models\Task> $groupTasks */
 @endphp
 
@@ -25,6 +23,7 @@
                 @endforeach
                 @include('pages.tasks._list-subtask-composer', ['task' => $task, 'priorityIconClasses' => $priorityIconClasses])
             @endforeach
+            @include('pages.tasks._list-task-composer', ['group' => $group, 'groupKeyString' => $groupKeyString, 'priorityIconClasses' => $priorityIconClasses])
         </tbody>
     </table>
 
@@ -37,19 +36,6 @@
             @endforeach
             @include('pages.tasks._list-subtask-composer-mobile', ['task' => $task])
         @endforeach
-    </div>
-
-    <div class="border-t border-secondary-soft px-3.5 py-2 dark:border-secondary-medium" wire:key="task-add-row-{{ $group }}-{{ $groupKeyString }}">
-        <label class="flex items-center gap-2">
-            <flux:icon.plus variant="micro" class="size-4 shrink-0 text-primary" aria-hidden="true" />
-            <span class="sr-only">{{ __('tasks.add_task') }}</span>
-            <input
-                type="text"
-                placeholder="{{ __('tasks.add_task') }}"
-                class="w-full min-w-0 border-0 bg-transparent p-1 text-sm text-secondary-dark placeholder:text-secondary-light focus:ring-0 focus:outline-none dark:text-white"
-                wire:keydown.enter="quickCreateTask($event.target.value, {{ $group === 'status' ? Js::from($groupKeyString) : 'null' }}, {{ $group === 'milestone' && $groupKeyString !== '' ? Js::from($groupKeyString) : 'null' }}); $event.target.value = ''"
-                data-test="task-quick-add-{{ $group }}-{{ $groupKeyString }}"
-            />
-        </label>
+        @include('pages.tasks._list-task-composer-mobile', ['group' => $group, 'groupKeyString' => $groupKeyString])
     </div>
 </div>

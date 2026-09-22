@@ -87,6 +87,17 @@ new #[Title('titles.tasks')] class extends Component {
      */
     public array $subtaskDrafts = [];
 
+    /**
+     * Per-group draft values for the list view's inline "+ Add task" row —
+     * one per group heading (keyed by "{group}|{groupKeyString}", since each
+     * heading renders its own composer row independently), covering the
+     * same due date, priority, status and assignees a real row edits. Mirrors
+     * subtaskDrafts in every other respect.
+     *
+     * @var array<string, array{status?: string, priority?: string, due_date?: string, assignees?: array<int, string>}>
+     */
+    public array $taskDrafts = [];
+
     public function updatedSearch(): void
     {
         $this->resetPage();
@@ -515,18 +526,22 @@ new #[Title('titles.tasks')] class extends Component {
 
     /**
      * A group's inline "+ Add task" row only captures a title, but a task
-     * always needs a proposal and an assignee. Both are inferred from context
-     * so the row can create the task directly, with no drawer:
+     * always needs a proposal and an assignee. The proposal is inferred from
+     * context so the row can create the task directly, with no drawer:
      *  - proposal: the one proposal funding the resolved milestone's project
      *    (its own milestoneId, falling back to the active milestone filter),
      *    only when that project is funded by exactly one — a project funded
      *    by several, or no milestone context at all, is genuinely ambiguous.
-     *  - assignee: the signed-in user's own HR employee record, if linked.
-     * When either can't be resolved, this falls back to the drawer exactly
-     * as before, pre-filled with the title and the row's own context, so
-     * nothing is ever silently dropped.
+     *  - assignee: whichever employees the row's own draft (see taskDraft())
+     *    has picked, falling back to the signed-in user's own HR employee
+     *    record when the row hasn't been touched.
+     * Due date, priority and status also come from that same draft, same as
+     * addSubtaskQuick()'s own draft. When the proposal or every assignee
+     * can't be resolved, this falls back to the drawer exactly as before,
+     * pre-filled with the title and whatever the row's own context and
+     * draft already had, so nothing is ever silently dropped.
      */
-    public function quickCreateTask(string $title, ?string $status = null, ?string $milestoneId = null): void
+    public function quickCreateTask(string $title, ?string $status = null, ?string $milestoneId = null, ?string $rowKey = null): void
     {
         $title = trim($title);
 
@@ -534,35 +549,92 @@ new #[Title('titles.tasks')] class extends Component {
             return;
         }
 
-        $proposalId = $this->resolveInlineProposalId($milestoneId);
-        $employeeId = $this->resolveInlineAssigneeId();
+        $draft = $rowKey !== null ? $this->taskDraft($rowKey, $status) : null;
 
-        if ($proposalId === null || $employeeId === null) {
-            $this->openCreateDrawer(status: $status, milestoneId: $milestoneId);
+        $proposalId = $this->resolveInlineProposalId($milestoneId);
+        $employeeIds = $draft !== null && $draft['assignees'] !== []
+            ? HrEmployee::query()->whereIn('id', collect($draft['assignees'])->map(fn (string $id): int => (int) $id))->pluck('id')
+            : collect(array_filter([$this->resolveInlineAssigneeId()]));
+
+        if ($proposalId === null || $employeeIds->isEmpty()) {
+            $this->openCreateDrawer(status: $draft !== null ? $draft['status'] : $status, milestoneId: $milestoneId);
             $this->title = $title;
+
+            if ($draft !== null) {
+                $this->taskPriority = $draft['priority'];
+                $this->dueDate = $draft['due_date'];
+                $this->assignedTo = $draft['assignees'];
+            }
 
             return;
         }
 
-        $statusCase = $status !== null ? TaskStatus::tryFrom($status) : null;
+        $statusCase = TaskStatus::tryFrom(($draft !== null ? $draft['status'] : $status) ?? '') ?? TaskStatus::Todo;
+        $priorityCase = $draft !== null ? (TaskPriority::tryFrom($draft['priority']) ?? TaskPriority::Medium) : TaskPriority::Medium;
+        $dueDate = $draft !== null && preg_match('/^\d{4}-\d{2}-\d{2}$/', $draft['due_date']) === 1 ? $draft['due_date'] : null;
 
-        DB::transaction(function () use ($title, $statusCase, $milestoneId, $proposalId, $employeeId): void {
+        DB::transaction(function () use ($title, $statusCase, $priorityCase, $dueDate, $milestoneId, $proposalId, $employeeIds): void {
             $task = Task::query()->create([
                 'title' => $title,
-                'status' => $statusCase ?? TaskStatus::Todo,
-                'priority' => TaskPriority::Medium,
-                'progress_percentage' => 0,
+                'status' => $statusCase,
+                'priority' => $priorityCase,
+                'due_date' => $dueDate,
+                'progress_percentage' => $statusCase === TaskStatus::Done ? 100 : 0,
+                'completed_date' => $statusCase === TaskStatus::Done ? CarbonImmutable::today() : null,
                 'proposal_id' => $proposalId,
                 'milestone_id' => $milestoneId !== null ? (int) $milestoneId : null,
                 'created_by' => (int) auth()->id(),
             ]);
 
-            $task->taskAssignees()->create(['employee_id' => $employeeId]);
+            foreach ($employeeIds as $employeeId) {
+                $task->taskAssignees()->create(['employee_id' => $employeeId]);
+            }
         });
+
+        if ($rowKey !== null) {
+            unset($this->taskDrafts[$rowKey]);
+        }
 
         $this->resetPage();
 
         Flux::toast(variant: 'success', text: __('tasks.task_created'));
+    }
+
+    /**
+     * The list view's inline "+ Add task" row's current draft values for one
+     * group heading, merged with sensible defaults so the row always renders
+     * something sane before the user touches it. $defaultStatus lets a
+     * status-grouped heading default its own row to that column's status
+     * instead of always "todo" — mirrors subtaskDraft() in every other
+     * respect.
+     *
+     * @return array{status: string, priority: string, due_date: string, assignees: array<int, string>}
+     */
+    public function taskDraft(string $rowKey, ?string $defaultStatus = null): array
+    {
+        $defaults = [
+            'status' => $defaultStatus ?? TaskStatus::Todo->value,
+            'priority' => TaskPriority::Medium->value,
+            'due_date' => '',
+            'assignees' => [],
+        ];
+
+        return array_merge($defaults, $this->taskDrafts[$rowKey] ?? []);
+    }
+
+    /**
+     * Adds or removes one employee from a group heading's "+ Add task" draft
+     * — mirrors toggleSubtaskDraftAssignee() but for a not-yet-created
+     * top-level task instead of a subtask.
+     */
+    public function toggleTaskDraftAssignee(string $rowKey, int $employeeId): void
+    {
+        $ids = $this->taskDraft($rowKey)['assignees'];
+        $employeeIdString = (string) $employeeId;
+
+        $this->taskDrafts[$rowKey]['assignees'] = in_array($employeeIdString, $ids, true)
+            ? array_values(array_diff($ids, [$employeeIdString]))
+            : [...$ids, $employeeIdString];
     }
 
     /**

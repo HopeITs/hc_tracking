@@ -309,17 +309,89 @@
                 @endforelse
             </div>
 
-            <label class="flex items-center gap-2 rounded-lg border border-dashed border-secondary-light px-2 py-1.5 dark:border-secondary-medium">
-                <flux:icon.plus variant="micro" class="size-4 shrink-0 text-primary" aria-hidden="true" />
-                <span class="sr-only">{{ __('tasks.add_task') }}</span>
-                <input
-                    type="text"
-                    placeholder="{{ __('tasks.add_task') }}"
-                    class="w-full min-w-0 border-0 bg-transparent p-0 text-sm text-secondary-dark placeholder:text-secondary-light focus:ring-0 focus:outline-none dark:text-white"
-                    wire:keydown.enter="quickCreateTask($event.target.value, '{{ $case->value }}', null); $event.target.value = ''"
-                    data-test="task-board-quick-add-{{ $case->value }}"
-                />
-            </label>
+            @php
+                $boardRowKey = 'board|'.$case->value;
+                $boardTaskDraft = $this->taskDraft($boardRowKey, $case->value);
+                $boardTaskDraftAssignees = collect($this->userOptions)->whereIn('id', collect($boardTaskDraft['assignees'])->map(fn ($id) => (int) $id));
+            @endphp
+            <div class="flex flex-col gap-1.5 rounded-lg border border-dashed border-secondary-light px-2 py-1.5 dark:border-secondary-medium" data-test="task-board-add-row-{{ $case->value }}">
+                <label class="flex items-center gap-2">
+                    <flux:icon.plus variant="micro" class="size-4 shrink-0 text-primary" aria-hidden="true" />
+                    <span class="sr-only">{{ __('tasks.add_task') }}</span>
+                    <input
+                        type="text"
+                        placeholder="{{ __('tasks.add_task') }}"
+                        class="w-full min-w-0 border-0 bg-transparent p-0 text-sm text-secondary-dark placeholder:text-secondary-light focus:ring-0 focus:outline-none dark:text-white"
+                        wire:keydown.enter="quickCreateTask($event.target.value, '{{ $case->value }}', null, {{ Js::from($boardRowKey) }}); $event.target.value = ''"
+                        data-test="task-board-quick-add-{{ $case->value }}"
+                    />
+                </label>
+                <div class="flex flex-wrap items-center gap-1.5 ps-6">
+                    <x-ui.multi-select-popover
+                        :label="__('tasks.assignees')"
+                        class="inline-flex shrink-0 cursor-pointer items-center -space-x-2 rtl:space-x-reverse"
+                        data-test="task-board-add-assignee-trigger-{{ $case->value }}"
+                    >
+                        <x-slot:trigger>
+                            @if ($boardTaskDraftAssignees->isEmpty())
+                                <span class="inline-flex size-6 items-center justify-center rounded-full border border-dashed border-secondary-light text-secondary-light">
+                                    <flux:icon.user-plus variant="micro" class="size-3" />
+                                </span>
+                            @else
+                                @foreach ($boardTaskDraftAssignees->take(3) as $userOption)
+                                    <span class="inline-flex size-6 items-center justify-center rounded-full border-2 border-white bg-secondary-dark text-[10px] font-semibold text-white dark:border-secondary-dark dark:bg-secondary-medium">
+                                        {{ Illuminate\Support\Str::of($userOption['name'])->explode(' ')->map(fn ($part) => mb_substr($part, 0, 1))->take(2)->implode('') }}
+                                    </span>
+                                @endforeach
+                                @if ($boardTaskDraftAssignees->count() > 3)
+                                    <span class="inline-flex size-6 items-center justify-center rounded-full border-2 border-white bg-secondary-soft text-[9px] font-semibold text-secondary-dark dark:border-secondary-dark dark:bg-secondary-medium dark:text-white">
+                                        +{{ $boardTaskDraftAssignees->count() - 3 }}
+                                    </span>
+                                @endif
+                            @endif
+                        </x-slot:trigger>
+
+                        @foreach ($this->userOptions as $userOption)
+                            @php $isBoardTaskDraftAssigned = in_array((string) $userOption['id'], $boardTaskDraft['assignees'], true); @endphp
+                            <button
+                                type="button"
+                                role="option"
+                                aria-selected="{{ $isBoardTaskDraftAssigned ? 'true' : 'false' }}"
+                                wire:click="toggleTaskDraftAssignee({{ Js::from($boardRowKey) }}, {{ $userOption['id'] }})"
+                                wire:key="task-board-add-{{ $case->value }}-assignee-{{ $userOption['id'] }}"
+                                x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
+                                class="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm hover:bg-secondary-soft dark:hover:bg-secondary-medium"
+                                data-test="task-board-add-assignee-option-{{ $case->value }}-{{ $userOption['id'] }}"
+                            >
+                                <span class="min-w-0 flex-1 truncate">{{ $userOption['name'] }} · {{ $userOption['secondary_name'] }}</span>
+                                @if ($isBoardTaskDraftAssigned)
+                                    <flux:icon.check class="size-4 shrink-0 text-primary" />
+                                @endif
+                            </button>
+                        @endforeach
+                    </x-ui.multi-select-popover>
+
+                    <input
+                        type="date"
+                        wire:model="taskDrafts.{{ $boardRowKey }}.due_date"
+                        value="{{ $boardTaskDraft['due_date'] }}"
+                        aria-label="{{ __('tasks.due_date_2') }}"
+                        class="w-24 shrink-0 rounded border-0 bg-transparent p-0.5 text-[11px] tabular-nums text-secondary-medium focus:ring-1 focus:ring-primary focus:outline-none dark:text-secondary-soft"
+                        data-test="task-board-add-due-date-{{ $case->value }}"
+                    />
+
+                    <select
+                        wire:model="taskDrafts.{{ $boardRowKey }}.priority"
+                        aria-label="{{ __('tasks.priority') }}"
+                        class="shrink-0 rounded-md border border-secondary-soft bg-white px-1 py-0.5 text-[11px] text-secondary-dark dark:border-secondary-medium dark:bg-secondary-dark dark:text-white"
+                        data-test="task-board-add-priority-{{ $case->value }}"
+                    >
+                        @foreach (TaskPriority::cases() as $priorityCase)
+                            <option value="{{ $priorityCase->value }}" @selected($boardTaskDraft['priority'] === $priorityCase->value)>{{ $priorityCase->label() }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
         </div>
     @endforeach
 </div>
