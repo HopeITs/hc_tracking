@@ -2,7 +2,7 @@
 
 use App\Models\HrCity;
 use App\Models\Project;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
@@ -13,10 +13,34 @@ use Livewire\WithPagination;
 new #[Title('titles.city_directory')] class extends Component {
     use WithPagination;
 
+    private const PerPage = 12;
+
     #[Url(except: '')]
     public string $search = '';
 
+    /**
+     * '' (all), 'active' or 'inactive' — filters on HrCity::is_active.
+     */
+    #[Url(except: '')]
+    public string $status = '';
+
+    /**
+     * 'name', 'projects' or 'active' — see {@see self::cities()}.
+     */
+    #[Url(except: 'name')]
+    public string $sort = 'name';
+
     public function updatedSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedStatus(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedSort(): void
     {
         $this->resetPage();
     }
@@ -31,6 +55,14 @@ new #[Title('titles.city_directory')] class extends Component {
      * Cities come from the HR database and are read-only here; every city is
      * listed, active or not, exactly as HR holds it.
      *
+     * Sorting by name stays a plain database query. Sorting by delivery
+     * signal (project count, active-first) needs {@see self::projectStatsByCity()}
+     * for every matching city up front — cities live in a different database
+     * connection from projects, so that can never be a single ordered query —
+     * which means those two modes fetch every matching city once and paginate
+     * the sorted collection in PHP instead of in SQL. HR city lists are small
+     * reference tables (dozens, not thousands), so this stays cheap.
+     *
      * @return LengthAwarePaginator<int, HrCity>
      */
     #[Computed]
@@ -38,43 +70,131 @@ new #[Title('titles.city_directory')] class extends Component {
     {
         $search = trim($this->search);
 
-        return HrCity::query()
+        $query = HrCity::query()
             ->select(['id', 'name_en', 'name_ar', 'is_active'])
             ->when($search !== '', fn ($query) => $query->where(fn ($query) => $query
                 ->where('name_en', 'like', '%'.$search.'%')
                 ->orWhere('name_ar', 'like', '%'.$search.'%')))
-            ->orderBy(HrCity::nameColumn())
-            ->orderBy('id')
-            ->paginate(15);
+            ->when($this->status !== '', fn ($query) => $query->where('is_active', $this->status === 'active'));
+
+        if ($this->sort === 'name') {
+            return $query
+                ->orderBy(HrCity::nameColumn())
+                ->orderBy('id')
+                ->paginate(self::PerPage);
+        }
+
+        $stats = $this->projectStatsByCity;
+        $page = (int) $this->getPage();
+
+        $sorted = $query->get()
+            ->sort(fn (HrCity $a, HrCity $b): int => match ($this->sort) {
+                'projects' => ($stats->get($b->id)['total'] ?? 0) <=> ($stats->get($a->id)['total'] ?? 0),
+                'active' => (int) $b->is_active <=> (int) $a->is_active,
+                default => 0,
+            } ?: strcmp($a->name, $b->name))
+            ->values();
+
+        return new LengthAwarePaginator(
+            $sorted->forPage($page, self::PerPage)->values(),
+            $sorted->count(),
+            self::PerPage,
+            $page,
+            ['path' => request()->url(), 'query' => request()->query()],
+        );
     }
 
     /**
-     * Project counts for the cities on this page, keyed by HR city id.
+     * Delivery signal for every HR city that has at least one project, keyed
+     * by city id: how many projects, how many are still open vs closed, how
+     * many distinct programs are behind them, and the beneficiaries targeted.
      *
-     * Projects live in a different database from cities, so the count cannot
-     * be a withCount() subquery.
+     * Scoped to the whole portfolio rather than just the visible page — the
+     * summary strip and the "most projects first" sort both need every city's
+     * figures, not only the 12 on screen.
      *
-     * @return Collection<int, int>
+     * @return Collection<int, array{total: int, open: int, closed: int, programs: int, beneficiaries: int}>
      */
     #[Computed]
-    public function projectCounts(): Collection
+    public function projectStatsByCity(): Collection
     {
         return Project::query()
-            ->whereIn('city_id', $this->cities->pluck('id'))
-            ->selectRaw('city_id, count(*) as aggregate')
+            ->select(['city_id', 'program_id', 'status', 'target_beneficiaries'])
+            ->get()
             ->groupBy('city_id')
-            ->pluck('aggregate', 'city_id')
-            ->map(fn ($count): int => (int) $count);
+            ->map(function (Collection $projects): array {
+                $open = $projects->filter(fn (Project $project): bool => $project->status->isOpen())->count();
+
+                return [
+                    'total' => $projects->count(),
+                    'open' => $open,
+                    'closed' => $projects->count() - $open,
+                    'programs' => $projects->pluck('program_id')->unique()->count(),
+                    'beneficiaries' => (int) $projects->sum('target_beneficiaries'),
+                ];
+            });
+    }
+
+    /**
+     * Portfolio-wide figures for the summary strip — independent of the
+     * current search, filter or page.
+     *
+     * @return array{totalCities: int, activeCities: int, coveredCities: int, openProjects: int, beneficiaries: int}
+     */
+    #[Computed]
+    public function summary(): array
+    {
+        $stats = $this->projectStatsByCity;
+
+        return [
+            'totalCities' => HrCity::count(),
+            'activeCities' => HrCity::where('is_active', true)->count(),
+            'coveredCities' => $stats->count(),
+            'openProjects' => (int) $stats->sum('open'),
+            'beneficiaries' => (int) $stats->sum('beneficiaries'),
+        ];
     }
 };
 ?>
 
 @php
     $secondaryButtonClasses = 'border-secondary-light! bg-white! text-secondary-dark! hover:bg-secondary-soft! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white! dark:hover:bg-secondary-medium!';
+    $summary = $this->summary;
+    $stats = $this->projectStatsByCity;
+
+    $figures = [
+        ['key' => 'covered', 'label' => __('cities.cities_covered'), 'value' => $summary['coveredCities'], 'suffix' => '', 'sub' => __('cities.cities_covered_hint', ['total' => $summary['totalCities']]), 'tone' => 'text-funding'],
+        ['key' => 'active', 'label' => __('cities.active_cities'), 'value' => $summary['activeCities'], 'suffix' => '', 'sub' => __('cities.cities_covered_hint', ['total' => $summary['totalCities']]), 'tone' => 'text-status-good'],
+        ['key' => 'open', 'label' => __('cities.open_projects'), 'value' => $summary['openProjects'], 'suffix' => '', 'sub' => __('cities.open_projects_hint'), 'tone' => ''],
+        ['key' => 'reached', 'label' => __('cities.beneficiaries_reached'), 'value' => $summary['beneficiaries'], 'suffix' => '', 'sub' => __('cities.beneficiaries_reached_hint'), 'tone' => 'text-primary'],
+    ];
+
+    // A calm rotation of already-brand-safe soft tones so the grid reads as
+    // lively rather than sixteen identical grey tiles — never the primary
+    // red, which the rest of the app reserves for late/critical signal.
+    $avatarTones = [
+        'bg-funding-soft text-funding',
+        'bg-status-active-soft text-status-active',
+        'bg-status-good-soft text-status-good',
+        'bg-status-warn-soft text-status-warn',
+        'bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white',
+    ];
+
+    $sortOptions = [
+        'name' => __('cities.sort_name'),
+        'projects' => __('cities.sort_most_projects'),
+        'active' => __('cities.sort_active_first'),
+    ];
+
+    $statusOptions = [
+        ['key' => '', 'label' => __('cities.all_cities')],
+        ['key' => 'active', 'label' => __('common.active')],
+        ['key' => 'inactive', 'label' => __('cities.inactive')],
+    ];
 @endphp
 
 <section
-    class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white [&_[data-flux-cell]]:border-secondary-soft! [&_[data-flux-cell]]:text-secondary-medium! [&_[data-flux-column]]:border-secondary-soft! [&_[data-flux-column]]:text-secondary-dark! [&_[data-flux-heading]]:text-secondary-dark! [&_[data-flux-label]]:text-secondary-dark! [&_[data-flux-subheading]]:text-secondary-medium! dark:[&_[data-flux-cell]]:border-secondary-medium! dark:[&_[data-flux-cell]]:text-secondary-soft! dark:[&_[data-flux-column]]:border-secondary-medium! dark:[&_[data-flux-column]]:text-white! dark:[&_[data-flux-heading]]:text-white! dark:[&_[data-flux-label]]:text-white! dark:[&_[data-flux-subheading]]:text-secondary-soft!"
+    class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white"
     aria-labelledby="city-directory-heading"
 >
     <x-ui.page-header heading-id="city-directory-heading" :title="__('common.cities')" :count="$this->cities->total()">
@@ -87,119 +207,172 @@ new #[Title('titles.city_directory')] class extends Component {
                 wire:model.live.debounce.300ms="search"
                 clearable
             />
+
+            <x-ui.header-filter-select :label="__('cities.sort_by')" wire:model.live="sort" :value="$sort">
+                @foreach ($sortOptions as $optionValue => $optionLabel)
+                    <flux:select.option :value="$optionValue">{{ $optionLabel }}</flux:select.option>
+                @endforeach
+            </x-ui.header-filter-select>
         </x-slot:filters>
+
+        <x-slot:actions>
+            <x-ui.view-toggle
+                wire-model="status"
+                :active="$status"
+                :options="$statusOptions"
+                :label="__('cities.status')"
+            />
+        </x-slot:actions>
+
+        <x-slot:summary>
+            {{-- The portfolio's figures, set directly on the page rather than boxed into cards: the numbers are the point (same treatment as reports/⚡index.blade.php). --}}
+            <div class="grid grid-cols-2 gap-x-6 gap-y-6 border-y border-secondary-soft py-6 @xl/directory:grid-cols-4 @xl/directory:divide-x @xl/directory:divide-secondary-soft dark:border-secondary-medium @xl/directory:dark:divide-secondary-medium">
+                @foreach ($figures as $index => $figure)
+                    <div
+                        class="logframe-reveal @xl/directory:ps-6 @xl/directory:first:ps-0"
+                        style="--logframe-order: {{ $index }}"
+                        wire:key="figure-{{ $figure['key'] }}"
+                    >
+                        <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ $figure['label'] }}</p>
+                        <p
+                            class="mt-1.5 text-4xl leading-none font-extrabold tabular-nums {{ $figure['tone'] }}"
+                            x-data="countUp({{ (int) $figure['value'] }})"
+                            x-text="display + '{{ $figure['suffix'] }}'"
+                        >{{ $figure['value'] }}{{ $figure['suffix'] }}</p>
+                        <p class="mt-1 text-xs text-secondary-medium dark:text-secondary-soft">{{ $figure['sub'] }}</p>
+                    </div>
+                @endforeach
+            </div>
+        </x-slot:summary>
     </x-ui.page-header>
 
-    <div class="overflow-hidden rounded-lg border border-secondary-light bg-white dark:border-secondary-medium dark:bg-secondary-dark">
-        <div class="flex min-h-10 flex-wrap items-center justify-between gap-2 border-b border-secondary-soft bg-white px-3.5 py-2 dark:border-secondary-medium dark:bg-secondary-dark">
-            <p class="text-xs font-semibold text-secondary-medium dark:text-secondary-soft">
-                {{ trans_choice('cities.count_matching_cities', $this->cities->total(), ['count' => $this->cities->total()]) }}
-            </p>
+    <div class="flex min-h-8 flex-wrap items-center justify-between gap-2">
+        <p class="text-xs font-semibold text-secondary-medium dark:text-secondary-soft">
+            {{ trans_choice('cities.count_matching_cities', $this->cities->total(), ['count' => $this->cities->total()]) }}
+        </p>
 
-            <div class="flex items-center gap-2">
-                <span wire:loading.delay.flex wire:target="search,clearSearch" class="hidden items-center gap-1.5 text-xs text-secondary-medium dark:text-secondary-soft">
-                    <flux:icon.arrow-path class="size-3.5 animate-spin" />
-                    {{ __('common.updating') }}
-                </span>
+        <div class="flex items-center gap-2">
+            <span wire:loading.delay.flex wire:target="search,status,sort,clearSearch,gotoPage,previousPage,nextPage" class="hidden items-center gap-1.5 text-xs text-secondary-medium dark:text-secondary-soft">
+                <flux:icon.arrow-path class="size-3.5 animate-spin" />
+                {{ __('common.updating') }}
+            </span>
 
-                @if ($search !== '')
-                    <flux:button
-                        size="sm"
-                        variant="ghost"
-                        class="text-secondary-medium! hover:bg-secondary-soft! hover:text-secondary-dark! dark:text-secondary-soft! dark:hover:bg-secondary-medium! dark:hover:text-white!"
-                        wire:click="clearSearch"
-                    >
-                        {{ __('cities.clear_search') }}
-                    </flux:button>
-                @endif
-            </div>
+            @if ($search !== '')
+                <flux:button
+                    size="sm"
+                    variant="ghost"
+                    class="text-secondary-medium! hover:bg-secondary-soft! hover:text-secondary-dark! dark:text-secondary-soft! dark:hover:bg-secondary-medium! dark:hover:text-white!"
+                    wire:click="clearSearch"
+                >
+                    {{ __('cities.clear_search') }}
+                </flux:button>
+            @endif
         </div>
+    </div>
 
-        @if ($this->cities->isEmpty())
-            <div class="flex min-h-56 flex-col items-center justify-center gap-3 px-5 py-10 text-center">
-                <div class="flex size-11 items-center justify-center rounded-lg border border-secondary-light bg-white text-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft">
-                    <flux:icon.map-pin class="size-5" />
-                </div>
-                <div class="space-y-1">
-                    <flux:heading size="base">{{ __('cities.no_matching_cities') }}</flux:heading>
-                    <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('common.change_the_search_and_try_again') }}</p>
-                </div>
+    @if ($this->cities->isEmpty())
+        <x-ui.empty-state
+            icon="map-pin"
+            :heading="__('cities.no_matching_cities')"
+            :body="__('common.change_the_search_and_try_again')"
+            class="rounded-xl border border-secondary-soft dark:border-secondary-medium"
+        >
+            <x-slot:action>
                 <flux:button size="sm" :class="$secondaryButtonClasses" wire:click="clearSearch">
                     {{ __('cities.clear_search') }}
                 </flux:button>
-            </div>
-        @else
-            <div class="divide-y divide-secondary-soft dark:divide-secondary-medium @3xl/directory:hidden">
-                @foreach ($this->cities as $city)
-                    @php($projectsCount = $this->projectCounts->get($city->id, 0))
-                    <article class="flex flex-col gap-2 p-3.5" wire:key="mobile-city-{{ $city->id }}">
-                        <div class="flex min-w-0 items-center justify-between gap-3">
-                            <div class="flex min-w-0 items-center gap-2.5">
-                                <div class="flex size-9 shrink-0 items-center justify-center rounded-md bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white">
-                                    <flux:icon.map-pin class="size-4.5" />
-                                </div>
-                                <div class="min-w-0">
-                                    <p class="truncate text-sm font-semibold text-secondary-dark dark:text-white">{{ $city->name }}</p>
-                                    <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft" dir="auto">{{ $city->secondary_name }}</p>
-                                </div>
-                            </div>
+            </x-slot:action>
+        </x-ui.empty-state>
+    @else
+        <div class="grid grid-cols-1 gap-4 @sm/directory:grid-cols-2 @4xl/directory:grid-cols-3 @7xl/directory:grid-cols-4">
+            @foreach ($this->cities as $index => $city)
+                @php
+                    $cityStats = $stats->get($city->id, ['total' => 0, 'open' => 0, 'closed' => 0, 'programs' => 0, 'beneficiaries' => 0]);
+                    $openPct = $cityStats['total'] > 0 ? ($cityStats['open'] / $cityStats['total']) * 100 : 0;
+                    $avatarTone = $avatarTones[$city->id % count($avatarTones)];
+                @endphp
+                <a
+                    href="{{ route('projects.index', ['city' => $city->id]) }}"
+                    wire:navigate
+                    wire:key="city-{{ $city->id }}"
+                    aria-label="{{ __('cities.view_projects_in_name', ['name' => $city->name]) }}"
+                    class="logframe-reveal group relative flex flex-col gap-4 overflow-hidden rounded-xl border border-secondary-soft bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] transition-all hover:-translate-y-0.5 hover:border-secondary-light hover:shadow-[0_2px_4px_rgba(16,24,40,0.06),0_4px_8px_rgba(16,24,40,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:border-secondary-medium dark:bg-secondary-dark dark:shadow-none dark:hover:shadow-none"
+                    style="--logframe-order: {{ min($index, 11) }}"
+                >
+                    <span
+                        aria-hidden="true"
+                        class="{{ $city->is_active ? 'bg-status-good' : 'bg-secondary-light dark:bg-secondary-medium' }} absolute inset-x-0 top-0 h-1"
+                    ></span>
 
-                            <span class="inline-flex shrink-0 rounded-md bg-secondary-soft px-2 py-1 text-xs font-semibold text-secondary-dark dark:bg-secondary-medium dark:text-white">
-                                {{ trans_choice('common.count_project', $projectsCount, ['count' => $projectsCount]) }}
-                            </span>
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="flex min-w-0 items-center gap-3">
+                            <div class="{{ $avatarTone }} flex size-11 shrink-0 items-center justify-center rounded-xl">
+                                <flux:icon.map-pin class="size-5" />
+                            </div>
+                            <div class="min-w-0">
+                                <p class="truncate text-base font-bold text-secondary-dark dark:text-white">{{ $city->name }}</p>
+                                <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft" dir="auto">{{ $city->secondary_name }}</p>
+                            </div>
                         </div>
 
-                        <p class="text-xs text-secondary-medium dark:text-secondary-soft">
+                        <span @class([
+                            'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap',
+                            'bg-status-good-soft text-status-good' => $city->is_active,
+                            'bg-secondary-soft text-secondary-medium dark:bg-secondary-medium dark:text-secondary-soft' => ! $city->is_active,
+                        ])>
                             {{ $city->is_active ? __('common.active') : __('cities.inactive') }}
-                        </p>
-                    </article>
-                @endforeach
-            </div>
+                        </span>
+                    </div>
 
-            <div class="hidden @3xl/directory:block">
-                <flux:table class="table-fixed [&_[data-flux-cell]]:px-3.5! [&_[data-flux-cell]]:py-2! [&_[data-flux-column]]:px-3.5! [&_[data-flux-column]]:py-2.5! [&_tbody_tr]:transition-colors [&_tbody_tr]:hover:bg-secondary-soft dark:[&_tbody_tr]:hover:bg-secondary-medium">
-                    <flux:table.columns class="bg-secondary-soft text-xs font-semibold dark:bg-secondary-medium">
-                        <flux:table.column class="w-[36%]">{{ __('common.city') }}</flux:table.column>
-                        <flux:table.column class="w-[32%]">{{ \App\Enums\Locale::current() === \App\Enums\Locale::Arabic ? __('cities.english_name') : __('cities.arabic_name') }}</flux:table.column>
-                        <flux:table.column class="w-[16%]" align="center">{{ __('common.projects') }}</flux:table.column>
-                        <flux:table.column class="w-[16%]" align="center">{{ __('common.status') }}</flux:table.column>
-                    </flux:table.columns>
+                    <div class="flex items-end justify-between gap-3">
+                        <div class="min-w-0">
+                            <p class="type-figure text-secondary-dark dark:text-white">{{ $cityStats['total'] }}</p>
+                            <p class="type-meta text-secondary-medium dark:text-secondary-soft">
+                                {{ trans_choice('common.count_project', $cityStats['total'], ['count' => $cityStats['total']]) }}
+                            </p>
+                        </div>
 
-                    <flux:table.rows>
-                        @foreach ($this->cities as $city)
-                            <flux:table.row :key="$city->id">
-                                <flux:table.cell variant="strong" class="text-secondary-dark! dark:text-white!">
-                                    <div class="flex min-w-0 items-center gap-2.5">
-                                        <div class="flex size-8 shrink-0 items-center justify-center rounded-md bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white">
-                                            <flux:icon.map-pin class="size-4" />
-                                        </div>
-                                        <p class="truncate font-semibold">{{ $city->name }}</p>
-                                    </div>
-                                </flux:table.cell>
-                                <flux:table.cell>
-                                    <p class="truncate" dir="auto">{{ $city->secondary_name }}</p>
-                                </flux:table.cell>
-                                <flux:table.cell align="center">
-                                    <span class="inline-flex min-w-8 items-center justify-center rounded-md bg-secondary-soft px-2 py-1 text-xs font-semibold text-secondary-dark dark:bg-secondary-medium dark:text-white">
-                                        {{ $this->projectCounts->get($city->id, 0) }}
-                                    </span>
-                                </flux:table.cell>
-                                <flux:table.cell align="center">
-                                    {{ $city->is_active ? __('common.active') : __('cities.inactive') }}
-                                </flux:table.cell>
-                            </flux:table.row>
-                        @endforeach
-                    </flux:table.rows>
-                </flux:table>
-            </div>
+                        @if ($cityStats['total'] > 0)
+                            <div class="min-w-0 text-end">
+                                <p class="type-meta truncate text-secondary-medium dark:text-secondary-soft">
+                                    {{ trans_choice('cities.count_program', $cityStats['programs'], ['count' => $cityStats['programs']]) }}
+                                </p>
+                                @if ($cityStats['beneficiaries'] > 0)
+                                    <p class="type-meta truncate text-secondary-medium dark:text-secondary-soft">
+                                        {{ \Illuminate\Support\Number::format($cityStats['beneficiaries']) }} {{ __('cities.beneficiaries_reached') }}
+                                    </p>
+                                @endif
+                            </div>
+                        @endif
+                    </div>
 
-            <div class="border-t border-secondary-soft px-3 pb-3 dark:border-secondary-medium">
-                <flux:pagination
-                    :paginator="$this->cities"
-                    class="text-secondary-medium! [&_button]:text-secondary-medium! [&_button:hover]:bg-secondary-soft! dark:text-secondary-soft! dark:[&_button]:text-secondary-soft! dark:[&_button:hover]:bg-secondary-medium!"
-                    scroll-to="#city-directory-heading"
-                />
-            </div>
-        @endif
-    </div>
+                    @if ($cityStats['total'] > 0)
+                        <div>
+                            <div class="flex h-1.5 w-full overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium" role="presentation">
+                                <div class="h-full bg-status-active" style="width: {{ $openPct }}%"></div>
+                                <div class="h-full bg-secondary-light dark:bg-secondary-light/60" style="width: {{ 100 - $openPct }}%"></div>
+                            </div>
+                            <div class="mt-1 flex items-center justify-between text-[11px] text-secondary-medium dark:text-secondary-soft">
+                                <span>{{ $cityStats['open'] }} {{ __('cities.open') }}</span>
+                                <span>{{ $cityStats['closed'] }} {{ __('cities.closed') }}</span>
+                            </div>
+                        </div>
+                    @else
+                        <p class="type-meta text-secondary-light italic dark:text-secondary-medium">{{ __('cities.no_projects_here_yet') }}</p>
+                    @endif
+
+                    <span class="mt-auto flex items-center gap-1 text-xs font-semibold text-secondary-medium transition-colors group-hover:text-primary dark:text-secondary-soft dark:group-hover:text-primary">
+                        {{ __('common.projects') }}
+                        <flux:icon.chevron-right variant="micro" class="size-3.5 shrink-0 transition-transform duration-200 group-hover:translate-x-0.5 rtl:-scale-x-100 rtl:group-hover:-translate-x-0.5" />
+                    </span>
+                </a>
+            @endforeach
+        </div>
+
+        <flux:pagination
+            :paginator="$this->cities"
+            class="text-secondary-medium! [&_button]:text-secondary-medium! [&_button:hover]:bg-secondary-soft! dark:text-secondary-soft! dark:[&_button]:text-secondary-soft! dark:[&_button:hover]:bg-secondary-medium!"
+            scroll-to="#city-directory-heading"
+        />
+    @endif
 </section>
