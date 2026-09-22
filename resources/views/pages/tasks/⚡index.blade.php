@@ -2,8 +2,11 @@
 
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Models\HrDepartment;
 use App\Models\HrEmployee;
 use App\Models\Milestone;
+use App\Models\Program;
+use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Task;
 use App\Models\TaskAssignee;
@@ -12,6 +15,7 @@ use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -22,7 +26,8 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('titles.tasks')] class extends Component {
+new #[Title('titles.tasks')] class extends Component
+{
     use WithPagination;
 
     #[Url(except: '')]
@@ -37,9 +42,16 @@ new #[Title('titles.tasks')] class extends Component {
     #[Url(except: '')]
     public string $assignee = '';
 
-    /** Accepts a milestone id, or the literal 'none' for tasks without one. */
+    /**
+     * Filters tasks down to one source type, and (once a type is chosen)
+     * one specific record of that type — the filter bar's own pair,
+     * independent of the drawer's taskSourceType/taskSourceId below.
+     */
     #[Url(except: '')]
-    public string $milestone = '';
+    public string $sourceType = '';
+
+    #[Url(except: '')]
+    public string $sourceId = '';
 
     #[Url(as: 'view', except: 'list')]
     public string $view = 'list';
@@ -57,23 +69,35 @@ new #[Title('titles.tasks')] class extends Component {
     public string $month = '';
 
     public bool $showTaskDrawer = false;
+
     public ?int $editingTaskId = null;
+
     public ?int $deletingTaskId = null;
+
     public bool $showDeleteModal = false;
+
     public string $title = '';
+
     public string $description = '';
+
     public string $taskStatus = 'todo';
+
     public string $taskPriority = 'medium';
+
     public string $startDate = '';
+
     public string $dueDate = '';
+
     public string $completedDate = '';
+
     public string $progressPercentage = '0';
 
     /** @var array<int, string> */
     public array $assignedTo = [];
 
-    public string $taskProposalId = '';
-    public string $taskMilestoneId = '';
+    public string $taskSourceType = '';
+
+    public string $taskSourceId = '';
 
     /**
      * Per-parent-task draft values for the list view's inline "add subtask"
@@ -118,9 +142,25 @@ new #[Title('titles.tasks')] class extends Component {
         $this->resetPage();
     }
 
-    public function updatedMilestone(): void
+    public function updatedSourceType(): void
+    {
+        $this->sourceId = '';
+        $this->resetPage();
+    }
+
+    public function updatedSourceId(): void
     {
         $this->resetPage();
+    }
+
+    /**
+     * Changing the drawer's source type invalidates whichever record was
+     * picked under the old type, so the id select always starts empty
+     * rather than silently keeping a now-meaningless numeric value.
+     */
+    public function updatedTaskSourceType(): void
+    {
+        $this->taskSourceId = '';
     }
 
     public function updatedSortField(): void
@@ -159,7 +199,8 @@ new #[Title('titles.tasks')] class extends Component {
         $this->status = '';
         $this->priority = '';
         $this->assignee = '';
-        $this->milestone = '';
+        $this->sourceType = '';
+        $this->sourceId = '';
         $this->resetPage();
     }
 
@@ -202,7 +243,7 @@ new #[Title('titles.tasks')] class extends Component {
         $search = trim($this->search);
 
         return Task::query()
-            ->select(['id', 'milestone_id', 'parent_task_id', 'proposal_id', 'title', 'description', 'status', 'priority', 'start_date', 'due_date', 'completed_date', 'progress_percentage'])
+            ->select(['id', 'parent_task_id', 'source_type', 'source_id', 'title', 'description', 'status', 'priority', 'start_date', 'due_date', 'completed_date', 'progress_percentage'])
             // Subtasks are shown nested under their parent (each parent's own
             // `subtasks` eager load below), never as their own top-level row —
             // so the list/board/calendar and the stat tiles all count and
@@ -210,9 +251,7 @@ new #[Title('titles.tasks')] class extends Component {
             ->whereNull('parent_task_id')
             ->withCount('subtasks')
             ->with([
-                'milestone:id,name,project_id',
-                'milestone.project:id,name',
-                'proposal:id,name',
+                'source',
                 'taskAssignees.employee:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
                 // Loaded alongside the count above so the list/board rows can expand
                 // a subtask panel in place (client-side, no extra round trip) instead
@@ -231,8 +270,8 @@ new #[Title('titles.tasks')] class extends Component {
             ->when($this->status !== '', fn (Builder $query) => $query->where('status', $this->status))
             ->when($this->priority !== '', fn (Builder $query) => $query->where('priority', $this->priority))
             ->when($this->assignee !== '', fn (Builder $query) => $query->whereHas('taskAssignees', fn (Builder $query) => $query->where('employee_id', (int) $this->assignee)))
-            ->when($this->milestone === 'none', fn (Builder $query) => $query->whereNull('milestone_id'))
-            ->when($this->milestone !== '' && $this->milestone !== 'none', fn (Builder $query) => $query->where('milestone_id', (int) $this->milestone));
+            ->when($this->sourceType !== '', fn (Builder $query) => $query->where('source_type', $this->sourceType))
+            ->when($this->sourceType !== '' && $this->sourceId !== '', fn (Builder $query) => $query->where('source_id', (int) $this->sourceId));
     }
 
     /** @return LengthAwarePaginator<int, Task> */
@@ -468,31 +507,101 @@ new #[Title('titles.tasks')] class extends Component {
             ->all();
     }
 
-    /** @return array<int, array{id: int, name: string}> */
-    #[Computed(persist: true, seconds: 300)]
-    public function proposalOptions(): array
+    /**
+     * The five source types a task can be raised against — static, so it
+     * needs no query. Mirrors the morph keys registered in
+     * AppServiceProvider::configureMorphMap() for the `tasks.source_type`
+     * column.
+     *
+     * @return array<int, array{value: string, label: string}>
+     */
+    #[Computed]
+    public function sourceTypeOptions(): array
     {
-        return Proposal::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get()
-            ->map(fn (Proposal $proposal): array => ['id' => $proposal->id, 'name' => $proposal->name])
-            ->all();
+        return [
+            ['value' => 'milestone', 'label' => __('tasks.source_type_milestone')],
+            ['value' => 'proposal', 'label' => __('tasks.source_type_proposal')],
+            ['value' => 'project', 'label' => __('tasks.source_type_project')],
+            ['value' => 'program', 'label' => __('tasks.source_type_program')],
+            ['value' => 'department', 'label' => __('tasks.source_type_department')],
+        ];
     }
 
-    /** @return array<int, array{id: int, name: string, project_name: string}> */
-    #[Computed(persist: true, seconds: 300)]
-    public function milestoneOptions(): array
+    /**
+     * The records the drawer's own Source select offers, for whichever
+     * source type is currently chosen there. Deliberately NOT
+     * `persist`-cached like userOptions() above: this depends on
+     * $this->taskSourceType, so a per-instance cache keyed only by method
+     * name would go stale (or serve the wrong type's records) the moment
+     * the type select changes. It costs one cheap query either way.
+     *
+     * @return Collection<int, array{id: int, name: string}>
+     */
+    #[Computed]
+    public function sourceOptions(): Collection
     {
-        return Milestone::query()
-            ->select(['id', 'name', 'project_id'])
-            ->with('project:id,name')
-            ->orderBy('name')
-            ->orderBy('id')
-            ->get()
-            ->map(fn (Milestone $milestone): array => [
-                'id' => $milestone->id,
-                'name' => $milestone->name,
-                'project_name' => $milestone->project->name,
-            ])
-            ->all();
+        return $this->optionsForSourceType($this->taskSourceType);
+    }
+
+    /**
+     * Same shape as sourceOptions(), but scoped by the filter bar's own
+     * source type instead of the drawer's — a separate computed method so
+     * switching one never invalidates the other's Livewire request-scoped
+     * cache.
+     *
+     * @return Collection<int, array{id: int, name: string}>
+     */
+    #[Computed]
+    public function filterSourceOptions(): Collection
+    {
+        return $this->optionsForSourceType($this->sourceType);
+    }
+
+    /**
+     * @return Collection<int, array{id: int, name: string}>
+     */
+    protected function optionsForSourceType(string $type): Collection
+    {
+        return match ($type) {
+            'milestone' => Milestone::query()
+                ->select(['id', 'name', 'project_id'])
+                ->with('project:id,name')
+                ->orderBy('name')
+                ->orderBy('id')
+                ->get()
+                ->map(fn (Milestone $milestone): array => [
+                    'id' => $milestone->id,
+                    'name' => $milestone->name.' · '.$milestone->project->name,
+                ]),
+            'proposal' => Proposal::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get()
+                ->map(fn (Proposal $proposal): array => ['id' => $proposal->id, 'name' => $proposal->name]),
+            'project' => Project::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get()
+                ->map(fn (Project $project): array => ['id' => $project->id, 'name' => $project->name]),
+            'program' => Program::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get()
+                ->map(fn (Program $program): array => ['id' => $program->id, 'name' => $program->name]),
+            'department' => HrDepartment::query()->select(['id', 'name'])->orderBy('name')->get()
+                ->map(fn (HrDepartment $department): array => ['id' => $department->id, 'name' => $department->name]),
+            default => collect(),
+        };
+    }
+
+    /**
+     * The Eloquent class backing one of the five task source types, or null
+     * for an unrecognized type — used both to validate a submitted
+     * taskSourceId and to build each type's own option list.
+     *
+     * @return class-string<Model>|null
+     */
+    protected function sourceModelClassFor(string $type): ?string
+    {
+        return match ($type) {
+            'milestone' => Milestone::class,
+            'proposal' => Proposal::class,
+            'project' => Project::class,
+            'program' => Program::class,
+            'department' => HrDepartment::class,
+            default => null,
+        };
     }
 
     #[Computed]
@@ -518,7 +627,8 @@ new #[Title('titles.tasks')] class extends Component {
         }
 
         if ($milestoneId !== null && Milestone::query()->whereKey((int) $milestoneId)->exists()) {
-            $this->taskMilestoneId = $milestoneId;
+            $this->taskSourceType = 'milestone';
+            $this->taskSourceId = $milestoneId;
         }
 
         $this->showTaskDrawer = true;
@@ -526,18 +636,18 @@ new #[Title('titles.tasks')] class extends Component {
 
     /**
      * A group's inline "+ Add task" row only captures a title, but a task
-     * always needs a proposal and an assignee. The proposal is inferred from
-     * context so the row can create the task directly, with no drawer:
-     *  - proposal: the one proposal funding the resolved milestone's project
-     *    (its own milestoneId, falling back to the active milestone filter),
-     *    only when that project is funded by exactly one — a project funded
-     *    by several, or no milestone context at all, is genuinely ambiguous.
+     * always needs a source and an assignee. Both are inferred from context
+     * so the row can create the task directly, with no drawer:
+     *  - source: the row's own milestone (its own milestoneId, when the row
+     *    is grouped or scheduled under one), falling back to the active
+     *    source-type/source-id filter — no milestone context and no active
+     *    single-record filter is genuinely ambiguous.
      *  - assignee: whichever employees the row's own draft (see taskDraft())
      *    has picked, falling back to the signed-in user's own HR employee
      *    record when the row hasn't been touched.
      * Due date, priority and status also come from that same draft, same as
-     * addSubtaskQuick()'s own draft. When the proposal or every assignee
-     * can't be resolved, this falls back to the drawer exactly as before,
+     * addSubtaskQuick()'s own draft. When the source or every assignee can't
+     * be resolved, this falls back to the drawer exactly as before,
      * pre-filled with the title and whatever the row's own context and
      * draft already had, so nothing is ever silently dropped.
      */
@@ -551,12 +661,12 @@ new #[Title('titles.tasks')] class extends Component {
 
         $draft = $rowKey !== null ? $this->taskDraft($rowKey, $status) : null;
 
-        $proposalId = $this->resolveInlineProposalId($milestoneId);
+        $source = $this->resolveInlineSource($milestoneId);
         $employeeIds = $draft !== null && $draft['assignees'] !== []
             ? HrEmployee::query()->whereIn('id', collect($draft['assignees'])->map(fn (string $id): int => (int) $id))->pluck('id')
             : collect(array_filter([$this->resolveInlineAssigneeId()]));
 
-        if ($proposalId === null || $employeeIds->isEmpty()) {
+        if ($source === null || $employeeIds->isEmpty()) {
             $this->openCreateDrawer(dueDate: $dueDate, status: $draft !== null ? $draft['status'] : $status, milestoneId: $milestoneId);
             $this->title = $title;
 
@@ -581,7 +691,7 @@ new #[Title('titles.tasks')] class extends Component {
         // date, if any, comes from its own draft.
         $resolvedDueDate = $dueDate ?? ($draft !== null && preg_match('/^\d{4}-\d{2}-\d{2}$/', $draft['due_date']) === 1 ? $draft['due_date'] : null);
 
-        DB::transaction(function () use ($title, $statusCase, $priorityCase, $resolvedDueDate, $milestoneId, $proposalId, $employeeIds): void {
+        DB::transaction(function () use ($title, $statusCase, $priorityCase, $resolvedDueDate, $source, $employeeIds): void {
             $task = Task::query()->create([
                 'title' => $title,
                 'status' => $statusCase,
@@ -589,8 +699,8 @@ new #[Title('titles.tasks')] class extends Component {
                 'due_date' => $resolvedDueDate,
                 'progress_percentage' => $statusCase === TaskStatus::Done ? 100 : 0,
                 'completed_date' => $statusCase === TaskStatus::Done ? CarbonImmutable::today() : null,
-                'proposal_id' => $proposalId,
-                'milestone_id' => $milestoneId !== null ? (int) $milestoneId : null,
+                'source_type' => $source['type'],
+                'source_id' => $source['id'],
                 'created_by' => (int) auth()->id(),
             ]);
 
@@ -646,32 +756,27 @@ new #[Title('titles.tasks')] class extends Component {
     }
 
     /**
-     * Resolves the single proposal a group's inline "+ Add task" row can
-     * safely default to, or null when that would be a guess.
+     * Resolves the source a group's inline "+ Add task" row can safely
+     * default to, or null when that would be a guess: its own milestone
+     * context when given (the row is grouped or scheduled under one),
+     * otherwise the active filter bar's source type/id pair when it names
+     * a single record.
      *
-     * @return int|null
+     * @return array{type: string, id: int}|null
      */
-    protected function resolveInlineProposalId(?string $milestoneId): ?int
+    protected function resolveInlineSource(?string $milestoneId): ?array
     {
-        $resolvedMilestoneId = $milestoneId ?? (
-            $this->milestone !== '' && $this->milestone !== 'none' ? $this->milestone : null
-        );
-
-        if ($resolvedMilestoneId === null) {
-            return null;
+        if ($milestoneId !== null) {
+            return Milestone::query()->whereKey((int) $milestoneId)->exists()
+                ? ['type' => 'milestone', 'id' => (int) $milestoneId]
+                : null;
         }
 
-        $milestone = Milestone::query()->select(['id', 'project_id'])->find((int) $resolvedMilestoneId);
-
-        if ($milestone === null) {
-            return null;
+        if ($this->sourceType !== '' && $this->sourceId !== '') {
+            return ['type' => $this->sourceType, 'id' => (int) $this->sourceId];
         }
 
-        $proposalIds = Proposal::query()
-            ->whereHas('projects', fn (Builder $query) => $query->whereKey($milestone->project_id))
-            ->pluck('id');
-
-        return $proposalIds->count() === 1 ? $proposalIds->first() : null;
+        return null;
     }
 
     /** The signed-in user's own HR employee id, when their account is linked to one. */
@@ -765,8 +870,8 @@ new #[Title('titles.tasks')] class extends Component {
         DB::transaction(function () use ($parent, $title, $status, $priority, $dueDate, $employeeIds): void {
             $subtask = Task::query()->create([
                 'parent_task_id' => $parent->id,
-                'proposal_id' => $parent->proposal_id,
-                'milestone_id' => $parent->milestone_id,
+                'source_type' => $parent->source_type,
+                'source_id' => $parent->source_id,
                 'title' => $title,
                 'status' => $status,
                 'priority' => $priority,
@@ -789,7 +894,7 @@ new #[Title('titles.tasks')] class extends Component {
     public function openEditDrawer(int $taskId): void
     {
         $task = Task::query()
-            ->select(['id', 'milestone_id', 'proposal_id', 'title', 'description', 'status', 'priority', 'start_date', 'due_date', 'completed_date', 'progress_percentage'])
+            ->select(['id', 'parent_task_id', 'source_type', 'source_id', 'title', 'description', 'status', 'priority', 'start_date', 'due_date', 'completed_date', 'progress_percentage'])
             ->with('taskAssignees:id,task_id,employee_id')
             ->findOrFail($taskId);
 
@@ -804,8 +909,8 @@ new #[Title('titles.tasks')] class extends Component {
         $this->completedDate = $task->completed_date?->toDateString() ?? '';
         $this->progressPercentage = (string) $task->progress_percentage;
         $this->assignedTo = $task->taskAssignees->pluck('employee_id')->map(fn (int $id): string => (string) $id)->all();
-        $this->taskProposalId = (string) $task->proposal_id;
-        $this->taskMilestoneId = (string) ($task->milestone_id ?? '');
+        $this->taskSourceType = $task->source_type;
+        $this->taskSourceId = (string) $task->source_id;
         $this->showTaskDrawer = true;
     }
 
@@ -824,16 +929,25 @@ new #[Title('titles.tasks')] class extends Component {
             'progressPercentage' => ['required', 'integer', 'min:0', 'max:100'],
             'assignedTo' => ['required', 'array', 'min:1'],
             'assignedTo.*' => ['integer', Rule::exists(HrEmployee::class, 'id')],
-            'taskProposalId' => ['required', 'integer', Rule::exists(Proposal::class, 'id')],
-            'taskMilestoneId' => ['nullable', 'integer', Rule::exists(Milestone::class, 'id')],
+            'taskSourceType' => ['required', Rule::in(['milestone', 'proposal', 'project', 'program', 'department'])],
+            'taskSourceId' => [
+                'required',
+                'integer',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    $modelClass = $this->sourceModelClassFor($this->taskSourceType);
+
+                    if ($modelClass !== null && ! $modelClass::query()->whereKey((int) $value)->exists()) {
+                        $fail(__('tasks.the_selected_source_is_no_longer_available'));
+                    }
+                },
+            ],
         ], [
             'title.required' => __('tasks.enter_a_task_title'),
             'assignedTo.required' => __('tasks.assign_this_task_to_someone'),
             'assignedTo.min' => __('tasks.assign_this_task_to_someone'),
             'assignedTo.*.exists' => __('tasks.the_selected_assignee_is_no_longer_available'),
-            'taskProposalId.required' => __('tasks.select_the_proposal_this_task_delivers_against'),
-            'taskProposalId.exists' => __('common.the_selected_proposal_is_no_longer_available'),
-            'taskMilestoneId.exists' => __('tasks.the_selected_milestone_is_no_longer_available'),
+            'taskSourceType.required' => __('tasks.select_the_source_this_task_is_raised_against'),
+            'taskSourceId.required' => __('tasks.select_the_source_this_task_is_raised_against'),
             'dueDate.after_or_equal' => __('tasks.the_due_date_cannot_fall_before_the_start_date'),
             'progressPercentage.min' => __('tasks.progress_cannot_be_negative'),
             'progressPercentage.max' => __('tasks.progress_cannot_exceed_100_percent'),
@@ -850,8 +964,8 @@ new #[Title('titles.tasks')] class extends Component {
             'due_date' => $validated['dueDate'] === '' ? null : $validated['dueDate'],
             'completed_date' => $validated['completedDate'] === '' ? null : $validated['completedDate'],
             'progress_percentage' => (int) $validated['progressPercentage'],
-            'proposal_id' => (int) $validated['taskProposalId'],
-            'milestone_id' => $validated['taskMilestoneId'] === '' || $validated['taskMilestoneId'] === null ? null : (int) $validated['taskMilestoneId'],
+            'source_type' => $validated['taskSourceType'],
+            'source_id' => (int) $validated['taskSourceId'],
         ];
 
         if ($isCreate) {
@@ -1057,13 +1171,13 @@ new #[Title('titles.tasks')] class extends Component {
         $this->completedDate = '';
         $this->progressPercentage = '0';
         $this->assignedTo = [];
-        $this->taskProposalId = '';
-        $this->taskMilestoneId = '';
+        $this->taskSourceType = '';
+        $this->taskSourceId = '';
     }
 
     protected function trimTaskForm(): void
     {
-        foreach (['title', 'description', 'taskStatus', 'taskPriority', 'startDate', 'dueDate', 'completedDate', 'progressPercentage', 'taskProposalId', 'taskMilestoneId'] as $property) {
+        foreach (['title', 'description', 'taskStatus', 'taskPriority', 'startDate', 'dueDate', 'completedDate', 'progressPercentage', 'taskSourceType', 'taskSourceId'] as $property) {
             $this->{$property} = trim($this->{$property});
         }
     }
@@ -1071,7 +1185,7 @@ new #[Title('titles.tasks')] class extends Component {
 ?>
 
 @php
-    $filtersAreActive = $search !== '' || $status !== '' || $priority !== '' || $assignee !== '' || $milestone !== '';
+    $filtersAreActive = $search !== '' || $status !== '' || $priority !== '' || $assignee !== '' || $sourceType !== '';
 @endphp
 
 <section class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="task-directory-heading">
@@ -1096,13 +1210,20 @@ new #[Title('titles.tasks')] class extends Component {
                     <flux:select.option :value="$userOption['id']" :wire:key="'task-assignee-filter-'.$userOption['id']">{{ $userOption['name'] }} · {{ $userOption['secondary_name'] }}</flux:select.option>
                 @endforeach
             </x-ui.header-filter-select>
-            <x-ui.header-filter-select :label="__('tasks.milestone')" wire:model.live="milestone" :value="$milestone">
-                <flux:select.option value="">{{ __('tasks.any_milestone') }}</flux:select.option>
-                <flux:select.option value="none">{{ __('tasks.no_milestone') }}</flux:select.option>
-                @foreach ($this->milestoneOptions as $milestoneOption)
-                    <flux:select.option :value="$milestoneOption['id']" :wire:key="'task-milestone-filter-'.$milestoneOption['id']">{{ $milestoneOption['name'] }} · {{ $milestoneOption['project_name'] }}</flux:select.option>
+            <x-ui.header-filter-select :label="__('tasks.source_type')" wire:model.live="sourceType" :value="$sourceType">
+                <flux:select.option value="">{{ __('common.select') }}</flux:select.option>
+                @foreach ($this->sourceTypeOptions as $sourceTypeOption)
+                    <flux:select.option :value="$sourceTypeOption['value']" :wire:key="'task-source-type-filter-'.$sourceTypeOption['value']">{{ $sourceTypeOption['label'] }}</flux:select.option>
                 @endforeach
             </x-ui.header-filter-select>
+            @if ($sourceType !== '')
+                <x-ui.header-filter-select :label="__('tasks.source')" wire:model.live="sourceId" :value="$sourceId">
+                    <flux:select.option value="">{{ __('common.select') }}</flux:select.option>
+                    @foreach ($this->filterSourceOptions as $sourceOption)
+                        <flux:select.option :value="$sourceOption['id']" :wire:key="'task-source-filter-'.$sourceOption['id']">{{ $sourceOption['name'] }}</flux:select.option>
+                    @endforeach
+                </x-ui.header-filter-select>
+            @endif
         </x-slot:filters>
         <x-slot:actions>
             <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateDrawer" data-test="create-task-button">{{ __('tasks.add_task') }}</x-ui.button>
@@ -1210,16 +1331,16 @@ new #[Title('titles.tasks')] class extends Component {
             <div class="flex flex-col gap-3 border-t border-secondary-soft pt-5 dark:border-secondary-medium">
                 <p class="text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('tasks.delivery_details') }}</p>
                 <div class="grid gap-4 sm:grid-cols-2">
-                    <x-ui.select wire:model="taskProposalId" :label="__('common.proposal')" required>
-                        <flux:select.option value="">{{ __('common.select_a_proposal') }}</flux:select.option>
-                        @foreach ($this->proposalOptions as $proposalOption)
-                            <flux:select.option :value="$proposalOption['id']" :wire:key="'task-proposal-option-'.$proposalOption['id']">{{ $proposalOption['name'] }}</flux:select.option>
+                    <x-ui.select wire:model.live="taskSourceType" :label="__('tasks.source_type')" required>
+                        <flux:select.option value="">{{ __('common.select') }}</flux:select.option>
+                        @foreach ($this->sourceTypeOptions as $sourceTypeOption)
+                            <flux:select.option :value="$sourceTypeOption['value']" :wire:key="'task-drawer-source-type-'.$sourceTypeOption['value']">{{ $sourceTypeOption['label'] }}</flux:select.option>
                         @endforeach
                     </x-ui.select>
-                    <x-ui.select wire:model="taskMilestoneId" :label="__('tasks.milestone')">
-                        <flux:select.option value="">{{ __('tasks.no_milestone') }}</flux:select.option>
-                        @foreach ($this->milestoneOptions as $milestoneOption)
-                            <flux:select.option :value="$milestoneOption['id']" :wire:key="'task-milestone-option-'.$milestoneOption['id']">{{ $milestoneOption['name'] }} · {{ $milestoneOption['project_name'] }}</flux:select.option>
+                    <x-ui.select wire:model="taskSourceId" :label="__('tasks.source')" required>
+                        <flux:select.option value="">{{ __('common.select') }}</flux:select.option>
+                        @foreach ($this->sourceOptions as $sourceOption)
+                            <flux:select.option :value="$sourceOption['id']" :wire:key="'task-drawer-source-'.$sourceOption['id']">{{ $sourceOption['name'] }}</flux:select.option>
                         @endforeach
                     </x-ui.select>
                 </div>

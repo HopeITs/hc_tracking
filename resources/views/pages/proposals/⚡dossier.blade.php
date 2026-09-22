@@ -4,6 +4,7 @@ use App\Enums\ArStatus;
 use App\Enums\ProposalStatus;
 use App\Enums\TaskStatus;
 use App\Models\DonorProposal;
+use App\Models\Milestone;
 use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\Proposal;
@@ -12,7 +13,9 @@ use App\Models\Task;
 use App\Models\TransfersTracking;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rules\Enum;
@@ -240,14 +243,27 @@ new #[Title('titles.proposal')] class extends Component {
             ->get();
     }
 
-    /** @return EloquentCollection<int, Task> */
+    /**
+     * Tasks sourced directly from this proposal, plus tasks sourced from a
+     * milestone that belongs to one of this proposal's funded projects.
+     *
+     * @return EloquentCollection<int, Task>
+     */
     #[Computed]
     public function tasks(): EloquentCollection
     {
+        $fundedProjectIds = $this->projects->modelKeys();
+        $milestoneIds = Milestone::query()->whereIn('project_id', $fundedProjectIds)->pluck('id');
+
         return Task::query()
-            ->select(['id', 'proposal_id', 'milestone_id', 'title', 'status', 'priority', 'due_date', 'progress_percentage'])
-            ->where('proposal_id', $this->proposalId)
-            ->with('taskAssignees.employee:id,first_name_en,last_name_en,first_name_ar,last_name_ar')
+            ->select(['id', 'source_type', 'source_id', 'title', 'status', 'priority', 'due_date', 'progress_percentage'])
+            ->with([
+                'taskAssignees.employee:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
+                'source' => fn (MorphTo $morphTo) => $morphTo->morphWith([Milestone::class => ['project:id']]),
+            ])
+            ->where(fn (Builder $query) => $query
+                ->where(fn (Builder $query) => $query->where('source_type', 'proposal')->where('source_id', $this->proposalId))
+                ->orWhere(fn (Builder $query) => $query->where('source_type', 'milestone')->whereIn('source_id', $milestoneIds)))
             ->orderByRaw('due_date is null, due_date')
             ->get();
     }

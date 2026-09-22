@@ -188,13 +188,19 @@ function insertMilestone(int $projectId, int $responsibleUserId, ?int $parentId 
 }
 
 /**
- * Insert a task under a proposal, optionally linked to a milestone.
+ * Insert a task against a proposal, or against a milestone under it when
+ * $milestoneId is given.
+ *
+ * `source_type`/`source_id` are polymorphic and carry no foreign key. This
+ * wrapper keeps the proposal/milestone-shaped call sites that predate the
+ * morph working unchanged; use Task::factory()->create(['source_type' =>
+ * ..., 'source_id' => ...]) directly for the other source types.
  */
 function insertTask(int $proposalId, int $assignedTo, int $createdBy, ?int $milestoneId = null, string $title = 'Draft the distribution plan'): int
 {
     $taskId = Task::factory()->create([
-        'proposal_id' => $proposalId,
-        'milestone_id' => $milestoneId,
+        'source_type' => $milestoneId !== null ? 'milestone' : 'proposal',
+        'source_id' => $milestoneId ?? $proposalId,
         'title' => $title,
         'description' => null,
         'created_by' => $createdBy,
@@ -344,6 +350,16 @@ function createHrSchema(): void
         $table->timestamps();
     });
 
+    $schema->create('departments', function (Blueprint $table): void {
+        $table->id();
+        $table->string('name');
+        $table->string('code');
+        $table->text('description_en')->nullable();
+        $table->text('description_ar')->nullable();
+        $table->string('email')->nullable();
+        $table->timestamps();
+    });
+
     $schema->create('employees', function (Blueprint $table): void {
         $table->id();
         $table->unsignedBigInteger('city_id')->nullable();
@@ -395,6 +411,17 @@ function insertHrProgram(string $name = 'Hope Center', bool $isActive = true): i
         'code' => fake()->bothify('??####'),
         'slug' => fake()->unique()->slug(),
         'is_active' => $isActive,
+    ]);
+}
+
+/**
+ * Insert an HR department and return its id.
+ */
+function insertHrDepartment(string $name = 'Water, Sanitation & Hygiene'): int
+{
+    return DB::connection('hr')->table('departments')->insertGetId([
+        'name' => $name,
+        'code' => fake()->unique()->bothify('??####'),
     ]);
 }
 

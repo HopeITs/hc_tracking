@@ -84,12 +84,12 @@ test('render the dossier to storage for visual inspection', function () {
         $proposal->projects()->attach(Project::factory()->create(['name' => $name]));
     }
 
-    Task::factory()->completed()->create(['proposal_id' => $proposal->id, 'title' => 'Signed agreement filed']);
-    Task::factory()->completed()->create(['proposal_id' => $proposal->id, 'title' => 'Baseline survey completed']);
-    Task::factory()->create(['proposal_id' => $proposal->id, 'title' => 'Interim narrative report', 'status' => TaskStatus::UnderReview, 'due_date' => now()->addDays(9)->toDateString()]);
-    Task::factory()->create(['proposal_id' => $proposal->id, 'title' => 'Procure water pumps', 'status' => TaskStatus::InProgress, 'due_date' => now()->addDays(21)->toDateString()]);
-    Task::factory()->create(['proposal_id' => $proposal->id, 'title' => 'Post-distribution monitoring', 'status' => TaskStatus::Todo, 'due_date' => now()->subDays(4)->toDateString()]);
-    Task::factory()->create(['proposal_id' => $proposal->id, 'title' => 'Verify beneficiary list', 'status' => TaskStatus::Todo, 'due_date' => now()->addDays(40)->toDateString()]);
+    Task::factory()->completed()->create(['source_type' => 'proposal', 'source_id' => $proposal->id, 'title' => 'Signed agreement filed']);
+    Task::factory()->completed()->create(['source_type' => 'proposal', 'source_id' => $proposal->id, 'title' => 'Baseline survey completed']);
+    Task::factory()->create(['source_type' => 'proposal', 'source_id' => $proposal->id, 'title' => 'Interim narrative report', 'status' => TaskStatus::UnderReview, 'due_date' => now()->addDays(9)->toDateString()]);
+    Task::factory()->create(['source_type' => 'proposal', 'source_id' => $proposal->id, 'title' => 'Procure water pumps', 'status' => TaskStatus::InProgress, 'due_date' => now()->addDays(21)->toDateString()]);
+    Task::factory()->create(['source_type' => 'proposal', 'source_id' => $proposal->id, 'title' => 'Post-distribution monitoring', 'status' => TaskStatus::Todo, 'due_date' => now()->subDays(4)->toDateString()]);
+    Task::factory()->create(['source_type' => 'proposal', 'source_id' => $proposal->id, 'title' => 'Verify beneficiary list', 'status' => TaskStatus::Todo, 'due_date' => now()->addDays(40)->toDateString()]);
 
     $result = Result::factory()->create(['statement' => 'Crisis-affected households in Aleppo and Homs meet their basic water and shelter needs.']);
 

@@ -289,9 +289,9 @@ test('the funding flow draws one graph per currency and lists unfunded proposals
 test('each proposal row shows its task progress and overdue work', function () {
     $user = User::factory()->role('Financial')->create();
     $proposal = Proposal::factory()->create();
-    Task::factory()->for($proposal)->create(['status' => TaskStatus::Done]);
-    Task::factory()->for($proposal)->create(['status' => TaskStatus::Todo, 'due_date' => now()->subDays(3)->toDateString()]);
-    Task::factory()->for($proposal)->create(['status' => TaskStatus::InProgress, 'due_date' => now()->addDays(3)->toDateString()]);
+    Task::factory()->create(['source_type' => 'proposal', 'source_id' => $proposal->id, 'status' => TaskStatus::Done]);
+    Task::factory()->create(['source_type' => 'proposal', 'source_id' => $proposal->id, 'status' => TaskStatus::Todo, 'due_date' => now()->subDays(3)->toDateString()]);
+    Task::factory()->create(['source_type' => 'proposal', 'source_id' => $proposal->id, 'status' => TaskStatus::InProgress, 'due_date' => now()->addDays(3)->toDateString()]);
 
     Livewire::actingAs($user)
         ->test('pages::proposals.index')

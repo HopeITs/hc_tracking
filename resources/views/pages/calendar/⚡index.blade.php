@@ -4,8 +4,10 @@ use App\Enums\MilestoneStatus;
 use App\Enums\ReportStatus;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Models\HrDepartment;
 use App\Models\HrEmployee;
 use App\Models\Milestone;
+use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Report;
@@ -15,6 +17,7 @@ use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
@@ -71,8 +74,9 @@ new #[Title('titles.calendar')] class extends Component {
     /** @var array<int, string> */
     public array $assignedTo = [];
 
-    public string $taskProposalId = '';
-    public string $taskMilestoneId = '';
+    public string $taskSourceType = 'proposal';
+
+    public string $taskSourceId = '';
 
     public function previousMonth(): void
     {
@@ -245,7 +249,7 @@ new #[Title('titles.calendar')] class extends Component {
         $tasksByDay = $employeeId === null || ! $this->showTasks
             ? new Collection
             : Task::query()
-                ->select(['id', 'title', 'status', 'due_date', 'milestone_id'])
+                ->select(['id', 'title', 'status', 'due_date'])
                 ->whereHas('taskAssignees', fn (Builder $query) => $query->where('employee_id', $employeeId))
                 ->whereNotNull('due_date')
                 ->whereBetween('due_date', [$gridStart->toDateString(), $gridEnd->toDateString()])
@@ -313,23 +317,44 @@ new #[Title('titles.calendar')] class extends Component {
             ->get();
     }
 
-    /** @return Collection<int, Proposal> */
+    /**
+     * The morph keys a task can be raised against, labeled for the source
+     * type dropdown.
+     *
+     * @return array<string, string>
+     */
     #[Computed]
-    public function proposalOptions(): Collection
+    public function sourceTypeOptions(): array
     {
-        return Proposal::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get();
+        return [
+            'milestone' => __('tasks.source_type_milestone'),
+            'proposal' => __('tasks.source_type_proposal'),
+            'project' => __('tasks.source_type_project'),
+            'program' => __('tasks.source_type_program'),
+            'department' => __('tasks.source_type_department'),
+        ];
     }
 
-    /** @return Collection<int, Milestone> */
+    /**
+     * The pickable sources for the currently selected source type.
+     *
+     * @return Collection<int, Milestone|Proposal|Project|Program|HrDepartment>
+     */
     #[Computed]
-    public function milestoneOptions(): Collection
+    public function sourceOptions(): Collection
     {
-        return Milestone::query()
-            ->select(['id', 'name', 'project_id'])
-            ->with('project:id,name')
-            ->orderBy('name')
-            ->orderBy('id')
-            ->get();
+        return match ($this->taskSourceType) {
+            'milestone' => Milestone::query()
+                ->select(['id', 'name', 'project_id'])
+                ->with('project:id,name')
+                ->orderBy('name')
+                ->orderBy('id')
+                ->get(),
+            'project' => Project::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get(),
+            'program' => Program::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get(),
+            'department' => HrDepartment::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get(),
+            default => Proposal::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get(),
+        };
     }
 
     public function updatedMilestoneProjectId(): void
@@ -531,6 +556,29 @@ new #[Title('titles.calendar')] class extends Component {
         return (int) $this->milestoneProjectId;
     }
 
+    /**
+     * The Eloquent model class backing the currently selected task source
+     * type, for validating taskSourceId exists in the right table.
+     *
+     * @return class-string<Model>
+     */
+    protected function sourceModelClass(): string
+    {
+        return match ($this->taskSourceType) {
+            'milestone' => Milestone::class,
+            'project' => Project::class,
+            'program' => Program::class,
+            'department' => HrDepartment::class,
+            default => Proposal::class,
+        };
+    }
+
+    public function updatedTaskSourceType(): void
+    {
+        $this->taskSourceId = '';
+        unset($this->sourceOptions);
+    }
+
     public function openCreateTaskModal(?string $date = null): void
     {
         $this->resetTaskForm();
@@ -546,7 +594,7 @@ new #[Title('titles.calendar')] class extends Component {
     public function openEditTaskModal(int $taskId): void
     {
         $task = Task::query()
-            ->select(['id', 'milestone_id', 'proposal_id', 'title', 'description', 'status', 'priority', 'start_date', 'due_date', 'completed_date', 'progress_percentage'])
+            ->select(['id', 'source_type', 'source_id', 'title', 'description', 'status', 'priority', 'start_date', 'due_date', 'completed_date', 'progress_percentage'])
             ->with('taskAssignees:id,task_id,employee_id')
             ->findOrFail($taskId);
 
@@ -561,8 +609,9 @@ new #[Title('titles.calendar')] class extends Component {
         $this->completedDate = $task->completed_date?->toDateString() ?? '';
         $this->progressPercentage = (string) $task->progress_percentage;
         $this->assignedTo = $task->taskAssignees->pluck('employee_id')->map(fn (int $id): string => (string) $id)->all();
-        $this->taskProposalId = (string) $task->proposal_id;
-        $this->taskMilestoneId = (string) ($task->milestone_id ?? '');
+        $this->taskSourceType = $task->source_type;
+        $this->taskSourceId = (string) $task->source_id;
+        unset($this->sourceOptions);
         $this->showTaskModal = true;
     }
 
@@ -582,16 +631,20 @@ new #[Title('titles.calendar')] class extends Component {
             'progressPercentage' => ['required', 'integer', 'min:0', 'max:100'],
             'assignedTo' => ['required', 'array', 'min:1'],
             'assignedTo.*' => ['integer', Rule::exists(HrEmployee::class, 'id')],
-            'taskProposalId' => ['required', 'integer', Rule::exists(Proposal::class, 'id')],
-            'taskMilestoneId' => ['nullable', 'integer', Rule::exists(Milestone::class, 'id')],
+            'taskSourceType' => ['required', 'string', Rule::in(array_keys($this->sourceTypeOptions))],
+            'taskSourceId' => [
+                'required',
+                'integer',
+                Rule::exists($this->sourceModelClass(), 'id'),
+            ],
         ], [
             'title.required' => __('tasks.enter_a_task_title'),
             'assignedTo.required' => __('tasks.assign_this_task_to_someone'),
             'assignedTo.min' => __('tasks.assign_this_task_to_someone'),
             'assignedTo.*.exists' => __('tasks.the_selected_assignee_is_no_longer_available'),
-            'taskProposalId.required' => __('tasks.select_the_proposal_this_task_delivers_against'),
-            'taskProposalId.exists' => __('common.the_selected_proposal_is_no_longer_available'),
-            'taskMilestoneId.exists' => __('tasks.the_selected_milestone_is_no_longer_available'),
+            'taskSourceType.required' => __('tasks.select_the_source_this_task_is_raised_against'),
+            'taskSourceId.required' => __('tasks.select_the_source_this_task_is_raised_against'),
+            'taskSourceId.exists' => __('tasks.the_selected_source_is_no_longer_available'),
             'dueDate.after_or_equal' => __('tasks.the_due_date_cannot_fall_before_the_start_date'),
             'progressPercentage.min' => __('tasks.progress_cannot_be_negative'),
             'progressPercentage.max' => __('tasks.progress_cannot_exceed_100_percent'),
@@ -608,8 +661,8 @@ new #[Title('titles.calendar')] class extends Component {
             'due_date' => $validated['dueDate'] === '' ? null : $validated['dueDate'],
             'completed_date' => $validated['completedDate'] === '' ? null : $validated['completedDate'],
             'progress_percentage' => (int) $validated['progressPercentage'],
-            'proposal_id' => (int) $validated['taskProposalId'],
-            'milestone_id' => $validated['taskMilestoneId'] === '' || $validated['taskMilestoneId'] === null ? null : (int) $validated['taskMilestoneId'],
+            'source_type' => $validated['taskSourceType'],
+            'source_id' => (int) $validated['taskSourceId'],
         ];
 
         if ($isCreate) {
@@ -692,8 +745,9 @@ new #[Title('titles.calendar')] class extends Component {
         $this->completedDate = '';
         $this->progressPercentage = '0';
         $this->assignedTo = [];
-        $this->taskProposalId = '';
-        $this->taskMilestoneId = '';
+        $this->taskSourceType = 'proposal';
+        $this->taskSourceId = '';
+        unset($this->sourceOptions);
     }
 };
 ?>
@@ -740,8 +794,7 @@ new #[Title('titles.calendar')] class extends Component {
     $selectedMilestoneProject = $milestoneProjectId === '' ? null : $this->projectOptions->firstWhere('id', (int) $milestoneProjectId);
     $selectedParentMilestone = $parentMilestoneId === '' ? null : $this->parentOptions->firstWhere('id', (int) $parentMilestoneId);
     $selectedResponsibleOption = $responsibleUserId === '' ? null : $this->userOptions->firstWhere('id', (int) $responsibleUserId);
-    $selectedTaskProposal = $taskProposalId === '' ? null : $this->proposalOptions->firstWhere('id', (int) $taskProposalId);
-    $selectedTaskMilestone = $taskMilestoneId === '' ? null : $this->milestoneOptions->firstWhere('id', (int) $taskMilestoneId);
+    $selectedTaskSource = $taskSourceId === '' ? null : $this->sourceOptions->firstWhere('id', (int) $taskSourceId);
     $selectedFilterEmployee = $filterEmployeeId === '' ? null : $this->userOptions->firstWhere('id', (int) $filterEmployeeId);
     $dropdownLabelClasses = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-secondary-soft';
 
@@ -1144,53 +1197,44 @@ new #[Title('titles.calendar')] class extends Component {
 
             <div class="grid gap-4 sm:grid-cols-2">
                 <div class="min-w-0">
-                    <label for="task-form-proposal" class="{{ $dropdownLabelClasses }}">{{ __('common.proposal') }}</label>
-                    <flux:dropdown position="bottom" align="start" class="filter-picker block! w-full!" x-data="{ optionSearch: '' }">
-                        <flux:button id="task-form-proposal" type="button" variant="outline" icon:trailing="chevron-up-down" class="w-full! justify-between!" :aria-label="__('common.proposal')">
-                            <span class="truncate">{{ $selectedTaskProposal?->name ?? __('common.select_a_proposal') }}</span>
+                    <label for="task-form-source-type" class="{{ $dropdownLabelClasses }}">{{ __('tasks.source_type') }}</label>
+                    <flux:dropdown position="bottom" align="start" class="filter-picker block! w-full!">
+                        <flux:button id="task-form-source-type" type="button" variant="outline" icon:trailing="chevron-up-down" class="w-full! justify-between!" :aria-label="__('tasks.source_type')">
+                            <span class="truncate">{{ $this->sourceTypeOptions[$taskSourceType] ?? __('common.select') }}</span>
                         </flux:button>
                         <flux:menu class="filter-menu">
-                            @if ($this->proposalOptions->count() > 6)
-                                <div class="border-b border-secondary-soft p-1.5 dark:border-secondary-medium">
-                                    <x-ui.input type="search" size="sm" icon="magnifying-glass" x-model="optionSearch" :aria-label="__('common.search_proposals')" :placeholder="__('common.search_proposals')" />
-                                </div>
-                            @endif
-                            @foreach ($this->proposalOptions as $proposalOption)
-                                <flux:menu.item wire:click="$set('taskProposalId', {{ $proposalOption->id }})" x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())" :wire:key="'task-form-proposal-option-'.$proposalOption->id">
-                                    <span class="min-w-0 truncate">{{ $proposalOption->name }}</span>
-                                    @if ((int) $taskProposalId === $proposalOption->id)<flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" />@endif
+                            @foreach ($this->sourceTypeOptions as $sourceTypeKey => $sourceTypeLabel)
+                                <flux:menu.item wire:click="$set('taskSourceType', '{{ $sourceTypeKey }}')" :wire:key="'task-form-source-type-option-'.$sourceTypeKey">
+                                    <span class="min-w-0 truncate">{{ $sourceTypeLabel }}</span>
+                                    @if ($taskSourceType === $sourceTypeKey)<flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" />@endif
                                 </flux:menu.item>
                             @endforeach
                         </flux:menu>
                     </flux:dropdown>
-                    <flux:error name="taskProposalId" class="mt-1.5" />
+                    <flux:error name="taskSourceType" class="mt-1.5" />
                 </div>
 
                 <div class="min-w-0">
-                    <label for="task-form-milestone" class="{{ $dropdownLabelClasses }}">{{ __('tasks.milestone') }}</label>
+                    <label for="task-form-source" class="{{ $dropdownLabelClasses }}">{{ __('tasks.source') }}</label>
                     <flux:dropdown position="bottom" align="start" class="filter-picker block! w-full!" x-data="{ optionSearch: '' }">
-                        <flux:button id="task-form-milestone" type="button" variant="outline" icon:trailing="chevron-up-down" class="w-full! justify-between!" :aria-label="__('tasks.milestone')">
-                            <span class="truncate">{{ $selectedTaskMilestone?->name ?? __('tasks.no_milestone') }}</span>
+                        <flux:button id="task-form-source" type="button" variant="outline" icon:trailing="chevron-up-down" class="w-full! justify-between!" :aria-label="__('tasks.source')">
+                            <span class="truncate">{{ $selectedTaskSource?->name ?? __('common.select') }}</span>
                         </flux:button>
                         <flux:menu class="filter-menu">
-                            @if ($this->milestoneOptions->count() > 6)
+                            @if ($this->sourceOptions->count() > 6)
                                 <div class="border-b border-secondary-soft p-1.5 dark:border-secondary-medium">
-                                    <x-ui.input type="search" size="sm" icon="magnifying-glass" x-model="optionSearch" :aria-label="__('milestones.search_milestones')" :placeholder="__('milestones.search_milestones')" />
+                                    <x-ui.input type="search" size="sm" icon="magnifying-glass" x-model="optionSearch" :aria-label="__('tasks.source')" :placeholder="__('tasks.source')" />
                                 </div>
                             @endif
-                            <flux:menu.item wire:click="$set('taskMilestoneId', '')">
-                                {{ __('tasks.no_milestone') }}
-                                @if ($taskMilestoneId === '')<flux:icon.check class="ms-auto size-4 text-secondary-medium" />@endif
-                            </flux:menu.item>
-                            @foreach ($this->milestoneOptions as $milestoneOption)
-                                <flux:menu.item wire:click="$set('taskMilestoneId', {{ $milestoneOption->id }})" x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())" :wire:key="'task-form-milestone-option-'.$milestoneOption->id">
-                                    <span class="min-w-0 truncate">{{ $milestoneOption->name }} · {{ $milestoneOption->project->name }}</span>
-                                    @if ((int) $taskMilestoneId === $milestoneOption->id)<flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" />@endif
+                            @foreach ($this->sourceOptions as $sourceOption)
+                                <flux:menu.item wire:click="$set('taskSourceId', {{ $sourceOption->id }})" x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())" :wire:key="'task-form-source-option-'.$sourceOption->id">
+                                    <span class="min-w-0 truncate">{{ $sourceOption->name }}{{ $taskSourceType === 'milestone' ? ' · '.$sourceOption->project->name : '' }}</span>
+                                    @if ((int) $taskSourceId === $sourceOption->id)<flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" />@endif
                                 </flux:menu.item>
                             @endforeach
                         </flux:menu>
                     </flux:dropdown>
-                    <flux:error name="taskMilestoneId" class="mt-1.5" />
+                    <flux:error name="taskSourceId" class="mt-1.5" />
                 </div>
             </div>
 

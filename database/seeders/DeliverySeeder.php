@@ -6,11 +6,10 @@ use App\Enums\MediaCollection;
 use App\Models\Media;
 use App\Models\Milestone;
 use App\Models\Project;
-use App\Models\Proposal;
 use App\Models\Risk;
 use App\Models\Task;
-use App\Models\TaskAttachment;
 use App\Models\TaskAssignee;
+use App\Models\TaskAttachment;
 use App\Models\User;
 use Database\Seeders\Concerns\PicksHrRecords;
 use Illuminate\Database\Seeder;
@@ -67,7 +66,7 @@ class DeliverySeeder extends Seeder
                 return;
             }
 
-            $this->seedTasks($proposal, $parent, $users, $employeeIds);
+            $this->seedTasks($parent, $users, $employeeIds);
         });
     }
 
@@ -101,17 +100,17 @@ class DeliverySeeder extends Seeder
      * @param  Collection<int, User>  $users
      * @param  Collection<int, int>  $employeeIds
      */
-    protected function seedTasks(Proposal $proposal, Milestone $milestone, $users, Collection $employeeIds): void
+    protected function seedTasks(Milestone $milestone, $users, Collection $employeeIds): void
     {
         $open = Task::factory(2)->create([
-            'proposal_id' => $proposal->id,
-            'milestone_id' => $milestone->id,
+            'source_type' => 'milestone',
+            'source_id' => $milestone->id,
             'created_by' => fn (): int => $users->random()->id,
         ]);
 
         $done = Task::factory()->completed()->create([
-            'proposal_id' => $proposal->id,
-            'milestone_id' => $milestone->id,
+            'source_type' => 'milestone',
+            'source_id' => $milestone->id,
             'created_by' => $users->random()->id,
         ]);
 

@@ -17,6 +17,7 @@ use App\Models\Risk;
 use App\Models\Task;
 use App\Models\TransfersTracking;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Number;
 use Livewire\Attributes\Computed;
@@ -52,8 +53,8 @@ new #[Title('titles.dashboard')] class extends Component {
         $today = CarbonImmutable::today();
 
         $tasks = Task::query()
-            ->select(['id', 'milestone_id', 'proposal_id', 'title', 'due_date', 'status'])
-            ->with(['milestone:id,project_id', 'milestone.project:id,name', 'proposal:id,name'])
+            ->select(['id', 'source_type', 'source_id', 'title', 'due_date', 'status'])
+            ->with(['source' => fn (MorphTo $morphTo) => $morphTo->morphWith([Milestone::class => ['project:id,name']])])
             ->where('status', '!=', TaskStatus::Done)
             ->whereDate('due_date', '<', $today)
             ->oldest('due_date')
@@ -64,7 +65,7 @@ new #[Title('titles.dashboard')] class extends Component {
                 group: 'delivery',
                 icon: 'clipboard-document-check',
                 title: $task->title,
-                context: __('dashboard.task_in', ['parent' => $task->milestone?->project?->name ?? $task->proposal?->name ?? '—']),
+                context: __('dashboard.task_in', ['parent' => $this->taskParentName($task)]),
                 daysLate: (int) $task->due_date->diffInDays($today),
                 href: route('tasks.show', $task),
             ));
@@ -448,8 +449,8 @@ new #[Title('titles.dashboard')] class extends Component {
             ]);
 
         $tasks = Task::query()
-            ->select(['id', 'milestone_id', 'proposal_id', 'title', 'due_date'])
-            ->with(['milestone:id,project_id', 'milestone.project:id,name', 'proposal:id,name'])
+            ->select(['id', 'source_type', 'source_id', 'title', 'due_date'])
+            ->with(['source' => fn (MorphTo $morphTo) => $morphTo->morphWith([Milestone::class => ['project:id,name']])])
             ->where('status', '!=', TaskStatus::Done)
             ->whereBetween('due_date', $horizon)
             ->oldest('due_date')
@@ -461,7 +462,7 @@ new #[Title('titles.dashboard')] class extends Component {
                 'icon' => 'clipboard-document-check',
                 'tone' => 'neutral',
                 'title' => $task->title,
-                'context' => __('dashboard.task_in', ['parent' => $task->milestone?->project?->name ?? $task->proposal?->name ?? '—']),
+                'context' => __('dashboard.task_in', ['parent' => $this->taskParentName($task)]),
                 'href' => route('tasks.show', $task),
             ]);
 
@@ -577,6 +578,18 @@ new #[Title('titles.dashboard')] class extends Component {
             'daysLate' => $daysLate,
             'href' => $href,
         ];
+    }
+
+    /**
+     * The parent context shown for a task row: its milestone's project name
+     * when sourced from a milestone (matching what the old milestone_id path
+     * showed), otherwise the task's own source name (a proposal).
+     */
+    private function taskParentName(Task $task): string
+    {
+        return $task->source instanceof Milestone
+            ? ($task->source->project?->name ?? '—')
+            : $task->sourceLabel();
     }
 };
 ?>

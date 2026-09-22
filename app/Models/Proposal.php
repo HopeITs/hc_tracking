@@ -123,13 +123,17 @@ class Proposal extends Model
     }
 
     /**
-     * The tasks carried out under this proposal.
+     * The tasks sourced directly from this proposal.
      *
-     * @return HasMany<Task, $this>
+     * Does not include tasks sourced from one of this proposal's funded
+     * projects' milestones — see the Tasks tab query in
+     * proposals/⚡show.blade.php for that broader listing.
+     *
+     * @return MorphMany<Task, $this>
      */
-    public function tasks(): HasMany
+    public function tasks(): MorphMany
     {
-        return $this->hasMany(Task::class);
+        return $this->morphMany(Task::class, 'source');
     }
 
     /**

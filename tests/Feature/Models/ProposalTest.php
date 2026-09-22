@@ -27,7 +27,7 @@ test('a proposal has its projects, tasks and status notes', function () {
     $proposal = Proposal::factory()->create();
 
     $proposal->projects()->attach(Project::factory()->create());
-    Task::factory(2)->create(['proposal_id' => $proposal->id]);
+    Task::factory(2)->create(['source_type' => 'proposal', 'source_id' => $proposal->id]);
     ProposalStatusNote::factory()->create(['proposal_id' => $proposal->id]);
 
     expect($proposal->projects)->toHaveCount(1)

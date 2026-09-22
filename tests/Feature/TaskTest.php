@@ -13,14 +13,18 @@ test('a new task starts as todo at medium priority with no progress', function (
     expect($task->status)->toBe('todo')
         ->and($task->priority)->toBe('medium')
         ->and((int) $task->progress_percentage)->toBe(0)
-        ->and($task->milestone_id)->toBeNull()
+        ->and($task->source_type)->toBe('proposal')
         ->and($task->description)->toBeNull()
         ->and($task->start_date)->toBeNull()
         ->and($task->due_date)->toBeNull()
         ->and($task->completed_date)->toBeNull();
 });
 
-test('deleting a milestone keeps its tasks but unlinks them', function () {
+test('deleting a milestone leaves tasks sourced from it orphaned', function () {
+    // source_type/source_id carry no foreign key (same as plan_indicators'
+    // own polymorphic source), so unlike the old milestone_id column this
+    // no longer cascades or nulls out — the task keeps pointing at the
+    // deleted id, and Task::sourceLabel() falls back to "No source" for it.
     $user = User::factory()->create();
     $projectId = insertProject(insertCity(), insertProgram(insertStrategy(), $user->id), $user->id);
     $milestoneId = insertMilestone($projectId, $user->id);
@@ -28,17 +32,19 @@ test('deleting a milestone keeps its tasks but unlinks them', function () {
 
     DB::table('milestones')->where('id', $milestoneId)->delete();
 
-    $this->assertDatabaseHas('tasks', ['id' => $taskId, 'milestone_id' => null]);
+    $this->assertDatabaseHas('tasks', ['id' => $taskId, 'source_type' => 'milestone', 'source_id' => $milestoneId]);
 });
 
-test('deleting a proposal deletes the tasks under it', function () {
+test('deleting a proposal leaves tasks sourced from it in place', function () {
+    // Same reasoning as the milestone case above: no foreign key means no
+    // cascade delete anymore.
     $user = User::factory()->create();
     $proposalId = insertProposal();
-    insertTask($proposalId, $user->id, $user->id);
+    $taskId = insertTask($proposalId, $user->id, $user->id);
 
     DB::table('proposals')->where('id', $proposalId)->delete();
 
-    $this->assertDatabaseCount('tasks', 0);
+    $this->assertDatabaseHas('tasks', ['id' => $taskId, 'source_type' => 'proposal', 'source_id' => $proposalId]);
 });
 
 test('a task assignment stores its hr employee id with no foreign key to users', function () {

@@ -27,7 +27,8 @@ class TaskFactory extends Factory
     public function definition(): array
     {
         return [
-            'proposal_id' => Proposal::factory(),
+            'source_type' => 'proposal',
+            'source_id' => Proposal::factory(),
             'title' => fake()->randomElement(['Draft the distribution plan', 'Verify beneficiary list', 'Procure water pumps', 'Run the post-distribution monitoring']),
             'description' => fake()->sentence(),
             'created_by' => User::factory(),
@@ -67,8 +68,8 @@ class TaskFactory extends Factory
     {
         return $this->state(fn (array $attributes): array => [
             'parent_task_id' => $parent->id,
-            'proposal_id' => $parent->proposal_id,
-            'milestone_id' => $parent->milestone_id,
+            'source_type' => $parent->source_type,
+            'source_id' => $parent->source_id,
         ]);
     }
 }

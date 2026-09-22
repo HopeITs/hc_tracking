@@ -1,7 +1,9 @@
 <?php
 
 use App\Models\AnnualPlan;
+use App\Models\HrDepartment;
 use App\Models\Milestone;
+use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Strategy;
@@ -9,12 +11,14 @@ use App\Models\User;
 use Illuminate\Database\ClassMorphViolationException;
 use Illuminate\Database\Eloquent\Relations\Relation;
 
-test('the morph map registers exactly the two target sources, the two media owners, and the permission model side', function () {
+test('the morph map registers exactly the two target sources, the five task sources, the two media owners, and the permission model side', function () {
     expect(Relation::morphMap())->toBe([
         'annual_plan' => AnnualPlan::class,
         'proposal' => Proposal::class,
         'project' => Project::class,
         'milestone' => Milestone::class,
+        'program' => Program::class,
+        'department' => HrDepartment::class,
         'user' => User::class,
     ]);
 });
@@ -25,6 +29,8 @@ test('the morph map is enforced so an unmapped model has no morph class', functi
         ->and((new Proposal)->getMorphClass())->toBe('proposal')
         ->and((new Project)->getMorphClass())->toBe('project')
         ->and((new Milestone)->getMorphClass())->toBe('milestone')
+        ->and((new Program)->getMorphClass())->toBe('program')
+        ->and((new HrDepartment)->getMorphClass())->toBe('department')
         ->and((new User)->getMorphClass())->toBe('user');
 
     (new Strategy)->getMorphClass();

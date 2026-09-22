@@ -3,7 +3,6 @@
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Models\Milestone;
-use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Task;
 use App\Models\TaskAttachment;
@@ -53,22 +52,24 @@ test('tasks can be filtered by search status priority and assignee', function ()
         ->call('clearFilters')->set('priority', TaskPriority::High->value)->assertSee('Draft distribution plan')->assertDontSee('Verify beneficiary list')
         ->call('clearFilters')->set('assignee', (string) $bob)->assertDontSee('Draft distribution plan')->assertSee('Verify beneficiary list')
         ->call('clearFilters')
-        ->assertSet('search', '')->assertSet('status', '')->assertSet('priority', '')->assertSet('assignee', '')->assertSet('milestone', '')
+        ->assertSet('search', '')->assertSet('status', '')->assertSet('priority', '')->assertSet('assignee', '')->assertSet('sourceType', '')->assertSet('sourceId', '')
         ->assertSee('Draft distribution plan')->assertSee('Verify beneficiary list');
 });
 
-test('tasks can be filtered by a milestone or the explicit no milestone state', function () {
+test('tasks can be filtered by source type and by a specific source record', function () {
     $user = User::factory()->create();
     $milestone = Milestone::factory()->create(['name' => 'First distribution']);
+    $proposal = Proposal::factory()->create();
 
-    Task::factory()->create(['title' => 'Attached task', 'milestone_id' => $milestone->id]);
-    Task::factory()->create(['title' => 'Loose task', 'milestone_id' => null]);
+    Task::factory()->create(['title' => 'Attached task', 'source_type' => 'milestone', 'source_id' => $milestone->id]);
+    Task::factory()->create(['title' => 'Loose task', 'source_type' => 'proposal', 'source_id' => $proposal->id]);
 
     Livewire::actingAs($user)
         ->test('pages::tasks.index')
         ->assertSee('Attached task')->assertSee('Loose task')
-        ->set('milestone', (string) $milestone->id)->assertSee('Attached task')->assertDontSee('Loose task')
-        ->set('milestone', 'none')->assertDontSee('Attached task')->assertSee('Loose task')->assertSee('No milestone');
+        ->set('sourceType', 'milestone')->assertSee('Attached task')->assertDontSee('Loose task')
+        ->set('sourceId', (string) $milestone->id)->assertSee('Attached task')->assertDontSee('Loose task')
+        ->set('sourceType', 'proposal')->set('sourceId', '')->assertDontSee('Attached task')->assertSee('Loose task');
 });
 
 test('a task records its creator and safely normalizes optional values', function () {
@@ -81,14 +82,14 @@ test('a task records its creator and safely normalizes optional values', functio
         ->call('openCreateDrawer')
         ->set('title', '  Prepare the sitrep  ')
         ->set('description', '   ')
-        ->set('taskProposalId', (string) $proposal->id)
+        ->set('taskSourceType', 'proposal')
+        ->set('taskSourceId', (string) $proposal->id)
         ->set('assignedTo', [(string) $assignee])
         ->set('taskStatus', TaskStatus::Todo->value)
         ->set('taskPriority', TaskPriority::Medium->value)
         ->set('startDate', '')
         ->set('dueDate', '2026-03-15')
         ->set('completedDate', '')
-        ->set('taskMilestoneId', '')
         ->call('saveTask')
         ->assertHasNoErrors()
         ->assertSet('showTaskDrawer', false);
@@ -97,8 +98,8 @@ test('a task records its creator and safely normalizes optional values', functio
 
     expect($task->created_by)->toBe($creator->id)
         ->and($task->taskAssignees->pluck('employee_id')->all())->toBe([$assignee])
-        ->and($task->proposal_id)->toBe($proposal->id)
-        ->and($task->milestone_id)->toBeNull()
+        ->and($task->source_type)->toBe('proposal')
+        ->and($task->source_id)->toBe($proposal->id)
         ->and($task->description)->toBeNull()
         ->and($task->start_date)->toBeNull()
         ->and($task->due_date?->toDateString())->toBe('2026-03-15')
@@ -115,7 +116,8 @@ test('a task can have several assignees at once', function () {
         ->test('pages::tasks.index')
         ->call('openCreateDrawer')
         ->set('title', 'Coordinate the handover')
-        ->set('taskProposalId', (string) $proposal->id)
+        ->set('taskSourceType', 'proposal')
+        ->set('taskSourceId', (string) $proposal->id)
         ->set('assignedTo', [(string) $alice, (string) $bob])
         ->call('saveTask')
         ->assertHasNoErrors();
@@ -133,11 +135,41 @@ test('creating a task rejects missing and invalid required selections', function
         ->test('pages::tasks.index')
         ->call('openCreateDrawer')
         ->set('title', '   ')
-        ->set('taskProposalId', '999999')
+        ->set('taskSourceType', 'proposal')
+        ->set('taskSourceId', '999999')
         ->set('assignedTo', ['999999'])
-        ->set('taskMilestoneId', '999999')
         ->call('saveTask')
-        ->assertHasErrors(['title', 'taskProposalId', 'assignedTo.0', 'taskMilestoneId']);
+        ->assertHasErrors(['title', 'taskSourceId', 'assignedTo.0']);
+
+    expect(Task::query()->count())->toBe(0);
+});
+
+test('creating a task rejects a missing source type or source', function () {
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->call('openCreateDrawer')
+        ->set('title', 'Valid title')
+        ->set('assignedTo', [(string) insertHrEmployee()])
+        ->call('saveTask')
+        ->assertHasErrors(['taskSourceType', 'taskSourceId']);
+
+    expect(Task::query()->count())->toBe(0);
+});
+
+test('creating a task rejects an unrecognized source type', function () {
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->call('openCreateDrawer')
+        ->set('title', 'Valid title')
+        ->set('taskSourceType', 'not-a-real-type')
+        ->set('taskSourceId', '1')
+        ->set('assignedTo', [(string) insertHrEmployee()])
+        ->call('saveTask')
+        ->assertHasErrors(['taskSourceType']);
 
     expect(Task::query()->count())->toBe(0);
 });
@@ -149,7 +181,8 @@ test('creating a task with no assignee at all is rejected', function () {
         ->test('pages::tasks.index')
         ->call('openCreateDrawer')
         ->set('title', 'Valid title')
-        ->set('taskProposalId', (string) Proposal::factory()->create()->id)
+        ->set('taskSourceType', 'proposal')
+        ->set('taskSourceId', (string) Proposal::factory()->create()->id)
         ->set('assignedTo', [])
         ->call('saveTask')
         ->assertHasErrors(['assignedTo']);
@@ -164,7 +197,8 @@ test('creating a task rejects invalid workflow values and progress', function (s
         ->test('pages::tasks.index')
         ->call('openCreateDrawer')
         ->set('title', 'Valid title')
-        ->set('taskProposalId', (string) Proposal::factory()->create()->id)
+        ->set('taskSourceType', 'proposal')
+        ->set('taskSourceId', (string) Proposal::factory()->create()->id)
         ->set('assignedTo', [(string) insertHrEmployee()])
         ->set($property, $value)
         ->call('saveTask')
@@ -185,7 +219,8 @@ test('a due date before the start date is rejected', function () {
         ->test('pages::tasks.index')
         ->call('openCreateDrawer')
         ->set('title', 'Schedule delivery')
-        ->set('taskProposalId', (string) Proposal::factory()->create()->id)
+        ->set('taskSourceType', 'proposal')
+        ->set('taskSourceId', (string) Proposal::factory()->create()->id)
         ->set('assignedTo', [(string) insertHrEmployee()])
         ->set('startDate', '2026-03-15')
         ->set('dueDate', '2026-03-14')
@@ -199,19 +234,20 @@ test('a task can be fully edited without changing its creator', function () {
     $creator = User::factory()->create();
     $editor = User::factory()->create();
     $newAssignee = insertHrEmployee();
-    $newProposal = Proposal::factory()->create();
+    $originalProposal = Proposal::factory()->create();
     $newMilestone = Milestone::factory()->create();
     $task = Task::factory()->create([
         'created_by' => $creator->id,
         'title' => 'Original',
-        'milestone_id' => null,
+        'source_type' => 'proposal',
+        'source_id' => $originalProposal->id,
         'description' => null,
     ]);
 
     Livewire::actingAs($editor)
         ->test('pages::tasks.index')
         ->call('openEditDrawer', $task->id)
-        ->assertSet('title', 'Original')->assertSet('description', '')->assertSet('taskMilestoneId', '')
+        ->assertSet('title', 'Original')->assertSet('description', '')->assertSet('taskSourceType', 'proposal')->assertSet('taskSourceId', (string) $originalProposal->id)
         ->set('title', '  Revised task  ')
         ->set('description', '  Revised scope.  ')
         ->set('taskStatus', TaskStatus::InProgress->value)
@@ -221,8 +257,8 @@ test('a task can be fully edited without changing its creator', function () {
         ->set('completedDate', '2026-04-29')
         ->set('progressPercentage', '80')
         ->set('assignedTo', [(string) $newAssignee])
-        ->set('taskProposalId', (string) $newProposal->id)
-        ->set('taskMilestoneId', (string) $newMilestone->id)
+        ->set('taskSourceType', 'milestone')
+        ->set('taskSourceId', (string) $newMilestone->id)
         ->call('saveTask')
         ->assertHasNoErrors();
 
@@ -234,8 +270,8 @@ test('a task can be fully edited without changing its creator', function () {
         ->and($task->priority)->toBe(TaskPriority::High)
         ->and($task->progress_percentage)->toBe(80)
         ->and($task->taskAssignees->pluck('employee_id')->all())->toBe([$newAssignee])
-        ->and($task->proposal_id)->toBe($newProposal->id)
-        ->and($task->milestone_id)->toBe($newMilestone->id)
+        ->and($task->source_type)->toBe('milestone')
+        ->and($task->source_id)->toBe($newMilestone->id)
         ->and($task->created_by)->toBe($creator->id);
 });
 
@@ -373,12 +409,11 @@ test('task rows link to the registered task detail route', function () {
 test('task directory content is escaped', function () {
     $user = User::factory()->create();
     $assignee = insertHrEmployee(firstNameEn: '<script>assignee()</script>', lastNameEn: '');
-    $proposal = Proposal::factory()->create(['name' => '<img src=x onerror=proposal()>']);
     $milestone = Milestone::factory()->create(['name' => '<svg onload=milestone()>']);
     $task = Task::factory()->create([
         'title' => '<script>task()</script>',
-        'proposal_id' => $proposal->id,
-        'milestone_id' => $milestone->id,
+        'source_type' => 'milestone',
+        'source_id' => $milestone->id,
     ]);
     $task->taskAssignees()->delete();
     $task->taskAssignees()->create(['employee_id' => $assignee]);
@@ -387,11 +422,9 @@ test('task directory content is escaped', function () {
         ->test('pages::tasks.index')
         ->assertSee('<script>task()</script>')
         ->assertSee('<script>assignee()</script>')
-        ->assertSee('<img src=x onerror=proposal()>')
         ->assertSee('<svg onload=milestone()>')
         ->assertDontSeeHtml('<script>task()</script>')
         ->assertDontSeeHtml('<script>assignee()</script>')
-        ->assertDontSeeHtml('<img src=x onerror=proposal()>')
         ->assertDontSeeHtml('<svg onload=milestone()>');
 });
 
@@ -560,7 +593,8 @@ test('quickCreateTask opens the drawer pre-filled with the title and the group c
         ->test('pages::tasks.index')
         ->call('quickCreateTask', 'Another task', null, (string) $milestone->id)
         ->assertSet('showTaskDrawer', true)
-        ->assertSet('taskMilestoneId', (string) $milestone->id);
+        ->assertSet('taskSourceType', 'milestone')
+        ->assertSet('taskSourceId', (string) $milestone->id);
 
     expect(Task::query()->count())->toBe(0);
 });
@@ -574,13 +608,10 @@ test('quickCreateTask does nothing for a blank title', function () {
         ->assertSet('showTaskDrawer', false);
 });
 
-test('quickCreateTask creates the task directly with no drawer when the proposal and assignee are both inferable', function () {
+test('quickCreateTask creates the task directly with no drawer when the milestone and assignee are both known', function () {
     $employeeId = insertHrEmployee();
     $user = User::factory()->create(['employee_id' => $employeeId]);
-    $proposal = Proposal::factory()->create();
-    $project = Project::factory()->create();
-    $project->proposals()->attach($proposal->id);
-    $milestone = Milestone::factory()->create(['project_id' => $project->id]);
+    $milestone = Milestone::factory()->create();
 
     Livewire::actingAs($user)
         ->test('pages::tasks.index')
@@ -590,21 +621,36 @@ test('quickCreateTask creates the task directly with no drawer when the proposal
     $task = Task::query()->where('title', 'Inline task')->sole();
 
     expect($task->status)->toBe(TaskStatus::InProgress)
-        ->and($task->milestone_id)->toBe($milestone->id)
-        ->and($task->proposal_id)->toBe($proposal->id)
+        ->and($task->source_type)->toBe('milestone')
+        ->and($task->source_id)->toBe($milestone->id)
         ->and($task->taskAssignees->pluck('employee_id')->all())->toBe([$employeeId]);
 });
 
-test('quickCreateTask falls back to the drawer when the milestone project funds several proposals', function () {
+test('quickCreateTask falls back to the active source filter when no milestone context is given', function () {
     $employeeId = insertHrEmployee();
     $user = User::factory()->create(['employee_id' => $employeeId]);
-    $project = Project::factory()->create();
-    $project->proposals()->attach(Proposal::factory()->count(2)->create()->pluck('id'));
-    $milestone = Milestone::factory()->create(['project_id' => $project->id]);
+    $proposal = Proposal::factory()->create();
 
     Livewire::actingAs($user)
         ->test('pages::tasks.index')
-        ->call('quickCreateTask', 'Ambiguous task', null, (string) $milestone->id)
+        ->set('sourceType', 'proposal')
+        ->set('sourceId', (string) $proposal->id)
+        ->call('quickCreateTask', 'Filtered task', null, null)
+        ->assertSet('showTaskDrawer', false);
+
+    $task = Task::query()->where('title', 'Filtered task')->sole();
+
+    expect($task->source_type)->toBe('proposal')
+        ->and($task->source_id)->toBe($proposal->id);
+});
+
+test('quickCreateTask falls back to the drawer when neither a milestone nor an active source filter is known', function () {
+    $employeeId = insertHrEmployee();
+    $user = User::factory()->create(['employee_id' => $employeeId]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->call('quickCreateTask', 'Ambiguous task')
         ->assertSet('showTaskDrawer', true)
         ->assertSet('title', 'Ambiguous task');
 
@@ -613,10 +659,7 @@ test('quickCreateTask falls back to the drawer when the milestone project funds 
 
 test('quickCreateTask falls back to the drawer when the signed-in user has no linked HR employee', function () {
     $user = User::factory()->create(['employee_id' => null]);
-    $proposal = Proposal::factory()->create();
-    $project = Project::factory()->create();
-    $project->proposals()->attach($proposal->id);
-    $milestone = Milestone::factory()->create(['project_id' => $project->id]);
+    $milestone = Milestone::factory()->create();
 
     Livewire::actingAs($user)
         ->test('pages::tasks.index')
@@ -633,10 +676,7 @@ test('the list view inline add task row honours its own due date priority status
     $alice = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
     $bob = insertHrEmployee(firstNameEn: 'Bob', lastNameEn: 'Rahman');
     $user = User::factory()->create(['employee_id' => $alice]);
-    $proposal = Proposal::factory()->create();
-    $project = Project::factory()->create();
-    $project->proposals()->attach($proposal->id);
-    $milestone = Milestone::factory()->create(['project_id' => $project->id]);
+    $milestone = Milestone::factory()->create();
 
     Livewire::actingAs($user)
         ->test('pages::tasks.index')
@@ -654,8 +694,8 @@ test('the list view inline add task row honours its own due date priority status
         ->and($task->status)->toBe(TaskStatus::Done)
         ->and($task->progress_percentage)->toBe(100)
         ->and($task->completed_date)->not->toBeNull()
-        ->and($task->milestone_id)->toBe($milestone->id)
-        ->and($task->proposal_id)->toBe($proposal->id)
+        ->and($task->source_type)->toBe('milestone')
+        ->and($task->source_id)->toBe($milestone->id)
         ->and($task->taskAssignees->pluck('employee_id')->all())->toBe([$bob]);
 });
 
@@ -697,14 +737,12 @@ test('toggleTaskDraftAssignee toggles an employee in and out of the add-task dra
 test('quickCreateTask uses the calendar days own due date over any draft due date', function () {
     $employeeId = insertHrEmployee();
     $user = User::factory()->create(['employee_id' => $employeeId]);
-    $proposal = Proposal::factory()->create();
-    $project = Project::factory()->create();
-    $project->proposals()->attach($proposal->id);
-    $milestone = Milestone::factory()->create(['project_id' => $project->id]);
+    $milestone = Milestone::factory()->create();
 
     Livewire::actingAs($user)
         ->test('pages::tasks.index')
-        ->set('milestone', (string) $milestone->id)
+        ->set('sourceType', 'milestone')
+        ->set('sourceId', (string) $milestone->id)
         ->set('taskDrafts.calendar|2026-08-30.due_date', '2099-01-01')
         ->set('taskDrafts.calendar|2026-08-30.priority', TaskPriority::High->value)
         ->call('quickCreateTask', 'Calendar task', null, null, 'calendar|2026-08-30', '2026-08-30')
@@ -716,11 +754,11 @@ test('quickCreateTask uses the calendar days own due date over any draft due dat
         ->and($task->priority)->toBe(TaskPriority::High);
 });
 
-test('addSubtaskQuick creates a subtask inheriting the parent proposal milestone and assignees', function () {
+test('addSubtaskQuick creates a subtask inheriting the parent source and assignees', function () {
     $user = User::factory()->create();
     $alice = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
     $milestone = Milestone::factory()->create();
-    $parent = Task::factory()->create(['milestone_id' => $milestone->id]);
+    $parent = Task::factory()->create(['source_type' => 'milestone', 'source_id' => $milestone->id]);
     $parent->taskAssignees()->delete();
     $parent->taskAssignees()->create(['employee_id' => $alice]);
 
@@ -731,8 +769,8 @@ test('addSubtaskQuick creates a subtask inheriting the parent proposal milestone
     $subtask = Task::query()->where('title', 'Follow up call')->sole();
 
     expect($subtask->parent_task_id)->toBe($parent->id)
-        ->and($subtask->proposal_id)->toBe($parent->proposal_id)
-        ->and($subtask->milestone_id)->toBe($milestone->id)
+        ->and($subtask->source_type)->toBe('milestone')
+        ->and($subtask->source_id)->toBe($milestone->id)
         ->and($subtask->taskAssignees->pluck('employee_id')->all())->toBe([$alice]);
 });
 
