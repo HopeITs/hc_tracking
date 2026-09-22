@@ -637,6 +637,23 @@ input[type='search']::-webkit-search-cancel-button {
     [dir='rtl'] .money-grow {
         transform-origin: right center;
     }
+
+    /* Donors share-of-wallet: segments rise into place one after another. */
+    .wallet-grow {
+        animation: wallet-rise 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+        animation-delay: calc(120ms + var(--wallet-order, 0) * 60ms);
+    }
+}
+
+@keyframes wallet-rise {
+    from {
+        opacity: 0;
+        clip-path: inset(100% 0 0 0);
+    }
+    to {
+        opacity: 1;
+        clip-path: inset(0 0 0 0);
+    }
 }
 
 @keyframes flow-pour {

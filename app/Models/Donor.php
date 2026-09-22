@@ -22,10 +22,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $phone
  * @property string|null $country
  * @property string|null $notes
+ * @property CarbonImmutable|null $last_contacted_on
+ * @property string|null $next_step
+ * @property CarbonImmutable|null $next_step_due_on
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['name', 'type', 'contact_person', 'email', 'phone', 'country', 'notes'])]
+#[Fillable(['name', 'type', 'contact_person', 'email', 'phone', 'country', 'notes', 'last_contacted_on', 'next_step', 'next_step_due_on'])]
 class Donor extends Model
 {
     /** @use HasFactory<DonorFactory> */
@@ -57,6 +60,14 @@ class Donor extends Model
     }
 
     /**
+     * Whether the planned next step has passed its due date undone.
+     */
+    public function isFollowUpOverdue(): bool
+    {
+        return $this->next_step_due_on !== null && $this->next_step_due_on->isBefore(CarbonImmutable::today());
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * `type` is nullable: donors recorded before the column existed, and
@@ -68,6 +79,8 @@ class Donor extends Model
     {
         return [
             'type' => DonorType::class,
+            'last_contacted_on' => 'date',
+            'next_step_due_on' => 'date',
         ];
     }
 }

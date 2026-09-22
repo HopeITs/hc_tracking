@@ -165,9 +165,9 @@ new #[Title('titles.funding_agreements')] class extends Component {
                 @foreach ($this->agreements as $agreement)
                     <article class="flex flex-col gap-3 p-3.5 @4xl/directory:flex-row @4xl/directory:items-center" wire:key="agreement-{{ $agreement->id }}">
                         <div class="min-w-0 @4xl/directory:me-auto">
-                            <a href="{{ route('funding-agreements.show', $agreement) }}" wire:navigate class="text-sm font-semibold hover:underline">
+                            <p class="text-sm font-semibold">
                                 {{ $agreement->donor->name }} · {{ $agreement->proposal->name }}
-                            </a>
+                            </p>
                             <p class="text-xs text-secondary-medium dark:text-secondary-soft">
                                 {{ $agreement->project_num ?? __('common.no_donor_reference') }}
                                 · {{ trans_choice('common.count_tranche', $agreement->transfers_count, ['count' => $agreement->transfers_count]) }}
@@ -179,6 +179,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
 
                         {{-- No delete: transfers_tracking cascades from this row, so
                              deleting an agreement would erase the money received. --}}
+                        <x-ui.button tone="ghost" size="sm" icon="eye" class="size-9! shrink-0" :href="route('funding-agreements.show', $agreement)" wire:navigate :aria-label="__('common.view_name', ['name' => $agreement->donor->name.' · '.$agreement->proposal->name])" />
                         @can('funding-agreements.update')
                         <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9! shrink-0" wire:click="openEditModal({{ $agreement->id }})" :aria-label="__('funding_agreements.edit_agreement')" />
                         @endcan

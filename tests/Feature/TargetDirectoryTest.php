@@ -216,8 +216,8 @@ test('a percentage indicator uses its latest approved value instead of a sum', f
         'target' => 80,
     ]);
 
-    Report::factory()->for($target, 'planIndicator')->create(['value' => 40, 'status' => 'approved', 'period_end' => '2026-03-31']);
-    Report::factory()->for($target, 'planIndicator')->create(['value' => 55, 'status' => 'approved', 'period_end' => '2026-06-30']);
+    Report::factory()->for($target, 'planIndicator')->create(['value' => 40, 'status' => 'approved', 'planned_date' => '2026-03-31', 'period_end' => '2026-03-31']);
+    Report::factory()->for($target, 'planIndicator')->create(['value' => 55, 'status' => 'approved', 'planned_date' => '2026-06-30', 'period_end' => '2026-06-30']);
 
     $row = Livewire::actingAs($user)->test('pages::targets.index')->instance()->targets->first();
 
