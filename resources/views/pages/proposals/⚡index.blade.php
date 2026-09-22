@@ -995,7 +995,7 @@ new #[Title('titles.proposals')] class extends Component {
                             <div class="flex flex-col gap-3 @3xl/directory:flex-row @3xl/directory:items-start">
                                 <div class="min-w-0 flex-1">
                                     <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
-                                        <a href="{{ route('proposals.show', $proposal) }}" wire:navigate class="text-lg leading-tight font-bold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary {{ $inkText }}">{{ $proposal->name }}</a>
+                                        <span class="text-lg leading-tight font-bold {{ $inkText }}">{{ $proposal->name }}</span>
                                         <x-ui.enum-badge :case="$proposal->status" />
                                         {{-- phase is a read-only accessor over status->phase(), not a column. --}}
                                         <span class="text-xs font-semibold {{ $mutedText }}">{{ $proposal->phase->label() }}</span>
@@ -1010,6 +1010,7 @@ new #[Title('titles.proposals')] class extends Component {
                                 </div>
 
                                 <div class="flex shrink-0 flex-wrap items-center gap-1">
+                                    <x-ui.button tone="ghost" size="sm" icon="eye" class="size-10! touch-manipulation" :href="route('proposals.show', $proposal)" wire:navigate :aria-label="__('common.view_name', ['name' => $proposal->name])" />
                                     @can('update', $proposal)
                                     @if ($nextStatus !== null)
                                         <x-ui.button size="sm" icon:trailing="arrow-right" class="min-h-10 touch-manipulation rtl:[&_svg]:rotate-180" wire:click="openStageModal({{ $proposal->id }})" data-test="advance-proposal-{{ $proposal->id }}">
