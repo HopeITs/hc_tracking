@@ -51,7 +51,7 @@ test('every connection renders at once with no tab to click', function () {
     $project = Project::factory()->create(['name' => 'Aleppo Water Points']);
     $proposal->projects()->attach($project);
 
-    Task::factory()->create(['proposal_id' => $proposal->id, 'title' => 'Verify beneficiary list']);
+    Task::factory()->create(['source_type' => 'proposal', 'source_id' => $proposal->id, 'title' => 'Verify beneficiary list']);
 
     PlanIndicator::factory()->forProposal($proposal)->create([
         'indicator_id' => Indicator::factory()->create(['name' => 'Households assisted'])->id,
@@ -191,9 +191,10 @@ test('delivery counts what is finished and what is overdue', function () {
     $user = User::factory()->create();
     $proposal = Proposal::factory()->create();
 
-    Task::factory()->completed()->create(['proposal_id' => $proposal->id, 'title' => 'Signed agreement filed']);
+    Task::factory()->completed()->create(['source_type' => 'proposal', 'source_id' => $proposal->id, 'title' => 'Signed agreement filed']);
     Task::factory()->create([
-        'proposal_id' => $proposal->id,
+        'source_type' => 'proposal',
+        'source_id' => $proposal->id,
         'title' => 'Submit interim report',
         'status' => TaskStatus::Todo,
         'due_date' => now()->subDays(5)->toDateString(),

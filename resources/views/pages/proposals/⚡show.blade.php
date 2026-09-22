@@ -13,6 +13,7 @@ use App\Livewire\Concerns\ManagesTransferForm;
 use App\Models\DonorProposal;
 use App\Models\DonorReport;
 use App\Models\Media;
+use App\Models\Milestone;
 use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\Proposal;
@@ -24,6 +25,7 @@ use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
@@ -318,23 +320,31 @@ new #[Title('titles.proposal')] class extends Component {
     /**
      * Tasks delivering this proposal, carrying the project they reach through.
      *
-     * A task has no project column: it reaches one through its milestone, so
-     * the milestone's project is loaded to group the work under the project it
-     * actually lands on. Tasks with no milestone are a real state and get their
-     * own group rather than being dropped.
+     * A task has one source: either this proposal directly, or a milestone
+     * belonging to one of the proposal's funded projects. A task has no
+     * project column, so a milestone-sourced task reaches its project
+     * through its milestone, and the milestone's project is loaded to group
+     * the work under the project it actually lands on. Tasks with no
+     * milestone (sourced straight from the proposal) are a real state and
+     * get their own group rather than being dropped.
      *
      * @return Collection<int, Task>
      */
     #[Computed]
     public function tasks(): Collection
     {
+        $fundedProjectIds = $this->projects->modelKeys();
+        $milestoneIds = Milestone::query()->whereIn('project_id', $fundedProjectIds)->pluck('id');
+
         return Task::query()
-            ->select(['id', 'proposal_id', 'milestone_id', 'title', 'status', 'priority', 'due_date', 'progress_percentage'])
-            ->where('proposal_id', $this->proposalId)
+            ->select(['id', 'source_type', 'source_id', 'title', 'status', 'priority', 'due_date', 'progress_percentage'])
             ->with([
                 'taskAssignees.employee:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
-                'milestone:id,name,project_id',
+                'source' => fn (MorphTo $morphTo) => $morphTo->morphWith([Milestone::class => ['project:id']]),
             ])
+            ->where(fn (Builder $query) => $query
+                ->where(fn (Builder $query) => $query->where('source_type', 'proposal')->where('source_id', $this->proposalId))
+                ->orWhere(fn (Builder $query) => $query->where('source_type', 'milestone')->whereIn('source_id', $milestoneIds)))
             ->orderByRaw('due_date is null, due_date')
             ->orderBy('id')
             ->get();
@@ -2212,7 +2222,7 @@ new #[Title('titles.proposal')] class extends Component {
                 <div class="flex flex-col gap-8">
                     @foreach ($this->projects as $project)
                         @php
-                            $projectTasks = $this->tasks->filter(fn (\App\Models\Task $task): bool => $task->milestone?->project_id === $project->id);
+                            $projectTasks = $this->tasks->filter(fn (\App\Models\Task $task): bool => $task->sourceProjectId() === $project->id);
                             $projectDone = $projectTasks->where('status', TaskStatus::Done)->count();
                             // Work scheduled past the grant's own end has no funding behind it after that date.
                             $runsPastTheGrant = $project->end_date !== null
@@ -2308,11 +2318,11 @@ new #[Title('titles.proposal')] class extends Component {
                     $groups = $this->projects
                         ->map(fn ($project): array => [
                             'project' => $project,
-                            'tasks' => $ordered->filter(fn (Task $task): bool => $task->milestone?->project_id === $project->id)->values(),
+                            'tasks' => $ordered->filter(fn (Task $task): bool => $task->sourceProjectId() === $project->id)->values(),
                         ])
                         ->filter(fn (array $group): bool => $group['tasks']->isNotEmpty())
                         ->values();
-                    $looseTasks = $ordered->filter(fn (Task $task): bool => $task->milestone === null || ! in_array($task->milestone->project_id, $fundedProjectIds, true))->values();
+                    $looseTasks = $ordered->filter(fn (Task $task): bool => $task->sourceProjectId() === null || ! in_array($task->sourceProjectId(), $fundedProjectIds, true))->values();
                     $taskTotal = $this->tasks->count();
                     $statusCounts = collect(TaskStatus::cases())->map(fn (TaskStatus $status): array => [
                         'status' => $status,

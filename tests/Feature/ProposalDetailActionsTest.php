@@ -225,8 +225,8 @@ test('deadlines list only open items in date order and group them by urgency', f
     $agreement = usdAgreement($this->proposal);
     TransfersTracking::factory()->create(['donor_proposal_id' => $agreement->id, 'scheduled_date' => '2026-06-01', 'ar_status' => ArStatus::Pending]);
     TransfersTracking::factory()->create(['donor_proposal_id' => $agreement->id, 'scheduled_date' => '2026-06-02', 'ar_status' => ArStatus::Received]);
-    Task::factory()->create(['proposal_id' => $this->proposal->id, 'due_date' => '2026-06-20', 'status' => TaskStatus::Todo]);
-    Task::factory()->create(['proposal_id' => $this->proposal->id, 'due_date' => '2026-06-10', 'status' => TaskStatus::Done]);
+    Task::factory()->create(['source_type' => 'proposal', 'source_id' => $this->proposal->id, 'due_date' => '2026-06-20', 'status' => TaskStatus::Todo]);
+    Task::factory()->create(['source_type' => 'proposal', 'source_id' => $this->proposal->id, 'due_date' => '2026-06-10', 'status' => TaskStatus::Done]);
 
     $deadlines = collect(proposalPage()->instance()->deadlines);
 

@@ -15,7 +15,6 @@ use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 /**
@@ -95,13 +94,13 @@ class Milestone extends Model
     }
 
     /**
-     * The tasks that deliver this milestone.
+     * The tasks sourced from this milestone.
      *
-     * @return HasMany<Task, $this>
+     * @return MorphMany<Task, $this>
      */
-    public function tasks(): HasMany
+    public function tasks(): MorphMany
     {
-        return $this->hasMany(Task::class);
+        return $this->morphMany(Task::class, 'source');
     }
 
     /**

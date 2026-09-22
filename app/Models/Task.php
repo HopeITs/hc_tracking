@@ -13,12 +13,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 /**
  * @property int $id
- * @property int|null $milestone_id
  * @property int|null $parent_task_id
- * @property int $proposal_id
+ * @property string $source_type
+ * @property int $source_id
  * @property string $title
  * @property string|null $description
  * @property TaskStatus $status
@@ -32,9 +33,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable|null $updated_at
  */
 #[Fillable([
-    'milestone_id',
     'parent_task_id',
-    'proposal_id',
+    'source_type',
+    'source_id',
     'title',
     'description',
     'status',
@@ -51,23 +52,45 @@ class Task extends Model
     use HasFactory;
 
     /**
-     * The milestone this task contributes to, if any.
+     * The milestone, proposal, project, program or department this task is
+     * raised against.
      *
-     * @return BelongsTo<Milestone, $this>
+     * There is no foreign key behind source_id, so a source can be deleted
+     * out from under this row.
+     *
+     * @return MorphTo<Model, $this>
      */
-    public function milestone(): BelongsTo
+    public function source(): MorphTo
     {
-        return $this->belongsTo(Milestone::class);
+        return $this->morphTo();
     }
 
     /**
-     * The proposal this task is carried out under.
-     *
-     * @return BelongsTo<Proposal, $this>
+     * The source's display name, or a placeholder when it no longer exists.
      */
-    public function proposal(): BelongsTo
+    public function sourceLabel(): string
     {
-        return $this->belongsTo(Proposal::class);
+        return $this->loadedSource()?->name ?? __('tasks.no_source');
+    }
+
+    /**
+     * The project this task's source sits under, when its source is a
+     * milestone. Used to bucket tasks under a project card (e.g. on a
+     * proposal's Tasks tab).
+     */
+    public function sourceProjectId(): ?int
+    {
+        $source = $this->loadedSource();
+
+        return $source instanceof Milestone ? $source->project_id : null;
+    }
+
+    /**
+     * The `source` relation, from the loaded relation when there is one.
+     */
+    private function loadedSource(): ?Model
+    {
+        return $this->relationLoaded('source') ? $this->getRelation('source') : $this->source()->first();
     }
 
     /**

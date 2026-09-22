@@ -378,7 +378,7 @@ test('a milestone with children is not deleted because the subtree would cascade
 test('a milestone carrying tasks is not deleted because tasks would be orphaned', function () {
     $user = User::factory()->create();
     $milestone = Milestone::factory()->create();
-    $task = Task::factory()->create(['milestone_id' => $milestone->id]);
+    $task = Task::factory()->create(['source_type' => 'milestone', 'source_id' => $milestone->id]);
 
     Livewire::actingAs($user)
         ->test('pages::milestones.index')
@@ -386,7 +386,7 @@ test('a milestone carrying tasks is not deleted because tasks would be orphaned'
         ->call('deleteMilestone');
 
     expect(DB::table('milestones')->find($milestone->id))->not->toBeNull()
-        ->and(DB::table('tasks')->find($task->id)->milestone_id)->toBe($milestone->id);
+        ->and(DB::table('tasks')->find($task->id)->source_id)->toBe($milestone->id);
 });
 
 test('the stat cards summarise reached, missed and upcoming milestones', function () {

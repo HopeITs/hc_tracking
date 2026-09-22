@@ -37,7 +37,7 @@ test('a milestone nests under a parent milestone', function () {
 test('a milestone has the tasks that deliver it', function () {
     $milestone = Milestone::factory()->create();
 
-    Task::factory(2)->create(['milestone_id' => $milestone->id]);
+    Task::factory(2)->create(['source_type' => 'milestone', 'source_id' => $milestone->id]);
     Task::factory()->create();
 
     expect($milestone->tasks)->toHaveCount(2);

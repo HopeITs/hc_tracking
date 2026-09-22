@@ -13,7 +13,7 @@
             'status' => TaskStatus::tryFrom($key)?->label() ?? $key,
             'priority' => TaskPriority::tryFrom($key)?->label() ?? $key,
             'assignee' => $key === '' ? __('common.not_assigned') : $groupTasks->first()->taskAssignees->pluck('employee')->filter()->map->name->implode(', '),
-            'milestone' => $key === '' ? __('tasks.no_milestone') : ($groupTasks->first()->milestone?->name ?? __('tasks.no_milestone')),
+            'milestone' => $key === '' ? __('tasks.no_milestone') : $groupTasks->first()->sourceLabel(),
             default => '',
         };
     };
@@ -51,14 +51,14 @@
         'status' => $paginator->getCollection()->groupBy(fn ($task) => $task->status->value)->sortKeys(),
         'priority' => $paginator->getCollection()->groupBy(fn ($task) => $task->priority->value),
         'assignee' => $paginator->getCollection()->groupBy(fn ($task) => $task->taskAssignees->pluck('employee_id')->sort()->implode(',')),
-        'milestone' => $paginator->getCollection()->groupBy(fn ($task) => (string) ($task->milestone_id ?? '')),
+        'milestone' => $paginator->getCollection()->groupBy(fn ($task) => $task->source_type === 'milestone' ? (string) $task->source_id : ''),
         default => new Collection(['' => $paginator->getCollection()]),
     };
 @endphp
 
 <div class="relative">
     {{-- Skeleton, shown only while a filter/sort/group change is in flight. --}}
-    <div wire:loading wire:target="search,status,priority,assignee,milestone,sort,group" class="overflow-hidden rounded-xl border border-secondary-soft bg-white dark:border-secondary-medium dark:bg-secondary-dark">
+    <div wire:loading wire:target="search,status,priority,assignee,sourceType,sourceId,sort,group" class="overflow-hidden rounded-xl border border-secondary-soft bg-white dark:border-secondary-medium dark:bg-secondary-dark">
         <div class="animate-pulse divide-y divide-secondary-soft p-3.5 motion-reduce:animate-none dark:divide-secondary-medium">
             @for ($i = 0; $i < 6; $i++)
                 <div class="flex items-center gap-3 py-2.5">
@@ -72,7 +72,7 @@
         </div>
     </div>
 
-    <div wire:loading.remove wire:target="search,status,priority,assignee,milestone,sort,group" class="flex flex-col gap-4">
+    <div wire:loading.remove wire:target="search,status,priority,assignee,sourceType,sourceId,sort,group" class="flex flex-col gap-4">
         <div class="overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-secondary-medium dark:bg-secondary-dark dark:shadow-none">
             <div class="border-b border-secondary-soft px-4 py-2.5 dark:border-secondary-medium">
                 <p class="text-xs text-secondary-medium dark:text-secondary-soft">{{ trans_choice('tasks.count_matching_task', $paginator->total(), ['count' => $paginator->total()]) }}</p>

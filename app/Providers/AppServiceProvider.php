@@ -3,7 +3,9 @@
 namespace App\Providers;
 
 use App\Models\AnnualPlan;
+use App\Models\HrDepartment;
 use App\Models\Milestone;
+use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\User;
@@ -37,15 +39,17 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Map every polymorphic type this application stores.
      *
-     * Both morph columns — `plan_indicators.source_type` and
-     * `media.mediable_type` — are VARCHAR(50), so short keys are stored rather
+     * Every morph column — `plan_indicators.source_type`, `media.mediable_type`
+     * and `tasks.source_type` — is VARCHAR(50), so short keys are stored rather
      * than fully qualified class names.
      *
      * enforceMorphMap() is global: any model on either side of ANY morph must
-     * appear here or getMorphClass() throws ClassMorphViolationException. The
-     * first two entries are the sources a target can be committed in; the next
-     * two are the owners a file can be attached to; `user` is the model side
-     * of spatie/laravel-permission's `model_has_roles`/`model_has_permissions`
+     * appear here or getMorphClass() throws ClassMorphViolationException.
+     * `annual_plan` and `proposal` are the sources a target can be committed
+     * in; `project` and `milestone` are also owners a file can be attached to;
+     * `milestone`, `proposal`, `project`, `program` and `department` are the
+     * sources a task can be raised against; `user` is the model side of
+     * spatie/laravel-permission's `model_has_roles`/`model_has_permissions`
      * polymorphic pivots.
      */
     protected function configureMorphMap(): void
@@ -55,6 +59,8 @@ class AppServiceProvider extends ServiceProvider
             'proposal' => Proposal::class,
             'project' => Project::class,
             'milestone' => Milestone::class,
+            'program' => Program::class,
+            'department' => HrDepartment::class,
             'user' => User::class,
         ]);
     }

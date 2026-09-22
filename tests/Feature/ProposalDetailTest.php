@@ -233,14 +233,14 @@ test('the work reading counts finished tasks and groups them under the project t
     $milestone = Milestone::factory()->create(['project_id' => $project->id]);
 
     Task::factory()->completed()->create([
-        'proposal_id' => $proposal->id,
-        'milestone_id' => $milestone->id,
+        'source_type' => 'milestone',
+        'source_id' => $milestone->id,
         'title' => 'Verify beneficiary list',
         'due_date' => null,
     ]);
     Task::factory()->create([
-        'proposal_id' => $proposal->id,
-        'milestone_id' => $milestone->id,
+        'source_type' => 'milestone',
+        'source_id' => $milestone->id,
         'title' => 'Procure water pumps',
         'due_date' => null,
         'progress_percentage' => 0,
@@ -260,7 +260,10 @@ test('the work reading counts finished tasks and groups them under the project t
         ->assertSeeText('be placed on the schedule');
 });
 
-test('a task whose milestone belongs to a project this proposal does not fund is listed apart', function () {
+test('a task sourced from a milestone whose project this proposal does not fund is not shown', function () {
+    // A task now has exactly one source, so a task sourced from a milestone can no
+    // longer also carry an independent link to this proposal — it belongs to
+    // whichever proposal funds its milestone's project, or to no proposal at all.
     $user = User::factory()->role('Financial')->create();
     $proposal = Proposal::factory()->create();
 
@@ -268,16 +271,41 @@ test('a task whose milestone belongs to a project this proposal does not fund is
     $milestone = Milestone::factory()->create(['project_id' => $unfunded->id]);
 
     Task::factory()->create([
-        'proposal_id' => $proposal->id,
-        'milestone_id' => $milestone->id,
+        'source_type' => 'milestone',
+        'source_id' => $milestone->id,
         'title' => 'Stranded task',
     ]);
 
     Livewire::actingAs($user)
         ->test('pages::proposals.show', ['proposal' => $proposal])
         ->set('tab', 'tasks')
+        ->assertDontSeeText('Stranded task');
+});
+
+test('a task sourced directly from the proposal is listed apart from funded-project work', function () {
+    $user = User::factory()->role('Financial')->create();
+    $proposal = Proposal::factory()->create();
+
+    $funded = Project::factory()->create(['name' => 'Aleppo Water Response']);
+    $proposal->projects()->attach($funded);
+    $milestone = Milestone::factory()->create(['project_id' => $funded->id]);
+
+    Task::factory()->create([
+        'source_type' => 'milestone',
+        'source_id' => $milestone->id,
+        'title' => 'Milestone task',
+    ]);
+    Task::factory()->create([
+        'source_type' => 'proposal',
+        'source_id' => $proposal->id,
+        'title' => 'Proposal-level task',
+    ]);
+
+    Livewire::actingAs($user)
+        ->test('pages::proposals.show', ['proposal' => $proposal])
+        ->set('tab', 'tasks')
         ->assertSeeText('Work not tied to a funded project')
-        ->assertSeeText('Stranded task');
+        ->assertSeeText('Proposal-level task');
 });
 
 test('the promises reading counts targets carrying a report and flags one committed off the proposal', function () {
@@ -357,7 +385,7 @@ test('each tab shows only its own content and the strip counts its records', fun
         'proposal_id' => $proposal->id,
         'donor_id' => Donor::factory()->create(['name' => 'UNICEF'])->id,
     ]);
-    Task::factory()->create(['proposal_id' => $proposal->id, 'title' => 'Draft the budget narrative']);
+    Task::factory()->create(['source_type' => 'proposal', 'source_id' => $proposal->id, 'title' => 'Draft the budget narrative']);
 
     $component = Livewire::actingAs($user)
         ->test('pages::proposals.show', ['proposal' => $proposal]);
@@ -515,18 +543,18 @@ test('the tasks tab puts open work before finished work and flags overdue and la
     $user = User::factory()->role('Financial')->create();
     $proposal = Proposal::factory()->create();
 
-    Task::factory()->completed()->create(['proposal_id' => $proposal->id, 'milestone_id' => null, 'title' => 'Finished survey']);
+    Task::factory()->completed()->create(['source_type' => 'proposal', 'source_id' => $proposal->id, 'title' => 'Finished survey']);
     Task::factory()->create([
-        'proposal_id' => $proposal->id,
-        'milestone_id' => null,
+        'source_type' => 'proposal',
+        'source_id' => $proposal->id,
         'title' => 'Late procurement',
         'status' => TaskStatus::InProgress,
         'progress_percentage' => 40,
         'due_date' => now()->subDays(3)->toDateString(),
     ]);
     Task::factory()->create([
-        'proposal_id' => $proposal->id,
-        'milestone_id' => null,
+        'source_type' => 'proposal',
+        'source_id' => $proposal->id,
         'title' => 'Forgotten status',
         'status' => TaskStatus::Todo,
         'progress_percentage' => 100,
@@ -547,8 +575,8 @@ test('a finished task waiting under review is not flagged as a lagging status', 
     $proposal = Proposal::factory()->create();
 
     Task::factory()->create([
-        'proposal_id' => $proposal->id,
-        'milestone_id' => null,
+        'source_type' => 'proposal',
+        'source_id' => $proposal->id,
         'status' => TaskStatus::UnderReview,
         'progress_percentage' => 100,
     ]);

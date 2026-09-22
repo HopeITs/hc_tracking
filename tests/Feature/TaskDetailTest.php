@@ -22,7 +22,7 @@ test('missing tasks return not found from task detail', function () {
     $this->actingAs($user)->get(route('tasks.show', 999999))->assertNotFound();
 });
 
-test('task detail shows the task proposal milestone assignees and creator', function () {
+test('task detail shows the task milestone project assignees and creator', function () {
     $user = User::factory()->create();
     $assignee = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
     $creator = User::factory()->create(['name' => 'Bob Rahman']);
@@ -31,10 +31,9 @@ test('task detail shows the task proposal milestone assignees and creator', func
         'project_id' => $project->id,
         'name' => 'Distribution ready',
     ]);
-    $proposal = Proposal::factory()->create(['name' => 'Emergency Response']);
     $task = Task::factory()->create([
-        'milestone_id' => $milestone->id,
-        'proposal_id' => $proposal->id,
+        'source_type' => 'milestone',
+        'source_id' => $milestone->id,
         'title' => 'Draft distribution plan',
         'created_by' => $creator->id,
         'start_date' => '2026-09-01',
@@ -47,7 +46,6 @@ test('task detail shows the task proposal milestone assignees and creator', func
         ->get(route('tasks.show', $task))
         ->assertOk()
         ->assertSeeText('Draft distribution plan')
-        ->assertSeeText('Emergency Response')
         ->assertSeeText('Distribution ready')
         ->assertSeeText('Winter Support')
         ->assertSeeText('Alice Nadir')
@@ -55,6 +53,21 @@ test('task detail shows the task proposal milestone assignees and creator', func
         ->assertSeeText('35%')
         ->assertSeeText('Sep 1, 2026')
         ->assertSeeText('Sep 30, 2026');
+});
+
+test('task detail shows the task proposal as its source when it is not raised against a milestone', function () {
+    $user = User::factory()->create();
+    $proposal = Proposal::factory()->create(['name' => 'Emergency Response']);
+    $task = Task::factory()->create([
+        'source_type' => 'proposal',
+        'source_id' => $proposal->id,
+        'title' => 'Draft distribution plan',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('tasks.show', $task))
+        ->assertOk()
+        ->assertSeeText('Emergency Response');
 });
 
 test('task detail lists every assignee when a task has more than one', function () {
@@ -109,7 +122,8 @@ test('task detail escapes all user controlled content', function () {
         'title' => '<script>task()</script>',
         'description' => '<img src=x onerror=description()>',
         'created_by' => $creator->id,
-        'proposal_id' => $proposal->id,
+        'source_type' => 'proposal',
+        'source_id' => $proposal->id,
     ]);
     $task->taskAssignees()->create(['employee_id' => $assignee]);
     TaskAttachment::factory()->create([
@@ -134,22 +148,21 @@ test('task detail escapes all user controlled content', function () {
         ->assertDontSeeHtml('<img src=x onerror=attachment()>.pdf');
 });
 
-test('task detail renders a task without a milestone or attachments', function () {
+test('task detail renders a task with no attachments and no project link when the source is not a milestone', function () {
     $user = User::factory()->create();
-    $task = Task::factory()->create(['milestone_id' => null, 'description' => null]);
+    $task = Task::factory()->create(['source_type' => 'proposal', 'source_id' => Proposal::factory()->create()->id, 'description' => null]);
 
     $this->actingAs($user)
         ->get(route('tasks.show', $task))
         ->assertOk()
-        ->assertSeeText('No milestone')
         ->assertSeeText('No files recorded');
 });
 
-test('a subtask can be added from the task detail page and inherits the parent proposal milestone and assignees', function () {
+test('a subtask can be added from the task detail page and inherits the parent source and assignees', function () {
     $user = User::factory()->create();
     $milestone = Milestone::factory()->create();
     $assignee = insertHrEmployee();
-    $parent = Task::factory()->create(['milestone_id' => $milestone->id]);
+    $parent = Task::factory()->create(['source_type' => 'milestone', 'source_id' => $milestone->id]);
     $parent->taskAssignees()->delete();
     $parent->taskAssignees()->create(['employee_id' => $assignee]);
 
@@ -164,8 +177,8 @@ test('a subtask can be added from the task detail page and inherits the parent p
     $subtask = Task::query()->where('title', 'Confirm the delivery window')->sole();
 
     expect($subtask->parent_task_id)->toBe($parent->id)
-        ->and($subtask->proposal_id)->toBe($parent->proposal_id)
-        ->and($subtask->milestone_id)->toBe($milestone->id)
+        ->and($subtask->source_type)->toBe('milestone')
+        ->and($subtask->source_id)->toBe($milestone->id)
         ->and($subtask->taskAssignees->pluck('employee_id')->all())->toBe([$assignee])
         ->and($subtask->status)->toBe(TaskStatus::Todo)
         ->and($subtask->created_by)->toBe($user->id);

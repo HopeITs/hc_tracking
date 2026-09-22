@@ -37,14 +37,7 @@
         <div class="min-w-0 flex-1">
             <a href="{{ route('tasks.show', $task) }}" wire:navigate title="{{ $task->title }}" @class(['line-clamp-2 text-sm font-semibold break-words hover:underline', 'text-secondary-light line-through' => $isDone])>{{ $task->title }}</a>
             @unless ($isSubtask)
-                <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">
-                    @if ($task->milestone === null)
-                        <span class="italic">{{ __('tasks.no_milestone') }}</span>
-                    @else
-                        {{ $task->milestone->name }}
-                    @endif
-                    · {{ $task->proposal->name }}
-                </p>
+                <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $task->sourceLabel() }}</p>
             @endunless
         </div>
     </div>

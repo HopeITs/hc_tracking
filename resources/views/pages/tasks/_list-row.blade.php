@@ -80,18 +80,11 @@
             >{{ $task->title }}</a>
         </div>
         @unless ($isSubtask)
-            {{-- A subtask always shares its parent's milestone/proposal (see
+            {{-- A subtask always shares its parent's source (see
                  addSubtaskQuick()), so repeating this line on every subtask
                  row would just be noise — the parent row right above already
                  says it. --}}
-            <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">
-                @if ($task->milestone === null)
-                    <span class="italic">{{ __('tasks.no_milestone') }}</span>
-                @else
-                    {{ $task->milestone->name }}
-                @endif
-                · {{ $task->proposal->name }}
-            </p>
+            <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $task->sourceLabel() }}</p>
         @endunless
     </td>
     <td class="px-2">

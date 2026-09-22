@@ -2,18 +2,21 @@
 
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Models\Milestone;
 use App\Models\Task;
 use App\Models\TaskAttachment;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
-new #[Title('titles.task')] class extends Component {
+new #[Title('titles.task')] class extends Component
+{
     #[Locked]
     public int $taskId;
 
@@ -30,9 +33,9 @@ new #[Title('titles.task')] class extends Component {
         return Task::query()
             ->select([
                 'id',
-                'milestone_id',
                 'parent_task_id',
-                'proposal_id',
+                'source_type',
+                'source_id',
                 'title',
                 'description',
                 'status',
@@ -44,9 +47,12 @@ new #[Title('titles.task')] class extends Component {
                 'created_by',
             ])
             ->with([
-                'milestone:id,name,project_id',
-                'milestone.project:id,name',
-                'proposal:id,name',
+                // morphWith() eager loads the milestone's project on top of
+                // the source itself in the same batch, so the meta line
+                // below can show "milestone · project" without an extra
+                // query — the other four source types have nothing further
+                // to load.
+                'source' => fn (MorphTo $morphTo) => $morphTo->morphWith([Milestone::class => ['project:id,name']]),
                 'taskAssignees.employee:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
                 'creator:id,name',
                 'parentTask:id,title',
@@ -67,10 +73,10 @@ new #[Title('titles.task')] class extends Component {
     }
 
     /**
-     * A subtask inherits its parent's proposal, milestone and assignees so it
-     * can be created immediately from a single title — the same required
-     * fields the top-level "add task" flow needs, just pre-filled here
-     * instead of asked for, since the parent already answers them.
+     * A subtask inherits its parent's source and assignees so it can be
+     * created immediately from a single title — the same required fields
+     * the top-level "add task" flow needs, just pre-filled here instead of
+     * asked for, since the parent already answers them.
      */
     public function addSubtask(): void
     {
@@ -86,8 +92,8 @@ new #[Title('titles.task')] class extends Component {
 
         $subtask = Task::query()->create([
             'parent_task_id' => $parent->id,
-            'proposal_id' => $parent->proposal_id,
-            'milestone_id' => $parent->milestone_id,
+            'source_type' => $parent->source_type,
+            'source_id' => $parent->source_id,
             'title' => $validated['newSubtaskTitle'],
             'status' => TaskStatus::Todo,
             'priority' => TaskPriority::Medium,
@@ -149,14 +155,12 @@ new #[Title('titles.task')] class extends Component {
             ['label' => $this->task->title],
         ]"
         :title="$this->task->title"
-        :subtitle="$this->task->proposal->name"
+        :subtitle="$this->task->sourceLabel()"
     >
         <x-slot:meta>
-            @if ($this->task->milestone === null)
-                <span class="italic">{{ __('tasks.no_milestone') }}</span>
-            @else
-                <a href="{{ route('projects.show', $this->task->milestone->project) }}" wire:navigate class="font-medium hover:underline">
-                    {{ $this->task->milestone->name }} · {{ $this->task->milestone->project->name }}
+            @if ($this->task->source instanceof \App\Models\Milestone)
+                <a href="{{ route('projects.show', $this->task->source->project) }}" wire:navigate class="font-medium hover:underline">
+                    {{ $this->task->source->name }} · {{ $this->task->source->project->name }}
                 </a>
             @endif
             <span>{{ __('tasks.assigned_to_name', ['name' => $assignees->isEmpty() ? __('common.not_assigned') : $assignees->map->name->implode(', ')]) }}</span>

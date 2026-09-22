@@ -208,7 +208,8 @@ test('saving a task from the calendar creates it with the clicked due date', fun
         ->test('pages::calendar.index')
         ->call('openCreateTaskModal', '2026-06-15')
         ->set('title', 'Follow up with donor')
-        ->set('taskProposalId', (string) $proposal->id)
+        ->set('taskSourceType', 'proposal')
+        ->set('taskSourceId', (string) $proposal->id)
         ->call('saveTask')
         ->assertHasNoErrors()
         ->assertSet('showTaskModal', false);
@@ -217,7 +218,8 @@ test('saving a task from the calendar creates it with the clicked due date', fun
 
     expect($task->due_date->toDateString())->toBe('2026-06-15')
         ->and($task->taskAssignees->pluck('employee_id')->all())->toBe([$employeeId])
-        ->and($task->proposal_id)->toBe($proposal->id);
+        ->and($task->source_type)->toBe('proposal')
+        ->and($task->source_id)->toBe($proposal->id);
 });
 
 test('a linked user sees their own report deadlines on the correct day, and not another user\'s', function () {

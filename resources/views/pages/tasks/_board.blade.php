@@ -70,9 +70,7 @@
                             </div>
                         </div>
 
-                        @if ($task->milestone !== null)
-                            <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $task->milestone->name }}</p>
-                        @endif
+                        <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $task->sourceLabel() }}</p>
 
                         <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                             <flux:dropdown position="bottom" align="start">
