@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
@@ -113,7 +114,8 @@ class User extends Authenticatable implements PasskeyUser
     /**
      * The tracking user for an HR account, created on first use.
      *
-     * Every HR account may use tracking. A new user starts with no role,
+     * Only active HR accounts (see HrUser::isActive()) may use tracking; the
+     * caller checks that first. A new user starts with no role,
      * except an email listed in auth.hr_admin_emails, which starts as Super
      * Admin.
      */
@@ -133,7 +135,7 @@ class User extends Authenticatable implements PasskeyUser
     }
 
     /**
-     * Create the missing tracking users for every HR account.
+     * Create the missing tracking users for every active HR account.
      *
      * @return int The number of users created.
      */
@@ -142,7 +144,7 @@ class User extends Authenticatable implements PasskeyUser
         $existingEmails = static::query()->pluck('email')->map(fn (string $email): string => mb_strtolower($email))->flip();
         $created = 0;
 
-        HrUser::query()->with('employee')->orderBy('id')->each(function (HrUser $hrUser) use ($existingEmails, &$created): void {
+        HrUser::query()->active()->with('employee')->orderBy('id')->each(function (HrUser $hrUser) use ($existingEmails, &$created): void {
             if ($existingEmails->has(mb_strtolower($hrUser->email))) {
                 return;
             }
@@ -152,6 +154,36 @@ class User extends Authenticatable implements PasskeyUser
         });
 
         return $created;
+    }
+
+    /**
+     * Delete the tracking users whose HR account is gone or no longer active.
+     *
+     * A user still referenced by records that restrict deletion (reports,
+     * indicator readings, uploads, created tasks) is kept.
+     *
+     * @return array{deleted: int, kept: list<string>}
+     */
+    public static function pruneInactiveHrAccounts(): array
+    {
+        $activeEmails = HrUser::query()->active()->pluck('email')->map(fn (string $email): string => mb_strtolower($email))->flip();
+        $deleted = 0;
+        $kept = [];
+
+        static::query()->orderBy('id')->each(function (User $user) use ($activeEmails, &$deleted, &$kept): void {
+            if ($activeEmails->has(mb_strtolower($user->email))) {
+                return;
+            }
+
+            try {
+                $user->delete();
+                $deleted++;
+            } catch (QueryException) {
+                $kept[] = $user->email;
+            }
+        });
+
+        return ['deleted' => $deleted, 'kept' => $kept];
     }
 
     /**

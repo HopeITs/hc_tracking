@@ -77,6 +77,12 @@ class CreateUserCommand extends Command
             return self::FAILURE;
         }
 
+        if (! $hrUser->isActive()) {
+            $this->components->error("The HR employee behind {$email} is not active.");
+
+            return self::FAILURE;
+        }
+
         $user = User::createFromHrAccount($hrUser, $validated['role'], verified: ! $this->option('unverified'));
 
         $this->components->info("Created {$user->email}".($validated['role'] !== null ? " as {$validated['role']}." : ' with no role.'));

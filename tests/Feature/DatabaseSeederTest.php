@@ -166,3 +166,17 @@ test('every seeded transfer reconciles', function () {
             ->and((float) $tranche->fees)->toBeGreaterThanOrEqual(0.0);
     }
 });
+
+test('seeding uses active hr employees only', function () {
+    $inactiveId = insertHrEmployee(isActive: false);
+    insertHrEmployee();
+    insertHrUser($inactiveId, 'gone@example.org');
+    insertHrUser(insertHrEmployee(), 'rana@example.org');
+
+    $this->seed();
+
+    expect(User::query()->where('email', 'gone@example.org')->exists())->toBeFalse()
+        ->and(TaskAssignee::query()->where('employee_id', $inactiveId)->exists())->toBeFalse()
+        ->and(Program::query()->where('manager_id', $inactiveId)->exists())->toBeFalse()
+        ->and(Project::query()->where('user_id', $inactiveId)->exists())->toBeFalse();
+});

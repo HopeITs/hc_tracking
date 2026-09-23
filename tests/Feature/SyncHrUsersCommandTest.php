@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Report;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
@@ -27,4 +28,28 @@ test('syncing again leaves existing users and their roles alone', function () {
 
     expect(User::query()->count())->toBe(1)
         ->and($user->refresh()->roles->first()?->name)->toBe('Managers');
+});
+
+test('inactive hr employees get no tracking user', function () {
+    insertHrUser(insertHrEmployee(isActive: false), 'gone@example.org');
+    insertHrUser(null, 'system@example.org');
+
+    $this->artisan('hr:sync-users')->assertSuccessful();
+
+    expect(User::query()->pluck('email')->all())->toBe(['system@example.org']);
+});
+
+test('users of inactive hr employees are deleted unless records reference them', function () {
+    insertHrUser(insertHrEmployee(isActive: false), 'gone@example.org');
+    insertHrUser(insertHrEmployee(isActive: false), 'busy@example.org');
+    insertHrUser(insertHrEmployee(), 'rana@example.org');
+    User::factory()->create(['email' => 'gone@example.org']);
+    $busy = User::factory()->create(['email' => 'busy@example.org']);
+    Report::factory()->create(['user_id' => $busy->id]);
+
+    $this->artisan('hr:sync-users')
+        ->expectsOutputToContain('Kept busy@example.org')
+        ->assertSuccessful();
+
+    expect(User::query()->orderBy('email')->pluck('email')->all())->toBe(['busy@example.org', 'rana@example.org']);
 });

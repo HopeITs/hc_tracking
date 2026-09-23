@@ -102,24 +102,21 @@ class DeliverySeeder extends Seeder
      */
     protected function seedTasks(Milestone $milestone, $users, Collection $employeeIds): void
     {
-        $open = Task::factory(2)->create([
+        $assignee = TaskAssignee::factory()->state(fn (): array => ['employee_id' => $employeeIds->random()]);
+
+        $open = Task::factory(2)->has($assignee, 'taskAssignees')->create([
             'source_type' => 'milestone',
             'source_id' => $milestone->id,
             'created_by' => fn (): int => $users->random()->id,
         ]);
 
-        $done = Task::factory()->completed()->create([
+        $done = Task::factory()->completed()->has($assignee, 'taskAssignees')->create([
             'source_type' => 'milestone',
             'source_id' => $milestone->id,
             'created_by' => $users->random()->id,
         ]);
 
         foreach ($open->push($done) as $task) {
-            TaskAssignee::factory()->create([
-                'task_id' => $task->id,
-                'employee_id' => $employeeIds->random(),
-            ]);
-
             TaskAttachment::factory()->create([
                 'task_id' => $task->id,
             ]);

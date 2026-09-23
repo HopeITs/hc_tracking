@@ -41,7 +41,7 @@ class AuthenticateWithHrAccount
 
         $hrUser = self::findHrUserByEmail($email);
 
-        if ($hrUser === null) {
+        if ($hrUser === null || ! $hrUser->isActive()) {
             return null;
         }
 
@@ -79,7 +79,7 @@ class AuthenticateWithHrAccount
 
         $hrUser = self::findHrUserByEmail($email);
 
-        return $hrUser !== null && Hash::check($password, $hrUser->password) ? $hrUser : null;
+        return $hrUser !== null && $hrUser->isActive() && Hash::check($password, $hrUser->password) ? $hrUser : null;
     }
 
     private static function findHrUserByEmail(string $email): ?HrUser

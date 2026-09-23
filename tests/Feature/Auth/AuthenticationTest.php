@@ -27,6 +27,18 @@ test('users can authenticate with their hr password', function () {
     $this->assertAuthenticatedAs($user);
 });
 
+test('inactive hr employees cannot log in', function () {
+    insertHrUser(insertHrEmployee(isActive: false), 'gone@example.org');
+
+    $this->post(route('login.store'), [
+        'email' => 'gone@example.org',
+        'password' => 'password',
+    ])->assertSessionHasErrors('email');
+
+    $this->assertGuest();
+    expect(User::query()->where('email', 'gone@example.org')->exists())->toBeFalse();
+});
+
 test('logging in links the user to their hr account and refreshes their name', function () {
     $employeeId = insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Darwish');
     $hrUserId = insertHrUser($employeeId, 'rana@example.org', 'hr-secret');

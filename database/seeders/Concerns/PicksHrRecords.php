@@ -31,13 +31,13 @@ trait PicksHrRecords
     }
 
     /**
-     * The ids of the HR employees work can be assigned to.
+     * The ids of the active HR employees work can be assigned to.
      *
      * @return Collection<int, int>
      */
     protected function hrEmployeeIds(): Collection
     {
-        $ids = HrEmployee::query()->pluck('id');
+        $ids = HrEmployee::query()->where('is_active', true)->pluck('id');
 
         return $ids->isNotEmpty() ? $ids : collect(range(1, 6))->map(fn (): int => $this->createHrEmployee());
     }

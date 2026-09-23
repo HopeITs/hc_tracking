@@ -59,7 +59,11 @@
         />
     </flux:sidebar.header>
 
-    <flux:sidebar.nav aria-label="{{ __('navigation.primary_navigation') }}" class="min-h-0 flex-1 gap-3 overflow-y-auto">
+    <flux:sidebar.nav aria-label="{{ __('navigation.primary_navigation') }}" class="min-h-0 flex-1 gap-3 overflow-y-auto"
+        x-data
+        x-init="$el.scrollTop = Number(sessionStorage.getItem('sidebar-scroll') ?? 0)"
+        x-on:scroll.debounce.50ms="sessionStorage.setItem('sidebar-scroll', $el.scrollTop)"
+    >
         <flux:sidebar.group
             :heading="__('navigation.overview')"
             :class="$navigationGroupClasses"

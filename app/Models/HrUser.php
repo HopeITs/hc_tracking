@@ -6,6 +6,8 @@ namespace App\Models;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
@@ -34,6 +36,30 @@ class HrUser extends HrModel
         return [
             'email_verified_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Whether this account may use hc-tracking: its employee is active in HR.
+     *
+     * A system account with no employee record (e.g. HR's super admin) counts
+     * as active.
+     */
+    public function isActive(): bool
+    {
+        return $this->employee_id === null || $this->employee?->is_active === true;
+    }
+
+    /**
+     * Accounts that may use hc-tracking, matching isActive().
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function active(Builder $query): void
+    {
+        $query->where(fn (Builder $query) => $query
+            ->whereNull('employee_id')
+            ->orWhereHas('employee', fn (Builder $query) => $query->where('is_active', true)));
     }
 
     /**
