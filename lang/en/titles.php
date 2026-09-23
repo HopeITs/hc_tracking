@@ -37,4 +37,7 @@ return [
     'timeline' => 'Timeline',
     'transfers' => 'Transfers',
     'user_directory' => 'User directory',
+    'activity_log' => 'Activity log',
+    'notifications' => 'Notifications',
+    'notification_settings' => 'Notification settings',
 ];

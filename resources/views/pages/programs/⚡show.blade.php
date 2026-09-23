@@ -400,7 +400,12 @@ new #[Title('titles.program')] class extends Component {
                     <div class="flex size-11 shrink-0 items-center justify-center rounded-md bg-primary text-white"><flux:icon name="briefcase" class="size-5" /></div>
                     <div class="min-w-0">
                         <p class="text-xs font-semibold tracking-[0.12em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('common.program') }}</p>
-                        <h1 class="mt-1 text-3xl font-bold tracking-tight text-secondary-dark dark:text-white @3xl/detail:text-4xl">{{ $this->program->name }}</h1>
+                        <div class="mt-1 flex items-center gap-2">
+                            <h1 class="text-3xl font-bold tracking-tight text-secondary-dark dark:text-white @3xl/detail:text-4xl">{{ $this->program->name }}</h1>
+                            @if (app(\App\Notifications\UnreadSubjects::class)->has(auth()->user(), 'program', $this->program->id))
+                                <span class="size-2.5 shrink-0 rounded-full bg-primary" data-unread-dot title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
+                            @endif
+                        </div>
                     </div>
                 </div>
 
@@ -491,4 +496,9 @@ new #[Title('titles.program')] class extends Component {
     @else
         <x-ui.logframe :roots="$this->resultRoots" :summary="$this->resultSummary" />
     @endif
+
+    <section aria-labelledby="record-activity-heading" class="grid gap-3" data-record-activity>
+        <h2 id="record-activity-heading" class="text-base font-bold">{{ __('activity.title') }}</h2>
+        <livewire:activity.timeline :subjects="['program' => [$this->program->id]]" :key="'program-activity-'.$this->program->id" />
+    </section>
 </section>

@@ -12,6 +12,9 @@
 
             <div class="min-w-0 flex-1">
                 <div class="flex flex-wrap items-center gap-2">
+                    @if (in_array($milestone->id, $this->unreadIds, true))
+                        <span class="size-2 shrink-0 rounded-full bg-primary" data-unread-dot="milestone-{{ $milestone->id }}" title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
+                    @endif
                     <p class="min-w-0 font-semibold text-secondary-dark dark:text-white">{{ $milestone->name }}</p>
                     <x-ui.enum-badge :case="$milestone->status" />
                     <x-ui.milestone-flags :milestone="$milestone" />

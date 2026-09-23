@@ -37,4 +37,7 @@ return [
     'timeline' => 'الخط الزمني',
     'transfers' => 'التحويلات',
     'user_directory' => 'دليل المستخدمين',
+    'activity_log' => 'سجل النشاط',
+    'notifications' => 'الإشعارات',
+    'notification_settings' => 'إعدادات الإشعارات',
 ];

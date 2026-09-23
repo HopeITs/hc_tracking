@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\RecordsParentActivity;
 use Carbon\CarbonImmutable;
 use Database\Factories\IndicatorProgressFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -32,7 +33,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class IndicatorProgress extends Model
 {
     /** @use HasFactory<IndicatorProgressFactory> */
-    use HasFactory;
+    use HasFactory, RecordsParentActivity;
 
     /**
      * Eloquent would pluralize this to `indicator_progresses`.
@@ -72,5 +73,26 @@ class IndicatorProgress extends Model
             'date' => 'date',
             'value' => 'decimal:2',
         ];
+    }
+
+    /**
+     * Readings are logged on their indicator.
+     */
+    public function activityParent(): ?Indicator
+    {
+        return $this->indicator()->first();
+    }
+
+    protected function parentActivityEvent(string $hook): ?string
+    {
+        return $hook === 'created' ? 'indicator.progress_recorded' : null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function parentActivityProperties(string $hook): array
+    {
+        return ['value' => rtrim(rtrim((string) $this->value, '0'), '.')];
     }
 }

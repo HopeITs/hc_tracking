@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\RecordsActivity;
 use App\Enums\DonorType;
+use App\Notifications\TracksActivity;
 use Carbon\CarbonImmutable;
 use Database\Factories\DonorFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -29,10 +31,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable|null $updated_at
  */
 #[Fillable(['name', 'type', 'contact_person', 'email', 'phone', 'country', 'notes', 'last_contacted_on', 'next_step', 'next_step_due_on'])]
-class Donor extends Model
+class Donor extends Model implements TracksActivity
 {
     /** @use HasFactory<DonorFactory> */
-    use HasFactory;
+    use HasFactory, RecordsActivity;
 
     /**
      * The funding agreements this donor has signed.
@@ -82,5 +84,28 @@ class Donor extends Model
             'last_contacted_on' => 'date',
             'next_step_due_on' => 'date',
         ];
+    }
+
+    public function activityModule(): string
+    {
+        return 'donors';
+    }
+
+    public function activityLabel(): string
+    {
+        return (string) $this->activityAttribute('name');
+    }
+
+    public function activityProgramId(): ?int
+    {
+        return null;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function activityEvents(): array
+    {
+        return ['name' => 'updated', 'contact_person' => 'updated', 'next_step' => 'updated', 'next_step_due_on' => 'updated'];
     }
 }

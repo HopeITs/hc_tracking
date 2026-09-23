@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'activity_log' => 'Activity log',
     'administration' => 'Administration',
     'application_navigation' => 'Application navigation',
     'documentation' => 'Documentation',

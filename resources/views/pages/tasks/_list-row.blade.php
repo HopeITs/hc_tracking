@@ -72,6 +72,9 @@
                     @endif
                 </button>
             @endif
+            @if (in_array($task->id, $this->unreadIds, true))
+                <span class="size-2 shrink-0 rounded-full bg-primary" data-unread-dot="task-{{ $task->id }}" title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
+            @endif
             <a
                 href="{{ route('tasks.show', $task) }}"
                 wire:navigate

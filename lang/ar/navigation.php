@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'activity_log' => 'سجل النشاط',
     'administration' => 'الإدارة',
     'application_navigation' => 'التنقل في التطبيق',
     'documentation' => 'التوثيق',

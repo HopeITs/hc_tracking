@@ -10,6 +10,7 @@ use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Task;
 use App\Models\TaskAssignee;
+use App\Notifications\UnreadSubjects;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -272,6 +273,17 @@ new #[Title('titles.tasks')] class extends Component
             ->when($this->assignee !== '', fn (Builder $query) => $query->whereHas('taskAssignees', fn (Builder $query) => $query->where('employee_id', (int) $this->assignee)))
             ->when($this->sourceType !== '', fn (Builder $query) => $query->where('source_type', $this->sourceType))
             ->when($this->sourceType !== '' && $this->sourceId !== '', fn (Builder $query) => $query->where('source_id', (int) $this->sourceId));
+    }
+
+    /**
+     * Records with unread notifications for me, for the row dots.
+     *
+     * @return list<int>
+     */
+    #[Computed]
+    public function unreadIds(): array
+    {
+        return app(UnreadSubjects::class)->ids(auth()->user(), 'task');
     }
 
     /** @return LengthAwarePaginator<int, Task> */

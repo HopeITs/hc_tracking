@@ -1688,6 +1688,7 @@ new #[Title('titles.proposal')] class extends Component {
             ['label' => $this->proposal->name],
         ]"
         :title="$this->proposal->name"
+        :unread="app(\App\Notifications\UnreadSubjects::class)->has(auth()->user(), 'proposal', $this->proposal->id)"
         title-class="text-3xl! font-bold! leading-none! tracking-tight! @3xl/detail:text-[2.5rem]!"
     >
         <x-slot:meta>
@@ -2710,6 +2711,11 @@ new #[Title('titles.proposal')] class extends Component {
             </div>
         @endif
     </div>
+
+    <section aria-labelledby="record-activity-heading" class="grid gap-3 mt-10" data-record-activity>
+        <h2 id="record-activity-heading" class="text-base font-bold">{{ __('activity.title') }}</h2>
+        <livewire:activity.timeline :subjects="['proposal' => [$this->proposal->id]]" :key="'proposal-activity-'.$this->proposal->id" />
+    </section>
 
     <flux:modal wire:model="showStatusModal" class="w-full max-w-xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
         <form wire:submit="changeStatus" class="space-y-5">

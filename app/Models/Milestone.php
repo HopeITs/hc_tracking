@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Concerns\HasTree;
+use App\Concerns\RecordsActivity;
 use App\Enums\MilestoneStatus;
+use App\Notifications\TracksActivity;
 use App\Observers\MediaOwnerObserver;
 use App\Observers\MilestoneObserver;
 use App\Observers\ScheduleItemObserver;
@@ -48,10 +50,10 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
     'parent_milestone_id',
 ])]
 #[ObservedBy([MilestoneObserver::class, MediaOwnerObserver::class, ScheduleItemObserver::class])]
-class Milestone extends Model
+class Milestone extends Model implements TracksActivity
 {
     /** @use HasFactory<MilestoneFactory> */
-    use HasFactory;
+    use HasFactory, RecordsActivity;
 
     use HasTree;
 
@@ -157,5 +159,55 @@ class Milestone extends Model
         return $this->status === MilestoneStatus::Planned
             && $this->planned_end_date !== null
             && $this->planned_end_date->isPast();
+    }
+
+    public function activityModule(): string
+    {
+        return 'milestones';
+    }
+
+    public function activityLabel(): string
+    {
+        return (string) $this->activityAttribute('name');
+    }
+
+    public function activityProgramId(): ?int
+    {
+        return Project::programIdFor($this->activityAttribute('project_id'));
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function activityEvents(): array
+    {
+        return [
+            'status' => 'status_changed',
+            'responsible_user_id' => 'responsible_changed',
+            'planned_start_date' => 'dates_changed',
+            'planned_end_date' => 'dates_changed',
+            'name' => 'updated',
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function activityEmployeeFields(): array
+    {
+        return ['responsible_user_id'];
+    }
+
+    /**
+     * The responsible person and project owner, remembered for the deleted event.
+     *
+     * @return array<string, mixed>
+     */
+    protected function activityPropertiesBeforeDelete(): array
+    {
+        return ['employee_ids' => array_values(array_filter([
+            (int) $this->activityAttribute('responsible_user_id'),
+            Project::ownerEmployeeIdFor($this->activityAttribute('project_id')),
+        ]))];
     }
 }

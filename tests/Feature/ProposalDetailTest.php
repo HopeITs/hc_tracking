@@ -3,6 +3,7 @@
 use App\Enums\Currency;
 use App\Enums\ProposalStatus;
 use App\Enums\TaskStatus;
+use App\Models\Activity;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\Indicator;
@@ -49,20 +50,22 @@ test('proposal detail shows only its own status notes newest first', function ()
     $proposal = Proposal::factory()->create();
     $other = Proposal::factory()->create();
 
-    ProposalStatusNote::factory()->create([
-        'proposal_id' => $proposal->id,
-        'context' => 'Older note',
-        'date' => '2026-01-01',
-    ]);
-    ProposalStatusNote::factory()->create([
-        'proposal_id' => $proposal->id,
-        'context' => 'Newer note',
-        'date' => '2026-06-01',
-    ]);
-    ProposalStatusNote::factory()->create([
-        'proposal_id' => $other->id,
-        'context' => 'Someone elses note',
-    ]);
+    Activity::withoutRecording(function () use ($proposal, $other): void {
+        ProposalStatusNote::factory()->create([
+            'proposal_id' => $proposal->id,
+            'context' => 'Older note',
+            'date' => '2026-01-01',
+        ]);
+        ProposalStatusNote::factory()->create([
+            'proposal_id' => $proposal->id,
+            'context' => 'Newer note',
+            'date' => '2026-06-01',
+        ]);
+        ProposalStatusNote::factory()->create([
+            'proposal_id' => $other->id,
+            'context' => 'Someone elses note',
+        ]);
+    });
 
     $this->actingAs($user)
         ->get(route('proposals.show', $proposal))

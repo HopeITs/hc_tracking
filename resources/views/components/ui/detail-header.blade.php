@@ -1,4 +1,4 @@
-@props(['breadcrumbs' => [], 'title', 'subtitle' => null, 'titleClass' => null])
+@props(['breadcrumbs' => [], 'title', 'subtitle' => null, 'titleClass' => null, 'unread' => false])
 
 <header {{ $attributes->class('flex flex-col gap-3 border-b border-secondary-soft pb-4 dark:border-secondary-medium') }}>
     @if ($breadcrumbs !== [])
@@ -19,7 +19,12 @@
 
     <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
         <div class="min-w-0 sm:me-auto">
-            <flux:heading size="lg" class="{{ $titleClass }}">{{ $title }}</flux:heading>
+            <div class="flex min-w-0 items-center gap-2">
+                <flux:heading size="lg" class="{{ $titleClass }}">{{ $title }}</flux:heading>
+                @if ($unread)
+                    <span class="size-2.5 shrink-0 rounded-full bg-primary" data-unread-dot title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
+                @endif
+            </div>
             @if ($subtitle !== null)
                 <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ $subtitle }}</p>
             @endif

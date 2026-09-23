@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\RecordsParentActivity;
 use App\Enums\FileType;
 use Carbon\CarbonImmutable;
 use Database\Factories\TaskAttachmentFactory;
@@ -25,7 +26,25 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class TaskAttachment extends Model
 {
     /** @use HasFactory<TaskAttachmentFactory> */
-    use HasFactory;
+    use HasFactory, RecordsParentActivity;
+
+    public function activityParent(): ?Task
+    {
+        return $this->task()->first();
+    }
+
+    protected function parentActivityEvent(string $hook): ?string
+    {
+        return $hook === 'created' ? 'task.attachment_added' : null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function parentActivityProperties(string $hook): array
+    {
+        return ['file' => basename((string) $this->path)];
+    }
 
     /**
      * The task this file is attached to.

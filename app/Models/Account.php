@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\RecordsActivity;
+use App\Notifications\TracksActivity;
 use Carbon\CarbonImmutable;
 use Database\Factories\AccountFactory;
 use DateTimeInterface;
@@ -31,10 +33,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable|null $updated_at
  */
 #[Fillable(['name', 'opened_at', 'closed_at', 'is_active'])]
-class Account extends Model
+class Account extends Model implements TracksActivity
 {
     /** @use HasFactory<AccountFactory> */
-    use HasFactory;
+    use HasFactory, RecordsActivity;
 
     /**
      * Mirror the column default so a model that has not been round-tripped
@@ -102,5 +104,40 @@ class Account extends Model
             'closed_at' => 'date',
             'is_active' => 'boolean',
         ];
+    }
+
+    public function activityModule(): string
+    {
+        return 'accounts';
+    }
+
+    public function activityLabel(): string
+    {
+        return (string) $this->activityAttribute('name');
+    }
+
+    public function activityProgramId(): ?int
+    {
+        return null;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function activityEvents(): array
+    {
+        return ['is_active' => 'closed', 'name' => 'updated'];
+    }
+
+    /**
+     * Only deactivating is "closed"; reopening is a plain update.
+     */
+    protected function activityEventForChange(string $field, mixed $old, mixed $new): ?string
+    {
+        if ($field === 'is_active') {
+            return (bool) $new ? 'updated' : 'closed';
+        }
+
+        return $this->activityEvents()[$field] ?? null;
     }
 }

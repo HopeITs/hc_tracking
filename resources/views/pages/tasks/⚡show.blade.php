@@ -155,6 +155,7 @@ new #[Title('titles.task')] class extends Component
             ['label' => $this->task->title],
         ]"
         :title="$this->task->title"
+        :unread="app(\App\Notifications\UnreadSubjects::class)->has(auth()->user(), 'task', $this->task->id)"
         :subtitle="$this->task->sourceLabel()"
     >
         <x-slot:meta>
@@ -267,4 +268,9 @@ new #[Title('titles.task')] class extends Component
             </ul>
         @endif
     </x-ui.panel>
+
+    <section aria-labelledby="record-activity-heading" class="grid gap-3" data-record-activity>
+        <h2 id="record-activity-heading" class="text-base font-bold">{{ __('activity.title') }}</h2>
+        <livewire:activity.timeline :subjects="['task' => [$this->task->id]]" :key="'task-activity-'.$this->task->id" />
+    </section>
 </section>

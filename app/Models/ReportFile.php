@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\RecordsParentActivity;
 use App\Enums\FileType;
 use Carbon\CarbonImmutable;
 use Database\Factories\ReportFileFactory;
@@ -31,7 +32,7 @@ use Illuminate\Support\Facades\Storage;
 class ReportFile extends Model
 {
     /** @use HasFactory<ReportFileFactory> */
-    use HasFactory;
+    use HasFactory, RecordsParentActivity;
 
     /**
      * Mirror the column default so an unsaved model still reports its disk
@@ -104,5 +105,26 @@ class ReportFile extends Model
             'type' => FileType::class,
             'size' => 'integer',
         ];
+    }
+
+    /**
+     * Files are logged on their report.
+     */
+    public function activityParent(): ?Report
+    {
+        return $this->report()->first();
+    }
+
+    protected function parentActivityEvent(string $hook): ?string
+    {
+        return $hook === 'created' ? 'report.file_added' : null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function parentActivityProperties(string $hook): array
+    {
+        return ['file' => (string) ($this->original_name ?? basename((string) $this->path))];
     }
 }

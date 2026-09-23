@@ -1,4 +1,5 @@
 @php
+    $moduleCounts = auth()->check() ? app(\App\Notifications\UnreadCounts::class)->for(auth()->user())['modules'] : [];
     $navigationGroupClasses = '[&>div:first-child>div]:text-[11px]! [&>div:first-child>div]:font-semibold! [&>div:first-child>div]:tracking-[0.12em] [&>div:first-child>div]:text-secondary-light! [&>div:first-child>div]:uppercase dark:[&>div:first-child>div]:text-secondary-soft! in-data-flux-sidebar-collapsed-desktop:flex! in-data-flux-sidebar-collapsed-desktop:[&>div:first-child]:hidden!';
     $navigationItemClasses = 'touch-manipulation rounded-lg! text-secondary-dark! hover:bg-secondary-soft/70! max-lg:h-11! data-current:border-primary! data-current:bg-primary! data-current:font-semibold! data-current:text-white! data-current:shadow-sm! dark:text-secondary-soft! dark:hover:bg-white/10! dark:hover:text-white! dark:data-current:border-primary! dark:data-current:bg-primary! dark:data-current:text-white!';
 @endphp
@@ -111,6 +112,9 @@
                 wire:navigate
             >
                 {{ __('common.strategies') }}
+                <x-slot:icon-trailing>
+                    <x-notifications.module-badge module="strategies" :count="$moduleCounts['strategies'] ?? 0" />
+                </x-slot:icon-trailing>
             </flux:sidebar.item>
 
             <flux:sidebar.item
@@ -121,6 +125,9 @@
                 wire:navigate
             >
                 {{ __('common.programs') }}
+                <x-slot:icon-trailing>
+                    <x-notifications.module-badge module="programs" :count="$moduleCounts['programs'] ?? 0" />
+                </x-slot:icon-trailing>
             </flux:sidebar.item>
 
             <flux:sidebar.item
@@ -131,6 +138,9 @@
                 wire:navigate
             >
                 {{ __('common.annual_plans') }}
+                <x-slot:icon-trailing>
+                    <x-notifications.module-badge module="annual-plans" :count="$moduleCounts['annual-plans'] ?? 0" />
+                </x-slot:icon-trailing>
             </flux:sidebar.item>
         </flux:sidebar.group>
 
@@ -146,6 +156,9 @@
                 wire:navigate
             >
                 {{ __('common.projects') }}
+                <x-slot:icon-trailing>
+                    <x-notifications.module-badge module="projects" :count="$moduleCounts['projects'] ?? 0" />
+                </x-slot:icon-trailing>
             </flux:sidebar.item>
 
             <flux:sidebar.item
@@ -166,6 +179,9 @@
                 wire:navigate
             >
                 {{ __('common.milestones') }}
+                <x-slot:icon-trailing>
+                    <x-notifications.module-badge module="milestones" :count="$moduleCounts['milestones'] ?? 0" />
+                </x-slot:icon-trailing>
             </flux:sidebar.item>
 
             <flux:sidebar.item
@@ -176,6 +192,9 @@
                 wire:navigate
             >
                 {{ __('common.tasks') }}
+                <x-slot:icon-trailing>
+                    <x-notifications.module-badge module="tasks" :count="$moduleCounts['tasks'] ?? 0" />
+                </x-slot:icon-trailing>
             </flux:sidebar.item>
 
             <flux:sidebar.item
@@ -186,6 +205,9 @@
                 wire:navigate
             >
                 {{ __('common.risks') }}
+                <x-slot:icon-trailing>
+                    <x-notifications.module-badge module="risks" :count="$moduleCounts['risks'] ?? 0" />
+                </x-slot:icon-trailing>
             </flux:sidebar.item>
         </flux:sidebar.group>
 
@@ -201,6 +223,9 @@
                 wire:navigate
             >
                 {{ __('common.results_framework') }}
+                <x-slot:icon-trailing>
+                    <x-notifications.module-badge module="results" :count="$moduleCounts['results'] ?? 0" />
+                </x-slot:icon-trailing>
             </flux:sidebar.item>
 
             <flux:sidebar.item
@@ -211,6 +236,9 @@
                 wire:navigate
             >
                 {{ __('common.indicators') }}
+                <x-slot:icon-trailing>
+                    <x-notifications.module-badge module="indicators" :count="$moduleCounts['indicators'] ?? 0" />
+                </x-slot:icon-trailing>
             </flux:sidebar.item>
 
             <flux:sidebar.item
@@ -221,6 +249,9 @@
                 wire:navigate
             >
                 {{ __('common.targets') }}
+                <x-slot:icon-trailing>
+                    <x-notifications.module-badge module="targets" :count="$moduleCounts['targets'] ?? 0" />
+                </x-slot:icon-trailing>
             </flux:sidebar.item>
 
             <flux:sidebar.item
@@ -231,6 +262,9 @@
                 wire:navigate
             >
                 {{ __('common.reports') }}
+                <x-slot:icon-trailing>
+                    <x-notifications.module-badge module="reports" :count="$moduleCounts['reports'] ?? 0" />
+                </x-slot:icon-trailing>
             </flux:sidebar.item>
         </flux:sidebar.group>
 
@@ -246,6 +280,9 @@
                 wire:navigate
             >
                 {{ __('common.proposals') }}
+                <x-slot:icon-trailing>
+                    <x-notifications.module-badge module="proposals" :count="$moduleCounts['proposals'] ?? 0" />
+                </x-slot:icon-trailing>
             </flux:sidebar.item>
 
             <flux:sidebar.item
@@ -256,6 +293,9 @@
                 wire:navigate
             >
                 {{ __('common.donors') }}
+                <x-slot:icon-trailing>
+                    <x-notifications.module-badge module="donors" :count="$moduleCounts['donors'] ?? 0" />
+                </x-slot:icon-trailing>
             </flux:sidebar.item>
 
             <flux:sidebar.item
@@ -266,6 +306,9 @@
                 wire:navigate
             >
                 {{ __('common.funding_agreements') }}
+                <x-slot:icon-trailing>
+                    <x-notifications.module-badge module="funding-agreements" :count="$moduleCounts['funding-agreements'] ?? 0" />
+                </x-slot:icon-trailing>
             </flux:sidebar.item>
 
             <flux:sidebar.item
@@ -276,6 +319,9 @@
                 wire:navigate
             >
                 {{ __('common.transfers') }}
+                <x-slot:icon-trailing>
+                    <x-notifications.module-badge module="transfers" :count="$moduleCounts['transfers'] ?? 0" />
+                </x-slot:icon-trailing>
             </flux:sidebar.item>
         </flux:sidebar.group>
 
@@ -291,6 +337,9 @@
                 wire:navigate
             >
                 {{ __('common.accounts') }}
+                <x-slot:icon-trailing>
+                    <x-notifications.module-badge module="accounts" :count="$moduleCounts['accounts'] ?? 0" />
+                </x-slot:icon-trailing>
             </flux:sidebar.item>
 
             <flux:sidebar.item
@@ -303,6 +352,18 @@
                 {{ __('common.cities') }}
             </flux:sidebar.item>
 
+            @can('view-activity-log')
+                <flux:sidebar.item
+                    icon="clock"
+                    :href="route('activity.index')"
+                    :current="request()->routeIs('activity.*')"
+                    :class="$navigationItemClasses"
+                    wire:navigate
+                >
+                    {{ __('navigation.activity_log') }}
+                </flux:sidebar.item>
+            @endcan
+
             @can('viewAny', App\Models\User::class)
                 <flux:sidebar.item
                     icon="users"
@@ -312,6 +373,9 @@
                     wire:navigate
                 >
                     {{ __('navigation.user_directory') }}
+                    <x-slot:icon-trailing>
+                        <x-notifications.module-badge module="access-management" :count="$moduleCounts['access-management'] ?? 0" />
+                    </x-slot:icon-trailing>
                 </flux:sidebar.item>
             @endcan
         </flux:sidebar.group>
