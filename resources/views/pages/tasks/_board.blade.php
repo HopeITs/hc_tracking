@@ -40,9 +40,20 @@
         @php $columnTasks = $allTasks->where('status', $case)->values(); @endphp
 
         <div
-            class="flex flex-col gap-3 overflow-hidden rounded-2xl border border-secondary-soft bg-secondary-soft/20 pb-3 dark:border-secondary-medium dark:bg-secondary-medium/10"
+            class="flex flex-col gap-3 overflow-hidden rounded-2xl border border-secondary-soft bg-secondary-soft/20 pb-3 transition-shadow dark:border-secondary-medium dark:bg-secondary-medium/10"
             wire:key="task-board-column-{{ $case->value }}"
             data-test="task-board-column-{{ $case->value }}"
+            x-data="{ dragOver: false }"
+            x-on:dragover.prevent="dragOver = true"
+            x-on:dragleave="dragOver = false"
+            x-on:drop.prevent="
+                dragOver = false;
+                const dragged = JSON.parse($event.dataTransfer.getData('text/plain') || '{}');
+                if (dragged.id && dragged.status !== '{{ $case->value }}') {
+                    $wire.quickSetStatus(dragged.id, '{{ $case->value }}');
+                }
+            "
+            :class="dragOver ? 'ring-2 ring-primary ring-offset-1' : ''"
         >
             <div class="h-1 w-full shrink-0 {{ $columnAccent($case) }}"></div>
 
@@ -54,10 +65,7 @@
                 <span class="inline-flex min-w-6 items-center justify-center rounded-full bg-white px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-secondary-medium shadow-sm dark:bg-secondary-dark dark:text-secondary-soft">{{ $columnTasks->count() }}</span>
             </div>
 
-            <div
-                class="flex min-h-16 flex-col gap-2 px-3"
-                x-data="taskDropList('task-board', (wire, id) => wire.quickSetStatus(id, '{{ $case->value }}'))"
-            >
+            <div class="flex min-h-16 flex-col gap-2 px-3">
                 @forelse ($columnTasks as $task)
                     @php
                         $isOverdue = $task->status !== TaskStatus::Done && $task->due_date !== null && $task->due_date->lt($today);
@@ -67,8 +75,10 @@
                     <div
                         class="group flex cursor-grab flex-col gap-2.5 rounded-xl border border-secondary-soft bg-white p-3 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md active:cursor-grabbing dark:border-secondary-medium dark:bg-secondary-dark"
                         wire:key="task-board-card-{{ $task->id }}"
-                        data-task-card
                         data-task-id="{{ $task->id }}"
+                        draggable="true"
+                        x-on:dragstart="$event.dataTransfer.setData('text/plain', JSON.stringify({ id: {{ $task->id }}, status: '{{ $case->value }}' })); $event.currentTarget.classList.add('opacity-40')"
+                        x-on:dragend="$event.currentTarget.classList.remove('opacity-40')"
                     >
                         <div class="flex items-start justify-between gap-2">
                             <a href="{{ route('tasks.show', $task) }}" wire:navigate class="min-w-0 truncate text-sm font-semibold text-secondary-dark hover:text-primary hover:underline dark:text-white dark:hover:text-status-critical" data-test="task-board-card-{{ $task->id }}">
