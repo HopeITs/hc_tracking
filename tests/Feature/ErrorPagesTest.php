@@ -1,12 +1,11 @@
 <?php
 
-test('each custom error view renders its status, heading and the shared quick links', function (string $view, string $headingKey) {
+test('each custom error view renders its status, heading and a single dashboard button', function (string $view, string $headingKey) {
     $rendered = $this->view($view);
 
     $rendered->assertSee(__($headingKey));
-    $rendered->assertSee(__('errors.where_you_can_go'));
+    $rendered->assertSee(__('errors.back_to_dashboard'));
     $rendered->assertSee(route('dashboard'), false);
-    $rendered->assertSee(route('donors.index'), false);
 })->with([
     ['errors.403', 'errors.403_heading'],
     ['errors.404', 'errors.404_heading'],

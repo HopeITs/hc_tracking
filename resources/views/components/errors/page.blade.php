@@ -1,37 +1,17 @@
 @props([
     'code',
     'tone' => 'neutral',
-    'icon',
-    'terminalLabel',
-    'trail' => [],
     'heading',
     'body',
-    'retryAfter' => null,
 ])
 
 @php
-    $toneRing = match ($tone) {
-        'critical' => 'border-status-critical text-status-critical',
-        'warn' => 'border-status-warn text-status-warn',
-        'active' => 'border-status-active text-status-active',
-        default => 'border-secondary-medium text-secondary-medium dark:border-secondary-light dark:text-secondary-light',
+    $toneText = match ($tone) {
+        'critical' => 'text-status-critical',
+        'warn' => 'text-status-warn',
+        'active' => 'text-status-active',
+        default => 'text-secondary-medium dark:text-secondary-light',
     };
-
-    $toneSoftBg = match ($tone) {
-        'critical' => 'bg-status-critical-soft',
-        'warn' => 'bg-status-warn-soft',
-        'active' => 'bg-status-active-soft',
-        default => 'bg-secondary-soft dark:bg-secondary-medium/40',
-    };
-
-    $toneBorderVar = match ($tone) {
-        'critical' => 'var(--color-status-critical)',
-        'warn' => 'var(--color-status-warn)',
-        'active' => 'var(--color-status-active)',
-        default => 'var(--color-secondary-light)',
-    };
-
-    $diagramLabel = collect($trail)->push($terminalLabel)->implode(" \u{2192} ");
 @endphp
 
 <!DOCTYPE html>
@@ -40,83 +20,40 @@
         @include('partials.head', ['title' => $heading])
     </head>
     <body class="min-h-screen bg-[#e5e7eb] antialiased dark:bg-secondary-dark">
-        <div class="error-page flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
-            <div class="flex w-full max-w-xl flex-col items-center gap-6">
+        <div class="error-page relative flex min-h-svh flex-col items-center justify-center overflow-hidden p-6 md:p-10">
+
+            {{-- The tracking route: a faint path threading from origin to destination, with its waypoints along the way. Purely ambient, never a UI element. --}}
+            <svg class="error-route pointer-events-none absolute inset-0 size-full text-secondary-dark/[0.09] dark:text-white/[0.1]" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice" fill="none" aria-hidden="true">
+                <path d="M-60 60 C 140 60, 160 220, 340 240 S 560 140, 700 260 S 760 520, 940 560 S 1020 700, 1220 660" stroke="currentColor" stroke-width="3" stroke-dasharray="2 22" stroke-linecap="round" />
+                <circle cx="-60" cy="60" r="8" fill="currentColor" />
+                <circle cx="340" cy="240" r="8" fill="currentColor" />
+                <circle cx="700" cy="260" r="8" fill="currentColor" />
+                <circle cx="940" cy="560" r="8" fill="currentColor" />
+                <path transform="translate(1195, 630)" d="M0 0 C 0 -28, 28 -28, 28 0 C 28 22, 14 37, 14 50 C 14 37, 0 22, 0 0 Z" fill="currentColor" />
+            </svg>
+
+            <div class="relative flex w-full max-w-lg flex-col items-center gap-8 text-center">
                 <a href="{{ route('home') }}" class="flex flex-col items-center">
                     <img src="{{ asset('logo-tracking.svg') }}" alt="" class="h-11 w-auto dark:hidden" />
                     <img src="{{ asset('logo-tracking-white.svg') }}" alt="" class="hidden h-11 w-auto dark:block" />
                     <span class="sr-only">{{ config('app.name', 'Laravel') }}</span>
                 </a>
 
-                <div class="w-full rounded-2xl border border-secondary-soft bg-white p-8 text-center shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] sm:p-10 dark:border-secondary-medium dark:bg-secondary-dark">
-
-                    {{-- The connection trail: a real thread of sections, breaking exactly where this page should have been. --}}
-                    <div class="error-trail flex items-center justify-center" role="img" aria-label="{{ $diagramLabel }}">
-                        @foreach ($trail as $i => $label)
-                            @if ($i > 0)
-                                <span class="error-trail-line mx-1.5 h-px w-8 shrink-0 bg-secondary-soft sm:w-12 dark:bg-secondary-medium" aria-hidden="true"></span>
-                            @endif
-                            <span class="error-trail-node flex flex-col items-center gap-2" style="--logframe-order: {{ $i }}" aria-hidden="true">
-                                <span class="size-2.5 shrink-0 rounded-full bg-secondary-light dark:bg-secondary-medium"></span>
-                                <span class="type-label hidden text-secondary-medium sm:inline dark:text-secondary-soft">{{ $label }}</span>
-                            </span>
-                        @endforeach
-
-                        <span class="error-trail-line error-trail-line--broken mx-1.5 h-px w-8 shrink-0 sm:w-12" style="border-color: {{ $toneBorderVar }}" aria-hidden="true"></span>
-
-                        <span class="error-trail-node flex flex-col items-center gap-2" style="--logframe-order: {{ count($trail) }}" aria-hidden="true">
-                            <span @class(['flex size-14 shrink-0 items-center justify-center rounded-full border-2 bg-white dark:bg-secondary-dark', $toneRing])>
-                                <flux:icon :name="$icon" class="size-6" />
-                            </span>
-                            <span @class(['type-label', $toneRing])>{{ $terminalLabel }}</span>
-                        </span>
-                    </div>
-
-                    <p class="type-label mt-7 text-secondary-light dark:text-secondary-soft" dir="ltr">HTTP {{ $code }}</p>
-                    <flux:heading size="xl" class="mt-2">{{ $heading }}</flux:heading>
-                    <p class="mx-auto mt-3 max-w-md text-sm text-pretty text-secondary-medium dark:text-secondary-soft">{{ $body }}</p>
-
-                    @if ($retryAfter !== null)
-                        <p class="type-meta mt-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 {{ $toneSoftBg }}" data-error-retry data-retry-after="{{ $retryAfter }}">
-                            <flux:icon name="arrow-path" variant="micro" class="size-3.5" />
-                            <span data-error-retry-text>{{ __('errors.checking_again_in', ['seconds' => $retryAfter]) }}</span>
-                        </p>
-                    @endif
-
-                    <div class="mt-7 flex flex-wrap items-center justify-center gap-3">
-                        {{ $secondaryAction ?? '' }}
-                        {{ $primaryAction }}
-                    </div>
+                <div>
+                    <p @class(['type-label', $toneText]) dir="ltr">{{ __('errors.error_code', ['code' => $code]) }}</p>
+                    <h1 class="mt-3 text-4xl font-extrabold tracking-tight text-balance text-secondary-dark sm:text-5xl dark:text-white">{{ $heading }}</h1>
+                    <p class="mx-auto mt-4 max-w-sm text-base text-pretty text-secondary-medium dark:text-secondary-soft">{{ $body }}</p>
                 </div>
 
-                <x-errors.quick-links />
+                <x-ui.button tone="primary" :href="route('dashboard')" class="!px-6 !py-3 !text-base">
+                    {{ __('errors.back_to_dashboard') }}
+                </x-ui.button>
 
                 <p class="text-center text-xs text-secondary-medium dark:text-secondary-soft">
                     {{ __('authentication.copyright_notice', ['year' => now()->year]) }}
                 </p>
             </div>
         </div>
-
-        @if ($retryAfter !== null)
-            <script>
-                (() => {
-                    const el = document.querySelector('[data-error-retry]');
-                    if (!el) return;
-                    let seconds = parseInt(el.dataset.retryAfter, 10) || 0;
-                    const textEl = el.querySelector('[data-error-retry-text]');
-                    const label = @js(__('errors.checking_again_in', ['seconds' => ':seconds']));
-                    const timer = setInterval(() => {
-                        seconds -= 1;
-                        if (seconds <= 0) {
-                            clearInterval(timer);
-                            window.location.reload();
-                            return;
-                        }
-                        textEl.textContent = label.replace(':seconds', String(seconds));
-                    }, 1000);
-                })();
-            </script>
-        @endif
 
         @fluxScripts
     </body>
