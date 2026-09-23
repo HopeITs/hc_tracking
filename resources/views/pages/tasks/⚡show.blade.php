@@ -9,6 +9,7 @@ use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
@@ -24,6 +25,8 @@ new #[Title('titles.task')] class extends Component
 
     public function mount(Task $task): void
     {
+        Gate::authorize('view', $task);
+
         $this->taskId = $task->id;
     }
 

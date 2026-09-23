@@ -49,6 +49,22 @@ return [
     */
     'administrator_roles' => ['Super Admin'],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Task department-scope bypass roles
+    |--------------------------------------------------------------------------
+    |
+    | task_department_scoped_roles are hard-scoped to their own HR department
+    | on the tasks page (resolved via HrEmployee::currentDepartmentId()) — no
+    | filter can widen it. task_department_scope_bypass_roles see every
+    | department by default and get a department filter to narrow down
+    | instead. Anyone holding neither (including a brand-new account with no
+    | role yet) sees every department too, unfiltered — scoping is opt-in per
+    | named team, not the default for an unclassified account.
+    */
+    'task_department_scope_bypass_roles' => ['Super Admin', 'General Manager', 'Managers'],
+    'task_department_scoped_roles' => ['MEAL', 'Financial', 'Media Team', 'Public Relations', 'Public Relations Manager'],
+
     'role_baselines' => [
         'General Manager' => [
             'access-management.manage-users',
@@ -86,20 +102,20 @@ return [
             'funding-agreements.view', 'funding-agreements.create', 'funding-agreements.update', 'funding-agreements.delete',
             'transfers.view', 'transfers.create', 'transfers.update', 'transfers.delete',
             'accounts.view', 'accounts.create', 'accounts.update', 'accounts.delete',
-            'programs.view', 'projects.view', 'calendar.view',
+            'programs.view', 'projects.view', 'tasks.view', 'tasks.create', 'tasks.update', 'calendar.view',
         ],
         'Media Team' => [
             'reports.view', 'reports.create', 'reports.update',
-            'programs.view', 'projects.view', 'calendar.view',
+            'programs.view', 'projects.view', 'tasks.view', 'tasks.create', 'tasks.update', 'calendar.view',
         ],
         'Public Relations' => [
             'reports.view', 'reports.create', 'reports.update',
-            'programs.view', 'projects.view', 'donors.view', 'calendar.view',
+            'programs.view', 'projects.view', 'donors.view', 'tasks.view', 'tasks.create', 'tasks.update', 'calendar.view',
         ],
         'Public Relations Manager' => [
             'reports.view', 'reports.create', 'reports.update', 'reports.delete',
             'programs.view', 'projects.view', 'donors.view', 'proposals.view',
-            'funding-agreements.view', 'calendar.view',
+            'funding-agreements.view', 'tasks.view', 'tasks.create', 'tasks.update', 'calendar.view',
         ],
     ],
 ];

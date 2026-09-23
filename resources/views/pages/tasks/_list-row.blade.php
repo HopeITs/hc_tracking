@@ -26,6 +26,11 @@
     };
     $assignedIds = $task->taskAssignees->pluck('employee_id')->all();
     $assignees = $task->taskAssignees->pluck('employee')->filter();
+    $priorityBorderClass = match ($task->priority) {
+        TaskPriority::High => 'border-primary dark:border-status-critical',
+        TaskPriority::Medium => 'border-status-warn',
+        TaskPriority::Low => 'border-transparent',
+    };
 @endphp
 
 <tr
@@ -33,7 +38,7 @@
     wire:key="task-table-row-{{ $task->id }}"
     data-test="task-row-{{ $task->id }}"
     @class([
-        'group/row outline-none hover:bg-secondary-soft/40 focus-visible:bg-secondary-soft/40 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary dark:hover:bg-secondary-medium/30',
+        'group/row outline-none transition-colors hover:bg-secondary-soft/40 focus-visible:bg-secondary-soft/40 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary dark:hover:bg-secondary-medium/30',
         'bg-secondary-soft/20 dark:bg-secondary-medium/10' => $isSubtask,
     ])
     @if ($isSubtask)
@@ -43,7 +48,7 @@
     x-on:keydown.up.prevent="$event.currentTarget.previousElementSibling?.focus()"
     x-on:keydown.enter="if (!$event.target.closest('button, a, input')) { window.location.href = {{ Js::from(route('tasks.show', $task)) }} }"
 >
-    <td class="ps-3">
+    <td class="border-s-[3px] ps-2.5 {{ $priorityBorderClass }}">
         <button
             type="button"
             wire:click="toggleComplete({{ $task->id }})"
@@ -102,7 +107,7 @@
                 @else
                     @foreach ($assignees->take(3) as $employee)
                         <div class="group/avatar relative">
-                            <span class="inline-flex size-7 items-center justify-center rounded-full border-2 border-white bg-secondary-dark text-[11px] font-semibold text-white dark:border-secondary-dark dark:bg-secondary-medium">
+                            <span class="inline-flex size-7 items-center justify-center rounded-full bg-secondary-dark text-[11px] font-semibold text-white ring-2 ring-white transition-transform group-hover/row:ring-secondary-soft/40 dark:bg-secondary-medium dark:ring-secondary-dark dark:group-hover/row:ring-secondary-medium/40">
                                 {{ Illuminate\Support\Str::of($employee->name)->explode(' ')->map(fn ($part) => mb_substr($part, 0, 1))->take(2)->implode('') }}
                             </span>
                             <button
@@ -117,7 +122,7 @@
                         </div>
                     @endforeach
                     @if ($assignees->count() > 3)
-                        <span class="inline-flex size-7 items-center justify-center rounded-full border-2 border-white bg-secondary-soft text-[10px] font-semibold text-secondary-dark dark:border-secondary-dark dark:bg-secondary-medium dark:text-white">
+                        <span class="inline-flex size-7 items-center justify-center rounded-full bg-secondary-soft text-[10px] font-semibold text-secondary-dark ring-2 ring-white dark:bg-secondary-medium dark:text-white dark:ring-secondary-dark">
                             +{{ $assignees->count() - 3 }}
                         </span>
                     @endif

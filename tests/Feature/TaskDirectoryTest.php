@@ -343,6 +343,7 @@ test('the list row assignee trigger opens an inline multi select popover of ever
 
     Livewire::actingAs($user)
         ->test('pages::tasks.index')
+        ->set('view', 'list')
         ->assertSee('data-test="task-assignee-trigger-'.$task->id.'"', false)
         ->assertSee('data-test="task-assignee-option-'.$task->id.'-'.$alice.'"', false)
         ->assertSee('data-test="task-assignee-option-'.$task->id.'-'.$bob.'"', false)
@@ -546,10 +547,12 @@ test('the list view computes stat tiles with one aggregate query instead of load
     $user = User::factory()->create();
     Task::factory()->count(10)->create();
 
+    $page = Livewire::actingAs($user)->test('pages::tasks.index');
+
     DB::flushQueryLog();
     DB::enableQueryLog();
 
-    Livewire::actingAs($user)->test('pages::tasks.index');
+    $page->set('view', 'list');
 
     $taskTableQueries = collect(DB::getQueryLog())
         ->filter(fn (array $query): bool => str_contains($query['query'], '`tasks`') || str_contains($query['query'], 'from "tasks"'));
@@ -557,11 +560,12 @@ test('the list view computes stat tiles with one aggregate query instead of load
     DB::disableQueryLog();
 
     // paginate() itself issues a count query plus the page's select query;
-    // the stat tiles add one aggregate select on top of that, and the eager
+    // the stat tiles add one aggregate select on top of that, the eager
     // load of each row's own subtasks (for the inline expand panel) adds a
-    // fourth — four total, not a second full (board-sized) fetch of every
-    // task with its relations just to count a handful of numbers.
-    expect($taskTableQueries)->toHaveCount(4);
+    // fourth, and the "My Tasks" rail's own capped preview query a fifth —
+    // five total, not a second full (board-sized) fetch of every task with
+    // its relations just to count a handful of numbers.
+    expect($taskTableQueries)->toHaveCount(5);
 });
 
 test('the list view groups tasks by status with a colored collapsible header', function () {
@@ -571,6 +575,7 @@ test('the list view groups tasks by status with a colored collapsible header', f
 
     Livewire::actingAs($user)
         ->test('pages::tasks.index')
+        ->set('view', 'list')
         ->set('group', 'status')
         ->assertSee('Grouped todo task')
         ->assertSee('Grouped done task')

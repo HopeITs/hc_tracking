@@ -246,6 +246,39 @@ class User extends Authenticatable implements PasskeyUser
     }
 
     /**
+     * The HR department of this user's current position, or null when they
+     * have no linked employee or no active contract.
+     */
+    public function departmentId(): ?int
+    {
+        return $this->employee?->currentDepartmentId();
+    }
+
+    /**
+     * Whether this user sees every department's tasks by default, with a
+     * filter to narrow down, instead of being hard-scoped to their own.
+     *
+     * Drives whether the department filter dropdown is shown at all.
+     */
+    public function canViewAllTaskDepartments(): bool
+    {
+        return $this->hasAnyRole(config('access-control.task_department_scope_bypass_roles', []));
+    }
+
+    /**
+     * Whether this user's default task visibility is hard-scoped to their
+     * own HR department, with no filter able to widen it.
+     *
+     * Only the named team roles are scoped this way. Anyone else — an
+     * elevated role, or an account holding no role at all yet — sees every
+     * department unfiltered.
+     */
+    public function isTaskDepartmentScoped(): bool
+    {
+        return $this->hasAnyRole(config('access-control.task_department_scoped_roles', []));
+    }
+
+    /**
      * Get the user initials.
      */
     public function initials(): string
