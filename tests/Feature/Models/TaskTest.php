@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\TaskStatus;
 use App\Models\HrEmployee;
 use App\Models\Milestone;
 use App\Models\Proposal;
@@ -115,4 +116,38 @@ test('a task casts its dates and progress', function () {
         ->and($task->due_date->toDateString())->toBe('2026-02-05')
         ->and($task->completed_date)->toBeNull()
         ->and($task->progress_percentage)->toBe(45);
+});
+
+test('a todo task past its due date is missed, not overdue', function () {
+    $task = Task::factory()->create(['status' => TaskStatus::Todo, 'due_date' => now()->subDay()->toDateString()]);
+
+    expect($task->isMissed())->toBeTrue()
+        ->and($task->isOverdue())->toBeFalse();
+});
+
+test('an in progress or under review task past its due date is overdue, not missed', function () {
+    $inProgress = Task::factory()->create(['status' => TaskStatus::InProgress, 'due_date' => now()->subDay()->toDateString()]);
+    $underReview = Task::factory()->create(['status' => TaskStatus::UnderReview, 'due_date' => now()->subDay()->toDateString()]);
+
+    expect($inProgress->isOverdue())->toBeTrue()
+        ->and($inProgress->isMissed())->toBeFalse()
+        ->and($underReview->isOverdue())->toBeTrue()
+        ->and($underReview->isMissed())->toBeFalse();
+});
+
+test('a done task is never overdue or missed regardless of its due date', function () {
+    $task = Task::factory()->create(['status' => TaskStatus::Done, 'due_date' => now()->subDay()->toDateString()]);
+
+    expect($task->isOverdue())->toBeFalse()
+        ->and($task->isMissed())->toBeFalse();
+});
+
+test('a task with no due date or a future due date is neither overdue nor missed', function () {
+    $noDueDate = Task::factory()->create(['status' => TaskStatus::Todo, 'due_date' => null]);
+    $futureDueDate = Task::factory()->create(['status' => TaskStatus::InProgress, 'due_date' => now()->addDay()->toDateString()]);
+
+    expect($noDueDate->isOverdue())->toBeFalse()
+        ->and($noDueDate->isMissed())->toBeFalse()
+        ->and($futureDueDate->isOverdue())->toBeFalse()
+        ->and($futureDueDate->isMissed())->toBeFalse();
 });

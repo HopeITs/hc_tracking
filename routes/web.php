@@ -6,6 +6,8 @@ use App\Http\Controllers\ProposalFilePreviewController;
 use App\Http\Controllers\ReportFileDownloadController;
 use App\Http\Controllers\ReportFilePreviewController;
 use App\Http\Controllers\SwitchLocaleController;
+use App\Http\Controllers\TaskFileDownloadController;
+use App\Http\Controllers\TaskFilePreviewController;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -76,6 +78,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::livewire('tasks/{task}', 'pages::tasks.show')
         ->name('tasks.show');
+
+    Route::get('tasks/{task}/files/{taskAttachment}/download', TaskFileDownloadController::class)
+        ->name('tasks.files.download');
+
+    Route::get('tasks/{task}/files/{taskAttachment}/preview', TaskFilePreviewController::class)
+        ->name('tasks.files.preview');
 
     Route::livewire('proposals', 'pages::proposals.index')
         ->name('proposals.index');

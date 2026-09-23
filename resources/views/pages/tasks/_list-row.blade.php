@@ -16,11 +16,12 @@
      */
     $isSubtask ??= false;
     $isDone = $task->status === TaskStatus::Done;
-    $isOverdue = ! $isDone && $task->due_date !== null && $task->due_date->lt($today);
-    $isDueSoon = ! $isDone && ! $isOverdue && $task->due_date !== null && $task->due_date->between($today, $today->addDay());
+    $isOverdue = $task->isOverdue();
+    $isMissed = $task->isMissed();
+    $isDueSoon = ! $isDone && ! $isOverdue && ! $isMissed && $task->due_date !== null && $task->due_date->between($today, $today->addDay());
     $dueDateClasses = match (true) {
         $isDone => 'text-secondary-light line-through',
-        $isOverdue => 'font-semibold text-primary',
+        $isOverdue, $isMissed => 'font-semibold text-primary',
         $isDueSoon => 'font-medium text-status-warn',
         default => 'text-secondary-medium dark:text-secondary-soft',
     };
@@ -52,8 +53,9 @@
         <button
             type="button"
             wire:click="toggleComplete({{ $task->id }})"
-            aria-label="{{ $isDone ? __('tasks.mark_incomplete') : __('tasks.mark_complete') }}"
-            class="inline-flex size-6 cursor-pointer touch-manipulation items-center justify-center rounded-full text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium"
+            @disabled($isDone)
+            aria-label="{{ __('tasks.mark_complete') }}"
+            class="inline-flex size-6 cursor-pointer touch-manipulation items-center justify-center rounded-full text-secondary-medium hover:bg-secondary-soft disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent dark:text-secondary-soft dark:hover:bg-secondary-medium"
             data-test="task-toggle-complete-{{ $task->id }}"
         >
             <flux:icon.check-circle :variant="$isDone ? 'solid' : 'outline'" class="size-4.5 {{ $isDone ? 'text-status-good' : '' }}" />
@@ -150,14 +152,21 @@
         </x-ui.multi-select-popover>
     </td>
     <td class="px-2">
-        <input
-            type="date"
-            value="{{ $task->due_date?->toDateString() }}"
-            wire:change="rescheduleTask({{ $task->id }}, $event.target.value)"
-            aria-label="{{ __('tasks.due_date_2') }}: {{ $task->title }}"
-            class="w-full min-w-0 rounded border-0 bg-transparent p-1 text-xs tabular-nums focus:ring-1 focus:ring-primary focus:outline-none {{ $dueDateClasses }}"
-            data-test="task-due-date-{{ $task->id }}"
-        />
+        <div class="flex items-center gap-1">
+            @if ($isMissed)
+                <span class="inline-flex shrink-0 items-center rounded-full bg-status-critical-soft px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-primary uppercase dark:text-status-critical" data-test="task-missed-{{ $task->id }}">{{ __('tasks.missed') }}</span>
+            @elseif ($isOverdue)
+                <span class="inline-flex shrink-0 items-center rounded-full bg-status-critical-soft px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-primary uppercase dark:text-status-critical" data-test="task-overdue-{{ $task->id }}">{{ __('tasks.overdue') }}</span>
+            @endif
+            <input
+                type="date"
+                value="{{ $task->due_date?->toDateString() }}"
+                wire:change="rescheduleTask({{ $task->id }}, $event.target.value)"
+                aria-label="{{ __('tasks.due_date_2') }}: {{ $task->title }}"
+                class="w-full min-w-0 rounded border-0 bg-transparent p-1 text-xs tabular-nums focus:ring-1 focus:ring-primary focus:outline-none {{ $dueDateClasses }}"
+                data-test="task-due-date-{{ $task->id }}"
+            />
+        </div>
     </td>
     <td class="px-2">
         <flux:dropdown position="bottom" align="start">

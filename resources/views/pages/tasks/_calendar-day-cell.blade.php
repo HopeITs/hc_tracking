@@ -7,6 +7,7 @@
      * @var array{month: \Carbon\CarbonImmutable, weeks: ?array<int, array<int, \Carbon\CarbonImmutable>>, days: ?array<int, \Carbon\CarbonImmutable>, tasksByDay: \Illuminate\Support\Collection<string, \Illuminate\Database\Eloquent\Collection<int, \App\Models\Task>>, unscheduled: \Illuminate\Database\Eloquent\Collection<int, \App\Models\Task>} $calendar
      * @var \Closure $markerTone
      * @var \Closure $markerDot
+     * @var \Closure $markerLabel
      * @var \Closure $priorityIconClasses
      */
     $dayTasks = $calendar['tasksByDay']->get($day->toDateString(), new \Illuminate\Database\Eloquent\Collection);
@@ -18,11 +19,21 @@
 
 <div class="flex min-h-4 flex-1 flex-col gap-1" x-data="taskDropList('task-calendar', (wire, id) => wire.rescheduleTask(id, '{{ $day->toDateString() }}'))">
     @foreach ($dayTasks as $task)
-        <div data-task-chip data-task-id="{{ $task->id }}" wire:key="task-calendar-chip-{{ $day->toDateString() }}-{{ $task->id }}" class="group flex cursor-grab items-center gap-1.5 rounded-md px-1.5 py-1 text-[10px] transition-transform hover:-translate-y-px {{ $markerTone($task) }}">
+        @php $chipLabel = $markerLabel($task); @endphp
+        <div
+            data-task-chip
+            data-task-id="{{ $task->id }}"
+            wire:key="task-calendar-chip-{{ $day->toDateString() }}-{{ $task->id }}"
+            title="{{ $chipLabel }}"
+            class="group flex cursor-grab items-center gap-1.5 rounded-md px-1.5 py-1 text-[10px] transition-transform hover:-translate-y-px {{ $markerTone($task) }}"
+        >
             <span class="size-1.5 shrink-0 rounded-full {{ $markerDot($task) }}"></span>
             <a href="{{ route('tasks.show', $task) }}" wire:navigate class="min-w-0 flex-1 truncate text-start font-semibold hover:underline" data-test="task-calendar-chip-{{ $task->id }}">
                 {{ $task->title }}
             </a>
+            @if ($chipLabel !== null)
+                <span class="shrink-0 text-[9px] font-bold uppercase opacity-80" data-test="task-calendar-chip-badge-{{ $task->id }}">{{ $chipLabel }}</span>
+            @endif
         </div>
     @endforeach
 </div>

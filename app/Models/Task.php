@@ -149,6 +149,30 @@ class Task extends Model
     }
 
     /**
+     * Past its due date while actively being worked (in progress or under
+     * review) — distinct from {@see isMissed()}, which covers a task that
+     * never started. A completed task is never overdue.
+     */
+    public function isOverdue(): bool
+    {
+        return $this->status !== TaskStatus::Todo
+            && $this->status !== TaskStatus::Done
+            && $this->due_date !== null
+            && $this->due_date->lt(CarbonImmutable::today());
+    }
+
+    /**
+     * Past its due date while still untouched in To Do — distinct from
+     * {@see isOverdue()}, which covers a task that's actively being worked.
+     */
+    public function isMissed(): bool
+    {
+        return $this->status === TaskStatus::Todo
+            && $this->due_date !== null
+            && $this->due_date->lt(CarbonImmutable::today());
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string|class-string>

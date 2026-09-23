@@ -7,24 +7,24 @@
     $calendar = $this->calendarGrid;
     $today = \Carbon\CarbonImmutable::today();
 
-    $markerTone = function (\App\Models\Task $task) use ($today): string {
+    $markerTone = function (\App\Models\Task $task): string {
         if ($task->status === TaskStatus::Done) {
             return 'bg-status-good-soft text-status-good';
         }
 
-        if ($task->due_date !== null && $task->due_date->lt($today)) {
+        if ($task->isOverdue() || $task->isMissed()) {
             return 'bg-status-critical-soft text-primary dark:text-status-critical';
         }
 
         return 'bg-white text-secondary-dark ring-1 ring-secondary-soft hover:ring-secondary-light dark:bg-secondary-dark dark:text-white dark:ring-secondary-medium';
     };
 
-    $markerDot = function (\App\Models\Task $task) use ($today): string {
+    $markerDot = function (\App\Models\Task $task): string {
         if ($task->status === TaskStatus::Done) {
             return 'bg-status-good';
         }
 
-        if ($task->due_date !== null && $task->due_date->lt($today)) {
+        if ($task->isOverdue() || $task->isMissed()) {
             return 'bg-primary';
         }
 
@@ -33,6 +33,18 @@
             TaskPriority::Medium => 'bg-status-warn',
             TaskPriority::Low => 'bg-secondary-light',
         };
+    };
+
+    $markerLabel = function (\App\Models\Task $task): ?string {
+        if ($task->isMissed()) {
+            return __('tasks.missed');
+        }
+
+        if ($task->isOverdue()) {
+            return __('tasks.overdue');
+        }
+
+        return null;
     };
 
     $priorityIconClasses = fn (TaskPriority $case): string => match ($case) {
@@ -112,7 +124,7 @@
                                     {{ $day->day }}
                                 </span>
 
-                                @include('pages.tasks._calendar-day-cell', ['day' => $day, 'calendar' => $calendar, 'markerTone' => $markerTone, 'markerDot' => $markerDot, 'priorityIconClasses' => $priorityIconClasses])
+                                @include('pages.tasks._calendar-day-cell', ['day' => $day, 'calendar' => $calendar, 'markerTone' => $markerTone, 'markerDot' => $markerDot, 'markerLabel' => $markerLabel, 'priorityIconClasses' => $priorityIconClasses])
                             </div>
                         @endforeach
                     @endforeach
@@ -151,7 +163,7 @@
                                 ])
                                 data-test="task-calendar-allday-{{ $day->toDateString() }}"
                             >
-                                @include('pages.tasks._calendar-day-cell', ['day' => $day, 'calendar' => $calendar, 'markerTone' => $markerTone, 'markerDot' => $markerDot, 'priorityIconClasses' => $priorityIconClasses])
+                                @include('pages.tasks._calendar-day-cell', ['day' => $day, 'calendar' => $calendar, 'markerTone' => $markerTone, 'markerDot' => $markerDot, 'markerLabel' => $markerLabel, 'priorityIconClasses' => $priorityIconClasses])
                             </div>
                         @endforeach
                     </div>
