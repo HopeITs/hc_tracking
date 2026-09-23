@@ -4,8 +4,8 @@
 
 <div class="@container" x-data="{ subtasksOpen: {} }">
     <table class="hidden w-full table-fixed border-collapse text-start text-sm @3xl:table">
-        <thead class="bg-secondary-soft/30 dark:bg-secondary-medium/20">
-            <tr class="[&>th]:px-3.5 [&>th]:py-2 [&>th]:text-start [&>th]:text-[11px] [&>th]:font-semibold [&>th]:tracking-wide [&>th]:text-secondary-medium [&>th]:uppercase [&>th]:dark:text-secondary-soft">
+        <thead class="bg-secondary-soft/40 dark:bg-secondary-medium/20">
+            <tr class="[&>th]:px-3.5 [&>th]:py-2.5 [&>th]:text-start [&>th]:text-[11px] [&>th]:font-bold [&>th]:tracking-wider [&>th]:text-secondary-medium [&>th]:uppercase [&>th]:dark:text-secondary-soft">
                 <th class="w-9"></th>
                 @include('pages.tasks._sortable-th', ['field' => 'title', 'label' => __('common.name')])
                 @include('pages.tasks._sortable-th', ['field' => 'assignee', 'label' => __('tasks.assignee'), 'class' => 'w-28'])

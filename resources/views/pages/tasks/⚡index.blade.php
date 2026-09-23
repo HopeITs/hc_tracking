@@ -2,6 +2,7 @@
 
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Livewire\Concerns\ManagesTaskVisibility;
 use App\Models\HrDepartment;
 use App\Models\HrEmployee;
 use App\Models\Milestone;
@@ -28,7 +29,7 @@ use Livewire\WithPagination;
 
 new #[Title('titles.tasks')] class extends Component
 {
-    use WithPagination;
+    use ManagesTaskVisibility, WithPagination;
 
     #[Url(except: '')]
     public string $search = '';
@@ -53,8 +54,30 @@ new #[Title('titles.tasks')] class extends Component
     #[Url(except: '')]
     public string $sourceId = '';
 
-    #[Url(as: 'view', except: 'list')]
-    public string $view = 'list';
+    #[Url(as: 'view', except: 'board')]
+    public string $view = 'board';
+
+    /**
+     * Only meaningful for a bypass role (see ManagesTaskVisibility) — a
+     * department-scoped role never sees this filter at all, since their
+     * scope is fixed to their own department.
+     */
+    #[Url(except: '')]
+    public string $departmentId = '';
+
+    /**
+     * Assigned to, or created by, the viewer — always available regardless
+     * of department scope, since it's inherently already about "me".
+     */
+    #[Url(except: false)]
+    public bool $myTasksOnly = false;
+
+    /**
+     * Set by clicking the "Overdue" or "Due soon" stat tile — a quick filter
+     * alongside status/priority/assignee rather than a fifth dropdown.
+     */
+    #[Url(except: '')]
+    public string $dueFilter = '';
 
     #[Url(as: 'sort', except: 'due')]
     public string $sortField = 'due';
@@ -67,6 +90,12 @@ new #[Title('titles.tasks')] class extends Component
 
     #[Url(except: '')]
     public string $month = '';
+
+    #[Url(except: '')]
+    public string $anchorDate = '';
+
+    #[Url(as: 'period', except: 'month')]
+    public string $viewMode = 'month';
 
     public bool $showTaskDrawer = false;
 
@@ -142,6 +171,33 @@ new #[Title('titles.tasks')] class extends Component
         $this->resetPage();
     }
 
+    public function updatedDepartmentId(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedMyTasksOnly(): void
+    {
+        $this->resetPage();
+    }
+
+    /**
+     * Toggles a stat tile's own quick filter off when clicked again, exactly
+     * like setSort() toggles direction — a second click on the same tile
+     * clears it rather than being a no-op.
+     */
+    public function toggleDueFilter(string $filter): void
+    {
+        $this->dueFilter = $this->dueFilter === $filter ? '' : $filter;
+        $this->resetPage();
+    }
+
+    public function toggleStatusFilter(string $status): void
+    {
+        $this->status = $this->status === $status ? '' : $status;
+        $this->resetPage();
+    }
+
     public function updatedSourceType(): void
     {
         $this->sourceId = '';
@@ -201,6 +257,9 @@ new #[Title('titles.tasks')] class extends Component
         $this->assignee = '';
         $this->sourceType = '';
         $this->sourceId = '';
+        $this->departmentId = '';
+        $this->myTasksOnly = false;
+        $this->dueFilter = '';
         $this->resetPage();
     }
 
@@ -217,6 +276,74 @@ new #[Title('titles.tasks')] class extends Component
     public function goToToday(): void
     {
         $this->month = '';
+        $this->anchorDate = '';
+    }
+
+    /**
+     * Switch between the month grid and the ClickUp-style day/4-days/week
+     * time-grid views, mirroring the "My Calendar" page. Only the four
+     * values below are valid view modes; any other value (e.g. a stale
+     * bookmarked URL) is silently ignored so the component falls back to
+     * whatever $viewMode already holds.
+     */
+    public function setViewMode(string $viewMode): void
+    {
+        if (! in_array($viewMode, ['day', 'four_days', 'week', 'month'], true)) {
+            return;
+        }
+
+        $this->viewMode = $viewMode;
+    }
+
+    public function previousPeriod(): void
+    {
+        $this->anchorDate = $this->activeAnchor()->subDays($this->periodLengthInDays())->format('Y-m-d');
+    }
+
+    public function nextPeriod(): void
+    {
+        $this->anchorDate = $this->activeAnchor()->addDays($this->periodLengthInDays())->format('Y-m-d');
+    }
+
+    protected function periodLengthInDays(): int
+    {
+        return match ($this->viewMode) {
+            'day' => 1,
+            'four_days' => 4,
+            'week' => 7,
+            default => 1,
+        };
+    }
+
+    protected function activeAnchor(): CarbonImmutable
+    {
+        if ($this->anchorDate !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $this->anchorDate) === 1) {
+            $parsed = CarbonImmutable::createFromFormat('Y-m-d', $this->anchorDate);
+
+            if ($parsed !== false) {
+                return $parsed->startOfDay();
+            }
+        }
+
+        return CarbonImmutable::now()->startOfDay();
+    }
+
+    /**
+     * The visible days for the day/4-days/week views. Week always starts on
+     * the anchor's Sunday, so navigating never lands mid-week.
+     *
+     * @return array<int, CarbonImmutable>
+     */
+    protected function periodDays(): array
+    {
+        $anchor = $this->viewMode === 'week'
+            ? $this->activeAnchor()->startOfWeek(CarbonImmutable::SUNDAY)
+            : $this->activeAnchor();
+
+        return array_map(
+            fn (int $i): CarbonImmutable => $anchor->addDays($i),
+            range(0, $this->periodLengthInDays() - 1),
+        );
     }
 
     protected function activeMonth(): CarbonImmutable
@@ -271,7 +398,31 @@ new #[Title('titles.tasks')] class extends Component
             ->when($this->priority !== '', fn (Builder $query) => $query->where('priority', $this->priority))
             ->when($this->assignee !== '', fn (Builder $query) => $query->whereHas('taskAssignees', fn (Builder $query) => $query->where('employee_id', (int) $this->assignee)))
             ->when($this->sourceType !== '', fn (Builder $query) => $query->where('source_type', $this->sourceType))
-            ->when($this->sourceType !== '' && $this->sourceId !== '', fn (Builder $query) => $query->where('source_id', (int) $this->sourceId));
+            ->when($this->sourceType !== '' && $this->sourceId !== '', fn (Builder $query) => $query->where('source_id', (int) $this->sourceId))
+            ->when($this->dueFilter === 'overdue', fn (Builder $query) => $query
+                ->where('status', '!=', TaskStatus::Done->value)
+                ->whereNotNull('due_date')
+                ->where('due_date', '<', CarbonImmutable::today()))
+            ->when($this->dueFilter === 'due_soon', fn (Builder $query) => $query
+                ->where('status', '!=', TaskStatus::Done->value)
+                ->whereNotNull('due_date')
+                ->whereBetween('due_date', [CarbonImmutable::today(), CarbonImmutable::today()->addDays(7)]))
+            ->when(
+                $this->departmentId !== '' && auth()->user()->canViewAllTaskDepartments(),
+                fn (Builder $query) => $this->scopeTasksToDepartment($query, (int) $this->departmentId),
+            )
+            ->when($this->myTasksOnly, function (Builder $query): void {
+                $user = auth()->user();
+                $employeeId = $user->employee_id;
+
+                $query->where(fn (Builder $query) => $query
+                    ->when($employeeId !== null, fn (Builder $query) => $query->orWhereHas(
+                        'taskAssignees',
+                        fn (Builder $query) => $query->where('employee_id', $employeeId),
+                    ))
+                    ->orWhere('created_by', $user->id));
+            })
+            ->tap(fn (Builder $query) => $this->applyViewerDepartmentScope($query));
     }
 
     /** @return LengthAwarePaginator<int, Task> */
@@ -436,28 +587,74 @@ new #[Title('titles.tasks')] class extends Component
     }
 
     /**
-     * The month grid for the calendar view, built from the same filtered
-     * tasks as the other views. Tasks without a due date are returned
-     * separately for the "unscheduled" panel.
+     * A capped preview of the viewer's own tasks (assigned to or created by
+     * them) for the "My Tasks" rail — independent of every other filter
+     * (status, priority, department, …) so it always reflects "what's mine"
+     * regardless of what the rest of the page is currently narrowed to.
+     * Bypasses the base filteredTasksQuery() entirely rather than layering
+     * myTasksOnly on top of it, for exactly that reason.
      *
-     * @return array{month: CarbonImmutable, weeks: array<int, array<int, CarbonImmutable>>, tasksByDay: Collection<string, EloquentCollection<int, Task>>, unscheduled: EloquentCollection<int, Task>}
+     * @return EloquentCollection<int, Task>
+     */
+    #[Computed]
+    public function myTasksPreview(): EloquentCollection
+    {
+        $user = auth()->user();
+        $employeeId = $user->employee_id;
+
+        return Task::query()
+            ->select(['id', 'title', 'status', 'priority', 'due_date', 'created_by'])
+            ->whereNull('parent_task_id')
+            ->where(fn (Builder $query) => $query
+                ->when($employeeId !== null, fn (Builder $query) => $query->orWhereHas(
+                    'taskAssignees',
+                    fn (Builder $query) => $query->where('employee_id', $employeeId),
+                ))
+                ->orWhere('created_by', $user->id))
+            ->where('status', '!=', TaskStatus::Done->value)
+            ->with('taskAssignees.employee:id,first_name_en,last_name_en,first_name_ar,last_name_ar')
+            ->orderByRaw('due_date is null, due_date asc')
+            ->limit(8)
+            ->get();
+    }
+
+    /**
+     * The calendar grid for the calendar view, built from the same filtered
+     * tasks as the other views. Tasks without a due date are returned
+     * separately for the "unscheduled" panel. In month view, full weeks
+     * covering the active month (padded with the tail of adjacent months).
+     * In day/4-days/week view, the plain list of visible days instead —
+     * `weeks` is null then and `days` is populated, and vice versa in month
+     * view.
+     *
+     * @return array{month: CarbonImmutable, weeks: ?array<int, array<int, CarbonImmutable>>, days: ?array<int, CarbonImmutable>, tasksByDay: Collection<string, EloquentCollection<int, Task>>, unscheduled: EloquentCollection<int, Task>}
      */
     #[Computed]
     public function calendarGrid(): array
     {
-        $month = $this->activeMonth();
-        $gridStart = $month->startOfWeek(CarbonImmutable::SUNDAY);
-        $gridEnd = $month->endOfMonth()->endOfWeek(CarbonImmutable::SATURDAY);
+        if ($this->viewMode === 'month') {
+            $month = $this->activeMonth();
+            $gridStart = $month->startOfWeek(CarbonImmutable::SUNDAY);
+            $gridEnd = $month->endOfMonth()->endOfWeek(CarbonImmutable::SATURDAY);
 
-        $weeks = [];
-        $cursor = $gridStart;
-        while ($cursor->lte($gridEnd)) {
-            $week = [];
-            for ($i = 0; $i < 7; $i++) {
-                $week[] = $cursor;
-                $cursor = $cursor->addDay();
+            $weeks = [];
+            $cursor = $gridStart;
+            while ($cursor->lte($gridEnd)) {
+                $week = [];
+                for ($i = 0; $i < 7; $i++) {
+                    $week[] = $cursor;
+                    $cursor = $cursor->addDay();
+                }
+                $weeks[] = $week;
             }
-            $weeks[] = $week;
+
+            $days = null;
+        } else {
+            $days = $this->periodDays();
+            $month = $days[0];
+            $gridStart = $days[0];
+            $gridEnd = end($days);
+            $weeks = null;
         }
 
         $tasks = $this->boardTasks;
@@ -471,6 +668,7 @@ new #[Title('titles.tasks')] class extends Component
         return [
             'month' => $month,
             'weeks' => $weeks,
+            'days' => $days,
             'tasksByDay' => $tasksByDay,
             'unscheduled' => $unscheduled,
         ];
@@ -495,6 +693,25 @@ new #[Title('titles.tasks')] class extends Component
      *
      * @return array<int, array{id: int, name: string, secondary_name: string}>
      */
+    /**
+     * The department filter's options — only ever queried/rendered for a
+     * bypass role (see ManagesTaskVisibility); a department-scoped role's
+     * view never needs this list.
+     *
+     * @return array<int, array{id: int, name: string}>
+     */
+    #[Computed(persist: true, seconds: 300)]
+    public function departmentOptions(): array
+    {
+        if (! auth()->user()->canViewAllTaskDepartments()) {
+            return [];
+        }
+
+        return HrDepartment::options()
+            ->map(fn (HrDepartment $department): array => ['id' => $department->id, 'name' => $department->name])
+            ->all();
+    }
+
     #[Computed(persist: true, seconds: 300)]
     public function userOptions(): array
     {
@@ -1185,7 +1402,8 @@ new #[Title('titles.tasks')] class extends Component
 ?>
 
 @php
-    $filtersAreActive = $search !== '' || $status !== '' || $priority !== '' || $assignee !== '' || $sourceType !== '';
+    $filtersAreActive = $search !== '' || $status !== '' || $priority !== '' || $assignee !== '' || $sourceType !== '' || $departmentId !== '' || $dueFilter !== '' || $myTasksOnly;
+    $canPickDepartment = auth()->user()->canViewAllTaskDepartments();
 @endphp
 
 <section class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="task-directory-heading">
@@ -1210,6 +1428,14 @@ new #[Title('titles.tasks')] class extends Component
                     <flux:select.option :value="$userOption['id']" :wire:key="'task-assignee-filter-'.$userOption['id']">{{ $userOption['name'] }} · {{ $userOption['secondary_name'] }}</flux:select.option>
                 @endforeach
             </x-ui.header-filter-select>
+            @if ($canPickDepartment)
+                <x-ui.header-filter-select :label="__('tasks.department')" wire:model.live="departmentId" :value="$departmentId" data-test="task-department-filter">
+                    <flux:select.option value="">{{ __('tasks.every_department') }}</flux:select.option>
+                    @foreach ($this->departmentOptions as $departmentOption)
+                        <flux:select.option :value="$departmentOption['id']" :wire:key="'task-department-filter-'.$departmentOption['id']">{{ $departmentOption['name'] }}</flux:select.option>
+                    @endforeach
+                </x-ui.header-filter-select>
+            @endif
             <x-ui.header-filter-select :label="__('tasks.source_type')" wire:model.live="sourceType" :value="$sourceType">
                 <flux:select.option value="">{{ __('common.select') }}</flux:select.option>
                 @foreach ($this->sourceTypeOptions as $sourceTypeOption)
@@ -1231,10 +1457,75 @@ new #[Title('titles.tasks')] class extends Component
     </x-ui.page-header>
 
     <div class="grid gap-3 @2xl/directory:grid-cols-2 @5xl/directory:grid-cols-4">
-        <x-ui.stat-tile :label="__('tasks.total_tasks')" :value="$this->taskStats['total']" icon="clipboard-document-check" wire:key="task-stat-total" />
-        <x-ui.stat-tile :label="TaskStatus::Done->label()" :value="$this->taskStats['done']" icon="check-circle" tone="good" wire:key="task-stat-done" />
-        <x-ui.stat-tile :label="__('tasks.overdue')" :value="$this->taskStats['overdue']" icon="exclamation-triangle" tone="critical" wire:key="task-stat-overdue" />
-        <x-ui.stat-tile :label="__('tasks.due_within_7_days')" :value="$this->taskStats['due_soon']" icon="clock" tone="warn" wire:key="task-stat-due-soon" />
+        <button type="button" wire:click="clearFilters" data-test="task-stat-total" @class(['text-left transition-transform', 'scale-[0.98]' => ! $filtersAreActive])>
+            <x-ui.stat-tile :label="__('tasks.total_tasks')" :value="$this->taskStats['total']" icon="clipboard-document-check" />
+        </button>
+        <button type="button" wire:click="toggleStatusFilter('{{ TaskStatus::Done->value }}')" data-test="task-stat-done" @class(['text-left transition-transform', 'scale-[0.98] ring-2 ring-status-good rounded-xl' => $status === TaskStatus::Done->value])>
+            <x-ui.stat-tile :label="TaskStatus::Done->label()" :value="$this->taskStats['done']" icon="check-circle" tone="good" />
+        </button>
+        <button type="button" wire:click="toggleDueFilter('overdue')" data-test="task-stat-overdue" @class(['text-left transition-transform', 'scale-[0.98] ring-2 ring-status-critical rounded-xl' => $dueFilter === 'overdue'])>
+            <x-ui.stat-tile :label="__('tasks.overdue')" :value="$this->taskStats['overdue']" icon="exclamation-triangle" tone="critical" />
+        </button>
+        <button type="button" wire:click="toggleDueFilter('due_soon')" data-test="task-stat-due-soon" @class(['text-left transition-transform', 'scale-[0.98] ring-2 ring-status-warn rounded-xl' => $dueFilter === 'due_soon'])>
+            <x-ui.stat-tile :label="__('tasks.due_within_7_days')" :value="$this->taskStats['due_soon']" icon="clock" tone="warn" />
+        </button>
+    </div>
+
+    <div class="flex flex-col gap-3 rounded-2xl border border-secondary-soft bg-secondary-soft/20 p-4 dark:border-secondary-medium dark:bg-secondary-medium/10" data-test="my-tasks-rail">
+        <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+                <flux:icon name="user-circle" variant="micro" class="size-5 text-primary" aria-hidden="true" />
+                <h2 class="text-sm font-bold text-secondary-dark dark:text-white">{{ __('tasks.my_tasks') }}</h2>
+            </div>
+            @if ($this->myTasksPreview->isNotEmpty())
+                <button type="button" wire:click="$set('myTasksOnly', {{ $myTasksOnly ? 'false' : 'true' }})" class="text-xs font-semibold text-primary hover:underline" data-test="my-tasks-view-all">
+                    {{ $myTasksOnly ? __('tasks.showing_my_tasks_only') : __('tasks.view_all') }}
+                </button>
+            @endif
+        </div>
+        @if ($this->myTasksPreview->isNotEmpty())
+            @php $viewerEmployeeId = auth()->user()->employee_id; @endphp
+            <div class="flex gap-3 overflow-x-auto pb-1">
+                @foreach ($this->myTasksPreview as $myTask)
+                    @php $isAssignedToMe = $viewerEmployeeId !== null && $myTask->taskAssignees->pluck('employee_id')->contains($viewerEmployeeId); @endphp
+                    <button
+                        type="button"
+                        wire:click="openEditDrawer({{ $myTask->id }})"
+                        wire:key="my-task-{{ $myTask->id }}"
+                        data-test="my-task-card-{{ $myTask->id }}"
+                        @class([
+                            'flex w-56 shrink-0 flex-col gap-2 rounded-xl border p-3 text-left shadow-sm transition-shadow hover:shadow-md dark:bg-secondary-dark',
+                            'border-primary/30 bg-white dark:border-status-critical/30' => $isAssignedToMe,
+                            'border-dashed border-secondary-light bg-secondary-soft/30 dark:border-secondary-medium dark:bg-secondary-medium/10' => ! $isAssignedToMe,
+                        ])
+                    >
+                        <div class="flex items-center justify-between gap-2">
+                            <x-ui.status-pill :case="$myTask->status" />
+                            @if ($isAssignedToMe)
+                                <span class="inline-flex shrink-0 items-center gap-1 text-[10px] font-bold text-primary dark:text-status-critical" data-test="my-task-role-assigned-{{ $myTask->id }}">
+                                    <flux:icon.user variant="micro" class="size-3" aria-hidden="true" />
+                                    {{ __('tasks.assigned_to_you') }}
+                                </span>
+                            @else
+                                <span class="inline-flex shrink-0 items-center gap-1 text-[10px] font-semibold text-secondary-medium dark:text-secondary-soft" data-test="my-task-role-delegated-{{ $myTask->id }}">
+                                    <flux:icon.paper-airplane variant="micro" class="size-3" aria-hidden="true" />
+                                    {{ __('tasks.you_assigned') }}
+                                </span>
+                            @endif
+                        </div>
+                        <p class="truncate text-sm font-semibold text-secondary-dark dark:text-white">{{ $myTask->title }}</p>
+                        <div class="flex items-center justify-between text-xs text-secondary-medium dark:text-secondary-soft">
+                            <span @class(['font-semibold text-status-critical' => $myTask->due_date !== null && $myTask->due_date->isPast() && $myTask->status !== TaskStatus::Done])>
+                                {{ $myTask->due_date?->translatedFormat('M j') ?? __('tasks.no_due_date') }}
+                            </span>
+                            <x-ui.enum-badge :case="$myTask->priority" />
+                        </div>
+                    </button>
+                @endforeach
+            </div>
+        @else
+            <p class="text-sm text-secondary-medium dark:text-secondary-soft" data-test="my-tasks-empty">{{ __('common.no_tasks_yet') }}</p>
+        @endif
     </div>
 
     <div class="flex flex-wrap items-center justify-between gap-3">

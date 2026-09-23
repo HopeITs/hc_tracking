@@ -30,6 +30,9 @@ test('creating a configured role grants exactly its baseline', function () {
     Permission::query()->create(['name' => 'programs.view', 'guard_name' => 'web']);
     Permission::query()->create(['name' => 'projects.view', 'guard_name' => 'web']);
     Permission::query()->create(['name' => 'calendar.view', 'guard_name' => 'web']);
+    Permission::query()->create(['name' => 'tasks.view', 'guard_name' => 'web']);
+    Permission::query()->create(['name' => 'tasks.create', 'guard_name' => 'web']);
+    Permission::query()->create(['name' => 'tasks.update', 'guard_name' => 'web']);
 
     $role = Role::query()->create(['name' => 'Media Team', 'guard_name' => 'web']);
 

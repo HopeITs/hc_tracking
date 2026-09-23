@@ -8,16 +8,30 @@
     $allTasks = $this->boardTasks;
     $today = CarbonImmutable::today();
 
-    $columnTone = fn (TaskStatus $case): string => match ($case) {
-        TaskStatus::Done => 'border-status-good/30 bg-status-good-soft',
-        TaskStatus::UnderReview => 'border-status-warn/30 bg-status-warn-soft',
-        TaskStatus::InProgress, TaskStatus::Todo => 'border-board-line bg-board',
+    $columnAccent = fn (TaskStatus $case): string => match ($case) {
+        TaskStatus::Todo => 'bg-secondary-light',
+        TaskStatus::InProgress => 'bg-status-active',
+        TaskStatus::UnderReview => 'bg-status-warn',
+        TaskStatus::Done => 'bg-status-good',
+    };
+
+    $columnIcon = fn (TaskStatus $case): string => match ($case) {
+        TaskStatus::Todo => 'stop-circle',
+        TaskStatus::InProgress => 'play-circle',
+        TaskStatus::UnderReview => 'eye',
+        TaskStatus::Done => 'check-circle',
+    };
+
+    $priorityChipClasses = fn (TaskPriority $case): string => match ($case) {
+        TaskPriority::High => 'bg-status-critical-soft text-primary dark:text-status-critical',
+        TaskPriority::Medium => 'bg-status-warn-soft text-status-warn',
+        TaskPriority::Low => 'bg-secondary-soft text-secondary-medium dark:bg-secondary-medium/50 dark:text-secondary-soft',
     };
 
     $priorityIconClasses = fn (TaskPriority $case): string => match ($case) {
-        TaskPriority::High => 'text-primary',
+        TaskPriority::High => 'text-primary dark:text-status-critical',
         TaskPriority::Medium => 'text-status-warn',
-        TaskPriority::Low => 'text-secondary-light',
+        TaskPriority::Low => 'text-secondary-medium dark:text-secondary-soft',
     };
 @endphp
 
@@ -26,19 +40,32 @@
         @php $columnTasks = $allTasks->where('status', $case)->values(); @endphp
 
         <div
-            class="flex flex-col gap-3 rounded-xl border p-3 transition-colors {{ $columnTone($case) }}"
+            class="flex flex-col gap-3 overflow-hidden rounded-2xl border border-secondary-soft bg-secondary-soft/20 pb-3 transition-shadow dark:border-secondary-medium dark:bg-secondary-medium/10"
             wire:key="task-board-column-{{ $case->value }}"
             data-test="task-board-column-{{ $case->value }}"
+            x-data="{ dragOver: false }"
+            x-on:dragover.prevent="dragOver = true"
+            x-on:dragleave="dragOver = false"
+            x-on:drop.prevent="
+                dragOver = false;
+                const dragged = JSON.parse($event.dataTransfer.getData('text/plain') || '{}');
+                if (dragged.id && dragged.status !== '{{ $case->value }}') {
+                    $wire.quickSetStatus(dragged.id, '{{ $case->value }}');
+                }
+            "
+            :class="dragOver ? 'ring-2 ring-primary ring-offset-1' : ''"
         >
-            <div class="flex items-center justify-between px-1">
-                <x-ui.enum-badge :case="$case" />
-                <span class="text-xs font-semibold tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $columnTasks->count() }}</span>
+            <div class="h-1 w-full shrink-0 {{ $columnAccent($case) }}"></div>
+
+            <div class="flex items-center justify-between px-3.5">
+                <div class="flex items-center gap-1.5">
+                    <flux:icon :name="$columnIcon($case)" variant="micro" class="size-4 shrink-0 {{ $columnAccent($case) }} rounded-full text-white" />
+                    <span class="text-xs font-bold tracking-wide text-secondary-dark uppercase dark:text-white">{{ $case->label() }}</span>
+                </div>
+                <span class="inline-flex min-w-6 items-center justify-center rounded-full bg-white px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-secondary-medium shadow-sm dark:bg-secondary-dark dark:text-secondary-soft">{{ $columnTasks->count() }}</span>
             </div>
 
-            <div
-                class="flex min-h-16 flex-col gap-2"
-                x-data="taskDropList('task-board', (wire, id) => wire.quickSetStatus(id, '{{ $case->value }}'))"
-            >
+            <div class="flex min-h-16 flex-col gap-2 px-3">
                 @forelse ($columnTasks as $task)
                     @php
                         $isOverdue = $task->status !== TaskStatus::Done && $task->due_date !== null && $task->due_date->lt($today);
@@ -46,36 +73,38 @@
                         $boardAssignees = $task->taskAssignees->pluck('employee')->filter();
                     @endphp
                     <div
-                        class="flex cursor-grab flex-col gap-2 rounded-lg border border-secondary-soft bg-white p-3 shadow-[0_1px_2px_rgba(16,24,40,0.04)] dark:border-secondary-medium dark:bg-secondary-dark"
+                        class="group flex cursor-grab flex-col gap-2.5 rounded-xl border border-secondary-soft bg-white p-3 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md active:cursor-grabbing dark:border-secondary-medium dark:bg-secondary-dark"
                         wire:key="task-board-card-{{ $task->id }}"
-                        data-task-card
                         data-task-id="{{ $task->id }}"
+                        draggable="true"
+                        x-on:dragstart="$event.dataTransfer.setData('text/plain', JSON.stringify({ id: {{ $task->id }}, status: '{{ $case->value }}' })); $event.currentTarget.classList.add('opacity-40')"
+                        x-on:dragend="$event.currentTarget.classList.remove('opacity-40')"
                     >
                         <div class="flex items-start justify-between gap-2">
-                            <a href="{{ route('tasks.show', $task) }}" wire:navigate class="min-w-0 truncate text-sm font-semibold text-secondary-dark hover:underline dark:text-white" data-test="task-board-card-{{ $task->id }}">
+                            <a href="{{ route('tasks.show', $task) }}" wire:navigate class="min-w-0 truncate text-sm font-semibold text-secondary-dark hover:text-primary hover:underline dark:text-white dark:hover:text-status-critical" data-test="task-board-card-{{ $task->id }}">
                                 {{ $task->title }}
                             </a>
-                            <div class="flex shrink-0 items-center gap-0.5">
+                            <div class="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
                                 <x-ui.button
                                     tone="ghost"
                                     size="sm"
                                     icon="plus"
-                                    class="size-8!"
+                                    class="size-7!"
                                     x-on:click="subtasksOpen[{{ $task->id }}] = true; $nextTick(() => $refs['subtaskAddInputBoard{{ $task->id }}']?.focus())"
                                     :aria-label="__('tasks.add_subtask')"
                                     data-test="task-board-add-subtask-{{ $task->id }}"
                                 />
-                                <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-8!" wire:click="openEditDrawer({{ $task->id }})" :aria-label="__('tasks.edit_title', ['title' => $task->title])" />
-                                <x-ui.button tone="ghost" size="sm" icon="trash" class="size-8!" wire:click="confirmDelete({{ $task->id }})" :aria-label="__('tasks.delete_title', ['title' => $task->title])" />
+                                <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-7!" wire:click="openEditDrawer({{ $task->id }})" :aria-label="__('tasks.edit_title', ['title' => $task->title])" />
+                                <x-ui.button tone="ghost" size="sm" icon="trash" class="size-7!" wire:click="confirmDelete({{ $task->id }})" :aria-label="__('tasks.delete_title', ['title' => $task->title])" />
                             </div>
                         </div>
 
-                        <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $task->sourceLabel() }}</p>
+                        <p class="-mt-1.5 truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $task->sourceLabel() }}</p>
 
-                        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                        <div class="flex flex-wrap items-center gap-1.5 text-xs">
                             <flux:dropdown position="bottom" align="start">
-                                <button type="button" aria-label="{{ __('tasks.priority') }}: {{ $task->priority->label() }}" class="inline-flex cursor-pointer items-center gap-1 rounded px-1 py-0.5 hover:bg-secondary-soft dark:hover:bg-secondary-medium" data-test="task-board-priority-trigger-{{ $task->id }}">
-                                    <flux:icon.flag :variant="$task->priority === TaskPriority::Low ? 'outline' : 'solid'" class="size-3.5 {{ $priorityIconClasses($task->priority) }}" />
+                                <button type="button" aria-label="{{ __('tasks.priority') }}: {{ $task->priority->label() }}" class="inline-flex cursor-pointer items-center gap-1 rounded-full px-2 py-1 font-semibold {{ $priorityChipClasses($task->priority) }}" data-test="task-board-priority-trigger-{{ $task->id }}">
+                                    <flux:icon.flag :variant="$task->priority === TaskPriority::Low ? 'outline' : 'solid'" class="size-3 shrink-0" />
                                     {{ $task->priority->label() }}
                                 </button>
                                 <flux:menu>
@@ -89,32 +118,35 @@
                                 </flux:menu>
                             </flux:dropdown>
 
-                            <input
-                                type="date"
-                                value="{{ $task->due_date?->toDateString() }}"
-                                wire:change="rescheduleTask({{ $task->id }}, $event.target.value)"
-                                aria-label="{{ __('tasks.due_date_2') }}: {{ $task->title }}"
-                                @class(['w-28 rounded border-0 bg-transparent p-0.5 tabular-nums focus:ring-1 focus:ring-primary focus:outline-none', 'font-semibold text-primary' => $isOverdue, 'text-secondary-medium dark:text-secondary-soft' => ! $isOverdue])
-                                data-test="task-board-due-date-{{ $task->id }}"
-                            />
+                            <div @class(['inline-flex items-center gap-1 rounded-full px-2 py-1 font-semibold', 'bg-status-critical-soft text-primary dark:text-status-critical' => $isOverdue, 'bg-secondary-soft text-secondary-medium dark:bg-secondary-medium/50 dark:text-secondary-soft' => ! $isOverdue])>
+                                <flux:icon.calendar-days variant="micro" class="size-3 shrink-0" aria-hidden="true" />
+                                <input
+                                    type="date"
+                                    value="{{ $task->due_date?->toDateString() }}"
+                                    wire:change="rescheduleTask({{ $task->id }}, $event.target.value)"
+                                    aria-label="{{ __('tasks.due_date_2') }}: {{ $task->title }}"
+                                    class="w-24 border-0 bg-transparent p-0 tabular-nums focus:ring-0 focus:outline-none"
+                                    data-test="task-board-due-date-{{ $task->id }}"
+                                />
+                            </div>
 
                             @if ($task->subtasks_count > 0)
                                 <button
                                     type="button"
                                     x-on:click="subtasksOpen[{{ $task->id }}] = !subtasksOpen[{{ $task->id }}]"
                                     :aria-expanded="!!subtasksOpen[{{ $task->id }}]"
-                                    class="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-secondary-medium hover:bg-secondary-soft/60 dark:text-secondary-soft dark:hover:bg-secondary-medium"
+                                    class="inline-flex items-center gap-1 rounded-full bg-secondary-soft px-2 py-1 font-semibold text-secondary-medium hover:bg-secondary-light/60 dark:bg-secondary-medium/50 dark:text-secondary-soft dark:hover:bg-secondary-medium"
                                     :aria-label="subtasksOpen[{{ $task->id }}] ? {{ Js::from(__('tasks.hide_subtasks')) }} : {{ Js::from(__('tasks.show_subtasks')) }}"
                                     data-test="task-board-subtasks-toggle-{{ $task->id }}"
                                 >
-                                    <flux:icon.rectangle-stack variant="micro" class="size-3.5" aria-hidden="true" />
+                                    <flux:icon.rectangle-stack variant="micro" class="size-3 shrink-0" aria-hidden="true" />
                                     {{ $task->subtasks_count }}
                                 </button>
                             @endif
                         </div>
 
                         <div class="h-1.5 w-full overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium">
-                            <div class="h-full rounded-full bg-primary" style="width: {{ $task->progress_percentage }}%"></div>
+                            <div @class(['h-full rounded-full transition-[width]', 'bg-status-good' => $task->status === TaskStatus::Done, 'bg-primary' => $task->status !== TaskStatus::Done]) style="width: {{ $task->progress_percentage }}%"></div>
                         </div>
 
                         <x-ui.multi-select-popover
@@ -131,7 +163,7 @@
                                 @else
                                     @foreach ($boardAssignees->take(3) as $employee)
                                         <div class="group/avatar relative">
-                                            <span class="inline-flex size-7 items-center justify-center rounded-full border-2 border-white bg-secondary-dark text-[11px] font-semibold text-white dark:border-secondary-dark dark:bg-secondary-medium">
+                                            <span class="inline-flex size-7 items-center justify-center rounded-full bg-secondary-dark text-[11px] font-semibold text-white ring-2 ring-white dark:bg-secondary-medium dark:ring-secondary-dark">
                                                 {{ Illuminate\Support\Str::of($employee->name)->explode(' ')->map(fn ($part) => mb_substr($part, 0, 1))->take(2)->implode('') }}
                                             </span>
                                             <button
@@ -146,7 +178,7 @@
                                         </div>
                                     @endforeach
                                     @if ($boardAssignees->count() > 3)
-                                        <span class="inline-flex size-7 items-center justify-center rounded-full border-2 border-white bg-secondary-soft text-[10px] font-semibold text-secondary-dark dark:border-secondary-dark dark:bg-secondary-medium dark:text-white">
+                                        <span class="inline-flex size-7 items-center justify-center rounded-full bg-secondary-soft text-[10px] font-semibold text-secondary-dark ring-2 ring-white dark:bg-secondary-medium dark:text-white dark:ring-secondary-dark">
                                             +{{ $boardAssignees->count() - 3 }}
                                         </span>
                                     @endif
@@ -181,7 +213,7 @@
                                 wire:change="quickSetStatus({{ $task->id }}, $event.target.value)"
                                 wire:loading.attr="disabled"
                                 wire:target="quickSetStatus"
-                                class="w-full rounded-md border border-secondary-soft bg-white px-2 py-1.5 text-xs text-secondary-dark disabled:opacity-60 dark:border-secondary-medium dark:bg-secondary-dark dark:text-white"
+                                class="w-full rounded-lg border border-secondary-soft bg-white px-2 py-1.5 text-xs text-secondary-dark disabled:opacity-60 dark:border-secondary-medium dark:bg-secondary-dark dark:text-white"
                                 data-test="task-quick-status-{{ $task->id }}"
                             >
                                 @foreach (TaskStatus::cases() as $statusOption)
@@ -247,12 +279,12 @@
                                                 </span>
                                             @else
                                                 @foreach ($boardDraftAssignees->take(3) as $userOption)
-                                                    <span class="inline-flex size-6 items-center justify-center rounded-full border-2 border-white bg-secondary-dark text-[10px] font-semibold text-white dark:border-secondary-dark dark:bg-secondary-medium">
+                                                    <span class="inline-flex size-6 items-center justify-center rounded-full bg-secondary-dark text-[10px] font-semibold text-white ring-2 ring-white dark:bg-secondary-medium dark:ring-secondary-dark">
                                                         {{ Illuminate\Support\Str::of($userOption['name'])->explode(' ')->map(fn ($part) => mb_substr($part, 0, 1))->take(2)->implode('') }}
                                                     </span>
                                                 @endforeach
                                                 @if ($boardDraftAssignees->count() > 3)
-                                                    <span class="inline-flex size-6 items-center justify-center rounded-full border-2 border-white bg-secondary-soft text-[9px] font-semibold text-secondary-dark dark:border-secondary-dark dark:bg-secondary-medium dark:text-white">
+                                                    <span class="inline-flex size-6 items-center justify-center rounded-full bg-secondary-soft text-[9px] font-semibold text-secondary-dark ring-2 ring-white dark:bg-secondary-medium dark:text-white dark:ring-secondary-dark">
                                                         +{{ $boardDraftAssignees->count() - 3 }}
                                                     </span>
                                                 @endif
@@ -303,7 +335,7 @@
                         </div>
                     </div>
                 @empty
-                    <p class="px-1 py-4 text-center text-xs text-secondary-light" data-test="task-board-empty-{{ $case->value }}">{{ __('tasks.no_tasks_in_this_status') }}</p>
+                    <p class="px-1 py-6 text-center text-xs text-secondary-light" data-test="task-board-empty-{{ $case->value }}">{{ __('tasks.no_tasks_in_this_status') }}</p>
                 @endforelse
             </div>
 
@@ -313,7 +345,7 @@
                 $boardTaskDraftAssignees = collect($this->userOptions)->whereIn('id', collect($boardTaskDraft['assignees'])->map(fn ($id) => (int) $id));
                 $boardDraftPriority = TaskPriority::from($boardTaskDraft['priority']);
             @endphp
-            <div class="flex flex-col gap-1.5 rounded-lg border border-dashed border-secondary-light px-2 py-1.5 dark:border-secondary-medium" data-test="task-board-add-row-{{ $case->value }}">
+            <div class="mx-3 flex flex-col gap-1.5 rounded-xl border border-dashed border-secondary-light bg-white/60 px-2.5 py-2 transition-colors focus-within:border-primary hover:border-secondary-medium dark:border-secondary-medium dark:bg-secondary-dark/40" data-test="task-board-add-row-{{ $case->value }}">
                 <label class="flex items-center gap-2">
                     <flux:icon.plus variant="micro" class="size-4 shrink-0 text-primary" aria-hidden="true" />
                     <span class="sr-only">{{ __('tasks.add_task') }}</span>
@@ -338,12 +370,12 @@
                                 </span>
                             @else
                                 @foreach ($boardTaskDraftAssignees->take(3) as $userOption)
-                                    <span class="inline-flex size-6 items-center justify-center rounded-full border-2 border-white bg-secondary-dark text-[10px] font-semibold text-white dark:border-secondary-dark dark:bg-secondary-medium">
+                                    <span class="inline-flex size-6 items-center justify-center rounded-full bg-secondary-dark text-[10px] font-semibold text-white ring-2 ring-white dark:bg-secondary-medium dark:ring-secondary-dark">
                                         {{ Illuminate\Support\Str::of($userOption['name'])->explode(' ')->map(fn ($part) => mb_substr($part, 0, 1))->take(2)->implode('') }}
                                     </span>
                                 @endforeach
                                 @if ($boardTaskDraftAssignees->count() > 3)
-                                    <span class="inline-flex size-6 items-center justify-center rounded-full border-2 border-white bg-secondary-soft text-[9px] font-semibold text-secondary-dark dark:border-secondary-dark dark:bg-secondary-medium dark:text-white">
+                                    <span class="inline-flex size-6 items-center justify-center rounded-full bg-secondary-soft text-[9px] font-semibold text-secondary-dark ring-2 ring-white dark:bg-secondary-medium dark:text-white dark:ring-secondary-dark">
                                         +{{ $boardTaskDraftAssignees->count() - 3 }}
                                     </span>
                                 @endif

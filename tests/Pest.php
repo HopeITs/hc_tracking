@@ -382,6 +382,25 @@ function createHrSchema(): void
         $table->rememberToken();
         $table->timestamps();
     });
+
+    $schema->create('positions', function (Blueprint $table): void {
+        $table->id();
+        $table->unsignedBigInteger('department_id');
+        $table->unsignedBigInteger('program_id')->nullable();
+        $table->string('title_en');
+        $table->string('title_ar');
+        $table->boolean('is_active')->default(true);
+        $table->timestamps();
+    });
+
+    $schema->create('contracts', function (Blueprint $table): void {
+        $table->id();
+        $table->unsignedBigInteger('employee_id');
+        $table->unsignedBigInteger('position_id');
+        $table->dateTime('start_date')->nullable();
+        $table->boolean('is_active')->default(true);
+        $table->timestamps();
+    });
 }
 
 /**
@@ -450,5 +469,32 @@ function insertHrUser(?int $employeeId, string $email, string $password = 'passw
         'employee_id' => $employeeId,
         'email' => $email,
         'password' => bcrypt($password),
+    ]);
+}
+
+/**
+ * Insert an HR position (within a department) and return its id.
+ */
+function insertHrPosition(int $departmentId, string $titleEn = 'Officer', ?int $programId = null, bool $isActive = true): int
+{
+    return DB::connection('hr')->table('positions')->insertGetId([
+        'department_id' => $departmentId,
+        'program_id' => $programId,
+        'title_en' => $titleEn,
+        'title_ar' => $titleEn,
+        'is_active' => $isActive,
+    ]);
+}
+
+/**
+ * Insert an HR contract linking an employee to a position, and return its id.
+ */
+function insertHrContract(int $employeeId, int $positionId, bool $isActive = true, ?string $startDate = null): int
+{
+    return DB::connection('hr')->table('contracts')->insertGetId([
+        'employee_id' => $employeeId,
+        'position_id' => $positionId,
+        'start_date' => $startDate ?? now()->toDateTimeString(),
+        'is_active' => $isActive,
     ]);
 }

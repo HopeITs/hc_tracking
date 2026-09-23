@@ -246,4 +246,38 @@ class HrEmployee extends HrModel
     {
         return $this->hasOne(HrUser::class, 'employee_id');
     }
+
+    /**
+     * Every contract this employee has held, current or past.
+     *
+     * @return HasMany<HrContract, $this>
+     */
+    public function contracts(): HasMany
+    {
+        return $this->hasMany(HrContract::class, 'employee_id');
+    }
+
+    /**
+     * The department of this employee's current position, resolved through
+     * their active contract.
+     *
+     * There is no department_id on the employee row itself — department is
+     * only reachable via employees -> contracts (is_active) -> positions ->
+     * departments. Kept as a plain query rather than a hasOneThrough chain
+     * across two intermediate tables, matching the "resolve ids first"
+     * convention the rest of this class uses for cross-connection lookups.
+     * An employee with more than one active contract (should not happen)
+     * resolves to the most recently started one.
+     */
+    public function currentDepartmentId(): ?int
+    {
+        return HrContract::query()
+            ->where('employee_id', $this->id)
+            ->where('is_active', true)
+            ->orderByDesc('start_date')
+            ->with('position')
+            ->first()
+            ?->position
+            ?->department_id;
+    }
 }

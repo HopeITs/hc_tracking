@@ -343,6 +343,7 @@ test('the list row assignee trigger opens an inline multi select popover of ever
 
     Livewire::actingAs($user)
         ->test('pages::tasks.index')
+        ->set('view', 'list')
         ->assertSee('data-test="task-assignee-trigger-'.$task->id.'"', false)
         ->assertSee('data-test="task-assignee-option-'.$task->id.'-'.$alice.'"', false)
         ->assertSee('data-test="task-assignee-option-'.$task->id.'-'.$bob.'"', false)
@@ -432,6 +433,15 @@ test('the task directory renders with no tasks', function () {
     $user = User::factory()->create();
 
     Livewire::actingAs($user)->test('pages::tasks.index')->assertSee('No tasks yet');
+});
+
+test('the my tasks rail stays visible and shows an empty state when the viewer has no tasks', function () {
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)->test('pages::tasks.index')
+        ->assertSeeHtml('data-test="my-tasks-rail"')
+        ->assertSeeHtml('data-test="my-tasks-empty"')
+        ->assertSee('My Tasks');
 });
 
 test('toggling completion marks a task done and back to todo', function () {
@@ -546,10 +556,12 @@ test('the list view computes stat tiles with one aggregate query instead of load
     $user = User::factory()->create();
     Task::factory()->count(10)->create();
 
+    $page = Livewire::actingAs($user)->test('pages::tasks.index');
+
     DB::flushQueryLog();
     DB::enableQueryLog();
 
-    Livewire::actingAs($user)->test('pages::tasks.index');
+    $page->set('view', 'list');
 
     $taskTableQueries = collect(DB::getQueryLog())
         ->filter(fn (array $query): bool => str_contains($query['query'], '`tasks`') || str_contains($query['query'], 'from "tasks"'));
@@ -557,11 +569,32 @@ test('the list view computes stat tiles with one aggregate query instead of load
     DB::disableQueryLog();
 
     // paginate() itself issues a count query plus the page's select query;
-    // the stat tiles add one aggregate select on top of that, and the eager
+    // the stat tiles add one aggregate select on top of that, the eager
     // load of each row's own subtasks (for the inline expand panel) adds a
-    // fourth — four total, not a second full (board-sized) fetch of every
-    // task with its relations just to count a handful of numbers.
-    expect($taskTableQueries)->toHaveCount(4);
+    // fourth, and the "My Tasks" rail's own capped preview query a fifth —
+    // five total, not a second full (board-sized) fetch of every task with
+    // its relations just to count a handful of numbers.
+    expect($taskTableQueries)->toHaveCount(5);
+});
+
+test('the My Tasks rail visually distinguishes tasks assigned to the viewer from tasks the viewer only delegated', function () {
+    $employeeId = insertHrEmployee();
+    $user = User::factory()->create(['employee_id' => $employeeId]);
+
+    $assignedToMe = Task::factory()->create(['title' => 'Assigned to me', 'created_by' => $user->id]);
+    $assignedToMe->taskAssignees()->delete();
+    $assignedToMe->taskAssignees()->create(['employee_id' => $employeeId]);
+
+    $delegatedByMe = Task::factory()->create(['title' => 'Delegated by me', 'created_by' => $user->id]);
+    $delegatedByMe->taskAssignees()->delete();
+    $delegatedByMe->taskAssignees()->create(['employee_id' => insertHrEmployee(firstNameEn: 'Someone', lastNameEn: 'Else')]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->assertSee('data-test="my-task-role-assigned-'.$assignedToMe->id.'"', false)
+        ->assertSee('data-test="my-task-role-delegated-'.$delegatedByMe->id.'"', false)
+        ->assertDontSee('data-test="my-task-role-delegated-'.$assignedToMe->id.'"', false)
+        ->assertDontSee('data-test="my-task-role-assigned-'.$delegatedByMe->id.'"', false);
 });
 
 test('the list view groups tasks by status with a colored collapsible header', function () {
@@ -571,6 +604,7 @@ test('the list view groups tasks by status with a colored collapsible header', f
 
     Livewire::actingAs($user)
         ->test('pages::tasks.index')
+        ->set('view', 'list')
         ->set('group', 'status')
         ->assertSee('Grouped todo task')
         ->assertSee('Grouped done task')
@@ -984,6 +1018,51 @@ test('the calendar view places tasks on their due date and lists unscheduled tas
         ->assertSee('Scheduled task')
         ->assertSee('Unscheduled task')
         ->assertSee('data-test="task-calendar-unscheduled"', false);
+});
+
+test('the calendar view switches between day, 4-days, week and month periods', function () {
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->set('view', 'calendar')
+        ->assertSet('viewMode', 'month')
+        ->call('setViewMode', 'week')
+        ->assertSet('viewMode', 'week')
+        ->call('setViewMode', 'day')
+        ->assertSet('viewMode', 'day')
+        ->call('setViewMode', 'four_days')
+        ->assertSet('viewMode', 'four_days')
+        ->call('setViewMode', 'not-a-real-mode')
+        ->assertSet('viewMode', 'four_days');
+});
+
+test('the calendar view period navigation moves the anchor date in day/week/4-day modes', function () {
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->set('view', 'calendar')
+        ->call('setViewMode', 'week')
+        ->set('anchorDate', '2026-04-08')
+        ->call('nextPeriod')
+        ->assertSet('anchorDate', '2026-04-15')
+        ->call('previousPeriod')
+        ->assertSet('anchorDate', '2026-04-08')
+        ->call('goToToday')
+        ->assertSet('anchorDate', '');
+});
+
+test('a task shows on its due date in the week calendar view', function () {
+    $user = User::factory()->create();
+    Task::factory()->create(['title' => 'Weekly task', 'due_date' => '2026-04-15']);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->set('view', 'calendar')
+        ->call('setViewMode', 'week')
+        ->set('anchorDate', '2026-04-15')
+        ->assertSee('Weekly task');
 });
 
 test('rescheduleTask sets or clears a due date from calendar drag and drop', function () {

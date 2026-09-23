@@ -681,3 +681,48 @@ test('a deletable milestone shows a delete action in the calendar view, and a lo
         ->assertSee('wire:click="confirmDelete('.$child->id.')"', false)
         ->assertDontSee('wire:click="confirmDelete('.$parent->id.')"', false);
 });
+
+test('the calendar view switches between day, 4-days, week and month periods', function () {
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.index')
+        ->set('view', 'calendar')
+        ->assertSet('viewMode', 'month')
+        ->call('setViewMode', 'week')
+        ->assertSet('viewMode', 'week')
+        ->call('setViewMode', 'day')
+        ->assertSet('viewMode', 'day')
+        ->call('setViewMode', 'four_days')
+        ->assertSet('viewMode', 'four_days')
+        ->call('setViewMode', 'not-a-real-mode')
+        ->assertSet('viewMode', 'four_days');
+});
+
+test('the calendar view period navigation moves the anchor date in day/week/4-day modes', function () {
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.index')
+        ->set('view', 'calendar')
+        ->call('setViewMode', 'week')
+        ->set('anchorDate', '2026-04-08')
+        ->call('nextPeriod')
+        ->assertSet('anchorDate', '2026-04-15')
+        ->call('previousPeriod')
+        ->assertSet('anchorDate', '2026-04-08')
+        ->call('goToToday')
+        ->assertSet('anchorDate', '');
+});
+
+test('a milestone shows on its planned date in the week calendar view', function () {
+    $user = User::factory()->create();
+    $milestone = Milestone::factory()->create(['name' => 'Foundation poured', 'planned_start_date' => '2026-04-15']);
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.index')
+        ->set('view', 'calendar')
+        ->call('setViewMode', 'week')
+        ->set('anchorDate', '2026-04-15')
+        ->assertSee('data-test="milestone-calendar-period-chip-'.$milestone->id.'"', false);
+});

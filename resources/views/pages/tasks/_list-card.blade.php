@@ -16,10 +16,15 @@
     $isDone = $task->status === TaskStatus::Done;
     $isOverdue = ! $isDone && $task->due_date !== null && $task->due_date->lt($today);
     $cardAssignees = $task->taskAssignees->pluck('employee')->filter();
+    $priorityBorderClass = match ($task->priority) {
+        TaskPriority::High => 'border-primary dark:border-status-critical',
+        TaskPriority::Medium => 'border-status-warn',
+        TaskPriority::Low => 'border-transparent',
+    };
 @endphp
 
 <article
-    @class(['flex flex-col gap-3 p-3.5', 'bg-secondary-soft/20 dark:bg-secondary-medium/10' => $isSubtask])
+    @class(['flex flex-col gap-3 border-s-[3px] p-3.5', $priorityBorderClass, 'bg-secondary-soft/20 dark:bg-secondary-medium/10' => $isSubtask])
     wire:key="task-card-{{ $task->id }}"
     @if ($isSubtask)
         x-show="subtasksOpen[{{ $task->parent_task_id }}]" x-cloak
