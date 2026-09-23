@@ -6,7 +6,9 @@ namespace App\Models;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Prunable;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
@@ -33,6 +35,8 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 #[Fillable(['actor_id', 'subject_type', 'subject_id', 'program_id', 'module', 'event', 'changes', 'properties'])]
 class Activity extends Model
 {
+    use Prunable;
+
     private static bool $recording = true;
 
     /**
@@ -114,5 +118,15 @@ class Activity extends Model
             'changes' => 'json:unicode',
             'properties' => 'json:unicode',
         ];
+    }
+
+    /**
+     * Activity older than the retention period (default two years).
+     *
+     * @return Builder<static>
+     */
+    public function prunable(): Builder
+    {
+        return static::query()->where('created_at', '<', now()->subYears((int) config('notifications.retention.activity_years')));
     }
 }

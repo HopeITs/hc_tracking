@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\MarkNotificationReadController;
 use App\Http\Controllers\OpenNotificationController;
 use App\Http\Controllers\ProjectFileDownloadController;
 use App\Http\Controllers\ProposalFileDownloadController;
@@ -121,6 +122,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('reports/{report}/files/{reportFile}/preview', ReportFilePreviewController::class)
         ->name('reports.files.preview');
 
+    Route::livewire('admin/notification-settings', 'pages::admin.notification-settings')
+        ->can('manage-notification-settings')
+        ->name('admin.notification-settings.edit');
+
     Route::livewire('activity', 'pages::activity.index')
         ->can('view-activity-log')
         ->name('activity.index');
@@ -133,6 +138,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('notifications/{notification}/open', OpenNotificationController::class)
         ->name('notifications.open');
+
+    Route::post('notifications/{notification}/read', MarkNotificationReadController::class)
+        ->name('notifications.read');
 
     Route::livewire('admin/users', 'pages::admin.users')
         ->can('viewAny', User::class)

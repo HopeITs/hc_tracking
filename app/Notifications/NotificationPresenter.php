@@ -50,8 +50,35 @@ final class NotificationPresenter
             'priority' => $notification->priority->value,
             'kind' => $notification->kind->value,
             'url' => route('notifications.open', $notification->id),
+            'read_url' => route('notifications.read', $notification->id),
+            'icon' => $this->desktopIcon($notification->module, $notification->priority->value),
+            'image' => $this->desktopBanner($notification->module, $notification->priority->value, $locale),
             'created_at' => (string) $notification->created_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * The banner on top of a desktop popup, in the reader's language
+     * (public/notification-banners/{locale}); null for info, which never
+     * pops up.
+     */
+    public function desktopBanner(string $module, string $priority, string $locale): ?string
+    {
+        $banner = "notification-banners/{$locale}/{$module}-{$priority}.png";
+
+        return is_file(public_path($banner)) ? asset($banner) : null;
+    }
+
+    /**
+     * The square icon of a desktop popup: the module's tile in its urgency
+     * colour (public/notification-banners/tiles, rendered by
+     * `notifications:banners`), else the app icon.
+     */
+    public function desktopIcon(string $module, string $priority): string
+    {
+        $tile = "notification-banners/tiles/{$module}-{$priority}.png";
+
+        return asset(is_file(public_path($tile)) ? $tile : 'icons/icon-192.png');
     }
 
     public function moduleLabel(string $module, ?string $locale = null): string

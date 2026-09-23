@@ -97,6 +97,12 @@
             </flux:toast.group>
         @endpersist
 
+        @auth
+            @persist('notification-toasts')
+                <x-notifications.toasts />
+            @endpersist
+        @endauth
+
         @fluxScripts
     </body>
 </html>

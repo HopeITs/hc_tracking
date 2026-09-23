@@ -364,6 +364,18 @@
                 </flux:sidebar.item>
             @endcan
 
+            @can('manage-notification-settings')
+                <flux:sidebar.item
+                    icon="adjustments-horizontal"
+                    :href="route('admin.notification-settings.edit')"
+                    :current="request()->routeIs('admin.notification-settings.*')"
+                    :class="$navigationItemClasses"
+                    wire:navigate
+                >
+                    {{ __('navigation.notification_settings') }}
+                </flux:sidebar.item>
+            @endcan
+
             @can('viewAny', App\Models\User::class)
                 <flux:sidebar.item
                     icon="users"

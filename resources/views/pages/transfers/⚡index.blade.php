@@ -61,6 +61,13 @@ new #[Title('titles.transfers')] class extends Component {
     public string $agreement = '';
 
     /**
+     * Deep link from a notification's "Mark received": opens that tranche's
+     * edit form once, then clears itself.
+     */
+    #[Url(as: 'edit', except: '')]
+    public string $editTransfer = '';
+
+    /**
      * `sort` and `stage` arrive from the URL, so a hand-typed value would
      * otherwise leave the page sorted by `attention` with no pill pressed, or
      * showing "Reset filters" with nothing filtered. Normalise on the way in.
@@ -74,6 +81,12 @@ new #[Title('titles.transfers')] class extends Component {
         if (! in_array($this->stage, self::STAGES, true)) {
             $this->stage = '';
         }
+
+        if (ctype_digit($this->editTransfer)) {
+            $this->openTransferEdit((int) $this->editTransfer);
+        }
+
+        $this->editTransfer = '';
     }
 
     public function updatedSearch(): void

@@ -5,12 +5,14 @@ Before planning or editing, find the row whose globs match the file's path and r
 | Applies to | Rule file |
 | --- | --- |
 | app/Actions/Fortify/AuthenticateWithHrAccount.php | .ai/rules/actions-fortify.md |
+| app/Notifications/Alerts/** | .ai/rules/alerts.md |
 | resources/views/pages/annual-plans/** | .ai/rules/annual-plans.md |
 | resources/views/{components/navigation/**,layouts/app/sidebar.blade.php}, resources/views/{components/navigation/sidebar.blade.php,components/desktop-user-menu.blade.php,layouts/app/sidebar.blade.php} | .ai/rules/app.md |
 | resources/views/pages/auth/login.blade.php | .ai/rules/auth.md |
 | {app/Actions/Fortify/**,app/Console/Commands/**,config/auth.php,database/seeders/**} | .ai/rules/commands-seeders.md |
 | {app/Actions/Fortify/**,app/Console/Commands/**,config/fortify.php} | .ai/rules/commands.md |
 | resources/views/components/navigation/sidebar.blade.php | .ai/rules/components-navigation.md |
+| {public/sw.js,public/manifest.webmanifest,resources/js/notifications.js,resources/views/components/notifications/toasts.blade.php} | .ai/rules/components-notifications.md |
 | resources/views/components/ui/**, resources/views/components/ui/{logframe-node.blade.php,logframe.blade.php,target-lineage.blade.php}, resources/views/components/ui/framework-node.blade.php, resources/views/components/ui/multi-select-popover.blade.php | .ai/rules/components-ui.md |
 | resources/views/components/app-logo.blade.php, resources/views/layouts/auth/simple.blade.php | .ai/rules/components.md |
 | app/Concerns/HasTree.php | .ai/rules/concerns.md |

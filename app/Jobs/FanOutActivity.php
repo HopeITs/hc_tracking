@@ -13,6 +13,7 @@ use App\Notifications\ActivityParameters;
 use App\Notifications\AppNotification;
 use App\Notifications\EmployeeRecipients;
 use App\Notifications\NotificationPayload;
+use App\Notifications\QuickActions;
 use App\Notifications\RecipientResolver;
 use App\Notifications\ResolvedRecipients;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -36,7 +37,7 @@ final class FanOutActivity implements ShouldQueue
 
     public function __construct(public int $activityId) {}
 
-    public function handle(RecipientResolver $resolver, ActivityParameters $parameters, EmployeeRecipients $employees): void
+    public function handle(RecipientResolver $resolver, ActivityParameters $parameters, EmployeeRecipients $employees, QuickActions $quickActions): void
     {
         $activity = Activity::query()->with('actor:id,name')->find($this->activityId);
 
@@ -47,7 +48,7 @@ final class FanOutActivity implements ShouldQueue
         $recipients = $resolver->resolve($activity);
 
         if ($recipients->priorities !== []) {
-            $this->notifyRecipients($activity, $recipients, $parameters->for($activity));
+            $this->notifyRecipients($activity, $recipients, $parameters->for($activity), $quickActions);
         }
 
         $this->warnActorAboutUnnotified($activity, $recipients, $employees);
@@ -56,10 +57,10 @@ final class FanOutActivity implements ShouldQueue
     /**
      * @param  array<string, mixed>  $params
      */
-    private function notifyRecipients(Activity $activity, ResolvedRecipients $recipients, array $params): void
+    private function notifyRecipients(Activity $activity, ResolvedRecipients $recipients, array $params, QuickActions $quickActions): void
     {
         User::query()->whereIn('id', array_keys($recipients->priorities))->get()->each(
-            function (User $user) use ($activity, $recipients, $params): void {
+            function (User $user) use ($activity, $recipients, $params, $quickActions): void {
                 if ($this->alreadyDelivered($user, $activity)) {
                     return;
                 }
@@ -69,6 +70,7 @@ final class FanOutActivity implements ShouldQueue
                     $recipients->priorities[$user->id],
                     $params,
                     in_array($user->id, $recipients->assignedUserIds, true),
+                    $activity->event === $activity->subject_type.'.deleted' ? [] : $quickActions->forSubject($activity->subject_type, $activity->subject_id, $user),
                 )));
             },
         );

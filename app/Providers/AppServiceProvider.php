@@ -21,6 +21,7 @@ use App\Models\Strategy;
 use App\Models\Task;
 use App\Models\TransfersTracking;
 use App\Models\User;
+use App\Notifications\Alerts\NotificationSettings;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -37,7 +38,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // One instance per request or job, so queue workers never hold stale values.
+        $this->app->scoped(NotificationSettings::class);
     }
 
     /**
@@ -56,6 +58,7 @@ class AppServiceProvider extends ServiceProvider
     protected function configureGates(): void
     {
         Gate::define('view-activity-log', fn (User $user): bool => $user->hasAnyRole(['Super Admin', 'General Manager']));
+        Gate::define('manage-notification-settings', fn (User $user): bool => $user->hasAnyRole(config('access-control.administrator_roles')));
     }
 
     /**

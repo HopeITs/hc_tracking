@@ -3,6 +3,7 @@
 @php
     $presenter = app(\App\Notifications\NotificationPresenter::class);
     $isUnread = $notification->read_at === null;
+    $quickLabels = __('notifications.quick.labels');
     $dotClasses = match ($notification->priority) {
         \App\Enums\NotificationPriority::Critical => 'bg-primary',
         \App\Enums\NotificationPriority::Important => 'bg-status-warn',
@@ -45,6 +46,20 @@
                 <span class="sr-only">{{ $notification->priority->label() }}</span>
             </p>
         </a>
+
+        @if (! empty($notification->data['actions']))
+            <div class="mt-2 flex flex-wrap gap-2" data-quick-actions>
+                @foreach ($notification->data['actions'] as $action)
+                    <button
+                        type="button"
+                        wire:click="runQuickAction('{{ $notification->id }}', '{{ $action['type'] }}')"
+                        wire:loading.attr="disabled"
+                        class="inline-flex min-h-8 cursor-pointer items-center rounded-full border border-secondary-soft px-3 text-xs font-semibold text-secondary-dark hover:border-primary hover:text-status-critical disabled:opacity-50 dark:border-secondary-medium dark:text-white"
+                        data-quick-action="{{ $action['type'] }}"
+                    >{{ $quickLabels[str_replace('.', '_', $action['type'])] ?? $action['type'] }}</button>
+                @endforeach
+            </div>
+        @endif
     </div>
 
     <div x-data="{ snoozing: false }" class="relative flex shrink-0 items-start gap-0.5 lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100">

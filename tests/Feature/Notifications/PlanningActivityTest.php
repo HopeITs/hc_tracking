@@ -103,7 +103,7 @@ test('program and annual plan managers hear about a manager change', function ()
 
 test('strategies are watched by managers', function () {
     $watcher = userWithRole('Managers');
-    $strategy = Activity::withoutRecording(fn () => Strategy::factory()->create(['name' => 'Country Strategy']));
+    $strategy = Activity::withoutRecording(fn () => Strategy::factory()->create(['name' => 'Country Strategy', 'start_year' => 2025, 'end_year' => 2029]));
 
     $this->actingAs(userWithRole('Managers'));
     $strategy->update(['end_year' => 2030]);

@@ -6,6 +6,7 @@ namespace App\Notifications;
 
 use App\Models\User;
 use App\Models\UserNotification;
+use App\Notifications\Alerts\WorkingCalendar;
 use Carbon\CarbonImmutable;
 use InvalidArgumentException;
 
@@ -62,15 +63,15 @@ final class Inbox
     }
 
     /**
-     * When a snooze preset ends: in an hour, tomorrow 08:00, or next week's
-     * first day 08:00.
+     * When a snooze preset ends: in an hour, tomorrow 08:00, or the first
+     * working day of next week 08:00.
      */
     public static function snoozeUntil(string $preset, CarbonImmutable $now): CarbonImmutable
     {
         return match ($preset) {
             '1h' => $now->addHour(),
             'tomorrow' => $now->addDay()->setTime(8, 0),
-            'next_week' => $now->startOfWeek()->addWeek()->setTime(8, 0),
+            'next_week' => app(WorkingCalendar::class)->firstWorkingDayOfNextWeek($now)->setTime(8, 0),
             default => throw new InvalidArgumentException("Unknown snooze preset [{$preset}]."),
         };
     }

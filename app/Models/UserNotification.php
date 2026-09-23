@@ -10,6 +10,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Prunable;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Notifications\DatabaseNotification;
 
@@ -43,6 +44,8 @@ use Illuminate\Notifications\DatabaseNotification;
 ])]
 class UserNotification extends DatabaseNotification
 {
+    use Prunable;
+
     /**
      * Mirror the column defaults for rows that have not been round-tripped.
      *
@@ -103,5 +106,16 @@ class UserNotification extends DatabaseNotification
             'snoozed_until' => 'datetime',
             'read_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Read notifications past the retention period (default 61 days). Unread
+     * ones are kept however old.
+     *
+     * @return Builder<static>
+     */
+    public function prunable(): Builder
+    {
+        return static::query()->whereNotNull('read_at')->where('read_at', '<', now()->subDays((int) config('notifications.retention.read_notification_days')));
     }
 }

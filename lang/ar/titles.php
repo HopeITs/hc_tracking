@@ -38,6 +38,7 @@ return [
     'transfers' => 'التحويلات',
     'user_directory' => 'دليل المستخدمين',
     'activity_log' => 'سجل النشاط',
+    'notification_rules' => 'قواعد الإشعارات',
     'notifications' => 'الإشعارات',
     'notification_settings' => 'إعدادات الإشعارات',
 ];

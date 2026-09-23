@@ -6,6 +6,7 @@ import './file-preview';
 import './proposal-clock';
 import './section-rail';
 import './task-board';
+import './theme-color';
 
 /**
  * Echo exposes an expressive API for subscribing to channels and listening
