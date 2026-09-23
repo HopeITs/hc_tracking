@@ -617,6 +617,7 @@ new #[Title('titles.project')] class extends Component {
             ['key' => 'targets', 'label' => __('common.targets'), 'count' => $this->project->plan_indicators_count],
             ['key' => 'proposals', 'label' => __('common.proposals'), 'count' => $this->project->proposals_count],
             ['key' => 'files', 'label' => __('projects.files'), 'count' => $this->project->media_count],
+            ['key' => 'activity', 'label' => __('activity.title'), 'count' => null],
         ];
     }
 };
@@ -629,6 +630,7 @@ new #[Title('titles.project')] class extends Component {
             ['label' => $this->project->name],
         ]"
         :title="$this->project->name"
+        :unread="app(\App\Notifications\UnreadSubjects::class)->has(auth()->user(), 'project', $this->project->id)"
         :subtitle="$this->project->city?->name ?? __('common.unknown_city')"
     >
         <x-slot:meta>
@@ -877,6 +879,8 @@ new #[Title('titles.project')] class extends Component {
                 </div>
             @endif
         </x-ui.panel>
+    @elseif ($tab === 'activity')
+        <livewire:activity.timeline :subjects="['project' => [$this->project->id]]" :key="'project-activity-'.$this->project->id" />
     @else
         <x-ui.panel :title="__('projects.linked_proposals')" :count="$this->attachedProposals->count()" :subtitle="__('projects.a_project_may_be_funded_by_several_proposals_and_a_proposal')">
             <x-slot:toolbar>

@@ -104,4 +104,14 @@ return [
         'meal' => 'MEAL',
         'admin' => 'Admin',
     ],
+    'notification_priority' => [
+        'info' => 'Info',
+        'important' => 'Important',
+        'critical' => 'Critical',
+    ],
+    'notification_kind' => [
+        'action' => 'Activity',
+        'alert' => 'Alert',
+        'digest' => 'Digest',
+    ],
 ];

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\RecordsActivity;
 use App\Enums\ProjectStatus;
+use App\Notifications\TracksActivity;
 use App\Observers\MediaOwnerObserver;
 use Carbon\CarbonImmutable;
 use Database\Factories\ProjectFactory;
@@ -55,10 +57,10 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
     'schedule_weekend',
 ])]
 #[ObservedBy(MediaOwnerObserver::class)]
-class Project extends Model
+class Project extends Model implements TracksActivity
 {
     /** @use HasFactory<ProjectFactory> */
-    use HasFactory;
+    use HasFactory, RecordsActivity;
 
     /**
      * Mirror the column default so a project that has not been round-tripped
@@ -222,5 +224,74 @@ class Project extends Model
             'target_boys' => 'integer',
             'target_girls' => 'integer',
         ];
+    }
+
+    public function activityModule(): string
+    {
+        return 'projects';
+    }
+
+    public function activityLabel(): string
+    {
+        return (string) $this->activityAttribute('name');
+    }
+
+    public function activityProgramId(): ?int
+    {
+        $programId = $this->activityAttribute('program_id');
+
+        return $programId === null ? null : (int) $programId;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function activityEvents(): array
+    {
+        return [
+            'status' => 'status_changed',
+            'user_id' => 'owner_changed',
+            'start_date' => 'dates_changed',
+            'end_date' => 'dates_changed',
+            'name' => 'updated',
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function activityEmployeeFields(): array
+    {
+        return ['user_id'];
+    }
+
+    /**
+     * The owner, remembered for the deleted event.
+     *
+     * @return array<string, mixed>
+     */
+    protected function activityPropertiesBeforeDelete(): array
+    {
+        return ['employee_ids' => array_values(array_filter([(int) $this->activityAttribute('user_id')]))];
+    }
+
+    /**
+     * The program a project belongs to, without loading the project.
+     */
+    public static function programIdFor(mixed $projectId): ?int
+    {
+        $programId = $projectId === null ? null : static::query()->whereKey($projectId)->value('program_id');
+
+        return $programId === null ? null : (int) $programId;
+    }
+
+    /**
+     * The HR employee who owns a project, without loading it.
+     */
+    public static function ownerEmployeeIdFor(mixed $projectId): ?int
+    {
+        $ownerId = $projectId === null ? null : static::query()->whereKey($projectId)->value('user_id');
+
+        return $ownerId === null ? null : (int) $ownerId;
     }
 }

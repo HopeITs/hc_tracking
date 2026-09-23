@@ -974,6 +974,7 @@ new #[Title('titles.funding_agreement')] class extends Component {
             ['label' => $donor->name.' · '.$proposal->name],
         ]"
         :title="$donor->name.' · '.$proposal->name"
+        :unread="app(\App\Notifications\UnreadSubjects::class)->has(auth()->user(), 'donor_proposal', $this->agreementId)"
         title-class="text-3xl! font-bold! leading-tight! tracking-tight! text-balance @3xl/detail:text-[2.5rem]!"
     >
         <x-slot:meta>
@@ -1519,6 +1520,11 @@ new #[Title('titles.funding_agreement')] class extends Component {
             </ol>
         </aside>
     </div>
+
+    <section aria-labelledby="record-activity-heading" class="grid gap-3 mt-14" data-record-activity>
+        <h2 id="record-activity-heading" class="text-base font-bold">{{ __('activity.title') }}</h2>
+        <livewire:activity.timeline :subjects="['donor_proposal' => [$agreementId], 'transfer' => $this->transfers->pluck('id')->all(), 'donor_report' => $this->reports->pluck('id')->all()]" :key="'agreement-activity-'.$agreementId" />
+    </section>
 
     <x-funding.agreement-modal
         :editing="$editingAgreementId !== null"

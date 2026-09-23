@@ -264,6 +264,7 @@ new #[Title('titles.milestone')] class extends Component {
             ['label' => $this->milestone->name],
         ]"
         :title="$this->milestone->name"
+        :unread="app(\App\Notifications\UnreadSubjects::class)->has(auth()->user(), 'milestone', $this->milestone->id)"
         title-class="text-3xl! font-bold! leading-none!"
         :subtitle="$this->milestone->project->name"
     >
@@ -414,6 +415,11 @@ new #[Title('titles.milestone')] class extends Component {
             </ul>
         @endif
     </x-ui.panel>
+
+    <section aria-labelledby="record-activity-heading" class="grid gap-3" data-record-activity>
+        <h2 id="record-activity-heading" class="text-base font-bold">{{ __('activity.title') }}</h2>
+        <livewire:activity.timeline :subjects="['milestone' => [$this->milestone->id]]" :key="'milestone-activity-'.$this->milestone->id" />
+    </section>
 
     <flux:modal wire:model="showRelatedModal" wire:close="closeRelatedModal" class="w-full max-w-3xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
         <form wire:submit="saveRelatedMilestone" class="flex flex-col gap-5">

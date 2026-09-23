@@ -5,13 +5,17 @@ declare(strict_types=1);
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Concerns\RecordsActivity;
+use App\Notifications\TracksActivity;
 use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
+use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -37,6 +41,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property int|null $employee_id
  * @property int|null $active_role_id
  * @property string|null $locale
+ * @property bool $notification_popups
  * @property CarbonImmutable|null $email_verified_at
  * @property string|null $password
  * @property string|null $two_factor_secret
@@ -48,22 +53,52 @@ use Spatie\Permission\Traits\HasRoles;
  */
 #[Fillable(['name', 'email', 'password'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
-class User extends Authenticatable implements PasskeyUser
+class User extends Authenticatable implements HasLocalePreference, PasskeyUser, TracksActivity
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, HasRoles, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
+    use HasFactory, HasRoles, Notifiable, PasskeyAuthenticatable, RecordsActivity, TwoFactorAuthenticatable;
 
     /**
      * Mirror the columns' DB defaults so a user that has not been round-tripped
      * through the database still reports them under strict mode: no language
-     * chosen and no linked HR employee.
+     * chosen, no linked HR employee and no desktop notification popups.
      *
      * @var array<string, mixed>
      */
     protected $attributes = [
         'employee_id' => null,
         'locale' => null,
+        'notification_popups' => false,
     ];
+
+    /**
+     * Remove the inbox with the user: notifications are polymorphic, so no
+     * foreign key can cascade them.
+     */
+    protected static function booted(): void
+    {
+        static::deleted(function (User $user): void {
+            UserNotification::query()->forUser($user)->delete();
+        });
+    }
+
+    /**
+     * This user's inbox, newest first, as UserNotification rows.
+     *
+     * @return MorphMany<UserNotification, $this>
+     */
+    public function notifications(): MorphMany
+    {
+        return $this->morphMany(UserNotification::class, 'notifiable')->latest();
+    }
+
+    /**
+     * The language notifications are written in for this user.
+     */
+    public function preferredLocale(): ?string
+    {
+        return $this->locale;
+    }
 
     /**
      * The tasks this user raised.
@@ -137,53 +172,60 @@ class User extends Authenticatable implements PasskeyUser
     /**
      * Create the missing tracking users for every active HR account.
      *
+     * The HR mirror is not somebody's action, so it records no activity.
+     *
      * @return int The number of users created.
      */
     public static function syncFromHrAccounts(): int
     {
-        $existingEmails = static::query()->pluck('email')->map(fn (string $email): string => mb_strtolower($email))->flip();
-        $created = 0;
+        return Activity::withoutRecording(function (): int {
+            $existingEmails = static::query()->pluck('email')->map(fn (string $email): string => mb_strtolower($email))->flip();
+            $created = 0;
 
-        HrUser::query()->active()->with('employee')->orderBy('id')->each(function (HrUser $hrUser) use ($existingEmails, &$created): void {
-            if ($existingEmails->has(mb_strtolower($hrUser->email))) {
-                return;
-            }
+            HrUser::query()->active()->with('employee')->orderBy('id')->each(function (HrUser $hrUser) use ($existingEmails, &$created): void {
+                if ($existingEmails->has(mb_strtolower($hrUser->email))) {
+                    return;
+                }
 
-            static::forHrAccount($hrUser);
-            $created++;
+                static::forHrAccount($hrUser);
+                $created++;
+            });
+
+            return $created;
         });
-
-        return $created;
     }
 
     /**
      * Delete the tracking users whose HR account is gone or no longer active.
      *
      * A user still referenced by records that restrict deletion (reports,
-     * indicator readings, uploads, created tasks) is kept.
+     * indicator readings, uploads, created tasks) is kept. Part of the HR
+     * mirror, so it records no activity.
      *
      * @return array{deleted: int, kept: list<string>}
      */
     public static function pruneInactiveHrAccounts(): array
     {
-        $activeEmails = HrUser::query()->active()->pluck('email')->map(fn (string $email): string => mb_strtolower($email))->flip();
-        $deleted = 0;
-        $kept = [];
+        return Activity::withoutRecording(function (): array {
+            $activeEmails = HrUser::query()->active()->pluck('email')->map(fn (string $email): string => mb_strtolower($email))->flip();
+            $deleted = 0;
+            $kept = [];
 
-        static::query()->orderBy('id')->each(function (User $user) use ($activeEmails, &$deleted, &$kept): void {
-            if ($activeEmails->has(mb_strtolower($user->email))) {
-                return;
-            }
+            static::query()->orderBy('id')->each(function (User $user) use ($activeEmails, &$deleted, &$kept): void {
+                if ($activeEmails->has(mb_strtolower($user->email))) {
+                    return;
+                }
 
-            try {
-                $user->delete();
-                $deleted++;
-            } catch (QueryException) {
-                $kept[] = $user->email;
-            }
+                try {
+                    $user->delete();
+                    $deleted++;
+                } catch (QueryException) {
+                    $kept[] = $user->email;
+                }
+            });
+
+            return ['deleted' => $deleted, 'kept' => $kept];
         });
-
-        return ['deleted' => $deleted, 'kept' => $kept];
     }
 
     /**
@@ -209,6 +251,7 @@ class User extends Authenticatable implements PasskeyUser
             $role = Role::findOrCreate($roleName);
             $user->assignRole($role);
             $user->setActiveRole($role->id);
+            $user->recordRoleChange([], [$role->name]);
         }
 
         return $user;
@@ -333,6 +376,56 @@ class User extends Authenticatable implements PasskeyUser
             'email_verified_at' => 'datetime',
             'two_factor_confirmed_at' => 'datetime',
             'password' => 'hashed',
+            'notification_popups' => 'boolean',
         ];
+    }
+
+    public function activityModule(): string
+    {
+        return 'access-management';
+    }
+
+    public function activityLabel(): string
+    {
+        return (string) $this->activityAttribute('name');
+    }
+
+    public function activityProgramId(): ?int
+    {
+        return null;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function activityEvents(): array
+    {
+        return [];
+    }
+
+    /**
+     * Logins refresh the name and HR ids on every sign-in; that is not news.
+     */
+    protected function activityRecordsUpdates(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Record a change of roles (role pivots fire no model events).
+     *
+     * @param  list<string>  $before
+     * @param  list<string>  $after
+     */
+    public function recordRoleChange(array $before, array $after): void
+    {
+        sort($before);
+        sort($after);
+
+        if ($before === $after) {
+            return;
+        }
+
+        $this->recordActivity('user.role_changed', ['roles' => [$before, $after]], ['role' => $after === [] ? '—' : implode(', ', $after)]);
     }
 }

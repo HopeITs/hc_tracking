@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\RecordsActivity;
+use App\Notifications\TracksActivity;
 use Carbon\CarbonImmutable;
 use Database\Factories\StrategyFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -20,10 +22,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable|null $updated_at
  */
 #[Fillable(['name', 'start_year', 'end_year'])]
-class Strategy extends Model
+class Strategy extends Model implements TracksActivity
 {
     /** @use HasFactory<StrategyFactory> */
-    use HasFactory;
+    use HasFactory, RecordsActivity;
 
     /**
      * The programs delivered under this strategy.
@@ -46,5 +48,28 @@ class Strategy extends Model
             'start_year' => 'integer',
             'end_year' => 'integer',
         ];
+    }
+
+    public function activityModule(): string
+    {
+        return 'strategies';
+    }
+
+    public function activityLabel(): string
+    {
+        return (string) $this->activityAttribute('name');
+    }
+
+    public function activityProgramId(): ?int
+    {
+        return null;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function activityEvents(): array
+    {
+        return ['name' => 'updated', 'start_year' => 'updated', 'end_year' => 'updated'];
     }
 }

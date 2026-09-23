@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\RecordsActivity;
 use App\Enums\IndicatorMeasure;
 use App\Enums\Period;
 use App\Enums\RagStatus;
+use App\Notifications\TracksActivity;
 use Carbon\CarbonImmutable;
 use Database\Factories\IndicatorFactory;
 use DateTimeInterface;
@@ -30,10 +32,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable|null $updated_at
  */
 #[Fillable(['name', 'result_id', 'project_id', 'measure', 'unit', 'baseline', 'target', 'frequency'])]
-class Indicator extends Model
+class Indicator extends Model implements TracksActivity
 {
     /** @use HasFactory<IndicatorFactory> */
-    use HasFactory;
+    use HasFactory, RecordsActivity;
 
     /**
      * Mirror the column defaults so an indicator that has not been
@@ -195,5 +197,50 @@ class Indicator extends Model
             'baseline' => 'decimal:2',
             'target' => 'decimal:2',
         ];
+    }
+
+    public function activityModule(): string
+    {
+        return 'indicators';
+    }
+
+    public function activityLabel(): string
+    {
+        return (string) $this->activityAttribute('name');
+    }
+
+    /**
+     * The program of its result, else of its project.
+     */
+    public function activityProgramId(): ?int
+    {
+        $programId = Result::query()->whereKey($this->activityAttribute('result_id'))->value('program_id');
+
+        return $programId !== null ? (int) $programId : Project::programIdFor($this->activityAttribute('project_id'));
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function activityEvents(): array
+    {
+        return [
+            'target' => 'target_changed',
+            'name' => 'updated',
+            'baseline' => 'updated',
+            'unit' => 'updated',
+            'measure' => 'updated',
+            'frequency' => 'updated',
+        ];
+    }
+
+    /**
+     * The project owner, remembered for the deleted event.
+     *
+     * @return array<string, mixed>
+     */
+    protected function activityPropertiesBeforeDelete(): array
+    {
+        return ['employee_ids' => array_values(array_filter([Project::ownerEmployeeIdFor($this->activityAttribute('project_id'))]))];
     }
 }

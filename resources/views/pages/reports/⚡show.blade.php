@@ -516,6 +516,7 @@ new #[Title('titles.report')] class extends Component {
             ['label' => $planIndicator->indicator->name],
         ]"
         :title="$planIndicator->indicator->name"
+        :unread="app(\App\Notifications\UnreadSubjects::class)->has(auth()->user(), 'report', $this->reportId)"
         :subtitle="$planIndicator->indicator->result->statement"
         title-class="text-3xl! font-extrabold! leading-none! tracking-tight!"
     >
@@ -867,6 +868,11 @@ new #[Title('titles.report')] class extends Component {
             </ul>
         @endif
     </x-ui.panel>
+
+    <section aria-labelledby="record-activity-heading" class="grid gap-3" data-record-activity>
+        <h2 id="record-activity-heading" class="text-base font-bold">{{ __('activity.title') }}</h2>
+        <livewire:activity.timeline :subjects="['report' => [$this->reportId]]" :key="'report-activity-'.$this->reportId" />
+    </section>
 
     <x-reports.form-modal
         :open="$showReportModal"

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\RecordsParentActivity;
 use Carbon\CarbonImmutable;
 use Database\Factories\ScheduleBaselineFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -27,7 +28,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class ScheduleBaseline extends Model
 {
     /** @use HasFactory<ScheduleBaselineFactory> */
-    use HasFactory;
+    use HasFactory, RecordsParentActivity;
 
     /**
      * @return BelongsTo<Project, $this>
@@ -51,5 +52,23 @@ class ScheduleBaseline extends Model
     public function items(): HasMany
     {
         return $this->hasMany(ScheduleBaselineItem::class);
+    }
+
+    public function activityParent(): ?Project
+    {
+        return $this->project()->first();
+    }
+
+    protected function parentActivityEvent(string $hook): ?string
+    {
+        return $hook === 'created' ? 'project.baseline_saved' : null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function parentActivityProperties(string $hook): array
+    {
+        return ['baseline' => (string) $this->name];
     }
 }

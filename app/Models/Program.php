@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\RecordsActivity;
+use App\Notifications\TracksActivity;
 use App\Observers\ProgramObserver;
 use Carbon\CarbonImmutable;
 use Database\Factories\ProgramFactory;
@@ -31,10 +33,10 @@ use Illuminate\Support\Facades\DB;
  */
 #[Fillable(['strategy_id', 'manager_id'])]
 #[ObservedBy(ProgramObserver::class)]
-class Program extends Model
+class Program extends Model implements TracksActivity
 {
     /** @use HasFactory<ProgramFactory> */
-    use HasFactory;
+    use HasFactory, RecordsActivity;
 
     /**
      * Delete the model inside a transaction.
@@ -53,24 +55,27 @@ class Program extends Model
      *
      * Strategy and manager links are never touched, and programs that have
      * disappeared from HR are kept so the projects and plans under them survive.
+     * The HR mirror is not somebody's action, so it records no activity.
      */
     public static function syncFromHr(): void
     {
-        $now = now();
+        Activity::withoutRecording(function (): void {
+            $now = now();
 
-        $rows = HrProgram::query()
-            ->get(['id', 'name'])
-            ->map(fn (HrProgram $hrProgram): array => [
-                'id' => $hrProgram->id,
-                'name' => trim($hrProgram->name),
-                'created_at' => $now,
-                'updated_at' => $now,
-            ])
-            ->all();
+            $rows = HrProgram::query()
+                ->get(['id', 'name'])
+                ->map(fn (HrProgram $hrProgram): array => [
+                    'id' => $hrProgram->id,
+                    'name' => trim($hrProgram->name),
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ])
+                ->all();
 
-        if ($rows !== []) {
-            static::query()->toBase()->upsert($rows, ['id'], ['name']);
-        }
+            if ($rows !== []) {
+                static::query()->toBase()->upsert($rows, ['id'], ['name']);
+            }
+        });
     }
 
     /**
@@ -131,5 +136,46 @@ class Program extends Model
     public function results(): HasMany
     {
         return $this->hasMany(Result::class);
+    }
+
+    public function activityModule(): string
+    {
+        return 'programs';
+    }
+
+    public function activityLabel(): string
+    {
+        return (string) $this->activityAttribute('name');
+    }
+
+    public function activityProgramId(): ?int
+    {
+        return $this->getKey() === null ? null : (int) $this->getKey();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function activityEvents(): array
+    {
+        return ['manager_id' => 'manager_changed', 'strategy_id' => 'updated', 'name' => 'updated'];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function activityEmployeeFields(): array
+    {
+        return ['manager_id'];
+    }
+
+    /**
+     * The manager, remembered for the deleted event.
+     *
+     * @return array<string, mixed>
+     */
+    protected function activityPropertiesBeforeDelete(): array
+    {
+        return ['employee_ids' => array_values(array_filter([(int) $this->activityAttribute('manager_id')]))];
     }
 }

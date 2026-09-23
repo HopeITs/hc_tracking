@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\RecordsParentActivity;
+use App\Notifications\EmployeeRecipients;
 use Database\Factories\TaskAssigneeFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -21,7 +23,30 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class TaskAssignee extends Model
 {
     /** @use HasFactory<TaskAssigneeFactory> */
-    use HasFactory;
+    use HasFactory, RecordsParentActivity;
+
+    public function activityParent(): ?Task
+    {
+        return $this->task()->first();
+    }
+
+    protected function parentActivityEvent(string $hook): ?string
+    {
+        return $hook === 'created' ? 'task.assigned' : 'task.unassigned';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function parentActivityProperties(string $hook): array
+    {
+        $employeeId = (int) $this->employee_id;
+
+        return [
+            'employee_id' => $employeeId,
+            'employee' => app(EmployeeRecipients::class)->names([$employeeId])[$employeeId] ?? null,
+        ];
+    }
 
     /**
      * The task this assignment belongs to.

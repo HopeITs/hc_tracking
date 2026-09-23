@@ -11,6 +11,7 @@ use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Task;
 use App\Models\TaskAssignee;
+use App\Notifications\UnreadSubjects;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -429,6 +430,17 @@ new #[Title('titles.tasks')] class extends Component
                     ->orWhere('created_by', $user->id));
             })
             ->tap(fn (Builder $query) => $this->applyViewerDepartmentScope($query));
+    }
+
+    /**
+     * Records with unread notifications for me, for the row dots.
+     *
+     * @return list<int>
+     */
+    #[Computed]
+    public function unreadIds(): array
+    {
+        return app(UnreadSubjects::class)->ids(auth()->user(), 'task');
     }
 
     /** @return LengthAwarePaginator<int, Task> */

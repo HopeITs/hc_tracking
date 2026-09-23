@@ -104,4 +104,14 @@ return [
         'meal' => 'الرصد والتقييم',
         'admin' => 'مسؤول النظام',
     ],
+    'notification_priority' => [
+        'info' => 'معلومة',
+        'important' => 'مهمة',
+        'critical' => 'حرجة',
+    ],
+    'notification_kind' => [
+        'action' => 'نشاط',
+        'alert' => 'تنبيه',
+        'digest' => 'ملخص',
+    ],
 ];

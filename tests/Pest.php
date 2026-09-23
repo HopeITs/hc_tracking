@@ -4,12 +4,14 @@ use App\Enums\Currency;
 use App\Enums\FileType;
 use App\Enums\ResultType;
 use App\Models\Account;
+use App\Models\Activity;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\Indicator;
 use App\Models\IndicatorProgress;
 use App\Models\Media;
 use App\Models\Milestone;
+use App\Models\Permission;
 use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
@@ -19,6 +21,10 @@ use App\Models\Result;
 use App\Models\Strategy;
 use App\Models\Task;
 use App\Models\TaskAssignee;
+use App\Models\User;
+use App\Models\UserNotification;
+use App\Notifications\NotificationPresenter;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -497,4 +503,35 @@ function insertHrContract(int $employeeId, int $positionId, bool $isActive = tru
         'start_date' => $startDate ?? now()->toDateTimeString(),
         'is_active' => $isActive,
     ]);
+}
+
+/**
+ * A user holding one role, optionally linked to an HR employee. Seeds the
+ * access-control catalog first when it is missing.
+ *
+ * Unlike the insertX() helpers this returns a model: the notification tests
+ * assert behaviour (who hears about what), not stored column values. Created
+ * with recording off: a fixture account is not news.
+ */
+function userWithRole(string $role, ?int $employeeId = null): User
+{
+    if (! Permission::query()->exists()) {
+        test()->seed(RolesAndPermissionsSeeder::class);
+    }
+
+    return Activity::withoutRecording(fn (): User => User::factory()->role($role)->create(['employee_id' => $employeeId]));
+}
+
+/**
+ * Every notification a user received, oldest first, as English sentences.
+ *
+ * @return list<string>
+ */
+function sentencesFor(User $user): array
+{
+    $presenter = app(NotificationPresenter::class);
+
+    return UserNotification::query()->forUser($user)->orderBy('created_at')->get()
+        ->map(fn (UserNotification $notification): string => $presenter->sentence($notification->data, 'en'))
+        ->all();
 }

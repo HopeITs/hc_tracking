@@ -630,6 +630,29 @@ input[type='search']::-webkit-search-cancel-button {
     }
 }
 
+/*
+ * Notification toasts (resources/views/components/notifications/toasts.blade.php):
+ * the thin line that runs down while an important toast is on screen.
+ */
+@keyframes hc-toast-countdown {
+    from {
+        transform: scaleX(1);
+    }
+    to {
+        transform: scaleX(0);
+    }
+}
+
+.hc-toast-countdown {
+    animation: hc-toast-countdown 6s linear forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hc-toast-countdown {
+        animation: none;
+    }
+}
+
 @keyframes arc-line-draw {
     from {
         stroke-dashoffset: var(--arc-length, 1600);

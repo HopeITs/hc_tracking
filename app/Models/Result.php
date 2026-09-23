@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Concerns\HasTree;
+use App\Concerns\RecordsActivity;
 use App\Enums\Period;
 use App\Enums\ResultType;
+use App\Notifications\TracksActivity;
 use App\Observers\ResultObserver;
 use Carbon\CarbonImmutable;
 use Database\Factories\ResultFactory;
@@ -16,6 +18,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 /**
  * A node in the logframe: an impact, outcome or output statement.
@@ -31,10 +34,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 #[Fillable(['statement', 'parent_id', 'program_id', 'type', 'checkout_period'])]
 #[ObservedBy(ResultObserver::class)]
-class Result extends Model
+class Result extends Model implements TracksActivity
 {
     /** @use HasFactory<ResultFactory> */
-    use HasFactory;
+    use HasFactory, RecordsActivity;
 
     use HasTree;
 
@@ -77,5 +80,30 @@ class Result extends Model
             'type' => ResultType::class,
             'checkout_period' => Period::class,
         ];
+    }
+
+    public function activityModule(): string
+    {
+        return 'results';
+    }
+
+    public function activityLabel(): string
+    {
+        return Str::limit((string) $this->activityAttribute('statement'), 80);
+    }
+
+    public function activityProgramId(): ?int
+    {
+        $programId = $this->activityAttribute('program_id');
+
+        return $programId === null ? null : (int) $programId;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function activityEvents(): array
+    {
+        return ['statement' => 'updated', 'type' => 'updated', 'parent_id' => 'updated', 'program_id' => 'updated'];
     }
 }

@@ -1,6 +1,8 @@
 <?php
 
 return [
+    'activity_log' => 'Activity log',
+    'notification_settings' => 'Notification rules',
     'administration' => 'Administration',
     'application_navigation' => 'Application navigation',
     'documentation' => 'Documentation',

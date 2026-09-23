@@ -1,17 +1,29 @@
 <?php
 
+use App\Models\Account;
 use App\Models\AnnualPlan;
+use App\Models\Donor;
+use App\Models\DonorProposal;
+use App\Models\DonorReport;
 use App\Models\HrDepartment;
+use App\Models\Indicator;
 use App\Models\Milestone;
+use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\Report;
+use App\Models\ReportFile;
+use App\Models\Result;
+use App\Models\Risk;
 use App\Models\Strategy;
+use App\Models\Task;
+use App\Models\TransfersTracking;
 use App\Models\User;
 use Illuminate\Database\ClassMorphViolationException;
 use Illuminate\Database\Eloquent\Relations\Relation;
 
-test('the morph map registers exactly the two target sources, the five task sources, the two media owners, and the permission model side', function () {
+test('the morph map registers exactly the target sources, task sources, media owners, the permission model side and the activity subjects', function () {
     expect(Relation::morphMap())->toBe([
         'annual_plan' => AnnualPlan::class,
         'proposal' => Proposal::class,
@@ -20,6 +32,18 @@ test('the morph map registers exactly the two target sources, the five task sour
         'program' => Program::class,
         'department' => HrDepartment::class,
         'user' => User::class,
+        'task' => Task::class,
+        'strategy' => Strategy::class,
+        'risk' => Risk::class,
+        'indicator' => Indicator::class,
+        'plan_indicator' => PlanIndicator::class,
+        'result' => Result::class,
+        'report' => Report::class,
+        'donor' => Donor::class,
+        'donor_proposal' => DonorProposal::class,
+        'donor_report' => DonorReport::class,
+        'transfer' => TransfersTracking::class,
+        'account' => Account::class,
     ]);
 });
 
@@ -31,9 +55,12 @@ test('the morph map is enforced so an unmapped model has no morph class', functi
         ->and((new Milestone)->getMorphClass())->toBe('milestone')
         ->and((new Program)->getMorphClass())->toBe('program')
         ->and((new HrDepartment)->getMorphClass())->toBe('department')
-        ->and((new User)->getMorphClass())->toBe('user');
+        ->and((new User)->getMorphClass())->toBe('user')
+        ->and((new Task)->getMorphClass())->toBe('task')
+        ->and((new Strategy)->getMorphClass())->toBe('strategy')
+        ->and((new TransfersTracking)->getMorphClass())->toBe('transfer');
 
-    (new Strategy)->getMorphClass();
+    (new ReportFile)->getMorphClass();
 })->throws(ClassMorphViolationException::class);
 
 test('each mapped key fits the fifty character source_type column', function () {

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\RecordsActivity;
+use App\Notifications\TracksActivity;
 use App\Observers\PlanIndicatorSourceObserver;
 use Carbon\CarbonImmutable;
 use Database\Factories\AnnualPlanFactory;
@@ -27,10 +29,10 @@ use Illuminate\Support\Facades\DB;
  */
 #[Fillable(['program_id', 'manager_id', 'year'])]
 #[ObservedBy(PlanIndicatorSourceObserver::class)]
-class AnnualPlan extends Model
+class AnnualPlan extends Model implements TracksActivity
 {
     /** @use HasFactory<AnnualPlanFactory> */
-    use HasFactory;
+    use HasFactory, RecordsActivity;
 
     /**
      * Delete the model inside a transaction.
@@ -131,5 +133,51 @@ class AnnualPlan extends Model
         return [
             'year' => 'integer',
         ];
+    }
+
+    public function activityModule(): string
+    {
+        return 'annual-plans';
+    }
+
+    /**
+     * "Program · Year".
+     */
+    public function activityLabel(): string
+    {
+        return Program::query()->whereKey($this->activityAttribute('program_id'))->value('name').' · '.$this->activityAttribute('year');
+    }
+
+    public function activityProgramId(): ?int
+    {
+        $programId = $this->activityAttribute('program_id');
+
+        return $programId === null ? null : (int) $programId;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function activityEvents(): array
+    {
+        return ['manager_id' => 'manager_changed', 'year' => 'updated'];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function activityEmployeeFields(): array
+    {
+        return ['manager_id'];
+    }
+
+    /**
+     * The manager, remembered for the deleted event.
+     *
+     * @return array<string, mixed>
+     */
+    protected function activityPropertiesBeforeDelete(): array
+    {
+        return ['employee_ids' => array_values(array_filter([(int) $this->activityAttribute('manager_id')]))];
     }
 }
