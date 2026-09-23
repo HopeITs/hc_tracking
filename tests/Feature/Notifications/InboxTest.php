@@ -11,7 +11,9 @@ use App\Notifications\Inbox;
 use App\Notifications\NotificationPayload;
 use App\Notifications\UnreadCounts;
 use Carbon\CarbonImmutable;
+use Illuminate\Broadcasting\BroadcastEvent;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Queue;
 
 function inboxPayload(string $module = 'tasks', NotificationPriority $priority = NotificationPriority::Info): NotificationPayload
 {
@@ -119,4 +121,34 @@ test('a snoozed notification hides, then returns unread on top and is pushed aga
         ->and($row->created_at->greaterThan(now()->subMinute()))->toBeTrue()
         ->and(app(UnreadCounts::class)->for($user)['total'])->toBe(1);
     Event::assertDispatchedTimes(NotificationPushed::class, 2);
+});
+
+test('snoozing until next week does not depend on the reader language', function (string $locale) {
+    app()->setLocale($locale);
+
+    expect(Inbox::snoozeUntil('next_week', CarbonImmutable::parse('2026-09-26 10:00'))->format('Y-m-d H:i'))->toBe('2026-09-28 08:00') // Saturday
+        ->and(Inbox::snoozeUntil('next_week', CarbonImmutable::parse('2026-09-27 10:00'))->format('Y-m-d H:i'))->toBe('2026-09-28 08:00'); // Sunday
+})->with(['en', 'ar']);
+
+test('unsnoozing brings a notification back at once, only for its owner', function () {
+    [$me, $other] = Activity::withoutRecording(fn () => User::factory()->count(2)->create());
+    $me->notify(new AppNotification(inboxPayload()));
+    $id = UserNotification::query()->value('id');
+    app(Inbox::class)->snooze($me, $id, 'tomorrow');
+
+    app(Inbox::class)->unsnooze($other, $id);
+    expect(app(UnreadCounts::class)->for($me)['total'])->toBe(0);
+
+    app(Inbox::class)->unsnooze($me, $id);
+    expect(UserNotification::query()->find($id)->snoozed_until)->toBeNull()
+        ->and(app(UnreadCounts::class)->for($me)['total'])->toBe(1);
+});
+
+test('the push is sent straight away, not queued as a second job', function () {
+    Queue::fake();
+    $user = Activity::withoutRecording(fn () => User::factory()->create());
+
+    $user->notify(new AppNotification(inboxPayload(priority: NotificationPriority::Important)));
+
+    Queue::assertNotPushed(BroadcastEvent::class);
 });

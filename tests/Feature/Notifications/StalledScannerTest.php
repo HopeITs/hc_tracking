@@ -73,12 +73,16 @@ test('a draft report stalls for its author and meal; nothing fires on a weekend'
     expect(UserNotification::query()->forUser($meal)->where('kind', 'alert')->count())->toBe(1);
 });
 
-test('a pending transfer stalls seven working days after its scheduled date', function () {
+test('a late tranche is never reported as stalled, sent or not: the overdue chain covers it', function () {
     $financial = userWithRole('Financial');
-    Activity::withoutRecording(fn () => TransfersTracking::factory()->create(['scheduled_date' => '2026-09-14']));
+    Activity::withoutRecording(function (): void {
+        TransfersTracking::factory()->create(['scheduled_date' => '2026-08-03']);
+        TransfersTracking::factory()->create(['scheduled_date' => '2026-08-03', 'transfer_date' => '2026-08-04']);
+    });
 
-    expect(scanStalled('2026-09-22 09:00'))->toBe(0)
-        ->and(scanStalled('2026-09-23 09:00'))->toBe(1);
+    expect(collect(app(StalledScanner::class)->stalledSubjects(CarbonImmutable::parse('2026-09-23')))->pluck('type'))->not->toContain('transfer');
 
-    expect(UserNotification::query()->forUser($financial)->where('kind', 'alert')->count())->toBe(1);
+    scanStalled('2026-09-23 09:00');
+
+    expect(UserNotification::query()->forUser($financial)->where('data', 'like', '%stalled%')->count())->toBe(0);
 });

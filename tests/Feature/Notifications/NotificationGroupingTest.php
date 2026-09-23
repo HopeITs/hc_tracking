@@ -6,7 +6,9 @@ use App\Models\Activity;
 use App\Models\User;
 use App\Models\UserNotification;
 use App\Notifications\AppNotification;
+use App\Notifications\Inbox;
 use App\Notifications\NotificationPayload;
+use App\Notifications\UnreadCounts;
 
 /**
  * A payload for task 9, backed by a real activity row (notifications.activity_id
@@ -112,4 +114,15 @@ test('grouping is per recipient', function () {
     $second->notify(new AppNotification(taskPayload()));
 
     expect(UserNotification::query()->count())->toBe(2);
+});
+
+test('an event never merges into a snoozed notification, so it cannot vanish until the snooze ends', function () {
+    $user = Activity::withoutRecording(fn () => User::factory()->create());
+    $user->notify(new AppNotification(taskPayload()));
+    app(Inbox::class)->snooze($user, UserNotification::query()->value('id'), 'tomorrow');
+
+    $user->notify(new AppNotification(taskPayload()));
+
+    expect(UserNotification::query()->count())->toBe(2)
+        ->and(app(UnreadCounts::class)->for($user)['total'])->toBe(1);
 });

@@ -6,6 +6,7 @@ use App\Models\Activity;
 use App\Models\User;
 use App\Models\UserNotification;
 use App\Notifications\AppNotification;
+use App\Notifications\Inbox;
 use App\Notifications\NotificationPayload;
 use Livewire\Livewire;
 
@@ -98,4 +99,38 @@ test('the list grows by loading more', function () {
         ->call('loadMore')
         ->assertSet('perPage', 50)
         ->assertDontSeeHtml('data-load-more');
+});
+
+test('search matches the words people read, in either language and any case, never the stored keys', function () {
+    $user = Activity::withoutRecording(fn () => User::factory()->create());
+    pageNotify($user, 'Water trucking');
+
+    $page = fn () => Livewire::actingAs($user)->test('pages::notifications.index');
+
+    $page()->set('search', 'created the task')->assertSeeText('Water trucking');
+    $page()->set('search', 'CREATED')->assertSeeText('Water trucking');
+    $page()->set('search', 'أنشأ')->assertSeeText('Water trucking');
+
+    foreach (['params', 'notifications.events', 'activity_ids'] as $storedKey) {
+        $page()->set('search', $storedKey)->assertDontSeeText('Water trucking');
+    }
+});
+
+test('snoozed notifications can be listed and brought back', function () {
+    $user = Activity::withoutRecording(fn () => User::factory()->create());
+    $later = pageNotify($user, 'Later please');
+    pageNotify($user, 'Right now');
+    app(Inbox::class)->snooze($user, $later, 'tomorrow');
+
+    Livewire::actingAs($user)->test('pages::notifications.index')
+        ->assertDontSeeText('Later please')
+        ->set('state', 'snoozed')
+        ->assertSeeText('Later please')
+        ->assertDontSeeText('Right now')
+        ->assertSeeHtml('data-snoozed-until')
+        ->call('unsnooze', $later)
+        ->assertDispatched('notification-received')
+        ->assertDontSeeText('Later please');
+
+    expect(UserNotification::query()->find($later)->snoozed_until)->toBeNull();
 });

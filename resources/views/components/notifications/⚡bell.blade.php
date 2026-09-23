@@ -17,6 +17,14 @@ new class extends Component {
     public string $tab = 'all';
 
     /**
+     * Whether the panel has been opened on this page. The bell renders on
+     * every page (twice: mobile and desktop header), so its rows are only
+     * queried once somebody actually opens it; until then only the cached
+     * unread count is read.
+     */
+    public bool $opened = false;
+
+    /**
      * @return array{total: int, critical: int, modules: array<string, int>}
      */
     #[Computed]
@@ -33,6 +41,10 @@ new class extends Component {
     #[Computed]
     public function sections(): Collection
     {
+        if (! $this->opened) {
+            return collect();
+        }
+
         $order = ['pinned', 'today', 'yesterday', 'earlier'];
 
         return UserNotification::query()
@@ -54,6 +66,12 @@ new class extends Component {
             ->sortBy(fn (Collection $rows, string $section): int => (int) array_search($section, $order, true));
     }
 
+    public function loadPanel(): void
+    {
+        $this->opened = true;
+        unset($this->sections);
+    }
+
     public function showTab(string $tab): void
     {
         $this->tab = in_array($tab, ['all', 'unread', 'alerts'], true) ? $tab : 'all';
@@ -70,14 +88,15 @@ new class extends Component {
 
 <div
     x-data="notificationBell"
-    x-on:keydown.escape.window="open = false"
-    x-on:click.outside="open = false"
+    x-on:keydown.escape.window="close(true)"
+    x-on:click.outside="close(false)"
     class="relative"
     data-notification-bell
 >
     <button
         type="button"
-        x-on:click="open = ! open"
+        x-ref="button"
+        x-on:click="toggle()"
         x-bind:aria-expanded="open.toString()"
         aria-haspopup="dialog"
         aria-label="{{ trans_choice('notifications.bell_label', $this->counts['total'], ['count' => $this->counts['total']]) }}"
@@ -100,13 +119,19 @@ new class extends Component {
         @endif
     </button>
 
+    {{-- From lg the sidebar sits beside the header and paints above it, so
+         the panel is pinned to the viewport's end edge there instead of hanging
+         off the bell (where a narrow window pushed it under the sidebar). --}}
     <div
         x-show="open"
         x-cloak
+        x-ref="panel"
+        tabindex="-1"
         x-transition.opacity.duration.150ms
         role="dialog"
         aria-label="{{ __('notifications.inbox') }}"
-        class="fixed inset-x-3 top-16 z-50 flex flex-col rounded-xl bg-white text-secondary-dark shadow-[0_12px_32px_rgba(16,24,40,0.14),0_2px_6px_rgba(16,24,40,0.08)] sm:absolute sm:inset-x-auto sm:end-0 sm:top-full sm:mt-2 sm:w-[26rem] dark:bg-secondary-dark dark:text-white dark:ring-1 dark:ring-secondary-medium"
+        class="fixed inset-x-3 top-16 z-50 flex flex-col rounded-xl bg-white text-secondary-dark shadow-[0_12px_32px_rgba(16,24,40,0.14),0_2px_6px_rgba(16,24,40,0.08)] focus:outline-none sm:absolute sm:inset-x-auto sm:end-0 sm:top-full sm:mt-2 sm:w-[26rem] lg:fixed lg:end-4 lg:top-[4.5rem] lg:mt-0 dark:bg-secondary-dark dark:text-white dark:ring-1 dark:ring-secondary-medium"
+        data-notification-panel
     >
         <div class="flex items-center justify-between gap-3 px-4 pt-4">
             <p class="text-base font-bold">{{ __('notifications.inbox') }}</p>
@@ -122,6 +147,7 @@ new class extends Component {
                     role="tab"
                     wire:click="showTab('{{ $key }}')"
                     aria-selected="{{ $tab === $key ? 'true' : 'false' }}"
+                    aria-controls="notification-panel-{{ $this->getId() }}"
                     @class([
                         'min-h-9 border-b-2 font-semibold transition-colors',
                         'border-primary text-secondary-dark dark:text-white' => $tab === $key,
@@ -131,17 +157,21 @@ new class extends Component {
             @endforeach
         </div>
 
-        <div class="max-h-[min(32rem,70vh)] overflow-y-auto px-2 pb-2">
-            @forelse ($this->sections as $section => $rows)
-                <p class="type-label px-2 pt-4 pb-1">{{ __("notifications.sections.{$section}") }}</p>
-                <ol class="space-y-0.5">
-                    @foreach ($rows as $notification)
-                        <x-notifications.row :notification="$notification" wire:key="bell-{{ $notification->id }}" />
-                    @endforeach
-                </ol>
-            @empty
-                <p class="px-4 py-12 text-center text-sm text-secondary-medium dark:text-secondary-soft">{{ __('notifications.empty') }}</p>
-            @endforelse
+        <div id="notification-panel-{{ $this->getId() }}" role="tabpanel" class="max-h-[min(32rem,70vh)] overflow-y-auto px-2 pb-2">
+            @if (! $opened)
+                <p class="px-4 py-12 text-center text-sm text-secondary-medium dark:text-secondary-soft" role="status" data-panel-loading>{{ __('notifications.loading') }}</p>
+            @else
+                @forelse ($this->sections as $section => $rows)
+                    <p class="type-label px-2 pt-4 pb-1">{{ __("notifications.sections.{$section}") }}</p>
+                    <ol class="space-y-0.5">
+                        @foreach ($rows as $notification)
+                            <x-notifications.row :notification="$notification" wire:key="bell-{{ $notification->id }}" />
+                        @endforeach
+                    </ol>
+                @empty
+                    <p class="px-4 py-12 text-center text-sm text-secondary-medium dark:text-secondary-soft">{{ __('notifications.empty') }}</p>
+                @endforelse
+            @endif
         </div>
 
         <div class="flex items-center justify-between gap-3 border-t border-secondary-soft px-4 py-3 text-sm dark:border-secondary-medium">

@@ -28,13 +28,28 @@ test('the bell shows the unread count and the sentences', function () {
     bellNotify($user, subject: 'Hygiene kits');
 
     Livewire::actingAs($user)->test('notifications.bell')
+        ->call('loadPanel')
         ->assertSeeHtml('data-unread-count')
         ->assertSeeText('Sami created the task “Water trucking”')
         ->assertSeeText('Hygiene kits');
 });
 
+test('the panel reads no rows until it is opened', function () {
+    $user = Activity::withoutRecording(fn () => User::factory()->create());
+    bellNotify($user, subject: 'Water trucking');
+
+    Livewire::actingAs($user)->test('notifications.bell')
+        ->assertSeeHtml('data-unread-count')
+        ->assertSeeHtml('data-panel-loading')
+        ->assertDontSeeText('Water trucking')
+        ->call('loadPanel')
+        ->assertDontSeeHtml('data-panel-loading')
+        ->assertSeeText('Water trucking');
+});
+
 test('an empty inbox shows no counter', function () {
     Livewire::actingAs(Activity::withoutRecording(fn () => User::factory()->create()))->test('notifications.bell')
+        ->call('loadPanel')
         ->assertDontSeeHtml('data-unread-count')
         ->assertSeeText(__('notifications.empty'));
 });
@@ -46,6 +61,7 @@ test('an unread critical notification is pinned first and turns the counter red'
     bellNotify($user, subject: 'Latest of all');
 
     Livewire::actingAs($user)->test('notifications.bell')
+        ->call('loadPanel')
         ->assertSeeInOrder(['Urgent', 'Latest of all'])
         ->assertSeeHtml('data-critical-unread');
 });
@@ -57,6 +73,7 @@ test('the unread and alerts tabs narrow the list', function () {
     bellNotify($user, subject: 'Fresh action');
 
     Livewire::actingAs($user)->test('notifications.bell')
+        ->call('loadPanel')
         ->call('showTab', 'unread')
         ->assertDontSeeText('Already read')
         ->assertSeeText('Fresh action')
@@ -114,5 +131,5 @@ test('the bell renders in arabic for arabic readers', function () {
 
     app()->setLocale('ar');
 
-    Livewire::actingAs($user)->test('notifications.bell')->assertSeeText('أنشأ Sami المهمة «خطة»');
+    Livewire::actingAs($user)->test('notifications.bell')->call('loadPanel')->assertSeeText('أنشأ Sami المهمة «خطة»');
 });

@@ -89,3 +89,14 @@ test('a system activity names the system as its actor', function () {
 
     expect(app(ActivityParameters::class)->for($activity)['actor'])->toBe(['trans' => 'notifications.system']);
 });
+
+test('arabic dates use the levantine month names the rest of the app uses', function () {
+    expect(app(NotificationPresenter::class)->param(['date' => '2026-09-30'], 'ar'))->toContain('أيلول');
+});
+
+test('the search text holds the sentence in every interface language', function () {
+    $data = ['key' => 'notifications.events.task.created', 'params' => ['actor' => 'Sami', 'subject' => 'Plan'], 'count' => 4];
+
+    expect(app(NotificationPresenter::class)->searchText($data))
+        ->toBe("Sami created the task “Plan”\nأنشأ Sami المهمة «Plan»");
+});

@@ -39,9 +39,22 @@ test('an indicator with no reading inside its frequency window is flagged silent
     $meal = userWithRole('MEAL');
     Activity::withoutRecording(fn () => Indicator::factory()->create(['frequency' => 'monthly', 'target' => null, 'created_at' => '2026-01-01']));
 
-    app(OffTrackIndicatorScanner::class)->scan(CarbonImmutable::parse('2026-03-01 06:00'));
+    app(OffTrackIndicatorScanner::class)->scan(CarbonImmutable::parse('2026-03-02 06:00')); // Monday
 
     expect(UserNotification::query()->forUser($meal)->where('data', 'like', '%off_track.silent%')->count())->toBe(1);
+});
+
+test('indicator and data-gap alerts are never sent on a non-working day', function () {
+    $meal = userWithRole('MEAL');
+    Activity::withoutRecording(function (): void {
+        Indicator::factory()->create(['frequency' => 'monthly', 'target' => null, 'created_at' => '2026-01-01']);
+        Project::factory()->status(ProjectStatus::Active)->create(['end_date' => '2026-01-31']);
+    });
+    $sunday = CarbonImmutable::parse('2026-03-01 06:00');
+
+    expect(app(OffTrackIndicatorScanner::class)->scan($sunday))->toBe(0)
+        ->and(app(DataGapScanner::class)->scan($sunday))->toBe(0)
+        ->and(UserNotification::query()->forUser($meal)->count())->toBe(0);
 });
 
 test('data gaps fire at most once a week', function () {

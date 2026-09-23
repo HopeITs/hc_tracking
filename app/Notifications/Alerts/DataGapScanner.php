@@ -16,7 +16,8 @@ use Carbon\CarbonImmutable;
 /**
  * Weekly nudges about missing data: active projects with no milestones or
  * indicators, projects past their end still active, approved reports with no
- * files.
+ * files. Runs on working days only, so each week's nudge lands on its first
+ * working day.
  */
 final class DataGapScanner implements Scanner
 {
@@ -24,10 +25,15 @@ final class DataGapScanner implements Scanner
         private AlertDispatcher $dispatcher,
         private RecipientResolver $resolver,
         private EmployeeRecipients $employees,
+        private WorkingCalendar $calendar,
     ) {}
 
     public function scan(CarbonImmutable $now): int
     {
+        if (! $this->calendar->isWorkingDay($now)) {
+            return 0;
+        }
+
         $week = $now->format('o-\WW');
         $meal = $this->resolver->usersWithRoles(['MEAL']);
         $sent = 0;

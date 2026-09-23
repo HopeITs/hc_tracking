@@ -57,13 +57,17 @@ new #[Title('titles.notifications')] class extends Component {
 
         return UserNotification::query()
             ->forUser(auth()->user())
-            ->visible()
+            ->when(
+                $this->state === 'snoozed',
+                fn (Builder $query) => $query->where('snoozed_until', '>', now()),
+                fn (Builder $query) => $query->visible(),
+            )
             ->when($this->module !== '', fn (Builder $query) => $query->where('module', $this->module))
             ->when(in_array($this->kind, NotificationKind::values(), true), fn (Builder $query) => $query->where('kind', $this->kind))
             ->when(in_array($this->priority, NotificationPriority::values(), true), fn (Builder $query) => $query->where('priority', $this->priority))
             ->when($this->state === 'unread', fn (Builder $query) => $query->whereNull('read_at'))
             ->when($this->state === 'read', fn (Builder $query) => $query->whereNotNull('read_at'))
-            ->when($term !== '', fn (Builder $query) => $query->where('data', 'like', '%'.addcslashes($term, '%_\\').'%'));
+            ->when($term !== '', fn (Builder $query) => $query->where('search_text', 'like', '%'.addcslashes($term, '%_\\').'%'));
     }
 
     /**
@@ -157,7 +161,7 @@ new #[Title('titles.notifications')] class extends Component {
             </x-ui.header-filter-select>
 
             <x-ui.header-filter-select :label="__('notifications.filters.state')" wire:model.live="state" :value="$state">
-                @foreach (['all', 'unread', 'read'] as $option)
+                @foreach (['all', 'unread', 'read', 'snoozed'] as $option)
                     <flux:select.option :value="$option">{{ __("notifications.states.{$option}") }}</flux:select.option>
                 @endforeach
             </x-ui.header-filter-select>

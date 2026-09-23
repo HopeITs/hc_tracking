@@ -50,5 +50,5 @@ test('the catalog lists open dated items with their direct people and closes the
     }
 
     expect($items->where('subjectType', 'proposal')->pluck('label')->all())->toContain('Ending proposal')
-        ->and($items->where('subjectType', 'transfer')->pluck('label')->filter(fn (string $label): bool => str_contains($label, '4321'))->count())->toBe(1);
+        ->and($items->where('subjectType', 'transfer')->pluck('label')->filter(fn (string $label): bool => str_contains($label, '4,321.00'))->count())->toBe(1);
 });

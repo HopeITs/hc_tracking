@@ -25,6 +25,7 @@ use App\Notifications\Alerts\NotificationSettings;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Foundation\DevCommands;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -40,6 +41,18 @@ class AppServiceProvider extends ServiceProvider
     {
         // One instance per request or job, so queue workers never hold stale values.
         $this->app->scoped(NotificationSettings::class);
+
+        $this->registerDevCommands();
+    }
+
+    /**
+     * `php artisan dev` also runs the scheduler, so notification alerts,
+     * digests and snooze wake-ups fire locally exactly as they will in
+     * production (where cron runs schedule:run every minute).
+     */
+    protected function registerDevCommands(): void
+    {
+        DevCommands::artisan('schedule:work', 'scheduler');
     }
 
     /**

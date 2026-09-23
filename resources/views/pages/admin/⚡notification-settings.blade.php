@@ -18,6 +18,8 @@ new #[Title('titles.notification_rules')] class extends Component {
 
     public int $escalateTopAfter = 10;
 
+    public int $escalationCatchUp = 3;
+
     public int $stalledTaskInProgress = 7;
 
     public int $stalledTaskUnderReview = 3;
@@ -25,8 +27,6 @@ new #[Title('titles.notification_rules')] class extends Component {
     public int $stalledReportDraft = 7;
 
     public int $stalledReportReviewed = 5;
-
-    public int $stalledTransferPending = 7;
 
     public int $stalledProposal = 30;
 
@@ -43,11 +43,11 @@ new #[Title('titles.notification_rules')] class extends Component {
         'overdueRepeat' => 'overdue_repeat_days',
         'escalateManagerAfter' => 'escalate_manager_after_days',
         'escalateTopAfter' => 'escalate_top_after_days',
+        'escalationCatchUp' => 'escalation_catch_up_days',
         'stalledTaskInProgress' => 'stalled_task_in_progress_days',
         'stalledTaskUnderReview' => 'stalled_task_under_review_days',
         'stalledReportDraft' => 'stalled_report_draft_days',
         'stalledReportReviewed' => 'stalled_report_reviewed_days',
-        'stalledTransferPending' => 'stalled_transfer_pending_days',
         'stalledProposal' => 'stalled_proposal_days',
         'offTrackPace' => 'off_track_pace_percent',
         'dailyBriefTime' => 'daily_brief_time',
@@ -84,11 +84,11 @@ new #[Title('titles.notification_rules')] class extends Component {
             'overdueRepeat' => ['required', 'integer', 'between:1,30'],
             'escalateManagerAfter' => ['required', 'integer', 'between:1,60'],
             'escalateTopAfter' => ['required', 'integer', 'gt:escalateManagerAfter', 'max:90'],
+            'escalationCatchUp' => ['required', 'integer', 'between:1,30'],
             'stalledTaskInProgress' => ['required', 'integer', 'between:1,365'],
             'stalledTaskUnderReview' => ['required', 'integer', 'between:1,365'],
             'stalledReportDraft' => ['required', 'integer', 'between:1,365'],
             'stalledReportReviewed' => ['required', 'integer', 'between:1,365'],
-            'stalledTransferPending' => ['required', 'integer', 'between:1,365'],
             'stalledProposal' => ['required', 'integer', 'between:1,365'],
             'offTrackPace' => ['required', 'integer', 'between:1,100'],
             'dailyBriefTime' => ['required', 'date_format:H:i'],
@@ -125,7 +125,7 @@ new #[Title('titles.notification_rules')] class extends Component {
                 @foreach (range(1, 7) as $weekday)
                     <label class="inline-flex min-h-10 items-center gap-2 rounded-full border border-secondary-soft px-3 text-sm has-checked:border-primary has-checked:bg-primary/5 dark:border-secondary-medium">
                         <input type="checkbox" wire:model="workingDays" value="{{ $weekday }}" class="size-4 accent-primary" />
-                        {{ \Carbon\CarbonImmutable::now()->startOfWeek()->addDays($weekday - 1)->translatedFormat('l') }}
+                        {{ \Carbon\CarbonImmutable::now()->startOfWeek(\Carbon\CarbonImmutable::MONDAY)->addDays($weekday - 1)->translatedFormat('l') }}
                     </label>
                 @endforeach
             </div>
@@ -138,6 +138,7 @@ new #[Title('titles.notification_rules')] class extends Component {
             <x-ui.input type="number" min="1" :label="__('notifications.admin.overdue_repeat')" wire:model="overdueRepeat" />
             <x-ui.input type="number" min="1" :label="__('notifications.admin.escalate_manager')" wire:model="escalateManagerAfter" />
             <x-ui.input type="number" min="1" :label="__('notifications.admin.escalate_top')" wire:model="escalateTopAfter" />
+            <x-ui.input type="number" min="1" max="30" :label="__('notifications.admin.escalation_catch_up')" description:trailing="{{ __('notifications.admin.escalation_catch_up_help') }}" wire:model="escalationCatchUp" />
         </fieldset>
 
         <fieldset class="grid items-start gap-4 @3xl/directory:grid-cols-2">
@@ -146,7 +147,6 @@ new #[Title('titles.notification_rules')] class extends Component {
             <x-ui.input type="number" min="1" :label="__('notifications.admin.stalled_task_under_review')" wire:model="stalledTaskUnderReview" />
             <x-ui.input type="number" min="1" :label="__('notifications.admin.stalled_report_draft')" wire:model="stalledReportDraft" />
             <x-ui.input type="number" min="1" :label="__('notifications.admin.stalled_report_reviewed')" wire:model="stalledReportReviewed" />
-            <x-ui.input type="number" min="1" :label="__('notifications.admin.stalled_transfer_pending')" wire:model="stalledTransferPending" />
             <x-ui.input type="number" min="1" :label="__('notifications.admin.stalled_proposal')" wire:model="stalledProposal" />
         </fieldset>
 

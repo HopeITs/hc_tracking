@@ -63,6 +63,15 @@ final class Inbox
     }
 
     /**
+     * Bring a snoozed notification back now, as it was (read state kept).
+     */
+    public function unsnooze(User $user, string $id): void
+    {
+        UserNotification::query()->forUser($user)->whereKey($id)->update(['snoozed_until' => null]);
+        $this->counts->forget($user->id);
+    }
+
+    /**
      * When a snooze preset ends: in an hour, tomorrow 08:00, or the first
      * working day of next week 08:00.
      */

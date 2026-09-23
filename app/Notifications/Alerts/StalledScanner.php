@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Notifications\Alerts;
 
-use App\Enums\ArStatus;
 use App\Enums\NotificationPriority;
 use App\Enums\ProposalStatus;
 use App\Enums\ReportStatus;
@@ -13,7 +12,6 @@ use App\Models\Activity;
 use App\Models\Proposal;
 use App\Models\Report;
 use App\Models\Task;
-use App\Models\TransfersTracking;
 use App\Notifications\EmployeeRecipients;
 use App\Notifications\RecipientResolver;
 use Carbon\CarbonImmutable;
@@ -23,6 +21,10 @@ use Illuminate\Support\Collection;
 /**
  * Work sitting in one status too long. Only a status change resets the
  * timer, and each stall fires once (its stage is keyed on when it started).
+ *
+ * Tranches are deliberately not here: a late tranche is already covered by
+ * the overdue and escalation chain (DeadlineCatalog), and a second "stalled"
+ * alert would tell Financial the same thing twice (user decision 2026-09-23).
  */
 final class StalledScanner implements Scanner
 {
@@ -73,7 +75,6 @@ final class StalledScanner implements Scanner
             ...$this->reports($today, ReportStatus::Draft, (int) $this->settings->get('stalled_report_draft_days')),
             ...$this->reports($today, ReportStatus::Reviewed, (int) $this->settings->get('stalled_report_reviewed_days')),
             ...$this->proposals($today, (int) $this->settings->get('stalled_proposal_days')),
-            ...$this->transfers($today, (int) $this->settings->get('stalled_transfer_pending_days')),
         ];
     }
 
@@ -117,31 +118,6 @@ final class StalledScanner implements Scanner
             ['enum' => 'proposal_status', 'value' => $proposal->status->value], ['Financial'],
             fn (): array => [], fn (Proposal $proposal): string => $proposal->name,
         ))->all();
-    }
-
-    /**
-     * @return list<array<string, mixed>>
-     */
-    private function transfers(CarbonImmutable $today, int $threshold): array
-    {
-        return TransfersTracking::query()
-            ->select(['id', 'donor_proposal_id', 'payment_amount', 'amount_transfered_currency', 'scheduled_date'])
-            ->where('ar_status', ArStatus::Pending->value)
-            ->whereNotNull('scheduled_date')
-            ->whereDate('scheduled_date', '<', $today->toDateString())
-            ->get()
-            ->map(function (TransfersTracking $transfer) use ($today, $threshold): ?array {
-                $days = $this->calendar->workingDaysBetween($transfer->scheduled_date, $today);
-
-                return $days < $threshold ? null : [
-                    'type' => 'transfer', 'id' => $transfer->id, 'module' => 'transfers', 'label' => $transfer->activityLabel(),
-                    'status' => ['enum' => 'ar_status', 'value' => ArStatus::Pending->value], 'days' => $days,
-                    'stage' => 'pending:'.$transfer->scheduled_date->toDateString(), 'userIds' => [], 'reviewerRoles' => ['Financial'],
-                ];
-            })
-            ->filter()
-            ->values()
-            ->all();
     }
 
     /**

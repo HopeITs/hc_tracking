@@ -25,6 +25,7 @@ use Illuminate\Notifications\DatabaseNotification;
  * @property string $notifiable_type
  * @property int $notifiable_id
  * @property array<string, mixed> $data
+ * @property string|null $search_text
  * @property NotificationPriority $priority
  * @property string $module
  * @property NotificationKind $kind
@@ -39,7 +40,7 @@ use Illuminate\Notifications\DatabaseNotification;
  * @property CarbonImmutable|null $updated_at
  */
 #[Fillable([
-    'id', 'type', 'notifiable_type', 'notifiable_id', 'data', 'priority', 'module', 'kind',
+    'id', 'type', 'notifiable_type', 'notifiable_id', 'data', 'search_text', 'priority', 'module', 'kind',
     'subject_type', 'subject_id', 'actor_id', 'activity_id', 'group_key', 'snoozed_until', 'read_at',
 ])]
 class UserNotification extends DatabaseNotification

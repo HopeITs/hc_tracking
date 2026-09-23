@@ -4,6 +4,7 @@ use App\Jobs\RunScanner;
 use App\Notifications\Alerts\DueSoonScanner;
 use App\Notifications\Alerts\OffTrackIndicatorScanner;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Foundation\DevCommands;
 use Illuminate\Support\Facades\Queue;
 
 test('a scan group queues one job per scanner', function () {
@@ -28,4 +29,8 @@ test('the scheduler runs the frequent group every fifteen minutes and the daily 
 
 test('a scanner job runs its scanner', function () {
     expect(fn () => (new RunScanner(OffTrackIndicatorScanner::class))->handle())->not->toThrow(Throwable::class);
+});
+
+test('php artisan dev also runs the scheduler, so alerts fire locally too', function () {
+    expect(collect(DevCommands::commands())->pluck('command'))->toContain('php artisan schedule:work');
 });

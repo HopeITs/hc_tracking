@@ -13,7 +13,8 @@ use App\Notifications\RecipientResolver;
 use Carbon\CarbonImmutable;
 
 /**
- * Indicators behind pace or silent past their reporting frequency.
+ * Indicators behind pace or silent past their reporting frequency. Like
+ * every alert, never sent on a non-working day.
  */
 final class OffTrackIndicatorScanner implements Scanner
 {
@@ -23,10 +24,15 @@ final class OffTrackIndicatorScanner implements Scanner
         private AlertLedger $ledger,
         private RecipientResolver $resolver,
         private EmployeeRecipients $employees,
+        private WorkingCalendar $calendar,
     ) {}
 
     public function scan(CarbonImmutable $now): int
     {
+        if (! $this->calendar->isWorkingDay($now)) {
+            return 0;
+        }
+
         $indicators = Indicator::query()->with('progress')->get();
         $owners = $this->ownerUsers($indicators->pluck('project_id')->filter()->unique()->values()->all());
         $meal = $this->resolver->usersWithRoles(['MEAL']);

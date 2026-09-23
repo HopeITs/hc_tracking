@@ -75,10 +75,6 @@ if ('serviceWorker' in navigator) {
         if (event.data?.type === 'hc-notification-open') {
             navigateTo(event.data.url);
         }
-
-        if (event.data?.type === 'hc-notification-read') {
-            refreshInbox();
-        }
     });
 }
 
@@ -179,6 +175,12 @@ function oneLine(sentence, room) {
  * buttons (they cost a full row): a click opens it, and the sentence is cut
  * to one line. Popups never stack: a new one replaces the one on screen and
  * counts it ("+2 more"); a pile opens the inbox.
+ *
+ * Every open tab (and the installed app window) receives the same push, so
+ * the popup is shown under a cross-tab lock and remembers the ids it already
+ * holds: the second tab finds its notification on screen and does nothing,
+ * instead of counting it again as "+1 more".
+ *
  * Returns false when the browser cannot show popups. Also used by the
  * settings page's "Test popup" button, so the test takes the real path.
  */
@@ -187,11 +189,26 @@ async function showDesktopPopup(payload) {
         return false;
     }
 
+    const show = () => renderDesktopPopup(payload);
+
+    return navigator.locks?.request ? navigator.locks.request('hc-desktop-popup', show) : show();
+}
+
+/** Remember at most this many notification ids on the popup on screen. */
+const POPUP_REMEMBERED_IDS = 50;
+
+async function renderDesktopPopup(payload) {
     const text = labels();
     const critical = payload.priority === 'critical';
     const urgency = critical ? text.critical : text.important;
     const registration = await serviceWorker;
     const [showing] = registration?.getNotifications ? await registration.getNotifications({ tag: POPUP_TAG }) : [];
+    const shownIds = showing?.data?.ids ?? [];
+
+    if (shownIds.includes(payload.id)) {
+        return true;
+    }
+
     const pile = (showing?.data?.pile ?? 0) + 1;
     const anyCritical = critical || Boolean(showing?.data?.critical);
     const inbox = new URL('/notifications', window.location.origin).href;
@@ -216,8 +233,7 @@ async function showDesktopPopup(payload) {
         timestamp: Date.parse(payload.created_at) || Date.now(),
         data: {
             url: pile > 1 ? inbox : payload.url,
-            readUrl: pile > 1 ? null : payload.read_url,
-            csrf: csrfToken(),
+            ids: [...shownIds, payload.id].slice(-POPUP_REMEMBERED_IDS),
             pile,
             critical: anyCritical,
         },
@@ -318,6 +334,11 @@ document.addEventListener('visibilitychange', () => {
 /* ------------------------------------------------------------------ */
 
 document.addEventListener('alpine:init', () => {
+    /**
+     * The bell's panel. Its rows are fetched the first time it opens
+     * (loadPanel), focus moves into it on open and back to the bell when
+     * Escape closes it.
+     */
     window.Alpine.data('notificationBell', () => ({
         open: false,
         pulse: false,
@@ -328,6 +349,34 @@ document.addEventListener('alpine:init', () => {
                 window.setTimeout(() => (this.pulse = false), 1200);
             });
         },
+
+        toggle() {
+            if (this.open) {
+                this.close(false);
+
+                return;
+            }
+
+            this.open = true;
+
+            if (!this.$wire.opened) {
+                this.$wire.loadPanel();
+            }
+
+            this.$nextTick(() => this.$refs.panel?.focus({ preventScroll: true }));
+        },
+
+        close(returnFocus) {
+            if (!this.open) {
+                return;
+            }
+
+            this.open = false;
+
+            if (returnFocus) {
+                this.$refs.button?.focus();
+            }
+        },
     }));
 
     /**
@@ -336,9 +385,30 @@ document.addEventListener('alpine:init', () => {
      */
     window.Alpine.data('notificationToasts', () => ({
         items: [],
+        clock: Date.now(),
 
         init() {
             window.addEventListener('hc-notification', (event) => this.add(event.detail));
+
+            // A critical toast can stay for a long time: keep its "time ago" true.
+            window.setInterval(() => {
+                if (this.items.length > 0) {
+                    this.clock = Date.now();
+                }
+            }, 30_000);
+        },
+
+        /** "now" for the first minute, then "5 minutes ago" in the page language. */
+        ago(item) {
+            const minutes = Math.floor((this.clock - item.receivedAt) / 60_000);
+
+            if (minutes < 1) {
+                return labels().now ?? '';
+            }
+
+            const format = new Intl.RelativeTimeFormat(document.documentElement.lang || undefined, { numeric: 'auto' });
+
+            return minutes < 60 ? format.format(-minutes, 'minute') : format.format(-Math.floor(minutes / 60), 'hour');
         },
 
         add(payload) {
@@ -349,6 +419,7 @@ document.addEventListener('alpine:init', () => {
             this.items.unshift({
                 ...payload,
                 sticky: payload.priority === 'critical',
+                receivedAt: Date.now(),
                 remaining: TOAST_DURATION_MS,
                 paused: false,
                 timer: null,

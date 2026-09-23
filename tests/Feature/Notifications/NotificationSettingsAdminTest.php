@@ -50,3 +50,28 @@ test('settings are validated', function (string $property, mixed $value) {
 test('a non-administrator cannot save by calling the action', function () {
     Livewire::actingAs(userWithRole('Managers'))->test('pages::admin.notification-settings')->call('save')->assertForbidden();
 });
+
+test('in arabic every working-day checkbox is labelled with its own weekday', function () {
+    app()->setLocale('ar');
+
+    $html = Livewire::actingAs(userWithRole('Super Admin'))->test('pages::admin.notification-settings')->html();
+    preg_match_all('/value="(\d)"[^>]*\/>\s*([^<]+?)\s*<\/label>/u', $html, $matches, PREG_SET_ORDER);
+
+    expect(collect($matches)->mapWithKeys(fn (array $match): array => [(int) $match[1] => trim($match[2])])->all())
+        ->toBe([1 => 'الاثنين', 2 => 'الثلاثاء', 3 => 'الأربعاء', 4 => 'الخميس', 5 => 'الجمعة', 6 => 'السبت', 7 => 'الأحد']);
+});
+
+test('the escalation catch-up window is saved and validated', function () {
+    Livewire::actingAs(userWithRole('Super Admin'))->test('pages::admin.notification-settings')
+        ->assertSet('escalationCatchUp', 3)
+        ->set('escalationCatchUp', 5)
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect(app(NotificationSettings::class)->get('escalation_catch_up_days'))->toBe(5);
+
+    Livewire::actingAs(userWithRole('Super Admin'))->test('pages::admin.notification-settings')
+        ->set('escalationCatchUp', 0)
+        ->call('save')
+        ->assertHasErrors('escalationCatchUp');
+});
