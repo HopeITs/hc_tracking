@@ -3,8 +3,10 @@
 namespace Database\Seeders;
 
 use App\Enums\DonorType;
+use App\Enums\ProposalStatus;
 use App\Models\Donor;
 use App\Models\HrUser;
+use App\Models\Proposal;
 use App\Models\Strategy;
 use App\Models\User;
 use Database\Seeders\Concerns\PicksHrRecords;
@@ -14,7 +16,8 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 /**
- * Master data every other seeder builds on: staff, strategies, donors.
+ * Master data every other seeder builds on: staff, strategies, donors, and a
+ * handful of real, program-independent proposals.
  *
  * Staff are the HR accounts: every one gets a tracking user (Officer, or Admin
  * for auth.hr_admin_emails). Cities come from the HR database too.
@@ -105,6 +108,57 @@ class CoreDataSeeder extends Seeder
                     'contact_person' => $profile['contact_person'] ?? fake()->name(),
                     'email' => $profile['email'] ?? Str::lower('grants@'.Str::slug($name).'.org'),
                     'phone' => $profile['phone'] ?? fake()->numerify('+## ## ### ####'),
+                    'notes' => $profile['notes'] ?? null,
+                ],
+            );
+        }
+
+        // Real proposals recorded from grant paperwork, not yet linked to a
+        // program or project. The donor and budget only exist as free text in
+        // `notes` here, because the source data gives no project_num to key a
+        // donor_proposal row on — raise that with the user before inventing one.
+        $proposals = [
+            'Family to Family - CP' => [
+                'planned_date_begin' => '2026-01-01',
+                'planned_date_end' => '2026-12-31',
+                'status' => ProposalStatus::Approved,
+                'notes' => 'Donor: CP, Budget: €854,470.00',
+            ],
+            'Micro Projects - CP' => [
+                'planned_date_begin' => '2026-01-01',
+                'planned_date_end' => '2026-12-31',
+                'status' => ProposalStatus::Approved,
+                'notes' => 'Donor: CP, Budget: €817,032.00',
+            ],
+            'Leadership Aleppo - MCC' => [
+                'planned_date_begin' => '2026-04-01',
+                'planned_date_end' => '2027-03-31',
+                'status' => ProposalStatus::Approved,
+                'notes' => 'Donor: MCC, Budget: $50,010.00',
+            ],
+            'Study Zone Syria - CDCS' => [
+                'planned_date_begin' => '2025-11-01',
+                'planned_date_end' => '2026-12-31',
+                'status' => ProposalStatus::Approved,
+                'notes' => 'Donor: CDCS, Budget: €322,180.00',
+            ],
+            'Children University - Missio Munich' => [
+                'planned_date_begin' => '2026-01-01',
+                'planned_date_end' => '2026-12-31',
+                'status' => ProposalStatus::Approved,
+                'notes' => 'Donor: Missio Munich, Budget: €27,000.00',
+            ],
+        ];
+
+        foreach ($proposals as $name => $profile) {
+            Proposal::firstOrCreate(
+                ['name' => $name],
+                [
+                    'planned_date_begin' => $profile['planned_date_begin'],
+                    'planned_date_end' => $profile['planned_date_end'],
+                    'actual_date_begin' => $profile['actual_date_begin'] ?? null,
+                    'actual_date_end' => $profile['actual_date_end'] ?? null,
+                    'status' => $profile['status'],
                     'notes' => $profile['notes'] ?? null,
                 ],
             );
