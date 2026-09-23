@@ -3,6 +3,7 @@
 @php
     $presenter = app(\App\Notifications\NotificationPresenter::class);
     $isUnread = $notification->read_at === null;
+    $isSnoozed = $notification->snoozed_until !== null && $notification->snoozed_until->isFuture();
     $quickLabels = __('notifications.quick.labels');
     $dotClasses = match ($notification->priority) {
         \App\Enums\NotificationPriority::Critical => 'bg-primary',
@@ -43,6 +44,13 @@
                 <time datetime="{{ $notification->created_at?->toIso8601String() }}">{{ $notification->created_at?->diffForHumans() }}</time>
                 <span aria-hidden="true">·</span>
                 <span>{{ $presenter->moduleLabel($notification->module) }}</span>
+                @if ($isSnoozed)
+                    <span aria-hidden="true">·</span>
+                    <span class="inline-flex items-center gap-1" data-snoozed-until>
+                        <flux:icon.clock variant="micro" />
+                        {{ __('notifications.snoozed_until', ['time' => $notification->snoozed_until->translatedFormat(__('formats.datetime'))]) }}
+                    </span>
+                @endif
                 <span class="sr-only">{{ $notification->priority->label() }}</span>
             </p>
         </a>
@@ -73,14 +81,20 @@
             </button>
         @endif
 
-        <button type="button" x-on:click="snoozing = ! snoozing" x-bind:aria-expanded="snoozing.toString()" class="inline-flex size-8 items-center justify-center rounded-md text-secondary-medium hover:bg-secondary-soft hover:text-secondary-dark dark:text-secondary-soft dark:hover:bg-white/10" aria-label="{{ __('notifications.snooze') }}">
-            <flux:icon.clock variant="micro" />
-        </button>
+        @if ($isSnoozed)
+            <button type="button" wire:click="unsnooze('{{ $notification->id }}')" class="inline-flex size-8 items-center justify-center rounded-md text-secondary-medium hover:bg-secondary-soft hover:text-secondary-dark dark:text-secondary-soft dark:hover:bg-white/10" aria-label="{{ __('notifications.unsnooze') }}" data-unsnooze>
+                <flux:icon.arrow-uturn-left variant="micro" />
+            </button>
+        @else
+            <button type="button" x-on:click="snoozing = ! snoozing" x-on:keydown.escape.stop="snoozing = false" x-bind:aria-expanded="snoozing.toString()" class="inline-flex size-8 items-center justify-center rounded-md text-secondary-medium hover:bg-secondary-soft hover:text-secondary-dark dark:text-secondary-soft dark:hover:bg-white/10" aria-label="{{ __('notifications.snooze') }}">
+                <flux:icon.clock variant="micro" />
+            </button>
 
-        <div x-show="snoozing" x-cloak x-on:click.outside="snoozing = false" class="absolute end-0 top-9 z-10 w-40 rounded-lg bg-white py-1 text-sm shadow-lg dark:bg-secondary-dark dark:ring-1 dark:ring-secondary-medium">
-            @foreach (\App\Notifications\Inbox::SnoozePresets as $preset)
-                <button type="button" wire:click="snooze('{{ $notification->id }}', '{{ $preset }}')" x-on:click="snoozing = false" class="block w-full px-3 py-2 text-start hover:bg-secondary-soft/60 dark:hover:bg-white/10">{{ __("notifications.snooze_presets.{$preset}") }}</button>
-            @endforeach
-        </div>
+            <div x-show="snoozing" x-cloak x-on:click.outside="snoozing = false" x-on:keydown.escape.stop="snoozing = false" class="absolute end-0 top-9 z-10 w-40 rounded-lg bg-white py-1 text-sm shadow-lg dark:bg-secondary-dark dark:ring-1 dark:ring-secondary-medium">
+                @foreach (\App\Notifications\Inbox::SnoozePresets as $preset)
+                    <button type="button" wire:click="snooze('{{ $notification->id }}', '{{ $preset }}')" x-on:click="snoozing = false" class="block w-full px-3 py-2 text-start hover:bg-secondary-soft/60 dark:hover:bg-white/10">{{ __("notifications.snooze_presets.{$preset}") }}</button>
+                @endforeach
+            </div>
+        @endif
     </div>
 </li>

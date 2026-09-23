@@ -87,3 +87,9 @@ test('media team members never hear about finance modules', function () {
 
     expect(UserNotification::query()->forUser($media)->count())->toBe(0);
 });
+
+test('a tranche is named with its amount formatted like the rest of the app', function () {
+    $transfer = Activity::withoutRecording(fn () => TransfersTracking::factory()->create(['payment_amount' => '923100.12']));
+
+    expect($transfer->activityLabel())->toContain(' · 923,100.12 ');
+});

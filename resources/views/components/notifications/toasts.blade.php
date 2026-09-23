@@ -10,6 +10,7 @@
         'critical' => __('notifications.toast.critical'),
         'important' => __('notifications.toast.important'),
         'more' => __('notifications.toast.more'),
+        'now' => __('notifications.toast.now'),
         'view_all' => __('notifications.view_all'),
     ];
 @endphp
@@ -53,7 +54,7 @@
                         ></span>
                         <p class="min-w-0 truncate text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-secondary-soft" x-text="item.module_label"></p>
                         <span x-show="item.sticky" class="shrink-0 text-[11px] font-bold uppercase tracking-[0.1em] text-status-critical">{{ __('notifications.toast.critical') }}</span>
-                        <span class="ms-auto shrink-0 text-[11px] text-secondary-light">{{ __('notifications.toast.now') }}</span>
+                        <span class="ms-auto shrink-0 text-[11px] text-secondary-light" x-text="ago(item)" data-toast-time></span>
                     </div>
 
                     <p class="mt-1 line-clamp-3 text-sm font-semibold leading-snug" x-text="item.text"></p>

@@ -67,3 +67,26 @@ test('escalation reaches the program manager at five and the top roles at ten wo
     expect(UserNotification::query()->forUser($manager)->sole()->priority)->toBe(NotificationPriority::Critical)
         ->and(UserNotification::query()->forUser($generalManager)->sole()->priority)->toBe(NotificationPriority::Critical);
 });
+
+test('escalations fire only inside their catch-up window, so old overdue work never floods managers', function () {
+    $managerEmployee = insertHrEmployee();
+    $manager = userWithRole('Managers', $managerEmployee);
+    $generalManager = userWithRole('General Manager');
+    $program = Activity::withoutRecording(fn () => Program::factory()->create(['manager_id' => $managerEmployee]));
+    $assignees = [userWithRole('Managers', insertHrEmployee()), userWithRole('Managers', insertHrEmployee()), userWithRole('Managers', insertHrEmployee())];
+    $tasks = [
+        overdueTaskFor($assignees[0], '2026-09-11', $program->id), // day 7 on the 22nd: inside the 5–7 window
+        overdueTaskFor($assignees[1], '2026-09-10', $program->id), // day 8: past the manager window, before the top one
+        overdueTaskFor($assignees[2], '2026-06-01', $program->id), // months overdue before the first scan
+    ];
+
+    runScanner(EscalationScanner::class, '2026-09-22 09:00');
+    runScanner(OverdueScanner::class, '2026-09-22 09:00');
+
+    expect(UserNotification::query()->forUser($manager)->pluck('subject_id')->all())->toBe([$tasks[0]->id])
+        ->and(UserNotification::query()->forUser($generalManager)->where('subject_type', 'task')->whereIn('subject_id', collect($tasks)->pluck('id'))->count())->toBe(0);
+
+    foreach ($assignees as $assignee) {
+        expect(UserNotification::query()->forUser($assignee)->where('data', 'like', '%alerts.overdue%')->count())->toBe(1);
+    }
+});

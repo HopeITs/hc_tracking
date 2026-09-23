@@ -32,7 +32,7 @@ final class WeeklyDigestScanner implements Scanner
     {
         $today = $now->startOfDay();
 
-        if (! $this->calendar->firstWorkingDayOnOrAfter($today->startOfWeek())->isSameDay($today)) {
+        if (! $this->calendar->firstWorkingDayOnOrAfter($this->calendar->startOfIsoWeek($today))->isSameDay($today)) {
             return 0;
         }
 

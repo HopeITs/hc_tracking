@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Notifications;
 
+use App\Enums\Locale;
 use App\Models\UserNotification;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
@@ -36,9 +37,23 @@ final class NotificationPresenter
     }
 
     /**
+     * The sentence in every interface language, one per line: what inbox
+     * search matches, so people find the words they actually read.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function searchText(array $data): string
+    {
+        return implode("\n", array_map(
+            fn (Locale $locale): string => $this->sentence([...$data, 'count' => 1], $locale->value),
+            Locale::cases(),
+        ));
+    }
+
+    /**
      * The push payload for the browser, rendered in the reader's language.
      *
-     * @return array{id: string, text: string, module: string, module_label: string, priority: string, kind: string, url: string, created_at: string}
+     * @return array{id: string, text: string, module: string, module_label: string, priority: string, kind: string, url: string, read_url: string, icon: string, image: string|null, created_at: string}
      */
     public function toBroadcast(UserNotification $notification, string $locale): array
     {
@@ -98,8 +113,8 @@ final class NotificationPresenter
         return match (true) {
             isset($param['trans']) => (string) __($param['trans'], [], $locale),
             isset($param['enum']) => (string) __('enums.'.$param['enum'].'.'.$this->enumKey((string) $param['value']), [], $locale),
-            isset($param['date']) => CarbonImmutable::parse($param['date'])->locale($locale)->translatedFormat((string) __('formats.date', [], $locale)),
-            isset($param['weekday']) => CarbonImmutable::parse($param['weekday'])->locale($locale)->translatedFormat('l'),
+            isset($param['date']) => CarbonImmutable::parse($param['date'])->locale($this->carbonLocale($locale))->translatedFormat((string) __('formats.date', [], $locale)),
+            isset($param['weekday']) => CarbonImmutable::parse($param['weekday'])->locale($this->carbonLocale($locale))->translatedFormat('l'),
             isset($param['localized']) => $this->localized($param['localized'], $locale),
             isset($param['localized_list']) => implode(
                 $locale === 'ar' ? '، ' : ', ',
@@ -107,6 +122,15 @@ final class NotificationPresenter
             ),
             default => '',
         };
+    }
+
+    /**
+     * The Carbon locale the rest of the app formats dates with (Levantine
+     * month names in Arabic), so notifications read like every other page.
+     */
+    private function carbonLocale(string $locale): string
+    {
+        return Locale::tryFrom($locale)?->carbonLocale() ?? $locale;
     }
 
     /**

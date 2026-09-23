@@ -42,7 +42,7 @@ test('the sidebar shows the unread count of each module', function () {
 
     $this->actingAs($user)->get(route('dashboard'))
         ->assertSeeHtml('data-module-badge="tasks"')
-        ->assertSeeInOrder(['data-module-badge="tasks"', '>2<'], false);
+        ->assertSeeInOrder(['data-module-badge="tasks"', '>2<', '<span class="sr-only"> '.__('notifications.unread_suffix').'</span>'], false);
 });
 
 test('list rows carry a dot only for records with unread notifications', function (string $route, string $type, Closure $make) {

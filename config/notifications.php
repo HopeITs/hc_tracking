@@ -88,15 +88,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Alert defaults
-    |--------------------------------------------------------------------------
-    |
-    | Shipped defaults for every admin-editable setting (Admin → Notification
-    | settings). Day counts are WORKING days. working_days uses ISO numbers:
-    | 1 = Monday … 7 = Sunday.
-    */
-    /*
-    |--------------------------------------------------------------------------
     | Scanner groups
     |--------------------------------------------------------------------------
     |
@@ -152,17 +143,26 @@ return [
         'activity_years' => 2,
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Alert defaults
+    |--------------------------------------------------------------------------
+    |
+    | Shipped defaults for every admin-editable setting (Admin → Notification
+    | settings). Day counts are WORKING days. working_days uses ISO numbers:
+    | 1 = Monday … 7 = Sunday.
+    */
     'defaults' => [
         'working_days' => [1, 2, 3, 4, 5],
         'due_soon_days' => [7, 3, 1],
         'overdue_repeat_days' => 3,
         'escalate_manager_after_days' => 5,
         'escalate_top_after_days' => 10,
+        'escalation_catch_up_days' => 3,
         'stalled_task_in_progress_days' => 7,
         'stalled_task_under_review_days' => 3,
         'stalled_report_draft_days' => 7,
         'stalled_report_reviewed_days' => 5,
-        'stalled_transfer_pending_days' => 7,
         'stalled_proposal_days' => 30,
         'off_track_pace_percent' => 80,
         'daily_brief_time' => '07:30',

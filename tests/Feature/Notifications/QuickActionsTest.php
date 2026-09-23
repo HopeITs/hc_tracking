@@ -125,3 +125,13 @@ test('an overdue alert can be snoozed until tomorrow', function () {
 
     expect($alert->fresh()->snoozed_until->format('Y-m-d H:i'))->toBe('2026-09-22 08:00');
 });
+
+test('a quick action that did not go through leaves the notification unread', function () {
+    $assignee = userWithRole('Managers', insertHrEmployee());
+    [$task, $notification] = taskNotificationFor($assignee);
+    Activity::withoutRecording(fn () => $task->update(['status' => TaskStatus::Done]));
+
+    Livewire::actingAs($assignee)->test('notifications.bell')->call('runQuickAction', $notification->id, 'task.mark_done');
+
+    expect($notification->fresh()->read_at)->toBeNull();
+});

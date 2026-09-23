@@ -44,8 +44,16 @@ trait ManagesInbox
         $this->dispatch('notification-received');
     }
 
+    public function unsnooze(string $id): void
+    {
+        app(Inbox::class)->unsnooze(auth()->user(), $id);
+        $this->dispatch('notification-received');
+    }
+
     /**
      * Run a one-click action offered inside a notification (see QuickActions).
+     * The notification is read only when the action actually went through;
+     * a refused or outdated action leaves it for the person to open.
      */
     public function runQuickAction(string $id, string $type): void
     {
@@ -58,7 +66,7 @@ trait ManagesInbox
 
         $result = app(QuickActions::class)->run($user, $notification, $type);
 
-        if ($type !== 'alert.snooze') {
+        if ($result['ok'] && $type !== 'alert.snooze') {
             app(Inbox::class)->markRead($user, $id);
         }
 

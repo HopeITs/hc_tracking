@@ -43,6 +43,11 @@ return [
             ],
             'client_options' => [
                 // Guzzle client options: https://docs.guzzlephp.org/en/stable/request-options.html
+                // Notifications are pushed inline from queued jobs
+                // (NotificationPushed is ShouldBroadcastNow): an unreachable
+                // Reverb must fail fast, not hold every fan-out for 30s.
+                'connect_timeout' => 2,
+                'timeout' => 5,
             ],
         ],
 

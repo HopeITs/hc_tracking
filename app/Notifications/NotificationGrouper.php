@@ -11,10 +11,13 @@ use App\Models\UserNotification;
 /**
  * Merge-or-create: an unread notification for the same actor and record,
  * touched within the grouping window, absorbs the new event instead of a new
- * row appearing. The loudest event's sentence stays the headline.
+ * row appearing. The loudest event's sentence stays the headline. A snoozed
+ * row never absorbs anything: the new event would be hidden until it wakes.
  */
 final class NotificationGrouper
 {
+    public function __construct(private NotificationPresenter $presenter) {}
+
     /**
      * @return array{0: UserNotification, 1: bool} the row, and whether it was merged
      */
@@ -24,6 +27,7 @@ final class NotificationGrouper
             ->forUser($user)
             ->where('group_key', $payload->groupKey)
             ->whereNull('read_at')
+            ->whereNull('snoozed_until')
             ->where('created_at', '>=', now()->subMinutes((int) config('notifications.grouping_window_minutes')))
             ->latest()
             ->first();
@@ -32,19 +36,22 @@ final class NotificationGrouper
             return [$this->merge($existing, $payload), true];
         }
 
+        $data = [
+            'key' => $payload->key,
+            'params' => $payload->params,
+            'count' => 1,
+            'activity_ids' => $payload->activityId === null ? [] : [$payload->activityId],
+            'link' => $payload->link,
+            'actions' => $payload->actions,
+        ];
+
         return [UserNotification::query()->create([
             'id' => $id,
             'type' => AppNotification::class,
             'notifiable_type' => $user->getMorphClass(),
             'notifiable_id' => $user->getKey(),
-            'data' => [
-                'key' => $payload->key,
-                'params' => $payload->params,
-                'count' => 1,
-                'activity_ids' => $payload->activityId === null ? [] : [$payload->activityId],
-                'link' => $payload->link,
-                'actions' => $payload->actions,
-            ],
+            'data' => $data,
+            'search_text' => $this->presenter->searchText($data),
             'priority' => $payload->priority,
             'module' => $payload->module,
             'kind' => $payload->kind,
@@ -71,6 +78,7 @@ final class NotificationGrouper
 
         $existing->forceFill([
             'data' => $data,
+            'search_text' => $this->presenter->searchText($data),
             'priority' => NotificationPriority::highest($existing->priority, $payload->priority),
             'activity_id' => $payload->activityId ?? $existing->activity_id,
             'created_at' => now(),

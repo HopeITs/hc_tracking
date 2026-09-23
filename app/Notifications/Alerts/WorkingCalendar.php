@@ -82,9 +82,21 @@ final class WorkingCalendar
         return $day;
     }
 
+    /**
+     * Weeks always start on Monday here (ISO), whatever the reader's locale:
+     * Carbon's locale-dependent default starts an Arabic week on Saturday.
+     */
     public function firstWorkingDayOfNextWeek(CarbonInterface $now): CarbonImmutable
     {
-        return $this->firstWorkingDayOnOrAfter(CarbonImmutable::parse($now)->startOfWeek()->addWeek());
+        return $this->firstWorkingDayOnOrAfter($this->startOfIsoWeek($now)->addWeek());
+    }
+
+    /**
+     * The Monday that starts the ISO week containing the day.
+     */
+    public function startOfIsoWeek(CarbonInterface $day): CarbonImmutable
+    {
+        return CarbonImmutable::parse($day)->startOfWeek(CarbonInterface::MONDAY);
     }
 
     /**

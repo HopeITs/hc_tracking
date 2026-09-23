@@ -147,7 +147,7 @@ class TransfersTracking extends Model implements TracksActivity
     public function activityLabel(): string
     {
         return DonorProposal::labelFor($this->activityAttribute('donor_proposal_id'))
-            .' · '.$this->activityAttribute('payment_amount').' '.$this->getRawOriginal('amount_transfered_currency', $this->getAttributes()['amount_transfered_currency'] ?? '');
+            .' · '.number_format((float) $this->activityAttribute('payment_amount'), 2).' '.$this->getRawOriginal('amount_transfered_currency', $this->getAttributes()['amount_transfered_currency'] ?? '');
     }
 
     public function activityProgramId(): ?int
