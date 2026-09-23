@@ -79,6 +79,7 @@ return [
     'previous_file' => 'Previous file',
     'priority' => 'Priority',
     'progress' => 'Progress',
+    'progress_complete_but_status_is' => '100% done, but the status is still :status',
     'remove_assignee_name' => 'Remove :name',
     'progress_2' => 'Progress %',
     'progress_cannot_be_negative' => 'Progress cannot be negative.',

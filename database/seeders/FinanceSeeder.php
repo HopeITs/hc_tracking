@@ -25,9 +25,9 @@ class FinanceSeeder extends Seeder
      */
     public function run(): void
     {
-        $operations = Account::factory()->create(['name' => 'Operations USD']);
-        Account::factory()->create(['name' => 'Programmes EUR']);
-        Account::factory()->closed()->create(['name' => 'Legacy USD']);
+        $operations = Account::factory()->create(['account_name' => 'Operations USD']);
+        Account::factory()->create(['account_name' => 'Programmes EUR']);
+        Account::factory()->closed()->create(['account_name' => 'Legacy USD']);
 
         DonorProposal::query()->each(function (DonorProposal $agreement) use ($operations): void {
             DonorReport::factory()->submitted()->create([

@@ -95,7 +95,7 @@ trait ManagesTransferForm
     #[Computed]
     public function accountOptions(): Collection
     {
-        return Account::query()->select(['id', 'name', 'is_active'])->orderBy('name')->orderBy('id')->get();
+        return Account::query()->select(['id', 'account_name', 'is_active'])->orderBy('account_name')->orderBy('id')->get();
     }
 
     /** @return Collection<int, DonorProposal> */

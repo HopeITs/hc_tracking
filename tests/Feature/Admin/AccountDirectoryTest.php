@@ -13,8 +13,8 @@ test('guests are redirected from the account directory', function () {
 test('accounts can be filtered by open and closed state', function () {
     $user = User::factory()->create();
 
-    Account::factory()->create(['name' => 'Operations USD', 'is_active' => true]);
-    Account::factory()->create(['name' => 'Legacy EUR', 'is_active' => false, 'closed_at' => '2026-01-31']);
+    Account::factory()->create(['account_name' => 'Operations USD', 'is_active' => true]);
+    Account::factory()->create(['account_name' => 'Legacy EUR', 'is_active' => false, 'closed_at' => '2026-01-31']);
 
     Livewire::actingAs($user)
         ->test('pages::admin.accounts')
@@ -35,27 +35,53 @@ test('an account can be opened', function () {
     Livewire::actingAs($user)
         ->test('pages::admin.accounts')
         ->call('openCreateModal')
-        ->set('name', '  Reserve SYP  ')
+        ->set('accountName', '  Reserve SYP  ')
+        ->set('bankName', 'Fransbank')
+        ->set('currency', 'SYP')
+        ->set('accountNumber', '21.13.0000803.11')
+        ->set('country', 'Syria')
         ->set('openedAt', '2026-02-01')
         ->call('saveAccount')
         ->assertHasNoErrors();
 
-    $account = Account::query()->where('name', 'Reserve SYP')->sole();
+    $account = Account::query()->where('account_name', 'Reserve SYP')->sole();
 
     expect($account->is_active)->toBeTrue()
-        ->and($account->closed_at)->toBeNull();
+        ->and($account->closed_at)->toBeNull()
+        ->and($account->bank_name)->toBe('Fransbank');
 });
 
-test('opening an account requires a name and an opening date', function () {
+test('an account can be opened with no known opening date', function () {
     $user = User::factory()->create();
 
     Livewire::actingAs($user)
         ->test('pages::admin.accounts')
         ->call('openCreateModal')
-        ->set('name', '')
-        ->set('openedAt', '')
+        ->set('accountName', 'Cash Account')
+        ->set('bankName', 'Cash')
+        ->set('currency', 'USD')
+        ->set('accountNumber', 'CASH-USD-01')
+        ->set('country', 'Syria')
         ->call('saveAccount')
-        ->assertHasErrors(['name', 'openedAt']);
+        ->assertHasNoErrors();
+
+    $account = Account::query()->where('account_name', 'Cash Account')->sole();
+
+    expect($account->opened_at)->toBeNull();
+});
+
+test('opening an account requires the core banking fields', function () {
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::admin.accounts')
+        ->call('openCreateModal')
+        ->set('accountName', '')
+        ->set('bankName', '')
+        ->set('accountNumber', '')
+        ->set('country', '')
+        ->call('saveAccount')
+        ->assertHasErrors(['accountName', 'bankName', 'accountNumber', 'country']);
 });
 
 test('closing an account sets both the flag and the date together', function () {

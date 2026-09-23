@@ -376,7 +376,7 @@ test('agreement detail lists its tranches and totals received per currency', fun
         'budget' => '500000.00',
         'currency' => Currency::Usd,
     ]);
-    $account = Account::factory()->create(['name' => 'Operations USD']);
+    $account = Account::factory()->create(['account_name' => 'Operations USD']);
 
     TransfersTracking::factory()->create([
         'donor_proposal_id' => $agreement->id,

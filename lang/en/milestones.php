@@ -6,6 +6,7 @@ return [
     'actual_end_date' => 'Actual end date',
     'actual_start_date' => 'Actual start date',
     'add_a_milestone_nested_under_this_one' => 'Add a milestone nested under this one.',
+    'add_a_task_linked_to_this_milestone' => 'Add a task linked to this milestone.',
     'add_milestone' => 'Add milestone',
     'add_milestone_to_project' => 'Add a milestone to :name',
     'add_related_milestone' => 'Add related milestone',

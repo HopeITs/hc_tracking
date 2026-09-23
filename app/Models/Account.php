@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Concerns\RecordsActivity;
+use App\Enums\Currency;
 use App\Notifications\TracksActivity;
 use Carbon\CarbonImmutable;
 use Database\Factories\AccountFactory;
@@ -24,15 +25,43 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * must go through isUsable(), the active scope or close() rather than reading
  * either column directly, so the two can never be interpreted apart.
  *
+ * `po_box_street` is the bank's own branch address (the same value repeats
+ * across every account held at that branch); `company_address` is the
+ * account holder company's own registered address, when it differs from the
+ * organisation's own — kept separate rather than folded together.
+ *
  * @property int $id
- * @property string $name
- * @property CarbonImmutable $opened_at
+ * @property string $account_name
+ * @property string $bank_name
+ * @property Currency $currency
+ * @property string|null $authorized_person
+ * @property string $account_number
+ * @property string|null $iban
+ * @property string|null $swift_code
+ * @property string $country
+ * @property string|null $po_box_street
+ * @property string|null $company_address
+ * @property CarbonImmutable|null $opened_at
  * @property CarbonImmutable|null $closed_at
  * @property bool $is_active
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['name', 'opened_at', 'closed_at', 'is_active'])]
+#[Fillable([
+    'account_name',
+    'bank_name',
+    'currency',
+    'authorized_person',
+    'account_number',
+    'iban',
+    'swift_code',
+    'country',
+    'po_box_street',
+    'company_address',
+    'opened_at',
+    'closed_at',
+    'is_active',
+])]
 class Account extends Model implements TracksActivity
 {
     /** @use HasFactory<AccountFactory> */
@@ -100,6 +129,7 @@ class Account extends Model implements TracksActivity
     protected function casts(): array
     {
         return [
+            'currency' => Currency::class,
             'opened_at' => 'date',
             'closed_at' => 'date',
             'is_active' => 'boolean',
@@ -113,7 +143,7 @@ class Account extends Model implements TracksActivity
 
     public function activityLabel(): string
     {
-        return (string) $this->activityAttribute('name');
+        return (string) $this->activityAttribute('account_name');
     }
 
     public function activityProgramId(): ?int
@@ -126,7 +156,7 @@ class Account extends Model implements TracksActivity
      */
     public function activityEvents(): array
     {
-        return ['is_active' => 'closed', 'name' => 'updated'];
+        return ['is_active' => 'closed', 'account_name' => 'updated'];
     }
 
     /**

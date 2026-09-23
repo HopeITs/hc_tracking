@@ -79,6 +79,7 @@ return [
     'previous_file' => 'الملف السابق',
     'priority' => 'الأولوية',
     'progress' => 'التقدم',
+    'progress_complete_but_status_is' => 'مكتملة بنسبة 100%، لكن حالتها ما زالت :status',
     'remove_assignee_name' => 'إزالة :name',
     'progress_2' => 'التقدم %',
     'progress_cannot_be_negative' => 'لا يمكن أن يكون التقدم سالبًا.',
