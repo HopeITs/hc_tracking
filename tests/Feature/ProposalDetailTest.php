@@ -404,6 +404,43 @@ test('each tab shows only its own content and the strip counts its records', fun
         ->assertDontSeeText('UNICEF');
 });
 
+test('a task can be added from the proposal show page pre-filled with this proposal', function () {
+    $user = User::factory()->role('Financial')->create();
+    $assignee = insertHrEmployee();
+    $proposal = Proposal::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::proposals.show', ['proposal' => $proposal])
+        ->set('tab', 'tasks')
+        ->call('openAddTaskModal')
+        ->assertSet('showAddTaskModal', true)
+        ->set('newTaskTitle', '  Draft the budget narrative  ')
+        ->set('newTaskAssignedTo', [(string) $assignee])
+        ->call('addTask')
+        ->assertHasNoErrors()
+        ->assertSet('showAddTaskModal', false);
+
+    $task = Task::query()->where('title', 'Draft the budget narrative')->sole();
+
+    expect($task->source_type)->toBe('proposal')
+        ->and($task->source_id)->toBe($proposal->id)
+        ->and($task->taskAssignees->pluck('employee_id')->all())->toBe([$assignee]);
+});
+
+test('adding a task from the proposal show page requires a title and an assignee', function () {
+    $user = User::factory()->role('Financial')->create();
+    $proposal = Proposal::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::proposals.show', ['proposal' => $proposal])
+        ->set('tab', 'tasks')
+        ->call('openAddTaskModal')
+        ->set('newTaskTitle', '   ')
+        ->set('newTaskAssignedTo', [])
+        ->call('addTask')
+        ->assertHasErrors(['newTaskTitle', 'newTaskAssignedTo']);
+});
+
 test('the arrivals climb accumulates only received tranches, in the order they landed', function () {
     $user = User::factory()->role('Financial')->create();
     $proposal = Proposal::factory()->create([
