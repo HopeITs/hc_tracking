@@ -91,6 +91,12 @@ new #[Title('titles.tasks')] class extends Component
     #[Url(except: '')]
     public string $month = '';
 
+    #[Url(except: '')]
+    public string $anchorDate = '';
+
+    #[Url(as: 'period', except: 'month')]
+    public string $viewMode = 'month';
+
     public bool $showTaskDrawer = false;
 
     public ?int $editingTaskId = null;
@@ -270,6 +276,74 @@ new #[Title('titles.tasks')] class extends Component
     public function goToToday(): void
     {
         $this->month = '';
+        $this->anchorDate = '';
+    }
+
+    /**
+     * Switch between the month grid and the ClickUp-style day/4-days/week
+     * time-grid views, mirroring the "My Calendar" page. Only the four
+     * values below are valid view modes; any other value (e.g. a stale
+     * bookmarked URL) is silently ignored so the component falls back to
+     * whatever $viewMode already holds.
+     */
+    public function setViewMode(string $viewMode): void
+    {
+        if (! in_array($viewMode, ['day', 'four_days', 'week', 'month'], true)) {
+            return;
+        }
+
+        $this->viewMode = $viewMode;
+    }
+
+    public function previousPeriod(): void
+    {
+        $this->anchorDate = $this->activeAnchor()->subDays($this->periodLengthInDays())->format('Y-m-d');
+    }
+
+    public function nextPeriod(): void
+    {
+        $this->anchorDate = $this->activeAnchor()->addDays($this->periodLengthInDays())->format('Y-m-d');
+    }
+
+    protected function periodLengthInDays(): int
+    {
+        return match ($this->viewMode) {
+            'day' => 1,
+            'four_days' => 4,
+            'week' => 7,
+            default => 1,
+        };
+    }
+
+    protected function activeAnchor(): CarbonImmutable
+    {
+        if ($this->anchorDate !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $this->anchorDate) === 1) {
+            $parsed = CarbonImmutable::createFromFormat('Y-m-d', $this->anchorDate);
+
+            if ($parsed !== false) {
+                return $parsed->startOfDay();
+            }
+        }
+
+        return CarbonImmutable::now()->startOfDay();
+    }
+
+    /**
+     * The visible days for the day/4-days/week views. Week always starts on
+     * the anchor's Sunday, so navigating never lands mid-week.
+     *
+     * @return array<int, CarbonImmutable>
+     */
+    protected function periodDays(): array
+    {
+        $anchor = $this->viewMode === 'week'
+            ? $this->activeAnchor()->startOfWeek(CarbonImmutable::SUNDAY)
+            : $this->activeAnchor();
+
+        return array_map(
+            fn (int $i): CarbonImmutable => $anchor->addDays($i),
+            range(0, $this->periodLengthInDays() - 1),
+        );
     }
 
     protected function activeMonth(): CarbonImmutable
@@ -529,7 +603,7 @@ new #[Title('titles.tasks')] class extends Component
         $employeeId = $user->employee_id;
 
         return Task::query()
-            ->select(['id', 'title', 'status', 'priority', 'due_date'])
+            ->select(['id', 'title', 'status', 'priority', 'due_date', 'created_by'])
             ->whereNull('parent_task_id')
             ->where(fn (Builder $query) => $query
                 ->when($employeeId !== null, fn (Builder $query) => $query->orWhereHas(
@@ -545,28 +619,42 @@ new #[Title('titles.tasks')] class extends Component
     }
 
     /**
-     * The month grid for the calendar view, built from the same filtered
+     * The calendar grid for the calendar view, built from the same filtered
      * tasks as the other views. Tasks without a due date are returned
-     * separately for the "unscheduled" panel.
+     * separately for the "unscheduled" panel. In month view, full weeks
+     * covering the active month (padded with the tail of adjacent months).
+     * In day/4-days/week view, the plain list of visible days instead —
+     * `weeks` is null then and `days` is populated, and vice versa in month
+     * view.
      *
-     * @return array{month: CarbonImmutable, weeks: array<int, array<int, CarbonImmutable>>, tasksByDay: Collection<string, EloquentCollection<int, Task>>, unscheduled: EloquentCollection<int, Task>}
+     * @return array{month: CarbonImmutable, weeks: ?array<int, array<int, CarbonImmutable>>, days: ?array<int, CarbonImmutable>, tasksByDay: Collection<string, EloquentCollection<int, Task>>, unscheduled: EloquentCollection<int, Task>}
      */
     #[Computed]
     public function calendarGrid(): array
     {
-        $month = $this->activeMonth();
-        $gridStart = $month->startOfWeek(CarbonImmutable::SUNDAY);
-        $gridEnd = $month->endOfMonth()->endOfWeek(CarbonImmutable::SATURDAY);
+        if ($this->viewMode === 'month') {
+            $month = $this->activeMonth();
+            $gridStart = $month->startOfWeek(CarbonImmutable::SUNDAY);
+            $gridEnd = $month->endOfMonth()->endOfWeek(CarbonImmutable::SATURDAY);
 
-        $weeks = [];
-        $cursor = $gridStart;
-        while ($cursor->lte($gridEnd)) {
-            $week = [];
-            for ($i = 0; $i < 7; $i++) {
-                $week[] = $cursor;
-                $cursor = $cursor->addDay();
+            $weeks = [];
+            $cursor = $gridStart;
+            while ($cursor->lte($gridEnd)) {
+                $week = [];
+                for ($i = 0; $i < 7; $i++) {
+                    $week[] = $cursor;
+                    $cursor = $cursor->addDay();
+                }
+                $weeks[] = $week;
             }
-            $weeks[] = $week;
+
+            $days = null;
+        } else {
+            $days = $this->periodDays();
+            $month = $days[0];
+            $gridStart = $days[0];
+            $gridEnd = end($days);
+            $weeks = null;
         }
 
         $tasks = $this->boardTasks;
@@ -580,6 +668,7 @@ new #[Title('titles.tasks')] class extends Component
         return [
             'month' => $month,
             'weeks' => $weeks,
+            'days' => $days,
             'tasksByDay' => $tasksByDay,
             'unscheduled' => $unscheduled,
         ];
@@ -1382,27 +1471,48 @@ new #[Title('titles.tasks')] class extends Component
         </button>
     </div>
 
-    @if ($this->myTasksPreview->isNotEmpty())
-        <div class="flex flex-col gap-3 rounded-2xl border border-secondary-soft bg-secondary-soft/20 p-4 dark:border-secondary-medium dark:bg-secondary-medium/10" data-test="my-tasks-rail">
-            <div class="flex items-center justify-between gap-3">
-                <div class="flex items-center gap-2">
-                    <flux:icon name="user-circle" variant="micro" class="size-5 text-primary" aria-hidden="true" />
-                    <h2 class="text-sm font-bold text-secondary-dark dark:text-white">{{ __('tasks.my_tasks') }}</h2>
-                </div>
+    <div class="flex flex-col gap-3 rounded-2xl border border-secondary-soft bg-secondary-soft/20 p-4 dark:border-secondary-medium dark:bg-secondary-medium/10" data-test="my-tasks-rail">
+        <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+                <flux:icon name="user-circle" variant="micro" class="size-5 text-primary" aria-hidden="true" />
+                <h2 class="text-sm font-bold text-secondary-dark dark:text-white">{{ __('tasks.my_tasks') }}</h2>
+            </div>
+            @if ($this->myTasksPreview->isNotEmpty())
                 <button type="button" wire:click="$set('myTasksOnly', {{ $myTasksOnly ? 'false' : 'true' }})" class="text-xs font-semibold text-primary hover:underline" data-test="my-tasks-view-all">
                     {{ $myTasksOnly ? __('tasks.showing_my_tasks_only') : __('tasks.view_all') }}
                 </button>
-            </div>
+            @endif
+        </div>
+        @if ($this->myTasksPreview->isNotEmpty())
+            @php $viewerEmployeeId = auth()->user()->employee_id; @endphp
             <div class="flex gap-3 overflow-x-auto pb-1">
                 @foreach ($this->myTasksPreview as $myTask)
+                    @php $isAssignedToMe = $viewerEmployeeId !== null && $myTask->taskAssignees->pluck('employee_id')->contains($viewerEmployeeId); @endphp
                     <button
                         type="button"
                         wire:click="openEditDrawer({{ $myTask->id }})"
                         wire:key="my-task-{{ $myTask->id }}"
                         data-test="my-task-card-{{ $myTask->id }}"
-                        class="flex w-56 shrink-0 flex-col gap-2 rounded-xl border border-secondary-soft bg-white p-3 text-left shadow-sm transition-shadow hover:shadow-md dark:border-secondary-medium dark:bg-secondary-dark"
+                        @class([
+                            'flex w-56 shrink-0 flex-col gap-2 rounded-xl border p-3 text-left shadow-sm transition-shadow hover:shadow-md dark:bg-secondary-dark',
+                            'border-primary/30 bg-white dark:border-status-critical/30' => $isAssignedToMe,
+                            'border-dashed border-secondary-light bg-secondary-soft/30 dark:border-secondary-medium dark:bg-secondary-medium/10' => ! $isAssignedToMe,
+                        ])
                     >
-                        <x-ui.status-pill :case="$myTask->status" class="self-start" />
+                        <div class="flex items-center justify-between gap-2">
+                            <x-ui.status-pill :case="$myTask->status" />
+                            @if ($isAssignedToMe)
+                                <span class="inline-flex shrink-0 items-center gap-1 text-[10px] font-bold text-primary dark:text-status-critical" data-test="my-task-role-assigned-{{ $myTask->id }}">
+                                    <flux:icon.user variant="micro" class="size-3" aria-hidden="true" />
+                                    {{ __('tasks.assigned_to_you') }}
+                                </span>
+                            @else
+                                <span class="inline-flex shrink-0 items-center gap-1 text-[10px] font-semibold text-secondary-medium dark:text-secondary-soft" data-test="my-task-role-delegated-{{ $myTask->id }}">
+                                    <flux:icon.paper-airplane variant="micro" class="size-3" aria-hidden="true" />
+                                    {{ __('tasks.you_assigned') }}
+                                </span>
+                            @endif
+                        </div>
                         <p class="truncate text-sm font-semibold text-secondary-dark dark:text-white">{{ $myTask->title }}</p>
                         <div class="flex items-center justify-between text-xs text-secondary-medium dark:text-secondary-soft">
                             <span @class(['font-semibold text-status-critical' => $myTask->due_date !== null && $myTask->due_date->isPast() && $myTask->status !== TaskStatus::Done])>
@@ -1413,8 +1523,10 @@ new #[Title('titles.tasks')] class extends Component
                     </button>
                 @endforeach
             </div>
-        </div>
-    @endif
+        @else
+            <p class="text-sm text-secondary-medium dark:text-secondary-soft" data-test="my-tasks-empty">{{ __('common.no_tasks_yet') }}</p>
+        @endif
+    </div>
 
     <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="inline-flex flex-wrap gap-1 rounded-lg border border-secondary-soft bg-secondary-soft/40 p-1 dark:border-secondary-medium dark:bg-secondary-medium/40" role="group" aria-label="{{ __('tasks.view') }}">
