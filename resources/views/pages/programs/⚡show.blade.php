@@ -4,6 +4,9 @@ use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\ReportStatus;
 use App\Enums\ResultType;
+use App\Enums\TaskPriority;
+use App\Enums\TaskStatus;
+use App\Models\HrEmployee;
 use App\Models\Milestone;
 use App\Models\PlanIndicator;
 use App\Models\Program;
@@ -12,9 +15,16 @@ use App\Models\Report;
 use App\Models\Result;
 use App\Models\Risk;
 use App\Models\AnnualPlan;
+use App\Models\Task;
 use Carbon\CarbonImmutable;
+use Flux\Flux;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -34,6 +44,19 @@ new #[Title('titles.program')] class extends Component {
 
     #[Url(except: '')]
     public string $projectStatus = '';
+
+    public bool $showAddTaskModal = false;
+
+    public string $newTaskTitle = '';
+
+    public string $newTaskStatus = 'todo';
+
+    public string $newTaskPriority = 'medium';
+
+    public string $newTaskDueDate = '';
+
+    /** @var array<int, string> */
+    public array $newTaskAssignedTo = [];
 
     public function mount(Program $program): void
     {
@@ -350,6 +373,142 @@ new #[Title('titles.program')] class extends Component {
         ];
     }
 
+    /**
+     * Every project under this program, unpaginated and unfiltered — used to
+     * name and group tasks on the Tasks tab, distinct from {@see projects()}
+     * which is the paginated, search/status-filtered delivery timeline.
+     *
+     * @return Collection<int, Project>
+     */
+    #[Computed]
+    public function allProjects(): Collection
+    {
+        return Project::query()
+            ->select(['id', 'name'])
+            ->where('program_id', $this->programId)
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
+     * Tasks reachable from this program: raised straight against the
+     * program, against one of its projects, or against a milestone belonging
+     * to one of those projects.
+     *
+     * @return Collection<int, Task>
+     */
+    #[Computed]
+    public function tasks(): Collection
+    {
+        $projectIds = $this->allProjects->modelKeys();
+        $milestoneIds = Milestone::query()->whereIn('project_id', $projectIds)->pluck('id');
+
+        return Task::query()
+            ->select(['id', 'source_type', 'source_id', 'title', 'status', 'priority', 'due_date', 'progress_percentage'])
+            ->with([
+                'taskAssignees.employee:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
+                'source' => fn (MorphTo $morphTo) => $morphTo->morphWith([Milestone::class => ['project:id']]),
+            ])
+            ->where(fn (Builder $query) => $query
+                ->where(fn (Builder $query) => $query->where('source_type', 'program')->where('source_id', $this->programId))
+                ->orWhere(fn (Builder $query) => $query->where('source_type', 'project')->whereIn('source_id', $projectIds))
+                ->orWhere(fn (Builder $query) => $query->where('source_type', 'milestone')->whereIn('source_id', $milestoneIds)))
+            ->orderByRaw('due_date is null, due_date')
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
+     * The project a task lands on, for grouping on the Tasks tab: a
+     * project-sourced task names itself, a milestone-sourced task names its
+     * milestone's project. A program-direct task has no project and groups
+     * separately.
+     */
+    public function taskProjectId(Task $task): ?int
+    {
+        return match ($task->source_type) {
+            'project' => $task->source_id,
+            'milestone' => $task->source?->project_id,
+            default => null,
+        };
+    }
+
+    /** @return Collection<int, HrEmployee> */
+    #[Computed]
+    public function userOptions(): Collection
+    {
+        return HrEmployee::pickerOptions();
+    }
+
+    public function openAddTaskModal(): void
+    {
+        $this->resetValidation();
+        $this->newTaskTitle = '';
+        $this->newTaskStatus = TaskStatus::Todo->value;
+        $this->newTaskPriority = TaskPriority::Medium->value;
+        $this->newTaskDueDate = '';
+        $this->newTaskAssignedTo = [];
+        $this->showAddTaskModal = true;
+    }
+
+    public function closeAddTaskModal(): void
+    {
+        $this->showAddTaskModal = false;
+    }
+
+    /**
+     * Raise a task straight against this program — the source is always this
+     * program, never one of its projects or milestones: a task tied to a
+     * project's or milestone's own delivery is added from that record's page
+     * instead.
+     */
+    public function addTask(): void
+    {
+        $this->newTaskTitle = trim($this->newTaskTitle);
+
+        $validated = $this->validate([
+            'newTaskTitle' => ['required', 'string', 'max:255'],
+            'newTaskStatus' => ['required', new Enum(TaskStatus::class)],
+            'newTaskPriority' => ['required', new Enum(TaskPriority::class)],
+            'newTaskDueDate' => ['nullable', 'date'],
+            'newTaskAssignedTo' => ['required', 'array', 'min:1'],
+            'newTaskAssignedTo.*' => ['integer', Rule::exists(HrEmployee::class, 'id')],
+        ], [
+            'newTaskTitle.required' => __('tasks.enter_a_task_title'),
+            'newTaskAssignedTo.required' => __('tasks.assign_this_task_to_someone'),
+            'newTaskAssignedTo.min' => __('tasks.assign_this_task_to_someone'),
+            'newTaskAssignedTo.*.exists' => __('tasks.the_selected_assignee_is_no_longer_available'),
+        ]);
+
+        $programId = $this->programId;
+        $statusCase = TaskStatus::from($validated['newTaskStatus']);
+        $employeeIds = collect($validated['newTaskAssignedTo'])->map(fn ($id): int => (int) $id)->unique()->values();
+
+        DB::transaction(function () use ($programId, $validated, $statusCase, $employeeIds): void {
+            $task = Task::query()->create([
+                'source_type' => 'program',
+                'source_id' => $programId,
+                'title' => $validated['newTaskTitle'],
+                'status' => $statusCase,
+                'priority' => $validated['newTaskPriority'],
+                'due_date' => $validated['newTaskDueDate'] === '' ? null : $validated['newTaskDueDate'],
+                'progress_percentage' => $statusCase === TaskStatus::Done ? 100 : 0,
+                'completed_date' => $statusCase === TaskStatus::Done ? CarbonImmutable::today() : null,
+                'created_by' => (int) auth()->id(),
+            ]);
+
+            foreach ($employeeIds as $employeeId) {
+                $task->taskAssignees()->create(['employee_id' => $employeeId]);
+            }
+        });
+
+        $this->showAddTaskModal = false;
+        unset($this->tasks);
+
+        Flux::toast(variant: 'success', text: __('tasks.task_created'));
+    }
+
     /** @return array<int, array{label: string, count: int, tone: string}> */
     #[Computed]
     public function projectStatusSegments(): array
@@ -379,6 +538,7 @@ new #[Title('titles.program')] class extends Component {
     {
         return [
             ['key' => 'projects', 'label' => __('common.projects'), 'count' => $this->program->projects_count, 'icon' => 'rectangle-stack'],
+            ['key' => 'tasks', 'label' => __('common.tasks'), 'count' => $this->tasks->count(), 'icon' => 'clipboard-document-list'],
             ['key' => 'plans', 'label' => __('programs.annual_plans'), 'count' => $this->program->annual_plans_count, 'icon' => 'calendar-days'],
             ['key' => 'results', 'label' => __('programs.results'), 'count' => $this->program->results_count, 'icon' => 'chart-bar'],
         ];
@@ -486,9 +646,190 @@ new #[Title('titles.program')] class extends Component {
             :search="$projectSearch"
             :status="$projectStatus"
         />
+    @elseif ($tab === 'tasks')
+        <x-ui.panel :title="__('common.tasks')" :count="$this->tasks->count()" :subtitle="__('programs.tasks_across_the_program_its_projects_and_their_milestones')">
+            <x-slot:toolbar>
+                <x-ui.button tone="primary" size="sm" icon="plus" wire:click="openAddTaskModal" data-test="add-program-task-button">{{ __('tasks.add_task') }}</x-ui.button>
+            </x-slot:toolbar>
+
+            @if ($this->tasks->isEmpty())
+                <x-ui.empty-state icon="clipboard-document-list" :heading="__('common.no_tasks_yet')" :body="__('programs.tasks_for_this_program_will_appear_here')">
+                    <x-slot:action>
+                        <x-ui.button size="sm" tone="primary" icon="plus" wire:click="openAddTaskModal">{{ __('tasks.add_task') }}</x-ui.button>
+                    </x-slot:action>
+                </x-ui.empty-state>
+            @else
+                @php
+                    $taskDone = $this->tasks->where('status', TaskStatus::Done)->count();
+                    $taskTotal = $this->tasks->count();
+                    $taskOverdue = $this->tasks->filter(fn (Task $task): bool => $task->status !== TaskStatus::Done && $task->due_date !== null && $task->due_date->lt(today()))->count();
+                    $taskUnassigned = $this->tasks->filter(fn (Task $task): bool => $task->taskAssignees->isEmpty())->count();
+                    $taskInkText = 'text-secondary-dark dark:text-white';
+                    $taskMutedText = 'text-secondary-medium dark:text-secondary-soft';
+
+                    $ordered = $this->tasks->sortBy([
+                        fn (Task $a, Task $b): int => ($a->status === TaskStatus::Done) <=> ($b->status === TaskStatus::Done),
+                        fn (Task $a, Task $b): int => ($a->due_date === null) <=> ($b->due_date === null),
+                        fn (Task $a, Task $b): int => ($a->due_date?->getTimestamp() ?? 0) <=> ($b->due_date?->getTimestamp() ?? 0),
+                        fn (Task $a, Task $b): int => $a->id <=> $b->id,
+                    ]);
+                    $taskGroups = $this->allProjects
+                        ->map(fn (Project $project): array => [
+                            'project' => $project,
+                            'tasks' => $ordered->filter(fn (Task $task): bool => $this->taskProjectId($task) === $project->id)->values(),
+                        ])
+                        ->filter(fn (array $group): bool => $group['tasks']->isNotEmpty())
+                        ->values();
+                    $looseTasks = $ordered->filter(fn (Task $task): bool => $this->taskProjectId($task) === null)->values();
+                @endphp
+
+                <div class="grid gap-3 border-b border-secondary-soft p-3.5 @lg/detail:grid-cols-3 dark:border-secondary-medium">
+                    <x-ui.stat-tile :label="__('programs.stat_tasks_done')" :value="$taskDone" :denominator="$taskTotal" />
+                    <x-ui.stat-tile :label="__('tasks.overdue')" :value="$taskOverdue" :tone="$taskOverdue > 0 ? 'warn' : null" />
+                    <x-ui.stat-tile :label="__('common.unassigned')" :value="$taskUnassigned" />
+                </div>
+
+                <div class="hidden grid-cols-[1.25rem_minmax(0,1fr)_11rem_6rem_7.5rem_8rem_7rem] gap-x-4 px-3.5 pt-4 @3xl/detail:grid" aria-hidden="true">
+                    <span></span>
+                    @foreach ([__('tasks.task'), __('tasks.assignee'), __('tasks.priority'), __('tasks.due'), __('tasks.progress'), __('common.status')] as $column)
+                        <span @class(['type-label', $taskMutedText, 'text-end' => $loop->last])>{{ $column }}</span>
+                    @endforeach
+                </div>
+
+                <div class="flex flex-col gap-8 px-3.5 pb-3.5 @6xl/detail:px-5 @6xl/detail:pb-5">
+                    @foreach ($taskGroups as $group)
+                        <section class="min-w-0" wire:key="program-task-group-{{ $group['project']->id }}">
+                            <header class="border-b border-secondary-soft pt-4 pb-3 dark:border-secondary-medium">
+                                <a href="{{ route('projects.show', $group['project']) }}" wire:navigate class="min-w-0 truncate text-base font-bold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary {{ $taskInkText }}">{{ $group['project']->name }}</a>
+                            </header>
+                            <ul class="divide-y divide-secondary-soft dark:divide-secondary-medium">
+                                @foreach ($group['tasks'] as $task)
+                                    @include('pages.programs._task-row', ['task' => $task, 'inkText' => $taskInkText, 'mutedText' => $taskMutedText])
+                                @endforeach
+                            </ul>
+                        </section>
+                    @endforeach
+
+                    @if ($looseTasks->isNotEmpty())
+                        <section class="min-w-0" data-loose-tasks>
+                            <header class="border-b border-secondary-soft pt-4 pb-3 dark:border-secondary-medium">
+                                <p class="text-base font-bold {{ $taskInkText }}">{{ __('programs.work_not_tied_to_a_project') }}</p>
+                            </header>
+                            <ul class="divide-y divide-secondary-soft dark:divide-secondary-medium">
+                                @foreach ($looseTasks as $task)
+                                    @include('pages.programs._task-row', ['task' => $task, 'inkText' => $taskInkText, 'mutedText' => $taskMutedText])
+                                @endforeach
+                            </ul>
+                        </section>
+                    @endif
+                </div>
+            @endif
+        </x-ui.panel>
     @elseif ($tab === 'plans')
         <x-ui.plan-years :slots="$this->planTimeline" :strategy="$this->program->strategy" />
     @else
         <x-ui.logframe :roots="$this->resultRoots" :summary="$this->resultSummary" />
     @endif
+
+    @php
+        $selectedNewTaskAssigneeOptions = $this->userOptions->whereIn('id', collect($newTaskAssignedTo)->map(fn ($id) => (int) $id));
+        $newTaskAssigneeTriggerLabel = match (true) {
+            $selectedNewTaskAssigneeOptions->isEmpty() => __('common.select'),
+            $selectedNewTaskAssigneeOptions->count() <= 2 => $selectedNewTaskAssigneeOptions->pluck('name')->implode(', '),
+            default => __('common.count_selected', ['count' => $selectedNewTaskAssigneeOptions->count()]),
+        };
+    @endphp
+
+    <flux:modal name="program-add-task-modal" wire:model="showAddTaskModal" wire:close="closeAddTaskModal" class="w-full max-w-2xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
+        <form wire:submit="addTask" class="flex flex-col gap-5">
+            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
+                <flux:heading size="lg">{{ __('tasks.add_task') }}</flux:heading>
+            </div>
+
+            <x-ui.input wire:model="newTaskTitle" :label="__('tasks.task_title')" type="text" maxlength="255" required autofocus data-test="new-program-task-title-input" />
+
+            <div class="grid gap-5 sm:grid-cols-2">
+                <div class="min-w-0">
+                    <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft" id="new-program-task-status-label">{{ __('common.status') }}</label>
+                    <div class="grid grid-cols-2 gap-1.5" role="radiogroup" aria-labelledby="new-program-task-status-label">
+                        @foreach (TaskStatus::cases() as $statusCase)
+                            @php $isNewTaskStatusSelected = $newTaskStatus === $statusCase->value; @endphp
+                            <button
+                                type="button"
+                                role="radio"
+                                aria-checked="{{ $isNewTaskStatusSelected ? 'true' : 'false' }}"
+                                wire:click="$set('newTaskStatus', '{{ $statusCase->value }}')"
+                                @class([
+                                    'inline-flex min-h-10 cursor-pointer touch-manipulation items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-semibold whitespace-nowrap transition-colors',
+                                    'border-secondary-dark bg-secondary-dark text-white dark:border-white dark:bg-white dark:text-secondary-dark' => $isNewTaskStatusSelected,
+                                    'border-secondary-light text-secondary-medium hover:border-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => ! $isNewTaskStatusSelected,
+                                ])
+                                data-test="new-program-task-status-{{ $statusCase->value }}"
+                            >
+                                {{ $statusCase->label() }}
+                            </button>
+                        @endforeach
+                    </div>
+                    <flux:error name="newTaskStatus" class="mt-1.5" />
+                </div>
+
+                <div class="min-w-0">
+                    <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft" id="new-program-task-priority-label">{{ __('tasks.priority') }}</label>
+                    <div class="grid grid-cols-3 gap-1.5" role="radiogroup" aria-labelledby="new-program-task-priority-label">
+                        @foreach (TaskPriority::cases() as $priorityCase)
+                            @php $isNewTaskPrioritySelected = $newTaskPriority === $priorityCase->value; @endphp
+                            <button
+                                type="button"
+                                role="radio"
+                                aria-checked="{{ $isNewTaskPrioritySelected ? 'true' : 'false' }}"
+                                wire:click="$set('newTaskPriority', '{{ $priorityCase->value }}')"
+                                @class([
+                                    'inline-flex min-h-10 cursor-pointer touch-manipulation items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-semibold whitespace-nowrap transition-colors',
+                                    'border-secondary-dark bg-secondary-dark text-white dark:border-secondary-medium dark:bg-secondary-medium' => $isNewTaskPrioritySelected,
+                                    'border-secondary-light text-secondary-medium hover:border-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => ! $isNewTaskPrioritySelected,
+                                ])
+                                data-test="new-program-task-priority-{{ $priorityCase->value }}"
+                            >
+                                {{ $priorityCase->label() }}
+                            </button>
+                        @endforeach
+                    </div>
+                    <flux:error name="newTaskPriority" class="mt-1.5" />
+                </div>
+            </div>
+
+            <div class="min-w-0">
+                <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('tasks.assignees') }}</label>
+                <x-ui.multi-select-popover
+                    :label="__('tasks.assignees')"
+                    target="[data-modal='program-add-task-modal']"
+                    class="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-secondary-light bg-white px-3 py-2 text-start text-sm dark:border-secondary-light dark:bg-secondary-medium"
+                    data-test="new-program-task-assignee-picker"
+                >
+                    <x-slot:trigger>
+                        <span class="min-w-0 truncate">{{ $newTaskAssigneeTriggerLabel }}</span>
+                        <flux:icon.chevron-up-down class="size-4 shrink-0 text-secondary-medium dark:text-secondary-soft" aria-hidden="true" />
+                    </x-slot:trigger>
+
+                    @foreach ($this->userOptions as $userOption)
+                        <label
+                            x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
+                            class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-secondary-soft dark:hover:bg-secondary-medium"
+                        >
+                            <input type="checkbox" wire:model.live="newTaskAssignedTo" value="{{ $userOption->id }}" class="rounded border-secondary-light text-primary focus:ring-primary" data-test="new-program-task-assignee-checkbox-{{ $userOption->id }}" />
+                            <span class="min-w-0 truncate">{{ $userOption->name }} · {{ $userOption->secondary_name }}</span>
+                        </label>
+                    @endforeach
+                </x-ui.multi-select-popover>
+                <flux:error name="newTaskAssignedTo" class="mt-1.5" />
+            </div>
+
+            <x-ui.input wire:model="newTaskDueDate" :label="__('tasks.due_date_2')" type="date" />
+
+            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
+                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="closeAddTaskModal">{{ __('common.cancel') }}</x-ui.button>
+                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" data-test="save-new-program-task-button">{{ __('tasks.add_task') }}</x-ui.button>
+            </div>
+        </form>
+    </flux:modal>
 </section>

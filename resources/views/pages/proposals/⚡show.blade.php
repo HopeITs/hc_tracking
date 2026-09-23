@@ -162,7 +162,7 @@ new #[Title('titles.proposal')] class extends Component {
         return DonorProposal::query()
             ->select(['id', 'donor_id', 'budget', 'currency', 'project_num', 'proposal_id'])
             ->where('proposal_id', $this->proposalId)
-            ->with(['donor:id,name', 'transfers.account:id,name'])
+            ->with(['donor:id,name', 'transfers.account:id,account_name'])
             ->orderBy('id')
             ->get();
     }
@@ -1944,7 +1944,7 @@ new #[Title('titles.proposal')] class extends Component {
                                                             <span>{{ __('common.unscheduled') }}</span>
                                                         @endif
                                                         <span aria-hidden="true">·</span>
-                                                        <span>{{ $transfer->account?->name ?? __('proposals.no_account_recorded') }}</span>
+                                                        <span>{{ $transfer->account?->account_name ?? __('proposals.no_account_recorded') }}</span>
                                                         @if ((float) $transfer->fees > 0)
                                                             <span aria-hidden="true">·</span>
                                                             <span>{{ __('proposals.fees_amount', ['amount' => $amount((float) $transfer->fees), 'currency' => $transfer->fees_currency?->value ?? $currency]) }}</span>

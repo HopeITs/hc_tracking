@@ -56,6 +56,44 @@ class CoreDataSeeder extends Seeder
             'GIZ' => ['type' => DonorType::Bilateral, 'country' => 'Germany'],
             'SIDA' => ['type' => DonorType::Bilateral, 'country' => 'Sweden'],
             'OCHA' => ['type' => DonorType::Foundation, 'country' => 'Switzerland'],
+            'Caritas Poland' => [
+                'type' => DonorType::Foundation,
+                'country' => 'Poland',
+                'contact_person' => 'Radoslow / Yousef Hazboun / Dominik Derlicki / Anna szancilo / erik',
+                'email' => 'rsterna@caritas.org.pl / yhazboun@caritas.org.pl / dderlicki@caritas.org.pl',
+                'notes' => 'Responsible for the financial matters / Projects Coordinator - Lebanon/Syria / vice director',
+            ],
+            'L\'Oeuvre D\'Orients' => [
+                'type' => DonorType::Foundation,
+                'country' => 'France',
+                'contact_person' => 'Pascal GOLLNISCH / Vincent Cayol / Vincent Gelot / Fabrice de Boisanger',
+                'email' => 'pgollnisch@oeuvre-orient.fr / vcayol@oeuvre-orient.fr / vgelot@oeuvre-orient.fr',
+                'phone' => '+33(0)777680074',
+                'notes' => 'director / vice director / Directeur pays de l\'Œuvre d\'Orient',
+            ],
+            'Mennonite Central Committee' => [
+                'type' => DonorType::Foundation,
+                'country' => null,
+                'contact_person' => 'Georgina Gavrus / Petra Antoun / Huda Houssari',
+                'email' => 'lebanonrep@mcc.org / petraantoun@mcc.org',
+                'phone' => '9613654106',
+                'notes' => 'MCC Country Representative for Lebanon, Syria and Iraq',
+            ],
+            'Hungary Embassy & Hungary Help' => [
+                'type' => DonorType::Bilateral,
+                'country' => 'Hungary',
+                'contact_person' => 'Péter CSULÁK / Youssef Fakhouri / peter Zelei',
+                'email' => 'pcsulak@mfa.gov.hu / youssef.fakhouri@hungaryhelps.gov.hu',
+                'notes' => 'Consul / Regional Project Manager (Middle East)',
+            ],
+            'Pro Terra Sancta' => [
+                'type' => DonorType::Foundation,
+                'country' => 'Italy',
+                'contact_person' => 'Giacomo Gentile / Jean Francios / Ayham Khouly',
+                'email' => 'g.gentile@proterrasancta.org',
+                'phone' => '+393332029050',
+                'notes' => 'coordinator aleppo / Project Manager',
+            ],
         ];
 
         foreach ($donors as $name => $profile) {
@@ -63,10 +101,11 @@ class CoreDataSeeder extends Seeder
                 ['name' => $name],
                 [
                     'type' => $profile['type'],
-                    'country' => $profile['country'],
-                    'contact_person' => fake()->name(),
-                    'email' => Str::lower('grants@'.Str::slug($name).'.org'),
-                    'phone' => fake()->numerify('+## ## ### ####'),
+                    'country' => $profile['country'] ?? null,
+                    'contact_person' => $profile['contact_person'] ?? fake()->name(),
+                    'email' => $profile['email'] ?? Str::lower('grants@'.Str::slug($name).'.org'),
+                    'phone' => $profile['phone'] ?? fake()->numerify('+## ## ### ####'),
+                    'notes' => $profile['notes'] ?? null,
                 ],
             );
         }

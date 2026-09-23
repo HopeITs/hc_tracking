@@ -1,10 +1,15 @@
 <?php
 
 use App\Enums\MilestoneStatus;
+use App\Enums\TaskPriority;
+use App\Enums\TaskStatus;
 use App\Models\HrEmployee;
 use App\Models\Milestone;
+use App\Models\Task;
+use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
@@ -34,6 +39,15 @@ new #[Title('titles.milestone')] class extends Component {
     public string $relatedWeightPercentage = '0';
     public string $relatedResponsibleUserId = '';
     public string $relatedParentMilestoneId = '';
+
+    public bool $showAddTaskModal = false;
+    public string $newTaskTitle = '';
+    public string $newTaskStatus = 'todo';
+    public string $newTaskPriority = 'medium';
+    public string $newTaskDueDate = '';
+
+    /** @var array<int, string> */
+    public array $newTaskAssignedTo = [];
 
     public function mount(Milestone $milestone): void
     {
@@ -68,6 +82,20 @@ new #[Title('titles.milestone')] class extends Component {
             ->where('parent_milestone_id', $this->milestoneId)
             ->orderBy('sequence')
             ->orderBy('name')
+            ->orderBy('id')
+            ->get();
+    }
+
+    /** @return Collection<int, Task> */
+    #[Computed]
+    public function relatedTasks(): Collection
+    {
+        return Task::query()
+            ->select(['id', 'title', 'status', 'priority', 'due_date', 'progress_percentage'])
+            ->where('source_type', 'milestone')
+            ->where('source_id', $this->milestoneId)
+            ->whereNull('parent_task_id')
+            ->with('taskAssignees.employee:id,first_name_en,last_name_en,first_name_ar,last_name_ar')
             ->orderBy('id')
             ->get();
     }
@@ -231,6 +259,68 @@ new #[Title('titles.milestone')] class extends Component {
         Flux::toast(variant: 'success', text: __('milestones.milestone_created'));
     }
 
+    public function openAddTaskModal(): void
+    {
+        $this->resetValidation();
+        $this->newTaskTitle = '';
+        $this->newTaskStatus = TaskStatus::Todo->value;
+        $this->newTaskPriority = TaskPriority::Medium->value;
+        $this->newTaskDueDate = '';
+        $this->newTaskAssignedTo = [];
+        $this->showAddTaskModal = true;
+    }
+
+    public function closeAddTaskModal(): void
+    {
+        $this->showAddTaskModal = false;
+    }
+
+    public function addTask(): void
+    {
+        $this->newTaskTitle = trim($this->newTaskTitle);
+
+        $validated = $this->validate([
+            'newTaskTitle' => ['required', 'string', 'max:255'],
+            'newTaskStatus' => ['required', new Enum(TaskStatus::class)],
+            'newTaskPriority' => ['required', new Enum(TaskPriority::class)],
+            'newTaskDueDate' => ['nullable', 'date'],
+            'newTaskAssignedTo' => ['required', 'array', 'min:1'],
+            'newTaskAssignedTo.*' => ['integer', Rule::exists(HrEmployee::class, 'id')],
+        ], [
+            'newTaskTitle.required' => __('tasks.enter_a_task_title'),
+            'newTaskAssignedTo.required' => __('tasks.assign_this_task_to_someone'),
+            'newTaskAssignedTo.min' => __('tasks.assign_this_task_to_someone'),
+            'newTaskAssignedTo.*.exists' => __('tasks.the_selected_assignee_is_no_longer_available'),
+        ]);
+
+        $milestoneId = $this->milestoneId;
+        $statusCase = TaskStatus::from($validated['newTaskStatus']);
+        $employeeIds = collect($validated['newTaskAssignedTo'])->map(fn ($id): int => (int) $id)->unique()->values();
+
+        DB::transaction(function () use ($milestoneId, $validated, $statusCase, $employeeIds): void {
+            $task = Task::query()->create([
+                'source_type' => 'milestone',
+                'source_id' => $milestoneId,
+                'title' => $validated['newTaskTitle'],
+                'status' => $statusCase,
+                'priority' => $validated['newTaskPriority'],
+                'due_date' => $validated['newTaskDueDate'] === '' ? null : $validated['newTaskDueDate'],
+                'progress_percentage' => $statusCase === TaskStatus::Done ? 100 : 0,
+                'completed_date' => $statusCase === TaskStatus::Done ? CarbonImmutable::today() : null,
+                'created_by' => (int) auth()->id(),
+            ]);
+
+            foreach ($employeeIds as $employeeId) {
+                $task->taskAssignees()->create(['employee_id' => $employeeId]);
+            }
+        });
+
+        $this->showAddTaskModal = false;
+        unset($this->relatedTasks);
+
+        Flux::toast(variant: 'success', text: __('tasks.task_created'));
+    }
+
     /** @return array<int, int> */
     protected function invalidParentIds(): array
     {
@@ -254,6 +344,12 @@ new #[Title('titles.milestone')] class extends Component {
     $selectedResponsibleOption = $responsibleUserId === '' ? null : $this->userOptions->firstWhere('id', (int) $responsibleUserId);
     $selectedRelatedParentMilestone = $relatedParentMilestoneId === '' ? null : $this->relatedParentOptions->firstWhere('id', (int) $relatedParentMilestoneId);
     $selectedRelatedResponsibleOption = $relatedResponsibleUserId === '' ? null : $this->userOptions->firstWhere('id', (int) $relatedResponsibleUserId);
+    $selectedNewTaskAssigneeOptions = $this->userOptions->whereIn('id', collect($newTaskAssignedTo)->map(fn ($id) => (int) $id));
+    $newTaskAssigneeTriggerLabel = match (true) {
+        $selectedNewTaskAssigneeOptions->isEmpty() => __('common.select'),
+        $selectedNewTaskAssigneeOptions->count() <= 2 => $selectedNewTaskAssigneeOptions->pluck('name')->implode(', '),
+        default => __('common.count_selected', ['count' => $selectedNewTaskAssigneeOptions->count()]),
+    };
 @endphp
 
 <section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="milestone-detail-heading">
@@ -414,6 +510,134 @@ new #[Title('titles.milestone')] class extends Component {
             </ul>
         @endif
     </x-ui.panel>
+
+    <x-ui.panel :title="__('tasks.related_tasks')" :count="$this->relatedTasks->count()">
+        <x-slot:toolbar>
+            <x-ui.button tone="primary" size="sm" icon="plus" wire:click="openAddTaskModal" data-test="add-milestone-task-button">{{ __('tasks.add_task') }}</x-ui.button>
+        </x-slot:toolbar>
+
+        @if ($this->relatedTasks->isEmpty())
+            <x-ui.empty-state icon="clipboard-document-list" :heading="__('common.no_tasks_yet')" :body="__('milestones.add_a_task_linked_to_this_milestone')">
+                <x-slot:action>
+                    <x-ui.button size="sm" tone="primary" icon="plus" wire:click="openAddTaskModal">{{ __('tasks.add_task') }}</x-ui.button>
+                </x-slot:action>
+            </x-ui.empty-state>
+        @else
+            <ul class="divide-y divide-secondary-soft dark:divide-secondary-medium">
+                @foreach ($this->relatedTasks as $relatedTask)
+                    @php $relatedTaskAssignees = $relatedTask->taskAssignees->pluck('employee')->filter(); @endphp
+                    <li class="flex flex-wrap items-center justify-between gap-3 p-3.5" wire:key="milestone-related-task-{{ $relatedTask->id }}">
+                        <a href="{{ route('tasks.show', $relatedTask) }}" wire:navigate class="min-w-0 flex-1 truncate text-sm font-semibold hover:underline">
+                            {{ $relatedTask->title }}
+                        </a>
+                        <div class="flex shrink-0 items-center gap-3">
+                            <span class="w-40 shrink-0 truncate text-xs text-secondary-medium dark:text-secondary-soft">
+                                {{ $relatedTaskAssignees->isEmpty() ? __('common.not_assigned') : $relatedTaskAssignees->map->name->implode(', ') }}
+                            </span>
+                            <span class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">
+                                {{ $relatedTask->due_date?->translatedFormat(__('formats.date')) ?? '—' }}
+                            </span>
+                            <x-ui.enum-badge :case="$relatedTask->status" />
+                            <x-ui.enum-badge :case="$relatedTask->priority" />
+                        </div>
+                    </li>
+                @endforeach
+            </ul>
+        @endif
+    </x-ui.panel>
+
+    <flux:modal name="milestone-add-task-modal" wire:model="showAddTaskModal" wire:close="closeAddTaskModal" class="w-full max-w-2xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
+        <form wire:submit="addTask" class="flex flex-col gap-5">
+            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
+                <flux:heading size="lg">{{ __('tasks.add_task') }}</flux:heading>
+            </div>
+
+            <x-ui.input wire:model="newTaskTitle" :label="__('tasks.task_title')" type="text" maxlength="255" required autofocus data-test="new-milestone-task-title-input" />
+
+            <div class="grid gap-5 sm:grid-cols-2">
+                <div class="min-w-0">
+                    <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft" id="new-milestone-task-status-label">{{ __('common.status') }}</label>
+                    <div class="grid grid-cols-2 gap-1.5" role="radiogroup" aria-labelledby="new-milestone-task-status-label">
+                        @foreach (TaskStatus::cases() as $statusCase)
+                            @php $isNewTaskStatusSelected = $newTaskStatus === $statusCase->value; @endphp
+                            <button
+                                type="button"
+                                role="radio"
+                                aria-checked="{{ $isNewTaskStatusSelected ? 'true' : 'false' }}"
+                                wire:click="$set('newTaskStatus', '{{ $statusCase->value }}')"
+                                @class([
+                                    'inline-flex min-h-10 cursor-pointer touch-manipulation items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-semibold whitespace-nowrap transition-colors',
+                                    'border-secondary-dark bg-secondary-dark text-white dark:border-white dark:bg-white dark:text-secondary-dark' => $isNewTaskStatusSelected,
+                                    'border-secondary-light text-secondary-medium hover:border-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => ! $isNewTaskStatusSelected,
+                                ])
+                                data-test="new-milestone-task-status-{{ $statusCase->value }}"
+                            >
+                                {{ $statusCase->label() }}
+                            </button>
+                        @endforeach
+                    </div>
+                    <flux:error name="newTaskStatus" class="mt-1.5" />
+                </div>
+
+                <div class="min-w-0">
+                    <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft" id="new-milestone-task-priority-label">{{ __('tasks.priority') }}</label>
+                    <div class="grid grid-cols-3 gap-1.5" role="radiogroup" aria-labelledby="new-milestone-task-priority-label">
+                        @foreach (TaskPriority::cases() as $priorityCase)
+                            @php $isNewTaskPrioritySelected = $newTaskPriority === $priorityCase->value; @endphp
+                            <button
+                                type="button"
+                                role="radio"
+                                aria-checked="{{ $isNewTaskPrioritySelected ? 'true' : 'false' }}"
+                                wire:click="$set('newTaskPriority', '{{ $priorityCase->value }}')"
+                                @class([
+                                    'inline-flex min-h-10 cursor-pointer touch-manipulation items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-semibold whitespace-nowrap transition-colors',
+                                    'border-secondary-dark bg-secondary-dark text-white dark:border-secondary-medium dark:bg-secondary-medium' => $isNewTaskPrioritySelected,
+                                    'border-secondary-light text-secondary-medium hover:border-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => ! $isNewTaskPrioritySelected,
+                                ])
+                                data-test="new-milestone-task-priority-{{ $priorityCase->value }}"
+                            >
+                                {{ $priorityCase->label() }}
+                            </button>
+                        @endforeach
+                    </div>
+                    <flux:error name="newTaskPriority" class="mt-1.5" />
+                </div>
+            </div>
+
+            <div class="min-w-0">
+                <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('tasks.assignees') }}</label>
+                <x-ui.multi-select-popover
+                    :label="__('tasks.assignees')"
+                    target="[data-modal='milestone-add-task-modal']"
+                    class="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-secondary-light bg-white px-3 py-2 text-start text-sm dark:border-secondary-light dark:bg-secondary-medium"
+                    data-test="new-milestone-task-assignee-picker"
+                >
+                    <x-slot:trigger>
+                        <span class="min-w-0 truncate">{{ $newTaskAssigneeTriggerLabel }}</span>
+                        <flux:icon.chevron-up-down class="size-4 shrink-0 text-secondary-medium dark:text-secondary-soft" aria-hidden="true" />
+                    </x-slot:trigger>
+
+                    @foreach ($this->userOptions as $userOption)
+                        <label
+                            x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
+                            class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-secondary-soft dark:hover:bg-secondary-medium"
+                        >
+                            <input type="checkbox" wire:model.live="newTaskAssignedTo" value="{{ $userOption->id }}" class="rounded border-secondary-light text-primary focus:ring-primary" data-test="new-milestone-task-assignee-checkbox-{{ $userOption->id }}" />
+                            <span class="min-w-0 truncate">{{ $userOption->name }} · {{ $userOption->secondary_name }}</span>
+                        </label>
+                    @endforeach
+                </x-ui.multi-select-popover>
+                <flux:error name="newTaskAssignedTo" class="mt-1.5" />
+            </div>
+
+            <x-ui.input wire:model="newTaskDueDate" :label="__('tasks.due_date_2')" type="date" />
+
+            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
+                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="closeAddTaskModal">{{ __('common.cancel') }}</x-ui.button>
+                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" data-test="save-new-milestone-task-button">{{ __('tasks.add_task') }}</x-ui.button>
+            </div>
+        </form>
+    </flux:modal>
 
     <flux:modal wire:model="showRelatedModal" wire:close="closeRelatedModal" class="w-full max-w-3xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
         <form wire:submit="saveRelatedMilestone" class="flex flex-col gap-5">

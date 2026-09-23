@@ -19,8 +19,8 @@ test('guests are redirected from transfer tracking', function () {
 
 test('transfers can be filtered by receipt status and account', function () {
     $user = User::factory()->role('Financial')->create();
-    $operations = Account::factory()->create(['name' => 'Operations USD']);
-    $reserve = Account::factory()->create(['name' => 'Reserve EUR']);
+    $operations = Account::factory()->create(['account_name' => 'Operations USD']);
+    $reserve = Account::factory()->create(['account_name' => 'Reserve EUR']);
 
     TransfersTracking::factory()->create([
         'account_id' => $operations->id,

@@ -98,7 +98,7 @@ test('lookup seeding reuses existing named donors', function () {
     $this->seed(CoreDataSeeder::class);
     $this->seed(CoreDataSeeder::class);
 
-    $this->assertDatabaseCount('donors', 5);
+    $this->assertDatabaseCount('donors', 10);
     expect(Donor::query()->where('name', 'UNICEF')->sole()->id)->toBe($donor->id);
 });
 

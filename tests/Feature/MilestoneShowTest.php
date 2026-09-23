@@ -1,8 +1,10 @@
 <?php
 
 use App\Enums\MilestoneStatus;
+use App\Enums\TaskStatus;
 use App\Models\Milestone;
 use App\Models\Project;
+use App\Models\Task;
 use App\Models\User;
 use Livewire\Livewire;
 
@@ -151,6 +153,65 @@ test('creating a related milestone requires its core delivery fields', function 
         ->set('relatedResponsibleUserId', '')
         ->call('saveRelatedMilestone')
         ->assertHasErrors(['relatedName', 'relatedPlannedStartDate', 'relatedResponsibleUserId']);
+});
+
+test('a task can be added from the milestone show page pre-filled with this milestone', function () {
+    $user = User::factory()->create();
+    $assignee = insertHrEmployee();
+    $milestone = Milestone::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.show', ['milestone' => $milestone])
+        ->call('openAddTaskModal')
+        ->assertSet('showAddTaskModal', true)
+        ->set('newTaskTitle', '  Household survey  ')
+        ->set('newTaskAssignedTo', [(string) $assignee])
+        ->call('addTask')
+        ->assertHasNoErrors()
+        ->assertSet('showAddTaskModal', false);
+
+    $task = Task::query()->where('title', 'Household survey')->sole();
+
+    expect($task->source_type)->toBe('milestone')
+        ->and($task->source_id)->toBe($milestone->id)
+        ->and($task->parent_task_id)->toBeNull()
+        ->and($task->taskAssignees->pluck('employee_id')->all())->toBe([$assignee]);
+});
+
+test('adding a task from the milestone show page requires a title and an assignee', function () {
+    $user = User::factory()->create();
+    $milestone = Milestone::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.show', ['milestone' => $milestone])
+        ->call('openAddTaskModal')
+        ->set('newTaskTitle', '   ')
+        ->set('newTaskAssignedTo', [])
+        ->call('addTask')
+        ->assertHasErrors(['newTaskTitle', 'newTaskAssignedTo']);
+});
+
+test('tasks linked to this milestone appear in the related tasks panel', function () {
+    $user = User::factory()->create();
+    $milestone = Milestone::factory()->create();
+    $task = Task::factory()->create([
+        'source_type' => 'milestone',
+        'source_id' => $milestone->id,
+        'title' => 'Survey households',
+        'status' => TaskStatus::Todo,
+    ]);
+    $otherMilestone = Milestone::factory()->create();
+    Task::factory()->create([
+        'source_type' => 'milestone',
+        'source_id' => $otherMilestone->id,
+        'title' => 'Unrelated task',
+    ]);
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.show', ['milestone' => $milestone])
+        ->assertSee('Survey households')
+        ->assertSee('href="'.route('tasks.show', $task).'"', false)
+        ->assertDontSee('Unrelated task');
 });
 
 test('the status can be changed from the edit form', function () {

@@ -98,7 +98,7 @@ new #[Title('titles.funding_agreement')] class extends Component {
             ->where('donor_proposal_id', $this->agreementId)
             // account_id is nullable: a tranche may be scheduled before an
             // account is assigned.
-            ->with('account:id,name,is_active')
+            ->with('account:id,account_name,is_active')
             ->orderByRaw('scheduled_date is null, scheduled_date')
             ->orderBy('id')
             ->get();
@@ -280,7 +280,7 @@ new #[Title('titles.funding_agreement')] class extends Component {
                 [
                     'key' => 'account',
                     'label' => __('funding_agreements.stop_in_account'),
-                    'detail' => $transfer->account?->name,
+                    'detail' => $transfer->account?->account_name,
                     'state' => $isReceived && $transfer->account !== null ? 'done' : 'ahead',
                 ],
             ];
@@ -653,7 +653,7 @@ new #[Title('titles.funding_agreement')] class extends Component {
             ->filter(fn (TransfersTracking $transfer): bool => $transfer->account !== null)
             ->groupBy('account_id')
             ->map(fn (Collection $group): array => [
-                'name' => $group->first()->account->name,
+                'name' => $group->first()->account->account_name,
                 'active' => (bool) $group->first()->account->is_active,
                 'tranches' => $group->count(),
                 'landed' => $group

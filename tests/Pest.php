@@ -276,7 +276,7 @@ function insertReport(int $planIndicatorId, int $userId, string $value = '9500.0
 function insertAccount(string $name = 'Operations USD'): int
 {
     return Account::factory()->create([
-        'name' => $name,
+        'account_name' => $name,
         'opened_at' => '2024-03-15',
     ])->id;
 }
