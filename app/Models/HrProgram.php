@@ -90,10 +90,23 @@ class HrProgram extends HrModel
 
     /**
      * The slug of one HR program, empty when HR no longer has it.
+     *
+     * Forces one reload when the id is missing from the cached list, the same
+     * way `rememberedHrLookupEntry()` does for `nameOf()` — otherwise a
+     * program created after the cache was last filled (e.g. a second program
+     * factory'd later in the same test) would read as slugless until the
+     * cache's own 60-second window expires.
      */
     public static function slugOf(int $id): string
     {
-        return self::slugsById()[$id] ?? '';
+        $slugs = self::slugsById();
+
+        if (! array_key_exists($id, $slugs)) {
+            self::$slugsById = $slugs = self::loadSlugsById();
+            self::$slugsLoadedAt = microtime(true);
+        }
+
+        return $slugs[$id] ?? '';
     }
 
     /**
@@ -101,7 +114,14 @@ class HrProgram extends HrModel
      */
     public static function idBySlug(string $slug): ?int
     {
-        $id = array_search($slug, self::slugsById(), true);
+        $slugs = self::slugsById();
+        $id = array_search($slug, $slugs, true);
+
+        if ($id === false) {
+            self::$slugsById = $slugs = self::loadSlugsById();
+            self::$slugsLoadedAt = microtime(true);
+            $id = array_search($slug, $slugs, true);
+        }
 
         return $id === false ? null : $id;
     }

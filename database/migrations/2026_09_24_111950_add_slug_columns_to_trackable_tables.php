@@ -8,9 +8,14 @@ use Illuminate\Support\Str;
 
 /**
  * Adds a `slug` column to every table whose show route now binds by slug
- * instead of id (see App\Concerns\HasSlug). Nullable + backfilled first, then
- * tightened to unique NOT NULL, so existing rows never violate the
- * constraint mid-migration.
+ * instead of id (see App\Concerns\HasSlug).
+ *
+ * Stays nullable even after backfilling existing rows: several tests (e.g.
+ * DonorTest) insert rows straight through the query builder to exercise the
+ * table's own schema, bypassing HasSlug::save() entirely, and a NOT NULL
+ * slug would break that legitimate pattern app-wide. A row without a slug
+ * simply has no working show route until one is generated. MySQL's UNIQUE
+ * index allows any number of NULLs, so this loses no collision protection.
  */
 return new class extends Migration
 {
@@ -76,7 +81,7 @@ return new class extends Migration
 
         foreach ([...array_keys(self::SIMPLE_TABLES), 'donor_proposal', 'reports', 'annual_plans'] as $table) {
             Schema::table($table, function (Blueprint $table) {
-                $table->string('slug')->nullable(false)->unique()->change();
+                $table->string('slug')->nullable()->unique()->change();
             });
         }
     }

@@ -373,7 +373,7 @@ new #[Title('titles.tasks')] class extends Component
         $search = trim($this->search);
 
         return Task::query()
-            ->select(['id', 'parent_task_id', 'source_type', 'source_id', 'title', 'description', 'status', 'priority', 'start_date', 'due_date', 'completed_date', 'progress_percentage', 'created_by'])
+            ->select(['id', 'slug', 'parent_task_id', 'source_type', 'source_id', 'title', 'description', 'status', 'priority', 'start_date', 'due_date', 'completed_date', 'progress_percentage', 'created_by'])
             // Subtasks are shown nested under their parent (each parent's own
             // `subtasks` eager load below), never as their own top-level row —
             // so the list/board/calendar and the stat tiles all count and
