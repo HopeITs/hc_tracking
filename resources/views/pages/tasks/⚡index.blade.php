@@ -184,6 +184,12 @@ new #[Title('titles.tasks')] class extends Component
         $this->resetPage();
     }
 
+    public function toggleMyTasksOnly(): void
+    {
+        $this->myTasksOnly = ! $this->myTasksOnly;
+        $this->resetPage();
+    }
+
     /**
      * Toggles a stat tile's own quick filter off when clicked again, exactly
      * like setSort() toggles direction — a second click on the same tile
@@ -1538,7 +1544,7 @@ new #[Title('titles.tasks')] class extends Component
                 <h2 class="text-sm font-bold text-secondary-dark dark:text-white">{{ __('tasks.my_tasks') }}</h2>
             </div>
             @if ($this->myTasksPreview->isNotEmpty())
-                <button type="button" wire:click="$set('myTasksOnly', {{ $myTasksOnly ? 'false' : 'true' }})" class="text-xs font-semibold text-primary hover:underline" data-test="my-tasks-view-all">
+                <button type="button" wire:click="toggleMyTasksOnly" class="text-xs font-semibold text-primary hover:underline" data-test="my-tasks-view-all">
                     {{ $myTasksOnly ? __('tasks.showing_my_tasks_only') : __('tasks.view_all') }}
                 </button>
             @endif
@@ -1655,6 +1661,21 @@ new #[Title('titles.tasks')] class extends Component
             @if ($filtersAreActive)
                 <flux:button size="sm" variant="ghost" class="self-end" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
             @endif
+
+            <button
+                type="button"
+                wire:click="toggleMyTasksOnly"
+                aria-pressed="{{ $myTasksOnly ? 'true' : 'false' }}"
+                data-test="task-filter-my-tasks-only"
+                @class([
+                    'inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-primary',
+                    'border-primary bg-primary text-white' => $myTasksOnly,
+                    'border-secondary-light text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium' => ! $myTasksOnly,
+                ])
+            >
+                <flux:icon.user variant="micro" class="size-3.5" />
+                {{ __('tasks.my_tasks_only') }}
+            </button>
         </div>
     </div>
 
