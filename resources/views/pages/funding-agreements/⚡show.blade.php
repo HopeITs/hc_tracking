@@ -1536,44 +1536,46 @@ new #[Title('titles.funding_agreement')] class extends Component {
         :locked-proposal-name="$proposal->name"
     />
 
-    <flux:modal wire:model="showReportModal" wire:close="closeReportModal" class="w-full max-w-lg border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <form wire:submit="saveReport" class="space-y-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ $editingReportId !== null ? __('funding_agreements.edit_report') : __('funding_agreements.add_report') }}</flux:heading>
-                <flux:subheading>{{ __('funding_agreements.a_report_the_donor_expects_under_this_agreement') }}</flux:subheading>
-            </div>
+    <x-ui.modal
+        wire:model="showReportModal"
+        size="md"
+        :title="$editingReportId !== null ? __('funding_agreements.edit_report') : __('funding_agreements.add_report')"
+        :description="__('funding_agreements.a_report_the_donor_expects_under_this_agreement')"
+        submit="saveReport"
+        close="closeReportModal"
+        required-note
+    >
+        <div class="grid grid-cols-2 gap-x-4 gap-y-4">
+            <x-ui.form-input wire:model="reportTitle" :label="__('funding_agreements.report_title')" maxlength="255" required autofocus class="col-span-2" />
 
-            <x-ui.input wire:model="reportTitle" :label="__('funding_agreements.report_title')" type="text" maxlength="255" required />
+            <x-ui.form-segmented
+                wire:model="reportType"
+                :label="__('common.type')"
+                required
+                class="col-span-2"
+                :options="collect(DonorReportType::cases())->map(fn (DonorReportType $reportTypeCase): array => ['value' => $reportTypeCase->value, 'label' => $reportTypeCase->label()])->all()"
+            />
 
-            <div class="grid gap-4 sm:grid-cols-3">
-                <x-ui.select wire:model="reportType" :label="__('common.type')" required>
-                    @foreach (DonorReportType::cases() as $reportTypeCase)
-                        <flux:select.option :value="$reportTypeCase->value" :wire:key="'report-type-'.$reportTypeCase->value">{{ $reportTypeCase->label() }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
-                <x-ui.input wire:model="reportDueOn" :label="__('funding_agreements.due')" type="date" required />
-                <x-ui.input wire:model="reportSubmittedOn" :label="__('funding_agreements.submitted')" type="date" />
-            </div>
-
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeReportModal">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-report-button">
-                    {{ $editingReportId !== null ? __('common.save_changes') : __('funding_agreements.add_report') }}
-                </x-ui.button>
-            </div>
-        </form>
-    </flux:modal>
-
-    <flux:modal wire:model="showReportDeleteModal" wire:close="closeReportDeleteModal" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <div class="flex flex-col gap-4">
-            <flux:heading size="lg">{{ __('funding_agreements.delete_this_report') }}</flux:heading>
-            <flux:subheading>{{ __('funding_agreements.the_report_is_removed_from_this_agreement') }}</flux:subheading>
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="closeReportDeleteModal">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="button" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="deleteReport" data-test="confirm-delete-report">{{ __('funding_agreements.delete_report') }}</x-ui.button>
-            </div>
+            <x-ui.form-input wire:model="reportDueOn" :label="__('funding_agreements.due')" type="date" required />
+            <x-ui.form-input wire:model="reportSubmittedOn" :label="__('funding_agreements.submitted')" type="date" />
         </div>
-    </flux:modal>
+
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="save-report-button">
+                {{ $editingReportId !== null ? __('common.save_changes') : __('funding_agreements.add_report') }}
+            </x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
+
+    <x-ui.confirm-modal
+        wire:model="showReportDeleteModal"
+        close="closeReportDeleteModal"
+        :title="__('funding_agreements.delete_this_report')"
+        :message="__('funding_agreements.the_report_is_removed_from_this_agreement')"
+        confirm="deleteReport"
+        :confirm-label="__('funding_agreements.delete_report')"
+        confirm-test="confirm-delete-report"
+    />
 
     <x-funding.transfer-modal
         :editing="$editingTransferId !== null"

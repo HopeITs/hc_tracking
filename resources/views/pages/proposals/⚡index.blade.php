@@ -1234,84 +1234,84 @@ new #[Title('titles.proposals')] class extends Component {
         </section>
     @endif
 
-    <flux:modal wire:model="showProposalModal" class="w-full max-w-3xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <form wire:submit="saveProposal" class="space-y-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ $editingProposalId === null ? __('proposals.add_proposal') : __('proposals.edit_proposal') }}</flux:heading>
-                <flux:subheading>{{ __('proposals.phase_follows_automatically_from_the_status_you_choose') }}</flux:subheading>
+    <x-ui.modal
+        wire:model="showProposalModal"
+        size="xl"
+        :title="$editingProposalId === null ? __('proposals.add_proposal') : __('proposals.edit_proposal')"
+        :description="__('proposals.phase_follows_automatically_from_the_status_you_choose')"
+        submit="saveProposal"
+        close="closeProposalModal"
+        required-note
+    >
+        <x-ui.form-section
+            :title="__('common.section_details')"
+            :hint="$editingProposalId === null ? __('proposals.the_starting_status_opens_the_status_history') : __('proposals.status_moves_only_through_change_status')"
+            :fields="['name', 'proposalStatus', 'notes']"
+        >
+            <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                <x-ui.form-input wire:model="name" :label="__('proposals.proposal_name')" maxlength="255" required autofocus :class="$editingProposalId !== null ? '@2xl/modal:col-span-2' : null" />
+
+                @if ($editingProposalId === null)
+                    <x-ui.form-select wire:model="proposalStatus" :label="__('proposals.starting_status')" required>
+                        @foreach (ProposalStatus::cases() as $statusCase)
+                            <flux:select.option :value="$statusCase->value">{{ $statusCase->label() }} — {{ $statusCase->phase()->label() }}</flux:select.option>
+                        @endforeach
+                    </x-ui.form-select>
+                @endif
+
+                <x-ui.form-textarea wire:model="notes" :label="__('common.notes')" rows="2" class="@2xl/modal:col-span-2" />
             </div>
+        </x-ui.form-section>
 
-            <x-ui.input wire:model="name" :label="__('proposals.proposal_name')" type="text" maxlength="255" required autofocus />
-
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.input wire:model="plannedDateBegin" :label="__('proposals.planned_start')" type="date" required />
-                <x-ui.input wire:model="plannedDateEnd" :label="__('proposals.planned_end')" type="date" required />
-                <x-ui.input wire:model="actualDateBegin" :label="__('proposals.actual_start')" type="date" />
-                <x-ui.input wire:model="actualDateEnd" :label="__('proposals.actual_end')" type="date" />
+        <x-ui.form-section :title="__('common.section_schedule')" :fields="['plannedDateBegin', 'plannedDateEnd', 'actualDateBegin', 'actualDateEnd']">
+            <div class="grid grid-cols-2 gap-x-4 gap-y-3 @4xl/modal:grid-cols-4">
+                <x-ui.form-input wire:model="plannedDateBegin" :label="__('proposals.planned_start')" type="date" required />
+                <x-ui.form-input wire:model="plannedDateEnd" :label="__('proposals.planned_end')" type="date" required />
+                <x-ui.form-input wire:model="actualDateBegin" :label="__('proposals.actual_start')" type="date" />
+                <x-ui.form-input wire:model="actualDateEnd" :label="__('proposals.actual_end')" type="date" />
             </div>
+        </x-ui.form-section>
 
-            @if ($editingProposalId === null)
-            <x-ui.select wire:model="proposalStatus" :label="__('proposals.starting_status')" required>
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="save-proposal-button">
+                {{ $editingProposalId === null ? __('proposals.create_proposal') : __('common.save_changes') }}
+            </x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
+
+    <x-ui.modal
+        wire:model="showStageModal"
+        size="md"
+        :title="__('proposals.change_status')"
+        :description="__('proposals.the_new_status_and_your_reason_are_recorded_together_as_one')"
+        submit="recordStageChange"
+        close="closeStageModal"
+        required-note
+    >
+        <div class="grid grid-cols-2 gap-x-4 gap-y-4">
+            <x-ui.form-select wire:model="newStatus" :label="__('proposals.new_status')" required autofocus>
                 @foreach (ProposalStatus::cases() as $statusCase)
-                    <flux:select.option :value="$statusCase->value" :wire:key="'proposal-status-option-'.$statusCase->value">
-                        {{ $statusCase->label() }} — {{ $statusCase->phase()->label() }}
-                    </flux:select.option>
+                    <flux:select.option :value="$statusCase->value">{{ $statusCase->label() }} — {{ $statusCase->phase()->label() }}</flux:select.option>
                 @endforeach
-            </x-ui.select>
-            @endif
+            </x-ui.form-select>
 
-            <flux:textarea wire:model="notes" :label="__('common.notes')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
+            <x-ui.form-input wire:model="statusDate" :label="__('proposals.effective_date')" type="date" required />
 
-            <div class="rounded-lg border border-secondary-soft bg-secondary-soft/50 p-3 text-sm text-secondary-medium dark:border-secondary-medium dark:bg-secondary-medium/50 dark:text-secondary-soft">
-                <div class="flex items-start gap-2.5">
-                    <flux:icon.information-circle class="mt-0.5 size-4 shrink-0" />
-                    <p>{{ $editingProposalId === null ? __('proposals.the_starting_status_opens_the_status_history') : __('proposals.status_moves_only_through_change_status') }}</p>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeProposalModal">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-proposal-button">
-                    {{ $editingProposalId === null ? __('proposals.create_proposal') : __('common.save_changes') }}
-                </x-ui.button>
-            </div>
-        </form>
-    </flux:modal>
-
-    <flux:modal wire:model="showStageModal" wire:close="closeStageModal" class="w-full max-w-xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <form wire:submit="recordStageChange" class="space-y-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ __('proposals.change_status') }}</flux:heading>
-                <flux:subheading>{{ __('proposals.the_new_status_and_your_reason_are_recorded_together_as_one') }}</flux:subheading>
-            </div>
-
-            <x-ui.select wire:model="newStatus" :label="__('proposals.new_status')" required>
-                @foreach (ProposalStatus::cases() as $statusCase)
-                    <flux:select.option :value="$statusCase->value" :wire:key="'stage-status-'.$statusCase->value">
-                        {{ $statusCase->label() }} — {{ $statusCase->phase()->label() }}
-                    </flux:select.option>
-                @endforeach
-            </x-ui.select>
-
-            <flux:textarea wire:model="statusContext" :label="__('proposals.why_did_it_change')" rows="3" required class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
-
-            <x-ui.input wire:model="statusDate" :label="__('proposals.effective_date')" type="date" required />
-
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeStageModal">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-stage-button">{{ __('proposals.record_change') }}</x-ui.button>
-            </div>
-        </form>
-    </flux:modal>
-
-    <flux:modal wire:model="showDeleteModal" wire:close="cancelDelete" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <div class="space-y-4">
-            <flux:heading size="lg">{{ __('proposals.delete_this_proposal') }}</flux:heading>
-            <flux:subheading>{{ __('proposals.its_tasks_project_links_and_status_history_are_removed_with') }}</flux:subheading>
-            <div class="flex justify-end gap-2 border-t border-secondary-soft pt-4 dark:border-secondary-medium">
-                <x-ui.button type="button" wire:click="cancelDelete">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="button" tone="primary" wire:click="deleteProposal" data-test="confirm-delete-proposal">{{ __('proposals.delete_proposal') }}</x-ui.button>
-            </div>
+            <x-ui.form-textarea wire:model="statusContext" :label="__('proposals.why_did_it_change')" required class="col-span-2" />
         </div>
-    </flux:modal>
+
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="save-stage-button">{{ __('proposals.record_change') }}</x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
+
+    <x-ui.confirm-modal
+        wire:model="showDeleteModal"
+        close="cancelDelete"
+        :title="__('proposals.delete_this_proposal')"
+        :message="__('proposals.its_tasks_project_links_and_status_history_are_removed_with')"
+        confirm="deleteProposal"
+        :confirm-label="__('proposals.delete_proposal')"
+        confirm-test="confirm-delete-proposal"
+    />
 </section>

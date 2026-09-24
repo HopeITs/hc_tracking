@@ -129,7 +129,7 @@ test('the create modal renders a project dropdown with every project option', fu
         ->test('pages::milestones.index')
         ->call('openCreateModal')
         ->assertSee('id="milestone-form-project"', false)
-        ->assertSee('$set(\'milestoneProjectId\', '.$project->id.')', false)
+        ->assertSee('data-option-value="'.$project->id.'"', false)
         ->assertSee('Coastal Relief');
 });
 

@@ -88,6 +88,8 @@ return [
     'search_reports' => 'Search reports',
     'seen_by_meal' => 'Seen by MEAL',
     'select_a_file_to_upload' => 'Select a file to upload.',
+    'section_narrative' => 'Narrative',
+    'section_summary' => 'Summary',
     'select_a_target' => 'Select a target',
     'select_the_target_this_reports_against' => 'Select the target this reports against.',
     'set_the_file_date' => 'Set the file date.',

@@ -233,9 +233,6 @@ new #[Title('titles.programs')] class extends Component {
     $summary = $this->programSummary;
     $visiblePrograms = $this->programs->take($visibleProgramCount);
     $hasMorePrograms = $this->programs->count() > $visibleProgramCount;
-    $controlClasses = 'border-secondary-light! bg-white! text-secondary-dark! placeholder:text-secondary-light! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!';
-    $primaryButtonClasses = 'border-primary! bg-primary! text-white! hover:border-primary! hover:bg-primary!';
-    $secondaryButtonClasses = 'border-secondary-light! bg-white! text-secondary-dark! hover:bg-secondary-soft! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white! dark:hover:bg-secondary-medium!';
 @endphp
 
 <section class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-8 bg-white px-1 text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="program-directory-heading">
@@ -291,46 +288,32 @@ new #[Title('titles.programs')] class extends Component {
             @endif
         @endif
 
-    <flux:modal wire:model="showProgramModal" class="w-full max-w-2xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <form wire:submit="saveProgram" class="space-y-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ __('programs.assign_name', ['name' => $editingProgramName]) }}</flux:heading>
-                <flux:subheading>{{ __('programs.the_program_name_is_managed_in_the_hr_system_link_it_to_a_st') }}</flux:subheading>
-            </div>
+    <x-ui.modal
+        wire:model="showProgramModal"
+        size="md"
+        :title="__('programs.assign_name', ['name' => $editingProgramName])"
+        :description="__('programs.the_program_name_is_managed_in_the_hr_system_link_it_to_a_st')"
+        submit="saveProgram"
+        close="closeProgramModal"
+    >
+        <div class="grid gap-y-4">
+            <x-ui.form-select wire:model="strategyId" :label="__('programs.linked_strategy')" autofocus>
+                <flux:select.option value="">{{ __('common.not_assigned') }}</flux:select.option>
+                @foreach ($this->strategyOptions as $strategyOption)
+                    <flux:select.option :value="$strategyOption->id">{{ $strategyOption->name }} ({{ $strategyOption->start_year }}–{{ $strategyOption->end_year }})</flux:select.option>
+                @endforeach
+            </x-ui.form-select>
 
-            <div class="grid gap-4 sm:grid-cols-2">
-                <flux:select wire:model="strategyId" :class="$controlClasses" :label="__('programs.linked_strategy')">
-                    <flux:select.option value="">{{ __('common.not_assigned') }}</flux:select.option>
-                    @foreach ($this->strategyOptions as $strategyOption)
-                        <flux:select.option :value="$strategyOption->id" :wire:key="'strategy-option-'.$strategyOption->id">
-                            {{ $strategyOption->name }} ({{ $strategyOption->start_year }}–{{ $strategyOption->end_year }})
-                        </flux:select.option>
-                    @endforeach
-                </flux:select>
+            <x-ui.form-select wire:model="managerId" :label="__('programs.direct_manager')" :help="__('programs.the_assigned_manager_is_the_hr_employee_directly_accountable')">
+                <flux:select.option value="">{{ __('common.not_assigned') }}</flux:select.option>
+                @foreach ($this->managerOptions as $managerOption)
+                    <flux:select.option :value="$managerOption->id">{{ $managerOption->name }} · {{ $managerOption->secondary_name }}</flux:select.option>
+                @endforeach
+            </x-ui.form-select>
+        </div>
 
-                <flux:select wire:model="managerId" :class="$controlClasses" :label="__('programs.direct_manager')">
-                    <flux:select.option value="">{{ __('common.not_assigned') }}</flux:select.option>
-                    @foreach ($this->managerOptions as $managerOption)
-                        <flux:select.option :value="$managerOption->id" :wire:key="'manager-option-'.$managerOption->id">
-                            {{ $managerOption->name }} · {{ $managerOption->secondary_name }}
-                        </flux:select.option>
-                    @endforeach
-                </flux:select>
-            </div>
-
-            <div class="rounded-lg border border-secondary-soft bg-secondary-soft/50 p-3 text-sm text-secondary-medium dark:border-secondary-medium dark:bg-secondary-medium/50 dark:text-secondary-soft">
-                <div class="flex items-start gap-2.5">
-                    <flux:icon.information-circle class="mt-0.5 size-4 shrink-0" />
-                    <p>{{ __('programs.the_assigned_manager_is_the_hr_employee_directly_accountable') }}</p>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <flux:button type="button" variant="filled" :class="$secondaryButtonClasses.' min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto'" wire:click="closeProgramModal">{{ __('common.cancel') }}</flux:button>
-                <flux:button type="submit" variant="primary" :class="$primaryButtonClasses.' min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto'" data-test="save-program-button">
-                    {{ __('common.save_changes') }}
-                </flux:button>
-            </div>
-        </form>
-    </flux:modal>
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="save-program-button">{{ __('common.save_changes') }}</x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
 </section>

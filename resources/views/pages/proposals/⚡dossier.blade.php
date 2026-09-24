@@ -1050,29 +1050,28 @@ new #[Title('titles.proposal')] class extends Component {
     </section>
     {{-- =============== END STATUS HISTORY (replaceable) =============== --}}
 
-    <flux:modal wire:model="showStatusModal" class="w-full max-w-xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <form wire:submit="changeStatus" class="space-y-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ __('proposals.change_status') }}</flux:heading>
-                <flux:subheading>{{ __('proposals.the_new_status_and_your_reason_are_recorded_together_as_one') }}</flux:subheading>
-            </div>
-
-            <x-ui.select wire:model="newStatus" :label="__('proposals.new_status')" required>
+    <x-ui.modal
+        wire:model="showStatusModal"
+        size="md"
+        :title="__('proposals.change_status')"
+        :description="__('proposals.the_new_status_and_your_reason_are_recorded_together_as_one')"
+        submit="changeStatus"
+        required-note
+    >
+        <div class="grid grid-cols-2 gap-x-4 gap-y-4">
+            <x-ui.form-select wire:model="newStatus" :label="__('proposals.new_status')" required autofocus>
                 @foreach (ProposalStatus::cases() as $statusCase)
-                    <flux:select.option :value="$statusCase->value" :wire:key="'change-status-'.$statusCase->value">
-                        {{ $statusCase->label() }} — {{ $statusCase->phase()->label() }}
-                    </flux:select.option>
+                    <flux:select.option :value="$statusCase->value">{{ $statusCase->label() }} — {{ $statusCase->phase()->label() }}</flux:select.option>
                 @endforeach
-            </x-ui.select>
+            </x-ui.form-select>
 
-            <flux:textarea wire:model="statusContext" :label="__('proposals.why_did_it_change')" rows="3" required class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
+            <x-ui.form-input wire:model="statusDate" :label="__('proposals.effective_date')" type="date" required />
 
-            <x-ui.input wire:model="statusDate" :label="__('proposals.effective_date')" type="date" required />
+            <x-ui.form-textarea wire:model="statusContext" :label="__('proposals.why_did_it_change')" required class="col-span-2" />
+        </div>
 
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="$set('showStatusModal', false)">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-status-button">{{ __('proposals.record_change') }}</x-ui.button>
-            </div>
-        </form>
-    </flux:modal>
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="save-status-button">{{ __('proposals.record_change') }}</x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
 </section>

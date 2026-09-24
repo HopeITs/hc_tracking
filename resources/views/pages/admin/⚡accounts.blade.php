@@ -532,83 +532,81 @@ new #[Title('titles.accounts')] class extends Component {
         />
     @endif
 
-    <flux:modal wire:model="showAccountModal" class="w-full max-w-lg border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <form wire:submit="saveAccount" class="space-y-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ $editingAccountId === null ? __('accounts.open_account') : __('accounts.edit_account') }}</flux:heading>
-                <flux:subheading>{{ __('accounts.a_new_account_is_usable_immediately_to_stop_it_receiving_tra') }}</flux:subheading>
-            </div>
-
+    <x-ui.modal
+        wire:model="showAccountModal"
+        size="xl"
+        :title="$editingAccountId === null ? __('accounts.open_account') : __('accounts.edit_account')"
+        :description="__('accounts.a_new_account_is_usable_immediately_to_stop_it_receiving_tra')"
+        submit="saveAccount"
+        close="closeAccountModal"
+        required-note
+    >
+        <x-ui.form-section :title="__('common.section_details')" :fields="['accountName', 'bankName', 'currency', 'authorizedPerson', 'openedAt']">
             @if ($editingAccountId !== null)
-                <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-lg bg-secondary-soft px-3 py-2.5 dark:bg-secondary-medium/40">
-                    <div class="flex items-center gap-1.5">
-                        <span class="type-meta text-secondary-medium dark:text-secondary-soft">{{ __('accounts.current_status') }}</span>
+                <x-slot:hint>
+                    <span class="flex flex-col gap-0.5">
                         <span @class([
-                            'rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap',
+                            'inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap',
                             'bg-status-good-soft text-status-good' => $editingAccountIsActive,
-                            'bg-secondary-medium/60 text-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft' => ! $editingAccountIsActive,
+                            'bg-secondary-soft text-secondary-medium dark:bg-secondary-medium dark:text-secondary-soft' => ! $editingAccountIsActive,
                         ])>
                             {{ $editingAccountIsActive ? __('accounts.open') : __('accounts.closed') }}
                         </span>
-                    </div>
-
-                    @if ($editingAccountClosedAt !== null)
-                        <span class="type-meta text-secondary-medium dark:text-secondary-soft">
-                            {{ __('accounts.closed_date', ['date' => \Carbon\CarbonImmutable::parse($editingAccountClosedAt)->translatedFormat(__('formats.date'))]) }}
-                        </span>
-                    @endif
-
-                    <span class="type-meta text-secondary-medium dark:text-secondary-soft">
-                        {{ trans_choice('accounts.count_transfer', $editingAccountTransfersCount, ['count' => $editingAccountTransfersCount]) }}
+                        @if ($editingAccountClosedAt !== null)
+                            <span>{{ __('accounts.closed_date', ['date' => \Carbon\CarbonImmutable::parse($editingAccountClosedAt)->translatedFormat(__('formats.date'))]) }}</span>
+                        @endif
+                        <span>{{ trans_choice('accounts.count_transfer', $editingAccountTransfersCount, ['count' => $editingAccountTransfersCount]) }}</span>
                     </span>
-                </div>
+                </x-slot:hint>
             @endif
 
-            <x-ui.input wire:model="accountName" :label="__('accounts.account_name')" type="text" maxlength="255" required autofocus />
+            <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                <x-ui.form-input wire:model="accountName" :label="__('accounts.account_name')" maxlength="255" required autofocus class="@2xl/modal:col-span-2" />
+                <x-ui.form-input wire:model="bankName" :label="__('accounts.bank_name')" maxlength="255" required />
 
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.input wire:model="bankName" :label="__('accounts.bank_name')" type="text" maxlength="255" required />
-                <x-ui.select wire:model="currency" :label="__('common.currency')" required>
-                    @foreach (Currency::cases() as $currencyCase)
-                        <flux:select.option :value="$currencyCase->value" :wire:key="'account-currency-'.$currencyCase->value">{{ $currencyCase->value }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
+                <x-ui.form-segmented
+                    wire:model="currency"
+                    :label="__('common.currency')"
+                    required
+                    :options="collect(Currency::cases())->map(fn (Currency $currencyCase): array => ['value' => $currencyCase->value, 'label' => $currencyCase->value])->all()"
+                />
+
+                <x-ui.form-input wire:model="authorizedPerson" :label="__('accounts.authorized_person')" maxlength="255" />
+                <x-ui.form-input wire:model="openedAt" :label="__('accounts.opened_on')" type="date" />
             </div>
+        </x-ui.form-section>
 
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.input wire:model="accountNumber" :label="__('accounts.account_number')" type="text" maxlength="100" required />
-                <x-ui.input wire:model="iban" :label="__('accounts.iban')" type="text" maxlength="100" />
+        <x-ui.form-section :title="__('accounts.section_bank')" :fields="['accountNumber', 'iban', 'swiftCode', 'country']">
+            <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                <x-ui.form-input wire:model="accountNumber" :label="__('accounts.account_number')" maxlength="100" required dir="ltr" />
+                <x-ui.form-input wire:model="iban" :label="__('accounts.iban')" maxlength="100" dir="ltr" />
+                <x-ui.form-input wire:model="swiftCode" :label="__('accounts.swift_code')" maxlength="50" dir="ltr" />
+                <x-ui.form-input wire:model="country" :label="__('donors.country')" maxlength="100" required />
             </div>
+        </x-ui.form-section>
 
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.input wire:model="swiftCode" :label="__('accounts.swift_code')" type="text" maxlength="50" />
-                <x-ui.input wire:model="country" :label="__('donors.country')" type="text" maxlength="100" required />
+        <x-ui.form-section :title="__('accounts.section_address')" :fields="['poBoxStreet', 'companyAddress']">
+            <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                <x-ui.form-textarea wire:model="poBoxStreet" :label="__('accounts.po_box_street')" rows="2" />
+                <x-ui.form-textarea wire:model="companyAddress" :label="__('accounts.company_address')" rows="2" />
             </div>
+        </x-ui.form-section>
 
-            <x-ui.input wire:model="authorizedPerson" :label="__('accounts.authorized_person')" type="text" maxlength="255" />
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="save-account-button">
+                {{ $editingAccountId === null ? __('accounts.open_account') : __('common.save_changes') }}
+            </x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
 
-            <flux:textarea wire:model="poBoxStreet" :label="__('accounts.po_box_street')" rows="2" class="border-secondary-light! bg-white! text-secondary-dark! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!" />
-            <flux:textarea wire:model="companyAddress" :label="__('accounts.company_address')" rows="2" class="border-secondary-light! bg-white! text-secondary-dark! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!" />
-
-            <x-ui.input wire:model="openedAt" :label="__('accounts.opened_on')" type="date" />
-
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeAccountModal">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-account-button">
-                    {{ $editingAccountId === null ? __('accounts.open_account') : __('common.save_changes') }}
-                </x-ui.button>
-            </div>
-        </form>
-    </flux:modal>
-
-    <flux:modal wire:model="showCloseModal" class="w-full max-w-md border border-secondary-light! bg-white! dark:bg-secondary-dark!">
-        <div class="space-y-4">
-            <flux:heading size="lg">{{ __('accounts.close_this_account') }}</flux:heading>
-            <flux:subheading>{{ __('accounts.it_stops_accepting_new_transfers_existing_transfer_records_a') }}</flux:subheading>
-            <div class="flex justify-end gap-2 border-t border-secondary-soft pt-4 dark:border-secondary-medium">
-                <x-ui.button type="button" wire:click="cancelClose">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="button" tone="primary" wire:click="closeAccount" data-test="confirm-close-account">{{ __('accounts.close_account') }}</x-ui.button>
-            </div>
-        </div>
-    </flux:modal>
+    <x-ui.confirm-modal
+        wire:model="showCloseModal"
+        close="cancelClose"
+        tone="neutral"
+        :title="__('accounts.close_this_account')"
+        :message="__('accounts.it_stops_accepting_new_transfers_existing_transfer_records_a')"
+        confirm="closeAccount"
+        :confirm-label="__('accounts.close_account')"
+        confirm-test="confirm-close-account"
+    />
 </section>

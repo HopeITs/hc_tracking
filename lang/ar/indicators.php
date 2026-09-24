@@ -44,6 +44,7 @@ return [
     'log_a_reading_for_name' => 'تسجيل قراءة لـ :name',
     'log_reading' => 'تسجيل القراءة',
     'measure' => 'نوع القياس',
+    'section_measurement' => 'القياس',
     'measuring_count_of_total_results' => 'تقيس :count من :total نتيجة',
     'needs_a_reading' => 'بحاجة إلى قراءة',
     'never_measured' => 'لم يُقَس بعد',

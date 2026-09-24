@@ -868,14 +868,13 @@ new #[Title('titles.donors')] class extends Component {
 
     <x-donors.form-modal :editing="$editingDonorId !== null" :type-options="$this->donorTypeOptions" />
 
-    <flux:modal wire:model="showDeleteModal" wire:close="cancelDelete" class="w-full max-w-md border border-secondary-light! bg-white! dark:bg-secondary-dark!">
-        <div class="space-y-4">
-            <flux:heading size="lg">{{ __('donors.delete_this_donor') }}</flux:heading>
-            <flux:subheading>{{ __('donors.only_a_donor_holding_no_funding_agreement_can_be_deleted') }}</flux:subheading>
-            <div class="flex justify-end gap-2 border-t border-secondary-soft pt-4 dark:border-secondary-medium">
-                <x-ui.button type="button" wire:click="cancelDelete">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="button" tone="primary" wire:click="deleteDonor" data-test="confirm-delete-donor">{{ __('donors.delete_donor') }}</x-ui.button>
-            </div>
-        </div>
-    </flux:modal>
+    <x-ui.confirm-modal
+        wire:model="showDeleteModal"
+        close="cancelDelete"
+        :title="__('donors.delete_this_donor')"
+        :message="__('donors.only_a_donor_holding_no_funding_agreement_can_be_deleted')"
+        confirm="deleteDonor"
+        :confirm-label="__('donors.delete_donor')"
+        confirm-test="confirm-delete-donor"
+    />
 </section>

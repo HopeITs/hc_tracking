@@ -21,6 +21,7 @@ return [
     'risk_impact_or_project' => 'Risk, impact, or project',
     'risk_logged' => 'Risk logged.',
     'risk_name' => 'Risk name',
+    'section_assessment' => 'Assessment',
     'risk_updated' => 'Risk updated.',
     'risks_by_project' => 'Risks by project',
     'risks_by_project_hint' => 'Challenges already faced vs risks still being anticipated, per project.',

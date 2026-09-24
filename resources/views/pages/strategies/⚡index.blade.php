@@ -445,36 +445,33 @@ new #[Title('titles.strategies')] class extends Component {
     @endif
 
     @if ($this->canManage)
-        <flux:modal wire:model="showStrategyModal" class="w-full max-w-lg border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-            <form wire:submit="saveStrategy" class="space-y-5">
-                <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                    <flux:heading size="lg">{{ $editingStrategyId === null ? __('strategies.add_strategy') : __('strategies.edit_strategy') }}</flux:heading>
-                </div>
-
-                <x-ui.input wire:model="name" :label="__('strategies.strategy_name')" type="text" maxlength="255" required autofocus />
-
-                <div class="grid gap-4 sm:grid-cols-2">
-                    <x-ui.input wire:model="startYear" :label="__('strategies.period_start')" type="number" min="1900" max="2100" required />
-                    <x-ui.input wire:model="endYear" :label="__('strategies.period_end')" type="number" min="1900" max="2100" required />
-                </div>
-
-                <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                    <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeStrategyModal">{{ __('common.cancel') }}</x-ui.button>
-                    <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-strategy-button">
-                        {{ $editingStrategyId === null ? __('strategies.create_strategy') : __('common.save_changes') }}
-                    </x-ui.button>
-                </div>
-            </form>
-        </flux:modal>
-
-        <flux:modal wire:model="showDeleteModal" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-            <div class="space-y-4">
-                <flux:heading size="lg">{{ __('strategies.delete_this_strategy') }}</flux:heading>
-                <div class="flex justify-end gap-2 border-t border-secondary-soft pt-4 dark:border-secondary-medium">
-                    <x-ui.button type="button" wire:click="$set('showDeleteModal', false)">{{ __('common.cancel') }}</x-ui.button>
-                    <x-ui.button type="button" tone="primary" wire:click="deleteStrategy" data-test="confirm-delete-strategy">{{ __('strategies.delete_strategy') }}</x-ui.button>
-                </div>
+        <x-ui.modal
+            wire:model="showStrategyModal"
+            size="md"
+            :title="$editingStrategyId === null ? __('strategies.add_strategy') : __('strategies.edit_strategy')"
+            submit="saveStrategy"
+            close="closeStrategyModal"
+            required-note
+        >
+            <div class="grid grid-cols-2 gap-x-4 gap-y-4">
+                <x-ui.form-input wire:model="name" :label="__('strategies.strategy_name')" maxlength="255" required autofocus class="col-span-2" />
+                <x-ui.form-input wire:model="startYear" :label="__('strategies.period_start')" type="number" min="1900" max="2100" required />
+                <x-ui.form-input wire:model="endYear" :label="__('strategies.period_end')" type="number" min="1900" max="2100" required />
             </div>
-        </flux:modal>
+
+            <x-slot:actions>
+                <x-ui.button type="submit" tone="primary" data-test="save-strategy-button">
+                    {{ $editingStrategyId === null ? __('strategies.create_strategy') : __('common.save_changes') }}
+                </x-ui.button>
+            </x-slot:actions>
+        </x-ui.modal>
+
+        <x-ui.confirm-modal
+            wire:model="showDeleteModal"
+            :title="__('strategies.delete_this_strategy')"
+            confirm="deleteStrategy"
+            :confirm-label="__('strategies.delete_strategy')"
+            confirm-test="confirm-delete-strategy"
+        />
     @endif
 </section>

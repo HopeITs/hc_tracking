@@ -1389,78 +1389,86 @@ new #[Title('titles.results_framework')] class extends Component {
         @endforeach
     @endif
 
-    <flux:modal wire:model="showResultModal" class="w-full max-w-2xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
+    <x-ui.modal
+        wire:model="showResultModal"
+        size="xl"
+        :title="$editingResultId === null ? __('results_framework.add_result') : __('results_framework.edit_result')"
+        :description="__('results_framework.an_output_contributes_to_an_outcome_which_contributes_to_an')"
+        submit="saveResult"
+        close="closeResultModal"
+        required-note
+    >
         @if ($showResultModal)
-        <form wire:submit="saveResult" class="space-y-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ $editingResultId === null ? __('results_framework.add_result') : __('results_framework.edit_result') }}</flux:heading>
-                <flux:subheading>{{ __('results_framework.an_output_contributes_to_an_outcome_which_contributes_to_an') }}</flux:subheading>
-            </div>
+            <x-ui.form-section :title="__('common.section_details')" :fields="['statement', 'resultType', 'checkoutPeriod']">
+                <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                    <x-ui.form-textarea wire:model="statement" :label="__('results_framework.statement')" required autofocus class="@2xl/modal:col-span-2" />
 
-            <flux:textarea wire:model="statement" :label="__('results_framework.statement')" rows="3" required class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
+                    {{-- The Impact / Outcome / Output marks are the logframe's own (see components-ui rules). --}}
+                    <x-ui.form-segmented
+                        wire:model.live="resultType"
+                        :label="__('common.type')"
+                        required
+                        :options="[
+                            ['value' => ResultType::Impact->value, 'label' => ResultType::Impact->label(), 'dot' => 'bg-secondary-dark dark:bg-white'],
+                            ['value' => ResultType::Outcome->value, 'label' => ResultType::Outcome->label(), 'dot' => 'bg-primary'],
+                            ['value' => ResultType::Output->value, 'label' => ResultType::Output->label(), 'dot' => 'bg-board ring-1 ring-secondary-light'],
+                        ]"
+                    />
 
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.select wire:model.live="resultType" :label="__('common.type')" required>
-                    @foreach (ResultType::cases() as $typeCase)
-                        <flux:select.option :value="$typeCase->value" :wire:key="'result-type-option-'.$typeCase->value">{{ $typeCase->label() }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
+                    <x-ui.form-segmented
+                        wire:model="checkoutPeriod"
+                        :label="__('results_framework.checked')"
+                        required
+                        :options="collect(Period::cases())->map(fn (Period $periodCase): array => ['value' => $periodCase->value, 'label' => $periodCase->label()])->all()"
+                    />
+                </div>
+            </x-ui.form-section>
 
-                <x-ui.select wire:model="checkoutPeriod" :label="__('results_framework.checked')" required>
-                    @foreach (Period::cases() as $periodCase)
-                        <flux:select.option :value="$periodCase->value" :wire:key="'result-period-'.$periodCase->value">{{ $periodCase->label() }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
-            </div>
-
-            <div class="grid gap-4 sm:grid-cols-2">
-                <div>
-                    <x-ui.select wire:model.live="parentId" :label="__('results_framework.contributes_to')" :disabled="$resultType === ResultType::Impact->value">
+            <x-ui.form-section :title="__('common.section_placement')" :fields="['parentId', 'resultProgramId']">
+                <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                    <x-ui.form-select
+                        wire:model.live="parentId"
+                        :label="__('results_framework.contributes_to')"
+                        :disabled="$resultType === ResultType::Impact->value"
+                        :locked-reason="__('results_framework.an_impact_sits_at_the_top_of_the_chain')"
+                        :help="__('results_framework.only_the_level_directly_above_is_offered')"
+                    >
                         <flux:select.option value="">{{ __('common.top_level') }}</flux:select.option>
                         @foreach ($this->parentOptions as $parentOption)
-                            <flux:select.option :value="$parentOption->id" :wire:key="'result-parent-'.$parentOption->id">
-                                {{ Str::limit($parentOption->statement, 60) }} · {{ $parentOption->program?->name ?? __('common.unassigned') }}
-                            </flux:select.option>
+                            <flux:select.option :value="$parentOption->id">{{ Str::limit($parentOption->statement, 60) }} · {{ $parentOption->program?->name ?? __('common.unassigned') }}</flux:select.option>
                         @endforeach
-                    </x-ui.select>
-                    <p class="mt-1.5 type-meta text-secondary-medium dark:text-secondary-soft">
-                        {{ $resultType === ResultType::Impact->value ? __('results_framework.an_impact_sits_at_the_top_of_the_chain') : __('results_framework.only_the_level_directly_above_is_offered') }}
-                    </p>
-                </div>
+                    </x-ui.form-select>
 
-                <div>
-                    <x-ui.select wire:model="resultProgramId" :label="__('common.program')" :disabled="$parentId !== ''">
+                    <x-ui.form-select
+                        wire:model="resultProgramId"
+                        :label="__('common.program')"
+                        :disabled="$parentId !== ''"
+                        :locked-reason="__('results_framework.follows_the_program_of_the_result_it_contributes_to')"
+                        :help="$editingResultId !== null ? __('results_framework.nested_results_move_with_it') : null"
+                    >
                         <flux:select.option value="">{{ __('common.unassigned') }}</flux:select.option>
                         @foreach ($this->programOptions as $programOption)
-                            <flux:select.option :value="$programOption->id" :wire:key="'result-program-option-'.$programOption->id">{{ $programOption->name }}</flux:select.option>
+                            <flux:select.option :value="$programOption->id">{{ $programOption->name }}</flux:select.option>
                         @endforeach
-                    </x-ui.select>
-                    @if ($parentId !== '')
-                        <p class="mt-1.5 type-meta text-secondary-medium dark:text-secondary-soft">{{ __('results_framework.follows_the_program_of_the_result_it_contributes_to') }}</p>
-                    @elseif ($editingResultId !== null)
-                        <p class="mt-1.5 type-meta text-secondary-medium dark:text-secondary-soft">{{ __('results_framework.nested_results_move_with_it') }}</p>
-                    @endif
+                    </x-ui.form-select>
                 </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeResultModal">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-result-button">
-                    {{ $editingResultId === null ? __('results_framework.add_result') : __('common.save_changes') }}
-                </x-ui.button>
-            </div>
-        </form>
+            </x-ui.form-section>
         @endif
-    </flux:modal>
 
-    <flux:modal wire:model="showDeleteModal" wire:close="cancelDelete" class="w-full max-w-md border border-secondary-light! bg-white! dark:bg-secondary-dark!">
-        <div class="space-y-4">
-            <flux:heading size="lg">{{ __('results_framework.delete_this_result') }}</flux:heading>
-            <flux:subheading>{{ __('results_framework.only_a_result_with_no_nested_results_and_no_indicators_can_b') }}</flux:subheading>
-            <div class="flex justify-end gap-2 border-t border-secondary-soft pt-4 dark:border-secondary-medium">
-                <x-ui.button type="button" wire:click="cancelDelete">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="button" tone="primary" wire:click="deleteResult" data-test="confirm-delete-result">{{ __('results_framework.delete_result') }}</x-ui.button>
-            </div>
-        </div>
-    </flux:modal>
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="save-result-button">
+                {{ $editingResultId === null ? __('results_framework.add_result') : __('common.save_changes') }}
+            </x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
+
+    <x-ui.confirm-modal
+        wire:model="showDeleteModal"
+        close="cancelDelete"
+        :title="__('results_framework.delete_this_result')"
+        :message="__('results_framework.only_a_result_with_no_nested_results_and_no_indicators_can_b')"
+        confirm="deleteResult"
+        :confirm-label="__('results_framework.delete_result')"
+        confirm-test="confirm-delete-result"
+    />
 </section>

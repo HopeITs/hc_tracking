@@ -703,57 +703,51 @@ new #[Title('titles.annual_plan')] class extends Component {
         </x-ui.panel>
     </div>
 
-    <flux:modal wire:model="showPlanModal" class="w-full max-w-lg border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <form wire:submit="savePlan" class="flex flex-col gap-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ __('annual_plans.edit_annual_plan') }}</flux:heading>
-                <flux:subheading>{{ $plan->program->name }}</flux:subheading>
-            </div>
-
-            @if ($showPlanModal)
-                <x-ui.select wire:model="planYear" :label="__('annual_plans.fiscal_year')" required>
-                    <flux:select.option value="">{{ __('annual_plans.select_a_fiscal_year') }}</flux:select.option>
+    <x-ui.modal
+        wire:model="showPlanModal"
+        size="md"
+        :title="__('annual_plans.edit_annual_plan')"
+        :description="$plan->program->name"
+        submit="savePlan"
+        close="closePlanModal"
+        required-note
+    >
+        @if ($showPlanModal)
+            <div class="grid grid-cols-2 gap-x-4 gap-y-4">
+                <x-ui.form-select wire:model="planYear" :label="__('annual_plans.fiscal_year')" :placeholder="__('annual_plans.select_a_fiscal_year')" required autofocus>
                     @foreach ($this->yearFormOptions as $yearFormOption)
-                        <flux:select.option :value="$yearFormOption" :wire:key="'plan-year-option-'.$yearFormOption">{{ $yearFormOption }}</flux:select.option>
+                        <flux:select.option :value="$yearFormOption">{{ $yearFormOption }}</flux:select.option>
                     @endforeach
-                </x-ui.select>
+                </x-ui.form-select>
 
-                <x-ui.select wire:model="planManagerId" :label="__('annual_plans.assigned_manager')" required>
-                    <flux:select.option value="">{{ __('annual_plans.select_a_manager') }}</flux:select.option>
+                <x-ui.form-select wire:model="planManagerId" :label="__('annual_plans.assigned_manager')" :placeholder="__('annual_plans.select_a_manager')" required>
                     @foreach ($this->employeeOptions as $employeeOption)
-                        <flux:select.option :value="$employeeOption->id" :wire:key="'plan-manager-option-'.$employeeOption->id">
-                            {{ $employeeOption->name }} · {{ $employeeOption->secondary_name }}
-                        </flux:select.option>
+                        <flux:select.option :value="$employeeOption->id">{{ $employeeOption->name }} · {{ $employeeOption->secondary_name }}</flux:select.option>
                     @endforeach
-                </x-ui.select>
-            @endif
-
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="closePlanModal">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" data-test="save-annual-plan-button">{{ __('common.save_changes') }}</x-ui.button>
+                </x-ui.form-select>
             </div>
-        </form>
-    </flux:modal>
+        @endif
 
-    <flux:modal wire:model="confirmingDelete" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <div class="flex flex-col gap-4">
-            <flux:heading size="lg">{{ __('annual_plans.delete_this_annual_plan') }}</flux:heading>
-            <flux:subheading>
-                {{ $summary['targets'] > 0
-                    ? __('annual_plans.deleting_the_plan_also_removes_its_targets_and_their_reports', [
-                        'program' => $plan->program->name,
-                        'year' => $plan->year,
-                        'count' => $summary['targets'],
-                    ])
-                    : __('annual_plans.this_plan_has_no_targets_committed_in_it', [
-                        'program' => $plan->program->name,
-                        'year' => $plan->year,
-                    ]) }}
-            </flux:subheading>
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="$set('confirmingDelete', false)">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="button" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="deletePlan" data-test="confirm-delete-annual-plan">{{ __('annual_plans.delete_annual_plan') }}</x-ui.button>
-            </div>
-        </div>
-    </flux:modal>
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="save-annual-plan-button">{{ __('common.save_changes') }}</x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
+
+    <x-ui.confirm-modal
+        wire:model="confirmingDelete"
+        :title="__('annual_plans.delete_this_annual_plan')"
+        :message="$summary['targets'] > 0
+            ? __('annual_plans.deleting_the_plan_also_removes_its_targets_and_their_reports', [
+                'program' => $plan->program->name,
+                'year' => $plan->year,
+                'count' => $summary['targets'],
+            ])
+            : __('annual_plans.this_plan_has_no_targets_committed_in_it', [
+                'program' => $plan->program->name,
+                'year' => $plan->year,
+            ])"
+        confirm="deletePlan"
+        :confirm-label="__('annual_plans.delete_annual_plan')"
+        confirm-test="confirm-delete-annual-plan"
+    />
 </section>

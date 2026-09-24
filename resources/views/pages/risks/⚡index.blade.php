@@ -541,87 +541,56 @@ new #[Title('titles.risks')] class extends Component {
         </x-slot:footer>
     </x-ui.panel>
 
-    <flux:modal wire:model="showRiskModal" class="w-full max-w-2xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <form wire:submit="saveRisk" class="flex flex-col gap-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ $editingRiskId === null ? __('risks.log_risk') : __('risks.edit_risk') }}</flux:heading>
-            </div>
+    <x-ui.modal
+        wire:model="showRiskModal"
+        size="xl"
+        :title="$editingRiskId === null ? __('risks.log_risk') : __('risks.edit_risk')"
+        submit="saveRisk"
+        close="closeRiskModal"
+        required-note
+    >
+        <x-ui.form-section :title="__('common.section_details')" :fields="['name', 'riskProjectId', 'happened']">
+            <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                <x-ui.form-input wire:model="name" :label="__('risks.risk_name')" maxlength="255" required autofocus class="@2xl/modal:col-span-2" />
 
-            <x-ui.input wire:model="name" :label="__('risks.risk_name')" type="text" maxlength="255" required autofocus />
-
-            <flux:textarea wire:model="impact" :label="__('common.impact')" rows="3" required />
-
-            <flux:textarea wire:model="solution" :label="__('common.mitigation')" rows="3" />
-
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.select wire:model="riskProjectId" :label="__('common.project')" required>
-                    <flux:select.option value="">{{ __('common.select_a_project') }}</flux:select.option>
+                <x-ui.form-select wire:model="riskProjectId" :label="__('common.project')" :placeholder="__('common.select_a_project')" required>
                     @foreach ($this->projectOptions as $projectOption)
-                        <flux:select.option :value="$projectOption->id" :wire:key="'risk-project-option-'.$projectOption->id">{{ $projectOption->name }}</flux:select.option>
+                        <flux:select.option :value="$projectOption->id">{{ $projectOption->name }}</flux:select.option>
                     @endforeach
-                </x-ui.select>
+                </x-ui.form-select>
 
-                <div class="self-end">
-                    <span class="mb-1.5 block text-[11px] font-semibold uppercase leading-4 tracking-[0.1em] text-secondary-medium dark:text-secondary-soft">{{ __('common.state') }}</span>
-                    <div class="inline-flex w-full overflow-hidden rounded-lg border border-secondary-light dark:border-secondary-medium" role="radiogroup" aria-label="{{ __('common.state') }}">
-                        <button
-                            type="button"
-                            role="radio"
-                            aria-checked="{{ ! $happened ? 'true' : 'false' }}"
-                            wire:click="$set('happened', false)"
-                            @class([
-                                'flex flex-1 items-center justify-center gap-1.5 px-3 py-2 text-sm font-semibold transition-colors',
-                                'bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white' => ! $happened,
-                                'text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium' => $happened,
-                            ])
-                        >
-                            <span @class([
-                                'size-2.5 shrink-0 rounded-full border',
-                                'border-secondary-dark bg-secondary-dark dark:border-white dark:bg-white' => ! $happened,
-                                'border-secondary-light dark:border-secondary-soft' => $happened,
-                            ]) aria-hidden="true"></span>
-                            {{ __('risks.potential_risk') }}
-                        </button>
-                        <button
-                            type="button"
-                            role="radio"
-                            aria-checked="{{ $happened ? 'true' : 'false' }}"
-                            wire:click="$set('happened', true)"
-                            @class([
-                                'flex flex-1 items-center justify-center gap-1.5 border-s border-secondary-light px-3 py-2 text-sm font-semibold transition-colors dark:border-secondary-medium',
-                                'bg-primary text-white' => $happened,
-                                'text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium' => ! $happened,
-                            ])
-                            data-test="form-materialised-option"
-                        >
-                            <span @class([
-                                'size-2.5 shrink-0 rounded-full border',
-                                'border-white bg-white' => $happened,
-                                'border-secondary-light dark:border-secondary-soft' => ! $happened,
-                            ]) aria-hidden="true"></span>
-                            {{ __('common.materialised') }}
-                        </button>
-                    </div>
-                </div>
+                <x-ui.form-segmented
+                    wire:model="happened"
+                    :label="__('common.state')"
+                    :options="[
+                        ['value' => '0', 'label' => __('risks.potential_risk'), 'dot' => 'border border-secondary-light bg-transparent'],
+                        ['value' => '1', 'label' => __('common.materialised'), 'dot' => 'bg-primary', 'test' => 'form-materialised-option'],
+                    ]"
+                />
             </div>
+        </x-ui.form-section>
 
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="closeRiskModal">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" data-test="save-risk-button">
-                    {{ $editingRiskId === null ? __('risks.log_risk') : __('common.save_changes') }}
-                </x-ui.button>
+        <x-ui.form-section :title="__('risks.section_assessment')" :fields="['impact', 'solution']">
+            <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                <x-ui.form-textarea wire:model="impact" :label="__('common.impact')" required />
+                <x-ui.form-textarea wire:model="solution" :label="__('common.mitigation')" />
             </div>
-        </form>
-    </flux:modal>
+        </x-ui.form-section>
 
-    <flux:modal wire:model="showDeleteModal" wire:close="cancelDelete" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <div class="flex flex-col gap-4">
-            <flux:heading size="lg">{{ __('risks.delete_this_risk') }}</flux:heading>
-            <flux:subheading>{{ __('risks.the_risk_and_its_mitigation_notes_are_removed_nothing_else_i') }}</flux:subheading>
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="cancelDelete">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="button" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="deleteRisk" data-test="confirm-delete-risk">{{ __('risks.delete_risk') }}</x-ui.button>
-            </div>
-        </div>
-    </flux:modal>
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="save-risk-button">
+                {{ $editingRiskId === null ? __('risks.log_risk') : __('common.save_changes') }}
+            </x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
+
+    <x-ui.confirm-modal
+        wire:model="showDeleteModal"
+        close="cancelDelete"
+        :title="__('risks.delete_this_risk')"
+        :message="__('risks.the_risk_and_its_mitigation_notes_are_removed_nothing_else_i')"
+        confirm="deleteRisk"
+        :confirm-label="__('risks.delete_risk')"
+        confirm-test="confirm-delete-risk"
+    />
 </section>

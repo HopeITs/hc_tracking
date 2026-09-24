@@ -799,81 +799,72 @@ new #[Title('titles.user_directory')] class extends Component {
             </section>
         </div>
 
-        <flux:modal wire:model="showAssignedUsersModal" class="w-full max-w-2xl">
-            <div class="space-y-4">
-                <div>
-                    <flux:heading size="lg">{{ __('access.assigned-users', ['count' => $this->selectedRole?->users_count ?? 0]) }}</flux:heading>
-                    <flux:subheading>{{ $this->selectedRole?->name }}</flux:subheading>
-                </div>
-
-                <div class="max-h-[min(65vh,32rem)] divide-y divide-gray-100 overflow-y-auto dark:divide-secondary-medium">
-                    @forelse ($this->selectedRoleUsers as $roleUser)
-                        <div class="flex min-w-0 items-center justify-between gap-3 px-1 py-3" wire:key="assigned-role-user-{{ $roleUser->id }}">
-                            <div class="min-w-0">
-                                <p class="truncate text-sm font-bold text-gray-900 dark:text-white">{{ $roleUser->name }}</p>
-                                <p class="truncate text-sm text-gray-500 dark:text-secondary-soft">{{ $roleUser->email }}</p>
-                            </div>
+        <x-ui.modal
+            wire:model="showAssignedUsersModal"
+            size="lg"
+            :title="__('access.assigned-users', ['count' => $this->selectedRole?->users_count ?? 0])"
+            :description="$this->selectedRole?->name"
+            close="closeAssignedUsersModal"
+            :cancel-label="__('roles.close')"
+        >
+            <div class="divide-y divide-secondary-soft dark:divide-secondary-medium">
+                @forelse ($this->selectedRoleUsers as $roleUser)
+                    <div class="flex min-w-0 items-center justify-between gap-3 px-1 py-3" wire:key="assigned-role-user-{{ $roleUser->id }}">
+                        <div class="min-w-0">
+                            <p class="truncate text-sm font-bold text-secondary-dark dark:text-white">{{ $roleUser->name }}</p>
+                            <p class="truncate text-sm text-secondary-medium dark:text-secondary-soft">{{ $roleUser->email }}</p>
                         </div>
-                    @empty
-                        <p class="py-8 text-center text-sm text-gray-500 dark:text-secondary-soft">{{ __('access.no-assigned-users') }}</p>
-                    @endforelse
-                </div>
-
-                <div class="flex justify-end">
-                    <flux:button wire:click="closeAssignedUsersModal">{{ __('roles.close') }}</flux:button>
-                </div>
+                    </div>
+                @empty
+                    <p class="py-8 text-center text-sm text-secondary-medium dark:text-secondary-soft">{{ __('access.no-assigned-users') }}</p>
+                @endforelse
             </div>
-        </flux:modal>
+        </x-ui.modal>
     @endif
 
-    <flux:modal wire:model="showCreateUserModal" class="w-full max-w-xl">
-        <form wire:submit="createUser" class="space-y-5">
-            <div class="border-b border-gray-200 pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ __('users.add_user') }}</flux:heading>
-                <flux:subheading>{{ __('users.give_an_hr_system_account_access_and_choose_its_role_people') }}</flux:subheading>
-            </div>
-
-            <flux:select wire:model="hrUserId" :label="__('users.hr_account')" required>
-                <flux:select.option value="">{{ __('users.select_an_hr_account') }}</flux:select.option>
+    <x-ui.modal
+        wire:model="showCreateUserModal"
+        size="md"
+        :title="__('users.add_user')"
+        :description="__('users.give_an_hr_system_account_access_and_choose_its_role_people')"
+        submit="createUser"
+        close="closeCreateModal"
+        required-note
+    >
+        <div class="grid gap-y-4">
+            <x-ui.form-select wire:model="hrUserId" :label="__('users.hr_account')" :placeholder="__('users.select_an_hr_account')" required autofocus>
                 @foreach ($this->hrAccountOptions as $hrAccountOption)
-                    <flux:select.option :value="$hrAccountOption->id" :wire:key="'hr-account-option-'.$hrAccountOption->id">
-                        {{ $hrAccountOption->email }}@if ($hrAccountOption->employee) · {{ $hrAccountOption->employee->name }} · {{ $hrAccountOption->employee->secondary_name }}@endif
-                    </flux:select.option>
+                    <flux:select.option :value="$hrAccountOption->id">{{ $hrAccountOption->email }}@if ($hrAccountOption->employee) · {{ $hrAccountOption->employee->name }} · {{ $hrAccountOption->employee->secondary_name }}@endif</flux:select.option>
                 @endforeach
-            </flux:select>
+            </x-ui.form-select>
 
-            <flux:select wire:model="initialRoleId" :label="__('users.role')">
+            <x-ui.form-select wire:model="initialRoleId" :label="__('users.role')">
                 <flux:select.option value="">{{ __('users.no_role') }}</flux:select.option>
                 @foreach ($this->roleOptions as $roleOption)
-                    <flux:select.option :value="$roleOption->id" :wire:key="'initial-role-'.$roleOption->id">{{ $roleOption->name }}</flux:select.option>
+                    <flux:select.option :value="$roleOption->id">{{ $roleOption->name }}</flux:select.option>
                 @endforeach
-            </flux:select>
+            </x-ui.form-select>
+        </div>
 
-            <div class="grid grid-cols-2 gap-2 border-t border-gray-200 pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <flux:button type="button" variant="filled" wire:click="closeCreateModal">{{ __('common.cancel') }}</flux:button>
-                <flux:button type="submit" variant="primary" data-test="save-user-button">{{ __('users.create_user') }}</flux:button>
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="save-user-button">{{ __('users.create_user') }}</x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
+
+    <x-ui.confirm-modal
+        wire:model="showDeleteModal"
+        close="closeDeleteModal"
+        :title="__('users.delete_user_2')"
+        :message="__('users.permanently_delete_name_this_action_cannot_be_undone', ['name' => $deletingUserName])"
+        confirm="deleteUser"
+        :confirm-label="__('users.delete_user')"
+        confirm-test="confirm-delete-user-button"
+    >
+        @if ($deleteError)
+            <div class="rounded-lg border border-primary bg-primary/5 p-3 text-sm text-status-critical" role="alert">
+                <p class="font-semibold">{{ __('users.unable_to_delete_user') }}</p>
+                <p>{{ $deleteError }}</p>
             </div>
-        </form>
-    </flux:modal>
-
-    <flux:modal wire:model="showDeleteModal" class="w-full max-w-lg">
-        <form wire:submit="deleteUser" class="space-y-5">
-            <div>
-                <flux:heading size="lg">{{ __('users.delete_user_2') }}</flux:heading>
-                <flux:subheading>{{ __('users.permanently_delete_name_this_action_cannot_be_undone', ['name' => $deletingUserName]) }}</flux:subheading>
-            </div>
-
-            @if ($deleteError)
-                <div class="rounded-lg border border-primary bg-white p-3 text-sm text-primary" role="alert">
-                    <p class="font-semibold">{{ __('users.unable_to_delete_user') }}</p>
-                    <p>{{ $deleteError }}</p>
-                </div>
-            @endif
-
-            <div class="grid grid-cols-2 gap-2 sm:flex sm:justify-end">
-                <flux:button type="button" variant="filled" wire:click="closeDeleteModal">{{ __('common.cancel') }}</flux:button>
-                <flux:button type="submit" variant="danger" data-test="confirm-delete-user-button">{{ __('users.delete_user') }}</flux:button>
-            </div>
-        </form>
-    </flux:modal>
+        @endif
+    </x-ui.confirm-modal>
 </section>

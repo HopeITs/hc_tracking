@@ -882,159 +882,149 @@ new #[Title('titles.report')] class extends Component {
         :window="$showReportModal ? $this->formWindow() : null"
     />
 
-    <flux:modal wire:model="showFileModal" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
+    <x-ui.modal
+        wire:model="showFileModal"
+        size="md"
+        :title="$editingFileId === null ? __('reports.upload_file') : __('reports.edit_file')"
+        :description="__('reports.allowed_file_types_and_size', ['types' => Str::upper(implode(', ', FileType::values())), 'size' => '5 MB'])"
+        submit="saveFile"
+        close="closeFileModal"
+        required-note
+    >
         @if ($showFileModal)
-            <form wire:submit="saveFile" class="space-y-5">
-                <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                    <flux:heading size="lg">{{ $editingFileId === null ? __('reports.upload_file') : __('reports.edit_file') }}</flux:heading>
-                    <flux:subheading>{{ __('reports.allowed_file_types_and_size', ['types' => Str::upper(implode(', ', FileType::values())), 'size' => '5 MB']) }}</flux:subheading>
+            <div class="grid gap-y-4">
+                <x-ui.form-file
+                    wire:model="newFile"
+                    :label="$editingFileId === null ? __('reports.choose_a_file') : __('reports.replace_file_optional')"
+                    :accept="collect(FileType::values())->map(fn ($extension) => '.'.$extension)->implode(',')"
+                    :required="$editingFileId === null"
+                />
+
+                <div class="grid grid-cols-2 gap-x-4 gap-y-4">
+                    <x-ui.form-input wire:model="fileDisplayName" :label="__('reports.file_display_name')" :placeholder="$editingFileId === null ? __('reports.defaults_to_the_uploaded_file_name') : null" :required="$editingFileId !== null" />
+                    <x-ui.form-input wire:model="fileDate" :label="__('reports.document_date')" type="date" required />
                 </div>
-
-                <div>
-                    <x-ui.input
-                        type="file"
-                        wire:model="newFile"
-                        :label="$editingFileId === null ? __('reports.choose_a_file') : __('reports.replace_file_optional')"
-                        accept="{{ collect(FileType::values())->map(fn ($extension) => '.'.$extension)->implode(',') }}"
-                        :required="$editingFileId === null"
-                    />
-                    <p wire:loading wire:target="newFile" class="mt-1.5 text-xs text-secondary-medium dark:text-secondary-soft">{{ __('reports.uploading') }}</p>
-                </div>
-
-                <x-ui.input wire:model="fileDisplayName" :label="__('reports.file_display_name')" :placeholder="$editingFileId === null ? __('reports.defaults_to_the_uploaded_file_name') : null" :required="$editingFileId !== null" />
-
-                <x-ui.input wire:model="fileDate" :label="__('reports.document_date')" type="date" required />
-
-                <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                    <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeFileModal">{{ __('common.cancel') }}</x-ui.button>
-                    <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:loading.attr="disabled" wire:target="newFile,saveFile" data-test="save-file-button">
-                        {{ $editingFileId === null ? __('reports.upload_file') : __('common.save_changes') }}
-                    </x-ui.button>
-                </div>
-            </form>
+            </div>
         @endif
-    </flux:modal>
 
-    <flux:modal wire:model="showPreviewModal" wire:close="closePreview" class="w-full max-w-5xl border border-secondary-light! bg-white! p-0! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        @if ($showPreviewModal && ($previewFile = $this->files->firstWhere('id', $previewingFileId)) !== null)
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" wire:loading.attr="disabled" wire:target="newFile,saveFile" data-test="save-file-button">
+                {{ $editingFileId === null ? __('reports.upload_file') : __('common.save_changes') }}
+            </x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
+
+    @php
+        $previewFile = $showPreviewModal ? $this->files->firstWhere('id', $previewingFileId) : null;
+        $previewMeta = $previewFile === null ? null : collect([
+            Str::upper($previewFile->type->value),
+            $previewFile->size !== null ? \Illuminate\Support\Number::fileSize($previewFile->size, precision: 1) : null,
+            $previewFile->date?->translatedFormat(__('formats.date')),
+            $this->files->count() > 1 ? __('reports.preview_position', [
+                'position' => $this->files->search(fn ($candidate) => $candidate->id === $previewFile->id) + 1,
+                'total' => $this->files->count(),
+            ]) : null,
+        ])->filter()->implode(' · ');
+    @endphp
+
+    <x-ui.modal
+        wire:model="showPreviewModal"
+        size="xl"
+        :title="$previewFile?->displayName() ?? ''"
+        :description="$previewMeta"
+        close="closePreview"
+        :cancel-label="__('common.close')"
+        flush
+    >
+        @if ($previewFile !== null)
             @php
                 $previewName = $previewFile->displayName();
                 $previewUrl = route('reports.files.preview', [$report, $previewFile]);
                 $downloadUrl = route('reports.files.download', [$report, $previewFile]);
-                $previewPosition = $this->files->search(fn ($candidate) => $candidate->id === $previewFile->id) + 1;
             @endphp
+
+            <x-slot:headerActions>
+                @if ($this->files->count() > 1)
+                    <x-ui.button tone="ghost" size="sm" icon="chevron-left" class="size-8! rtl:[&_svg]:-scale-x-100" wire:click="previewAdjacent(-1)" :aria-label="__('reports.previous_file')" />
+                    <x-ui.button tone="ghost" size="sm" icon="chevron-right" class="size-8! rtl:[&_svg]:-scale-x-100" wire:click="previewAdjacent(1)" :aria-label="__('reports.next_file')" />
+                @endif
+                @if ($previewFile->isPreviewable())
+                    <a href="{{ $previewUrl }}" target="_blank" rel="noopener" class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-secondary-soft dark:hover:bg-secondary-medium dark:hover:text-white" aria-label="{{ __('reports.open_in_new_tab') }}">
+                        <flux:icon name="arrow-top-right-on-square" variant="micro" class="size-4" />
+                    </a>
+                @endif
+                <a href="{{ $downloadUrl }}" class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-secondary-soft dark:hover:bg-secondary-medium dark:hover:text-white" aria-label="{{ __('common.download_name', ['name' => $previewName]) }}">
+                    <flux:icon name="arrow-down-tray" variant="micro" class="size-4" />
+                </a>
+            </x-slot:headerActions>
+
             <div
-                class="flex max-h-[90dvh] flex-col"
+                class="bg-board-head dark:bg-secondary-medium/20"
                 wire:key="preview-{{ $previewFile->id }}"
                 x-data
                 x-on:keydown.left.window="$wire.previewAdjacent(document.dir === 'rtl' ? 1 : -1)"
                 x-on:keydown.right.window="$wire.previewAdjacent(document.dir === 'rtl' ? -1 : 1)"
             >
-                <div class="flex flex-wrap items-center gap-3 border-b border-secondary-soft py-3 ps-5 pe-14 dark:border-secondary-medium">
-                    <div class="min-w-0 flex-1">
-                        <flux:heading size="lg" class="truncate" title="{{ $previewName }}">{{ $previewName }}</flux:heading>
-                        <p class="flex flex-wrap items-center gap-x-1.5 text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">
-                            <span class="font-bold">{{ Str::upper($previewFile->type->value) }}</span>
-                            @if ($previewFile->size !== null)
-                                <span aria-hidden="true">&middot;</span>
-                                <span>{{ \Illuminate\Support\Number::fileSize($previewFile->size, precision: 1) }}</span>
-                            @endif
-                            <span aria-hidden="true">&middot;</span>
-                            <time datetime="{{ $previewFile->date?->toDateString() }}">{{ $previewFile->date?->translatedFormat(__('formats.date')) }}</time>
-                            @if ($this->files->count() > 1)
-                                <span aria-hidden="true">&middot;</span>
-                                <span>{{ __('reports.preview_position', ['position' => $previewPosition, 'total' => $this->files->count()]) }}</span>
-                            @endif
-                        </p>
+                @if (! $previewFile->isStored())
+                    <x-ui.empty-state icon="eye-slash" :heading="__('reports.preview_not_available')" :body="__('reports.this_record_has_no_stored_file')" />
+                @elseif ($previewFile->type === FileType::Pdf)
+                    <iframe src="{{ $previewUrl }}#view=FitH" title="{{ $previewName }}" class="h-[75dvh] w-full border-0 bg-white" data-test="pdf-preview"></iframe>
+                @elseif ($previewFile->isPreviewable())
+                    <div class="flex min-h-[50dvh] items-center justify-center p-4">
+                        <img src="{{ $previewUrl }}" alt="{{ $previewName }}" class="max-h-[75dvh] max-w-full rounded-lg object-contain shadow-sm" data-test="image-preview" />
                     </div>
+                @else
+                    {{-- Word/Excel: rendered client-side by resources/js/file-preview.js from the authenticated download route. --}}
+                    <div
+                        wire:ignore
+                        x-data="officePreview(@js(['url' => $downloadUrl, 'type' => $previewFile->type->value]))"
+                        class="flex h-[75dvh] flex-col"
+                        data-test="office-preview"
+                    >
+                        <div x-show="sheets.length > 1" class="flex shrink-0 gap-1 overflow-x-auto border-b border-secondary-soft bg-white px-3 py-2 dark:border-secondary-medium dark:bg-secondary-dark">
+                            <template x-for="(sheetName, index) in sheets" :key="index">
+                                <button
+                                    type="button"
+                                    x-on:click="showSheet(index)"
+                                    x-text="sheetName"
+                                    class="shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold whitespace-nowrap"
+                                    :class="index === activeSheet ? 'bg-primary text-white' : 'text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium'"
+                                ></button>
+                            </template>
+                        </div>
 
-                    <div class="flex shrink-0 items-center gap-1">
-                        @if ($this->files->count() > 1)
-                            <x-ui.button tone="ghost" size="sm" icon="chevron-left" class="size-8! rtl:[&_svg]:-scale-x-100" wire:click="previewAdjacent(-1)" :aria-label="__('reports.previous_file')" />
-                            <x-ui.button tone="ghost" size="sm" icon="chevron-right" class="size-8! rtl:[&_svg]:-scale-x-100" wire:click="previewAdjacent(1)" :aria-label="__('reports.next_file')" />
-                        @endif
-                        @if ($previewFile->isPreviewable())
-                            <a href="{{ $previewUrl }}" target="_blank" rel="noopener" class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-secondary-soft dark:hover:bg-secondary-medium dark:hover:text-white" aria-label="{{ __('reports.open_in_new_tab') }}">
-                                <flux:icon name="arrow-top-right-on-square" variant="micro" class="size-4" />
-                            </a>
-                        @endif
-                        <a href="{{ $downloadUrl }}" class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-secondary-soft dark:hover:bg-secondary-medium dark:hover:text-white" aria-label="{{ __('common.download_name', ['name' => $previewName]) }}">
-                            <flux:icon name="arrow-down-tray" variant="micro" class="size-4" />
-                        </a>
+                        <div x-show="status === 'loading'" class="flex flex-1 items-center justify-center gap-2 text-sm text-secondary-medium dark:text-secondary-soft">
+                            <flux:icon.loading class="size-5" />
+                            {{ __('reports.loading_preview') }}
+                        </div>
+
+                        <div x-show="status === 'error'" x-cloak class="flex-1">
+                            <x-ui.empty-state icon="exclamation-triangle" :heading="__('reports.preview_not_available')" :body="__('reports.this_file_could_not_be_previewed')">
+                                <x-slot:action>
+                                    <a href="{{ $downloadUrl }}" class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:opacity-90">
+                                        <flux:icon name="arrow-down-tray" variant="micro" class="size-4" />
+                                        {{ __('common.download_name', ['name' => $previewName]) }}
+                                    </a>
+                                </x-slot:action>
+                            </x-ui.empty-state>
+                        </div>
+
+                        <div x-show="status === 'ready'" x-cloak x-ref="canvas" class="min-h-0 flex-1 overflow-auto"></div>
+
+                        <p x-show="truncated" x-cloak class="shrink-0 border-t border-secondary-soft bg-white px-3 py-2 text-xs text-secondary-medium dark:border-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft">{{ __('reports.sheet_preview_truncated', ['rows' => 500]) }}</p>
                     </div>
-                </div>
-
-                <div class="min-h-0 flex-1 overflow-auto bg-board-head dark:bg-secondary-medium/20">
-                    @if (! $previewFile->isStored())
-                        <x-ui.empty-state icon="eye-slash" :heading="__('reports.preview_not_available')" :body="__('reports.this_record_has_no_stored_file')" />
-                    @elseif ($previewFile->type === FileType::Pdf)
-                        <iframe src="{{ $previewUrl }}#view=FitH" title="{{ $previewName }}" class="h-[75dvh] w-full border-0 bg-white" data-test="pdf-preview"></iframe>
-                    @elseif ($previewFile->isPreviewable())
-                        <div class="flex min-h-[50dvh] items-center justify-center p-4">
-                            <img src="{{ $previewUrl }}" alt="{{ $previewName }}" class="max-h-[75dvh] max-w-full rounded-lg object-contain shadow-sm" data-test="image-preview" />
-                        </div>
-                    @else
-                        {{-- Word/Excel: rendered client-side by resources/js/file-preview.js from the authenticated download route. --}}
-                        <div
-                            wire:ignore
-                            x-data="officePreview(@js(['url' => $downloadUrl, 'type' => $previewFile->type->value]))"
-                            class="flex h-[75dvh] flex-col"
-                            data-test="office-preview"
-                        >
-                            <div x-show="sheets.length > 1" class="flex shrink-0 gap-1 overflow-x-auto border-b border-secondary-soft bg-white px-3 py-2 dark:border-secondary-medium dark:bg-secondary-dark">
-                                <template x-for="(sheetName, index) in sheets" :key="index">
-                                    <button
-                                        type="button"
-                                        x-on:click="showSheet(index)"
-                                        x-text="sheetName"
-                                        class="shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold whitespace-nowrap"
-                                        :class="index === activeSheet ? 'bg-primary text-white' : 'text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium'"
-                                    ></button>
-                                </template>
-                            </div>
-
-                            <div x-show="status === 'loading'" class="flex flex-1 items-center justify-center gap-2 text-sm text-secondary-medium dark:text-secondary-soft">
-                                <flux:icon.loading class="size-5" />
-                                {{ __('reports.loading_preview') }}
-                            </div>
-
-                            <div x-show="status === 'error'" x-cloak class="flex-1">
-                                <x-ui.empty-state icon="exclamation-triangle" :heading="__('reports.preview_not_available')" :body="__('reports.this_file_could_not_be_previewed')">
-                                    <x-slot:action>
-                                        <a href="{{ $downloadUrl }}" class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:opacity-90">
-                                            <flux:icon name="arrow-down-tray" variant="micro" class="size-4" />
-                                            {{ __('common.download_name', ['name' => $previewName]) }}
-                                        </a>
-                                    </x-slot:action>
-                                </x-ui.empty-state>
-                            </div>
-
-                            <div x-show="status === 'ready'" x-cloak x-ref="canvas" class="min-h-0 flex-1 overflow-auto"></div>
-
-                            <p x-show="truncated" x-cloak class="shrink-0 border-t border-secondary-soft bg-white px-3 py-2 text-xs text-secondary-medium dark:border-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft">{{ __('reports.sheet_preview_truncated', ['rows' => 500]) }}</p>
-                        </div>
-                    @endif
-                </div>
+                @endif
             </div>
         @endif
-    </flux:modal>
+    </x-ui.modal>
 
-    <flux:modal wire:model="showDeleteFileModal" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        @if ($showDeleteFileModal)
-            @php
-                $deletingFile = $this->files->firstWhere('id', $deletingFileId);
-            @endphp
-            <div class="space-y-5">
-                <div>
-                    <flux:heading size="lg">{{ __('reports.delete_this_file') }}</flux:heading>
-                    <flux:subheading>{{ __('reports.deleting_the_file_also_removes_it_from_storage', ['name' => $deletingFile?->displayName() ?? '']) }}</flux:subheading>
-                </div>
-
-                <div class="flex justify-end gap-2">
-                    <x-ui.button wire:click="closeDeleteFileModal">{{ __('common.cancel') }}</x-ui.button>
-                    <x-ui.button tone="primary" wire:click="deleteFile" data-test="confirm-delete-file-button">{{ __('reports.delete_this_file') }}</x-ui.button>
-                </div>
-            </div>
-        @endif
-    </flux:modal>
+    <x-ui.confirm-modal
+        wire:model="showDeleteFileModal"
+        close="closeDeleteFileModal"
+        :title="__('reports.delete_this_file')"
+        :message="$showDeleteFileModal ? __('reports.deleting_the_file_also_removes_it_from_storage', ['name' => $this->files->firstWhere('id', $deletingFileId)?->displayName() ?? '']) : null"
+        confirm="deleteFile"
+        :confirm-label="__('reports.delete_this_file')"
+        confirm-test="confirm-delete-file-button"
+    />
 </section>

@@ -687,3 +687,63 @@ test('every view offers archive for a live project and restore for an archived o
             ->assertSeeHtml('Restore Retired Project');
     }
 });
+
+test('the project form lays its fields along a three-section rail with no native selects', function () {
+    $user = User::factory()->create();
+
+    $html = Livewire::actingAs($user)->test('pages::projects.index')->call('openCreateModal')->html();
+
+    $document = new DOMDocument;
+    @$document->loadHTML('<?xml encoding="utf-8" ?>'.$html);
+    $xpath = new DOMXPath($document);
+    $dialog = '//dialog[contains(@class, "modal-shell")][.//*[@data-test="save-project-button"]]';
+    $headings = array_map(
+        fn (DOMNode $heading): string => trim($heading->textContent),
+        iterator_to_array($xpath->query($dialog.'//*[contains(@class, "form-section-heading")]')),
+    );
+
+    expect($xpath->query($dialog)->length)->toBe(1)
+        ->and($headings)->toBe(['Details', 'Placement', 'Beneficiaries'])
+        ->and($xpath->query($dialog.'//select')->length)->toBe(0)
+        ->and($xpath->query($dialog.'//*[@data-form-select]')->length)->toBe(4)
+        ->and($xpath->query($dialog.'[@*[name()="wire:close"]="closeProjectModal"]')->length)->toBe(1)
+        ->and($xpath->query($dialog.'//form[@*[name()="wire:submit"]="saveProject"]')->length)->toBe(1);
+});
+
+test('a failed project save points at the rail sections that hold the problems', function () {
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::projects.index')
+        ->call('openCreateModal')
+        ->call('saveProject')
+        ->assertHasErrors(['name', 'cityId', 'programId', 'userId'])
+        ->assertSeeText('1 field needs attention')
+        ->assertSeeText('3 fields need attention')
+        ->assertSeeHtml('aria-invalid="true"');
+});
+
+test('editing a project shows its saved choices in the form pickers', function () {
+    $user = User::factory()->create();
+    $city = insertHrCity('Idlib', 'إدلب');
+    $owner = insertHrEmployee(firstNameEn: 'Lina', lastNameEn: 'Haddad', firstNameAr: 'لينا', lastNameAr: 'حداد');
+    $program = Program::factory()->create();
+    $project = Project::factory()->create([
+        'status' => ProjectStatus::Active,
+        'city_id' => $city,
+        'program_id' => $program->id,
+        'user_id' => $owner,
+    ]);
+
+    $html = Livewire::actingAs($user)->test('pages::projects.index')->call('openEditModal', $project->id)->html();
+
+    $document = new DOMDocument;
+    @$document->loadHTML('<?xml encoding="utf-8" ?>'.$html);
+    $xpath = new DOMXPath($document);
+    $triggerLabel = fn (string $model): string => trim($xpath->query('//*[@data-form-select="'.$model.'"]//*[@data-trigger-label]')->item(0)->textContent);
+
+    expect($triggerLabel('projectStatus'))->toBe('Active')
+        ->and($triggerLabel('cityId'))->toBe('Idlib · إدلب')
+        ->and($triggerLabel('programId'))->toBe($program->name)
+        ->and($triggerLabel('userId'))->toBe('Lina Haddad · لينا حداد');
+});

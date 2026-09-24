@@ -88,6 +88,7 @@ return [
     'related_tasks' => 'Related tasks',
     'replace_file_optional' => 'Replace file (optional)',
     'search_tasks' => 'Search tasks',
+    'section_progress' => 'Progress',
     'select_a_file_to_upload' => 'Select a file to upload.',
     'select_the_source_this_task_is_raised_against' => 'Select what this task is raised against.',
     'set_the_file_date' => 'Set the file date.',

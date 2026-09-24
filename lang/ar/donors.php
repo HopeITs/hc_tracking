@@ -30,6 +30,7 @@ return [
     'phone' => 'الهاتف',
     'reports_submitted' => 'التقارير المقدمة',
     'search_donors' => 'البحث في المانحين',
+    'section_contact' => 'التواصل',
     'this_donor_has_signed_a_funding_agreement_and_cannot_be_dele' => 'وقّع هذا المانح اتفاقية تمويل ولا يمكن حذفه.',
     'all_donors' => 'كل المانحين',
     'and_count_more' => '{1} واتفاقية أخرى|[2,*] و:count اتفاقيات أخرى',

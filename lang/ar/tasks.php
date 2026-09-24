@@ -88,6 +88,7 @@ return [
     'related_tasks' => 'المهام المرتبطة',
     'replace_file_optional' => 'استبدال الملف (اختياري)',
     'search_tasks' => 'البحث في المهام',
+    'section_progress' => 'التقدم',
     'select_a_file_to_upload' => 'اختر ملفًا لرفعه.',
     'select_the_source_this_task_is_raised_against' => 'اختر ما تُنشأ هذه المهمة مقابله.',
     'set_the_file_date' => 'حدد تاريخ الملف.',

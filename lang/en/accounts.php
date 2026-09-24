@@ -45,6 +45,8 @@ return [
     'opening_date_unknown' => 'Opening date unknown',
     'po_box_street' => 'Bank branch address',
     'search_accounts' => 'Search accounts',
+    'section_address' => 'Address',
+    'section_bank' => 'Bank details',
     'swift_code' => 'SWIFT / BIC code',
     'total_transfers' => 'Total transfers',
     'view_transfers_for_name' => 'View transfers for :name',

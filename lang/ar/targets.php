@@ -72,6 +72,7 @@ return [
     'the_indicator_and_source_are_locked_once_reported_against' => 'قُدمت تقارير على هذا المستهدف، فلا يمكن تغيير مؤشره أو خطته أو مقترحه. ما زال بإمكانك تعديل القيمة والفترة والمشروع.',
     'this_indicator_already_has_a_target_here' => 'لهذا المؤشر مستهدف في هذه الخطة أو المقترح للمشروع نفسه. عدّل ذلك المستهدف بدلًا من ذلك.',
     'scoped_to_project' => 'مخصص لمشروع :project',
+    'section_commitment' => 'الالتزام',
     'only_plans_of_the_result_program_are_offered' => 'تُعرض فقط خطط برنامج النتيجة.',
     'only_projects_the_proposal_funds_are_offered' => 'تُعرض فقط المشاريع التي يمولها هذا المقترح.',
     'only_projects_in_the_plan_program_are_offered' => 'تُعرض فقط مشاريع برنامج هذه الخطة.',

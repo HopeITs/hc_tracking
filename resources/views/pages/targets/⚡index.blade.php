@@ -1240,104 +1240,96 @@ new #[Title('titles.targets')] class extends Component {
         <flux:pagination :paginator="$this->resultPage" class="pt-4 text-secondary-medium! dark:text-secondary-soft!" scroll-to="#target-directory-heading" />
     </div>
 
-    <flux:modal wire:model="showTargetModal" class="w-full max-w-2xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
+    <x-ui.modal
+        wire:model="showTargetModal"
+        size="xl"
+        :title="$editingTargetId === null ? __('targets.commit_target') : __('targets.edit_target')"
+        :description="__('targets.a_target_is_committed_either_in_an_annual_operational_plan_o')"
+        submit="saveTarget"
+        close="closeTargetModal"
+        required-note
+    >
         @if ($showTargetModal)
-        <form wire:submit="saveTarget" class="space-y-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ $editingTargetId === null ? __('targets.commit_target') : __('targets.edit_target') }}</flux:heading>
-                <flux:subheading>{{ __('targets.a_target_is_committed_either_in_an_annual_operational_plan_o') }}</flux:subheading>
-            </div>
-
             @php
                 $formIndicator = $this->formIndicator;
                 $formIsPercentage = $formIndicator?->measure === IndicatorMeasure::Percentage;
+                $indicatorHelp = $formIndicator === null ? null : $formIndicator->measure->label().($formIndicator->project !== null ? ' · '.__('targets.scoped_to_project', ['project' => $formIndicator->project->name]) : '');
             @endphp
 
             {{-- The indicator comes first: it decides which plans and projects fit. --}}
-            <div>
-                <x-ui.select wire:model.live="targetIndicatorId" :label="__('targets.indicator')" required>
-                    <flux:select.option value="">{{ __('targets.select_an_indicator') }}</flux:select.option>
-                    @foreach ($this->indicatorOptions as $indicatorOption)
-                        <flux:select.option :value="$indicatorOption->id" :wire:key="'tgt-indicator-'.$indicatorOption->id">{{ $indicatorOption->name }} — {{ Str::limit($indicatorOption->result?->statement, 50) }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
-                @if ($formIndicator !== null)
-                    <p class="mt-1.5 type-meta text-secondary-medium dark:text-secondary-soft">
-                        {{ $formIndicator->measure->label() }}
-                        @if ($formIndicator->project !== null)
-                            · {{ __('targets.scoped_to_project', ['project' => $formIndicator->project->name]) }}
-                        @endif
-                    </p>
-                @endif
-            </div>
-
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.select wire:model.live="targetSourceType" :label="__('targets.committed_in')" required>
-                    @foreach ($sourceTypeLabels as $sourceKey => $sourceLabel)
-                        <flux:select.option :value="$sourceKey" :wire:key="'tgt-source-option-'.$sourceKey">{{ $sourceLabel }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
-
-                <div>
-                    <x-ui.select wire:model.live="targetSourceId" :label="$targetSourceType === 'proposal' ? __('common.proposal') : __('common.annual_plan')" required>
-                        <flux:select.option value="">{{ __('targets.select_a_source') }}</flux:select.option>
-                        @foreach ($this->sourceOptions as $sourceOption)
-                            <flux:select.option :value="$sourceOption['id']" :wire:key="'tgt-src-'.$targetSourceType.'-'.$sourceOption['id']">
-                                {{ $sourceOption['label'] }}
-                            </flux:select.option>
+            <x-ui.form-section :title="__('common.section_details')" :fields="['targetIndicatorId', 'targetSourceType', 'targetSourceId']">
+                <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                    <x-ui.form-select wire:model.live="targetIndicatorId" :label="__('targets.indicator')" :placeholder="__('targets.select_an_indicator')" :help="$indicatorHelp" required autofocus class="@2xl/modal:col-span-2">
+                        @foreach ($this->indicatorOptions as $indicatorOption)
+                            <flux:select.option :value="$indicatorOption->id">{{ $indicatorOption->name }} — {{ Str::limit($indicatorOption->result?->statement, 50) }}</flux:select.option>
                         @endforeach
-                    </x-ui.select>
-                    @if ($targetSourceType === 'annual_plan' && $formIndicator?->result?->program_id !== null)
-                        <p class="mt-1.5 type-meta text-secondary-medium dark:text-secondary-soft">{{ __('targets.only_plans_of_the_result_program_are_offered') }}</p>
-                    @endif
+                    </x-ui.form-select>
+
+                    <x-ui.form-segmented
+                        wire:model.live="targetSourceType"
+                        :label="__('targets.committed_in')"
+                        required
+                        :options="collect($sourceTypeLabels)->map(fn (string $sourceLabel, string $sourceKey): array => ['value' => $sourceKey, 'label' => $sourceLabel])->values()->all()"
+                    />
+
+                    <x-ui.form-select
+                        wire:model.live="targetSourceId"
+                        :label="$targetSourceType === 'proposal' ? __('common.proposal') : __('common.annual_plan')"
+                        :placeholder="__('targets.select_a_source')"
+                        :help="$targetSourceType === 'annual_plan' && $formIndicator?->result?->program_id !== null ? __('targets.only_plans_of_the_result_program_are_offered') : null"
+                        required
+                    >
+                        @foreach ($this->sourceOptions as $sourceOption)
+                            <flux:select.option :value="$sourceOption['id']">{{ $sourceOption['label'] }}</flux:select.option>
+                        @endforeach
+                    </x-ui.form-select>
                 </div>
-            </div>
+            </x-ui.form-section>
 
-            <div class="grid gap-4 sm:grid-cols-3">
-                <x-ui.input wire:model="targetValue" :label="$formIsPercentage ? __('targets.target_value_percent') : __('targets.target_value')" type="number" step="0.01" min="0" :max="$formIsPercentage ? 100 : null" required />
+            <x-ui.form-section :title="__('targets.section_commitment')" :fields="['targetValue', 'targetPeriod', 'targetProjectId']">
+                <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                    <x-ui.form-input wire:model="targetValue" :label="$formIsPercentage ? __('targets.target_value_percent') : __('targets.target_value')" type="number" step="0.01" min="0" :max="$formIsPercentage ? 100 : null" :suffix="$formIsPercentage ? '%' : null" required />
 
-                <x-ui.select wire:model="targetPeriod" :label="__('targets.reporting_period')" required>
-                    @foreach (Period::cases() as $periodCase)
-                        <flux:select.option :value="$periodCase->value" :wire:key="'tgt-period-option-'.$periodCase->value">{{ $periodCase->label() }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
+                    <x-ui.form-segmented
+                        wire:model="targetPeriod"
+                        :label="__('targets.reporting_period')"
+                        required
+                        :options="collect(Period::cases())->map(fn (Period $periodCase): array => ['value' => $periodCase->value, 'label' => $periodCase->label()])->all()"
+                    />
 
-                <x-ui.select wire:model="targetProjectId" :label="__('common.project')" :disabled="$formIndicator?->project_id !== null">
-                    @if ($formIndicator?->project_id === null)
-                        <flux:select.option value="">{{ __('common.organisation_wide') }}</flux:select.option>
-                    @endif
-                    @foreach ($this->formProjectOptions as $projectOption)
-                        <flux:select.option :value="$projectOption->id" :wire:key="'tgt-project-option-'.$projectOption->id">{{ $projectOption->name }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
-            </div>
-
-            @if ($targetSourceId !== '')
-                <p class="-mt-2 type-meta text-secondary-medium dark:text-secondary-soft">
-                    {{ $targetSourceType === 'proposal' ? __('targets.only_projects_the_proposal_funds_are_offered') : __('targets.only_projects_in_the_plan_program_are_offered') }}
-                </p>
-            @endif
-
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeTargetModal">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-target-button">
-                    {{ $editingTargetId === null ? __('targets.commit_target') : __('common.save_changes') }}
-                </x-ui.button>
-            </div>
-        </form>
+                    <x-ui.form-select
+                        wire:model="targetProjectId"
+                        :label="__('common.project')"
+                        :disabled="$formIndicator?->project_id !== null"
+                        :locked-reason="$formIndicator?->project !== null ? __('targets.scoped_to_project', ['project' => $formIndicator->project->name]) : null"
+                        :help="$targetSourceId !== '' ? ($targetSourceType === 'proposal' ? __('targets.only_projects_the_proposal_funds_are_offered') : __('targets.only_projects_in_the_plan_program_are_offered')) : null"
+                        class="@2xl/modal:col-span-2"
+                    >
+                        @if ($formIndicator?->project_id === null)
+                            <flux:select.option value="">{{ __('common.organisation_wide') }}</flux:select.option>
+                        @endif
+                        @foreach ($this->formProjectOptions as $projectOption)
+                            <flux:select.option :value="$projectOption->id">{{ $projectOption->name }}</flux:select.option>
+                        @endforeach
+                    </x-ui.form-select>
+                </div>
+            </x-ui.form-section>
         @endif
-    </flux:modal>
 
-    <flux:modal wire:model="showDeleteModal" wire:close="cancelDelete" class="w-full max-w-md border border-secondary-light! bg-white! dark:bg-secondary-dark!">
-        @if ($deletingTargetId !== null)
-        <div class="space-y-4">
-            <flux:heading size="lg">{{ __('targets.delete_this_target') }}</flux:heading>
-            <flux:subheading>{{ __('targets.only_a_target_with_no_reports_can_be_deleted_otherwise_every') }}</flux:subheading>
-            <div class="flex justify-end gap-2 border-t border-secondary-soft pt-4 dark:border-secondary-medium">
-                <x-ui.button type="button" wire:click="cancelDelete">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="button" tone="primary" wire:click="deleteTarget" data-test="confirm-delete-target">{{ __('targets.delete_target') }}</x-ui.button>
-            </div>
-        </div>
-        @endif
-    </flux:modal>
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="save-target-button">
+                {{ $editingTargetId === null ? __('targets.commit_target') : __('common.save_changes') }}
+            </x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
+
+    <x-ui.confirm-modal
+        wire:model="showDeleteModal"
+        close="cancelDelete"
+        :title="__('targets.delete_this_target')"
+        :message="__('targets.only_a_target_with_no_reports_can_be_deleted_otherwise_every')"
+        confirm="deleteTarget"
+        :confirm-label="__('targets.delete_target')"
+        confirm-test="confirm-delete-target"
+    />
 </section>

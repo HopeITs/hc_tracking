@@ -7,6 +7,7 @@
 ])
 
 @php
+    /* Flux's menu type-ahead listens on the whole menu; single-character keys stop at the search box so typing filters instead of jumping. */
     $model = $attributes->wire('model')->value();
 
     if ($model === null) {
@@ -64,6 +65,7 @@
                         size="sm"
                         icon="magnifying-glass"
                         x-model="optionSearch"
+                        x-on:keydown="$event.key.length === 1 && $event.stopPropagation()"
                         :aria-label="$searchLabel"
                         :placeholder="$searchLabel"
                     />

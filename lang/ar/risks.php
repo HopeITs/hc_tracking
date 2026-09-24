@@ -21,6 +21,7 @@ return [
     'risk_impact_or_project' => 'الخطر أو الأثر أو المشروع',
     'risk_logged' => 'تم تسجيل الخطر.',
     'risk_name' => 'اسم الخطر',
+    'section_assessment' => 'التقييم',
     'risk_updated' => 'تم تحديث الخطر.',
     'risks_by_project' => 'المخاطر حسب المشروع',
     'risks_by_project_hint' => 'التحديات التي وقعت فعلًا مقابل المخاطر التي ما زالت محتملة، لكل مشروع.',

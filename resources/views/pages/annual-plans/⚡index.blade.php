@@ -1437,71 +1437,60 @@ new #[Title('titles.annual_plans')] class extends Component {
         </section>
     @endif
 
-    <flux:modal wire:model="showPlanModal" class="w-full max-w-2xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <form wire:submit="savePlan" class="flex flex-col gap-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ $editingPlanId === null ? __('annual_plans.new_annual_plan') : __('annual_plans.edit_annual_plan') }}</flux:heading>
-                <flux:subheading>{{ __('annual_plans.one_program_one_fiscal_year_one_accountable_manager') }}</flux:subheading>
-            </div>
-
-            @if ($showPlanModal)
-                <x-ui.select wire:model="planProgramId" :label="__('common.program')" required>
-                    <flux:select.option value="">{{ __('annual_plans.select_a_program') }}</flux:select.option>
+    <x-ui.modal
+        wire:model="showPlanModal"
+        size="md"
+        :title="$editingPlanId === null ? __('annual_plans.new_annual_plan') : __('annual_plans.edit_annual_plan')"
+        :description="__('annual_plans.one_program_one_fiscal_year_one_accountable_manager')"
+        submit="savePlan"
+        close="closePlanModal"
+        required-note
+    >
+        @if ($showPlanModal)
+            <div class="grid grid-cols-2 gap-x-4 gap-y-4">
+                <x-ui.form-select wire:model="planProgramId" :label="__('common.program')" :placeholder="__('annual_plans.select_a_program')" required class="col-span-2">
                     @foreach ($this->programOptions as $programOption)
-                        <flux:select.option :value="$programOption->id" :wire:key="'plan-program-option-'.$programOption->id">{{ $programOption->name }}</flux:select.option>
+                        <flux:select.option :value="$programOption->id">{{ $programOption->name }}</flux:select.option>
                     @endforeach
-                </x-ui.select>
+                </x-ui.form-select>
 
-                <div class="grid gap-4 sm:grid-cols-2">
-                    <x-ui.select wire:model="planYear" :label="__('annual_plans.fiscal_year')" required>
-                        <flux:select.option value="">{{ __('annual_plans.select_a_fiscal_year') }}</flux:select.option>
-                        @foreach ($this->yearFormOptions as $yearFormOption)
-                            <flux:select.option :value="$yearFormOption" :wire:key="'plan-year-option-'.$yearFormOption">{{ $yearFormOption }}</flux:select.option>
-                        @endforeach
-                    </x-ui.select>
+                <x-ui.form-select wire:model="planYear" :label="__('annual_plans.fiscal_year')" :placeholder="__('annual_plans.select_a_fiscal_year')" required>
+                    @foreach ($this->yearFormOptions as $yearFormOption)
+                        <flux:select.option :value="$yearFormOption">{{ $yearFormOption }}</flux:select.option>
+                    @endforeach
+                </x-ui.form-select>
 
-                    <x-ui.select wire:model="planManagerId" :label="__('annual_plans.assigned_manager')" required>
-                        <flux:select.option value="">{{ __('annual_plans.select_a_manager') }}</flux:select.option>
-                        @foreach ($this->employeeOptions as $employeeOption)
-                            <flux:select.option :value="$employeeOption->id" :wire:key="'plan-manager-option-'.$employeeOption->id">
-                                {{ $employeeOption->name }} · {{ $employeeOption->secondary_name }}
-                            </flux:select.option>
-                        @endforeach
-                    </x-ui.select>
-                </div>
-            @endif
-
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="closePlanModal">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" data-test="save-annual-plan-button">
-                    {{ $editingPlanId === null ? __('annual_plans.create_annual_plan') : __('common.save_changes') }}
-                </x-ui.button>
+                <x-ui.form-select wire:model="planManagerId" :label="__('annual_plans.assigned_manager')" :placeholder="__('annual_plans.select_a_manager')" required>
+                    @foreach ($this->employeeOptions as $employeeOption)
+                        <flux:select.option :value="$employeeOption->id">{{ $employeeOption->name }} · {{ $employeeOption->secondary_name }}</flux:select.option>
+                    @endforeach
+                </x-ui.form-select>
             </div>
-        </form>
-    </flux:modal>
+        @endif
 
-    <flux:modal wire:model="showDeleteModal" wire:close="cancelDelete" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        @php($pendingDelete = $this->deletingPlan)
-        <div class="flex flex-col gap-4">
-            <flux:heading size="lg">{{ __('annual_plans.delete_this_annual_plan') }}</flux:heading>
-            @if ($pendingDelete !== null)
-                <flux:subheading>
-                    {{ $pendingDelete['targets'] > 0
-                        ? __('annual_plans.deleting_the_plan_also_removes_its_targets_and_their_reports', [
-                            'program' => $pendingDelete['plan']->program?->name ?? __('common.program'),
-                            'year' => $pendingDelete['plan']->year,
-                            'count' => $pendingDelete['targets'],
-                        ])
-                        : __('annual_plans.this_plan_has_no_targets_committed_in_it', [
-                            'program' => $pendingDelete['plan']->program?->name ?? __('common.program'),
-                            'year' => $pendingDelete['plan']->year,
-                        ]) }}
-                </flux:subheading>
-            @endif
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="cancelDelete">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="button" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="deletePlan" data-test="confirm-delete-annual-plan">{{ __('annual_plans.delete_annual_plan') }}</x-ui.button>
-            </div>
-        </div>
-    </flux:modal>
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="save-annual-plan-button">
+                {{ $editingPlanId === null ? __('annual_plans.create_annual_plan') : __('common.save_changes') }}
+            </x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
+
+    <x-ui.confirm-modal
+        wire:model="showDeleteModal"
+        close="cancelDelete"
+        :title="__('annual_plans.delete_this_annual_plan')"
+        :message="$this->deletingPlan === null ? null : ($this->deletingPlan['targets'] > 0
+            ? __('annual_plans.deleting_the_plan_also_removes_its_targets_and_their_reports', [
+                'program' => $this->deletingPlan['plan']->program?->name ?? __('common.program'),
+                'year' => $this->deletingPlan['plan']->year,
+                'count' => $this->deletingPlan['targets'],
+            ])
+            : __('annual_plans.this_plan_has_no_targets_committed_in_it', [
+                'program' => $this->deletingPlan['plan']->program?->name ?? __('common.program'),
+                'year' => $this->deletingPlan['plan']->year,
+            ]))"
+        confirm="deletePlan"
+        :confirm-label="__('annual_plans.delete_annual_plan')"
+        confirm-test="confirm-delete-annual-plan"
+    />
 </section>

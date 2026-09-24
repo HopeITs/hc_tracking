@@ -791,12 +791,7 @@ new #[Title('titles.calendar')] class extends Component {
         'report' => 'bg-primary',
     ];
 
-    $selectedMilestoneProject = $milestoneProjectId === '' ? null : $this->projectOptions->firstWhere('id', (int) $milestoneProjectId);
-    $selectedParentMilestone = $parentMilestoneId === '' ? null : $this->parentOptions->firstWhere('id', (int) $parentMilestoneId);
-    $selectedResponsibleOption = $responsibleUserId === '' ? null : $this->userOptions->firstWhere('id', (int) $responsibleUserId);
-    $selectedTaskSource = $taskSourceId === '' ? null : $this->sourceOptions->firstWhere('id', (int) $taskSourceId);
     $selectedFilterEmployee = $filterEmployeeId === '' ? null : $this->userOptions->firstWhere('id', (int) $filterEmployeeId);
-    $dropdownLabelClasses = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-secondary-soft';
 
     $periodHeading = match ($viewMode) {
         'month' => $calendar['month']->translatedFormat(__('formats.month_year')),
@@ -1064,274 +1059,166 @@ new #[Title('titles.calendar')] class extends Component {
         </div>
     @endif
 
-    <flux:modal wire:model="showMilestoneModal" class="w-full max-w-3xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <form wire:submit="saveMilestone" class="flex flex-col gap-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ $editingMilestoneId === null ? __('milestones.add_milestone') : __('milestones.edit_milestone') }}</flux:heading>
+    <x-ui.modal
+        wire:model="showMilestoneModal"
+        size="xl"
+        :title="$editingMilestoneId === null ? __('milestones.add_milestone') : __('milestones.edit_milestone')"
+        submit="saveMilestone"
+        close="closeMilestoneModal"
+        required-note
+    >
+        <x-ui.form-section :title="__('common.section_details')" :fields="['name']">
+            <x-ui.form-input wire:model="name" :label="__('milestones.milestone_name')" maxlength="255" required autofocus />
+        </x-ui.form-section>
+
+        <x-ui.form-section :title="__('common.section_placement')" :fields="['milestoneProjectId', 'parentMilestoneId', 'responsibleUserId']">
+            <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-3">
+                <x-ui.form-select
+                    wire:model.live="milestoneProjectId"
+                    id="milestone-form-project"
+                    :label="__('common.project')"
+                    :placeholder="__('common.select_a_project')"
+                    :search-label="__('milestones.search_projects')"
+                    :disabled="$editingMilestoneId !== null"
+                    :locked-reason="__('milestones.a_milestone_cannot_be_moved_to_another_project')"
+                    required
+                >
+                    @foreach ($this->projectOptions as $projectOption)
+                        <flux:select.option :value="$projectOption->id">{{ $projectOption->name }}</flux:select.option>
+                    @endforeach
+                </x-ui.form-select>
+
+                <x-ui.form-select wire:model="parentMilestoneId" :label="__('milestones.nest_under')" :search-label="__('milestones.search_milestones')">
+                    <flux:select.option value="">{{ __('common.top_level') }}</flux:select.option>
+                    @foreach ($this->parentOptions as $parentOption)
+                        <flux:select.option :value="$parentOption->id">{{ $parentOption->name }}</flux:select.option>
+                    @endforeach
+                </x-ui.form-select>
+
+                <x-ui.form-select wire:model="responsibleUserId" :label="__('milestones.responsible')" :placeholder="__('common.select')" :search-label="__('milestones.search_responsible')">
+                    @foreach ($this->userOptions as $userOption)
+                        <flux:select.option :value="$userOption->id">{{ $userOption->name }} · {{ $userOption->secondary_name }}</flux:select.option>
+                    @endforeach
+                </x-ui.form-select>
             </div>
+        </x-ui.form-section>
 
-            <x-ui.input wire:model="name" :label="__('milestones.milestone_name')" type="text" maxlength="255" required autofocus />
+        <x-ui.form-section :title="__('common.section_schedule')" :fields="['plannedStartDate', 'plannedEndDate', 'milestoneStatus', 'sequence', 'weightPercentage']">
+            <div class="grid grid-cols-2 gap-x-4 gap-y-3 @4xl/modal:grid-cols-3">
+                <x-ui.form-input wire:model="plannedStartDate" :label="__('milestones.planned_start_date')" type="date" required data-test="calendar-form-planned-date" />
+                <x-ui.form-input wire:model="plannedEndDate" :label="__('milestones.planned_end_date')" type="date" />
 
-            <div class="grid gap-4 sm:grid-cols-2">
-                <div class="min-w-0">
-                    <label for="milestone-form-project" class="{{ $dropdownLabelClasses }}">{{ __('common.project') }}</label>
-                    @if ($editingMilestoneId !== null)
-                        <flux:tooltip :content="__('milestones.a_milestone_cannot_be_moved_to_another_project')">
-                            @include('pages.milestones._project-dropdown', ['disabled' => true])
-                        </flux:tooltip>
-                    @else
-                        @include('pages.milestones._project-dropdown', ['disabled' => false])
-                    @endif
-                    <flux:error name="milestoneProjectId" class="mt-1.5" />
-                </div>
+                <x-ui.form-select wire:model="milestoneStatus" :label="__('common.status')" required class="col-span-2 @4xl/modal:col-span-1">
+                    @foreach (MilestoneStatus::cases() as $statusCase)
+                        <flux:select.option :value="$statusCase->value">{{ $statusCase->label() }}</flux:select.option>
+                    @endforeach
+                </x-ui.form-select>
 
-                <div class="min-w-0">
-                    <label for="milestone-form-parent" class="{{ $dropdownLabelClasses }}">{{ __('milestones.nest_under') }}</label>
-                    <flux:dropdown position="bottom" align="start" class="filter-picker block! w-full!" x-data="{ optionSearch: '' }">
-                        <flux:button id="milestone-form-parent" type="button" variant="outline" icon:trailing="chevron-up-down" class="w-full! justify-between!" :aria-label="__('milestones.nest_under')">
-                            <span class="truncate">{{ $selectedParentMilestone?->name ?? __('common.top_level') }}</span>
-                        </flux:button>
-                        <flux:menu class="filter-menu">
-                            @if ($this->parentOptions->count() > 6)
-                                <div class="border-b border-secondary-soft p-1.5 dark:border-secondary-medium">
-                                    <x-ui.input type="search" size="sm" icon="magnifying-glass" x-model="optionSearch" :aria-label="__('milestones.search_milestones')" :placeholder="__('milestones.search_milestones')" />
-                                </div>
-                            @endif
-                            <flux:menu.item wire:click="$set('parentMilestoneId', '')">
-                                {{ __('common.top_level') }}
-                                @if ($parentMilestoneId === '')<flux:icon.check class="ms-auto size-4 text-secondary-medium" />@endif
-                            </flux:menu.item>
-                            @foreach ($this->parentOptions as $parentOption)
-                                <flux:menu.item wire:click="$set('parentMilestoneId', {{ $parentOption->id }})" x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())" :wire:key="'milestone-form-parent-option-'.$parentOption->id">
-                                    <span class="min-w-0 truncate">{{ $parentOption->name }}</span>
-                                    @if ((int) $parentMilestoneId === $parentOption->id)<flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" />@endif
-                                </flux:menu.item>
-                            @endforeach
-                        </flux:menu>
-                    </flux:dropdown>
-                    <flux:error name="parentMilestoneId" class="mt-1.5" />
-                </div>
+                <x-ui.form-input wire:model="sequence" :label="__('milestones.sequence')" type="number" min="0" required />
+                <x-ui.form-input wire:model="weightPercentage" :label="__('milestones.weight')" type="number" min="0" max="100" step="0.01" suffix="%" required />
             </div>
+        </x-ui.form-section>
 
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.input wire:model="plannedStartDate" :label="__('milestones.planned_start_date')" type="date" required data-test="calendar-form-planned-date" />
-                <x-ui.input wire:model="plannedEndDate" :label="__('milestones.planned_end_date')" type="date" />
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="calendar-save-milestone-button">{{ $editingMilestoneId === null ? __('milestones.create_milestone') : __('common.save_changes') }}</x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
+
+    <x-ui.confirm-modal
+        wire:model="showDeleteModal"
+        :title="__('milestones.delete_this_milestone')"
+        :message="__('milestones.only_a_milestone_with_no_nested_milestones_and_no_tasks_can')"
+        confirm="deleteMilestone"
+        :confirm-label="__('milestones.delete_milestone')"
+        confirm-test="calendar-confirm-delete-milestone"
+    />
+
+    <x-ui.modal
+        wire:model="showTaskModal"
+        size="xl"
+        :title="$editingTaskId === null ? __('tasks.add_task') : __('tasks.edit_task')"
+        :description="__('tasks.every_task_delivers_against_a_proposal_a_milestone_is_option')"
+        submit="saveTask"
+        close="closeTaskModal"
+        required-note
+    >
+        <x-ui.form-section :title="__('common.section_details')" :fields="['title', 'description']">
+            <div class="grid gap-y-3">
+                <x-ui.form-input wire:model="title" :label="__('tasks.task_title')" maxlength="255" required autofocus />
+                <x-ui.form-textarea wire:model="description" :label="__('common.description')" rows="2" />
             </div>
+        </x-ui.form-section>
 
-            <div class="grid gap-4 sm:grid-cols-2">
-                <div class="min-w-0">
-                    <label for="milestone-form-status" class="{{ $dropdownLabelClasses }}">{{ __('common.status') }}</label>
-                    <flux:dropdown position="bottom" align="start" class="filter-picker block! w-full!">
-                        <flux:button id="milestone-form-status" type="button" variant="outline" icon:trailing="chevron-up-down" class="w-full! justify-between!" :aria-label="__('common.status')">
-                            <span class="truncate">{{ MilestoneStatus::from($milestoneStatus)->label() }}</span>
-                        </flux:button>
-                        <flux:menu class="filter-menu">
-                            @foreach (MilestoneStatus::cases() as $statusCase)
-                                <flux:menu.item wire:click="$set('milestoneStatus', '{{ $statusCase->value }}')" :wire:key="'milestone-form-status-option-'.$statusCase->value">
-                                    <span class="min-w-0 truncate">{{ $statusCase->label() }}</span>
-                                    @if ($milestoneStatus === $statusCase->value)<flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" />@endif
-                                </flux:menu.item>
-                            @endforeach
-                        </flux:menu>
-                    </flux:dropdown>
-                    <flux:error name="milestoneStatus" class="mt-1.5" />
-                </div>
+        <x-ui.form-section :title="__('common.section_placement')" :fields="['taskSourceType', 'taskSourceId']">
+            <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                <x-ui.form-select wire:model.live="taskSourceType" :label="__('tasks.source_type')" :placeholder="__('common.select')" required>
+                    @foreach ($this->sourceTypeOptions as $sourceTypeKey => $sourceTypeLabel)
+                        <flux:select.option :value="$sourceTypeKey">{{ $sourceTypeLabel }}</flux:select.option>
+                    @endforeach
+                </x-ui.form-select>
 
-                <x-ui.input wire:model="sequence" :label="__('milestones.sequence')" type="number" min="0" required />
+                <x-ui.form-select wire:model="taskSourceId" :label="__('tasks.source')" :placeholder="__('common.select')" required>
+                    @foreach ($this->sourceOptions as $sourceOption)
+                        <flux:select.option :value="$sourceOption->id">{{ $sourceOption->name }}{{ $taskSourceType === 'milestone' ? ' · '.$sourceOption->project->name : '' }}</flux:select.option>
+                    @endforeach
+                </x-ui.form-select>
             </div>
+        </x-ui.form-section>
 
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.input wire:model="weightPercentage" :label="__('milestones.weight')" type="number" min="0" max="100" step="0.01" required />
+        <x-ui.form-section :title="__('tasks.section_progress')" :fields="['taskStatus', 'taskPriority', 'progressPercentage', 'assignedTo']">
+            <div class="grid grid-cols-2 gap-x-4 gap-y-3">
+                <x-ui.form-segmented
+                    wire:model="taskStatus"
+                    :label="__('common.status')"
+                    required
+                    class="col-span-2"
+                    :options="[
+                        ['value' => TaskStatus::Todo->value, 'label' => TaskStatus::Todo->label(), 'dot' => 'border border-secondary-light'],
+                        ['value' => TaskStatus::InProgress->value, 'label' => TaskStatus::InProgress->label(), 'dot' => 'bg-status-active'],
+                        ['value' => TaskStatus::UnderReview->value, 'label' => TaskStatus::UnderReview->label(), 'dot' => 'bg-status-warn'],
+                        ['value' => TaskStatus::Done->value, 'label' => TaskStatus::Done->label(), 'dot' => 'bg-status-good'],
+                    ]"
+                />
 
-                <div class="min-w-0">
-                    <label for="milestone-form-responsible" class="{{ $dropdownLabelClasses }}">{{ __('milestones.responsible') }}</label>
-                    <flux:dropdown position="bottom" align="start" class="filter-picker block! w-full!" x-data="{ optionSearch: '' }">
-                        <flux:button id="milestone-form-responsible" type="button" variant="outline" icon:trailing="chevron-up-down" class="w-full! justify-between!" :aria-label="__('milestones.responsible')">
-                            <span class="truncate">{{ $selectedResponsibleOption ? $selectedResponsibleOption->name.' · '.$selectedResponsibleOption->secondary_name : __('common.select') }}</span>
-                        </flux:button>
-                        <flux:menu class="filter-menu">
-                            @if ($this->userOptions->count() > 6)
-                                <div class="border-b border-secondary-soft p-1.5 dark:border-secondary-medium">
-                                    <x-ui.input type="search" size="sm" icon="magnifying-glass" x-model="optionSearch" :aria-label="__('milestones.search_responsible')" :placeholder="__('milestones.search_responsible')" />
-                                </div>
-                            @endif
-                            @foreach ($this->userOptions as $userOption)
-                                <flux:menu.item wire:click="$set('responsibleUserId', {{ $userOption->id }})" x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())" :wire:key="'milestone-form-responsible-option-'.$userOption->id">
-                                    <span class="min-w-0 truncate">{{ $userOption->name }} · {{ $userOption->secondary_name }}</span>
-                                    @if ((int) $responsibleUserId === $userOption->id)<flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" />@endif
-                                </flux:menu.item>
-                            @endforeach
-                        </flux:menu>
-                    </flux:dropdown>
-                    <flux:error name="responsibleUserId" class="mt-1.5" />
-                </div>
+                <x-ui.form-segmented
+                    wire:model="taskPriority"
+                    :label="__('tasks.priority')"
+                    required
+                    :options="[
+                        ['value' => TaskPriority::Low->value, 'label' => TaskPriority::Low->label(), 'icon' => 'flag', 'iconClass' => 'text-secondary-light'],
+                        ['value' => TaskPriority::Medium->value, 'label' => TaskPriority::Medium->label(), 'icon' => 'flag', 'iconClass' => 'text-status-warn'],
+                        ['value' => TaskPriority::High->value, 'label' => TaskPriority::High->label(), 'icon' => 'flag', 'iconClass' => 'text-status-critical'],
+                    ]"
+                />
+
+                <x-ui.form-input wire:model="progressPercentage" :label="__('tasks.progress_2')" type="number" min="0" max="100" suffix="%" required />
+
+                <x-ui.form-multiselect wire:model="assignedTo" :label="__('tasks.assignees')" :placeholder="__('common.select')" class="col-span-2" data-test="task-assignee-picker">
+                    @foreach ($this->userOptions as $userOption)
+                        <flux:select.option :value="$userOption->id">{{ $userOption->name }} · {{ $userOption->secondary_name }}</flux:select.option>
+                    @endforeach
+                </x-ui.form-multiselect>
             </div>
+        </x-ui.form-section>
 
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="closeMilestoneModal">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" data-test="calendar-save-milestone-button">{{ $editingMilestoneId === null ? __('milestones.create_milestone') : __('common.save_changes') }}</x-ui.button>
+        <x-ui.form-section :title="__('common.section_schedule')" :fields="['startDate', 'dueDate', 'completedDate']">
+            <div class="grid grid-cols-2 gap-x-4 gap-y-3 @4xl/modal:grid-cols-3">
+                <x-ui.form-input wire:model="startDate" :label="__('common.start_date')" type="date" />
+                <x-ui.form-input wire:model="dueDate" :label="__('tasks.due_date_2')" type="date" data-test="calendar-task-form-due-date" />
+                <x-ui.form-input wire:model="completedDate" :label="__('tasks.completed_date')" type="date" />
             </div>
-        </form>
-    </flux:modal>
+        </x-ui.form-section>
 
-    <flux:modal wire:model="showDeleteModal" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <div class="flex flex-col gap-4">
-            <flux:heading size="lg">{{ __('milestones.delete_this_milestone') }}</flux:heading>
-            <flux:subheading>{{ __('milestones.only_a_milestone_with_no_nested_milestones_and_no_tasks_can') }}</flux:subheading>
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="$set('showDeleteModal', false)">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="button" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="deleteMilestone" data-test="calendar-confirm-delete-milestone">{{ __('milestones.delete_milestone') }}</x-ui.button>
-            </div>
-        </div>
-    </flux:modal>
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="calendar-save-task-button">{{ $editingTaskId === null ? __('tasks.create_task') : __('common.save_changes') }}</x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
 
-    <flux:modal wire:model="showTaskModal" class="w-full max-w-3xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <form wire:submit="saveTask" class="flex flex-col gap-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ $editingTaskId === null ? __('tasks.add_task') : __('tasks.edit_task') }}</flux:heading>
-                <flux:subheading>{{ __('tasks.every_task_delivers_against_a_proposal_a_milestone_is_option') }}</flux:subheading>
-            </div>
-
-            <x-ui.input wire:model="title" :label="__('tasks.task_title')" type="text" maxlength="255" required autofocus />
-            <flux:textarea wire:model="description" :label="__('common.description')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!" />
-
-            <div class="grid gap-4 sm:grid-cols-2">
-                <div class="min-w-0">
-                    <label for="task-form-source-type" class="{{ $dropdownLabelClasses }}">{{ __('tasks.source_type') }}</label>
-                    <flux:dropdown position="bottom" align="start" class="filter-picker block! w-full!">
-                        <flux:button id="task-form-source-type" type="button" variant="outline" icon:trailing="chevron-up-down" class="w-full! justify-between!" :aria-label="__('tasks.source_type')">
-                            <span class="truncate">{{ $this->sourceTypeOptions[$taskSourceType] ?? __('common.select') }}</span>
-                        </flux:button>
-                        <flux:menu class="filter-menu">
-                            @foreach ($this->sourceTypeOptions as $sourceTypeKey => $sourceTypeLabel)
-                                <flux:menu.item wire:click="$set('taskSourceType', '{{ $sourceTypeKey }}')" :wire:key="'task-form-source-type-option-'.$sourceTypeKey">
-                                    <span class="min-w-0 truncate">{{ $sourceTypeLabel }}</span>
-                                    @if ($taskSourceType === $sourceTypeKey)<flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" />@endif
-                                </flux:menu.item>
-                            @endforeach
-                        </flux:menu>
-                    </flux:dropdown>
-                    <flux:error name="taskSourceType" class="mt-1.5" />
-                </div>
-
-                <div class="min-w-0">
-                    <label for="task-form-source" class="{{ $dropdownLabelClasses }}">{{ __('tasks.source') }}</label>
-                    <flux:dropdown position="bottom" align="start" class="filter-picker block! w-full!" x-data="{ optionSearch: '' }">
-                        <flux:button id="task-form-source" type="button" variant="outline" icon:trailing="chevron-up-down" class="w-full! justify-between!" :aria-label="__('tasks.source')">
-                            <span class="truncate">{{ $selectedTaskSource?->name ?? __('common.select') }}</span>
-                        </flux:button>
-                        <flux:menu class="filter-menu">
-                            @if ($this->sourceOptions->count() > 6)
-                                <div class="border-b border-secondary-soft p-1.5 dark:border-secondary-medium">
-                                    <x-ui.input type="search" size="sm" icon="magnifying-glass" x-model="optionSearch" :aria-label="__('tasks.source')" :placeholder="__('tasks.source')" />
-                                </div>
-                            @endif
-                            @foreach ($this->sourceOptions as $sourceOption)
-                                <flux:menu.item wire:click="$set('taskSourceId', {{ $sourceOption->id }})" x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())" :wire:key="'task-form-source-option-'.$sourceOption->id">
-                                    <span class="min-w-0 truncate">{{ $sourceOption->name }}{{ $taskSourceType === 'milestone' ? ' · '.$sourceOption->project->name : '' }}</span>
-                                    @if ((int) $taskSourceId === $sourceOption->id)<flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" />@endif
-                                </flux:menu.item>
-                            @endforeach
-                        </flux:menu>
-                    </flux:dropdown>
-                    <flux:error name="taskSourceId" class="mt-1.5" />
-                </div>
-            </div>
-
-            <div class="grid gap-4 sm:grid-cols-2 @2xl/directory:grid-cols-4">
-                <div class="min-w-0">
-                    <label for="task-form-status" class="{{ $dropdownLabelClasses }}">{{ __('common.status') }}</label>
-                    <flux:dropdown position="bottom" align="start" class="filter-picker block! w-full!">
-                        <flux:button id="task-form-status" type="button" variant="outline" icon:trailing="chevron-up-down" class="w-full! justify-between!" :aria-label="__('common.status')">
-                            <span class="truncate">{{ TaskStatus::from($taskStatus)->label() }}</span>
-                        </flux:button>
-                        <flux:menu class="filter-menu">
-                            @foreach (TaskStatus::cases() as $statusCase)
-                                <flux:menu.item wire:click="$set('taskStatus', '{{ $statusCase->value }}')" :wire:key="'task-form-status-option-'.$statusCase->value">
-                                    <span class="min-w-0 truncate">{{ $statusCase->label() }}</span>
-                                    @if ($taskStatus === $statusCase->value)<flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" />@endif
-                                </flux:menu.item>
-                            @endforeach
-                        </flux:menu>
-                    </flux:dropdown>
-                    <flux:error name="taskStatus" class="mt-1.5" />
-                </div>
-
-                <div class="min-w-0">
-                    <label for="task-form-priority" class="{{ $dropdownLabelClasses }}">{{ __('tasks.priority') }}</label>
-                    <flux:dropdown position="bottom" align="start" class="filter-picker block! w-full!">
-                        <flux:button id="task-form-priority" type="button" variant="outline" icon:trailing="chevron-up-down" class="w-full! justify-between!" :aria-label="__('tasks.priority')">
-                            <span class="truncate">{{ TaskPriority::from($taskPriority)->label() }}</span>
-                        </flux:button>
-                        <flux:menu class="filter-menu">
-                            @foreach (TaskPriority::cases() as $priorityCase)
-                                <flux:menu.item wire:click="$set('taskPriority', '{{ $priorityCase->value }}')" :wire:key="'task-form-priority-option-'.$priorityCase->value">
-                                    <span class="min-w-0 truncate">{{ $priorityCase->label() }}</span>
-                                    @if ($taskPriority === $priorityCase->value)<flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" />@endif
-                                </flux:menu.item>
-                            @endforeach
-                        </flux:menu>
-                    </flux:dropdown>
-                    <flux:error name="taskPriority" class="mt-1.5" />
-                </div>
-
-                <x-ui.input wire:model="progressPercentage" :label="__('tasks.progress_2')" type="number" min="0" max="100" required />
-
-                <div class="min-w-0">
-                    <label class="{{ $dropdownLabelClasses }}">{{ __('tasks.assignees') }}</label>
-                    @php
-                        $selectedAssigneeOptions = $this->userOptions->whereIn('id', collect($assignedTo)->map(fn ($id) => (int) $id));
-                        $assigneeTriggerLabel = match (true) {
-                            $selectedAssigneeOptions->isEmpty() => __('common.select'),
-                            $selectedAssigneeOptions->count() <= 2 => $selectedAssigneeOptions->map->name->implode(', '),
-                            default => __('common.count_selected', ['count' => $selectedAssigneeOptions->count()]),
-                        };
-                    @endphp
-                    <x-ui.multi-select-popover
-                        :label="__('tasks.assignees')"
-                        in-modal
-                        class="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-secondary-light bg-white px-3 py-2 text-start text-sm dark:border-secondary-light dark:bg-secondary-medium"
-                        data-test="task-assignee-picker"
-                    >
-                        <x-slot:trigger>
-                            <span class="min-w-0 truncate">{{ $assigneeTriggerLabel }}</span>
-                            <flux:icon.chevron-up-down class="size-4 shrink-0 text-secondary-medium dark:text-secondary-soft" aria-hidden="true" />
-                        </x-slot:trigger>
-
-                        @foreach ($this->userOptions as $userOption)
-                            <label
-                                x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
-                                class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-secondary-soft dark:hover:bg-secondary-medium"
-                            >
-                                <input type="checkbox" wire:model.live="assignedTo" value="{{ $userOption->id }}" class="rounded border-secondary-light text-primary focus:ring-primary" />
-                                <span class="min-w-0 truncate">{{ $userOption->name }} · {{ $userOption->secondary_name }}</span>
-                            </label>
-                        @endforeach
-                    </x-ui.multi-select-popover>
-                    <flux:error name="assignedTo" class="mt-1.5" />
-                </div>
-            </div>
-
-            <div class="grid gap-4 sm:grid-cols-3">
-                <x-ui.input wire:model="startDate" :label="__('common.start_date')" type="date" />
-                <x-ui.input wire:model="dueDate" :label="__('tasks.due_date_2')" type="date" data-test="calendar-task-form-due-date" />
-                <x-ui.input wire:model="completedDate" :label="__('tasks.completed_date')" type="date" />
-            </div>
-
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="closeTaskModal">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" data-test="calendar-save-task-button">{{ $editingTaskId === null ? __('tasks.create_task') : __('common.save_changes') }}</x-ui.button>
-            </div>
-        </form>
-    </flux:modal>
-
-    <flux:modal wire:model="showTaskDeleteModal" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <div class="flex flex-col gap-4">
-            <flux:heading size="lg">{{ __('tasks.delete_this_task') }}</flux:heading>
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="$set('showTaskDeleteModal', false)">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="button" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="deleteTask" data-test="calendar-confirm-delete-task">{{ __('tasks.delete_task') }}</x-ui.button>
-            </div>
-        </div>
-    </flux:modal>
+    <x-ui.confirm-modal
+        wire:model="showTaskDeleteModal"
+        :title="__('tasks.delete_this_task')"
+        confirm="deleteTask"
+        :confirm-label="__('tasks.delete_task')"
+        confirm-test="calendar-confirm-delete-task"
+    />
 </section>

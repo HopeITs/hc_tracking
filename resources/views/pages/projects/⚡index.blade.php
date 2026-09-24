@@ -960,6 +960,12 @@ new #[Title('titles.projects')] class extends Component {
         3 => trans_choice('projects.duration_days', 3, ['count' => '__N__']),
         11 => trans_choice('projects.duration_days', 11, ['count' => '__N__']),
     ];
+
+    /* Month names in the reader's language (Syrian names in Arabic), so the
+       project modal's live duration range matches every other date here. */
+    $monthNames = collect(range(1, 12))
+        ->map(fn (int $month): string => CarbonImmutable::create(2000, $month, 1)->translatedFormat(__('formats.month_short')))
+        ->all();
 @endphp
 
 <section class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="project-directory-heading">
@@ -1683,165 +1689,170 @@ new #[Title('titles.projects')] class extends Component {
         </div>
     @endif
 
-    <flux:modal wire:model="showProjectModal" class="w-full max-w-4xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <form wire:submit="saveProject" class="flex flex-col gap-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ $editingProjectId === null ? __('projects.add_project') : __('projects.edit_project') }}</flux:heading>
-                <flux:subheading>{{ __('projects.define_delivery_ownership_lifecycle_schedule_and_beneficiary') }}</flux:subheading>
-            </div>
+    <x-ui.modal
+        wire:model="showProjectModal"
+        size="xl"
+        :title="$editingProjectId === null ? __('projects.add_project') : __('projects.edit_project')"
+        :description="__('projects.define_delivery_ownership_lifecycle_schedule_and_beneficiary')"
+        submit="saveProject"
+        close="closeProjectModal"
+        required-note
+    >
+        {{-- One Alpine scope for the live figures: the duration under Details and the breakdown beside Beneficiaries. --}}
+        <div
+            class="contents"
+            x-data="{
+                forms: @js($durationForms),
+                months: @js($monthNames),
+                breakdownTemplate: @js(e(__('projects.broken_down_of_headline', ['breakdown' => '__BREAKDOWN__', 'headline' => '__HEADLINE__']))),
+                get durationDays() {
+                    const start = Date.parse($wire.startDate);
+                    const end = Date.parse($wire.endDate);
 
-            <fieldset class="flex flex-col gap-4 border-t border-secondary-soft pt-4 dark:border-secondary-medium">
-                <legend class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.section_identity') }}</legend>
+                    if (Number.isNaN(start) || Number.isNaN(end)) {
+                        return 0;
+                    }
 
-                <div class="grid gap-4 @2xl/directory:grid-cols-2">
-                    <x-ui.input wire:model="name" :label="__('projects.project_name')" type="text" maxlength="255" required autofocus />
+                    return Math.max(0, Math.floor((end - start) / 86400000) + 1);
+                },
+                get durationLabel() {
+                    const days = this.durationDays;
 
-                    <x-ui.select wire:model="projectStatus" :label="__('common.status')" required>
+                    if (days < 1) {
+                        return '';
+                    }
+
+                    const form = days <= 3 ? this.forms[days] : (days <= 10 ? this.forms[3] : this.forms[11]);
+
+                    return form.replace('__N__', days.toLocaleString());
+                },
+                get durationRange() {
+                    if (this.durationDays < 1) {
+                        return '';
+                    }
+
+                    const [startYear, startMonth] = $wire.startDate.split('-').map(Number);
+                    const [endYear, endMonth] = $wire.endDate.split('-').map(Number);
+                    const start = this.months[startMonth - 1];
+                    const end = this.months[endMonth - 1];
+
+                    if (startYear !== endYear) {
+                        return `${start} ${startYear} – ${end} ${endYear}`;
+                    }
+
+                    return startMonth === endMonth ? `${start} ${startYear}` : `${start} – ${end} ${startYear}`;
+                },
+                get breakdownHint() {
+                    const breakdown = [$wire.targetMen, $wire.targetWomen, $wire.targetBoys, $wire.targetGirls]
+                        .reduce((total, value) => total + (Number(value) || 0), 0);
+                    const headline = Number($wire.targetBeneficiaries) || 0;
+
+                    if (breakdown === 0 && headline === 0) {
+                        return '';
+                    }
+
+                    return this.breakdownTemplate
+                        .replace('__BREAKDOWN__', `<b class='form-section-figure'>${breakdown.toLocaleString()}</b>`)
+                        .replace('__HEADLINE__', headline.toLocaleString());
+                },
+            }"
+        >
+            <x-ui.form-section
+                :title="__('projects.section_details')"
+                :hint="__('projects.section_details_hint')"
+                :fields="['name', 'projectStatus', 'startDate', 'endDate', 'description']"
+            >
+                <div class="grid grid-cols-2 gap-x-4 gap-y-3 @4xl/modal:grid-cols-3">
+                    <x-ui.form-input wire:model="name" :label="__('projects.project_name')" maxlength="255" required autofocus class="col-span-2" />
+
+                    <x-ui.form-select wire:model="projectStatus" :label="__('common.status')" required class="col-span-2 @4xl/modal:col-span-1">
                         @foreach (ProjectStatus::cases() as $statusOption)
-                            <flux:select.option :value="$statusOption->value" :wire:key="'project-status-'.$statusOption->value">{{ $statusOption->label() }}</flux:select.option>
+                            <flux:select.option :value="$statusOption->value">{{ $statusOption->label() }}</flux:select.option>
                         @endforeach
-                    </x-ui.select>
+                    </x-ui.form-select>
+
+                    <x-ui.form-input wire:model="startDate" :label="__('common.start_date')" type="date" />
+                    <x-ui.form-input wire:model="endDate" :label="__('projects.end_date')" type="date" />
+
+                    <div class="col-span-2 min-w-0 @4xl/modal:col-span-1">
+                        <span class="form-label">{{ __('projects.duration') }}</span>
+                        <p class="flex min-h-11 flex-wrap items-center gap-x-2 tabular-nums">
+                            <span class="text-lg font-bold text-secondary-dark dark:text-white" x-text="durationLabel || '—'">—</span>
+                            <span class="text-xs font-medium text-secondary-medium dark:text-secondary-soft" x-text="durationRange"></span>
+                        </p>
+                    </div>
+
+                    <x-ui.form-textarea wire:model="description" :label="__('common.description')" rows="2" class="col-span-2 @4xl/modal:col-span-3" />
                 </div>
+            </x-ui.form-section>
 
-                <flux:textarea wire:model="description" :label="__('common.description')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!" />
-            </fieldset>
-
-            <fieldset class="flex flex-col gap-4 border-t border-secondary-soft pt-4 dark:border-secondary-medium">
-                <legend class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.section_placement') }}</legend>
-
-                <div class="grid gap-4 @2xl/directory:grid-cols-3">
-                    <x-ui.select wire:model="cityId" :label="__('common.city')" required>
-                        <flux:select.option value="">{{ __('projects.select_a_city') }}</flux:select.option>
+            <x-ui.form-section :title="__('projects.section_placement')" :fields="['cityId', 'programId', 'userId']">
+                <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-3">
+                    <x-ui.form-select wire:model="cityId" :label="__('common.city')" :placeholder="__('projects.select_a_city')" required>
                         @foreach ($this->cityOptions as $cityOption)
-                            <flux:select.option :value="$cityOption->id" :wire:key="'city-option-'.$cityOption->id">{{ $cityOption->name }} · {{ $cityOption->secondary_name }}</flux:select.option>
+                            <flux:select.option :value="$cityOption->id">{{ $cityOption->name }} · {{ $cityOption->secondary_name }}</flux:select.option>
                         @endforeach
-                    </x-ui.select>
+                    </x-ui.form-select>
 
-                    <x-ui.select wire:model="programId" :label="__('common.program')" required>
-                        <flux:select.option value="">{{ __('projects.select_a_program') }}</flux:select.option>
+                    <x-ui.form-select wire:model="programId" :label="__('common.program')" :placeholder="__('projects.select_a_program')" required>
                         @foreach ($this->programOptions as $programOption)
-                            <flux:select.option :value="$programOption->id" :wire:key="'program-option-'.$programOption->id">{{ $programOption->name }}</flux:select.option>
+                            <flux:select.option :value="$programOption->id">{{ $programOption->name }}</flux:select.option>
                         @endforeach
-                    </x-ui.select>
+                    </x-ui.form-select>
 
-                    <x-ui.select wire:model="userId" :label="__('projects.owner')" required>
-                        <flux:select.option value="">{{ __('projects.select_an_owner') }}</flux:select.option>
+                    <x-ui.form-select wire:model="userId" :label="__('projects.owner')" :placeholder="__('projects.select_an_owner')" required>
                         @foreach ($this->userOptions as $userOption)
-                            <flux:select.option :value="$userOption->id" :wire:key="'owner-option-'.$userOption->id">{{ $userOption->name }} · {{ $userOption->secondary_name }}</flux:select.option>
+                            <flux:select.option :value="$userOption->id">{{ $userOption->name }} · {{ $userOption->secondary_name }}</flux:select.option>
                         @endforeach
-                    </x-ui.select>
+                    </x-ui.form-select>
                 </div>
-            </fieldset>
+            </x-ui.form-section>
 
-            <fieldset
-                class="flex flex-col gap-4 border-t border-secondary-soft pt-4 dark:border-secondary-medium"
-                x-data="{
-                    forms: @js($durationForms),
-                    get durationLabel() {
-                        const start = Date.parse($wire.startDate);
-                        const end = Date.parse($wire.endDate);
-
-                        if (Number.isNaN(start) || Number.isNaN(end)) {
-                            return '';
-                        }
-
-                        const days = Math.floor((end - start) / 86400000) + 1;
-
-                        if (days < 1) {
-                            return '';
-                        }
-
-                        const form = days <= 3 ? this.forms[days] : (days <= 10 ? this.forms[3] : this.forms[11]);
-
-                        return form.replace('__N__', days.toLocaleString());
-                    },
-                }"
+            <x-ui.form-section
+                :title="__('projects.section_beneficiaries')"
+                :fields="['targetBeneficiaries', 'targetMen', 'targetWomen', 'targetBoys', 'targetGirls']"
             >
-                <legend class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.section_schedule') }}</legend>
+                <x-slot:hint>
+                    <span x-show="breakdownHint !== ''" x-html="breakdownHint" style="display: none"></span>
+                </x-slot:hint>
 
-                <div class="grid gap-4 @2xl/directory:grid-cols-2">
-                    <x-ui.input wire:model="startDate" :label="__('common.start_date')" type="date" />
-                    <x-ui.input wire:model="endDate" :label="__('projects.end_date')" type="date" />
+                <div class="grid grid-cols-2 gap-3 @2xl/modal:grid-cols-5">
+                    <x-ui.form-input wire:model="targetBeneficiaries" :label="__('projects.headline_total')" type="number" min="0" step="1" class="col-span-2 @2xl/modal:col-span-1" />
+                    <x-ui.form-input wire:model="targetMen" :label="__('projects.men')" type="number" min="0" step="1" />
+                    <x-ui.form-input wire:model="targetWomen" :label="__('projects.women')" type="number" min="0" step="1" />
+                    <x-ui.form-input wire:model="targetBoys" :label="__('projects.boys')" type="number" min="0" step="1" />
+                    <x-ui.form-input wire:model="targetGirls" :label="__('projects.girls')" type="number" min="0" step="1" />
                 </div>
+            </x-ui.form-section>
+        </div>
 
-                <p class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft" x-show="durationLabel !== ''" x-text="durationLabel" style="display: none"></p>
-            </fieldset>
-
-            <fieldset
-                class="flex flex-col gap-4 border-t border-secondary-soft pt-4 dark:border-secondary-medium"
-                x-data="{
-                    template: @js(__('projects.breakdown_adds_up', ['breakdown' => '__BREAKDOWN__', 'headline' => '__HEADLINE__'])),
-                    get breakdownLabel() {
-                        const parts = [$wire.targetMen, $wire.targetWomen, $wire.targetBoys, $wire.targetGirls]
-                            .map((value) => Number(value) || 0);
-                        const breakdown = parts.reduce((total, value) => total + value, 0);
-                        const headline = Number($wire.targetBeneficiaries) || 0;
-
-                        if (breakdown === 0 && headline === 0) {
-                            return '';
-                        }
-
-                        return this.template
-                            .replace('__BREAKDOWN__', breakdown.toLocaleString())
-                            .replace('__HEADLINE__', headline.toLocaleString());
-                    },
-                }"
-            >
-                <div>
-                    <legend class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.beneficiary_targets') }}</legend>
-                    <p class="text-xs text-secondary-medium dark:text-secondary-soft">{{ __('projects.the_headline_commitment_and_demographic_breakdown_are_record') }}</p>
-                </div>
-
-                <div class="grid gap-4 @2xl/directory:grid-cols-5">
-                    <x-ui.input wire:model="targetBeneficiaries" :label="__('projects.headline_total')" type="number" min="0" step="1" />
-                    <x-ui.input wire:model="targetMen" :label="__('projects.men')" type="number" min="0" step="1" />
-                    <x-ui.input wire:model="targetWomen" :label="__('projects.women')" type="number" min="0" step="1" />
-                    <x-ui.input wire:model="targetBoys" :label="__('projects.boys')" type="number" min="0" step="1" />
-                    <x-ui.input wire:model="targetGirls" :label="__('projects.girls')" type="number" min="0" step="1" />
-                </div>
-
-                <p class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft" x-show="breakdownLabel !== ''" x-text="breakdownLabel" style="display: none"></p>
-            </fieldset>
-
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="closeProjectModal">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" data-test="save-project-button">
-                    {{ $editingProjectId === null ? __('projects.create_project') : __('common.save_changes') }}
-                </x-ui.button>
-            </div>
-        </form>
-    </flux:modal>
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="save-project-button">
+                {{ $editingProjectId === null ? __('projects.create_project') : __('common.save_changes') }}
+            </x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
 
     {{-- Archiving is reversible, so the dialog explains where the work goes, not what is lost. --}}
-    <flux:modal wire:model="showArchiveModal" wire:close="cancelArchive" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        @php
-            $pendingArchive = $this->archivingProject;
-        @endphp
-
-        <div class="flex flex-col gap-4">
-            <flux:heading size="lg">{{ __('projects.archive_this_project') }}</flux:heading>
-
-            @if ($pendingArchive !== null)
-                <flux:subheading>
-                    {{ __('projects.archiving_keeps_everything', ['name' => $pendingArchive['project']->name]) }}
-                </flux:subheading>
-
-                @if ($pendingArchive['carries'] !== [])
-                    <div class="rounded-lg border border-board-line bg-board-head p-3">
-                        <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.kept_with_the_project') }}</p>
-                        <ul class="mt-1.5 flex flex-col gap-0.5">
-                            @foreach ($pendingArchive['carries'] as $carriedLabel => $carriedCount)
-                                <li class="text-sm tabular-nums text-secondary-dark dark:text-white" wire:key="carried-{{ $loop->index }}">{{ $carriedCount }} {{ $carriedLabel }}</li>
-                            @endforeach
-                        </ul>
-                    </div>
-                @endif
-            @endif
-
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="cancelArchive">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="button" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="archiveProject" data-test="confirm-archive-project">{{ __('projects.archive_project') }}</x-ui.button>
+    <x-ui.confirm-modal
+        wire:model="showArchiveModal"
+        close="cancelArchive"
+        tone="neutral"
+        :title="__('projects.archive_this_project')"
+        :message="$this->archivingProject !== null ? __('projects.archiving_keeps_everything', ['name' => $this->archivingProject['project']->name]) : null"
+        confirm="archiveProject"
+        :confirm-label="__('projects.archive_project')"
+        confirm-test="confirm-archive-project"
+    >
+        @if ($this->archivingProject !== null && $this->archivingProject['carries'] !== [])
+            <div class="rounded-lg border border-board-line bg-board-head p-3">
+                <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.kept_with_the_project') }}</p>
+                <ul class="mt-1.5 flex flex-col gap-0.5">
+                    @foreach ($this->archivingProject['carries'] as $carriedLabel => $carriedCount)
+                        <li class="text-sm tabular-nums text-secondary-dark dark:text-white" wire:key="carried-{{ $loop->index }}">{{ $carriedCount }} {{ $carriedLabel }}</li>
+                    @endforeach
+                </ul>
             </div>
-        </div>
-    </flux:modal>
+        @endif
+    </x-ui.confirm-modal>
 </section>

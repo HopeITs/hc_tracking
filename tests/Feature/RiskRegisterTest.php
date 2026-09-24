@@ -363,3 +363,23 @@ test('the project chart respects every active filter, including the project filt
     $projectFilteredChart = $component->get('projectRiskChart');
     expect($projectFilteredChart['categories'])->toBe(['Project A']);
 });
+
+test('the state picker in the risk form saves the string values it sends as the boolean state', function (string $sent, bool $stored) {
+    $user = User::factory()->create();
+    $project = Project::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::risks.index')
+        ->call('openCreateModal')
+        ->set('name', 'Fuel shortage')
+        ->set('impact', 'Generators cannot run.')
+        ->set('riskProjectId', (string) $project->id)
+        ->set('happened', $sent)
+        ->call('saveRisk')
+        ->assertHasNoErrors();
+
+    $this->assertDatabaseHas('risks', ['name' => 'Fuel shortage', 'happened' => $stored]);
+})->with([
+    'materialised' => ['1', true],
+    'potential' => ['0', false],
+]);
