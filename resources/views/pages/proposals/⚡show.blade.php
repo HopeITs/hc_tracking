@@ -341,7 +341,7 @@ new #[Title('titles.proposal')] class extends Component
     public function projects(): Collection
     {
         return $this->proposal->projects()
-            ->select(['projects.id', 'projects.name', 'projects.city_id', 'projects.program_id', 'projects.status', 'projects.start_date', 'projects.end_date'])
+            ->select(['projects.id', 'projects.slug', 'projects.name', 'projects.city_id', 'projects.program_id', 'projects.status', 'projects.start_date', 'projects.end_date'])
             ->with(['city:id,name_en,name_ar', 'program:id'])
             ->withCount([
                 'milestones',
@@ -652,7 +652,7 @@ new #[Title('titles.proposal')] class extends Component
                 $donorReport->due_on,
                 $donorReport->title,
                 __('proposals.donor_report_for', ['donor' => $donorReport->donorProposal->donor->name, 'type' => $donorReport->type->label()]),
-                route('funding-agreements.show', $donorReport->donor_proposal_id),
+                route('funding-agreements.show', $donorReport->donorProposal),
                 'funding',
             );
         }
@@ -668,7 +668,7 @@ new #[Title('titles.proposal')] class extends Component
                 $report->planned_date,
                 __('proposals.report_on_indicator', ['indicator' => $report->planIndicator->indicator->name]),
                 $report->planIndicator->project?->name ?? __('common.organisation_wide'),
-                route('reports.show', $report->id),
+                route('reports.show', $report),
                 'reports',
             );
         }
@@ -684,7 +684,7 @@ new #[Title('titles.proposal')] class extends Component
                 $task->due_date,
                 $task->title,
                 $task->status->label(),
-                route('tasks.show', $task->id),
+                route('tasks.show', $task),
                 'tasks',
             );
         }
@@ -1719,8 +1719,8 @@ new #[Title('titles.proposal')] class extends Component
     public function documentDownloadUrl(Media $media): string
     {
         return $media->mediable_type === 'proposal'
-            ? route('proposals.files.download', [$this->proposalId, $media])
-            : route('projects.files.download', [$media->mediable_id, $media]);
+            ? route('proposals.files.download', [$this->proposal, $media])
+            : route('projects.files.download', [Project::query()->findOrFail($media->mediable_id), $media]);
     }
 
     public function closeFileModal(): void
@@ -1986,7 +1986,7 @@ new #[Title('titles.proposal')] class extends Component
                         <article class="min-w-0" wire:key="agreement-{{ $agreement->id }}" data-agreement="{{ $agreement->id }}">
                             <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                                 <p class="min-w-0 text-sm">
-                                    <a href="{{ route('donors.show', $agreement->donor_id) }}" wire:navigate class="text-base font-bold underline-offset-4 hover:underline {{ $inkText }}">{{ $agreement->donor->name }}</a>
+                                    <a href="{{ route('donors.show', $agreement->donor) }}" wire:navigate class="text-base font-bold underline-offset-4 hover:underline {{ $inkText }}">{{ $agreement->donor->name }}</a>
                                     <a href="{{ route('funding-agreements.show', $agreement) }}" wire:navigate class="ms-2 text-xs underline-offset-4 hover:underline {{ $mutedText }}">{{ filled($agreement->project_num) ? __('proposals.agreement_number', ['number' => $agreement->project_num]) : __('proposals.view_agreement') }}</a>
                                 </p>
                                 <div class="flex items-center gap-1">
@@ -2222,7 +2222,7 @@ new #[Title('titles.proposal')] class extends Component
                             @forelse ($chronology['projects'] as $bar)
                                 <li class="relative h-7" wire:key="chrono-project-{{ $bar['id'] }}">
                                     <a
-                                        href="{{ route('projects.show', $bar['id']) }}"
+                                        href="{{ route('projects.show', tap(new Project, fn ($project) => $project->id = $bar['id'])) }}"
                                         wire:navigate
                                         class="absolute top-0 flex h-7 min-w-0 items-center rounded-sm bg-funding-soft px-2 text-[11px] font-semibold text-funding transition-colors hover:bg-funding hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-white"
                                         style="inset-inline-start: {{ $bar['start'] }}%; width: {{ $bar['width'] }}%"
@@ -2715,7 +2715,7 @@ new #[Title('titles.proposal')] class extends Component
                         @endphp
                         <li class="flex min-w-0 flex-col gap-2 py-4 @2xl/detail:flex-row @2xl/detail:items-center @2xl/detail:gap-6" wire:key="report-{{ $report->id }}" data-report="{{ $report->id }}">
                             <div class="min-w-0 flex-1">
-                                <a href="{{ route('reports.show', $report->id) }}" wire:navigate class="line-clamp-2 text-sm font-semibold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary {{ $inkText }}">{{ $report->planIndicator->indicator->name }}</a>
+                                <a href="{{ route('reports.show', $report) }}" wire:navigate class="line-clamp-2 text-sm font-semibold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary {{ $inkText }}">{{ $report->planIndicator->indicator->name }}</a>
                                 <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs tabular-nums {{ $mutedText }}">
                                     <span>{{ $report->planIndicator->project?->name ?? __('common.organisation_wide') }}</span>
                                     @if ($report->period_start !== null && $report->period_end !== null)
@@ -2755,7 +2755,7 @@ new #[Title('titles.proposal')] class extends Component
                     @else
                         <ul class="divide-y {{ $hairline }}">
                             @foreach ($this->proposalFiles as $media)
-                                @include('pages.proposals._file-row', ['media' => $media, 'proposalId' => $this->proposalId, 'downloadUrl' => $this->documentDownloadUrl($media), 'owner' => null, 'editable' => auth()->user()->can('update', $this->proposal), 'inkText' => $inkText, 'mutedText' => $mutedText])
+                                @include('pages.proposals._file-row', ['media' => $media, 'proposal' => $this->proposal, 'downloadUrl' => $this->documentDownloadUrl($media), 'owner' => null, 'editable' => auth()->user()->can('update', $this->proposal), 'inkText' => $inkText, 'mutedText' => $mutedText])
                             @endforeach
                         </ul>
                     @endif
@@ -2772,7 +2772,7 @@ new #[Title('titles.proposal')] class extends Component
                     @else
                         <ul class="divide-y {{ $hairline }}">
                             @foreach ($this->projectFiles as $media)
-                                @include('pages.proposals._file-row', ['media' => $media, 'proposalId' => $this->proposalId, 'downloadUrl' => $this->documentDownloadUrl($media), 'owner' => $media->mediable, 'editable' => false, 'inkText' => $inkText, 'mutedText' => $mutedText])
+                                @include('pages.proposals._file-row', ['media' => $media, 'proposal' => $this->proposal, 'downloadUrl' => $this->documentDownloadUrl($media), 'owner' => $media->mediable, 'editable' => false, 'inkText' => $inkText, 'mutedText' => $mutedText])
                             @endforeach
                         </ul>
                     @endif
@@ -2957,7 +2957,7 @@ new #[Title('titles.proposal')] class extends Component
         @if ($showPreviewModal && ($previewFile = $this->documents->firstWhere('id', $previewingFileId)) !== null)
             @php
                 $previewName = $previewFile->original_name;
-                $previewUrl = route('proposals.files.preview', [$this->proposalId, $previewFile]);
+                $previewUrl = route('proposals.files.preview', [$this->proposal, $previewFile]);
                 $previewDownloadUrl = $this->documentDownloadUrl($previewFile);
                 $previewPosition = $this->documents->search(fn ($candidate) => $candidate->id === $previewFile->id) + 1;
             @endphp

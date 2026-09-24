@@ -32,6 +32,7 @@ use Illuminate\Support\Facades\DB;
  *
  * @property int $id
  * @property-read string $name
+ * @property-read string $slug
  * @property int|null $strategy_id
  * @property int|null $manager_id
  * @property CarbonImmutable|null $created_at
@@ -98,6 +99,33 @@ class Program extends Model implements TracksActivity
     protected function name(): Attribute
     {
         return Attribute::get(fn (): string => HrProgram::nameOf($this->id));
+    }
+
+    /**
+     * The program slug, read from HR — used as the route key so
+     * `programs/{program}` shows a readable slug instead of the id.
+     *
+     * @return Attribute<string, never>
+     */
+    protected function slug(): Attribute
+    {
+        return Attribute::get(fn (): string => HrProgram::slugOf($this->id));
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'slug';
+    }
+
+    /**
+     * Resolve `{program}` from its HR slug instead of the local id column,
+     * which the `slug` accessor above is not backed by.
+     */
+    public function resolveRouteBinding($value, $field = null): ?self
+    {
+        $id = HrProgram::idBySlug((string) $value);
+
+        return $id === null ? null : static::query()->find($id);
     }
 
     /**

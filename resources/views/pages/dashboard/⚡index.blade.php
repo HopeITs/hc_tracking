@@ -107,7 +107,7 @@ new #[Title('titles.dashboard')] class extends Component {
                 ]),
                 context: $transfer->donorProposal?->proposal?->name ?? '—',
                 daysLate: (int) $transfer->scheduled_date->diffInDays($today),
-                href: route('funding-agreements.show', $transfer->donor_proposal_id),
+                href: route('funding-agreements.show', $transfer->donorProposal),
             ));
 
         $risks = Risk::query()
@@ -445,7 +445,7 @@ new #[Title('titles.dashboard')] class extends Component {
                     'donor' => $transfer->donorProposal?->donor?->name ?? '—',
                 ]),
                 'context' => __('dashboard.scheduled_transfer'),
-                'href' => route('funding-agreements.show', $transfer->donor_proposal_id),
+                'href' => route('funding-agreements.show', $transfer->donorProposal),
             ]);
 
         $tasks = Task::query()
@@ -513,7 +513,7 @@ new #[Title('titles.dashboard')] class extends Component {
                 'dateOnly' => true,
                 'icon' => 'arrows-right-left',
                 'sentence' => __('dashboard.proposal_moved', ['proposal' => $note->proposal?->name ?? '—', 'status' => $note->status->label()]),
-                'href' => route('proposals.show', $note->proposal_id),
+                'href' => route('proposals.show', $note->proposal),
             ]);
 
         $reports = Report::query()

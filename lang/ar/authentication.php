@@ -7,7 +7,7 @@ return [
     'confirm_password' => 'تأكيد كلمة المرور',
     'confirm_with_passkey' => 'التأكيد بمفتاح مرور',
     'confirming' => 'جارٍ التأكيد...',
-    'copyright_notice' => '© :year - مركز الأمل المسيحي - PT',
+    'copyright_notice' => '© :year - مركز الأمل المسيحي - تتبع المشاريع',
     'create_account' => 'إنشاء حساب',
     'create_an_account' => 'أنشئ حسابًا',
     'don_t_have_an_account' => 'ليس لديك حساب؟',

@@ -1,3 +1,4 @@
+import './assignee-picker';
 import './charts';
 import './count-up';
 import './funding-flow';
@@ -5,6 +6,7 @@ import './gantt';
 import './notification-inbox';
 import './file-preview';
 import './proposal-clock';
+import './scroll-lock';
 import './section-rail';
 import './task-board';
 import './theme-color';

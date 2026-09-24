@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\HasSlug;
 use App\Concerns\RecordsActivity;
 use App\Enums\ProjectStatus;
 use App\Notifications\TracksActivity;
@@ -24,6 +25,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 /**
  * @property int $id
  * @property string $name
+ * @property string $slug
  * @property string|null $description
  * @property ProjectStatus $status
  * @property CarbonImmutable|null $start_date
@@ -60,7 +62,12 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 class Project extends Model implements TracksActivity
 {
     /** @use HasFactory<ProjectFactory> */
-    use HasFactory, RecordsActivity;
+    use HasFactory, HasSlug, RecordsActivity;
+
+    protected function slugSource(): string
+    {
+        return $this->name;
+    }
 
     /**
      * Mirror the column default so a project that has not been round-tripped

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\HasSlug;
 use App\Concerns\RecordsActivity;
 use App\Enums\Currency;
 use App\Notifications\TracksActivity;
@@ -22,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * budget, a currency and the project number the donor files it under.
  *
  * @property int $id
+ * @property string $slug
  * @property int $donor_id
  * @property string $budget
  * @property Currency $currency
@@ -34,7 +36,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class DonorProposal extends Model implements TracksActivity
 {
     /** @use HasFactory<DonorProposalFactory> */
-    use HasFactory, RecordsActivity;
+    use HasFactory, HasSlug, RecordsActivity;
 
     /**
      * Eloquent would otherwise pluralize this to donor_proposals.
@@ -42,6 +44,15 @@ class DonorProposal extends Model implements TracksActivity
      * @var string
      */
     protected $table = 'donor_proposal';
+
+    /**
+     * "donor-slug-proposal-slug" — there is no title field of its own, so the
+     * slug is built from the two records this funding agreement links.
+     */
+    protected function slugSource(): string
+    {
+        return $this->donor?->slug.'-'.$this->proposal?->slug;
+    }
 
     /**
      * The donor funding this agreement.

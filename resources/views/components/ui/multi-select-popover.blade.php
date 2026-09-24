@@ -68,6 +68,7 @@
             }
         },
     }"
+    x-init="$watch('open', (value) => value ? window.hcLockPageScroll() : window.hcUnlockPageScroll())"
     x-on:keydown.escape.window="open = false"
     class="min-w-0"
 >

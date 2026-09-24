@@ -1054,9 +1054,9 @@ new #[Title('titles.funding_agreements')] class extends Component {
                                             <div class="min-w-0 flex-1">
                                                 <div class="flex items-start justify-between gap-2">
                                                     <p class="min-w-0 text-sm leading-snug font-bold {{ $inkText }}">
-                                                        <a href="{{ route('donors.show', $agreement->donor_id) }}" wire:navigate class="underline-offset-4 hover:underline">{{ $agreement->donor->name }}</a>
+                                                        <a href="{{ route('donors.show', $agreement->donor) }}" wire:navigate class="underline-offset-4 hover:underline">{{ $agreement->donor->name }}</a>
                                                         <span class="{{ $mutedText }}" aria-hidden="true">·</span>
-                                                        <a href="{{ route('proposals.show', $agreement->proposal_id) }}" wire:navigate class="underline-offset-4 hover:underline">{{ $agreement->proposal->name }}</a>
+                                                        <a href="{{ route('proposals.show', $agreement->proposal) }}" wire:navigate class="underline-offset-4 hover:underline">{{ $agreement->proposal->name }}</a>
                                                     </p>
                                                     {{-- No delete: transfers_tracking cascades from this row, so
                                                          deleting an agreement would erase the money received. --}}
@@ -1230,7 +1230,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
                                                     <div>
                                                         <dt class="font-semibold {{ $mutedText }}">{{ __('common.proposal') }}</dt>
                                                         <dd class="mt-1 flex flex-wrap items-center gap-2">
-                                                            <a href="{{ route('proposals.show', $agreement->proposal_id) }}" wire:navigate class="font-bold underline-offset-4 hover:underline {{ $inkText }}">{{ $agreement->proposal->name }}</a>
+                                                            <a href="{{ route('proposals.show', $agreement->proposal) }}" wire:navigate class="font-bold underline-offset-4 hover:underline {{ $inkText }}">{{ $agreement->proposal->name }}</a>
                                                             <x-ui.enum-badge :case="$agreement->proposal->status" />
                                                         </dd>
                                                     </div>

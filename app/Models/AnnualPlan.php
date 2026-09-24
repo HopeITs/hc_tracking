@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\HasSlug;
 use App\Concerns\RecordsActivity;
 use App\Notifications\TracksActivity;
 use App\Observers\PlanIndicatorSourceObserver;
@@ -21,6 +22,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * @property int $id
+ * @property string $slug
  * @property int $program_id
  * @property int $manager_id
  * @property int $year
@@ -32,7 +34,16 @@ use Illuminate\Support\Facades\DB;
 class AnnualPlan extends Model implements TracksActivity
 {
     /** @use HasFactory<AnnualPlanFactory> */
-    use HasFactory, RecordsActivity;
+    use HasFactory, HasSlug, RecordsActivity;
+
+    /**
+     * "program-slug-year" — there is no title field of its own, so the slug
+     * is built from the program it covers and its fiscal year.
+     */
+    protected function slugSource(): string
+    {
+        return $this->program?->slug.'-'.$this->year;
+    }
 
     /**
      * Delete the model inside a transaction.

@@ -15,17 +15,17 @@ Job: scan a live, trustworthy record of everything that happened (who did what, 
 
 Constraints (user-confirmed): keep the existing filter set (search, module, actor, date range) and URL query-string behavior; keep the "open record" / "record gone" link behavior; keep server-side pagination. i18n (`lang/`) and accessibility must keep working. Preserve the sidebar shell and brand palette/typeface.
 
-## Direction contract
+## Direction contract (superseded — see history below)
 
-**THESIS:** The activity log is not a scrollable audit table — it's the organization's wire desk: a live feed of dated bulletins grouped by module, read the way a newsroom rundown or ops desk reads its wire, refusing the generic "GitHub commit list" / plain timeline-table default this category always ships.
+**THESIS:** The activity log is a reconciled statement, not a social feed: entries read like ledger rows grouped by date under a calm running-totals header, the register an NGO manager already trusts from donor reports and bank statements — refusing both the plain timeline-table default and the earlier wire-desk control-room register.
 
-**OWN-WORLD:** A dark control-room header strip (secondary-dark ground) holding glanceable cross-check stat dials — today's activity count, per-module counts, top actors — in the brand red as the single hot accent against the grays. Below it, a bright working feed on white: bulletins grouped by day under teletype-style date rules, each bulletin a compact card with a module tag (colored chip), actor, sentence, timestamp, and a connection line when the event links to funding/program counterparts (e.g. a transfer bulletin shows the project/milestone it funded inline). Somar Sans throughout; condensed caps for module tags and section date-rules; monospace-leaning tabular figures for counts/timestamps only.
+**OWN-WORLD:** A light "statement summary" strip (`bg-board`/`bg-board-head`/`border-board-line` — the app's existing table-surface tokens) holding four calm running totals (today, last 7 days, busiest module, most active) in restrained type, no flashy accent numerals. Below it, a real table per day (`x-ui.data-table`, reused as-is): a `bg-board-head` section band per day ("Today · 14 entries"), then hairline-divided rows — an immutable `#id` reference column, time, a bordered module tag (text only, no filled color chips), the sentence, a "Linked to" program column, and a right-aligned "Open record" action. Somar Sans throughout; tabular-nums on every numeric/time column; mobile collapses each row into label/value pairs via the data-table component's built-in `@3xl` breakpoint.
 
-**STORY:** The manager opens the page and instantly reads the org's pulse for today (dial strip), then scans the wire for anything notable, filters to a module/actor/date range, and drills into any bulletin to the underlying record. Connections between money and delivery are visible without extra clicks.
+**STORY:** The manager opens the page, reads the calm totals strip, then scans the ledger the way they'd scan a bank statement or donor report — trustworthy, dated, referenced — filters to a module/actor/date range, and opens any entry's `#ref` to the underlying record. A program link on a row threads delivery and funding without extra clicks.
 
-**FIRST VIEWPORT:** Sticky header strip (page title + filters) directly above the dial strip (3–5 stat dials in a row, brand-red numerals on dark ground). Below the fold-line, the day-grouped bulletin wire begins immediately — no empty hero, no illustration filler.
+**FIRST VIEWPORT:** Page header + filters, then the statement summary strip (single light bordered row, four cells), then the first day-section's table header and opening rows — no dark hero, no illustration filler.
 
-**FORM:** Assigned direction (index 5 of 7 self-derived grounded candidates: bank ledger, ship's log, ATC flight-strip board, courtroom exhibit log, newsroom wire/assignment desk, hospital chart, lab notebook), raised with one borrowed discipline from the declined "night-flight instrument six-pack" challenger (seed key 5087eccc): the header's glanceable cross-check dial ritual. All other catalog challengers (flash-scrawl sleeve, doujin catalog, cathode-gauze access control, cloud quarry, sneaker box stacks) declined on audience identification — none read as an NGO program/fundraising ops tool.
+**FORM:** User-directed switch away from the assigned "wire desk" direction to the "Audit Ledger" alternate offered in the same direction round (bank/financial-statement ledger candidate, seed key 5087eccc) — chosen by the user from a visual compare-card round after the wire desk build shipped.
 
 **FINISH:** unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance.
 
@@ -33,6 +33,11 @@ Constraints (user-confirmed): keep the existing filter set (search, module, acto
 
 Code-led (no image generation tool available in this session/harness) — stated, not asked.
 
+## History
+
+- v1 (shipped, then superseded): "Ops Wire Desk" — dark control-room pulse strip + bulletin-card feed. Kept in git history; superseded 2026-09-24 at the user's request to see the Audit Ledger alternate instead.
+- v2 (current): "Audit Ledger" as described above.
+
 ## Unresolved decisions
 
-- Exact per-module color chips beyond the red/gray anchor (semantic extension) — chosen during build from existing `config('notifications.modules')`.
+- None outstanding — module tag palette reuses the existing funding/warn/neutral tone tokens already established on v1.

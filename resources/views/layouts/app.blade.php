@@ -7,4 +7,10 @@
             {{ $slot }}
         </div>
     </flux:main>
+
+    <flux:footer class="border-t border-secondary-soft bg-white py-4 text-center dark:border-secondary-medium dark:bg-secondary-dark">
+        <p class="text-xs text-secondary-medium dark:text-secondary-soft">
+            {{ __('authentication.copyright_notice', ['year' => now()->year]) }}
+        </p>
+    </flux:footer>
 </x-layouts::app.sidebar>

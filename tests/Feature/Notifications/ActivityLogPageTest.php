@@ -16,7 +16,6 @@ test('only super admins and the general manager can open the activity log', func
 
 test('the log filters by module, person, text and date range', function () {
     $sami = userWithRole('Managers');
-    $sami->forceFill(['name' => 'Sami'])->save();
     $rana = userWithRole('Managers');
 
     $this->actingAs($sami);
@@ -33,6 +32,26 @@ test('the log filters by module, person, text and date range', function () {
     $page()->set('from', now()->toDateString())->assertSeeText('Road closure')->assertDontSeeText('Water trucking');
 });
 
+test('entries sort by time or module, toggling direction on repeat clicks', function () {
+    $this->actingAs(userWithRole('Managers'));
+    Risk::factory()->create(['name' => 'Alpha risk']);
+    $this->travel(1)->hours();
+    Task::factory()->create(['title' => 'Beta task']);
+
+    $page = Livewire::actingAs(userWithRole('Super Admin'))->test('pages::activity.index');
+
+    $page->assertSeeInOrder(['Beta task', 'Alpha risk']);
+
+    $page->call('setSort', 'module')
+        ->assertSeeInOrder(['Alpha risk', 'Beta task']);
+
+    $page->call('setSort', 'module')
+        ->assertSeeInOrder(['Beta task', 'Alpha risk']);
+
+    $page->call('setSort', 'created_at')
+        ->assertSeeInOrder(['Alpha risk', 'Beta task']);
+});
+
 test('a deleted record shows as deleted instead of a link', function () {
     $task = Activity::withoutRecording(fn () => Task::factory()->create(['title' => 'Gone']));
     $this->actingAs(userWithRole('Managers'));
@@ -40,7 +59,7 @@ test('a deleted record shows as deleted instead of a link', function () {
 
     Livewire::actingAs(userWithRole('Super Admin'))->test('pages::activity.index')
         ->assertSeeText(__('activity.record_gone'))
-        ->assertDontSeeHtml(route('tasks.show', $task->id));
+        ->assertDontSeeHtml(route('tasks.show', $task));
 });
 
 test('the sidebar links the log only for those who may open it', function () {

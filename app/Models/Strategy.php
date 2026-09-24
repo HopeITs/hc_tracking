@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\HasSlug;
 use App\Concerns\RecordsActivity;
 use App\Notifications\TracksActivity;
 use Carbon\CarbonImmutable;
@@ -16,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * @property int $id
  * @property string $name
+ * @property string $slug
  * @property int $start_year
  * @property int $end_year
  * @property CarbonImmutable|null $created_at
@@ -25,7 +27,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Strategy extends Model implements TracksActivity
 {
     /** @use HasFactory<StrategyFactory> */
-    use HasFactory, RecordsActivity;
+    use HasFactory, HasSlug, RecordsActivity;
+
+    protected function slugSource(): string
+    {
+        return $this->name;
+    }
 
     /**
      * The programs delivered under this strategy.

@@ -1,4 +1,4 @@
-@props(['media', 'projectId'])
+@props(['media', 'project'])
 
 @php
     $icon = match ($media->type) {
@@ -53,7 +53,7 @@
 
     <div class="flex items-center justify-end gap-1 border-t border-secondary-soft pt-2 dark:border-secondary-medium">
         <a
-            href="{{ route('projects.files.download', [$projectId, $media]) }}"
+            href="{{ route('projects.files.download', [$project, $media]) }}"
             class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-secondary-soft dark:hover:bg-secondary-medium dark:hover:text-white"
             aria-label="{{ __('common.download_name', ['name' => $media->original_name]) }}"
         >

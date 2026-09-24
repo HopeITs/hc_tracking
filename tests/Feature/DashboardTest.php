@@ -40,6 +40,15 @@ test('authenticated users see the application navigation on the dashboard', func
         ->assertDontSeeText('Documentation');
 });
 
+test('authenticated pages show the copyright footer', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $response = $this->get(route('dashboard'));
+
+    $response->assertSeeText(__('authentication.copyright_notice', ['year' => now()->year]));
+});
+
 test('an empty portfolio renders every empty state', function () {
     Livewire::actingAs(User::factory()->create())
         ->test('pages::dashboard.index')

@@ -98,61 +98,53 @@
         @endunless
     </td>
     <td class="px-2">
-        <x-ui.multi-select-popover
-            :label="__('tasks.assignees')"
-            :trigger-label="__('tasks.assignees').': '.($assignees->isEmpty() ? __('common.not_assigned') : $assignees->map->name->implode(', '))"
+        {{--
+            Trigger only — the option list (every HrEmployee) lives once in
+            _assignee-popover.blade.php via the assigneePicker Alpine store,
+            instead of being re-rendered here per row. See assignee-picker.js
+            for why that used to make this dropdown slow.
+        --}}
+        <div
+            x-data
+            role="button"
+            tabindex="0"
+            x-on:click="$store.assigneePicker.openFor({{ $task->id }}, {{ Js::from($assignedIds) }}, $el.getBoundingClientRect())"
+            x-on:keydown.enter="$store.assigneePicker.openFor({{ $task->id }}, {{ Js::from($assignedIds) }}, $el.getBoundingClientRect())"
+            x-on:keydown.space.prevent="$store.assigneePicker.openFor({{ $task->id }}, {{ Js::from($assignedIds) }}, $el.getBoundingClientRect())"
+            aria-haspopup="listbox"
+            x-bind:aria-expanded="$store.assigneePicker.open && $store.assigneePicker.taskId === {{ $task->id }} ? 'true' : 'false'"
+            aria-label="{{ __('tasks.assignees') }}: {{ $assignees->isEmpty() ? __('common.not_assigned') : $assignees->map->name->implode(', ') }}"
             class="inline-flex cursor-pointer items-center -space-x-2 rtl:space-x-reverse"
             data-test="task-assignee-trigger-{{ $task->id }}"
         >
-            <x-slot:trigger>
-                @if ($assignees->isEmpty())
-                    <span class="inline-flex size-7 items-center justify-center rounded-full border border-dashed border-secondary-light text-secondary-light">
-                        <flux:icon.user-plus variant="micro" class="size-3.5" />
-                    </span>
-                @else
-                    @foreach ($assignees->take(3) as $employee)
-                        <div class="group/avatar relative">
-                            <span class="inline-flex size-7 items-center justify-center rounded-full bg-secondary-dark text-[11px] font-semibold text-white ring-2 ring-white transition-transform group-hover/row:ring-secondary-soft/40 dark:bg-secondary-medium dark:ring-secondary-dark dark:group-hover/row:ring-secondary-medium/40">
-                                {{ Illuminate\Support\Str::of($employee->name)->explode(' ')->map(fn ($part) => mb_substr($part, 0, 1))->take(2)->implode('') }}
-                            </span>
-                            <button
-                                type="button"
-                                wire:click.stop="toggleAssignee({{ $task->id }}, {{ $employee->id }})"
-                                class="absolute -top-1 -end-1 hidden size-4 cursor-pointer items-center justify-center rounded-full bg-secondary-dark text-white hover:bg-primary group-hover/avatar:flex dark:bg-secondary-medium"
-                                aria-label="{{ __('tasks.remove_assignee_name', ['name' => $employee->name]) }}"
-                                data-test="task-assignee-remove-{{ $task->id }}-{{ $employee->id }}"
-                            >
-                                <flux:icon.x-mark variant="micro" class="size-2.5" />
-                            </button>
-                        </div>
-                    @endforeach
-                    @if ($assignees->count() > 3)
-                        <span class="inline-flex size-7 items-center justify-center rounded-full bg-secondary-soft text-[10px] font-semibold text-secondary-dark ring-2 ring-white dark:bg-secondary-medium dark:text-white dark:ring-secondary-dark">
-                            +{{ $assignees->count() - 3 }}
+            @if ($assignees->isEmpty())
+                <span class="inline-flex size-7 items-center justify-center rounded-full border border-dashed border-secondary-light text-secondary-light">
+                    <flux:icon.user-plus variant="micro" class="size-3.5" />
+                </span>
+            @else
+                @foreach ($assignees->take(3) as $employee)
+                    <div class="group/avatar relative">
+                        <span class="inline-flex size-7 items-center justify-center rounded-full bg-secondary-dark text-[11px] font-semibold text-white ring-2 ring-white transition-transform group-hover/row:ring-secondary-soft/40 dark:bg-secondary-medium dark:ring-secondary-dark dark:group-hover/row:ring-secondary-medium/40">
+                            {{ Illuminate\Support\Str::of($employee->name)->explode(' ')->map(fn ($part) => mb_substr($part, 0, 1))->take(2)->implode('') }}
                         </span>
-                    @endif
+                        <button
+                            type="button"
+                            wire:click.stop="toggleAssignee({{ $task->id }}, {{ $employee->id }})"
+                            class="absolute -top-1 -end-1 hidden size-4 cursor-pointer items-center justify-center rounded-full bg-secondary-dark text-white hover:bg-primary group-hover/avatar:flex dark:bg-secondary-medium"
+                            aria-label="{{ __('tasks.remove_assignee_name', ['name' => $employee->name]) }}"
+                            data-test="task-assignee-remove-{{ $task->id }}-{{ $employee->id }}"
+                        >
+                            <flux:icon.x-mark variant="micro" class="size-2.5" />
+                        </button>
+                    </div>
+                @endforeach
+                @if ($assignees->count() > 3)
+                    <span class="inline-flex size-7 items-center justify-center rounded-full bg-secondary-soft text-[10px] font-semibold text-secondary-dark ring-2 ring-white dark:bg-secondary-medium dark:text-white dark:ring-secondary-dark">
+                        +{{ $assignees->count() - 3 }}
+                    </span>
                 @endif
-            </x-slot:trigger>
-
-            @foreach ($this->userOptions as $userOption)
-                @php $isAssigned = in_array($userOption['id'], $assignedIds, true); @endphp
-                <button
-                    type="button"
-                    role="option"
-                    aria-selected="{{ $isAssigned ? 'true' : 'false' }}"
-                    wire:click="toggleAssignee({{ $task->id }}, {{ $userOption['id'] }})"
-                    wire:key="task-{{ $task->id }}-assignee-option-{{ $userOption['id'] }}"
-                    x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
-                    class="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm hover:bg-secondary-soft dark:hover:bg-secondary-medium"
-                    data-test="task-assignee-option-{{ $task->id }}-{{ $userOption['id'] }}"
-                >
-                    <span class="min-w-0 flex-1 truncate">{{ $userOption['name'] }} · {{ $userOption['secondary_name'] }}</span>
-                    @if ($isAssigned)
-                        <flux:icon.check class="size-4 shrink-0 text-primary" />
-                    @endif
-                </button>
-            @endforeach
-        </x-ui.multi-select-popover>
+            @endif
+        </div>
     </td>
     <td class="px-2">
         <div class="flex items-center gap-1">
