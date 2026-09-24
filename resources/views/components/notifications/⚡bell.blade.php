@@ -144,9 +144,9 @@ new class extends Component {
         @endif
     </button>
 
-    {{-- From lg the sidebar sits beside the header and paints above it, so
-         the panel is pinned to the viewport's end edge there instead of hanging
-         off the bell (where a narrow window pushed it under the sidebar). --}}
+    {{-- From sm the panel hangs from the bell, its end edge lined up with
+         the bell's so it opens towards the page rather than the window edge.
+         It stays short: the list scrolls inside it. --}}
     <div
         x-show="open"
         x-cloak
@@ -160,7 +160,7 @@ new class extends Component {
         x-transition:leave-end="opacity-0 scale-[0.98]"
         role="dialog"
         aria-label="{{ __('notifications.inbox') }}"
-        class="fixed inset-x-3 top-16 z-50 flex max-h-[calc(100dvh-5rem)] origin-top-right flex-col overflow-hidden rounded-2xl bg-white text-secondary-dark shadow-[0_24px_48px_-12px_rgba(16,24,40,0.22),0_4px_10px_rgba(16,24,40,0.08)] ring-1 ring-secondary-soft/70 focus:outline-none sm:absolute sm:inset-x-auto sm:end-0 sm:top-full sm:mt-2 sm:w-[27rem] lg:fixed lg:end-4 lg:top-[4.5rem] lg:mt-0 rtl:origin-top-left dark:bg-secondary-dark dark:text-white dark:ring-secondary-medium"
+        class="fixed inset-x-3 top-16 z-50 flex max-h-[calc(100dvh-5rem)] origin-top-right flex-col overflow-hidden rounded-2xl bg-white text-secondary-dark shadow-[0_24px_48px_-12px_rgba(16,24,40,0.22),0_4px_10px_rgba(16,24,40,0.08)] ring-1 ring-secondary-soft/70 focus:outline-none sm:absolute sm:inset-x-auto sm:end-0 sm:top-full sm:mt-2 sm:w-[26rem] rtl:origin-top-left dark:bg-secondary-dark dark:text-white dark:ring-secondary-medium"
         data-notification-panel
     >
         <div class="flex items-start justify-between gap-3 px-5 pt-5">
@@ -243,7 +243,7 @@ new class extends Component {
             </div>
         @endif
 
-        <div id="notification-panel-{{ $this->getId() }}" role="tabpanel" class="mt-2 min-h-0 flex-1 overflow-y-auto overscroll-contain px-2.5 pb-3 [scrollbar-width:thin]" wire:loading.class="opacity-60" wire:target="showTab,showModule">
+        <div id="notification-panel-{{ $this->getId() }}" role="tabpanel" class="mt-2 max-h-[min(19rem,calc(100dvh-16rem))] min-h-0 overflow-y-auto overscroll-contain px-2.5 pb-3 [scrollbar-width:thin]" wire:loading.class="opacity-60" wire:target="showTab,showModule">
             @if (! $opened)
                 <div class="space-y-1 px-2 py-2" role="status" data-panel-loading>
                     <span class="sr-only">{{ __('notifications.loading') }}</span>

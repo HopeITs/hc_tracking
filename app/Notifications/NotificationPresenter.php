@@ -155,7 +155,7 @@ final class NotificationPresenter
     {
         $tile = "notification-banners/tiles/{$module}-{$priority}.png";
 
-        return asset(is_file(public_path($tile)) ? $tile : 'icons/icon-192.png');
+        return asset(is_file(public_path($tile)) ? $tile : 'app-icons/icon-192.png');
     }
 
     public function moduleLabel(string $module, ?string $locale = null): string

@@ -43,7 +43,7 @@
             <span x-show="item.sticky" class="absolute inset-y-0 start-0 w-1 bg-primary" aria-hidden="true"></span>
 
             <div class="flex gap-3 py-4 ps-4 pe-2">
-                <img x-bind:src="item.icon || @js(asset('icons/icon-192.png'))" alt="" class="size-10 shrink-0 rounded-xl" width="40" height="40" />
+                <img x-bind:src="item.icon || @js(asset('app-icons/icon-192.png'))" alt="" class="size-10 shrink-0 rounded-xl" width="40" height="40" />
 
                 <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-2">

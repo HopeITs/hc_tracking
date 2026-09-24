@@ -17,8 +17,8 @@
 const POLL_INTERVAL_MS = 60_000;
 const TOAST_DURATION_MS = 6_000;
 const MAX_TOASTS = 4;
-const APP_ICON = '/icons/icon-192.png';
-const APP_BADGE = '/icons/badge-96.png';
+const APP_ICON = '/app-icons/icon-192.png';
+const APP_BADGE = '/app-icons/badge-96.png';
 
 let subscribed = false;
 let pollTimer = null;
