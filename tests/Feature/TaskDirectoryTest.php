@@ -626,7 +626,7 @@ test('the list view groups tasks by status with a colored collapsible header', f
 });
 
 test('quickCreateTask opens the drawer pre-filled with the title and the group context', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->create(['employee_id' => null]);
     $milestone = Milestone::factory()->create();
 
     Livewire::actingAs($user)

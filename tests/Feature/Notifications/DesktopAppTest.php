@@ -34,7 +34,8 @@ test('the app manifest names HC Tracking, uses the header colour and points at i
         ->and(collect($manifest['icons'])->pluck('purpose')->all())->toContain('any', 'maskable');
 
     foreach ([...$manifest['icons'], ...collect($manifest['shortcuts'])->flatMap(fn (array $shortcut) => $shortcut['icons'])->all()] as $icon) {
-        expect(file_exists(public_path(ltrim($icon['src'], '/'))))->toBeTrue($icon['src'].' is missing');
+        expect(file_exists(public_path(ltrim($icon['src'], '/'))))->toBeTrue($icon['src'].' is missing')
+            ->and($icon['src'])->not->toStartWith('/icons/', 'Apache aliases /icons/ to its own folder, so these 404 in production');
     }
 });
 
@@ -113,7 +114,7 @@ test('a pushed notification points at its module tile, and info falls back to th
     $presenter = app(NotificationPresenter::class);
 
     expect($presenter->desktopIcon('risks', 'critical'))->toBe(asset('notification-banners/tiles/risks-critical.png'))
-        ->and($presenter->desktopIcon('tasks', 'info'))->toBe(asset('icons/icon-192.png'));
+        ->and($presenter->desktopIcon('tasks', 'info'))->toBe(asset('app-icons/icon-192.png'));
 
     $user = Activity::withoutRecording(fn () => User::factory()->create());
 

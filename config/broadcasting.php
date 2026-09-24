@@ -66,6 +66,10 @@ return [
             ],
             'client_options' => [
                 // Guzzle client options: https://docs.guzzlephp.org/en/stable/request-options.html
+                // With QUEUE_CONNECTION=sync the push happens inside the
+                // user's request: a slow Pusher must fail fast.
+                'connect_timeout' => 2,
+                'timeout' => 5,
             ],
         ],
 

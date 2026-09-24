@@ -219,7 +219,7 @@ test('changing a filter returns the matrix to its first page', function () {
         matrixProgram('Program '.str_pad((string) $index, 2, '0', STR_PAD_LEFT));
     }
 
-    $lastProgram = Program::query()->orderByDesc('name')->firstOrFail();
+    $lastProgram = Program::query()->orderByName('desc')->firstOrFail();
     AnnualPlan::factory()->create([
         'program_id' => $lastProgram->id,
         'manager_id' => $manager->id,

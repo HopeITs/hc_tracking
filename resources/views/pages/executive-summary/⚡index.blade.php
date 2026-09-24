@@ -712,7 +712,7 @@ new #[Title('titles.executive_summary')] class extends Component {
     {
         return AnnualPlan::query()
             ->select(['id', 'program_id', 'year'])
-            ->with('program:id,name')
+            ->with('program:id')
             ->where('year', $year)
             ->get();
     }

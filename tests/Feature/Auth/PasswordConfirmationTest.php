@@ -21,7 +21,7 @@ test('the hr password confirms the session', function () {
 });
 
 test('a wrong or local password does not confirm the session', function (string $password) {
-    $user = User::factory()->withHrAccount('hr-secret')->create(['password' => 'local-secret']);
+    $user = User::factory()->withHrAccount('hr-secret')->create();
 
     $this->actingAs($user)
         ->post(route('password.confirm.store'), ['password' => $password])

@@ -5,6 +5,7 @@ use App\Enums\ProjectStatus;
 use App\Enums\RagStatus;
 use App\Models\HrCity;
 use App\Models\HrEmployee;
+use App\Models\HrProgram;
 use App\Models\Program;
 use App\Models\Project;
 use App\Notifications\UnreadSubjects;
@@ -259,7 +260,7 @@ new #[Title('titles.projects')] class extends Component {
                     $query
                         ->where('name', 'like', '%'.$search.'%')
                         ->orWhereIn('city_id', $matches['cities'])
-                        ->orWhereHas('program', fn ($query) => $query->where('name', 'like', '%'.$search.'%'))
+                        ->orWhereIn('program_id', HrProgram::idsMatchingName($search))
                         ->orWhereIn('user_id', $matches['owners']);
                 });
             })
@@ -338,7 +339,7 @@ new #[Title('titles.projects')] class extends Component {
             ])
             ->with([
                 'city:id,name_en,name_ar',
-                'program:id,name,strategy_id',
+                'program:id,strategy_id',
                 'program.strategy:id,name',
                 'user:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
             ])
@@ -576,7 +577,7 @@ new #[Title('titles.projects')] class extends Component {
     #[Computed]
     public function programOptions(): Collection
     {
-        return Program::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get();
+        return Program::options();
     }
 
     /** @return Collection<int, HrEmployee> */

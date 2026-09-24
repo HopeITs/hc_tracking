@@ -15,7 +15,7 @@ test('syncing mirrors every hr program under its hr id, inactive ones included',
 
     Program::syncFromHr();
 
-    expect(Program::query()->orderBy('id')->pluck('name', 'id')->all())->toBe([
+    expect(Program::query()->orderBy('id')->get()->pluck('name', 'id')->all())->toBe([
         $hopeId => 'Hope Center',
         $cygId => 'CYG',
     ])->and(Program::query()->whereNotNull('strategy_id')->orWhereNotNull('manager_id')->count())->toBe(0);
@@ -79,7 +79,7 @@ test('the sync middleware runs at most once a minute', function () {
     insertHrProgram('Second');
     $middleware->handle(Request::create('/'), $next);
 
-    expect(Program::query()->pluck('name')->all())->toBe(['First']);
+    expect(Program::query()->get()->pluck('name')->all())->toBe(['First']);
 
     $this->travel(61)->seconds();
     $middleware->handle(Request::create('/'), $next);

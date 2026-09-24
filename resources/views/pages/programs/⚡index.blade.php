@@ -98,7 +98,7 @@ new #[Title('titles.programs')] class extends Component {
     public function programs(): Collection
     {
         return $this->filteredProgramsQuery()
-            ->select(['id', 'name', 'strategy_id', 'manager_id', 'updated_at'])
+            ->select(['id', 'strategy_id', 'manager_id', 'updated_at'])
             ->with([
                 'strategy:id,name,start_year,end_year',
                 'manager:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
@@ -107,8 +107,7 @@ new #[Title('titles.programs')] class extends Component {
                 'projects',
                 'annualPlans',
             ])
-            ->orderBy('name')
-            ->orderBy('id')
+            ->orderByName()
             ->limit($this->visibleProgramCount + 1)
             ->get();
     }
@@ -140,7 +139,7 @@ new #[Title('titles.programs')] class extends Component {
             ->when($search !== '', function (Builder $query) use ($search): void {
                 $query->where(function (Builder $query) use ($search): void {
                     $query
-                        ->where('name', 'like', '%'.$search.'%')
+                        ->whereNameLike($search)
                         ->orWhereHas('strategy', fn (Builder $query) => $query->where('name', 'like', '%'.$search.'%'))
                         ->orWhereIn('manager_id', HrEmployee::idsMatchingName($search));
                 });
@@ -174,7 +173,7 @@ new #[Title('titles.programs')] class extends Component {
     public function openEditModal(int $programId): void
     {
         $program = Program::query()
-            ->select(['id', 'name', 'strategy_id', 'manager_id'])
+            ->select(['id', 'strategy_id', 'manager_id'])
             ->findOrFail($programId);
 
         $this->resetValidation();

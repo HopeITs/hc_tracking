@@ -13,12 +13,20 @@ return new class extends Migration
      * now holds an HR city id, which no foreign key can enforce across databases,
      * so the constraint and the local cities table are dropped. Existing rows are
      * not remapped: the data at this point is demo data, reseeded against HR.
+     *
+     * A fresh install never had the local table or the constraint (the
+     * create_cities migration was removed), so both are only dropped when found.
      */
     public function up(): void
     {
-        Schema::table('projects', function (Blueprint $table) {
-            $table->dropForeign(['city_id']);
-        });
+        $hasCityForeignKey = collect(Schema::getForeignKeys('projects'))
+            ->contains(fn (array $foreignKey): bool => $foreignKey['columns'] === ['city_id']);
+
+        if ($hasCityForeignKey) {
+            Schema::table('projects', function (Blueprint $table) {
+                $table->dropForeign(['city_id']);
+            });
+        }
 
         Schema::dropIfExists('cities');
     }

@@ -22,11 +22,11 @@ test('mirroring hr programs records no activity', function () {
 });
 
 test('bulk creating and pruning users from hr accounts records no activity', function () {
-    insertHrUser(insertHrEmployee(), 'someone@example.org');
+    $hrUserId = insertHrUser(insertHrEmployee(), 'someone@example.org');
 
     User::syncFromHrAccounts();
     User::pruneInactiveHrAccounts();
 
-    expect(User::query()->where('email', 'someone@example.org')->exists())->toBeTrue()
+    expect(User::query()->where('hr_user_id', $hrUserId)->exists())->toBeTrue()
         ->and(Activity::query()->count())->toBe(0);
 });

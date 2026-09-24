@@ -817,7 +817,7 @@ new #[Title('titles.tasks')] class extends Component
                 ->map(fn (Proposal $proposal): array => ['id' => $proposal->id, 'name' => $proposal->name]),
             'project' => Project::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get()
                 ->map(fn (Project $project): array => ['id' => $project->id, 'name' => $project->name]),
-            'program' => Program::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get()
+            'program' => Program::options()
                 ->map(fn (Program $program): array => ['id' => $program->id, 'name' => $program->name]),
             'department' => HrDepartment::query()->select(['id', 'name'])->orderBy('name')->get()
                 ->map(fn (HrDepartment $department): array => ['id' => $department->id, 'name' => $department->name]),

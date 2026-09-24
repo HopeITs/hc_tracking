@@ -16,6 +16,7 @@ use Illuminate\Support\Str;
 use Laravel\Fortify\Contracts\LoginResponse as LoginResponseContract;
 use Laravel\Fortify\Contracts\TwoFactorLoginResponse as TwoFactorLoginResponseContract;
 use Laravel\Fortify\Fortify;
+use Laravel\Passkeys\Passkeys;
 
 class FortifyServiceProvider extends ServiceProvider
 {
@@ -51,6 +52,9 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::confirmPasswordsUsing(
             fn (User $user, ?string $password): bool => AuthenticateWithHrAccount::confirmsPassword($user, $password),
         );
+
+        // A passkey skips the HR password check, so ask HR whether the account is still active.
+        Passkeys::authorizeLoginUsing(fn (Request $request, User $user): bool => ! $user->hasLostHrAccess());
     }
 
     /**

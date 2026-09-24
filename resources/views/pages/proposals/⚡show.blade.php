@@ -342,7 +342,7 @@ new #[Title('titles.proposal')] class extends Component
     {
         return $this->proposal->projects()
             ->select(['projects.id', 'projects.name', 'projects.city_id', 'projects.program_id', 'projects.status', 'projects.start_date', 'projects.end_date'])
-            ->with(['city:id,name_en,name_ar', 'program:id,name'])
+            ->with(['city:id,name_en,name_ar', 'program:id'])
             ->withCount([
                 'milestones',
                 'risks',
@@ -549,7 +549,7 @@ new #[Title('titles.proposal')] class extends Component
             ->select(['id', 'mediable_type', 'mediable_id', 'collection', 'disk', 'path', 'original_name', 'type', 'size', 'uploaded_at', 'uploaded_by'])
             ->where('mediable_type', 'proposal')
             ->where('mediable_id', $this->proposalId)
-            ->with('uploader:id,name')
+            ->with('uploader:id,hr_user_id')
             ->orderByDesc('uploaded_at')
             ->orderByDesc('id')
             ->get();
@@ -578,7 +578,7 @@ new #[Title('titles.proposal')] class extends Component
             ->where('mediable_type', 'project')
             ->whereIn('mediable_id', $projectIds)
             ->whereIn('collection', array_map(fn (MediaCollection $collection): string => $collection->value, self::GRANT_PAPER))
-            ->with('uploader:id,name')
+            ->with('uploader:id,hr_user_id')
             ->orderByDesc('uploaded_at')
             ->orderByDesc('id')
             ->get()

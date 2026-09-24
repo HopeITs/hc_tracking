@@ -64,7 +64,7 @@ new #[Title('titles.report')] class extends Component {
                 'planIndicator.source',
                 // Every figure on the target, for its achievement by the shared rule.
                 'planIndicator.reports:id,plan_indicator_id,status,planned_date,value',
-                'user:id,name,email',
+                'user:id,hr_user_id',
             ])
             ->findOrFail($this->reportId);
     }
@@ -85,7 +85,7 @@ new #[Title('titles.report')] class extends Component {
     {
         return ReportFile::query()
             ->select(['id', 'report_id', 'path', 'disk', 'original_name', 'size', 'date', 'type', 'uploaded_by'])
-            ->with('uploader:id,name')
+            ->with('uploader:id,hr_user_id')
             ->where('report_id', $this->reportId)
             ->orderByDesc('date')
             ->orderByDesc('id')

@@ -39,7 +39,7 @@ new class extends Component {
                     $query->orWhere(fn (Builder $query) => $query->where('subject_type', $type)->whereIn('subject_id', $ids));
                 }
             })
-            ->with('actor:id,name')
+            ->with('actor:id,hr_user_id')
             ->latest('id')
             ->limit($this->limit + 1)
             ->get();

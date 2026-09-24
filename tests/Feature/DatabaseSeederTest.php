@@ -75,8 +75,8 @@ test('seeded projects are placed in existing hr cities and seeding writes no cit
 test('staff are the hr accounts and assigned programmes have hr employee managers', function () {
     $this->seed();
 
-    expect(User::query()->pluck('email')->sort()->values()->all())
-        ->toBe(DB::connection('hr')->table('users')->pluck('email')->sort()->values()->all())
+    expect(User::query()->pluck('hr_user_id')->sort()->values()->all())
+        ->toBe(DB::connection('hr')->table('users')->pluck('id')->sort()->values()->all())
         ->and(User::query()->whereHas('roles')->exists())->toBeFalse();
 
     foreach (Program::query()->whereNotNull('manager_id')->with('manager', 'projects', 'annualPlans')->get() as $program) {
@@ -170,12 +170,12 @@ test('every seeded transfer reconciles', function () {
 test('seeding uses active hr employees only', function () {
     $inactiveId = insertHrEmployee(isActive: false);
     insertHrEmployee();
-    insertHrUser($inactiveId, 'gone@example.org');
+    $goneId = insertHrUser($inactiveId, 'gone@example.org');
     insertHrUser(insertHrEmployee(), 'rana@example.org');
 
     $this->seed();
 
-    expect(User::query()->where('email', 'gone@example.org')->exists())->toBeFalse()
+    expect(User::query()->where('hr_user_id', $goneId)->exists())->toBeFalse()
         ->and(TaskAssignee::query()->where('employee_id', $inactiveId)->exists())->toBeFalse()
         ->and(Program::query()->where('manager_id', $inactiveId)->exists())->toBeFalse()
         ->and(Project::query()->where('user_id', $inactiveId)->exists())->toBeFalse();

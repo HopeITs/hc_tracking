@@ -14,13 +14,12 @@ test('the command gives an hr account access with the given role', function () {
         '--no-interaction' => true,
     ])->assertSuccessful();
 
-    $user = User::query()->where('email', 'amina@example.org')->sole();
+    $user = User::query()->where('hr_user_id', $hrUserId)->sole();
 
     expect($user->name)->toBe('Amina Haddad')
         ->and($user->roles->first()?->name)->toBe('MEAL')
         ->and($user->hr_user_id)->toBe($hrUserId)
         ->and($user->employee_id)->toBe($employeeId)
-        ->and($user->password)->toBeNull()
         ->and($user->email_verified_at)->not->toBeNull();
 });
 
@@ -70,7 +69,6 @@ test('an unknown role is rejected', function () {
 
 test('a duplicate email is rejected', function () {
     User::factory()->create(['email' => 'taken@example.org']);
-    insertHrUser(insertHrEmployee(), 'taken@example.org');
 
     $this->artisan('user:create', [
         '--email' => 'taken@example.org',

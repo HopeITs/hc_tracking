@@ -251,7 +251,7 @@ test('editing a plan keeps the reader on the page of programs they were reading'
         crudProgram(sprintf('Program %02d', $index));
     }
 
-    $program = Program::query()->where('name', 'Program 18')->sole();
+    $program = Program::query()->get()->sole(fn (Program $program): bool => $program->name === 'Program 18');
     $plan = AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2025]);
     $replacement = insertHrEmployee(firstNameEn: 'Nour', lastNameEn: 'Saleh');
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Concerns\RemembersHrLookup;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -24,7 +25,86 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Hidden(['password', 'remember_token'])]
 class HrUser extends HrModel
 {
+    use RemembersHrLookup;
+
     protected $table = 'users';
+
+    /**
+     * Every HR account's email and English name by account id, kept in memory
+     * (see RemembersHrLookup).
+     *
+     * Tracking keeps no copy of either; User::email and User::name read them
+     * from here, so a page listing many people costs two HR queries in total.
+     *
+     * @return array<int, array{email: string, name: string}>
+     */
+    public static function directory(): array
+    {
+        return self::rememberedHrLookup(fn (): array => self::loadDirectory());
+    }
+
+    /**
+     * One HR account's email and English name, null when HR no longer has it.
+     *
+     * @return array{email: string, name: string}|null
+     */
+    public static function directoryEntry(int $id): ?array
+    {
+        return self::rememberedHrLookupEntry($id, fn (): array => self::loadDirectory());
+    }
+
+    /**
+     * The ids of the HR accounts whose email or employee name (English or
+     * Arabic) contains the search.
+     *
+     * @return list<int>
+     */
+    public static function idsMatching(string $search): array
+    {
+        $employeeIds = HrEmployee::idsMatchingName($search);
+
+        return static::query()
+            ->where(fn (Builder $query) => $query
+                ->where('email', 'like', '%'.trim($search).'%')
+                ->orWhereIn('employee_id', $employeeIds))
+            ->pluck('id')
+            ->all();
+    }
+
+    /**
+     * Every HR account id, ordered by the English name tracking shows (then id).
+     *
+     * @return list<int>
+     */
+    public static function idsOrderedByName(): array
+    {
+        $directory = self::directory();
+
+        uksort($directory, fn (int $a, int $b): int => [mb_strtolower($directory[$a]['name']), $a] <=> [mb_strtolower($directory[$b]['name']), $b]);
+
+        return array_keys($directory);
+    }
+
+    /**
+     * @return array<int, array{email: string, name: string}>
+     */
+    private static function loadDirectory(): array
+    {
+        $accounts = static::query()
+            ->select(['id', 'employee_id', 'email'])
+            ->get();
+
+        $employees = HrEmployee::query()
+            ->select(HrEmployee::NameColumns)
+            ->whereIn('id', $accounts->pluck('employee_id')->filter()->unique()->all())
+            ->get()
+            ->keyBy('id');
+
+        return $accounts->mapWithKeys(fn (HrUser $account): array => [$account->id => [
+            'email' => $account->email,
+            'name' => $employees->get($account->employee_id)?->name_en ?: $account->email,
+        ]])->all();
+    }
 
     /**
      * Get the attributes that should be cast.

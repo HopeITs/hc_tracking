@@ -145,7 +145,7 @@ class AnnualPlan extends Model implements TracksActivity
      */
     public function activityLabel(): string
     {
-        return Program::query()->whereKey($this->activityAttribute('program_id'))->value('name').' · '.$this->activityAttribute('year');
+        return Program::query()->find($this->activityAttribute('program_id'), ['id'])?->name.' · '.$this->activityAttribute('year');
     }
 
     public function activityProgramId(): ?int

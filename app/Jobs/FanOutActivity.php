@@ -39,7 +39,7 @@ final class FanOutActivity implements ShouldQueue
 
     public function handle(RecipientResolver $resolver, ActivityParameters $parameters, EmployeeRecipients $employees, QuickActions $quickActions): void
     {
-        $activity = Activity::query()->with('actor:id,name')->find($this->activityId);
+        $activity = Activity::query()->with('actor:id,hr_user_id')->find($this->activityId);
 
         if ($activity === null || ! $activity->shouldNotify()) {
             return;
