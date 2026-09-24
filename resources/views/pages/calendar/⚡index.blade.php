@@ -1,9 +1,12 @@
 <?php
 
+use App\Enums\ArStatus;
 use App\Enums\MilestoneStatus;
 use App\Enums\ReportStatus;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Models\Donor;
+use App\Models\DonorReport;
 use App\Models\HrDepartment;
 use App\Models\HrEmployee;
 use App\Models\Milestone;
@@ -12,6 +15,7 @@ use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Report;
 use App\Models\Task;
+use App\Models\TransfersTracking;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
@@ -36,13 +40,21 @@ new #[Title('titles.calendar')] class extends Component {
     #[Url(except: 'month')]
     public string $viewMode = 'month';
 
-    #[Url(except: '')]
-    public string $filterEmployeeId = '';
+    /** @var array<int, string> */
+    #[Url(as: 'responsible', except: [])]
+    public array $filterEmployeeIds = [];
 
     public bool $showMilestones = true;
     public bool $showTasks = true;
     public bool $showReports = true;
+    public bool $showProposals = true;
+    public bool $showTransfers = true;
+    public bool $showDonors = true;
+    public bool $showProjects = true;
     public bool $showTypeFilterMenu = false;
+
+    public string $dayDetailDate = '';
+    public bool $showDayDetailModal = false;
 
     public bool $showMilestoneModal = false;
     public bool $showDeleteModal = false;
@@ -171,13 +183,36 @@ new #[Title('titles.calendar')] class extends Component {
     }
 
     /**
-     * The employee whose items the calendar shows: the one chosen in the
-     * responsible-user filter, defaulting to the signed-in user's own
-     * employee record.
+     * The employees whose items the calendar shows: everyone checked in the
+     * responsible-user filter, defaulting to just the signed-in user's own
+     * employee record when nothing is checked.
+     *
+     * @return array<int, int>
      */
-    protected function scopedEmployeeId(): ?int
+    protected function scopedEmployeeIds(): array
     {
-        return $this->filterEmployeeId !== '' ? (int) $this->filterEmployeeId : $this->employeeId();
+        if ($this->filterEmployeeIds !== []) {
+            return array_map('intval', $this->filterEmployeeIds);
+        }
+
+        $employeeId = $this->employeeId();
+
+        return $employeeId === null ? [] : [$employeeId];
+    }
+
+    /**
+     * The employee a newly created milestone/task defaults to: the one
+     * employee the filter is narrowed to, or the signed-in user's own record
+     * when the filter covers several people (or none) and there is no single
+     * obvious owner to default to.
+     */
+    protected function defaultResponsibleEmployeeId(): ?int
+    {
+        if (count($this->filterEmployeeIds) === 1) {
+            return (int) $this->filterEmployeeIds[0];
+        }
+
+        return $this->employeeId();
     }
 
     protected function activeMonth(): CarbonImmutable
@@ -199,7 +234,7 @@ new #[Title('titles.calendar')] class extends Component {
      * view, the plain list of visible days instead — `weeks` is null then
      * and `days` is populated, and vice versa in month view.
      *
-     * @return array{month: CarbonImmutable, weeks: ?array<int, array<int, CarbonImmutable>>, days: ?array<int, CarbonImmutable>, milestonesByDay: Collection<string, Collection<int, Milestone>>, tasksByDay: Collection<string, Collection<int, Task>>, reportsByDay: Collection<string, Collection<int, Report>>, nowOffsetPercent: float}
+     * @return array{month: CarbonImmutable, weeks: ?array<int, array<int, CarbonImmutable>>, days: ?array<int, CarbonImmutable>, milestonesByDay: Collection<string, Collection<int, Milestone>>, tasksByDay: Collection<string, Collection<int, Task>>, reportsByDay: Collection<string, Collection<int, Report>>, proposalsByDay: Collection<string, Collection<int, Proposal>>, transfersByDay: Collection<string, Collection<int, TransfersTracking>>, donorFollowUpsByDay: Collection<string, Collection<int, Donor>>, donorReportsByDay: Collection<string, Collection<int, DonorReport>>, projectStartsByDay: Collection<string, Collection<int, Project>>, projectEndsByDay: Collection<string, Collection<int, Project>>, unscheduledTasks: Collection<int, Task>, nowOffsetPercent: float}
      */
     #[Computed]
     public function calendar(): array
@@ -231,13 +266,13 @@ new #[Title('titles.calendar')] class extends Component {
 
         $now = CarbonImmutable::now();
 
-        $employeeId = $this->scopedEmployeeId();
+        $employeeIds = $this->scopedEmployeeIds();
 
-        $milestonesByDay = $employeeId === null || ! $this->showMilestones
+        $milestonesByDay = $employeeIds === [] || ! $this->showMilestones
             ? new Collection
             : Milestone::query()
                 ->select(['id', 'project_id', 'name', 'planned_start_date', 'planned_end_date', 'actual_end_date', 'status', 'weight_percentage', 'responsible_user_id'])
-                ->where('responsible_user_id', $employeeId)
+                ->whereIn('responsible_user_id', $employeeIds)
                 ->whereBetween('planned_start_date', [$gridStart->toDateString(), $gridEnd->toDateString()])
                 ->with('project:id,name')
                 ->withCount(['children', 'tasks'])
@@ -246,20 +281,20 @@ new #[Title('titles.calendar')] class extends Component {
                 ->get()
                 ->groupBy(fn (Milestone $milestone): string => $milestone->planned_start_date->toDateString());
 
-        $tasksByDay = $employeeId === null || ! $this->showTasks
+        $tasksByDay = $employeeIds === [] || ! $this->showTasks
             ? new Collection
             : Task::query()
                 ->select(['id', 'title', 'status', 'due_date'])
-                ->whereHas('taskAssignees', fn (Builder $query) => $query->where('employee_id', $employeeId))
+                ->whereHas('taskAssignees', fn (Builder $query) => $query->whereIn('employee_id', $employeeIds))
                 ->whereNotNull('due_date')
                 ->whereBetween('due_date', [$gridStart->toDateString(), $gridEnd->toDateString()])
                 ->orderBy('due_date')
                 ->get()
                 ->groupBy(fn (Task $task): string => $task->due_date->toDateString());
 
-        $reportUserIds = $employeeId === null
+        $reportUserIds = $employeeIds === []
             ? []
-            : User::query()->where('employee_id', $employeeId)->pluck('id')->all();
+            : User::query()->whereIn('employee_id', $employeeIds)->pluck('id')->all();
 
         $reportsByDay = $reportUserIds === [] || ! $this->showReports
             ? new Collection
@@ -272,6 +307,89 @@ new #[Title('titles.calendar')] class extends Component {
                 ->get()
                 ->groupBy(fn (Report $report): string => $report->planned_date->toDateString());
 
+        $unscheduledTasks = $employeeIds === [] || ! $this->showTasks
+            ? new Collection
+            : Task::query()
+                ->select(['id', 'title', 'status', 'priority', 'due_date'])
+                ->whereHas('taskAssignees', fn (Builder $query) => $query->whereIn('employee_id', $employeeIds))
+                ->whereNull('due_date')
+                ->orderBy('title')
+                ->get();
+
+        // Proposals, transfers and donors carry no direct "responsible employee"
+        // column of their own — the only real ownership signal in the schema is
+        // Project::user_id, so anything funding/funded-by one of my projects
+        // counts as "mine" here, the same proxy every one of these queries uses.
+        $ownedProjectIds = $employeeIds === []
+            ? []
+            : Project::query()->whereIn('user_id', $employeeIds)->pluck('id')->all();
+
+        $projectStartsByDay = $employeeIds === [] || ! $this->showProjects
+            ? new Collection
+            : Project::query()
+                ->select(['id', 'name', 'start_date'])
+                ->whereIn('user_id', $employeeIds)
+                ->whereNotNull('start_date')
+                ->whereBetween('start_date', [$gridStart->toDateString(), $gridEnd->toDateString()])
+                ->orderBy('start_date')
+                ->get()
+                ->groupBy(fn (Project $project): string => $project->start_date->toDateString());
+
+        $projectEndsByDay = $employeeIds === [] || ! $this->showProjects
+            ? new Collection
+            : Project::query()
+                ->select(['id', 'name', 'end_date'])
+                ->whereIn('user_id', $employeeIds)
+                ->whereNotNull('end_date')
+                ->whereBetween('end_date', [$gridStart->toDateString(), $gridEnd->toDateString()])
+                ->orderBy('end_date')
+                ->get()
+                ->groupBy(fn (Project $project): string => $project->end_date->toDateString());
+
+        $proposalsByDay = $ownedProjectIds === [] || ! $this->showProposals
+            ? new Collection
+            : Proposal::query()
+                ->select(['id', 'slug', 'name', 'planned_date_end', 'actual_date_end'])
+                ->whereHas('projects', fn (Builder $query) => $query->whereIn('projects.id', $ownedProjectIds))
+                ->whereBetween('planned_date_end', [$gridStart->toDateString(), $gridEnd->toDateString()])
+                ->orderBy('planned_date_end')
+                ->get()
+                ->groupBy(fn (Proposal $proposal): string => $proposal->planned_date_end->toDateString());
+
+        $transfersByDay = $ownedProjectIds === [] || ! $this->showTransfers
+            ? new Collection
+            : TransfersTracking::query()
+                ->select(['id', 'donor_proposal_id', 'scheduled_date', 'payment_amount', 'amount_transfered_currency', 'ar_status'])
+                ->whereNotNull('scheduled_date')
+                ->whereBetween('scheduled_date', [$gridStart->toDateString(), $gridEnd->toDateString()])
+                ->whereHas('donorProposal.proposal.projects', fn (Builder $query) => $query->whereIn('projects.id', $ownedProjectIds))
+                ->with('donorProposal:id,slug,donor_id,proposal_id', 'donorProposal.donor:id,name')
+                ->orderBy('scheduled_date')
+                ->get()
+                ->groupBy(fn (TransfersTracking $transfer): string => $transfer->scheduled_date->toDateString());
+
+        $donorFollowUpsByDay = $ownedProjectIds === [] || ! $this->showDonors
+            ? new Collection
+            : Donor::query()
+                ->select(['id', 'slug', 'name', 'next_step', 'next_step_due_on'])
+                ->whereNotNull('next_step_due_on')
+                ->whereBetween('next_step_due_on', [$gridStart->toDateString(), $gridEnd->toDateString()])
+                ->whereHas('proposals.projects', fn (Builder $query) => $query->whereIn('projects.id', $ownedProjectIds))
+                ->orderBy('next_step_due_on')
+                ->get()
+                ->groupBy(fn (Donor $donor): string => $donor->next_step_due_on->toDateString());
+
+        $donorReportsByDay = $ownedProjectIds === [] || ! $this->showDonors
+            ? new Collection
+            : DonorReport::query()
+                ->select(['id', 'donor_proposal_id', 'title', 'due_on', 'submitted_on'])
+                ->whereBetween('due_on', [$gridStart->toDateString(), $gridEnd->toDateString()])
+                ->whereHas('donorProposal.proposal.projects', fn (Builder $query) => $query->whereIn('projects.id', $ownedProjectIds))
+                ->with('donorProposal:id,slug')
+                ->orderBy('due_on')
+                ->get()
+                ->groupBy(fn (DonorReport $report): string => $report->due_on->toDateString());
+
         return [
             'month' => $month,
             'weeks' => $weeks,
@@ -279,6 +397,13 @@ new #[Title('titles.calendar')] class extends Component {
             'milestonesByDay' => $milestonesByDay,
             'tasksByDay' => $tasksByDay,
             'reportsByDay' => $reportsByDay,
+            'proposalsByDay' => $proposalsByDay,
+            'transfersByDay' => $transfersByDay,
+            'donorFollowUpsByDay' => $donorFollowUpsByDay,
+            'donorReportsByDay' => $donorReportsByDay,
+            'projectStartsByDay' => $projectStartsByDay,
+            'projectEndsByDay' => $projectEndsByDay,
+            'unscheduledTasks' => $unscheduledTasks,
             'nowOffsetPercent' => ($now->hour * 60 + $now->minute) / (24 * 60) * 100,
         ];
     }
@@ -374,7 +499,7 @@ new #[Title('titles.calendar')] class extends Component {
             $this->plannedStartDate = $date;
         }
 
-        $this->responsibleUserId = (string) ($this->scopedEmployeeId() ?? '');
+        $this->responsibleUserId = (string) ($this->defaultResponsibleEmployeeId() ?? '');
         $this->showMilestoneModal = true;
     }
 
@@ -587,7 +712,8 @@ new #[Title('titles.calendar')] class extends Component {
             $this->dueDate = $date;
         }
 
-        $this->assignedTo = $this->scopedEmployeeId() !== null ? [(string) $this->scopedEmployeeId()] : [];
+        $defaultEmployeeId = $this->defaultResponsibleEmployeeId();
+        $this->assignedTo = $defaultEmployeeId !== null ? [(string) $defaultEmployeeId] : [];
         $this->showTaskModal = true;
     }
 
@@ -732,6 +858,30 @@ new #[Title('titles.calendar')] class extends Component {
         $this->resetTaskForm();
     }
 
+    /**
+     * Moves a task to a new due date (or clears it, back to "unscheduled")
+     * when dropped in the calendar grid or the unscheduled panel.
+     */
+    public function rescheduleTask(int $taskId, string $date): void
+    {
+        if ($date !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) !== 1) {
+            return;
+        }
+
+        $task = Task::query()->find($taskId);
+
+        if ($task === null) {
+            return;
+        }
+
+        $task->due_date = $date === '' ? null : CarbonImmutable::parse($date);
+        $task->save();
+
+        unset($this->calendar);
+
+        Flux::toast(variant: 'success', text: __('tasks.task_rescheduled'));
+    }
+
     protected function resetTaskForm(): void
     {
         $this->resetValidation();
@@ -748,6 +898,454 @@ new #[Title('titles.calendar')] class extends Component {
         $this->taskSourceType = 'proposal';
         $this->taskSourceId = '';
         unset($this->sourceOptions);
+    }
+
+    /**
+     * Flips one type's visibility and, when that leaves exactly one type
+     * switched on, jumps the grid to the nearest occurrence of it — so
+     * narrowing to a single type never strands the viewer on an empty month.
+     */
+    /**
+     * Flips one type's visibility. The menu stays open across picks — the
+     * caller unchecking five of seven boxes to narrow to one type would
+     * otherwise have to reopen the menu after every click.
+     */
+    public function toggleType(string $type): void
+    {
+        $property = $this->typeProperty($type);
+        $this->$property = ! $this->$property;
+
+        $focused = $this->focusedType();
+
+        if ($focused !== null) {
+            $this->jumpToNearest($focused);
+        }
+    }
+
+    /**
+     * The one-click alternative to narrowing by unchecking every other
+     * type: switches straight to showing only $type, closes the menu, and
+     * jumps to its nearest occurrence.
+     */
+    public function focusOnlyType(string $type): void
+    {
+        $this->showMilestones = $type === 'milestone';
+        $this->showTasks = $type === 'task';
+        $this->showReports = $type === 'report';
+        $this->showProposals = $type === 'proposal';
+        $this->showTransfers = $type === 'transfer';
+        $this->showDonors = $type === 'donor';
+        $this->showProjects = $type === 'project';
+        $this->showTypeFilterMenu = false;
+
+        $this->jumpToNearest($type);
+    }
+
+    public function resetFilters(): void
+    {
+        $this->showMilestones = true;
+        $this->showTasks = true;
+        $this->showReports = true;
+        $this->showProposals = true;
+        $this->showTransfers = true;
+        $this->showDonors = true;
+        $this->showProjects = true;
+        $this->filterEmployeeIds = [];
+    }
+
+    /**
+     * Opens the day-detail list for a day that already has at least one
+     * visible item on it — the click target that would otherwise land on
+     * the "add" context menu instead, since a day with content is something
+     * to look at, not a blank slot to fill.
+     */
+    public function openDayDetail(string $date): void
+    {
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) !== 1) {
+            return;
+        }
+
+        $this->dayDetailDate = $date;
+        $this->showDayDetailModal = true;
+    }
+
+    public function closeDayDetail(): void
+    {
+        $this->showDayDetailModal = false;
+    }
+
+    /**
+     * Every item visible on $dayDetailDate, across every type currently
+     * shown on the grid — built from the same per-day groupings the chips
+     * render from, so this list never disagrees with what the day's chips
+     * actually show.
+     *
+     * @return \Illuminate\Support\Collection<int, array{type: string, kind: string, id: int, url: ?string, title: string, subLabel: ?string}>
+     */
+    #[Computed]
+    public function dayDetailItems(): \Illuminate\Support\Collection
+    {
+        if ($this->dayDetailDate === '') {
+            return new \Illuminate\Support\Collection;
+        }
+
+        $calendar = $this->calendar;
+        $date = $this->dayDetailDate;
+        $rows = new \Illuminate\Support\Collection;
+
+        foreach ($calendar['milestonesByDay']->get($date, new Collection) as $milestone) {
+            $rows->push(['type' => 'milestone', 'kind' => 'modal-milestone', 'id' => $milestone->id, 'url' => null, 'title' => $milestone->name, 'subLabel' => $milestone->project?->name]);
+        }
+
+        foreach ($calendar['tasksByDay']->get($date, new Collection) as $task) {
+            $rows->push(['type' => 'task', 'kind' => 'modal-task', 'id' => $task->id, 'url' => null, 'title' => $task->title, 'subLabel' => null]);
+        }
+
+        foreach ($calendar['reportsByDay']->get($date, new Collection) as $report) {
+            $rows->push(['type' => 'report', 'kind' => 'link', 'id' => $report->id, 'url' => route('reports.show', $report), 'title' => $report->planIndicator?->indicator?->name ?? __('calendar.report_deadline'), 'subLabel' => null]);
+        }
+
+        foreach ($calendar['proposalsByDay']->get($date, new Collection) as $proposal) {
+            $rows->push(['type' => 'proposal', 'kind' => 'link', 'id' => $proposal->id, 'url' => route('proposals.show', $proposal), 'title' => $proposal->name, 'subLabel' => null]);
+        }
+
+        foreach ($calendar['transfersByDay']->get($date, new Collection) as $transfer) {
+            $rows->push([
+                'type' => 'transfer',
+                'kind' => 'link',
+                'id' => $transfer->id,
+                'url' => route('funding-agreements.show', $transfer->donorProposal),
+                'title' => $transfer->donorProposal?->donor?->name.' · '.number_format((float) $transfer->payment_amount, 2).' '.$transfer->amount_transfered_currency->value,
+                'subLabel' => null,
+            ]);
+        }
+
+        foreach ($calendar['donorFollowUpsByDay']->get($date, new Collection) as $donor) {
+            $rows->push(['type' => 'donor', 'kind' => 'link', 'id' => $donor->id, 'url' => route('donors.show', $donor), 'title' => $donor->name, 'subLabel' => __('calendar.donor_follow_up')]);
+        }
+
+        foreach ($calendar['donorReportsByDay']->get($date, new Collection) as $donorReport) {
+            $rows->push(['type' => 'donor', 'kind' => 'link', 'id' => $donorReport->id, 'url' => route('funding-agreements.show', $donorReport->donorProposal), 'title' => $donorReport->title, 'subLabel' => __('calendar.donor_report_due')]);
+        }
+
+        foreach ($calendar['projectStartsByDay']->get($date, new Collection) as $project) {
+            $rows->push(['type' => 'project', 'kind' => 'link', 'id' => $project->id, 'url' => route('projects.show', $project), 'title' => $project->name, 'subLabel' => __('calendar.project_starts')]);
+        }
+
+        foreach ($calendar['projectEndsByDay']->get($date, new Collection) as $project) {
+            $rows->push(['type' => 'project', 'kind' => 'link', 'id' => $project->id, 'url' => route('projects.show', $project), 'title' => $project->name, 'subLabel' => __('calendar.project_ends')]);
+        }
+
+        return $rows;
+    }
+
+    protected function typeProperty(string $type): string
+    {
+        return match ($type) {
+            'milestone' => 'showMilestones',
+            'task' => 'showTasks',
+            'report' => 'showReports',
+            'proposal' => 'showProposals',
+            'transfer' => 'showTransfers',
+            'donor' => 'showDonors',
+            'project' => 'showProjects',
+        };
+    }
+
+    /**
+     * The single type key ('milestone', 'task', …) when exactly one of the
+     * seven show* toggles is on, otherwise null. Drives the "focused" banner,
+     * grid highlighting and related-dates panel — all three stay off while
+     * more than one type (or none) is visible, since "filtered to one thing"
+     * only means something when it is actually just one thing.
+     */
+    public function focusedType(): ?string
+    {
+        $active = array_filter([
+            'milestone' => $this->showMilestones,
+            'task' => $this->showTasks,
+            'report' => $this->showReports,
+            'proposal' => $this->showProposals,
+            'transfer' => $this->showTransfers,
+            'donor' => $this->showDonors,
+            'project' => $this->showProjects,
+        ]);
+
+        return count($active) === 1 ? array_key_first($active) : null;
+    }
+
+    /**
+     * Moves the grid to the month (or period anchor) containing the nearest
+     * occurrence of $type: the next upcoming one if there is one, otherwise
+     * the most recent past one, so focusing a type with only historical
+     * records still lands somewhere with data instead of today's empty month.
+     */
+    protected function jumpToNearest(string $type): void
+    {
+        $nearest = $this->nearestDateFor($type);
+
+        if ($nearest === null) {
+            return;
+        }
+
+        if ($this->viewMode === 'month') {
+            $this->month = $nearest->format('Y-m');
+        } else {
+            $this->anchorDate = $nearest->toDateString();
+        }
+    }
+
+    protected function nearestDateFor(string $type): ?CarbonImmutable
+    {
+        $employeeIds = $this->scopedEmployeeIds();
+
+        if ($employeeIds === []) {
+            return null;
+        }
+
+        return match ($type) {
+            'milestone' => $this->nearestOrLatestDate(
+                Milestone::query()->whereIn('responsible_user_id', $employeeIds),
+                'planned_start_date'
+            ),
+            'task' => $this->nearestOrLatestDate(
+                Task::query()->whereHas('taskAssignees', fn (Builder $query) => $query->whereIn('employee_id', $employeeIds))->whereNotNull('due_date'),
+                'due_date'
+            ),
+            'report' => $this->nearestOrLatestDate(
+                Report::query()->whereIn('user_id', User::query()->whereIn('employee_id', $employeeIds)->pluck('id')),
+                'planned_date'
+            ),
+            'proposal' => $this->nearestOrLatestDate(
+                Proposal::query()->whereHas('projects', fn (Builder $query) => $query->whereIn('projects.user_id', $employeeIds)),
+                'planned_date_end'
+            ),
+            'transfer' => $this->nearestOrLatestDate(
+                TransfersTracking::query()->whereNotNull('scheduled_date')->whereHas('donorProposal.proposal.projects', fn (Builder $query) => $query->whereIn('projects.user_id', $employeeIds)),
+                'scheduled_date'
+            ),
+            'donor' => $this->pickCloserDate(
+                $this->nearestOrLatestDate(
+                    Donor::query()->whereNotNull('next_step_due_on')->whereHas('proposals.projects', fn (Builder $query) => $query->whereIn('projects.user_id', $employeeIds)),
+                    'next_step_due_on'
+                ),
+                $this->nearestOrLatestDate(
+                    DonorReport::query()->whereHas('donorProposal.proposal.projects', fn (Builder $query) => $query->whereIn('projects.user_id', $employeeIds)),
+                    'due_on'
+                ),
+            ),
+            'project' => $this->pickCloserDate(
+                $this->nearestOrLatestDate(
+                    Project::query()->whereIn('user_id', $employeeIds)->whereNotNull('start_date'),
+                    'start_date'
+                ),
+                $this->nearestOrLatestDate(
+                    Project::query()->whereIn('user_id', $employeeIds)->whereNotNull('end_date'),
+                    'end_date'
+                ),
+            ),
+            default => null,
+        };
+    }
+
+    /**
+     * The next date on/after today for $column, or the most recent one
+     * before today when nothing upcoming exists.
+     */
+    protected function nearestOrLatestDate(Builder $query, string $column): ?CarbonImmutable
+    {
+        $today = CarbonImmutable::today()->toDateString();
+
+        $upcoming = (clone $query)->where($column, '>=', $today)->orderBy($column)->value($column);
+
+        if ($upcoming !== null) {
+            return CarbonImmutable::parse($upcoming);
+        }
+
+        $past = (clone $query)->where($column, '<', $today)->orderByDesc($column)->value($column);
+
+        return $past === null ? null : CarbonImmutable::parse($past);
+    }
+
+    /**
+     * Picks whichever of two candidate dates sits fewer days from today, so
+     * a composite type (donor follow-ups + donor reports, project starts +
+     * ends) jumps to whichever of its two sources is actually the nearer one.
+     */
+    protected function pickCloserDate(?CarbonImmutable $a, ?CarbonImmutable $b): ?CarbonImmutable
+    {
+        if ($a === null) {
+            return $b;
+        }
+
+        if ($b === null) {
+            return $a;
+        }
+
+        $today = CarbonImmutable::today();
+
+        return abs($today->diffInDays($a, false)) <= abs($today->diffInDays($b, false)) ? $a : $b;
+    }
+
+    /**
+     * Up to $limit upcoming records for $column (today or later), or, when
+     * none are upcoming, the $limit most recent past ones in chronological
+     * order — so a focused type with only historical records still shows a
+     * populated related-dates list instead of an empty one.
+     *
+     * @return Collection<int, Model>
+     */
+    protected function upcomingOrRecent(Builder $query, string $column, int $limit = 15): Collection
+    {
+        $today = CarbonImmutable::today()->toDateString();
+
+        $upcoming = (clone $query)->where($column, '>=', $today)->orderBy($column)->limit($limit)->get();
+
+        if ($upcoming->isNotEmpty()) {
+            return $upcoming;
+        }
+
+        return (clone $query)->where($column, '<', $today)->orderByDesc($column)->limit($limit)->get()->reverse()->values();
+    }
+
+    /**
+     * The related-dates list for the currently focused type: title, date,
+     * an optional sub-label (which of a composite type's two sources this
+     * row came from) and how to open it — a modal action for milestones and
+     * tasks (they have no show page of their own), a link for everything
+     * else, matching the same click-through the grid chips use.
+     *
+     * Returns the base Support Collection, not the Eloquent one aliased as
+     * Collection in this file: mapping models to plain arrays makes Eloquent
+     * Collection::map() downgrade to toBase() internally, so the real return
+     * value never satisfies an Eloquent-typed signature.
+     *
+     * @return \Illuminate\Support\Collection<int, array{kind: string, id: int, url: ?string, title: string, subLabel: ?string, date: CarbonImmutable}>
+     */
+    #[Computed]
+    public function focusedItems(): \Illuminate\Support\Collection
+    {
+        $type = $this->focusedType();
+
+        if ($type === null) {
+            return new \Illuminate\Support\Collection;
+        }
+
+        $employeeIds = $this->scopedEmployeeIds();
+
+        if ($employeeIds === []) {
+            return new \Illuminate\Support\Collection;
+        }
+
+        return match ($type) {
+            'milestone' => $this->upcomingOrRecent(
+                Milestone::query()->whereIn('responsible_user_id', $employeeIds)->with('project:id,name'),
+                'planned_start_date'
+            )->map(fn (Milestone $milestone): array => [
+                'kind' => 'modal-milestone',
+                'id' => $milestone->id,
+                'url' => null,
+                'title' => $milestone->name,
+                'subLabel' => $milestone->project?->name,
+                'date' => $milestone->planned_start_date,
+            ]),
+            'task' => $this->upcomingOrRecent(
+                Task::query()->whereHas('taskAssignees', fn (Builder $query) => $query->whereIn('employee_id', $employeeIds))->whereNotNull('due_date'),
+                'due_date'
+            )->map(fn (Task $task): array => [
+                'kind' => 'modal-task',
+                'id' => $task->id,
+                'url' => null,
+                'title' => $task->title,
+                'subLabel' => null,
+                'date' => $task->due_date,
+            ]),
+            'report' => $this->upcomingOrRecent(
+                Report::query()->whereIn('user_id', User::query()->whereIn('employee_id', $employeeIds)->pluck('id'))->with('planIndicator.indicator:id,name'),
+                'planned_date'
+            )->map(fn (Report $report): array => [
+                'kind' => 'link',
+                'id' => $report->id,
+                'url' => route('reports.show', $report),
+                'title' => $report->planIndicator?->indicator?->name ?? __('calendar.report_deadline'),
+                'subLabel' => null,
+                'date' => $report->planned_date,
+            ]),
+            'proposal' => $this->upcomingOrRecent(
+                Proposal::query()->whereHas('projects', fn (Builder $query) => $query->whereIn('projects.user_id', $employeeIds)),
+                'planned_date_end'
+            )->map(fn (Proposal $proposal): array => [
+                'kind' => 'link',
+                'id' => $proposal->id,
+                'url' => route('proposals.show', $proposal),
+                'title' => $proposal->name,
+                'subLabel' => null,
+                'date' => $proposal->planned_date_end,
+            ]),
+            'transfer' => $this->upcomingOrRecent(
+                TransfersTracking::query()
+                    ->whereNotNull('scheduled_date')
+                    ->whereHas('donorProposal.proposal.projects', fn (Builder $query) => $query->whereIn('projects.user_id', $employeeIds))
+                    ->with('donorProposal:id,slug,donor_id', 'donorProposal.donor:id,name'),
+                'scheduled_date'
+            )->map(fn (TransfersTracking $transfer): array => [
+                'kind' => 'link',
+                'id' => $transfer->id,
+                'url' => route('funding-agreements.show', $transfer->donorProposal),
+                'title' => $transfer->donorProposal?->donor?->name.' · '.number_format((float) $transfer->payment_amount, 2).' '.$transfer->amount_transfered_currency->value,
+                'subLabel' => null,
+                'date' => $transfer->scheduled_date,
+            ]),
+            'donor' => $this->upcomingOrRecent(
+                Donor::query()->whereNotNull('next_step_due_on')->whereHas('proposals.projects', fn (Builder $query) => $query->whereIn('projects.user_id', $employeeIds)),
+                'next_step_due_on'
+            )->map(fn (Donor $donor): array => [
+                'kind' => 'link',
+                'id' => $donor->id,
+                'url' => route('donors.show', $donor),
+                'title' => $donor->name,
+                'subLabel' => __('calendar.donor_follow_up'),
+                'date' => $donor->next_step_due_on,
+            ])->concat(
+                $this->upcomingOrRecent(
+                    DonorReport::query()
+                        ->whereHas('donorProposal.proposal.projects', fn (Builder $query) => $query->whereIn('projects.user_id', $employeeIds))
+                        ->with('donorProposal:id,slug'),
+                    'due_on'
+                )->map(fn (DonorReport $report): array => [
+                    'kind' => 'link',
+                    'id' => $report->id,
+                    'url' => route('funding-agreements.show', $report->donorProposal),
+                    'title' => $report->title,
+                    'subLabel' => __('calendar.donor_report_due'),
+                    'date' => $report->due_on,
+                ])
+            )->sortBy('date')->values()->take(15),
+            'project' => $this->upcomingOrRecent(
+                Project::query()->whereIn('user_id', $employeeIds)->whereNotNull('start_date'),
+                'start_date'
+            )->map(fn (Project $project): array => [
+                'kind' => 'link',
+                'id' => $project->id,
+                'url' => route('projects.show', $project),
+                'title' => $project->name,
+                'subLabel' => __('calendar.project_starts'),
+                'date' => $project->start_date,
+            ])->concat(
+                $this->upcomingOrRecent(
+                    Project::query()->whereIn('user_id', $employeeIds)->whereNotNull('end_date'),
+                    'end_date'
+                )->map(fn (Project $project): array => [
+                    'kind' => 'link',
+                    'id' => $project->id,
+                    'url' => route('projects.show', $project),
+                    'title' => $project->name,
+                    'subLabel' => __('calendar.project_ends'),
+                    'date' => $project->end_date,
+                ])
+            )->sortBy('date')->values()->take(15),
+            default => new \Illuminate\Support\Collection,
+        };
     }
 };
 ?>
@@ -782,6 +1380,42 @@ new #[Title('titles.calendar')] class extends Component {
         ReportStatus::Draft => 'bg-status-warn-soft text-status-warn',
     };
 
+    $proposalTone = function (\App\Models\Proposal $proposal) use ($today): string {
+        if ($proposal->actual_date_end !== null) {
+            return 'bg-status-good-soft text-status-good';
+        }
+
+        if ($proposal->planned_date_end->isBefore($today)) {
+            return 'bg-status-critical-soft text-primary';
+        }
+
+        return 'bg-status-active-soft text-status-active';
+    };
+
+    $transferTone = fn (ArStatus $status): string => match ($status) {
+        ArStatus::Received => 'bg-status-good-soft text-status-good',
+        ArStatus::Failed => 'bg-status-critical-soft text-primary',
+        ArStatus::Pending => 'bg-status-active-soft text-status-active',
+    };
+
+    $donorFollowUpTone = function (\App\Models\Donor $donor): string {
+        return $donor->isFollowUpOverdue()
+            ? 'bg-status-critical-soft text-primary'
+            : 'bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white';
+    };
+
+    $donorReportTone = function (\App\Models\DonorReport $report): string {
+        if ($report->isSubmitted()) {
+            return 'bg-status-good-soft text-status-good';
+        }
+
+        return $report->isOverdue()
+            ? 'bg-status-critical-soft text-primary'
+            : 'bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white';
+    };
+
+    $projectTone = 'bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white';
+
     // A dot in front of each chip carries the item TYPE, independent of the
     // tone above (which carries its STATUS) — so a Reached milestone and a
     // Done task both render green fills but stay visually distinguishable.
@@ -789,13 +1423,72 @@ new #[Title('titles.calendar')] class extends Component {
         'milestone' => 'bg-funding',
         'task' => 'bg-status-warn',
         'report' => 'bg-primary',
+        'proposal' => 'bg-status-active',
+        'transfer' => 'bg-status-good',
+        'donor' => 'bg-secondary-dark dark:bg-secondary-light',
+        'project' => 'bg-secondary-medium',
     ];
+
+    // Literal ring-*/text-* utilities kept as their own arrays (rather than
+    // derived from $typeDotClasses with str_replace) because Tailwind only
+    // generates a class it can find as a literal token while scanning this
+    // file — a runtime-built "ring-status-active" string would never compile.
+    $typeRingClasses = [
+        'milestone' => 'ring-funding',
+        'task' => 'ring-status-warn',
+        'report' => 'ring-primary',
+        'proposal' => 'ring-status-active',
+        'transfer' => 'ring-status-good',
+        'donor' => 'ring-secondary-dark dark:ring-secondary-light',
+        'project' => 'ring-secondary-medium',
+    ];
+
+    $typeTextClasses = [
+        'milestone' => 'text-funding',
+        'task' => 'text-status-warn',
+        'report' => 'text-primary',
+        'proposal' => 'text-status-active',
+        'transfer' => 'text-status-good',
+        'donor' => 'text-secondary-dark dark:text-secondary-light',
+        'project' => 'text-secondary-medium',
+    ];
+
+    $typeLabels = [
+        'milestone' => __('tasks.milestone'),
+        'task' => __('tasks.task'),
+        'report' => __('calendar.report_deadline'),
+        'proposal' => __('calendar.proposal_deadline'),
+        'transfer' => __('calendar.transfer'),
+        'donor' => __('calendar.donor_follow_up'),
+        'project' => __('calendar.project_timeline'),
+    ];
+
+    // Which per-day grouping(s) in $calendar back each type, so the grid can
+    // tell whether a given day carries the focused type without re-querying.
+    // Donor and project are composite (two source columns each), same as
+    // focusedItems() above merges two queries for them.
+    $focusedGroupKeys = [
+        'milestone' => ['milestonesByDay'],
+        'task' => ['tasksByDay'],
+        'report' => ['reportsByDay'],
+        'proposal' => ['proposalsByDay'],
+        'transfer' => ['transfersByDay'],
+        'donor' => ['donorFollowUpsByDay', 'donorReportsByDay'],
+        'project' => ['projectStartsByDay', 'projectEndsByDay'],
+    ];
+
+    // Every per-day grouping, regardless of type — used to tell whether a
+    // day has anything on it at all, so its content area can open the
+    // day-detail list instead of the "add" menu.
+    $allGroupKeys = ['milestonesByDay', 'tasksByDay', 'reportsByDay', 'proposalsByDay', 'transfersByDay', 'donorFollowUpsByDay', 'donorReportsByDay', 'projectStartsByDay', 'projectEndsByDay'];
+
+    $focusedType = $this->focusedType();
 
     $selectedMilestoneProject = $milestoneProjectId === '' ? null : $this->projectOptions->firstWhere('id', (int) $milestoneProjectId);
     $selectedParentMilestone = $parentMilestoneId === '' ? null : $this->parentOptions->firstWhere('id', (int) $parentMilestoneId);
     $selectedResponsibleOption = $responsibleUserId === '' ? null : $this->userOptions->firstWhere('id', (int) $responsibleUserId);
     $selectedTaskSource = $taskSourceId === '' ? null : $this->sourceOptions->firstWhere('id', (int) $taskSourceId);
-    $selectedFilterEmployee = $filterEmployeeId === '' ? null : $this->userOptions->firstWhere('id', (int) $filterEmployeeId);
+    $selectedFilterEmployees = $filterEmployeeIds === [] ? new \Illuminate\Support\Collection : $this->userOptions->whereIn('id', array_map('intval', $filterEmployeeIds))->values();
     $dropdownLabelClasses = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-secondary-soft';
 
     $periodHeading = match ($viewMode) {
@@ -861,49 +1554,74 @@ new #[Title('titles.calendar')] class extends Component {
                         aria-multiselectable="true"
                         class="filter-menu absolute end-0 z-30 mt-1 min-w-44 rounded-lg border p-[.3125rem] shadow-xs"
                     >
-                        <button type="button" data-flux-menu-item wire:click="$toggle('showMilestones')" role="option" aria-selected="{{ $showMilestones ? 'true' : 'false' }}" class="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm hover:bg-secondary-soft dark:hover:bg-secondary-medium" data-test="calendar-filter-milestones">
-                            <span class="size-1.5 shrink-0 rounded-full {{ $typeDotClasses['milestone'] }}"></span>
-                            <span class="min-w-0 flex-1 truncate">{{ __('tasks.milestone') }}</span>
-                            @if ($showMilestones)<flux:icon.check class="size-4 shrink-0 text-primary" />@endif
-                        </button>
-                        <button type="button" data-flux-menu-item wire:click="$toggle('showTasks')" role="option" aria-selected="{{ $showTasks ? 'true' : 'false' }}" class="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm hover:bg-secondary-soft dark:hover:bg-secondary-medium" data-test="calendar-filter-tasks">
-                            <span class="size-1.5 shrink-0 rounded-full {{ $typeDotClasses['task'] }}"></span>
-                            <span class="min-w-0 flex-1 truncate">{{ __('tasks.task') }}</span>
-                            @if ($showTasks)<flux:icon.check class="size-4 shrink-0 text-primary" />@endif
-                        </button>
-                        <button type="button" data-flux-menu-item wire:click="$toggle('showReports')" role="option" aria-selected="{{ $showReports ? 'true' : 'false' }}" class="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm hover:bg-secondary-soft dark:hover:bg-secondary-medium" data-test="calendar-filter-reports">
-                            <span class="size-1.5 shrink-0 rounded-full {{ $typeDotClasses['report'] }}"></span>
-                            <span class="min-w-0 flex-1 truncate">{{ __('calendar.report_deadline') }}</span>
-                            @if ($showReports)<flux:icon.check class="size-4 shrink-0 text-primary" />@endif
-                        </button>
+                        @foreach ([
+                            ['milestone', 'showMilestones', 'tasks.milestone', 'calendar-filter-milestones'],
+                            ['task', 'showTasks', 'tasks.task', 'calendar-filter-tasks'],
+                            ['report', 'showReports', 'calendar.report_deadline', 'calendar-filter-reports'],
+                        ] as [$typeKey, $showProp, $labelKey, $testHook])
+                            <div class="group flex items-center gap-1 rounded-md hover:bg-secondary-soft dark:hover:bg-secondary-medium" role="option" aria-selected="{{ $$showProp ? 'true' : 'false' }}">
+                                <button type="button" data-flux-menu-item wire:click="toggleType('{{ $typeKey }}')" class="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 py-1.5 text-start text-sm" data-test="{{ $testHook }}">
+                                    <span class="size-1.5 shrink-0 rounded-full {{ $typeDotClasses[$typeKey] }}"></span>
+                                    <span class="min-w-0 flex-1 truncate">{{ __($labelKey) }}</span>
+                                    @if ($$showProp)<flux:icon.check class="size-4 shrink-0 text-primary" />@endif
+                                </button>
+                                <button type="button" wire:click="focusOnlyType('{{ $typeKey }}')" class="me-1 shrink-0 cursor-pointer rounded px-1.5 py-1 text-[10px] font-semibold text-secondary-medium opacity-0 hover:bg-white group-hover:opacity-100 dark:text-secondary-soft dark:hover:bg-secondary-dark" data-test="calendar-filter-only-{{ $typeKey }}">
+                                    {{ __('calendar.only') }}
+                                </button>
+                            </div>
+                        @endforeach
+
+                        <div class="my-1 border-t border-secondary-soft dark:border-secondary-medium"></div>
+
+                        @foreach ([
+                            ['proposal', 'showProposals', 'calendar.proposal_deadline', 'calendar-filter-proposals'],
+                            ['transfer', 'showTransfers', 'calendar.transfer', 'calendar-filter-transfers'],
+                            ['donor', 'showDonors', 'calendar.donor_follow_up', 'calendar-filter-donors'],
+                            ['project', 'showProjects', 'calendar.project_timeline', 'calendar-filter-projects'],
+                        ] as [$typeKey, $showProp, $labelKey, $testHook])
+                            <div class="group flex items-center gap-1 rounded-md hover:bg-secondary-soft dark:hover:bg-secondary-medium" role="option" aria-selected="{{ $$showProp ? 'true' : 'false' }}">
+                                <button type="button" data-flux-menu-item wire:click="toggleType('{{ $typeKey }}')" class="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 py-1.5 text-start text-sm" data-test="{{ $testHook }}">
+                                    <span class="size-1.5 shrink-0 rounded-full {{ $typeDotClasses[$typeKey] }}"></span>
+                                    <span class="min-w-0 flex-1 truncate">{{ __($labelKey) }}</span>
+                                    @if ($$showProp)<flux:icon.check class="size-4 shrink-0 text-primary" />@endif
+                                </button>
+                                <button type="button" wire:click="focusOnlyType('{{ $typeKey }}')" class="me-1 shrink-0 cursor-pointer rounded px-1.5 py-1 text-[10px] font-semibold text-secondary-medium opacity-0 hover:bg-white group-hover:opacity-100 dark:text-secondary-soft dark:hover:bg-secondary-dark" data-test="calendar-filter-only-{{ $typeKey }}">
+                                    {{ __('calendar.only') }}
+                                </button>
+                            </div>
+                        @endforeach
                     </div>
                 @endif
             </div>
 
-            <flux:tooltip :content="__('calendar.filter_by_responsible')">
-            <flux:dropdown position="bottom-end" class="filter-picker">
-                <x-ui.button size="sm" :aria-label="__('calendar.filter_by_responsible')" data-test="calendar-responsible-filter-button">
+            <x-ui.multi-select-popover
+                :label="__('calendar.filter_by_responsible')"
+                class="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-secondary-light bg-white px-2.5 py-1.5 text-secondary-dark hover:bg-secondary-soft dark:border-secondary-light dark:bg-secondary-dark dark:text-white dark:hover:bg-secondary-medium"
+                data-test="calendar-responsible-filter-button"
+            >
+                <x-slot:trigger>
                     <flux:icon.user variant="micro" class="size-4" />
-                </x-ui.button>
-                <flux:menu class="filter-menu" x-data="{ optionSearch: '' }">
-                    @if ($this->userOptions->count() > 6)
-                        <div class="border-b border-secondary-soft p-1.5 dark:border-secondary-medium">
-                            <x-ui.input type="search" size="sm" icon="magnifying-glass" x-model="optionSearch" :aria-label="__('milestones.search_responsible')" :placeholder="__('milestones.search_responsible')" />
-                        </div>
+                    @if ($selectedFilterEmployees->isNotEmpty())
+                        <span class="inline-flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-white" data-test="calendar-responsible-filter-count">{{ $selectedFilterEmployees->count() }}</span>
                     @endif
-                    <flux:menu.item wire:click="$set('filterEmployeeId', '')" data-test="calendar-responsible-filter-me">
-                        <span class="min-w-0 truncate">{{ __('calendar.me') }}</span>
-                        @if ($filterEmployeeId === '')<flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" />@endif
-                    </flux:menu.item>
-                    @foreach ($this->userOptions as $userOption)
-                        <flux:menu.item wire:click="$set('filterEmployeeId', {{ $userOption->id }})" x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())" :wire:key="'calendar-responsible-filter-option-'.$userOption->id" data-test="calendar-responsible-filter-option-{{ $userOption->id }}">
-                            <span class="min-w-0 truncate">{{ $userOption->name }} · {{ $userOption->secondary_name }}</span>
-                            @if ($filterEmployeeId !== '' && (int) $filterEmployeeId === $userOption->id)<flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" />@endif
-                        </flux:menu.item>
-                    @endforeach
-                </flux:menu>
-            </flux:dropdown>
-            </flux:tooltip>
+                </x-slot:trigger>
+
+                <button type="button" wire:click="$set('filterEmployeeIds', [])" class="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm hover:bg-secondary-soft dark:hover:bg-secondary-medium" data-test="calendar-responsible-filter-me">
+                    <span class="min-w-0 flex-1 truncate">{{ __('calendar.me') }}</span>
+                    @if ($filterEmployeeIds === [])<flux:icon.check class="ms-auto size-4 shrink-0 text-primary" />@endif
+                </button>
+                <div class="my-1 border-t border-secondary-soft dark:border-secondary-medium"></div>
+                @foreach ($this->userOptions as $userOption)
+                    <label
+                        x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
+                        class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-secondary-soft dark:hover:bg-secondary-medium"
+                        data-test="calendar-responsible-filter-option-{{ $userOption->id }}"
+                    >
+                        <input type="checkbox" wire:model.live="filterEmployeeIds" value="{{ $userOption->id }}" class="rounded border-secondary-light text-primary focus:ring-primary" />
+                        <span class="min-w-0 truncate">{{ $userOption->name }} · {{ $userOption->secondary_name }}</span>
+                    </label>
+                @endforeach
+            </x-ui.multi-select-popover>
 
             <flux:dropdown position="bottom-end" class="filter-picker">
                 <x-ui.button tone="primary" icon="plus" icon:trailing="chevron-down" data-test="calendar-add-button">{{ __('common.add') }}</x-ui.button>
@@ -926,12 +1644,32 @@ new #[Title('titles.calendar')] class extends Component {
             <x-ui.empty-state icon="user" :heading="__('calendar.no_linked_employee')" :body="__('calendar.link_your_account_to_see_your_calendar')" />
         </x-ui.panel>
     @else
-        <div class="flex flex-wrap items-center gap-4 text-xs text-secondary-medium dark:text-secondary-soft">
-            <span class="flex items-center gap-1.5"><span class="size-2 shrink-0 rounded-full {{ $typeDotClasses['milestone'] }}"></span>{{ __('tasks.milestone') }}</span>
-            <span class="flex items-center gap-1.5"><span class="size-2 shrink-0 rounded-full {{ $typeDotClasses['task'] }}"></span>{{ __('tasks.task') }}</span>
-            <span class="flex items-center gap-1.5"><span class="size-2 shrink-0 rounded-full {{ $typeDotClasses['report'] }}"></span>{{ __('calendar.report_deadline') }}</span>
-        </div>
+        @if ($focusedType !== null)
+            <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-secondary-soft bg-secondary-soft/30 px-4 py-3 dark:border-secondary-medium dark:bg-secondary-medium/20" data-test="calendar-focused-banner">
+                <div class="flex items-center gap-3">
+                    <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-white ring-1 ring-secondary-soft dark:bg-secondary-dark dark:ring-secondary-medium">
+                        <span class="size-2.5 rounded-full {{ $typeDotClasses[$focusedType] }}"></span>
+                    </span>
+                    <div>
+                        <p class="text-sm font-bold text-secondary-dark dark:text-white">{{ __('calendar.showing_type', ['type' => $typeLabels[$focusedType]]) }}</p>
+                        <p class="text-xs text-secondary-medium dark:text-secondary-soft">{{ trans_choice('calendar.items_count', $this->focusedItems->count(), ['count' => $this->focusedItems->count()]) }}</p>
+                    </div>
+                </div>
+                <x-ui.button size="sm" wire:click="resetFilters" data-test="calendar-clear-focus">{{ __('calendar.clear_filter') }}</x-ui.button>
+            </div>
+        @else
+            <div class="flex flex-wrap items-center gap-4 text-xs text-secondary-medium dark:text-secondary-soft">
+                <span class="flex items-center gap-1.5"><span class="size-2 shrink-0 rounded-full {{ $typeDotClasses['milestone'] }}"></span>{{ __('tasks.milestone') }}</span>
+                <span class="flex items-center gap-1.5"><span class="size-2 shrink-0 rounded-full {{ $typeDotClasses['task'] }}"></span>{{ __('tasks.task') }}</span>
+                <span class="flex items-center gap-1.5"><span class="size-2 shrink-0 rounded-full {{ $typeDotClasses['report'] }}"></span>{{ __('calendar.report_deadline') }}</span>
+                <span class="flex items-center gap-1.5"><span class="size-2 shrink-0 rounded-full {{ $typeDotClasses['proposal'] }}"></span>{{ __('calendar.proposal_deadline') }}</span>
+                <span class="flex items-center gap-1.5"><span class="size-2 shrink-0 rounded-full {{ $typeDotClasses['transfer'] }}"></span>{{ __('calendar.transfer') }}</span>
+                <span class="flex items-center gap-1.5"><span class="size-2 shrink-0 rounded-full {{ $typeDotClasses['donor'] }}"></span>{{ __('calendar.donor_follow_up') }}</span>
+                <span class="flex items-center gap-1.5"><span class="size-2 shrink-0 rounded-full {{ $typeDotClasses['project'] }}"></span>{{ __('calendar.project_timeline') }}</span>
+            </div>
+        @endif
 
+        <div class="grid gap-4 @6xl/directory:grid-cols-[minmax(0,1fr)_16rem]">
         <div
             class="relative overflow-hidden rounded-xl border border-secondary-soft dark:border-secondary-medium"
             x-data="{ menuOpen: false, menuX: 0, menuY: 0, menuDate: '' }"
@@ -949,17 +1687,21 @@ new #[Title('titles.calendar')] class extends Component {
                     @foreach ($calendar['weeks'] as $week)
                         @foreach ($week as $day)
                             @php
-                                $dayMilestones = $calendar['milestonesByDay']->get($day->toDateString(), new \Illuminate\Support\Collection);
-                                $dayTasks = $calendar['tasksByDay']->get($day->toDateString(), new \Illuminate\Support\Collection);
-                                $dayReports = $calendar['reportsByDay']->get($day->toDateString(), new \Illuminate\Support\Collection);
                                 $isCurrentMonth = $day->month === $calendar['month']->month;
                                 $isToday = $day->isSameDay($today);
+                                $dayFocusedCount = $focusedType === null ? 0 : collect($focusedGroupKeys[$focusedType])->sum(fn (string $key) => $calendar[$key]->get($day->toDateString(), new \Illuminate\Support\Collection)->count());
+                                $dayItemCount = collect($allGroupKeys)->sum(fn (string $key) => $calendar[$key]->get($day->toDateString(), new \Illuminate\Support\Collection)->count());
                             @endphp
                             <div
-                                wire:click="openCreateModal('{{ $day->toDateString() }}')"
                                 wire:key="calendar-day-{{ $day->toDateString() }}"
+                                x-on:click="menuOpen = true; menuX = $event.clientX; menuY = $event.clientY; menuDate = '{{ $day->toDateString() }}'"
                                 x-on:contextmenu.prevent="menuOpen = true; menuX = $event.clientX; menuY = $event.clientY; menuDate = '{{ $day->toDateString() }}'"
-                                class="flex min-h-28 cursor-pointer flex-col gap-1 border-b border-e border-secondary-soft p-1.5 text-start last:border-e-0 [&:nth-child(7n)]:border-e-0 hover:bg-secondary-soft/40 dark:border-secondary-medium dark:hover:bg-secondary-medium/40 {{ $isCurrentMonth ? '' : 'opacity-40' }}"
+                                @class([
+                                    'flex min-h-28 cursor-pointer flex-col gap-1 border-b border-e border-secondary-soft p-1.5 text-start last:border-e-0 [&:nth-child(7n)]:border-e-0 hover:bg-secondary-soft/40 dark:border-secondary-medium dark:hover:bg-secondary-medium/40 transition-opacity',
+                                    'opacity-40' => ! $isCurrentMonth,
+                                    'opacity-50' => $focusedType !== null && $dayFocusedCount === 0,
+                                    'ring-2 ring-inset '.$typeRingClasses[$focusedType ?? 'milestone'] => $focusedType !== null && $dayFocusedCount > 0,
+                                ])
                                 data-test="calendar-day-{{ $day->toDateString() }}"
                             >
                                 <span @class([
@@ -970,7 +1712,18 @@ new #[Title('titles.calendar')] class extends Component {
                                     {{ $day->day }}
                                 </span>
 
-                                @include('pages.calendar._item-chips', ['dayMilestones' => $dayMilestones, 'dayTasks' => $dayTasks, 'dayReports' => $dayReports, 'markerTone' => $markerTone, 'taskTone' => $taskTone, 'reportTone' => $reportTone, 'typeDotClasses' => $typeDotClasses])
+                                <div
+                                    class="flex min-h-4 flex-1 flex-col gap-1"
+                                    x-data="taskDropList('my-calendar', (wire, id) => wire.rescheduleTask(id, '{{ $day->toDateString() }}'))"
+                                    @if ($dayItemCount > 0)
+                                        wire:click.stop="openDayDetail('{{ $day->toDateString() }}')"
+                                        role="button"
+                                        tabindex="0"
+                                        data-test="calendar-day-content-{{ $day->toDateString() }}"
+                                    @endif
+                                >
+                                    @include('pages.calendar._item-chips', ['day' => $day, 'calendar' => $calendar, 'markerTone' => $markerTone, 'taskTone' => $taskTone, 'reportTone' => $reportTone, 'proposalTone' => $proposalTone, 'transferTone' => $transferTone, 'donorFollowUpTone' => $donorFollowUpTone, 'donorReportTone' => $donorReportTone, 'projectTone' => $projectTone, 'typeDotClasses' => $typeDotClasses])
+                                </div>
                             </div>
                         @endforeach
                     @endforeach
@@ -999,18 +1752,32 @@ new #[Title('titles.calendar')] class extends Component {
                     <div class="flex items-center justify-end border-e border-secondary-soft px-2 py-1.5 text-[11px] font-semibold text-secondary-medium dark:border-secondary-medium dark:text-secondary-soft">{{ __('calendar.all_day') }}</div>
                     @foreach ($periodDays as $day)
                         @php
-                            $dayMilestones = $calendar['milestonesByDay']->get($day->toDateString(), new \Illuminate\Support\Collection);
-                            $dayTasks = $calendar['tasksByDay']->get($day->toDateString(), new \Illuminate\Support\Collection);
-                            $dayReports = $calendar['reportsByDay']->get($day->toDateString(), new \Illuminate\Support\Collection);
+                            $dayFocusedCount = $focusedType === null ? 0 : collect($focusedGroupKeys[$focusedType])->sum(fn (string $key) => $calendar[$key]->get($day->toDateString(), new \Illuminate\Support\Collection)->count());
+                            $dayItemCount = collect($allGroupKeys)->sum(fn (string $key) => $calendar[$key]->get($day->toDateString(), new \Illuminate\Support\Collection)->count());
                         @endphp
                         <div
-                            wire:click="openCreateModal('{{ $day->toDateString() }}')"
                             wire:key="calendar-allday-{{ $day->toDateString() }}"
+                            x-on:click="menuOpen = true; menuX = $event.clientX; menuY = $event.clientY; menuDate = '{{ $day->toDateString() }}'"
                             x-on:contextmenu.prevent="menuOpen = true; menuX = $event.clientX; menuY = $event.clientY; menuDate = '{{ $day->toDateString() }}'"
-                            class="flex min-h-10 cursor-pointer flex-col gap-1 border-e border-secondary-soft p-1.5 text-start last:border-e-0 hover:bg-secondary-soft/40 dark:border-secondary-medium dark:hover:bg-secondary-medium/40"
+                            @class([
+                                'flex min-h-10 cursor-pointer flex-col gap-1 border-e border-secondary-soft p-1.5 text-start last:border-e-0 hover:bg-secondary-soft/40 dark:border-secondary-medium dark:hover:bg-secondary-medium/40 transition-opacity',
+                                'opacity-50' => $focusedType !== null && $dayFocusedCount === 0,
+                                'ring-2 ring-inset '.$typeRingClasses[$focusedType ?? 'milestone'] => $focusedType !== null && $dayFocusedCount > 0,
+                            ])
                             data-test="calendar-allday-{{ $day->toDateString() }}"
                         >
-                            @include('pages.calendar._item-chips', ['dayMilestones' => $dayMilestones, 'dayTasks' => $dayTasks, 'dayReports' => $dayReports, 'markerTone' => $markerTone, 'taskTone' => $taskTone, 'reportTone' => $reportTone, 'typeDotClasses' => $typeDotClasses])
+                            <div
+                                class="flex min-h-4 flex-1 flex-col gap-1"
+                                x-data="taskDropList('my-calendar', (wire, id) => wire.rescheduleTask(id, '{{ $day->toDateString() }}'))"
+                                @if ($dayItemCount > 0)
+                                    wire:click.stop="openDayDetail('{{ $day->toDateString() }}')"
+                                    role="button"
+                                    tabindex="0"
+                                    data-test="calendar-day-content-{{ $day->toDateString() }}"
+                                @endif
+                            >
+                                @include('pages.calendar._item-chips', ['day' => $day, 'calendar' => $calendar, 'markerTone' => $markerTone, 'taskTone' => $taskTone, 'reportTone' => $reportTone, 'proposalTone' => $proposalTone, 'transferTone' => $transferTone, 'donorFollowUpTone' => $donorFollowUpTone, 'donorReportTone' => $donorReportTone, 'projectTone' => $projectTone, 'typeDotClasses' => $typeDotClasses])
+                            </div>
                         </div>
                     @endforeach
                 </div>
@@ -1061,6 +1828,85 @@ new #[Title('titles.calendar')] class extends Component {
                     {{ __('tasks.add_task') }}
                 </button>
             </div>
+        </div>
+
+        @if ($focusedType !== null)
+            <x-ui.panel :title="__('calendar.related_dates')" :count="$this->focusedItems->count()">
+                <div class="flex max-h-96 flex-col gap-2 overflow-y-auto p-2" data-test="calendar-focused-list">
+                    @forelse ($this->focusedItems as $item)
+                        <div class="flex items-start gap-2 rounded-xl border border-secondary-soft bg-white p-2.5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] dark:border-secondary-medium dark:bg-secondary-dark" wire:key="calendar-focused-item-{{ $item['kind'] }}-{{ $item['id'] }}-{{ $item['date']->toDateString() }}">
+                            <span class="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary-soft dark:bg-secondary-medium">
+                                @switch($focusedType)
+                                    @case('milestone')
+                                        <flux:icon.flag variant="micro" class="size-3.5 {{ $typeTextClasses[$focusedType] }}" />
+                                        @break
+                                    @case('task')
+                                        <flux:icon.clipboard-document-check variant="micro" class="size-3.5 {{ $typeTextClasses[$focusedType] }}" />
+                                        @break
+                                    @case('report')
+                                        <flux:icon.document-text variant="micro" class="size-3.5 {{ $typeTextClasses[$focusedType] }}" />
+                                        @break
+                                    @case('proposal')
+                                        <flux:icon.paper-airplane variant="micro" class="size-3.5 {{ $typeTextClasses[$focusedType] }}" />
+                                        @break
+                                    @case('transfer')
+                                        <flux:icon.banknotes variant="micro" class="size-3.5 {{ $typeTextClasses[$focusedType] }}" />
+                                        @break
+                                    @case('donor')
+                                        <flux:icon.phone variant="micro" class="size-3.5 {{ $typeTextClasses[$focusedType] }}" />
+                                        @break
+                                    @case('project')
+                                        <flux:icon.rocket-launch variant="micro" class="size-3.5 {{ $typeTextClasses[$focusedType] }}" />
+                                        @break
+                                @endswitch
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                @if ($item['kind'] === 'modal-milestone')
+                                    <button type="button" wire:click="openEditModal({{ $item['id'] }})" class="block w-full min-w-0 truncate text-start text-xs font-semibold hover:text-primary hover:underline dark:hover:text-status-critical" data-test="calendar-focused-item-{{ $item['id'] }}">
+                                        {{ $item['title'] }}
+                                    </button>
+                                @elseif ($item['kind'] === 'modal-task')
+                                    <button type="button" wire:click="openEditTaskModal({{ $item['id'] }})" class="block w-full min-w-0 truncate text-start text-xs font-semibold hover:text-primary hover:underline dark:hover:text-status-critical" data-test="calendar-focused-item-{{ $item['id'] }}">
+                                        {{ $item['title'] }}
+                                    </button>
+                                @else
+                                    <a href="{{ $item['url'] }}" wire:navigate class="block min-w-0 truncate text-xs font-semibold hover:text-primary hover:underline dark:hover:text-status-critical" data-test="calendar-focused-item-{{ $item['id'] }}">
+                                        {{ $item['title'] }}
+                                    </a>
+                                @endif
+                                <p class="mt-0.5 truncate text-[11px] text-secondary-medium dark:text-secondary-soft">
+                                    {{ $item['date']->translatedFormat('D, j M') }}
+                                    @if ($item['subLabel'] !== null)
+                                        · {{ $item['subLabel'] }}
+                                    @endif
+                                </p>
+                            </div>
+                        </div>
+                    @empty
+                        <p class="px-1 py-6 text-center text-xs text-secondary-light">{{ __('calendar.no_related_dates') }}</p>
+                    @endforelse
+                </div>
+            </x-ui.panel>
+        @endif
+
+        <x-ui.panel :title="__('tasks.unscheduled')" :count="$calendar['unscheduledTasks']->count()" :subtitle="__('tasks.unscheduled_tasks_have_no_due_date_drag_one_onto_a_day_to_sch')">
+            <div class="flex min-h-24 flex-col gap-2 p-2" x-data="taskDropList('my-calendar', (wire, id) => wire.rescheduleTask(id, ''))" data-test="calendar-unscheduled">
+                @forelse ($calendar['unscheduledTasks'] as $task)
+                    <div
+                        class="flex cursor-grab flex-col gap-1.5 rounded-xl border border-secondary-soft bg-white p-2.5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md active:cursor-grabbing dark:border-secondary-medium dark:bg-secondary-dark"
+                        data-task-id="{{ $task->id }}"
+                        wire:key="calendar-unscheduled-{{ $task->id }}"
+                    >
+                        <button type="button" wire:click.stop="openEditTaskModal({{ $task->id }})" class="truncate text-start text-xs font-semibold hover:text-primary hover:underline dark:hover:text-status-critical" data-test="calendar-unscheduled-{{ $task->id }}">
+                            {{ $task->title }}
+                        </button>
+                        <x-ui.enum-badge :case="$task->priority" class="w-fit" />
+                    </div>
+                @empty
+                    <p class="px-1 py-6 text-center text-xs text-secondary-light">{{ __('tasks.drop_a_task_here_to_unschedule_it') }}</p>
+                @endforelse
+            </div>
+        </x-ui.panel>
         </div>
     @endif
 
@@ -1331,6 +2177,46 @@ new #[Title('titles.calendar')] class extends Component {
             <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
                 <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="$set('showTaskDeleteModal', false)">{{ __('common.cancel') }}</x-ui.button>
                 <x-ui.button type="button" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="deleteTask" data-test="calendar-confirm-delete-task">{{ __('tasks.delete_task') }}</x-ui.button>
+            </div>
+        </div>
+    </flux:modal>
+
+    <flux:modal wire:model="showDayDetailModal" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
+        <div class="flex flex-col gap-4">
+            <div class="border-b border-secondary-soft pb-3 dark:border-secondary-medium">
+                <flux:heading size="lg">
+                    {{ $dayDetailDate !== '' ? \Carbon\CarbonImmutable::parse($dayDetailDate)->translatedFormat('l, j F Y') : '' }}
+                </flux:heading>
+            </div>
+
+            <div class="flex max-h-96 flex-col gap-2 overflow-y-auto" data-test="calendar-daydetail-list">
+                @forelse ($this->dayDetailItems as $item)
+                    <div class="flex items-start gap-2 rounded-xl border border-secondary-soft bg-white p-2.5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] dark:border-secondary-medium dark:bg-secondary-dark" wire:key="calendar-daydetail-{{ $item['type'] }}-{{ $item['kind'] }}-{{ $item['id'] }}">
+                        <span class="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary-soft dark:bg-secondary-medium">
+                            <span class="size-2 rounded-full {{ $typeDotClasses[$item['type']] }}"></span>
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            @if ($item['kind'] === 'modal-milestone')
+                                <button type="button" wire:click="closeDayDetail(); openEditModal({{ $item['id'] }})" class="block w-full min-w-0 truncate text-start text-xs font-semibold hover:text-primary hover:underline dark:hover:text-status-critical" data-test="calendar-daydetail-item-{{ $item['id'] }}">
+                                    {{ $item['title'] }}
+                                </button>
+                            @elseif ($item['kind'] === 'modal-task')
+                                <button type="button" wire:click="closeDayDetail(); openEditTaskModal({{ $item['id'] }})" class="block w-full min-w-0 truncate text-start text-xs font-semibold hover:text-primary hover:underline dark:hover:text-status-critical" data-test="calendar-daydetail-item-{{ $item['id'] }}">
+                                    {{ $item['title'] }}
+                                </button>
+                            @else
+                                <a href="{{ $item['url'] }}" wire:navigate class="block min-w-0 truncate text-xs font-semibold hover:text-primary hover:underline dark:hover:text-status-critical" data-test="calendar-daydetail-item-{{ $item['id'] }}">
+                                    {{ $item['title'] }}
+                                </a>
+                            @endif
+                            @if ($item['subLabel'] !== null)
+                                <p class="mt-0.5 truncate text-[11px] text-secondary-medium dark:text-secondary-soft">{{ $item['subLabel'] }}</p>
+                            @endif
+                        </div>
+                    </div>
+                @empty
+                    <p class="px-1 py-6 text-center text-xs text-secondary-light">{{ __('calendar.no_related_dates') }}</p>
+                @endforelse
             </div>
         </div>
     </flux:modal>
