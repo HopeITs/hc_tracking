@@ -101,7 +101,7 @@
                     <x-ui.input type="search" size="sm" icon="magnifying-glass" x-ref="search" x-model="optionSearch" x-on:keydown.enter.prevent :aria-label="$label" :placeholder="$label" />
                 </div>
             @endif
-            <div class="max-h-56 overflow-y-auto">
+            <div class="max-h-56 overflow-y-auto overscroll-contain">
                 {{ $slot }}
             </div>
         </div>
@@ -122,7 +122,7 @@
                         <x-ui.input type="search" size="sm" icon="magnifying-glass" x-ref="search" x-model="optionSearch" :aria-label="$label" :placeholder="$label" />
                     </div>
                 @endif
-                <div class="max-h-56 overflow-y-auto">
+                <div class="max-h-56 overflow-y-auto overscroll-contain">
                     {{ $slot }}
                 </div>
             </div>

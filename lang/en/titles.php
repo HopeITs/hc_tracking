@@ -7,7 +7,7 @@ return [
     'appearance_settings' => 'Appearance settings',
     'calendar' => 'My Calendar',
     'city_directory' => 'City directory',
-    'dashboard' => 'Dashboard',
+    'dashboard' => 'Home',
     'donor' => 'Donor',
     'donors' => 'Donors',
     'executive_summary' => 'Executive Summary',

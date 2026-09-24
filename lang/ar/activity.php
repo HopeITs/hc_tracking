@@ -17,6 +17,15 @@ return [
     ],
     'open_record' => 'فتح السجل',
     'record_gone' => 'محذوف',
+    'pulse' => [
+        'heading' => 'نشاط اليوم',
+        'today' => 'اليوم',
+        'week' => 'آخر 7 أيام',
+        'busiest_module' => 'أكثر وحدة نشاطًا',
+        'top_actor' => 'الأكثر نشاطًا',
+        'quiet' => 'هادئ حتى الآن',
+    ],
+    'linked_program' => 'مرتبط بـ :program',
     'fields' => [
         'title' => 'العنوان',
         'name' => 'الاسم',
