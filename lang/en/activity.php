@@ -17,6 +17,15 @@ return [
     ],
     'open_record' => 'Open record',
     'record_gone' => 'Deleted',
+    'pulse' => [
+        'heading' => 'Today on the wire',
+        'today' => 'Today',
+        'week' => 'Last 7 days',
+        'busiest_module' => 'Busiest module',
+        'top_actor' => 'Most active',
+        'quiet' => 'Quiet so far',
+    ],
+    'linked_program' => 'Linked to :program',
     'fields' => [
         'title' => 'Title',
         'name' => 'Name',
