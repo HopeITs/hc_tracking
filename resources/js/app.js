@@ -3,6 +3,7 @@ import './count-up';
 import './funding-flow';
 import './gantt';
 import './notification-inbox';
+import './notification-rules';
 import './file-preview';
 import './proposal-clock';
 import './section-rail';
