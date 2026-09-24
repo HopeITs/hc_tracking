@@ -100,3 +100,20 @@ test('the search text holds the sentence in every interface language', function 
     expect(app(NotificationPresenter::class)->searchText($data))
         ->toBe("Sami created the task “Plan”\nأنشأ Sami المهمة «Plan»");
 });
+
+test('the html sentence escapes every name and marks up who and what', function () {
+    $data = [
+        'key' => 'notifications.events.task.created',
+        'params' => ['actor' => 'Sami <b>', 'subject' => '<script>alert(1)</script>'],
+        'count' => 3,
+    ];
+
+    $presenter = app(NotificationPresenter::class);
+    $html = (string) $presenter->sentenceHtml($data, 'en');
+
+    expect($html)->toContain('<span data-param="actor">Sami &lt;b&gt;</span>')
+        ->and($html)->toContain('<span data-param="subject">&lt;script&gt;alert(1)&lt;/script&gt;</span>')
+        ->and($html)->not->toContain('<script>')
+        ->and($html)->toContain('<span data-more-updates>and 2 more updates</span>')
+        ->and(html_entity_decode(strip_tags($html)))->toBe($presenter->sentence($data, 'en'));
+});

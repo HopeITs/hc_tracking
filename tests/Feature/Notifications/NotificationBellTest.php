@@ -133,3 +133,22 @@ test('the bell renders in arabic for arabic readers', function () {
 
     Livewire::actingAs($user)->test('notifications.bell')->call('loadPanel')->assertSeeText('أنشأ Sami المهمة «خطة»');
 });
+
+test('a module chip narrows the panel and a second click clears it', function () {
+    $user = Activity::withoutRecording(fn () => User::factory()->create());
+    bellNotify($user, subject: 'Task side');
+    $user->notify(new AppNotification(new NotificationPayload(
+        kind: NotificationKind::Action, module: 'risks', priority: NotificationPriority::Info,
+        key: 'notifications.events.task.created', params: ['actor' => 'Sami', 'subject' => 'Risk side'],
+        subjectType: 'risk', subjectId: 1,
+    )));
+
+    Livewire::actingAs($user)->test('notifications.bell')
+        ->call('loadPanel')
+        ->assertSeeHtml('data-bell-module="risks"')
+        ->call('showModule', 'risks')
+        ->assertSeeText('Risk side')
+        ->assertDontSeeText('Task side')
+        ->call('showModule', 'risks')
+        ->assertSeeText('Task side');
+});
