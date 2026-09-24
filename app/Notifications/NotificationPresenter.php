@@ -7,6 +7,7 @@ namespace App\Notifications;
 use App\Enums\Locale;
 use App\Models\UserNotification;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 
 /**
@@ -34,6 +35,67 @@ final class NotificationPresenter
         }
 
         return $sentence;
+    }
+
+    /**
+     * The sentence as safe HTML with its moving parts marked up, so the eye
+     * lands on who did it and what it was about: every param is escaped and
+     * wrapped in a <span data-param="name">, the translated frame around them
+     * is escaped too.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function sentenceHtml(array $data, ?string $locale = null): HtmlString
+    {
+        $locale ??= app()->getLocale();
+        $tokens = [];
+        $params = [];
+
+        foreach (array_keys($data['params'] ?? []) as $index => $name) {
+            $token = "\u{E000}{$index}\u{E001}";
+            $params[$name] = $token;
+            $tokens[$token] = sprintf(
+                '<span data-param="%s">%s</span>',
+                e((string) $name),
+                e($this->param($data['params'][$name], $locale)),
+            );
+        }
+
+        $html = strtr(e((string) __((string) ($data['key'] ?? ''), $params, $locale)), $tokens);
+        $more = (int) ($data['count'] ?? 1) - 1;
+
+        if ($more > 0) {
+            $html .= ' <span data-more-updates>'.e(trans_choice('notifications.more_updates', $more, ['count' => $more], $locale)).'</span>';
+        }
+
+        return new HtmlString($html);
+    }
+
+    /**
+     * The Heroicon a module is drawn with, matching the sidebar.
+     */
+    public function moduleIcon(string $module): string
+    {
+        return match ($module) {
+            'strategies' => 'chart-bar-square',
+            'programs' => 'briefcase',
+            'annual-plans' => 'calendar-days',
+            'projects' => 'rectangle-stack',
+            'milestones' => 'flag',
+            'tasks' => 'clipboard-document-check',
+            'risks' => 'exclamation-triangle',
+            'results' => 'chart-bar',
+            'indicators' => 'variable',
+            'targets' => 'viewfinder-circle',
+            'reports' => 'document-chart-bar',
+            'proposals' => 'document-text',
+            'donors' => 'building-library',
+            'funding-agreements' => 'banknotes',
+            'transfers' => 'arrow-right-circle',
+            'accounts' => 'credit-card',
+            'access-management' => 'users',
+            default => 'bell',
+        };
     }
 
     /**
