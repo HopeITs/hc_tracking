@@ -241,7 +241,7 @@
                         <div
                             class="relative mt-2 cursor-copy rounded-xl bg-secondary-soft/25 dark:bg-white/[0.03]"
                             style="height: {{ $riverHeight }}px"
-                            x-on:mousemove="hover = pointerInfo($event)"
+                            x-on:mousemove="hover = $event.target.closest('[data-milestone-marker]') ? null : pointerInfo($event)"
                             x-on:mouseleave="hover = null"
                             x-on:click="if ($event.target.closest('[data-milestone-marker]')) { return; } hover = null; $wire.openCreateModal(pointerInfo($event).iso, null, {{ $projectRow->id }})"
                             data-test="milestone-timeline-river-{{ $projectRow->id }}"

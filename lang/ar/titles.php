@@ -7,7 +7,7 @@ return [
     'appearance_settings' => 'إعدادات المظهر',
     'calendar' => 'تقويمي',
     'city_directory' => 'دليل المدن',
-    'dashboard' => 'لوحة التحكم',
+    'dashboard' => 'الرئيسية',
     'donor' => 'المانح',
     'donors' => 'المانحون',
     'executive_summary' => 'الملخص التنفيذي',

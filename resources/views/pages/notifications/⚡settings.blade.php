@@ -85,7 +85,7 @@ new #[Title('titles.notification_settings')] class extends Component {
             data-desktop-app
         >
             <div class="flex items-start gap-4">
-                <img src="{{ asset('icons/icon-192.png') }}" alt="" width="48" height="48" class="size-12 shrink-0 rounded-full" />
+                <img src="{{ asset('app-icons/icon-192.png') }}" alt="" width="48" height="48" class="size-12 shrink-0 rounded-full" />
                 <div class="min-w-0">
                     <h2 id="desktop-app-heading" class="text-base font-bold">{{ __('notifications.app.heading') }}</h2>
                     <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('notifications.app.help') }}</p>

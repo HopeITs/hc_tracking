@@ -48,6 +48,39 @@ final class Inbox
         return $updated;
     }
 
+    /**
+     * @param  array<int, string>  $ids
+     */
+    public function markManyUnread(User $user, array $ids): int
+    {
+        $updated = UserNotification::query()->forUser($user)->whereKey($ids)->whereNotNull('read_at')->update(['read_at' => null]);
+        $this->counts->forget($user->id);
+
+        return $updated;
+    }
+
+    /**
+     * The ids among the given ones that are still unread in my inbox, so an
+     * undo only restores what an action actually changed.
+     *
+     * @param  array<int, string>  $ids
+     * @return list<string>
+     */
+    public function unreadAmong(User $user, array $ids): array
+    {
+        return UserNotification::query()->forUser($user)->whereKey($ids)->whereNull('read_at')->pluck('id')->all();
+    }
+
+    /**
+     * Every unread notification I can currently see.
+     *
+     * @return list<string>
+     */
+    public function visibleUnreadIds(User $user): array
+    {
+        return UserNotification::query()->forUser($user)->visible()->whereNull('read_at')->pluck('id')->all();
+    }
+
     public function markAllRead(User $user): int
     {
         $updated = UserNotification::query()->forUser($user)->visible()->whereNull('read_at')->update(['read_at' => now()]);
@@ -58,8 +91,29 @@ final class Inbox
 
     public function snooze(User $user, string $id, string $preset): void
     {
-        UserNotification::query()->forUser($user)->whereKey($id)->update(['snoozed_until' => self::snoozeUntil($preset, CarbonImmutable::now())]);
+        $this->snoozeMany($user, [$id], $preset);
+    }
+
+    /**
+     * @param  array<int, string>  $ids
+     */
+    public function snoozeMany(User $user, array $ids, string $preset): int
+    {
+        $updated = UserNotification::query()->forUser($user)->whereKey($ids)->update(['snoozed_until' => self::snoozeUntil($preset, CarbonImmutable::now())]);
         $this->counts->forget($user->id);
+
+        return $updated;
+    }
+
+    /**
+     * @param  array<int, string>  $ids
+     */
+    public function unsnoozeMany(User $user, array $ids): int
+    {
+        $updated = UserNotification::query()->forUser($user)->whereKey($ids)->update(['snoozed_until' => null]);
+        $this->counts->forget($user->id);
+
+        return $updated;
     }
 
     /**
@@ -67,8 +121,7 @@ final class Inbox
      */
     public function unsnooze(User $user, string $id): void
     {
-        UserNotification::query()->forUser($user)->whereKey($id)->update(['snoozed_until' => null]);
-        $this->counts->forget($user->id);
+        $this->unsnoozeMany($user, [$id]);
     }
 
     /**

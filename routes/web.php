@@ -19,7 +19,7 @@ Route::get('/', fn () => redirect()->route(Auth::check() ? 'dashboard' : 'login'
 Route::post('locale', SwitchLocaleController::class)->name('locale.update');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::livewire('dashboard', 'pages::dashboard.index')->name('dashboard');
+    Route::livewire('home', 'pages::dashboard.index')->name('dashboard');
 
     Route::livewire('executive-summary', 'pages::executive-summary.index')
         ->name('executive-summary.index');

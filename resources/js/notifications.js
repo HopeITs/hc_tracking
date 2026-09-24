@@ -17,8 +17,8 @@
 const POLL_INTERVAL_MS = 60_000;
 const TOAST_DURATION_MS = 6_000;
 const MAX_TOASTS = 4;
-const APP_ICON = '/icons/icon-192.png';
-const APP_BADGE = '/icons/badge-96.png';
+const APP_ICON = '/app-icons/icon-192.png';
+const APP_BADGE = '/app-icons/badge-96.png';
 
 let subscribed = false;
 let pollTimer = null;
@@ -342,12 +342,41 @@ document.addEventListener('alpine:init', () => {
     window.Alpine.data('notificationBell', () => ({
         open: false,
         pulse: false,
+        undo: null,
+        undoTimer: null,
 
         init() {
             window.addEventListener('hc-notification', () => {
-                this.pulse = true;
-                window.setTimeout(() => (this.pulse = false), 1200);
+                this.pulse = false;
+                this.$nextTick(() => {
+                    this.pulse = true;
+                    window.setTimeout(() => (this.pulse = false), 1200);
+                });
             });
+        },
+
+        /**
+         * A read or snooze made inside the open panel can be reversed from
+         * its footer for a few seconds (the inbox page shows its own bar).
+         */
+        showUndo(detail) {
+            if (!this.open || !detail?.ids?.length) {
+                return;
+            }
+
+            window.clearTimeout(this.undoTimer);
+            this.undo = { action: detail.action, ids: detail.ids, message: detail.message };
+            this.undoTimer = window.setTimeout(() => (this.undo = null), 6000);
+        },
+
+        undoNow() {
+            if (!this.undo) {
+                return;
+            }
+
+            this.$wire.undoInbox(this.undo.action, this.undo.ids);
+            window.clearTimeout(this.undoTimer);
+            this.undo = null;
         },
 
         toggle() {

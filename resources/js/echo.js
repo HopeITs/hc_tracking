@@ -3,11 +3,21 @@ import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
 
 /**
- * Real-time connection to Reverb. Without a key (assets built before Reverb
- * was configured) Echo is simply not started: the notification script then
- * falls back to polling, and nothing else on the page is affected.
+ * Real-time connection: hosted Pusher when its key is built in (production,
+ * nothing to run on the server), otherwise a local Reverb server. Without
+ * either key Echo is simply not started: the notification script then falls
+ * back to polling, and nothing else on the page is affected.
  */
-if (import.meta.env.VITE_REVERB_APP_KEY) {
+if (import.meta.env.VITE_PUSHER_APP_KEY) {
+    window.Pusher = Pusher;
+
+    window.Echo = new Echo({
+        broadcaster: 'pusher',
+        key: import.meta.env.VITE_PUSHER_APP_KEY,
+        cluster: import.meta.env.VITE_PUSHER_APP_CLUSTER,
+        forceTLS: true,
+    });
+} else if (import.meta.env.VITE_REVERB_APP_KEY) {
     window.Pusher = Pusher;
 
     window.Echo = new Echo({

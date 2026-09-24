@@ -134,3 +134,108 @@ test('snoozed notifications can be listed and brought back', function () {
 
     expect(UserNotification::query()->find($later)->snoozed_until)->toBeNull();
 });
+
+test('unread critical notifications are lifted into the attention block', function () {
+    $user = Activity::withoutRecording(fn () => User::factory()->create());
+    pageNotify($user, 'Burning issue', priority: NotificationPriority::Critical);
+    pageNotify($user, 'Routine update');
+
+    Livewire::actingAs($user)->test('pages::notifications.index')
+        ->assertSeeHtml('data-inbox-pinned')
+        ->assertSeeInOrder([__('notifications.sections.pinned'), 'Burning issue', 'Routine update'])
+        ->set('priority', 'critical')
+        ->assertDontSeeHtml('data-inbox-pinned')
+        ->assertSeeText('Burning issue');
+});
+
+test('reading several at once can be undone, and only my rows are touched', function () {
+    [$me, $other] = Activity::withoutRecording(fn () => User::factory()->count(2)->create());
+    $first = pageNotify($me, 'One');
+    $second = pageNotify($me, 'Two');
+    $theirs = pageNotify($other, 'Theirs');
+
+    $page = Livewire::actingAs($me)->test('pages::notifications.index')
+        ->call('markIdsRead', [$first, $second, $theirs])
+        ->assertDispatched('inbox-undoable', fn (string $event, array $params): bool => $params['action'] === 'read' && collect($params['ids'])->sort()->values()->all() === collect([$first, $second])->sort()->values()->all());
+
+    expect(UserNotification::query()->whereNull('read_at')->pluck('id')->all())->toBe([$theirs]);
+
+    UserNotification::query()->find($theirs)->markAsRead();
+    $page->call('undoInbox', 'read', [$first, $second, $theirs]);
+
+    expect(UserNotification::query()->whereNull('read_at')->pluck('id')->sort()->values()->all())
+        ->toBe(collect([$first, $second])->sort()->values()->all());
+});
+
+test('mark all read offers an undo for exactly what it changed', function () {
+    $user = Activity::withoutRecording(fn () => User::factory()->create());
+    $unread = pageNotify($user, 'Fresh');
+    UserNotification::query()->find(pageNotify($user, 'Old'))->markAsRead();
+
+    Livewire::actingAs($user)->test('pages::notifications.index')
+        ->call('markAllRead')
+        ->assertDispatched('inbox-undoable', action: 'read', ids: [$unread]);
+});
+
+test('the selection can be snoozed together and brought back by undo', function () {
+    $user = Activity::withoutRecording(fn () => User::factory()->create());
+    $first = pageNotify($user, 'Snooze first');
+    $second = pageNotify($user, 'Snooze second');
+
+    $page = Livewire::actingAs($user)->test('pages::notifications.index')
+        ->set('selected', [$first, $second])
+        ->call('snoozeSelected', 'tomorrow')
+        ->assertSet('selected', [])
+        ->assertDispatched('inbox-undoable', action: 'snooze')
+        ->assertDontSeeText('Snooze first');
+
+    expect(UserNotification::query()->whereNotNull('snoozed_until')->count())->toBe(2);
+
+    $page->call('undoInbox', 'snooze', [$first, $second])->assertSeeText('Snooze first');
+
+    expect(UserNotification::query()->whereNotNull('snoozed_until')->count())->toBe(0);
+});
+
+test('an unknown snooze preset for the selection changes nothing', function () {
+    $user = Activity::withoutRecording(fn () => User::factory()->create());
+    $id = pageNotify($user, 'One');
+
+    Livewire::actingAs($user)->test('pages::notifications.index')
+        ->set('selected', [$id])
+        ->call('snoozeSelected', 'forever')
+        ->assertNotDispatched('inbox-undoable');
+
+    expect(UserNotification::query()->find($id)->snoozed_until)->toBeNull();
+});
+
+test('the critical shortcut and clear filters reset the view', function () {
+    $user = Activity::withoutRecording(fn () => User::factory()->create());
+    pageNotify($user, 'Burning issue', priority: NotificationPriority::Critical);
+    pageNotify($user, 'Routine update', module: 'risks');
+
+    Livewire::actingAs($user)->test('pages::notifications.index')
+        ->set('module', 'risks')
+        ->call('showCritical')
+        ->assertSet('module', '')
+        ->assertSet('state', 'unread')
+        ->assertSet('priority', 'critical')
+        ->assertSeeText('Burning issue')
+        ->assertDontSeeText('Routine update')
+        ->call('clearFilters')
+        ->assertSet('priority', '')
+        ->assertSeeText('Routine update');
+});
+
+test('the rail counts unread notifications per priority and type', function () {
+    $user = Activity::withoutRecording(fn () => User::factory()->create());
+    pageNotify($user, 'A', priority: NotificationPriority::Critical);
+    pageNotify($user, 'B', kind: NotificationKind::Alert);
+    UserNotification::query()->find(pageNotify($user, 'C', kind: NotificationKind::Alert))->markAsRead();
+
+    $counts = Livewire::actingAs($user)->test('pages::notifications.index')->instance()->railCounts;
+
+    expect($counts['total'])->toBe(2)
+        ->and($counts['priorities'])->toEqualCanonicalizing(['critical' => 1, 'info' => 1])
+        ->and($counts['kinds'])->toEqualCanonicalizing(['action' => 1, 'alert' => 1])
+        ->and($counts['snoozed'])->toBe(0);
+});

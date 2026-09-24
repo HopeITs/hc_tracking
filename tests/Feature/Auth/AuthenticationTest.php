@@ -31,6 +31,20 @@ test('users can authenticate with their hr password', function () {
     $this->assertAuthenticatedAs($user);
 });
 
+test('login always lands on the dashboard, never on the page visited before logging out', function () {
+    $user = User::factory()->withHrAccount()->create();
+
+    // Hitting a protected route while a guest stashes it as the "intended" URL.
+    $this->get(route('tasks.index'));
+
+    $response = $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+    ]);
+
+    $response->assertRedirect(route('dashboard', absolute: false));
+});
+
 test('inactive hr employees cannot log in', function () {
     $hrUserId = insertHrUser(insertHrEmployee(isActive: false), 'gone@example.org');
 
