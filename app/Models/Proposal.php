@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\HasSlug;
 use App\Concerns\RecordsActivity;
 use App\Enums\ProposalPhase;
 use App\Enums\ProposalStatus;
@@ -25,6 +26,7 @@ use Illuminate\Support\Facades\DB;
 /**
  * @property int $id
  * @property string $name
+ * @property string $slug
  * @property CarbonImmutable $planned_date_begin
  * @property CarbonImmutable $planned_date_end
  * @property CarbonImmutable|null $actual_date_begin
@@ -48,7 +50,12 @@ use Illuminate\Support\Facades\DB;
 class Proposal extends Model implements TracksActivity
 {
     /** @use HasFactory<ProposalFactory> */
-    use HasFactory, RecordsActivity;
+    use HasFactory, HasSlug, RecordsActivity;
+
+    protected function slugSource(): string
+    {
+        return $this->name;
+    }
 
     /**
      * Mirror the column default so an unrefreshed model can still report a

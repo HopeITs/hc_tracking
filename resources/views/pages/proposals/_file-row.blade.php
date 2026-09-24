@@ -13,7 +13,7 @@
 <li class="flex min-w-0 flex-wrap items-center gap-3 py-3" wire:key="file-{{ $media->mediable_type }}-{{ $media->id }}" data-file="{{ $media->id }}">
     @if ($isStored && in_array($media->type, [\App\Enums\FileType::Jpg, \App\Enums\FileType::Png], true))
         <button type="button" wire:click="openPreview({{ $media->id }})" class="size-10 shrink-0 touch-manipulation overflow-hidden rounded-xl border border-secondary-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:border-secondary-medium" aria-label="{{ __('reports.preview_name', ['name' => $media->original_name]) }}">
-            <img src="{{ route('proposals.files.preview', [$proposalId, $media]) }}" alt="" loading="lazy" class="size-full object-cover" />
+            <img src="{{ route('proposals.files.preview', [$proposal, $media]) }}" alt="" loading="lazy" class="size-full object-cover" />
         </button>
     @else
         <span class="inline-flex size-10 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-secondary-soft bg-board-head dark:border-secondary-medium dark:bg-secondary-medium/30" aria-hidden="true">

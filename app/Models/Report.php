@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\HasSlug;
 use App\Concerns\RecordsActivity;
 use App\Enums\ReportStatus;
 use App\Notifications\TracksActivity;
@@ -21,6 +22,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * An actual value reported against a planned target.
  *
  * @property int $id
+ * @property string $slug
  * @property int $plan_indicator_id
  * @property int $user_id
  * @property ReportStatus $status
@@ -59,7 +61,17 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Report extends Model implements TracksActivity
 {
     /** @use HasFactory<ReportFactory> */
-    use HasFactory, RecordsActivity;
+    use HasFactory, HasSlug, RecordsActivity;
+
+    /**
+     * "indicator-name-planned-date" — there is no title field of its own, so
+     * the slug is built from the target it reports against and the date it
+     * covers.
+     */
+    protected function slugSource(): string
+    {
+        return $this->planIndicator?->indicator?->name.'-'.$this->planned_date;
+    }
 
     /**
      * Mirror the column defaults so a report that has not been round-tripped

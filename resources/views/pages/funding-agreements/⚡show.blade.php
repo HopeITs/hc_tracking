@@ -11,6 +11,7 @@ use App\Models\DonorProposal;
 use App\Models\DonorReport;
 use App\Models\Media;
 use App\Models\Project;
+use App\Models\Proposal;
 use App\Models\TransfersTracking;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
@@ -852,8 +853,8 @@ new #[Title('titles.funding_agreement')] class extends Component {
     public function paperworkUrl(Media $media): string
     {
         return $media->mediable_type === 'proposal'
-            ? route('proposals.files.download', [$media->mediable_id, $media])
-            : route('projects.files.download', [$media->mediable_id, $media]);
+            ? route('proposals.files.download', [Proposal::query()->findOrFail($media->mediable_id), $media])
+            : route('projects.files.download', [Project::query()->findOrFail($media->mediable_id), $media]);
     }
 
     /**

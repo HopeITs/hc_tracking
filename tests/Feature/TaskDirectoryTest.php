@@ -333,7 +333,7 @@ test('toggleAssignee refuses to remove the last remaining assignee', function ()
     expect($task->refresh()->taskAssignees->pluck('employee_id')->all())->toBe([$alice]);
 });
 
-test('the list row assignee trigger opens an inline multi select popover of every employee', function () {
+test('the list row assignee trigger opens a shared multi select popover of every employee', function () {
     $user = User::factory()->create();
     $alice = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
     $bob = insertHrEmployee(firstNameEn: 'Bob', lastNameEn: 'Rahman');
@@ -341,13 +341,16 @@ test('the list row assignee trigger opens an inline multi select popover of ever
     $task->taskAssignees()->delete();
     $task->taskAssignees()->create(['employee_id' => $alice]);
 
+    // The employee option list is rendered once, shared by every row via the
+    // assigneePicker Alpine store, instead of once per row — see
+    // resources/js/assignee-picker.js.
     Livewire::actingAs($user)
         ->test('pages::tasks.index')
         ->set('view', 'list')
         ->assertSee('data-test="task-assignee-trigger-'.$task->id.'"', false)
-        ->assertSee('data-test="task-assignee-option-'.$task->id.'-'.$alice.'"', false)
-        ->assertSee('data-test="task-assignee-option-'.$task->id.'-'.$bob.'"', false)
-        ->assertSee('wire:click="toggleAssignee('.$task->id.', '.$bob.')"', false);
+        ->assertSee('data-test="assignee-popover-option-'.$alice.'"', false)
+        ->assertSee('data-test="assignee-popover-option-'.$bob.'"', false)
+        ->assertSee('$store.assigneePicker.openFor('.$task->id.',', false);
 });
 
 test('a task can be deleted and takes only its own attachments with it', function () {

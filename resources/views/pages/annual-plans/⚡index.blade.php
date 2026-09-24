@@ -327,7 +327,7 @@ new #[Title('titles.annual_plans')] class extends Component {
         }
 
         return AnnualPlan::query()
-            ->select(['id', 'program_id', 'manager_id', 'year'])
+            ->select(['id', 'slug', 'program_id', 'manager_id', 'year'])
             ->whereIn('program_id', $programIds)
             ->inYears($columns)
             ->managedBy($this->selectedManagerId())

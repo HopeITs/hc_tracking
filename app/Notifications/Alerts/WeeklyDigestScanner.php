@@ -49,7 +49,7 @@ final class WeeklyDigestScanner implements Scanner
                 continue;
             }
 
-            $payload = $this->digest('notifications.digests.weekly_program', ['program' => $program->name, ...$stats[$program->id]], 'program', $program->id, ['route' => 'programs.show', 'parameters' => ['program' => $program->id]]);
+            $payload = $this->digest('notifications.digests.weekly_program', ['program' => $program->name, ...$stats[$program->id]], 'program', $program->id, ['route' => 'programs.show', 'parameters' => ['program' => $program->slug]]);
             $sent += $this->dispatcher->send('weekly_digest', $week, $payload, [$managerId], [], [$managerId]);
         }
 
@@ -109,7 +109,7 @@ final class WeeklyDigestScanner implements Scanner
 
     /**
      * @param  array<string, int|string>  $params
-     * @param  array{route: string, parameters?: array<string, int>}  $link
+     * @param  array{route: string, parameters?: array<string, string>}  $link
      */
     private function digest(string $key, array $params, string $subjectType, int $subjectId, array $link): NotificationPayload
     {

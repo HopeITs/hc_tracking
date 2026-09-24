@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\HasSlug;
 use App\Concerns\RecordsActivity;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
@@ -25,6 +26,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  * @property string $source_type
  * @property int $source_id
  * @property string $title
+ * @property string $slug
  * @property string|null $description
  * @property TaskStatus $status
  * @property TaskPriority $priority
@@ -54,7 +56,12 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 class Task extends Model implements TracksActivity
 {
     /** @use HasFactory<TaskFactory> */
-    use HasFactory, RecordsActivity;
+    use HasFactory, HasSlug, RecordsActivity;
+
+    protected function slugSource(): string
+    {
+        return $this->title;
+    }
 
     /**
      * Mirror the column defaults so a task that has not been round-tripped

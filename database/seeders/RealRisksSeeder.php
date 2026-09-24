@@ -126,11 +126,11 @@ class RealRisksSeeder extends Seeder
                 'solution' => 'Implemented an automated online seat booking system with timed shift rotations to maximize access for all registered students.',
             ],
             [
-                'project' => 'Children University Aleppo',
-                'impact' => 'high',
-                'name' => 'Child fatigue, lack of transport, and harsh weather conditions affecting attendance',
-                'happened' => true,
-                'solution' => 'Scheduled activities during optimal daytime hours, provided seasonal transport stipends, and maintained warm, heated activity halls.',
+                'project' => 'DISC Aleppo',
+                'impact' => 'medium',
+                'name' => 'Mismatches between technical training curriculum and rapidly evolving private sector demands',
+                'happened' => false,
+                'solution' => 'Conducted semi-annual labor market employer surveys and aligned syllabi with digital freelance and IT networking standards.',
             ],
             [
                 'project' => 'School to School Aleppo',

@@ -34,6 +34,12 @@ new #[Title('titles.activity_log')] class extends Component {
     #[Url(except: '')]
     public string $to = '';
 
+    #[Url(except: 'created_at')]
+    public string $sortField = 'created_at';
+
+    #[Url(except: 'desc')]
+    public string $sortDirection = 'desc';
+
     public function updated(string $property): void
     {
         if (in_array($property, ['module', 'actor', 'search', 'from', 'to'], true)) {
@@ -41,10 +47,31 @@ new #[Title('titles.activity_log')] class extends Component {
         }
     }
 
+    /**
+     * Toggles direction when the same column is clicked again, otherwise
+     * switches to the new column with a predictable ascending default.
+     */
+    public function setSort(string $field): void
+    {
+        if (! in_array($field, ['created_at', 'module'], true)) {
+            return;
+        }
+
+        if ($this->sortField === $field) {
+            $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            $this->sortField = $field;
+            $this->sortDirection = 'asc';
+        }
+
+        $this->resetPage();
+    }
+
     #[Computed]
     public function activities(): LengthAwarePaginator
     {
         $term = trim($this->search);
+        $sortingByModule = $this->sortField === 'module';
 
         return Activity::query()
             ->with('actor:id,hr_user_id')
@@ -55,19 +82,21 @@ new #[Title('titles.activity_log')] class extends Component {
                 ->orWhere('properties', 'like', '%'.addcslashes($term, '%_\\').'%')))
             ->when($this->validDate($this->from), fn (Builder $query) => $query->where('created_at', '>=', CarbonImmutable::parse($this->from)->startOfDay()))
             ->when($this->validDate($this->to), fn (Builder $query) => $query->where('created_at', '<=', CarbonImmutable::parse($this->to)->endOfDay()))
-            ->latest('id')
+            ->when($sortingByModule, fn (Builder $query) => $query->orderBy('module', $this->sortDirection))
+            ->orderBy('created_at', $sortingByModule ? 'desc' : $this->sortDirection)
+            ->orderBy('id', $sortingByModule ? 'desc' : $this->sortDirection)
             ->paginate(50);
     }
 
     /**
-     * The org's pulse right now, independent of the filters below: today's
-     * count, the last 7 days, and today's busiest module and person — the
-     * wire desk's cross-check strip.
+     * The statement summary, independent of the filters below: today's
+     * count, the last 7 days, and today's busiest module and person — read
+     * the way a reconciled ledger opens with its running totals.
      *
      * @return array{today: int, week: int, module: array{label: string, count: int}|null, actor: array{name: string, count: int}|null}
      */
     #[Computed]
-    public function pulse(): array
+    public function summary(): array
     {
         $todayStart = CarbonImmutable::today();
 
@@ -89,7 +118,7 @@ new #[Title('titles.activity_log')] class extends Component {
             ->orderByDesc('total')
             ->first();
 
-        $actorName = $busiestActor === null ? null : User::query()->whereKey($busiestActor->actor_id)->value('name');
+        $actorName = $busiestActor === null ? null : User::query()->find($busiestActor->actor_id)?->name;
 
         return [
             'today' => $today,
@@ -124,7 +153,7 @@ new #[Title('titles.activity_log')] class extends Component {
 
     /**
      * Program names for every activity on this page that is tied to one —
-     * the thread that ties a delivery event or a funding event back to the
+     * the thread that ties a delivery entry or a funding entry back to the
      * program behind it.
      *
      * @return array<int, string>
@@ -142,7 +171,7 @@ new #[Title('titles.activity_log')] class extends Component {
             return [];
         }
 
-        return Program::query()->whereIn('id', $programIds)->pluck('name', 'id')->all();
+        return Program::query()->whereIn('id', $programIds)->get()->pluck('name', 'id')->all();
     }
 
     /**
@@ -158,8 +187,9 @@ new #[Title('titles.activity_log')] class extends Component {
     }
 
     /**
-     * The wire's accent family for a module: funding events run teal, a risk
-     * runs warn amber, everything else runs the neutral program-delivery ink.
+     * The ledger's accent family for a module: funding entries run teal, a
+     * risk runs warn amber, everything else runs the neutral program-delivery
+     * ink.
      */
     public function moduleTone(string $module): string
     {
@@ -180,18 +210,11 @@ new #[Title('titles.activity_log')] class extends Component {
     $presenter = app(ActivityPresenter::class);
     $notificationPresenter = app(NotificationPresenter::class);
     $links = app(SubjectLinks::class);
-    $moduleIcons = config('notifications.module_icons');
 
-    $toneClasses = fn (string $tone): string => match ($tone) {
-        'funding' => 'bg-funding-soft text-funding',
-        'warn' => 'bg-status-warn-soft text-status-warn',
-        default => 'bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white',
-    };
-
-    $dotClasses = fn (string $tone): string => match ($tone) {
-        'funding' => 'bg-funding',
-        'warn' => 'bg-status-warn',
-        default => 'bg-secondary-light',
+    $tagClasses = fn (string $tone): string => match ($tone) {
+        'funding' => 'border-funding/40 text-funding',
+        'warn' => 'border-status-warn/40 text-status-warn',
+        default => 'border-secondary-light text-secondary-medium dark:text-secondary-soft',
     };
 @endphp
 
@@ -219,83 +242,102 @@ new #[Title('titles.activity_log')] class extends Component {
         </x-slot:filters>
     </x-ui.page-header>
 
-    {{-- The cross-check strip: the org's pulse right now, read the way a control room
-         sweeps its instruments, independent of whatever the wire below is filtered to. --}}
+    {{-- The statement summary: today's running totals, read calmly before the ledger itself,
+         independent of whatever the entries below are filtered to. --}}
     @php
-        $pulse = $this->pulse;
+        $summary = $this->summary;
     @endphp
     <div
         role="group"
         aria-label="{{ __('activity.pulse.heading') }}"
-        class="relative grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-secondary-dark bg-secondary-soft text-white shadow-[0_8px_24px_-12px_rgba(20,21,22,0.45)] @2xl/directory:grid-cols-4 dark:border-secondary-medium dark:bg-secondary-medium/60"
+        class="grid grid-cols-2 divide-y divide-board-line rounded-xl border border-board-line bg-board @2xl/directory:grid-cols-4 @2xl/directory:divide-x @2xl/directory:divide-y-0 dark:shadow-none"
     >
-        <div
-            aria-hidden="true"
-            class="pointer-events-none absolute inset-0 opacity-[0.12]"
-            style="background-image: radial-gradient(rgba(255,255,255,0.9) 1px, transparent 1px); background-size: 14px 14px;"
-        ></div>
-
-        <div class="relative bg-secondary-dark p-4">
-            <p class="type-label text-secondary-soft">{{ __('activity.pulse.today') }}</p>
-            <p class="type-figure mt-2 text-white">{{ $pulse['today'] }}</p>
+        <div class="p-3.5">
+            <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('activity.pulse.today') }}</p>
+            <p class="type-heading mt-1 tabular-nums">{{ $summary['today'] }}</p>
         </div>
 
-        <div class="relative bg-secondary-dark p-4">
-            <p class="type-label text-secondary-soft">{{ __('activity.pulse.week') }}</p>
-            <p class="type-figure mt-2 text-white">{{ $pulse['week'] }}</p>
+        <div class="p-3.5">
+            <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('activity.pulse.week') }}</p>
+            <p class="type-heading mt-1 tabular-nums">{{ $summary['week'] }}</p>
         </div>
 
-        <div class="relative bg-secondary-dark p-4">
-            <p class="type-label text-secondary-soft">{{ __('activity.pulse.busiest_module') }}</p>
-            @if ($pulse['module'] !== null)
-                <p class="mt-2 flex items-baseline gap-1.5">
-                    <span class="type-heading truncate text-white">{{ $pulse['module']['label'] }}</span>
-                    <span class="type-meta shrink-0 tabular-nums text-status-critical">{{ $pulse['module']['count'] }}</span>
+        <div class="p-3.5">
+            <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('activity.pulse.busiest_module') }}</p>
+            @if ($summary['module'] !== null)
+                <p class="type-heading mt-1 flex items-baseline gap-1.5">
+                    <span class="truncate">{{ $summary['module']['label'] }}</span>
+                    <span class="type-meta shrink-0 tabular-nums text-secondary-medium dark:text-secondary-soft">({{ $summary['module']['count'] }})</span>
                 </p>
             @else
-                <p class="type-heading mt-2 text-secondary-soft">{{ __('activity.pulse.quiet') }}</p>
+                <p class="type-heading mt-1 text-secondary-medium dark:text-secondary-soft">{{ __('activity.pulse.quiet') }}</p>
             @endif
         </div>
 
-        <div class="relative bg-secondary-dark p-4">
-            <p class="type-label text-secondary-soft">{{ __('activity.pulse.top_actor') }}</p>
-            @if ($pulse['actor'] !== null)
-                <p class="mt-2 flex items-baseline gap-1.5">
-                    <span class="type-heading truncate text-white">{{ $pulse['actor']['name'] }}</span>
-                    <span class="type-meta shrink-0 tabular-nums text-status-critical">{{ $pulse['actor']['count'] }}</span>
+        <div class="p-3.5">
+            <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('activity.pulse.top_actor') }}</p>
+            @if ($summary['actor'] !== null)
+                <p class="type-heading mt-1 flex items-baseline gap-1.5">
+                    <span class="truncate">{{ $summary['actor']['name'] }}</span>
+                    <span class="type-meta shrink-0 tabular-nums text-secondary-medium dark:text-secondary-soft">({{ $summary['actor']['count'] }})</span>
                 </p>
             @else
-                <p class="type-heading mt-2 text-secondary-soft">{{ __('activity.pulse.quiet') }}</p>
+                <p class="type-heading mt-1 text-secondary-medium dark:text-secondary-soft">{{ __('activity.pulse.quiet') }}</p>
             @endif
         </div>
     </div>
 
     @if ($this->activities->isEmpty())
-        <x-ui.empty-state icon="signal" :heading="__('activity.empty')" />
+        <x-ui.empty-state icon="document-text" :heading="__('activity.empty')" />
     @else
         @php
-            $days = collect($this->activities->items())->groupBy(fn ($activity) => $activity->created_at?->toDateString());
+            $groupedByDay = $sortField === 'created_at';
+            $days = $groupedByDay
+                ? collect($this->activities->items())->groupBy(fn ($activity) => $activity->created_at?->toDateString())
+                : collect([null => collect($this->activities->items())]);
             $today = CarbonImmutable::today()->toDateString();
             $yesterday = CarbonImmutable::yesterday()->toDateString();
         @endphp
 
-        <div class="flex flex-col" wire:loading.class="opacity-50" wire:target="module, actor, search, from, to, previousPage, nextPage, gotoPage">
+        <div class="flex flex-col gap-4" wire:loading.class="opacity-50" wire:target="module, actor, search, from, to, setSort, previousPage, nextPage, gotoPage">
             @foreach ($days as $day => $dayActivities)
                 @php
-                    $dayLabel = match ($day) {
-                        $today => __('notifications.sections.today'),
-                        $yesterday => __('notifications.sections.yesterday'),
+                    $dayLabel = match (true) {
+                        ! $groupedByDay => null,
+                        $day === $today => __('notifications.sections.today'),
+                        $day === $yesterday => __('notifications.sections.yesterday'),
                         default => $dayActivities->first()->created_at?->translatedFormat(__('formats.date_wire')),
                     };
                 @endphp
 
-                <div class="flex items-center gap-3 py-2.5">
-                    <p class="type-label m-0 shrink-0 text-secondary-dark dark:text-white">{{ $dayLabel }}</p>
-                    <span class="h-px min-w-0 flex-1 bg-secondary-soft dark:bg-secondary-medium" aria-hidden="true"></span>
-                    <span class="type-meta shrink-0 tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $dayActivities->count() }}</span>
-                </div>
+                <x-ui.data-table x-data="{ open: true }" wire:key="day-{{ $day ?? 'all' }}">
+                    <x-slot:head>
+                        @include('pages.activity._sortable-th', ['field' => 'created_at', 'label' => __('activity.ledger.time'), 'class' => 'w-16!'])
+                        @include('pages.activity._sortable-th', ['field' => 'module', 'label' => __('activity.filters.module'), 'class' => 'w-32!'])
+                        <th>{{ __('activity.ledger.entry') }}</th>
+                        <th class="w-44!">{{ __('activity.ledger.linked_to') }}</th>
+                        <th class="w-24!"></th>
+                    </x-slot:head>
 
-                <ol class="flex flex-col divide-y divide-secondary-soft border-b border-secondary-soft pb-2 dark:divide-secondary-medium dark:border-secondary-medium">
+                    @if ($dayLabel !== null)
+                        <tr class="bg-board-head">
+                            <td colspan="5" class="p-0">
+                                <button
+                                    type="button"
+                                    x-on:click="open = !open"
+                                    :aria-expanded="open.toString()"
+                                    class="flex w-full cursor-pointer items-center justify-between gap-3 px-3.5 py-2 text-start hover:bg-board-line/40"
+                                >
+                                    <span class="inline-flex min-w-0 items-center gap-2">
+                                        <flux:icon.chevron-right variant="micro" class="size-3.5 shrink-0 text-secondary-medium rtl:-scale-x-100 dark:text-secondary-soft" x-bind:class="open && 'rotate-90 rtl:rotate-90'" style="transition: transform 150ms" />
+                                        <span class="type-label truncate text-secondary-dark dark:text-white">{{ $dayLabel }}</span>
+                                    </span>
+                                    <span class="type-meta shrink-0 tabular-nums text-secondary-medium dark:text-secondary-soft">{{ trans_choice('activity.ledger.entry_count', $dayActivities->count(), ['count' => $dayActivities->count()]) }}</span>
+                                </button>
+                            </td>
+                        </tr>
+                    @endif
+
                     @foreach ($dayActivities as $activity)
                         @php
                             $tone = $this->moduleTone($activity->module);
@@ -303,54 +345,45 @@ new #[Title('titles.activity_log')] class extends Component {
                             $url = $exists ? $links->routeFor($activity->subject_type, $activity->subject_id) : null;
                             $programName = $activity->program_id !== null ? ($this->programs[$activity->program_id] ?? null) : null;
                         @endphp
-                        <li class="group flex items-start gap-3 py-3 @3xl/directory:items-center @3xl/directory:gap-4" wire:key="log-{{ $activity->id }}">
-                            <time
-                                datetime="{{ $activity->created_at?->toIso8601String() }}"
-                                class="type-meta hidden w-14 shrink-0 tabular-nums text-secondary-medium dark:text-secondary-soft @3xl/directory:block"
-                            >
-                                {{ $activity->created_at?->format('H:i') }}
-                            </time>
+                        <tr wire:key="log-{{ $activity->id }}" @if ($dayLabel !== null) x-show="open" @endif>
+                            <x-ui.data-table.cell :label="__('activity.ledger.time')" numeric>
+                                @if ($groupedByDay)
+                                    <time datetime="{{ $activity->created_at?->toIso8601String() }}">{{ $activity->created_at?->format('H:i') }}</time>
+                                @else
+                                    <time datetime="{{ $activity->created_at?->toIso8601String() }}" class="whitespace-nowrap">{{ $activity->created_at?->translatedFormat(__('formats.date_short')) }} · {{ $activity->created_at?->format('H:i') }}</time>
+                                @endif
+                            </x-ui.data-table.cell>
 
-                            <div class="flex size-8 shrink-0 items-center justify-center rounded-lg {{ $toneClasses($tone) }}">
-                                <flux:icon :name="$moduleIcons[$activity->module] ?? 'bell'" class="size-4" />
-                            </div>
+                            <x-ui.data-table.cell :label="__('activity.filters.module')">
+                                <span class="{{ $tagClasses($tone) }} inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase whitespace-nowrap">
+                                    {{ $notificationPresenter->moduleLabel($activity->module) }}
+                                </span>
+                            </x-ui.data-table.cell>
 
-                            <div class="min-w-0 flex-1">
-                                <p class="text-sm leading-snug font-medium">{{ $presenter->sentence($activity) }}</p>
-                                <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-secondary-medium dark:text-secondary-soft">
-                                    <span class="tabular-nums @3xl/directory:hidden">{{ $activity->created_at?->format('H:i') }}</span>
-                                    <span aria-hidden="true" class="@3xl/directory:hidden">·</span>
-                                    <span class="inline-flex items-center gap-1.5">
-                                        <span class="size-1.5 shrink-0 rounded-full {{ $dotClasses($tone) }}" aria-hidden="true"></span>
-                                        {{ $notificationPresenter->moduleLabel($activity->module) }}
-                                    </span>
-                                    @if ($programName !== null)
-                                        <span aria-hidden="true">·</span>
-                                        <a href="{{ route('programs.show', $activity->program_id) }}" wire:navigate class="inline-flex min-w-0 items-center gap-1 truncate font-medium text-secondary-dark hover:text-status-critical hover:underline dark:text-white">
-                                            <flux:icon name="link" class="size-3 shrink-0" />
-                                            <span class="truncate">{{ __('activity.linked_program', ['program' => $programName]) }}</span>
-                                        </a>
-                                    @endif
-                                    @if ($url !== null)
-                                        <span aria-hidden="true" class="@3xl/directory:hidden">·</span>
-                                        <a href="{{ $url }}" wire:navigate class="font-semibold text-status-critical hover:underline @3xl/directory:hidden">{{ __('activity.open_record') }}</a>
-                                    @elseif (! $exists)
-                                        <span aria-hidden="true" class="@3xl/directory:hidden">·</span>
-                                        <span class="@3xl/directory:hidden">{{ __('activity.record_gone') }}</span>
-                                    @endif
-                                </p>
-                            </div>
+                            <x-ui.data-table.cell>
+                                <p class="text-sm leading-snug">{{ $presenter->sentence($activity) }}</p>
+                            </x-ui.data-table.cell>
 
-                            <div class="hidden shrink-0 text-xs @3xl/directory:block">
+                            <x-ui.data-table.cell :label="__('activity.ledger.linked_to')">
+                                @if ($programName !== null)
+                                    <a href="{{ route('programs.show', tap(new Program, fn ($program) => $program->id = $activity->program_id)) }}" wire:navigate class="truncate text-secondary-dark hover:text-status-critical hover:underline dark:text-white">
+                                        {{ $programName }}
+                                    </a>
+                                @else
+                                    <span class="text-secondary-light dark:text-secondary-medium">—</span>
+                                @endif
+                            </x-ui.data-table.cell>
+
+                            <x-ui.data-table.cell class="@3xl:text-end">
                                 @if ($url !== null)
                                     <a href="{{ $url }}" wire:navigate class="font-semibold text-status-critical hover:underline">{{ __('activity.open_record') }}</a>
                                 @elseif (! $exists)
                                     <span class="text-secondary-medium dark:text-secondary-soft">{{ __('activity.record_gone') }}</span>
                                 @endif
-                            </div>
-                        </li>
+                            </x-ui.data-table.cell>
+                        </tr>
                     @endforeach
-                </ol>
+                </x-ui.data-table>
             @endforeach
         </div>
 

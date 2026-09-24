@@ -62,4 +62,5 @@ Before planning or editing, find the row whose globs match the file's path and r
 | {app/Notifications/**,resources/views/pages/notifications/**,resources/views/components/notifications/**} | .ai/rules/views-components-notifications.md |
 | {app/Models/PlanIndicator.php,resources/views/pages/{results,indicators,targets}/**,resources/views/components/ui/framework-node.blade.php} | .ai/rules/views-components-ui.md |
 | {lang/**,resources/views/**,app/Enums/**} | .ai/rules/views-enums.md |
+| {app/Models/**,routes/web.php,resources/views/pages/**} | .ai/rules/views-pages.md |
 | resources/views/**/*.blade.php | .ai/rules/views.md |

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\HasSlug;
 use App\Concerns\HasTree;
 use App\Concerns\RecordsActivity;
 use App\Enums\MilestoneStatus;
@@ -24,6 +25,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
  * @property int $id
  * @property int $project_id
  * @property string $name
+ * @property string $slug
  * @property string|null $description
  * @property CarbonImmutable $planned_start_date
  * @property CarbonImmutable|null $planned_end_date
@@ -55,7 +57,12 @@ class Milestone extends Model implements TracksActivity
     /** @use HasFactory<MilestoneFactory> */
     use HasFactory, RecordsActivity;
 
-    use HasTree;
+    use HasSlug, HasTree;
+
+    protected function slugSource(): string
+    {
+        return $this->name;
+    }
 
     /**
      * The column pointing at the milestone this one is nested under.
