@@ -4,6 +4,10 @@
         @include('partials.head')
     </head>
     <body class="min-h-screen bg-white dark:bg-zinc-800" @auth data-user-id="{{ auth()->id() }}" data-notification-popups="{{ auth()->user()->notification_popups ? 'on' : 'off' }}" @endauth>
+        @persist('preloader')
+            <x-preloader />
+        @endpersist
+
         <x-navigation.sidebar />
 
         <!-- Mobile User Menu -->

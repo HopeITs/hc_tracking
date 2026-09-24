@@ -60,6 +60,7 @@ return [
     'impact_outcome_and_output_statements_nested_as_recorded' => 'بيانات الأثر والنتائج والمخرجات مرتبة كما سُجّلت.',
     'indicator_name' => 'اسم المؤشر',
     'indicators' => 'المؤشرات',
+    'loading' => 'جارٍ التحميل…',
     'log_out' => 'تسجيل الخروج',
     'materialised' => 'تحقق',
     'milestones' => 'المراحل الرئيسية',

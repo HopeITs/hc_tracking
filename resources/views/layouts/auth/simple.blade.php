@@ -4,6 +4,10 @@
         @include('partials.head')
     </head>
     <body class="min-h-screen bg-[#e5e7eb] antialiased dark:bg-secondary-dark">
+        @persist('preloader')
+            <x-preloader />
+        @endpersist
+
         <div class="flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
             <div class="flex w-full max-w-sm flex-col items-center gap-6">
                 <a href="{{ route('home') }}" class="flex flex-col items-center" wire:navigate>

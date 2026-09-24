@@ -60,6 +60,7 @@ return [
     'impact_outcome_and_output_statements_nested_as_recorded' => 'Impact, outcome and output statements, nested as recorded.',
     'indicator_name' => 'Indicator name',
     'indicators' => 'Indicators',
+    'loading' => 'Loading…',
     'log_out' => 'Log out',
     'materialised' => 'Materialised',
     'milestones' => 'Milestones',

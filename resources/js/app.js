@@ -1,3 +1,4 @@
+import './preloader';
 import './charts';
 import './count-up';
 import './form-fields';

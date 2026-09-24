@@ -352,22 +352,207 @@
 }
 
 /*
- * Page-navigation progress bar (Livewire's wire:navigate, NProgress markup):
- * the brand red instead of Livewire's default blue, a touch thicker than its
- * 2px. The extra `html` outranks the rules Livewire injects at runtime.
+ * Logo preloader (x-preloader, resources/js/preloader.js). data-state drives it:
+ *   boot     server-rendered. Quick mode fades in after 200ms; intro mode
+ *            (html[data-preloader='intro']) is visible at once and plays the
+ *            write-on. Both hide themselves after 10s even if no script runs.
+ *   waiting  visible; the O of HOPE becomes the loading ring.
+ *   shown    visible and solid; pins opacity so the fade starts from 1.
+ *   leaving  fades out while the logo grows slightly.
+ *   hidden   gone, not clickable.
  */
-html #nprogress .bar {
-    height: 3px;
-    background: var(--color-primary);
+.hc-preloader {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: grid;
+    place-items: center;
+    background-color: var(--color-white);
+    color: var(--color-primary);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
 }
 
-html #nprogress .peg {
-    box-shadow: 0 0 10px var(--color-primary), 0 0 5px var(--color-primary);
+.dark .hc-preloader {
+    background-color: var(--color-secondary-dark);
+    color: var(--color-white);
 }
 
-html #nprogress .spinner-icon {
-    border-top-color: var(--color-primary);
-    border-left-color: var(--color-primary);
+.hc-preloader:is([data-state='boot'], [data-state='waiting'], [data-state='shown']) {
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.hc-preloader:is([data-state='waiting'], [data-state='shown']) {
+    opacity: 1;
+}
+
+.hc-preloader[data-state='waiting'] {
+    transition: opacity 150ms ease-out;
+}
+
+.hc-preloader[data-state='boot'] {
+    animation:
+        hc-preloader-appear 150ms ease-out 200ms forwards,
+        hc-preloader-failsafe 1ms linear 10s forwards;
+}
+
+html[data-preloader='intro'] .hc-preloader[data-state='boot'] {
+    opacity: 1;
+    animation: hc-preloader-failsafe 1ms linear 10s forwards;
+}
+
+.hc-preloader[data-state='leaving'] {
+    visibility: hidden;
+    opacity: 0;
+    transition:
+        opacity 400ms cubic-bezier(0.4, 0, 0.2, 1),
+        visibility 0s linear 400ms;
+}
+
+.hc-preloader__logo {
+    width: min(15rem, 64vw);
+    overflow: visible;
+    fill: currentColor;
+    transition: transform 400ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hc-preloader[data-state='leaving'] .hc-preloader__logo {
+    transform: scale(1.04);
+}
+
+.hc-preloader__script {
+    fill: var(--color-secondary-medium);
+}
+
+.dark .hc-preloader__script {
+    fill: var(--color-white);
+}
+
+.hc-preloader__letter,
+.hc-preloader__small {
+    transform-box: fill-box;
+    transform-origin: 50% 100%;
+}
+
+.hc-preloader__wipe {
+    transform-box: fill-box;
+    transform-origin: 0 50%;
+}
+
+.hc-preloader__o {
+    transition: fill-opacity 200ms ease-out;
+}
+
+.hc-preloader__ring {
+    opacity: 0;
+    transition: opacity 200ms ease-out;
+}
+
+.hc-preloader__ring circle {
+    fill: none;
+    stroke: var(--color-primary);
+    stroke-width: 15;
+    stroke-dasharray: 40 96;
+    transform-box: view-box;
+    transform-origin: 81.08px 27.09px;
+}
+
+/* The spinning O: quick boot and waiting. */
+.hc-preloader:is([data-state='boot'], [data-state='waiting']) .hc-preloader__o {
+    fill-opacity: 0.2;
+}
+
+.hc-preloader:is([data-state='boot'], [data-state='waiting']) .hc-preloader__ring {
+    opacity: 1;
+}
+
+.hc-preloader:not([data-state='hidden']) .hc-preloader__ring circle {
+    animation: hc-preloader-spin 850ms linear infinite;
+}
+
+/* The write-on intro: the O stays solid while the letters arrive. */
+html[data-preloader='intro'] .hc-preloader[data-state='boot'] .hc-preloader__o {
+    fill-opacity: 1;
+}
+
+html[data-preloader='intro'] .hc-preloader[data-state='boot'] .hc-preloader__ring {
+    opacity: 0;
+}
+
+html[data-preloader='intro'] .hc-preloader[data-state='boot'] .hc-preloader__letter {
+    animation: hc-preloader-rise 500ms cubic-bezier(0.16, 1, 0.3, 1) calc(var(--i) * 55ms) both;
+}
+
+html[data-preloader='intro'] .hc-preloader[data-state='boot'] .hc-preloader__small {
+    animation: hc-preloader-rise 350ms cubic-bezier(0.16, 1, 0.3, 1) calc(250ms + var(--i) * 30ms) both;
+}
+
+html[data-preloader='intro'] .hc-preloader[data-state='boot'] .hc-preloader__wipe {
+    animation: hc-preloader-write 600ms cubic-bezier(0.65, 0, 0.35, 1) 400ms both;
+}
+
+@keyframes hc-preloader-appear {
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes hc-preloader-failsafe {
+    to {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+    }
+}
+
+@keyframes hc-preloader-rise {
+    from {
+        opacity: 0;
+        transform: translateY(14px);
+    }
+}
+
+@keyframes hc-preloader-write {
+    from {
+        transform: scaleX(0);
+    }
+}
+
+@keyframes hc-preloader-spin {
+    to {
+        transform: rotate(1turn);
+    }
+}
+
+@keyframes hc-preloader-breathe {
+    to {
+        fill-opacity: 0.35;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hc-preloader__ring {
+        display: none;
+    }
+
+    .hc-preloader:is([data-state='boot'], [data-state='waiting']) .hc-preloader__o {
+        fill-opacity: 1;
+        animation: hc-preloader-breathe 1.2s ease-in-out infinite alternate;
+    }
+
+    .hc-preloader__logo,
+    .hc-preloader[data-state='leaving'] .hc-preloader__logo {
+        transform: none;
+        transition: none;
+    }
+}
+
+@media print {
+    .hc-preloader {
+        display: none;
+    }
 }
 
 /* Every clickable button gets a hand cursor, matching links. */
