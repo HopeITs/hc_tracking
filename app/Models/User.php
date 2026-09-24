@@ -7,14 +7,17 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
@@ -24,21 +27,21 @@ use Spatie\Permission\Traits\HasRoles;
 /**
  * A person who can use hc-tracking.
  *
- * They log in with their HR account (see AuthenticateWithHrAccount), matched by
- * email; this row holds only two-factor settings, passkeys, and (via
- * Spatie\Permission\Traits\HasRoles) role/permission assignments. `name` is
- * copied from the HR employee at each login, and `password` is a leftover
- * that is never checked.
+ * They log in with their HR account (see AuthenticateWithHrAccount), linked by
+ * hr_user_id. This row holds only what HR does not: two-factor settings,
+ * passkeys, the interface language and (via Spatie\Permission\Traits\HasRoles)
+ * role/permission assignments. Name, email and password live in HR only;
+ * `name` and `email` are read from there (see HrUser::directory()), never
+ * copied. `employee_id` is the HR employee id, refreshed at each login.
  *
  * @property int $id
- * @property string $name
- * @property string $email
- * @property int|null $hr_user_id
+ * @property-read string $name
+ * @property-read string $email
+ * @property int $hr_user_id
  * @property int|null $employee_id
  * @property int|null $active_role_id
  * @property string|null $locale
  * @property CarbonImmutable|null $email_verified_at
- * @property string|null $password
  * @property string|null $two_factor_secret
  * @property string|null $two_factor_recovery_codes
  * @property CarbonImmutable|null $two_factor_confirmed_at
@@ -46,8 +49,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['name', 'email', 'password'])]
-#[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
+#[Hidden(['two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
@@ -112,16 +114,28 @@ class User extends Authenticatable implements PasskeyUser
     }
 
     /**
+     * Delete the model inside a transaction.
+     *
+     * HasRoles and HasPermissions detach the user's roles and direct
+     * permissions while deleting. When a restricting foreign key (reports,
+     * uploads, created tasks) then refuses the delete, the detach must be rolled
+     * back with it, or a user who is kept silently loses their access.
+     */
+    public function delete(): bool
+    {
+        return (bool) DB::transaction(fn () => parent::delete());
+    }
+
+    /**
      * The tracking user for an HR account, created on first use.
      *
      * Only active HR accounts (see HrUser::isActive()) may use tracking; the
-     * caller checks that first. A new user starts with no role,
-     * except an email listed in auth.hr_admin_emails, which starts as Super
-     * Admin.
+     * caller checks that first. A new user starts with no role, except an email
+     * listed in auth.hr_admin_emails, which starts as Super Admin.
      */
     public static function forHrAccount(HrUser $hrUser): self
     {
-        $user = static::query()->where('email', $hrUser->email)->first();
+        $user = static::query()->where('hr_user_id', $hrUser->id)->first();
 
         if ($user !== null) {
             return $user;
@@ -135,43 +149,54 @@ class User extends Authenticatable implements PasskeyUser
     }
 
     /**
-     * Create the missing tracking users for every active HR account.
+     * Give every active HR account its tracking user, and refresh the HR
+     * employee link of existing ones.
      *
-     * @return int The number of users created.
+     * Roles are never touched. Name and email need no refreshing: they are
+     * read from HR, not copied.
+     *
+     * @return array{created: int, updated: int}
      */
-    public static function syncFromHrAccounts(): int
+    public static function syncFromHrAccounts(): array
     {
-        $existingEmails = static::query()->pluck('email')->map(fn (string $email): string => mb_strtolower($email))->flip();
+        $usersByHrUserId = static::query()->get(['id', 'hr_user_id', 'employee_id'])->keyBy('hr_user_id');
         $created = 0;
+        $updated = 0;
 
-        HrUser::query()->active()->with('employee')->orderBy('id')->each(function (HrUser $hrUser) use ($existingEmails, &$created): void {
-            if ($existingEmails->has(mb_strtolower($hrUser->email))) {
+        HrUser::query()->active()->orderBy('id')->each(function (HrUser $hrUser) use ($usersByHrUserId, &$created, &$updated): void {
+            $user = $usersByHrUserId->get($hrUser->id);
+
+            if ($user === null) {
+                static::forHrAccount($hrUser);
+                $created++;
+
                 return;
             }
 
-            static::forHrAccount($hrUser);
-            $created++;
+            if ($user->linkToHrAccount($hrUser)) {
+                $updated++;
+            }
         });
 
-        return $created;
+        return ['created' => $created, 'updated' => $updated];
     }
 
     /**
      * Delete the tracking users whose HR account is gone or no longer active.
      *
      * A user still referenced by records that restrict deletion (reports,
-     * indicator readings, uploads, created tasks) is kept.
+     * indicator readings, uploads, created tasks) is kept, roles included.
      *
      * @return array{deleted: int, kept: list<string>}
      */
     public static function pruneInactiveHrAccounts(): array
     {
-        $activeEmails = HrUser::query()->active()->pluck('email')->map(fn (string $email): string => mb_strtolower($email))->flip();
+        $activeIds = HrUser::query()->active()->pluck('id')->flip();
         $deleted = 0;
         $kept = [];
 
-        static::query()->orderBy('id')->each(function (User $user) use ($activeEmails, &$deleted, &$kept): void {
-            if ($activeEmails->has(mb_strtolower($user->email))) {
+        static::query()->orderBy('id')->each(function (User $user) use ($activeIds, &$deleted, &$kept): void {
+            if ($activeIds->has($user->hr_user_id)) {
                 return;
             }
 
@@ -179,7 +204,7 @@ class User extends Authenticatable implements PasskeyUser
                 $user->delete();
                 $deleted++;
             } catch (QueryException) {
-                $kept[] = $user->email;
+                $kept[] = $user->email !== '' ? $user->email : "#{$user->id}";
             }
         });
 
@@ -189,19 +214,16 @@ class User extends Authenticatable implements PasskeyUser
     /**
      * Give an HR account access to hc-tracking, optionally with a role.
      *
-     * Name and email are taken from HR. No local password is stored: people
-     * always log in with their HR password.
+     * Only the link to HR is stored: name, email and password stay in HR, and
+     * people always log in with their HR password.
      */
     public static function createFromHrAccount(HrUser $hrUser, ?string $roleName, bool $verified = true): self
     {
         $user = new self;
 
         $user->forceFill([
-            'name' => $hrUser->employee?->name_en ?: $hrUser->email,
-            'email' => $hrUser->email,
             'hr_user_id' => $hrUser->id,
             'employee_id' => $hrUser->employee_id,
-            'password' => null,
             'email_verified_at' => $verified ? now() : null,
         ])->save();
 
@@ -244,17 +266,120 @@ class User extends Authenticatable implements PasskeyUser
     }
 
     /**
-     * Record the HR account this user logged in with and refresh their name.
+     * Refresh the HR employee this user's account belongs to.
      *
      * Only tracking columns are written; the HR account is read, never changed.
+     *
+     * @return bool Whether anything changed.
      */
-    public function linkToHrAccount(HrUser $hrUser): void
+    public function linkToHrAccount(HrUser $hrUser): bool
     {
         $this->forceFill([
             'hr_user_id' => $hrUser->id,
             'employee_id' => $hrUser->employee_id,
-            'name' => $hrUser->employee?->name_en ?: $this->name,
-        ])->save();
+        ]);
+
+        if (! $this->isDirty()) {
+            return false;
+        }
+
+        return $this->save();
+    }
+
+    /**
+     * Whether HR has deactivated or removed the account this user logs in with.
+     */
+    public function hasLostHrAccess(): bool
+    {
+        $hrUser = HrUser::query()->with('employee')->find($this->hr_user_id);
+
+        return $hrUser === null || ! $hrUser->isActive();
+    }
+
+    /**
+     * The user's name, read from their HR employee record (English), or the
+     * HR email for an account with no employee.
+     *
+     * @return Attribute<string, never>
+     */
+    protected function name(): Attribute
+    {
+        return Attribute::get(fn (): string => $this->hr_user_id === null ? '' : (HrUser::directoryEntry($this->hr_user_id)['name'] ?? ''));
+    }
+
+    /**
+     * The user's email, read from their HR account.
+     *
+     * @return Attribute<string, never>
+     */
+    protected function email(): Attribute
+    {
+        return Attribute::get(fn (): string => $this->hr_user_id === null ? '' : (HrUser::directoryEntry($this->hr_user_id)['email'] ?? ''));
+    }
+
+    /**
+     * No password is stored here: people log in with their HR password.
+     *
+     * The session guard still hashes this into the remember-me cookie, so it
+     * returns a constant instead of reading a column that does not exist.
+     */
+    public function getAuthPassword(): string
+    {
+        return '';
+    }
+
+    /**
+     * Users whose HR account may still use tracking (see HrUser::isActive()).
+     *
+     * HR lives on another connection, so the active account ids are read from
+     * HR first instead of a whereHas() across databases.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function withActiveHrAccount(Builder $query): void
+    {
+        $query->whereIn('hr_user_id', HrUser::query()->active()->pluck('id'));
+    }
+
+    /**
+     * Users whose HR account is gone or inactive, the complement of
+     * withActiveHrAccount().
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function withoutActiveHrAccount(Builder $query): void
+    {
+        $query->whereNotIn('hr_user_id', HrUser::query()->active()->pluck('id'));
+    }
+
+    /**
+     * Users whose HR email or employee name contains the search.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function whereNameOrEmailLike(Builder $query, string $search): void
+    {
+        $query->whereIn('hr_user_id', HrUser::idsMatching($search));
+    }
+
+    /**
+     * Order users by the name read from HR, then id.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function orderByName(Builder $query): void
+    {
+        $ids = HrUser::idsOrderedByName();
+
+        if ($ids !== []) {
+            $query->orderByRaw('FIELD('.$query->qualifyColumn('hr_user_id').', '.implode(', ', $ids).')');
+        }
+
+        $query->orderBy($query->qualifyColumn('id'));
     }
 
     /**
@@ -332,7 +457,6 @@ class User extends Authenticatable implements PasskeyUser
         return [
             'email_verified_at' => 'datetime',
             'two_factor_confirmed_at' => 'datetime',
-            'password' => 'hashed',
         ];
     }
 }

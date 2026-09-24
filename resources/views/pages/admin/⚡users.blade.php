@@ -108,18 +108,11 @@ new #[Title('titles.user_directory')] class extends Component {
 
         return User::query()
             ->with(['roles', 'employee'])
-            ->when($this->search !== '', function ($query): void {
-                $query->where(function ($query): void {
-                    $query
-                        ->where('name', 'like', '%'.$this->search.'%')
-                        ->orWhere('email', 'like', '%'.$this->search.'%');
-                });
-            })
+            ->when($this->search !== '', fn ($query) => $query->whereNameOrEmailLike($this->search))
             ->when($this->role !== '', fn ($query) => $query->whereHas('roles', fn ($q) => $q->where('name', $this->role)))
-            ->when($this->status === 'active', fn ($query) => $query->whereHas('employee', fn ($q) => $q->where('is_active', true)))
-            ->when($this->status === 'inactive', fn ($query) => $query->whereDoesntHave('employee', fn ($q) => $q->where('is_active', true)))
-            ->orderBy('name')
-            ->orderBy('id')
+            ->when($this->status === 'active', fn ($query) => $query->withActiveHrAccount())
+            ->when($this->status === 'inactive', fn ($query) => $query->withoutActiveHrAccount())
+            ->orderByName()
             ->paginate($this->selectedUserId ? 24 : 12);
     }
 
@@ -170,7 +163,7 @@ new #[Title('titles.user_directory')] class extends Component {
     }
 
     /**
-     * HR login accounts that do not have a tracking user yet.
+     * Active HR login accounts that do not have a tracking user yet.
      *
      * @return Collection<int, HrUser>
      */
@@ -179,14 +172,15 @@ new #[Title('titles.user_directory')] class extends Component {
     {
         Gate::authorize('create', User::class);
 
-        $existingEmails = User::query()->pluck('email')->map(fn (string $email): string => mb_strtolower($email))->flip();
+        $linkedHrUserIds = User::query()->pluck('hr_user_id')->flip();
 
         return HrUser::query()
+            ->active()
             ->select(['id', 'employee_id', 'email'])
             ->with('employee:id,first_name_en,last_name_en,first_name_ar,last_name_ar')
             ->orderBy('email')
             ->get()
-            ->reject(fn (HrUser $hrUser): bool => $existingEmails->has(mb_strtolower($hrUser->email)))
+            ->reject(fn (HrUser $hrUser): bool => $linkedHrUserIds->has($hrUser->id))
             ->values();
     }
 
@@ -269,7 +263,13 @@ new #[Title('titles.user_directory')] class extends Component {
 
         $hrUser = HrUser::query()->with('employee')->findOrFail((int) $validated['hrUserId']);
 
-        if (User::query()->where('email', $hrUser->email)->exists()) {
+        if (! $hrUser->isActive()) {
+            $this->addError('hrUserId', __('users.the_selected_hr_account_is_no_longer_available'));
+
+            return;
+        }
+
+        if (User::query()->where('hr_user_id', $hrUser->id)->exists()) {
             $this->addError('hrUserId', __('users.this_hr_account_already_has_access'));
 
             return;
@@ -366,7 +366,7 @@ new #[Title('titles.user_directory')] class extends Component {
             return new EloquentCollection;
         }
 
-        return $this->selectedRole->users()->orderBy('name')->get();
+        return $this->selectedRole->users()->get()->sortBy(fn (User $user): string => mb_strtolower($user->name))->values();
     }
 
     public function selectRole(int $roleId): void

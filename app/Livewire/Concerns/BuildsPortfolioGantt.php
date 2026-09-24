@@ -41,7 +41,7 @@ trait BuildsPortfolioGantt
             ->select(['id', 'name', 'status', 'start_date', 'end_date', 'program_id', 'user_id'])
             ->when($programId !== null, fn ($query) => $query->where('program_id', $programId))
             ->when($status !== null && $status !== '', fn ($query) => $query->where('status', $status))
-            ->with(['program:id,name', 'user:id,first_name_en,last_name_en,first_name_ar,last_name_ar'])
+            ->with(['program:id', 'user:id,first_name_en,last_name_en,first_name_ar,last_name_ar'])
             ->orderBy('start_date')
             ->orderBy('id')
             ->get();

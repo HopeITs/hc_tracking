@@ -250,7 +250,7 @@ new #[Title('titles.proposal')] class extends Component {
     {
         return $this->proposal->projects()
             ->select(['projects.id', 'projects.name', 'projects.city_id', 'projects.program_id', 'projects.status'])
-            ->with(['city:id,name_en,name_ar', 'program:id,name'])
+            ->with(['city:id,name_en,name_ar', 'program:id'])
             ->orderBy('projects.name')
             ->get();
     }

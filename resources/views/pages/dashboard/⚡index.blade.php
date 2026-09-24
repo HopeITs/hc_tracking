@@ -518,7 +518,7 @@ new #[Title('titles.dashboard')] class extends Component {
 
         $reports = Report::query()
             ->select(['id', 'plan_indicator_id', 'user_id', 'submit_date'])
-            ->with(['user:id,name', 'planIndicator:id,indicator_id', 'planIndicator.indicator:id,name'])
+            ->with(['user:id,hr_user_id', 'planIndicator:id,indicator_id', 'planIndicator.indicator:id,name'])
             ->whereNotNull('submit_date')
             ->latest('submit_date')
             ->limit(6)

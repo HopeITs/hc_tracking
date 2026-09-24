@@ -196,7 +196,7 @@ new #[Title('titles.reports')] class extends Component {
     {
         return $this->visibleReports()
             ->select(['id', 'plan_indicator_id', 'user_id', 'status', 'planned_date', 'value', 'submit_date', 'is_seen_by_meal'])
-            ->with([...$this->targetRelations(), 'user:id,name,email'])
+            ->with([...$this->targetRelations(), 'user:id,hr_user_id'])
             ->withCount('files')
             ->orderByDesc('planned_date')
             ->orderByDesc('id')
@@ -319,7 +319,7 @@ new #[Title('titles.reports')] class extends Component {
     #[Computed]
     public function authorOptions(): Collection
     {
-        return User::query()->select(['id', 'name', 'email'])->orderBy('name')->orderBy('id')->get();
+        return User::query()->select(['id', 'hr_user_id'])->orderByName()->get();
     }
 
     /** @return Collection<int, Project> */

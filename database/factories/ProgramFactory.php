@@ -6,6 +6,7 @@ use App\Models\Program;
 use App\Models\Strategy;
 use Database\Factories\Concerns\CreatesHrRecords;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -18,10 +19,12 @@ class ProgramFactory extends Factory
     /**
      * Define the model's default state.
      *
-     * A program mirrors an HR program under the same id, so the factory writes
-     * the HR row first. That only works against the test suite's in-memory HR
-     * database: the real `hr` connection is READ ONLY and rejects the insert,
-     * which is why seeders mirror real HR programs through Program::syncFromHr().
+     * A program is the tracking side of an HR program under the same id, so
+     * the factory writes the HR row first. `name` is not a tracking column: it
+     * only names that HR row (see newModel()). That only works against the test
+     * suite's in-memory HR database: the real `hr` connection is READ ONLY and
+     * rejects the insert, which is why seeders use real HR programs through
+     * Program::syncFromHr().
      *
      * @return array<string, mixed>
      */
@@ -37,6 +40,16 @@ class ProgramFactory extends Factory
             'strategy_id' => Strategy::factory(),
             'manager_id' => fn (): int => $this->createHrEmployee(),
         ];
+    }
+
+    /**
+     * Build the program without `name`, which lives in HR only.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    public function newModel(array $attributes = []): Program
+    {
+        return parent::newModel(Arr::except($attributes, 'name'));
     }
 
     /**

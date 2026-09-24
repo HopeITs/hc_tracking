@@ -273,7 +273,7 @@ new #[Title('titles.targets')] class extends Component {
     #[Computed]
     public function programOptions(): Collection
     {
-        return Program::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get();
+        return Program::options();
     }
 
     /**
@@ -390,7 +390,7 @@ new #[Title('titles.targets')] class extends Component {
                 // morphTo resolves to AnnualPlan or Proposal — or to null, when
                 // the source was removed by a write that fired no model events.
                 'source' => fn (MorphTo $morphTo) => $morphTo->morphWith([
-                    AnnualPlan::class => ['program:id,name'],
+                    AnnualPlan::class => ['program:id'],
                     // projects: which projects the proposal funds, for chainIssues().
                     Proposal::class => ['donors:id,name', 'projects:id'],
                 ]),
@@ -421,7 +421,7 @@ new #[Title('titles.targets')] class extends Component {
 
         return Report::query()
             ->select(['id', 'plan_indicator_id', 'user_id', 'status', 'period_start', 'period_end', 'planned_date', 'value', 'is_seen_by_meal'])
-            ->with('user:id,name')
+            ->with('user:id,hr_user_id')
             ->withCount('files')
             ->where('plan_indicator_id', $this->expandedTargetId)
             ->orderByDesc('period_end')
@@ -477,7 +477,7 @@ new #[Title('titles.targets')] class extends Component {
 
         return AnnualPlan::query()
             ->select(['id', 'program_id', 'year'])
-            ->with('program:id,name')
+            ->with('program:id')
             ->when($programId !== null, fn ($query) => $query->where('program_id', $programId))
             ->orderByDesc('year')
             ->get()

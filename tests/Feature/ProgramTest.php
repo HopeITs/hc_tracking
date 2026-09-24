@@ -9,10 +9,10 @@ test('a program is stored against its strategy and manager', function () {
     $strategyId = insertStrategy();
     $manager = User::factory()->create();
 
-    insertProgram($strategyId, $manager->id);
+    $programId = insertProgram($strategyId, $manager->id);
 
     $this->assertDatabaseHas('programs', [
-        'name' => 'WASH',
+        'id' => $programId,
         'strategy_id' => $strategyId,
         'manager_id' => $manager->id,
     ]);

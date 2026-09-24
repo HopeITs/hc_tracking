@@ -16,8 +16,8 @@ use Illuminate\Support\Str;
 /**
  * Master data every other seeder builds on: staff, strategies, donors.
  *
- * Staff are the HR accounts: every one gets a tracking user (Officer, or Admin
- * for auth.hr_admin_emails). Cities come from the HR database too.
+ * Staff are the HR accounts: every active one gets a tracking user (no role,
+ * or Super Admin for auth.hr_admin_emails). Cities come from the HR database too.
  */
 class CoreDataSeeder extends Seeder
 {

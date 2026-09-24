@@ -20,6 +20,9 @@ return new class extends Migration
      * did we reach across the portfolio" constantly, and that must be a SUM
      * over a column.
      *
+     * `city_id` holds an HR city id (hr_db.hchr_cities). No foreign key can
+     * reach across databases, and there is no local cities table any more.
+     *
      * `target_beneficiaries` is the headline total and is deliberately NOT a
      * generated column over the four breakdown columns: a proposal often
      * commits a total before the disaggregation is agreed, so the two are
@@ -39,7 +42,7 @@ return new class extends Migration
             $table->unsignedInteger('target_women')->nullable();
             $table->unsignedInteger('target_boys')->nullable();
             $table->unsignedInteger('target_girls')->nullable();
-            $table->foreignId('city_id')->constrained('cities')->restrictOnDelete();
+            $table->foreignId('city_id')->index();
             $table->foreignId('program_id')->constrained('programs')->cascadeOnDelete();
             $table->foreignId('user_id')->constrained('users')->restrictOnDelete();
             $table->timestamps();

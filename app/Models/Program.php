@@ -9,6 +9,10 @@ use Carbon\CarbonImmutable;
 use Database\Factories\ProgramFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -16,14 +20,16 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
 
 /**
- * A delivery program, mirroring one HR program under the same id.
+ * A delivery program: the tracking side of one HR program, under the same id.
  *
- * `name` is a copy of the HR name refreshed by syncFromHr() and is never edited
- * here; tracking owns only the strategy and manager links, which stay empty
- * until someone assigns them.
+ * The row exists only so local foreign keys (projects, annual plans, results)
+ * and the tracking-owned links can hang off the HR program. Everything HR
+ * holds, the name included, is read from HR (see HrProgram::namesById()) and
+ * never copied here. Tracking owns only the strategy and manager links, which
+ * stay empty until someone assigns them.
  *
  * @property int $id
- * @property string $name
+ * @property-read string $name
  * @property int|null $strategy_id
  * @property int|null $manager_id
  * @property CarbonImmutable|null $created_at
@@ -49,28 +55,74 @@ class Program extends Model
     }
 
     /**
-     * Mirror every HR program: add new ones and refresh the names of known ones.
+     * Give every HR program its tracking row.
      *
-     * Strategy and manager links are never touched, and programs that have
-     * disappeared from HR are kept so the projects and plans under them survive.
+     * Only ids are written: new HR programs get a row, existing rows are left
+     * alone, and programs that have disappeared from HR are kept so the
+     * projects and plans under them survive.
      */
     public static function syncFromHr(): void
     {
         $now = now();
 
         $rows = HrProgram::query()
-            ->get(['id', 'name'])
-            ->map(fn (HrProgram $hrProgram): array => [
-                'id' => $hrProgram->id,
-                'name' => trim($hrProgram->name),
-                'created_at' => $now,
-                'updated_at' => $now,
-            ])
+            ->pluck('id')
+            ->map(fn (int $id): array => ['id' => $id, 'created_at' => $now, 'updated_at' => $now])
             ->all();
 
         if ($rows !== []) {
-            static::query()->toBase()->upsert($rows, ['id'], ['name']);
+            static::query()->toBase()->insertOrIgnore($rows);
         }
+    }
+
+    /**
+     * Programs ordered for a picker by their HR name.
+     *
+     * @return Collection<int, static>
+     */
+    public static function options(): Collection
+    {
+        return static::query()->select(['id'])->orderByName()->get();
+    }
+
+    /**
+     * The program name, read from HR.
+     *
+     * @return Attribute<string, never>
+     */
+    protected function name(): Attribute
+    {
+        return Attribute::get(fn (): string => HrProgram::nameOf($this->id));
+    }
+
+    /**
+     * Programs whose HR name contains the search.
+     *
+     * The name lives in HR, so the matching ids are read from HR first.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function whereNameLike(Builder $query, string $search): void
+    {
+        $query->whereIn($query->qualifyColumn('id'), HrProgram::idsMatchingName($search));
+    }
+
+    /**
+     * Order programs by their HR name, then id.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function orderByName(Builder $query, string $direction = 'asc'): void
+    {
+        $ids = HrProgram::idsOrderedByName();
+
+        if ($ids !== []) {
+            $query->orderByRaw('FIELD('.$query->qualifyColumn('id').', '.implode(', ', $ids).') '.($direction === 'desc' ? 'desc' : 'asc'));
+        }
+
+        $query->orderBy($query->qualifyColumn('id'), $direction === 'desc' ? 'desc' : 'asc');
     }
 
     /**

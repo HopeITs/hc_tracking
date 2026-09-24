@@ -351,7 +351,7 @@ new #[Title('titles.calendar')] class extends Component {
                 ->orderBy('id')
                 ->get(),
             'project' => Project::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get(),
-            'program' => Program::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get(),
+            'program' => Program::options(),
             'department' => HrDepartment::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get(),
             default => Proposal::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get(),
         };

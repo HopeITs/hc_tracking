@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureHrAccountIsActive;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\SyncProgramsFromHr;
 use Illuminate\Foundation\Application;
@@ -17,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             SetLocale::class,
             SyncProgramsFromHr::class,
+            EnsureHrAccountIsActive::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

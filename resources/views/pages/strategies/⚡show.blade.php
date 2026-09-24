@@ -57,7 +57,7 @@ new #[Title('titles.strategy')] class extends Component {
     protected function programsQuery(): Builder
     {
         return Program::query()
-            ->select(['id', 'name', 'strategy_id', 'manager_id'])
+            ->select(['id', 'strategy_id', 'manager_id'])
             ->where('strategy_id', $this->strategyId)
             ->with(['manager:id,first_name_en,last_name_en,first_name_ar,last_name_ar'])
             ->withCount(['projects', 'annualPlans']);
@@ -85,7 +85,7 @@ new #[Title('titles.strategy')] class extends Component {
         $query = match ($this->sort) {
             'projects' => $this->programsQuery()->orderBy('projects_count', $direction),
             'plans' => $this->programsQuery()->orderBy('annual_plans_count', $direction),
-            default => $this->programsQuery()->orderBy('name', $direction),
+            default => $this->programsQuery()->orderByName($direction),
         };
 
         return $query

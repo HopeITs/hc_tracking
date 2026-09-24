@@ -53,7 +53,7 @@ new #[Title('titles.timeline')] class extends Component {
     #[Computed]
     public function programOptions(): Collection
     {
-        return Program::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get();
+        return Program::options();
     }
 
     /**

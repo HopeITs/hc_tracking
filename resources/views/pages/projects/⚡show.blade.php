@@ -86,12 +86,12 @@ new #[Title('titles.project')] class extends Component {
             ])
             ->with([
                 'city:id,name_en,name_ar',
-                'program:id,name,strategy_id',
+                'program:id,strategy_id',
                 'program.strategy:id,name',
                 'user:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
                 'media' => fn ($query) => $query
                     ->select(['id', 'mediable_type', 'mediable_id', 'collection', 'original_name', 'type', 'size', 'uploaded_at', 'uploaded_by'])
-                    ->with('uploader:id,name')
+                    ->with('uploader:id,hr_user_id')
                     ->orderByDesc('uploaded_at')
                     ->orderByDesc('id'),
             ])

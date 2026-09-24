@@ -1,10 +1,13 @@
 <?php
 
+use App\Http\Middleware\EnsureHrAccountIsActive;
 use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Laravel\Fortify\Features;
+use Symfony\Component\HttpFoundation\Response;
 
 test('login screen can be rendered', function () {
     $response = $this->get(route('login'));
@@ -28,7 +31,7 @@ test('users can authenticate with their hr password', function () {
 });
 
 test('inactive hr employees cannot log in', function () {
-    insertHrUser(insertHrEmployee(isActive: false), 'gone@example.org');
+    $hrUserId = insertHrUser(insertHrEmployee(isActive: false), 'gone@example.org');
 
     $this->post(route('login.store'), [
         'email' => 'gone@example.org',
@@ -36,7 +39,7 @@ test('inactive hr employees cannot log in', function () {
     ])->assertSessionHasErrors('email');
 
     $this->assertGuest();
-    expect(User::query()->where('email', 'gone@example.org')->exists())->toBeFalse();
+    expect(User::query()->where('hr_user_id', $hrUserId)->exists())->toBeFalse();
 });
 
 test('logging in links the user to their hr account and refreshes their name', function () {
@@ -185,29 +188,31 @@ test('an unknown email shows the error under the email field', function () {
     expect($emailFieldMarkup)->toContain(__('auth.failed'));
 });
 
-test('the local tracking password no longer logs anyone in', function () {
-    $user = User::factory()->withHrAccount('hr-secret')->create([
-        'password' => Hash::make('local-secret'),
-    ]);
+test('tracking keeps no copy of hr names, emails or passwords', function () {
+    expect(Schema::hasColumns('users', ['name']))->toBeFalse()
+        ->and(Schema::hasColumns('users', ['email']))->toBeFalse()
+        ->and(Schema::hasColumns('users', ['password']))->toBeFalse();
+});
 
-    $this->post(route('login.store'), [
-        'email' => $user->email,
-        'password' => 'local-secret',
-    ])->assertSessionHasErrorsIn('email');
+test('a user shows the name and email hr holds', function () {
+    $user = User::factory()->create(['name' => 'Rana Darwish', 'email' => 'rana@example.org']);
+    DB::connection('hr')->table('users')->where('id', $user->hr_user_id)->update(['email' => 'rana.d@example.org']);
 
-    $this->assertGuest();
+    expect($user->fresh())
+        ->name->toBe('Rana Darwish')
+        ->email->toBe('rana.d@example.org');
 });
 
 test('an hr account logging in for the first time gets a tracking user with no role', function () {
     $employeeId = insertHrEmployee(firstNameEn: 'Mai', lastNameEn: 'Nasser');
-    insertHrUser($employeeId, 'new.person@example.org', 'password');
+    $hrUserId = insertHrUser($employeeId, 'new.person@example.org', 'password');
 
     $this->post(route('login.store'), [
         'email' => 'new.person@example.org',
         'password' => 'password',
     ])->assertSessionHasNoErrors();
 
-    $user = User::query()->where('email', 'new.person@example.org')->sole();
+    $user = User::query()->where('hr_user_id', $hrUserId)->sole();
 
     $this->assertAuthenticatedAs($user);
     expect($user->roles)->toBeEmpty()
@@ -248,11 +253,12 @@ test('a wrong hr password creates no tracking user', function () {
     expect(User::query()->count())->toBe(0);
 });
 
-test('a tracking user without an hr account is refused', function () {
-    $user = User::factory()->create();
+test('a tracking user whose hr account was removed is refused', function () {
+    $user = User::factory()->create(['email' => 'orphan@example.org']);
+    DB::connection('hr')->table('users')->where('id', $user->hr_user_id)->delete();
 
     $this->post(route('login.store'), [
-        'email' => $user->email,
+        'email' => 'orphan@example.org',
         'password' => 'password',
     ])->assertSessionHasErrorsIn('email');
 
@@ -292,4 +298,56 @@ test('password reset is not offered because passwords live in hr', function () {
     expect(Features::enabled(Features::resetPasswords()))->toBeFalse();
 
     $this->get(route('login'))->assertDontSee('Forgot your password?');
+});
+
+test('an email changed in hr still logs in as the same user', function () {
+    $user = User::factory()->withHrAccount('hr-secret')->create(['email' => 'old@example.org']);
+    DB::connection('hr')->table('users')->where('id', $user->hr_user_id)->update(['email' => 'new@example.org']);
+
+    $this->post(route('login.store'), [
+        'email' => 'new@example.org',
+        'password' => 'hr-secret',
+    ])->assertSessionHasNoErrors();
+
+    $this->assertAuthenticatedAs($user);
+    expect(User::query()->count())->toBe(1)
+        ->and($user->refresh()->email)->toBe('new@example.org');
+});
+
+test('a signed-in user is signed out once hr deactivates them', function () {
+    $employeeId = insertHrEmployee();
+    $hrUserId = insertHrUser($employeeId, 'rana@example.org');
+    $user = User::factory()->create(['email' => 'rana@example.org']);
+
+    $this->actingAs($user)->get(route('dashboard'))->assertOk();
+
+    DB::connection('hr')->table('employees')->where('id', $employeeId)->update(['is_active' => false]);
+    $this->travel(61)->seconds();
+
+    $this->get(route('dashboard'))->assertRedirect(route('login'));
+    $this->assertGuest();
+});
+
+test('a signed-in user whose hr account was removed is signed out', function () {
+    $user = User::factory()->create();
+    DB::connection('hr')->table('users')->where('id', $user->hr_user_id)->delete();
+
+    $this->actingAs($user)->get(route('dashboard'))->assertRedirect(route('login'));
+    $this->assertGuest();
+});
+
+test('an unreachable hr database does not sign anyone out', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+    config(['database.connections.hr.database' => '/missing/dir/hr.sqlite']);
+    DB::purge('hr');
+
+    $request = Request::create('/');
+    $request->setUserResolver(fn (): User => $user);
+    $request->setLaravelSession(app('session.store'));
+
+    $response = (new EnsureHrAccountIsActive)->handle($request, fn (): Response => new Response('ok'));
+
+    expect($response->getContent())->toBe('ok');
+    $this->assertAuthenticatedAs($user);
 });

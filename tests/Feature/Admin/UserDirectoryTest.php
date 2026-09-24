@@ -4,6 +4,7 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Task;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -127,14 +128,13 @@ test('administrators can give an hr account access with an initial role', functi
         ->call('createUser')
         ->assertHasNoErrors();
 
-    $user = User::query()->where('email', 'amina@example.org')->sole();
+    $user = User::query()->where('hr_user_id', $hrUserId)->sole();
 
     expect($user->name)->toBe('Amina Haddad')
         ->and($user->roles->pluck('name')->all())->toBe(['MEAL'])
         ->and($user->active_role_id)->toBe($meal->id)
         ->and($user->hr_user_id)->toBe($hrUserId)
         ->and($user->employee_id)->toBe($employeeId)
-        ->and($user->password)->toBeNull()
         ->and($user->email_verified_at)->not->toBeNull();
 });
 
@@ -149,7 +149,7 @@ test('administrators can give an hr account access with no role', function () {
         ->call('createUser')
         ->assertHasNoErrors();
 
-    $user = User::query()->where('email', 'dana@example.org')->sole();
+    $user = User::query()->where('hr_user_id', $hrUserId)->sole();
 
     expect($user->roles)->toBeEmpty()
         ->and($user->active_role_id)->toBeNull();
@@ -158,7 +158,6 @@ test('administrators can give an hr account access with no role', function () {
 test('hr accounts that already have access are not offered again', function () {
     $admin = accessAdmin();
     User::factory()->create(['email' => 'taken@example.org']);
-    insertHrUser(insertHrEmployee(), 'taken@example.org');
     insertHrUser(insertHrEmployee(), 'free@example.org');
 
     $component = Livewire::actingAs($admin)
@@ -183,8 +182,7 @@ test('a new user must name an available hr account', function () {
 
 test('an hr account that already has access cannot be added twice', function () {
     $admin = accessAdmin();
-    User::factory()->create(['email' => 'taken@example.org']);
-    $hrUserId = insertHrUser(insertHrEmployee(), 'taken@example.org');
+    $hrUserId = User::factory()->create(['email' => 'taken@example.org'])->hr_user_id;
 
     Livewire::actingAs($admin)
         ->test('pages::admin.users')
@@ -193,7 +191,7 @@ test('an hr account that already has access cannot be added twice', function () 
         ->call('createUser')
         ->assertHasErrors(['hrUserId']);
 
-    expect(User::query()->where('email', 'taken@example.org')->count())->toBe(1);
+    expect(User::query()->where('hr_user_id', $hrUserId)->count())->toBe(1);
 });
 
 test('selecting a user loads their assigned roles, active role, and direct permissions', function () {
@@ -422,4 +420,52 @@ test('the assigned users modal lists holders of the selected role', function () 
         ->call('showAssignedUsers')
         ->assertSet('showAssignedUsersModal', true)
         ->assertSee('Role Holder');
+});
+
+test('administrators can filter the directory by hr account status', function () {
+    $admin = accessAdmin();
+    User::factory()->create(['name' => 'Active Person']);
+    $inactive = User::factory()->create(['name' => 'Departed Person']);
+    DB::connection('hr')->table('employees')->where('id', $inactive->employee_id)->update(['is_active' => false]);
+
+    Livewire::actingAs($admin)
+        ->test('pages::admin.users')
+        ->set('status', 'active')
+        ->assertSee('Active Person')
+        ->assertDontSee('Departed Person')
+        ->set('status', 'inactive')
+        ->assertSee('Departed Person')
+        ->assertDontSee('Active Person');
+});
+
+test('hr accounts of inactive employees are neither offered nor accepted', function () {
+    $admin = accessAdmin();
+    insertHrUser(insertHrEmployee(), 'free@example.org');
+    $goneId = insertHrUser(insertHrEmployee(isActive: false), 'gone@example.org');
+
+    $component = Livewire::actingAs($admin)
+        ->test('pages::admin.users')
+        ->call('openCreateModal');
+
+    expect($component->instance()->hrAccountOptions->pluck('email')->all())->toBe(['free@example.org']);
+
+    $component
+        ->set('hrUserId', (string) $goneId)
+        ->call('createUser')
+        ->assertHasErrors(['hrUserId']);
+
+    expect(User::query()->where('hr_user_id', $goneId)->exists())->toBeFalse();
+});
+
+test('a user the database refuses to delete keeps their roles', function () {
+    $admin = accessAdmin();
+    $user = User::factory()->role('Managers')->create();
+    Task::factory()->create(['created_by' => $user->id]);
+
+    Livewire::actingAs($admin)
+        ->test('pages::admin.users')
+        ->call('confirmUserDeletion', $user->id)
+        ->call('deleteUser');
+
+    expect($user->refresh()->roles->pluck('name')->all())->toBe(['Managers']);
 });

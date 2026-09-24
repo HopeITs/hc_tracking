@@ -55,7 +55,7 @@ class CreateUserCommand extends Command
             'email' => $email,
             'role' => $role,
         ], [
-            'email' => ['required', 'string', 'email', Rule::unique(User::class)],
+            'email' => ['required', 'string', 'email'],
             'role' => ['nullable', 'string', Rule::in($roleNames)],
         ]);
 
@@ -79,6 +79,12 @@ class CreateUserCommand extends Command
 
         if (! $hrUser->isActive()) {
             $this->components->error("The HR employee behind {$email} is not active.");
+
+            return self::FAILURE;
+        }
+
+        if (User::query()->where('hr_user_id', $hrUser->id)->exists()) {
+            $this->components->error("The HR account behind {$email} already has access.");
 
             return self::FAILURE;
         }

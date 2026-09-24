@@ -13,6 +13,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/views/components/navigation/sidebar.blade.php | .ai/rules/components-navigation.md |
 | resources/views/components/ui/**, resources/views/components/ui/{logframe-node.blade.php,logframe.blade.php,target-lineage.blade.php}, resources/views/components/ui/framework-node.blade.php, resources/views/components/ui/multi-select-popover.blade.php | .ai/rules/components-ui.md |
 | resources/views/components/app-logo.blade.php, resources/views/layouts/auth/simple.blade.php | .ai/rules/components.md |
+| {app/Models/User.php,app/Models/Program.php,app/Models/Hr*.php,app/Models/Concerns/RemembersHrLookup.php,database/factories/{UserFactory,ProgramFactory}.php} | .ai/rules/concerns-factories.md |
 | app/Concerns/HasTree.php | .ai/rules/concerns.md |
 | config/session.php | .ai/rules/config-2.md |
 | {config/database.php,.env.example} | .ai/rules/config.md |
@@ -29,6 +30,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | {app/Livewire/Concerns/**,resources/views/components/funding/**} | .ai/rules/funding.md |
 | resources/views/pages/indicators/** | .ai/rules/indicators.md |
 | {resources/views/components/ui/gantt.blade.php,resources/js/gantt/**,app/Livewire/Concerns/*Gantt.php} | .ai/rules/livewire-concerns.md |
+| {app/Models/User.php,app/Console/Commands/**,app/Http/Middleware/**,app/Actions/Fortify/**} | .ai/rules/middleware-actions-fortify.md |
 | {config/database.php,.env.example,database/migrations/**} | .ai/rules/migrations.md |
 | resources/views/pages/milestones/** | .ai/rules/milestones.md |
 | resources/views/pages/{milestones,tasks}/** | .ai/rules/milestonestasks.md |

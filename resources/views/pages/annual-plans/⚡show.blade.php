@@ -36,7 +36,7 @@ new #[Title('titles.annual_plan')] class extends Component {
         return AnnualPlan::query()
             ->select(['id', 'program_id', 'manager_id', 'year', 'updated_at'])
             ->with([
-                'program:id,name,strategy_id',
+                'program:id,strategy_id',
                 'program.strategy:id,name',
                 'manager:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
             ])

@@ -108,7 +108,7 @@ new #[Title('titles.results_framework')] class extends Component {
             ->select(['id', 'statement', 'parent_id', 'program_id', 'type', 'checkout_period'])
             ->with([
                 // program_id is nullable, so a result can outlive its program.
-                'program:id,name',
+                'program:id',
                 'indicators' => fn ($query) => $query
                     ->select(['id', 'name', 'result_id', 'project_id', 'measure', 'unit', 'baseline', 'target', 'frequency'])
                     ->with([
@@ -612,7 +612,7 @@ new #[Title('titles.results_framework')] class extends Component {
     #[Computed]
     public function programOptions(): Collection
     {
-        return Program::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get();
+        return Program::options();
     }
 
     /**
@@ -662,7 +662,7 @@ new #[Title('titles.results_framework')] class extends Component {
 
         return Result::query()
             ->select(['id', 'statement', 'type', 'program_id'])
-            ->with('program:id,name')
+            ->with('program:id')
             ->where('type', $parentLevel->value)
             ->when($excludedIds !== [], fn ($query) => $query->whereNotIn('id', $excludedIds))
             ->orderBy('program_id')

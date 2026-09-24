@@ -23,7 +23,7 @@ test('guests are redirected from the calendar', function () {
 });
 
 test('a user with no linked HR employee sees an explanation instead of a calendar', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->create(['employee_id' => null]);
 
     Livewire::actingAs($user)
         ->test('pages::calendar.index')

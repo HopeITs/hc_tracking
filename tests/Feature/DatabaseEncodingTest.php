@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\User;
+use App\Models\Strategy;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -86,8 +86,8 @@ test('every text column is utf8mb4, with utf8mb4_bin reserved for json columns',
 test('four byte and non latin characters survive a write and read', function () {
     $name = 'مركز الرعاية 🏥 — Ünïcodé';
 
-    $user = User::factory()->create(['name' => $name]);
+    $strategy = Strategy::factory()->create(['name' => $name]);
 
-    expect(User::query()->findOrFail($user->id)->name)->toBe($name)
-        ->and(DB::table('users')->where('id', $user->id)->value('name'))->toBe($name);
+    expect(Strategy::query()->findOrFail($strategy->id)->name)->toBe($name)
+        ->and(DB::table('strategies')->where('id', $strategy->id)->value('name'))->toBe($name);
 });

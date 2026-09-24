@@ -603,7 +603,7 @@ new #[Title('titles.funding_agreement')] class extends Component {
     {
         return $this->agreement->proposal->projects()
             ->select(['projects.id', 'projects.name', 'projects.city_id', 'projects.program_id', 'projects.status', 'projects.start_date', 'projects.end_date'])
-            ->with(['city:id,name_en,name_ar', 'program:id,name'])
+            ->with(['city:id,name_en,name_ar', 'program:id'])
             ->withCount([
                 'milestones',
                 'milestones as reached_milestones_count' => fn (Builder $query) => $query->where('status', MilestoneStatus::Reached),

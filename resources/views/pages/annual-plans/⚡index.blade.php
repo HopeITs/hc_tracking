@@ -291,7 +291,7 @@ new #[Title('titles.annual_plans')] class extends Component {
         $managerId = $this->selectedManagerId();
 
         return Program::query()
-            ->select(['id', 'name', 'strategy_id'])
+            ->select(['id', 'strategy_id'])
             ->with(['strategy:id,name,start_year,end_year'])
             ->when($managerId !== null, fn (Builder $query) => $query->whereHas(
                 'annualPlans',
@@ -303,9 +303,8 @@ new #[Title('titles.annual_plans')] class extends Component {
                     }
                 },
             ))
-            ->when($this->programSearch !== '', fn (Builder $query) => $query->where('name', 'like', '%'.$this->programSearch.'%'))
-            ->orderBy('name')
-            ->orderBy('id')
+            ->when($this->programSearch !== '', fn (Builder $query) => $query->whereNameLike($this->programSearch))
+            ->orderByName()
             ->paginate(15);
     }
 
@@ -503,11 +502,7 @@ new #[Title('titles.annual_plans')] class extends Component {
     #[Computed]
     public function programOptions(): Collection
     {
-        return Program::query()
-            ->select(['id', 'name'])
-            ->orderBy('name')
-            ->orderBy('id')
-            ->get();
+        return Program::options();
     }
 
     /**
@@ -572,7 +567,7 @@ new #[Title('titles.annual_plans')] class extends Component {
 
         $plan = AnnualPlan::query()
             ->select(['id', 'program_id', 'manager_id', 'year'])
-            ->with('program:id,name')
+            ->with('program:id')
             ->withCount('planIndicators')
             ->find($this->deletingPlanId);
 

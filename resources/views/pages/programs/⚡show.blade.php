@@ -73,7 +73,7 @@ new #[Title('titles.program')] class extends Component {
     public function program(): Program
     {
         return Program::query()
-            ->select(['id', 'name', 'strategy_id', 'manager_id', 'updated_at'])
+            ->select(['id', 'strategy_id', 'manager_id', 'updated_at'])
             ->selectSub(
                 Risk::query()
                     ->selectRaw('count(*)')

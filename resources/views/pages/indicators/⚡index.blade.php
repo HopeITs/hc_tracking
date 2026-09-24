@@ -194,14 +194,14 @@ new #[Title('titles.indicators')] class extends Component {
                 // parent_id is selected so the statement's lineage can be walked.
                 'result:id,statement,type,program_id,parent_id',
                 // program_id is nullable on results, so a result can outlive its program.
-                'result.program:id,name',
+                'result.program:id',
                 // A logframe is three levels at most, so walking up costs a
                 // fixed couple of queries for the whole page.
                 'result.parentRecursive',
                 'project:id,name',
                 'progress' => fn ($query) => $query
                     ->select(['id', 'indicator_id', 'date', 'value', 'notes', 'source_of_verification', 'recorded_by'])
-                    ->with('recorder:id,name'),
+                    ->with('recorder:id,hr_user_id'),
                 'planIndicators' => fn ($query) => $query
                     ->select(['id', 'indicator_id', 'source_type', 'source_id', 'target', 'project_id', 'period'])
                     ->with([
@@ -655,7 +655,7 @@ new #[Title('titles.indicators')] class extends Component {
     #[Computed]
     public function programOptions(): Collection
     {
-        return Program::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get();
+        return Program::options();
     }
 
     /**
