@@ -223,7 +223,9 @@ new #[Title('titles.user_directory')] class extends Component {
             'userPermissionIds.*' => ['integer', 'distinct', Rule::exists('permissions', 'id')],
         ]);
 
+        $rolesBefore = $user->roles()->pluck('name')->all();
         $user->roles()->sync($validated['userRoleIds']);
+        $user->recordRoleChange($rolesBefore, $user->roles()->pluck('name')->all());
         $user->setActiveRole($validated['userActiveRoleId']);
         $user->syncPermissions(Permission::query()->whereIn('id', $validated['userPermissionIds'])->get());
 

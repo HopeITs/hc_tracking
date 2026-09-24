@@ -58,7 +58,7 @@ new #[Title('titles.donor')] class extends Component {
                     ->orderByRaw('coalesce(receive_date, scheduled_date) is null')
                     ->orderByRaw('coalesce(receive_date, scheduled_date)')
                     ->orderBy('id'),
-                'transfers.account:id,name',
+                'transfers.account:id,account_name',
                 // The reports this donor is still owed under each agreement.
                 'reports' => fn ($query) => $query
                     ->select(['id', 'donor_proposal_id', 'title', 'type', 'due_on', 'submitted_on'])
@@ -824,7 +824,7 @@ new #[Title('titles.donor')] class extends Component {
                                                     <td class="py-2 pe-4 whitespace-nowrap">{{ (float) $transfer->exchange_rate !== 1.0 ? rtrim(rtrim(number_format((float) $transfer->exchange_rate, 6), '0'), '.') : '—' }}</td>
                                                     <td class="py-2 pe-4 whitespace-nowrap">{{ $transfer->net_amount_received !== null ? $amount((float) $transfer->net_amount_received).' '.$transfer->amount_received_currency?->value : '—' }}</td>
                                                     <td class="py-2 pe-4 whitespace-nowrap">{{ $formatDate($transfer->receive_date) }}</td>
-                                                    <td class="py-2 pe-4 whitespace-nowrap">{{ $transfer->account?->name ?? __('transfers.not_yet_assigned') }}</td>
+                                                    <td class="py-2 pe-4 whitespace-nowrap">{{ $transfer->account?->account_name ?? __('transfers.not_yet_assigned') }}</td>
                                                 </tr>
                                             @endforeach
                                         </tbody>

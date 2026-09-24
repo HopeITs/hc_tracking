@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\RecordsActivity;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Notifications\TracksActivity;
 use App\Observers\ScheduleItemObserver;
 use Carbon\CarbonImmutable;
 use Database\Factories\TaskFactory;
@@ -49,10 +51,100 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
     'created_by',
 ])]
 #[ObservedBy(ScheduleItemObserver::class)]
-class Task extends Model
+class Task extends Model implements TracksActivity
 {
     /** @use HasFactory<TaskFactory> */
-    use HasFactory;
+    use HasFactory, RecordsActivity;
+
+    /**
+     * Mirror the column defaults so a task that has not been round-tripped
+     * through the database still reports its status, priority and progress
+     * (and a later change logs the real "from" value, not none).
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'status' => 'todo',
+        'priority' => 'medium',
+        'progress_percentage' => 0,
+    ];
+
+    /**
+     * A subtask's creation and completion are also news on its parent task.
+     */
+    protected static function booted(): void
+    {
+        static::created(function (Task $task): void {
+            $task->activityParentTask()?->recordActivity('task.subtask_added', properties: ['subtask' => $task->activityLabel()]);
+        });
+
+        static::updated(function (Task $task): void {
+            if ($task->wasChanged('status') && ($task->getAttributes()['status'] ?? null) === TaskStatus::Done->value) {
+                $task->activityParentTask()?->recordActivity('task.subtask_completed', properties: ['subtask' => $task->activityLabel()]);
+            }
+        });
+    }
+
+    public function activityModule(): string
+    {
+        return 'tasks';
+    }
+
+    public function activityLabel(): string
+    {
+        return (string) $this->activityAttribute('title');
+    }
+
+    public function activityEvents(): array
+    {
+        return [
+            'status' => 'status_changed',
+            'due_date' => 'due_date_changed',
+            'priority' => 'priority_changed',
+            'title' => 'updated',
+            'start_date' => 'updated',
+        ];
+    }
+
+    public function activityProgramId(): ?int
+    {
+        $sourceId = $this->activityAttribute('source_id');
+
+        $programId = match ($this->activityAttribute('source_type')) {
+            'program' => $sourceId,
+            'project' => Project::query()->whereKey($sourceId)->value('program_id'),
+            'milestone' => Milestone::query()
+                ->join('projects', 'projects.id', '=', 'milestones.project_id')
+                ->where('milestones.id', $sourceId)
+                ->value('projects.program_id'),
+            default => null,
+        };
+
+        return $programId === null ? null : (int) $programId;
+    }
+
+    /**
+     * Who the task named, taken before the assignee rows cascade away.
+     *
+     * @return array<string, mixed>
+     */
+    protected function activityPropertiesBeforeDelete(): array
+    {
+        return [
+            'employee_ids' => $this->taskAssignees()->pluck('employee_id')->map(fn (int|string $id): int => (int) $id)->all(),
+            'creator_id' => $this->activityAttribute('created_by'),
+        ];
+    }
+
+    /**
+     * The parent task, when this is a subtask.
+     */
+    private function activityParentTask(): ?Task
+    {
+        $parentId = $this->activityAttribute('parent_task_id');
+
+        return $parentId === null ? null : Task::query()->find($parentId);
+    }
 
     /**
      * The milestone, proposal, project, program or department this task is
@@ -146,6 +238,30 @@ class Task extends Model
     public function attachments(): HasMany
     {
         return $this->hasMany(TaskAttachment::class);
+    }
+
+    /**
+     * Past its due date while actively being worked (in progress or under
+     * review) — distinct from {@see isMissed()}, which covers a task that
+     * never started. A completed task is never overdue.
+     */
+    public function isOverdue(): bool
+    {
+        return $this->status !== TaskStatus::Todo
+            && $this->status !== TaskStatus::Done
+            && $this->due_date !== null
+            && $this->due_date->lt(CarbonImmutable::today());
+    }
+
+    /**
+     * Past its due date while still untouched in To Do — distinct from
+     * {@see isOverdue()}, which covers a task that's actively being worked.
+     */
+    public function isMissed(): bool
+    {
+        return $this->status === TaskStatus::Todo
+            && $this->due_date !== null
+            && $this->due_date->lt(CarbonImmutable::today());
     }
 
     /**

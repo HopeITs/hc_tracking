@@ -164,7 +164,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
                     ->select(['id', 'donor_proposal_id', 'account_id', 'payment_amount', 'amount_transfered_currency', 'scheduled_date', 'transfer_date', 'fees', 'fees_currency', 'amount_received', 'net_amount_received', 'amount_received_currency', 'receive_date', 'ar_status'])
                     ->orderByRaw('scheduled_date is null, scheduled_date')
                     ->orderBy('id'),
-                'transfers.account:id,name',
+                'transfers.account:id,account_name',
             ])
             ->withCount(['reports as overdue_reports_count' => fn (Builder $query) => $query
                 ->whereNull('submitted_on')
@@ -516,7 +516,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
             'nextDue' => $agreement->transfers
                 ->filter(fn (TransfersTracking $transfer): bool => $transfer->state() === 'upcoming' && $transfer->scheduled_date !== null)
                 ->min('scheduled_date'),
-            'accounts' => $agreement->transfers->pluck('account.name')->filter()->unique()->values()->all(),
+            'accounts' => $agreement->transfers->pluck('account.account_name')->filter()->unique()->values()->all(),
         ];
     }
 
@@ -1190,7 +1190,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
                                                                 @elseif ($transfer->isMissingNetAmount())
                                                                     <span class="block opacity-80">{{ __('funding_agreements.net_not_recorded') }}</span>
                                                                 @endif
-                                                                <span class="block opacity-80">{{ $transfer->account?->name ?? __('funding_agreements.no_account_assigned') }}</span>
+                                                                <span class="block opacity-80">{{ $transfer->account?->account_name ?? __('funding_agreements.no_account_assigned') }}</span>
                                                             </span>
                                                         </li>
                                                     @endforeach
@@ -1310,7 +1310,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
                                                                                     <span class="{{ $mutedText }}">—</span>
                                                                                 @endif
                                                                             </td>
-                                                                            <td class="py-2 ps-4 {{ $inkText }}">{{ $transfer->account?->name ?? __('funding_agreements.no_account_assigned') }}</td>
+                                                                            <td class="py-2 ps-4 {{ $inkText }}">{{ $transfer->account?->account_name ?? __('funding_agreements.no_account_assigned') }}</td>
                                                                         </tr>
                                                                     @endforeach
                                                                 </tbody>

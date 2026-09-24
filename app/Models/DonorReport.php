@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\RecordsActivity;
 use App\Enums\DonorReportType;
+use App\Notifications\TracksActivity;
 use Carbon\CarbonImmutable;
 use Database\Factories\DonorReportFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -25,10 +27,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable|null $updated_at
  */
 #[Fillable(['donor_proposal_id', 'title', 'type', 'due_on', 'submitted_on'])]
-class DonorReport extends Model
+class DonorReport extends Model implements TracksActivity
 {
     /** @use HasFactory<DonorReportFactory> */
-    use HasFactory;
+    use HasFactory, RecordsActivity;
 
     /**
      * Mirrors the column default, so a report created without a type reads as
@@ -75,5 +77,40 @@ class DonorReport extends Model
             'due_on' => 'date',
             'submitted_on' => 'date',
         ];
+    }
+
+    public function activityModule(): string
+    {
+        return 'funding-agreements';
+    }
+
+    public function activityLabel(): string
+    {
+        return (string) $this->activityAttribute('title');
+    }
+
+    public function activityProgramId(): ?int
+    {
+        return null;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function activityEvents(): array
+    {
+        return ['submitted_on' => 'submitted', 'due_on' => 'updated', 'title' => 'updated'];
+    }
+
+    /**
+     * Only gaining a submission date is "submitted".
+     */
+    protected function activityEventForChange(string $field, mixed $old, mixed $new): ?string
+    {
+        if ($field === 'submitted_on') {
+            return $new !== null ? 'submitted' : 'updated';
+        }
+
+        return $this->activityEvents()[$field] ?? null;
     }
 }

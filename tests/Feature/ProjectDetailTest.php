@@ -17,6 +17,7 @@ use App\Models\Proposal;
 use App\Models\Report;
 use App\Models\Result;
 use App\Models\Risk;
+use App\Models\Task;
 use App\Models\TransfersTracking;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -180,6 +181,61 @@ test('project detail shows only its own risks', function () {
         ->set('tab', 'risks')
         ->assertSee('Access restrictions')
         ->assertDontSee('Currency collapse');
+});
+
+test('project detail tasks tab shows tasks raised directly on the project and on its milestones, but not on other projects', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->create();
+    $milestone = Milestone::factory()->create(['project_id' => $project->id]);
+    $otherProject = Project::factory()->create();
+
+    Task::factory()->create(['source_type' => 'project', 'source_id' => $project->id, 'title' => 'Sign the site access agreement']);
+    Task::factory()->create(['source_type' => 'milestone', 'source_id' => $milestone->id, 'title' => 'Deliver the milestone report']);
+    Task::factory()->create(['source_type' => 'project', 'source_id' => $otherProject->id, 'title' => 'Unrelated project task']);
+
+    Livewire::actingAs($user)
+        ->test('pages::projects.show', ['project' => $project])
+        ->set('tab', 'tasks')
+        ->assertSee('Sign the site access agreement')
+        ->assertSee('Deliver the milestone report')
+        ->assertDontSee('Unrelated project task');
+});
+
+test('a task can be added from the project show page pre-filled with this project', function () {
+    $user = User::factory()->create();
+    $assignee = insertHrEmployee();
+    $project = Project::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::projects.show', ['project' => $project])
+        ->set('tab', 'tasks')
+        ->call('openAddTaskModal')
+        ->assertSet('showAddTaskModal', true)
+        ->set('newTaskTitle', '  Household survey  ')
+        ->set('newTaskAssignedTo', [(string) $assignee])
+        ->call('addTask')
+        ->assertHasNoErrors()
+        ->assertSet('showAddTaskModal', false);
+
+    $task = Task::query()->where('title', 'Household survey')->sole();
+
+    expect($task->source_type)->toBe('project')
+        ->and($task->source_id)->toBe($project->id)
+        ->and($task->taskAssignees->pluck('employee_id')->all())->toBe([$assignee]);
+});
+
+test('adding a task from the project show page requires a title and an assignee', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::projects.show', ['project' => $project])
+        ->set('tab', 'tasks')
+        ->call('openAddTaskModal')
+        ->set('newTaskTitle', '   ')
+        ->set('newTaskAssignedTo', [])
+        ->call('addTask')
+        ->assertHasErrors(['newTaskTitle', 'newTaskAssignedTo']);
 });
 
 test('project detail shows targets naming this project', function () {

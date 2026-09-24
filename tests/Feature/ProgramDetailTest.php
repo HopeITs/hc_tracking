@@ -12,6 +12,7 @@ use App\Models\Project;
 use App\Models\Report;
 use App\Models\Result;
 use App\Models\Strategy;
+use App\Models\Task;
 use App\Models\User;
 use Livewire\Livewire;
 
@@ -71,6 +72,64 @@ test('program detail switches to annual plans and results', function () {
         ->assertSee('Annual plan 2026')
         ->set('tab', 'results')
         ->assertSee('Improved access to safe water.');
+});
+
+test('program detail tasks tab shows tasks raised on the program, its projects and their milestones, but not on another program', function () {
+    $user = User::factory()->create();
+    $program = Program::factory()->create();
+    $project = Project::factory()->create(['program_id' => $program->id]);
+    $milestone = Milestone::factory()->create(['project_id' => $project->id]);
+    $otherProgram = Program::factory()->create();
+
+    Task::factory()->create(['source_type' => 'program', 'source_id' => $program->id, 'title' => 'Approve the annual workplan']);
+    Task::factory()->create(['source_type' => 'project', 'source_id' => $project->id, 'title' => 'Sign the site access agreement']);
+    Task::factory()->create(['source_type' => 'milestone', 'source_id' => $milestone->id, 'title' => 'Deliver the milestone report']);
+    Task::factory()->create(['source_type' => 'program', 'source_id' => $otherProgram->id, 'title' => 'Unrelated program task']);
+
+    Livewire::actingAs($user)
+        ->test('pages::programs.show', ['program' => $program])
+        ->set('tab', 'tasks')
+        ->assertSee('Approve the annual workplan')
+        ->assertSee('Sign the site access agreement')
+        ->assertSee('Deliver the milestone report')
+        ->assertDontSee('Unrelated program task');
+});
+
+test('a task can be added from the program show page pre-filled with this program', function () {
+    $user = User::factory()->create();
+    $assignee = insertHrEmployee();
+    $program = Program::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::programs.show', ['program' => $program])
+        ->set('tab', 'tasks')
+        ->call('openAddTaskModal')
+        ->assertSet('showAddTaskModal', true)
+        ->set('newTaskTitle', '  Approve the workplan  ')
+        ->set('newTaskAssignedTo', [(string) $assignee])
+        ->call('addTask')
+        ->assertHasNoErrors()
+        ->assertSet('showAddTaskModal', false);
+
+    $task = Task::query()->where('title', 'Approve the workplan')->sole();
+
+    expect($task->source_type)->toBe('program')
+        ->and($task->source_id)->toBe($program->id)
+        ->and($task->taskAssignees->pluck('employee_id')->all())->toBe([$assignee]);
+});
+
+test('adding a task from the program show page requires a title and an assignee', function () {
+    $user = User::factory()->create();
+    $program = Program::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::programs.show', ['program' => $program])
+        ->set('tab', 'tasks')
+        ->call('openAddTaskModal')
+        ->set('newTaskTitle', '   ')
+        ->set('newTaskAssignedTo', [])
+        ->call('addTask')
+        ->assertHasErrors(['newTaskTitle', 'newTaskAssignedTo']);
 });
 
 test('program detail renders the results logframe as a tree', function () {

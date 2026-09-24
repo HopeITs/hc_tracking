@@ -61,6 +61,13 @@ new #[Title('titles.transfers')] class extends Component {
     public string $agreement = '';
 
     /**
+     * Deep link from a notification's "Mark received": opens that tranche's
+     * edit form once, then clears itself.
+     */
+    #[Url(as: 'edit', except: '')]
+    public string $editTransfer = '';
+
+    /**
      * `sort` and `stage` arrive from the URL, so a hand-typed value would
      * otherwise leave the page sorted by `attention` with no pill pressed, or
      * showing "Reset filters" with nothing filtered. Normalise on the way in.
@@ -74,6 +81,12 @@ new #[Title('titles.transfers')] class extends Component {
         if (! in_array($this->stage, self::STAGES, true)) {
             $this->stage = '';
         }
+
+        if (ctype_digit($this->editTransfer)) {
+            $this->openTransferEdit((int) $this->editTransfer);
+        }
+
+        $this->editTransfer = '';
     }
 
     public function updatedSearch(): void
@@ -245,7 +258,7 @@ new #[Title('titles.transfers')] class extends Component {
                 'donorProposal.donor:id,name',
                 'donorProposal.proposal:id,name',
                 // Nullable: a tranche may be scheduled before an account exists.
-                'account:id,name,is_active',
+                'account:id,account_name,is_active',
             ]);
 
         return $this->applySort($query)->paginate(20);
@@ -476,7 +489,7 @@ new #[Title('titles.transfers')] class extends Component {
                 <flux:select.option value="">{{ __('common.all_accounts') }}</flux:select.option>
                 @foreach ($this->accountOptions as $accountOption)
                     <flux:select.option :value="$accountOption->id" :wire:key="'tr-account-'.$accountOption->id">
-                        {{ $accountOption->name }}@unless ($accountOption->is_active) · {{ __('common.closed') }}@endunless
+                        {{ $accountOption->account_name }}@unless ($accountOption->is_active) · {{ __('common.closed') }}@endunless
                     </flux:select.option>
                 @endforeach
             </x-ui.header-filter-select>
@@ -976,7 +989,7 @@ new #[Title('titles.transfers')] class extends Component {
                                         @if ($transfer->account === null)
                                             <span class="italic">{{ __('transfers.no_account') }}</span>
                                         @else
-                                            {{ $transfer->account->name }}
+                                            {{ $transfer->account->account_name }}
                                         @endif
                                     </span>
                                 </p>

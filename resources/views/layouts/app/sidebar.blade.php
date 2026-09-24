@@ -3,7 +3,7 @@
     <head>
         @include('partials.head')
     </head>
-    <body class="min-h-screen bg-white dark:bg-zinc-800">
+    <body class="min-h-screen bg-white dark:bg-zinc-800" @auth data-user-id="{{ auth()->id() }}" data-notification-popups="{{ auth()->user()->notification_popups ? 'on' : 'off' }}" @endauth>
         <x-navigation.sidebar />
 
         <!-- Mobile User Menu -->
@@ -16,6 +16,8 @@
             />
 
             <flux:spacer />
+
+            <livewire:notifications.bell />
 
             <flux:dropdown position="top" align="end">
                 <flux:profile
@@ -62,6 +64,8 @@
             <flux:spacer />
 
             <div class="flex items-center gap-1.5">
+                <livewire:notifications.bell />
+
                 <flux:button
                     x-data
                     x-on:click="$flux.dark = ! $flux.dark"
@@ -92,6 +96,12 @@
                 <flux:toast />
             </flux:toast.group>
         @endpersist
+
+        @auth
+            @persist('notification-toasts')
+                <x-notifications.toasts />
+            @endpersist
+        @endauth
 
         @fluxScripts
     </body>

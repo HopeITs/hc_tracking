@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\RecordsParentActivity;
 use App\Enums\ProposalStatus;
 use Carbon\CarbonImmutable;
 use Database\Factories\ProposalStatusNoteFactory;
@@ -11,6 +12,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Str;
 
 /**
  * One entry in the audit trail of a proposal status change.
@@ -27,7 +29,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ProposalStatusNote extends Model
 {
     /** @use HasFactory<ProposalStatusNoteFactory> */
-    use HasFactory;
+    use HasFactory, RecordsParentActivity;
 
     /**
      * The proposal whose status changed.
@@ -50,5 +52,26 @@ class ProposalStatusNote extends Model
             'status' => ProposalStatus::class,
             'date' => 'date',
         ];
+    }
+
+    /**
+     * Status notes are logged on their proposal.
+     */
+    public function activityParent(): ?Proposal
+    {
+        return $this->proposal()->first();
+    }
+
+    protected function parentActivityEvent(string $hook): ?string
+    {
+        return $hook === 'created' ? 'proposal.status_note_added' : null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function parentActivityProperties(string $hook): array
+    {
+        return ['note' => Str::limit((string) $this->context, 120)];
     }
 }

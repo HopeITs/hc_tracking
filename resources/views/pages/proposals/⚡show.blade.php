@@ -7,11 +7,13 @@ use App\Enums\MilestoneStatus;
 use App\Enums\ProposalPhase;
 use App\Enums\ProposalStatus;
 use App\Enums\ReportStatus;
+use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Livewire\Concerns\ManagesAgreementForm;
 use App\Livewire\Concerns\ManagesTransferForm;
 use App\Models\DonorProposal;
 use App\Models\DonorReport;
+use App\Models\HrEmployee;
 use App\Models\Media;
 use App\Models\Milestone;
 use App\Models\PlanIndicator;
@@ -39,7 +41,8 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
-new #[Title('titles.proposal')] class extends Component {
+new #[Title('titles.proposal')] class extends Component
+{
     use ManagesAgreementForm;
     use ManagesTransferForm;
     use WithFileUploads;
@@ -65,31 +68,63 @@ new #[Title('titles.proposal')] class extends Component {
     public string $tab = 'status';
 
     public bool $showStatusModal = false;
+
     public string $newStatus = '';
+
     public string $statusContext = '';
+
     public string $statusDate = '';
 
     public bool $showDetailsModal = false;
+
     public string $detailsName = '';
+
     public string $detailsPlannedBegin = '';
+
     public string $detailsPlannedEnd = '';
+
     public string $detailsActualBegin = '';
+
     public string $detailsActualEnd = '';
+
     public string $detailsNotes = '';
 
     public string $projectToLink = '';
+
     public bool $showUnlinkModal = false;
+
     public ?int $unlinkingProjectId = null;
 
     public bool $showFileModal = false;
+
     public bool $confirmingFileDelete = false;
+
     public ?int $editingFileId = null;
+
     public ?int $deletingFileId = null;
+
     public $newFile = null;
+
     public string $fileCategory = '';
+
     public string $fileDisplayName = '';
+
     public bool $showPreviewModal = false;
+
     public ?int $previewingFileId = null;
+
+    public bool $showAddTaskModal = false;
+
+    public string $newTaskTitle = '';
+
+    public string $newTaskStatus = 'todo';
+
+    public string $newTaskPriority = 'medium';
+
+    public string $newTaskDueDate = '';
+
+    /** @var array<int, string> */
+    public array $newTaskAssignedTo = [];
 
     public function mount(Proposal $proposal): void
     {
@@ -162,7 +197,7 @@ new #[Title('titles.proposal')] class extends Component {
         return DonorProposal::query()
             ->select(['id', 'donor_id', 'budget', 'currency', 'project_num', 'proposal_id'])
             ->where('proposal_id', $this->proposalId)
-            ->with(['donor:id,name', 'transfers.account:id,name'])
+            ->with(['donor:id,name', 'transfers.account:id,account_name'])
             ->orderBy('id')
             ->get();
     }
@@ -348,6 +383,80 @@ new #[Title('titles.proposal')] class extends Component {
             ->orderByRaw('due_date is null, due_date')
             ->orderBy('id')
             ->get();
+    }
+
+    /** @return Collection<int, HrEmployee> */
+    #[Computed]
+    public function userOptions(): Collection
+    {
+        return HrEmployee::pickerOptions();
+    }
+
+    public function openAddTaskModal(): void
+    {
+        $this->resetValidation();
+        $this->newTaskTitle = '';
+        $this->newTaskStatus = TaskStatus::Todo->value;
+        $this->newTaskPriority = TaskPriority::Medium->value;
+        $this->newTaskDueDate = '';
+        $this->newTaskAssignedTo = [];
+        $this->showAddTaskModal = true;
+    }
+
+    public function closeAddTaskModal(): void
+    {
+        $this->showAddTaskModal = false;
+    }
+
+    /**
+     * Raise a task straight against this proposal — the source is always the
+     * proposal, never one of its funded projects' milestones: a task tied to
+     * one milestone's delivery is added from the milestone's own page instead.
+     */
+    public function addTask(): void
+    {
+        $this->newTaskTitle = trim($this->newTaskTitle);
+
+        $validated = $this->validate([
+            'newTaskTitle' => ['required', 'string', 'max:255'],
+            'newTaskStatus' => ['required', new Enum(TaskStatus::class)],
+            'newTaskPriority' => ['required', new Enum(TaskPriority::class)],
+            'newTaskDueDate' => ['nullable', 'date'],
+            'newTaskAssignedTo' => ['required', 'array', 'min:1'],
+            'newTaskAssignedTo.*' => ['integer', Rule::exists(HrEmployee::class, 'id')],
+        ], [
+            'newTaskTitle.required' => __('tasks.enter_a_task_title'),
+            'newTaskAssignedTo.required' => __('tasks.assign_this_task_to_someone'),
+            'newTaskAssignedTo.min' => __('tasks.assign_this_task_to_someone'),
+            'newTaskAssignedTo.*.exists' => __('tasks.the_selected_assignee_is_no_longer_available'),
+        ]);
+
+        $proposalId = $this->proposalId;
+        $statusCase = TaskStatus::from($validated['newTaskStatus']);
+        $employeeIds = collect($validated['newTaskAssignedTo'])->map(fn ($id): int => (int) $id)->unique()->values();
+
+        DB::transaction(function () use ($proposalId, $validated, $statusCase, $employeeIds): void {
+            $task = Task::query()->create([
+                'source_type' => 'proposal',
+                'source_id' => $proposalId,
+                'title' => $validated['newTaskTitle'],
+                'status' => $statusCase,
+                'priority' => $validated['newTaskPriority'],
+                'due_date' => $validated['newTaskDueDate'] === '' ? null : $validated['newTaskDueDate'],
+                'progress_percentage' => $statusCase === TaskStatus::Done ? 100 : 0,
+                'completed_date' => $statusCase === TaskStatus::Done ? CarbonImmutable::today() : null,
+                'created_by' => (int) auth()->id(),
+            ]);
+
+            foreach ($employeeIds as $employeeId) {
+                $task->taskAssignees()->create(['employee_id' => $employeeId]);
+            }
+        });
+
+        $this->showAddTaskModal = false;
+        unset($this->tasks);
+
+        Flux::toast(variant: 'success', text: __('tasks.task_created'));
     }
 
     /**
@@ -1076,7 +1185,7 @@ new #[Title('titles.proposal')] class extends Component {
         foreach ($labels as $index => $label) {
             $lane = 0;
 
-            while (isset($laneEnds[$lane]) && $label['at'] - $laneEnds[$lane] < $gap) {
+            while (isset($laneEnds[$lane]) && $gap > $label['at'] - $laneEnds[$lane]) {
                 $lane++;
             }
 
@@ -1688,6 +1797,7 @@ new #[Title('titles.proposal')] class extends Component {
             ['label' => $this->proposal->name],
         ]"
         :title="$this->proposal->name"
+        :unread="app(\App\Notifications\UnreadSubjects::class)->has(auth()->user(), 'proposal', $this->proposal->id)"
         title-class="text-3xl! font-bold! leading-none! tracking-tight! @3xl/detail:text-[2.5rem]!"
     >
         <x-slot:meta>
@@ -1944,7 +2054,7 @@ new #[Title('titles.proposal')] class extends Component {
                                                             <span>{{ __('common.unscheduled') }}</span>
                                                         @endif
                                                         <span aria-hidden="true">·</span>
-                                                        <span>{{ $transfer->account?->name ?? __('proposals.no_account_recorded') }}</span>
+                                                        <span>{{ $transfer->account?->account_name ?? __('proposals.no_account_recorded') }}</span>
                                                         @if ((float) $transfer->fees > 0)
                                                             <span aria-hidden="true">·</span>
                                                             <span>{{ __('proposals.fees_amount', ['amount' => $amount((float) $transfer->fees), 'currency' => $transfer->fees_currency?->value ?? $currency]) }}</span>
@@ -2303,8 +2413,16 @@ new #[Title('titles.proposal')] class extends Component {
                 </div>
             @endif
         @elseif ($tab === 'tasks')
+            <div class="mb-6 flex flex-wrap items-center justify-end gap-2">
+                <x-ui.button tone="primary" size="sm" icon="plus" class="min-h-10 touch-manipulation" wire:click="openAddTaskModal" data-test="add-proposal-task-button">{{ __('tasks.add_task') }}</x-ui.button>
+            </div>
+
             @if ($this->tasks->isEmpty())
-                <x-ui.empty-state icon="clipboard-document-list" :heading="__('common.no_tasks_yet')" :body="__('proposals.tasks_delivering_against_this_proposal_will_appear_here')" />
+                <x-ui.empty-state icon="clipboard-document-list" :heading="__('common.no_tasks_yet')" :body="__('proposals.tasks_delivering_against_this_proposal_will_appear_here')">
+                    <x-slot:action>
+                        <x-ui.button size="sm" tone="primary" icon="plus" wire:click="openAddTaskModal">{{ __('tasks.add_task') }}</x-ui.button>
+                    </x-slot:action>
+                </x-ui.empty-state>
             @else
                 @php
                     $fundedProjectIds = $this->projects->modelKeys();
@@ -2711,6 +2829,11 @@ new #[Title('titles.proposal')] class extends Component {
         @endif
     </div>
 
+    <section aria-labelledby="record-activity-heading" class="grid gap-3 mt-10" data-record-activity>
+        <h2 id="record-activity-heading" class="text-base font-bold">{{ __('activity.title') }}</h2>
+        <livewire:activity.timeline :subjects="['proposal' => [$this->proposal->id]]" :key="'proposal-activity-'.$this->proposal->id" />
+    </section>
+
     <flux:modal wire:model="showStatusModal" class="w-full max-w-xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
         <form wire:submit="changeStatus" class="space-y-5">
             <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
@@ -2950,5 +3073,107 @@ new #[Title('titles.proposal')] class extends Component {
                 <x-ui.button type="button" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="deleteFile" data-test="confirm-delete-proposal-file">{{ __('proposals.delete_this_file') }}</x-ui.button>
             </div>
         </div>
+    </flux:modal>
+
+    @php
+        $selectedNewTaskAssigneeOptions = $this->userOptions->whereIn('id', collect($newTaskAssignedTo)->map(fn ($id) => (int) $id));
+        $newTaskAssigneeTriggerLabel = match (true) {
+            $selectedNewTaskAssigneeOptions->isEmpty() => __('common.select'),
+            $selectedNewTaskAssigneeOptions->count() <= 2 => $selectedNewTaskAssigneeOptions->pluck('name')->implode(', '),
+            default => __('common.count_selected', ['count' => $selectedNewTaskAssigneeOptions->count()]),
+        };
+    @endphp
+
+    <flux:modal name="proposal-add-task-modal" wire:model="showAddTaskModal" wire:close="closeAddTaskModal" class="w-full max-w-2xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
+        <form wire:submit="addTask" class="flex flex-col gap-5">
+            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
+                <flux:heading size="lg">{{ __('tasks.add_task') }}</flux:heading>
+            </div>
+
+            <x-ui.input wire:model="newTaskTitle" :label="__('tasks.task_title')" type="text" maxlength="255" required autofocus data-test="new-proposal-task-title-input" />
+
+            <div class="grid gap-5 sm:grid-cols-2">
+                <div class="min-w-0">
+                    <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft" id="new-proposal-task-status-label">{{ __('common.status') }}</label>
+                    <div class="grid grid-cols-2 gap-1.5" role="radiogroup" aria-labelledby="new-proposal-task-status-label">
+                        @foreach (TaskStatus::cases() as $statusCase)
+                            @php $isNewTaskStatusSelected = $newTaskStatus === $statusCase->value; @endphp
+                            <button
+                                type="button"
+                                role="radio"
+                                aria-checked="{{ $isNewTaskStatusSelected ? 'true' : 'false' }}"
+                                wire:click="$set('newTaskStatus', '{{ $statusCase->value }}')"
+                                @class([
+                                    'inline-flex min-h-10 cursor-pointer touch-manipulation items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-semibold whitespace-nowrap transition-colors',
+                                    'border-secondary-dark bg-secondary-dark text-white dark:border-white dark:bg-white dark:text-secondary-dark' => $isNewTaskStatusSelected,
+                                    'border-secondary-light text-secondary-medium hover:border-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => ! $isNewTaskStatusSelected,
+                                ])
+                                data-test="new-proposal-task-status-{{ $statusCase->value }}"
+                            >
+                                {{ $statusCase->label() }}
+                            </button>
+                        @endforeach
+                    </div>
+                    <flux:error name="newTaskStatus" class="mt-1.5" />
+                </div>
+
+                <div class="min-w-0">
+                    <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft" id="new-proposal-task-priority-label">{{ __('tasks.priority') }}</label>
+                    <div class="grid grid-cols-3 gap-1.5" role="radiogroup" aria-labelledby="new-proposal-task-priority-label">
+                        @foreach (TaskPriority::cases() as $priorityCase)
+                            @php $isNewTaskPrioritySelected = $newTaskPriority === $priorityCase->value; @endphp
+                            <button
+                                type="button"
+                                role="radio"
+                                aria-checked="{{ $isNewTaskPrioritySelected ? 'true' : 'false' }}"
+                                wire:click="$set('newTaskPriority', '{{ $priorityCase->value }}')"
+                                @class([
+                                    'inline-flex min-h-10 cursor-pointer touch-manipulation items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-semibold whitespace-nowrap transition-colors',
+                                    'border-secondary-dark bg-secondary-dark text-white dark:border-secondary-medium dark:bg-secondary-medium' => $isNewTaskPrioritySelected,
+                                    'border-secondary-light text-secondary-medium hover:border-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => ! $isNewTaskPrioritySelected,
+                                ])
+                                data-test="new-proposal-task-priority-{{ $priorityCase->value }}"
+                            >
+                                {{ $priorityCase->label() }}
+                            </button>
+                        @endforeach
+                    </div>
+                    <flux:error name="newTaskPriority" class="mt-1.5" />
+                </div>
+            </div>
+
+            <div class="min-w-0">
+                <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('tasks.assignees') }}</label>
+                <x-ui.multi-select-popover
+                    :label="__('tasks.assignees')"
+                    in-modal
+                    class="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-secondary-light bg-white px-3 py-2 text-start text-sm dark:border-secondary-light dark:bg-secondary-medium"
+                    data-test="new-proposal-task-assignee-picker"
+                >
+                    <x-slot:trigger>
+                        <span class="min-w-0 truncate">{{ $newTaskAssigneeTriggerLabel }}</span>
+                        <flux:icon.chevron-up-down class="size-4 shrink-0 text-secondary-medium dark:text-secondary-soft" aria-hidden="true" />
+                    </x-slot:trigger>
+
+                    @foreach ($this->userOptions as $userOption)
+                        <label
+                            x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
+                            class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-secondary-soft dark:hover:bg-secondary-medium"
+                        >
+                            <input type="checkbox" wire:model.live="newTaskAssignedTo" value="{{ $userOption->id }}" class="rounded border-secondary-light text-primary focus:ring-primary" data-test="new-proposal-task-assignee-checkbox-{{ $userOption->id }}" />
+                            <span class="min-w-0 truncate">{{ $userOption->name }} · {{ $userOption->secondary_name }}</span>
+                        </label>
+                    @endforeach
+                </x-ui.multi-select-popover>
+                <flux:error name="newTaskAssignedTo" class="mt-1.5" />
+            </div>
+
+            <x-ui.input wire:model="newTaskDueDate" :label="__('tasks.due_date_2')" type="date" />
+
+            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
+                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="closeAddTaskModal">{{ __('common.cancel') }}</x-ui.button>
+                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" data-test="save-new-proposal-task-button">{{ __('tasks.add_task') }}</x-ui.button>
+            </div>
+        </form>
     </flux:modal>
 </section>

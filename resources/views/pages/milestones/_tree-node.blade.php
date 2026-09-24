@@ -12,6 +12,9 @@
 
             <div class="min-w-0 flex-1">
                 <div class="flex flex-wrap items-center gap-2">
+                    @if (in_array($milestone->id, $this->unreadIds, true))
+                        <span class="size-2 shrink-0 rounded-full bg-primary" data-unread-dot="milestone-{{ $milestone->id }}" title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
+                    @endif
                     <p class="min-w-0 font-semibold text-secondary-dark dark:text-white">{{ $milestone->name }}</p>
                     <x-ui.enum-badge :case="$milestone->status" />
                     <x-ui.milestone-flags :milestone="$milestone" />
@@ -28,6 +31,7 @@
         </div>
 
         <div class="flex shrink-0 items-center gap-1 self-end @lg/directory:self-start">
+            <x-ui.button tone="ghost" size="sm" icon="eye" href="{{ route('milestones.show', $milestone) }}" wire:navigate class="size-11! touch-manipulation @sm/directory:size-9!" data-test="milestone-view-{{ $milestone->id }}" :aria-label="__('common.view_name', ['name' => $milestone->name])" />
             <x-ui.button tone="ghost" size="sm" icon="plus" wire:click="openCreateModal(null, null, null, {{ $milestone->id }})" class="size-11! touch-manipulation @sm/directory:size-9!" data-test="milestone-add-nested-{{ $milestone->id }}" :aria-label="__('milestones.add_a_milestone_nested_under_this_one')" />
             <x-ui.button tone="ghost" size="sm" icon="pencil-square" href="{{ route('milestones.show', $milestone) }}" wire:navigate class="size-11! touch-manipulation @sm/directory:size-9!" :aria-label="__('common.edit_name', ['name' => $milestone->name])" />
             @if ($milestone->children_count === 0 && $milestone->tasks_count === 0)

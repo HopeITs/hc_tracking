@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\RecordsActivity;
 use App\Enums\IndicatorMeasure;
 use App\Enums\Period;
 use App\Enums\ReportStatus;
+use App\Notifications\TracksActivity;
 use Carbon\CarbonImmutable;
 use Database\Factories\PlanIndicatorFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -31,10 +33,10 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  * @property CarbonImmutable|null $updated_at
  */
 #[Fillable(['source_type', 'source_id', 'indicator_id', 'target', 'project_id', 'period'])]
-class PlanIndicator extends Model
+class PlanIndicator extends Model implements TracksActivity
 {
     /** @use HasFactory<PlanIndicatorFactory> */
-    use HasFactory;
+    use HasFactory, RecordsActivity;
 
     /**
      * The plan or proposal this target was committed in.
@@ -283,5 +285,63 @@ class PlanIndicator extends Model
             'target' => 'decimal:2',
             'period' => Period::class,
         ];
+    }
+
+    public function activityModule(): string
+    {
+        return 'targets';
+    }
+
+    /**
+     * The targeted indicator's name.
+     */
+    public function activityLabel(): string
+    {
+        return (string) Indicator::query()->whereKey($this->activityAttribute('indicator_id'))->value('name');
+    }
+
+    public function activityProgramId(): ?int
+    {
+        return static::programIdFor($this->getKey(), $this->activityAttribute('project_id'), $this->activityAttribute('source_type'), $this->activityAttribute('source_id'));
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function activityEvents(): array
+    {
+        return ['target' => 'target_changed', 'period' => 'updated', 'project_id' => 'updated', 'indicator_id' => 'updated'];
+    }
+
+    /**
+     * The project owner, remembered for the deleted event.
+     *
+     * @return array<string, mixed>
+     */
+    protected function activityPropertiesBeforeDelete(): array
+    {
+        return ['employee_ids' => array_values(array_filter([Project::ownerEmployeeIdFor($this->activityAttribute('project_id'))]))];
+    }
+
+    /**
+     * The program a target rolls up to: its project's, else its annual plan's.
+     * Pass the known columns to avoid a query; omit them to look the row up.
+     */
+    public static function programIdFor(mixed $planIndicatorId, mixed $projectId = null, mixed $sourceType = null, mixed $sourceId = null): ?int
+    {
+        if ($projectId === null && $sourceType === null) {
+            $row = static::query()->select(['project_id', 'source_type', 'source_id'])->find($planIndicatorId);
+            [$projectId, $sourceType, $sourceId] = [$row?->project_id, $row?->source_type, $row?->source_id];
+        }
+
+        $programId = Project::programIdFor($projectId);
+
+        if ($programId !== null || $sourceType !== 'annual_plan') {
+            return $programId;
+        }
+
+        $planProgramId = AnnualPlan::query()->whereKey($sourceId)->value('program_id');
+
+        return $planProgramId === null ? null : (int) $planProgramId;
     }
 }

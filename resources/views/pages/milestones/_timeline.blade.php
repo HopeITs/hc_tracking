@@ -292,6 +292,10 @@
                                     >
                                         <flux:icon.flag variant="micro" class="{{ $depth === 0 ? 'size-3.5' : 'size-3' }}" />
 
+                                        @if (in_array($milestone->id, $this->unreadIds, true))
+                                            <span class="absolute -top-1 -start-1 size-2.5 rounded-full bg-primary ring-2 ring-white dark:ring-secondary-dark" data-unread-dot="milestone-{{ $milestone->id }}" title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
+                                        @endif
+
                                         @if ($milestone->children_count > 0)
                                             <span aria-hidden="true" class="absolute -top-1 -end-1 flex size-4 items-center justify-center rounded-full bg-secondary-dark text-[9px] font-bold text-white ring-2 ring-white dark:bg-white dark:text-secondary-dark dark:ring-secondary-dark">{{ $milestone->children_count }}</span>
                                         @endif

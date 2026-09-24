@@ -11,6 +11,7 @@ use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Task;
 use App\Models\TaskAssignee;
+use App\Notifications\UnreadSubjects;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -100,6 +101,8 @@ new #[Title('titles.tasks')] class extends Component
     public bool $showTaskDrawer = false;
 
     public ?int $editingTaskId = null;
+
+    public ?int $editingTaskCreatedBy = null;
 
     public ?int $deletingTaskId = null;
 
@@ -370,7 +373,7 @@ new #[Title('titles.tasks')] class extends Component
         $search = trim($this->search);
 
         return Task::query()
-            ->select(['id', 'parent_task_id', 'source_type', 'source_id', 'title', 'description', 'status', 'priority', 'start_date', 'due_date', 'completed_date', 'progress_percentage'])
+            ->select(['id', 'parent_task_id', 'source_type', 'source_id', 'title', 'description', 'status', 'priority', 'start_date', 'due_date', 'completed_date', 'progress_percentage', 'created_by'])
             // Subtasks are shown nested under their parent (each parent's own
             // `subtasks` eager load below), never as their own top-level row —
             // so the list/board/calendar and the stat tiles all count and
@@ -400,7 +403,11 @@ new #[Title('titles.tasks')] class extends Component
             ->when($this->sourceType !== '', fn (Builder $query) => $query->where('source_type', $this->sourceType))
             ->when($this->sourceType !== '' && $this->sourceId !== '', fn (Builder $query) => $query->where('source_id', (int) $this->sourceId))
             ->when($this->dueFilter === 'overdue', fn (Builder $query) => $query
-                ->where('status', '!=', TaskStatus::Done->value)
+                ->whereNotIn('status', [TaskStatus::Todo->value, TaskStatus::Done->value])
+                ->whereNotNull('due_date')
+                ->where('due_date', '<', CarbonImmutable::today()))
+            ->when($this->dueFilter === 'missed', fn (Builder $query) => $query
+                ->where('status', TaskStatus::Todo->value)
                 ->whereNotNull('due_date')
                 ->where('due_date', '<', CarbonImmutable::today()))
             ->when($this->dueFilter === 'due_soon', fn (Builder $query) => $query
@@ -423,6 +430,17 @@ new #[Title('titles.tasks')] class extends Component
                     ->orWhere('created_by', $user->id));
             })
             ->tap(fn (Builder $query) => $this->applyViewerDepartmentScope($query));
+    }
+
+    /**
+     * Records with unread notifications for me, for the row dots.
+     *
+     * @return list<int>
+     */
+    #[Computed]
+    public function unreadIds(): array
+    {
+        return app(UnreadSubjects::class)->ids(auth()->user(), 'task');
     }
 
     /** @return LengthAwarePaginator<int, Task> */
@@ -559,7 +577,7 @@ new #[Title('titles.tasks')] class extends Component
      * ran on every list-view page load via boardTasks() before, which is a
      * full board/calendar-sized query the list view never otherwise needs.
      *
-     * @return array{total: int, done: int, overdue: int, due_soon: int}
+     * @return array{total: int, done: int, overdue: int, missed: int, due_soon: int}
      */
     #[Computed]
     public function taskStats(): array
@@ -568,13 +586,17 @@ new #[Title('titles.tasks')] class extends Component
         // inline them literally instead of passing bindings through a raw
         // select expression — Eloquent's select() replaces the column list
         // rather than appending to it, which selectRaw()/addSelect() would.
+        // Mirrors Task::isOverdue()/isMissed(): overdue is a task actively
+        // being worked (not todo, not done) past its due date, missed is a
+        // task still untouched in todo past its due date.
         $today = CarbonImmutable::today()->toDateString();
         $dueSoonEnd = CarbonImmutable::today()->addDays(7)->toDateString();
 
         $row = $this->filteredTasksQuery()->toBase()->select(DB::raw(
             "count(*) as total,
             sum(case when status = 'done' then 1 else 0 end) as done,
-            sum(case when status <> 'done' and due_date is not null and due_date < '{$today}' then 1 else 0 end) as overdue,
+            sum(case when status not in ('todo', 'done') and due_date is not null and due_date < '{$today}' then 1 else 0 end) as overdue,
+            sum(case when status = 'todo' and due_date is not null and due_date < '{$today}' then 1 else 0 end) as missed,
             sum(case when status <> 'done' and due_date is not null and due_date between '{$today}' and '{$dueSoonEnd}' then 1 else 0 end) as due_soon",
         ))->first();
 
@@ -582,6 +604,7 @@ new #[Title('titles.tasks')] class extends Component
             'total' => (int) ($row->total ?? 0),
             'done' => (int) ($row->done ?? 0),
             'overdue' => (int) ($row->overdue ?? 0),
+            'missed' => (int) ($row->missed ?? 0),
             'due_soon' => (int) ($row->due_soon ?? 0),
         ];
     }
@@ -1111,12 +1134,13 @@ new #[Title('titles.tasks')] class extends Component
     public function openEditDrawer(int $taskId): void
     {
         $task = Task::query()
-            ->select(['id', 'parent_task_id', 'source_type', 'source_id', 'title', 'description', 'status', 'priority', 'start_date', 'due_date', 'completed_date', 'progress_percentage'])
+            ->select(['id', 'parent_task_id', 'source_type', 'source_id', 'title', 'description', 'status', 'priority', 'start_date', 'due_date', 'completed_date', 'progress_percentage', 'created_by'])
             ->with('taskAssignees:id,task_id,employee_id')
             ->findOrFail($taskId);
 
         $this->resetValidation();
         $this->editingTaskId = $task->id;
+        $this->editingTaskCreatedBy = $task->created_by;
         $this->title = $task->title;
         $this->description = $task->description ?? '';
         $this->taskStatus = $task->status->value;
@@ -1172,13 +1196,28 @@ new #[Title('titles.tasks')] class extends Component
 
         $isCreate = $this->editingTaskId === null;
         $task = $isCreate ? new Task : Task::query()->findOrFail($this->editingTaskId);
+
+        if (! $isCreate && $task->status === TaskStatus::Done) {
+            Flux::toast(variant: 'danger', text: __('tasks.completed_tasks_cannot_change_status'));
+
+            return;
+        }
+
+        $dueDate = $validated['dueDate'] === '' ? null : $validated['dueDate'];
+
+        if (! $isCreate && $task->created_by !== auth()->id() && $dueDate !== $task->due_date?->toDateString()) {
+            Flux::toast(variant: 'danger', text: __('tasks.only_the_task_creator_can_change_the_due_date'));
+
+            $dueDate = $task->due_date?->toDateString();
+        }
+
         $attributes = [
             'title' => $validated['title'],
             'description' => $validated['description'] === '' ? null : $validated['description'],
             'status' => $validated['taskStatus'],
             'priority' => $validated['taskPriority'],
             'start_date' => $validated['startDate'] === '' ? null : $validated['startDate'],
-            'due_date' => $validated['dueDate'] === '' ? null : $validated['dueDate'],
+            'due_date' => $dueDate,
             'completed_date' => $validated['completedDate'] === '' ? null : $validated['completedDate'],
             'progress_percentage' => (int) $validated['progressPercentage'],
             'source_type' => $validated['taskSourceType'],
@@ -1264,13 +1303,14 @@ new #[Title('titles.tasks')] class extends Component
         }
 
         if ($task->status === TaskStatus::Done) {
-            $task->status = TaskStatus::Todo;
-            $task->completed_date = null;
-        } else {
-            $task->status = TaskStatus::Done;
-            $task->completed_date = CarbonImmutable::today();
-            $task->progress_percentage = 100;
+            Flux::toast(variant: 'danger', text: __('tasks.completed_tasks_cannot_change_status'));
+
+            return;
         }
+
+        $task->status = TaskStatus::Done;
+        $task->completed_date = CarbonImmutable::today();
+        $task->progress_percentage = 100;
 
         $task->save();
     }
@@ -1294,7 +1334,17 @@ new #[Title('titles.tasks')] class extends Component
             return;
         }
 
+        if ($task->status === TaskStatus::Done) {
+            Flux::toast(variant: 'danger', text: __('tasks.completed_tasks_cannot_change_status'));
+
+            return;
+        }
+
         $task->status = $newStatus;
+
+        if ($newStatus === TaskStatus::InProgress) {
+            $task->start_date ??= CarbonImmutable::today();
+        }
 
         if ($newStatus === TaskStatus::Done) {
             $task->completed_date ??= CarbonImmutable::today();
@@ -1363,6 +1413,12 @@ new #[Title('titles.tasks')] class extends Component
             return;
         }
 
+        if ($task->created_by !== auth()->id()) {
+            Flux::toast(variant: 'danger', text: __('tasks.only_the_task_creator_can_change_the_due_date'));
+
+            return;
+        }
+
         $task->due_date = $date === '' ? null : CarbonImmutable::parse($date);
         $task->save();
 
@@ -1379,6 +1435,7 @@ new #[Title('titles.tasks')] class extends Component
     {
         $this->resetValidation();
         $this->editingTaskId = null;
+        $this->editingTaskCreatedBy = null;
         $this->title = '';
         $this->description = '';
         $this->taskStatus = TaskStatus::Todo->value;
@@ -1456,7 +1513,7 @@ new #[Title('titles.tasks')] class extends Component
         </x-slot:actions>
     </x-ui.page-header>
 
-    <div class="grid gap-3 @2xl/directory:grid-cols-2 @5xl/directory:grid-cols-4">
+    <div class="grid gap-3 @2xl/directory:grid-cols-2 @4xl/directory:grid-cols-3 @6xl/directory:grid-cols-5">
         <button type="button" wire:click="clearFilters" data-test="task-stat-total" @class(['text-left transition-transform', 'scale-[0.98]' => ! $filtersAreActive])>
             <x-ui.stat-tile :label="__('tasks.total_tasks')" :value="$this->taskStats['total']" icon="clipboard-document-check" />
         </button>
@@ -1465,6 +1522,9 @@ new #[Title('titles.tasks')] class extends Component
         </button>
         <button type="button" wire:click="toggleDueFilter('overdue')" data-test="task-stat-overdue" @class(['text-left transition-transform', 'scale-[0.98] ring-2 ring-status-critical rounded-xl' => $dueFilter === 'overdue'])>
             <x-ui.stat-tile :label="__('tasks.overdue')" :value="$this->taskStats['overdue']" icon="exclamation-triangle" tone="critical" />
+        </button>
+        <button type="button" wire:click="toggleDueFilter('missed')" data-test="task-stat-missed" @class(['text-left transition-transform', 'scale-[0.98] ring-2 ring-status-critical rounded-xl' => $dueFilter === 'missed'])>
+            <x-ui.stat-tile :label="__('tasks.missed')" :value="$this->taskStats['missed']" icon="exclamation-circle" tone="critical" />
         </button>
         <button type="button" wire:click="toggleDueFilter('due_soon')" data-test="task-stat-due-soon" @class(['text-left transition-transform', 'scale-[0.98] ring-2 ring-status-warn rounded-xl' => $dueFilter === 'due_soon'])>
             <x-ui.stat-tile :label="__('tasks.due_within_7_days')" :value="$this->taskStats['due_soon']" icon="clock" tone="warn" />
@@ -1488,13 +1548,15 @@ new #[Title('titles.tasks')] class extends Component
             <div class="flex gap-3 overflow-x-auto pb-1">
                 @foreach ($this->myTasksPreview as $myTask)
                     @php $isAssignedToMe = $viewerEmployeeId !== null && $myTask->taskAssignees->pluck('employee_id')->contains($viewerEmployeeId); @endphp
-                    <button
-                        type="button"
+                    <div
+                        role="button"
+                        tabindex="0"
                         wire:click="openEditDrawer({{ $myTask->id }})"
                         wire:key="my-task-{{ $myTask->id }}"
                         data-test="my-task-card-{{ $myTask->id }}"
+                        x-on:keydown="if (! $event.target.closest('a') && ($event.key === 'Enter' || $event.key === ' ')) { $event.preventDefault(); $wire.openEditDrawer({{ $myTask->id }}) }"
                         @class([
-                            'flex w-56 shrink-0 flex-col gap-2 rounded-xl border p-3 text-left shadow-sm transition-shadow hover:shadow-md dark:bg-secondary-dark',
+                            'flex w-64 shrink-0 flex-col gap-2 rounded-xl border p-3 text-left shadow-sm transition-shadow hover:shadow-md dark:bg-secondary-dark',
                             'border-primary/30 bg-white dark:border-status-critical/30' => $isAssignedToMe,
                             'border-dashed border-secondary-light bg-secondary-soft/30 dark:border-secondary-medium dark:bg-secondary-medium/10' => ! $isAssignedToMe,
                         ])
@@ -1506,21 +1568,32 @@ new #[Title('titles.tasks')] class extends Component
                                     <flux:icon.user variant="micro" class="size-3" aria-hidden="true" />
                                     {{ __('tasks.assigned_to_you') }}
                                 </span>
-                            @else
-                                <span class="inline-flex shrink-0 items-center gap-1 text-[10px] font-semibold text-secondary-medium dark:text-secondary-soft" data-test="my-task-role-delegated-{{ $myTask->id }}">
-                                    <flux:icon.paper-airplane variant="micro" class="size-3" aria-hidden="true" />
-                                    {{ __('tasks.you_assigned') }}
-                                </span>
                             @endif
                         </div>
-                        <p class="truncate text-sm font-semibold text-secondary-dark dark:text-white">{{ $myTask->title }}</p>
+                        @unless ($isAssignedToMe)
+                            @php $assigneeName = $myTask->taskAssignees->first()?->employee?->name; @endphp
+                            @if ($assigneeName !== null)
+                                <span class="inline-flex items-start gap-1 text-[10px] font-semibold text-secondary-medium dark:text-secondary-soft" data-test="my-task-role-delegated-{{ $myTask->id }}">
+                                    <flux:icon.paper-airplane variant="micro" class="mt-0.5 size-3 shrink-0" aria-hidden="true" />
+                                    <span class="break-words">{{ __('tasks.assigned_to_name', ['name' => $assigneeName]) }}</span>
+                                </span>
+                            @endif
+                        @endunless
+                        <a
+                            href="{{ route('tasks.show', $myTask) }}"
+                            wire:navigate
+                            title="{{ $myTask->title }}"
+                            x-on:click.stop
+                            class="truncate text-sm font-semibold text-secondary-dark hover:text-primary hover:underline dark:text-white dark:hover:text-status-critical"
+                            data-test="my-task-title-{{ $myTask->id }}"
+                        >{{ $myTask->title }}</a>
                         <div class="flex items-center justify-between text-xs text-secondary-medium dark:text-secondary-soft">
-                            <span @class(['font-semibold text-status-critical' => $myTask->due_date !== null && $myTask->due_date->isPast() && $myTask->status !== TaskStatus::Done])>
+                            <span @class(['font-semibold text-status-critical' => $myTask->isOverdue() || $myTask->isMissed()])>
                                 {{ $myTask->due_date?->translatedFormat('M j') ?? __('tasks.no_due_date') }}
                             </span>
                             <x-ui.enum-badge :case="$myTask->priority" />
                         </div>
-                    </button>
+                    </div>
                 @endforeach
             </div>
         @else
@@ -1640,6 +1713,7 @@ new #[Title('titles.tasks')] class extends Component
             <div class="grid gap-5 border-t border-secondary-soft pt-5 sm:grid-cols-2 dark:border-secondary-medium">
                 <div class="min-w-0">
                     <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft" id="task-drawer-status-label">{{ __('common.status') }}</label>
+                    @php $isStatusLocked = $editingTaskId !== null && $taskStatus === TaskStatus::Done->value; @endphp
                     <div class="grid grid-cols-2 gap-1.5" role="radiogroup" aria-labelledby="task-drawer-status-label">
                         @foreach (TaskStatus::cases() as $statusCase)
                             @php
@@ -1655,11 +1729,13 @@ new #[Title('titles.tasks')] class extends Component
                                 type="button"
                                 role="radio"
                                 aria-checked="{{ $isStatusSelected ? 'true' : 'false' }}"
+                                @disabled($isStatusLocked)
                                 wire:click="$set('taskStatus', '{{ $statusCase->value }}')"
                                 @class([
                                     'inline-flex min-h-10 cursor-pointer touch-manipulation items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-semibold whitespace-nowrap transition-colors',
                                     $statusSelectedClasses => $isStatusSelected,
                                     'border-secondary-light text-secondary-medium hover:border-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => ! $isStatusSelected,
+                                    'cursor-not-allowed opacity-60' => $isStatusLocked,
                                 ])
                                 data-test="task-drawer-status-{{ $statusCase->value }}"
                             >
@@ -1668,6 +1744,9 @@ new #[Title('titles.tasks')] class extends Component
                             </button>
                         @endforeach
                     </div>
+                    @if ($isStatusLocked)
+                        <p class="mt-1.5 text-xs text-secondary-medium dark:text-secondary-soft">{{ __('tasks.completed_tasks_cannot_change_status') }}</p>
+                    @endif
                     <flux:error name="taskStatus" class="mt-1.5" />
                 </div>
 
@@ -1771,21 +1850,28 @@ new #[Title('titles.tasks')] class extends Component
 
             <div class="border-t border-secondary-soft pt-5 dark:border-secondary-medium">
                 @php
-                    $isOverdueDraft = preg_match('/^\d{4}-\d{2}-\d{2}$/', $dueDate) === 1
-                        && $taskStatus !== \App\Enums\TaskStatus::Done->value
+                    $isDueDatePast = preg_match('/^\d{4}-\d{2}-\d{2}$/', $dueDate) === 1
                         && \Carbon\CarbonImmutable::parse($dueDate)->lt(\Carbon\CarbonImmutable::today());
+                    $isMissedDraft = $isDueDatePast && $taskStatus === \App\Enums\TaskStatus::Todo->value;
+                    $isOverdueDraft = $isDueDatePast && ! $isMissedDraft && $taskStatus !== \App\Enums\TaskStatus::Done->value;
+                    $isDueDateLocked = $editingTaskId !== null && $editingTaskCreatedBy !== auth()->id();
                 @endphp
                 <div class="mb-1.5 flex items-center gap-2">
                     <p class="text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('tasks.timeline') }}</p>
-                    @if ($isOverdueDraft)
+                    @if ($isMissedDraft)
+                        <span class="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold tracking-wide text-primary uppercase">{{ __('tasks.missed') }}</span>
+                    @elseif ($isOverdueDraft)
                         <span class="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold tracking-wide text-primary uppercase">{{ __('tasks.overdue') }}</span>
                     @endif
                 </div>
                 <div class="grid gap-4 sm:grid-cols-3">
                     <x-ui.input wire:model="startDate" :label="__('common.start_date')" type="date" />
-                    <x-ui.input wire:model="dueDate" :label="__('tasks.due_date_2')" type="date" />
+                    <x-ui.input wire:model="dueDate" :label="__('tasks.due_date_2')" type="date" :disabled="$isDueDateLocked" />
                     <x-ui.input wire:model="completedDate" :label="__('tasks.completed_date')" type="date" />
                 </div>
+                @if ($isDueDateLocked)
+                    <p class="mt-1.5 text-xs text-secondary-medium dark:text-secondary-soft">{{ __('tasks.only_the_task_creator_can_change_the_due_date') }}</p>
+                @endif
             </div>
         </form>
 

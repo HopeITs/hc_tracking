@@ -108,7 +108,7 @@ new #[Title('titles.proposal')] class extends Component {
                     ])
                     ->orderByRaw('scheduled_date is null, scheduled_date')
                     ->orderBy('id'),
-                'transfers.account:id,name,is_active',
+                'transfers.account:id,account_name,is_active',
             ])
             ->orderBy('id')
             ->get();
@@ -809,7 +809,7 @@ new #[Title('titles.proposal')] class extends Component {
                                         @if ($tranche->account === null)
                                             <span class="italic">{{ __('proposals.no_account_assigned') }}</span>
                                         @else
-                                            <span>{{ $tranche->account->name }}@unless ($tranche->account->is_active) · {{ __('common.closed') }}@endunless</span>
+                                            <span>{{ $tranche->account->account_name }}@unless ($tranche->account->is_active) · {{ __('common.closed') }}@endunless</span>
                                         @endif
                                         @if ($tranche->receive_date !== null)
                                             <span class="tabular-nums">{{ __('proposals.arrived_on', ['date' => $day($tranche->receive_date)]) }}</span>

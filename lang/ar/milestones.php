@@ -6,6 +6,7 @@ return [
     'actual_end_date' => 'تاريخ الانتهاء الفعلي',
     'actual_start_date' => 'تاريخ البدء الفعلي',
     'add_a_milestone_nested_under_this_one' => 'أضف مرحلة رئيسية ضمن هذه المرحلة.',
+    'add_a_task_linked_to_this_milestone' => 'أضف مهمة مرتبطة بهذه المرحلة الرئيسية.',
     'add_milestone' => 'إضافة مرحلة رئيسية',
     'add_milestone_to_project' => 'إضافة مرحلة رئيسية إلى :name',
     'add_related_milestone' => 'إضافة مرحلة مرتبطة',

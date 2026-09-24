@@ -8,6 +8,7 @@ use App\Models\HrEmployee;
 use App\Models\HrProgram;
 use App\Models\Program;
 use App\Models\Project;
+use App\Notifications\UnreadSubjects;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -196,6 +197,17 @@ new #[Title('titles.projects')] class extends Component {
         $this->status = '';
         $this->lens = '';
         $this->resetPage();
+    }
+
+    /**
+     * Records with unread notifications for me, for the row dots.
+     *
+     * @return list<int>
+     */
+    #[Computed]
+    public function unreadIds(): array
+    {
+        return app(UnreadSubjects::class)->ids(auth()->user(), 'project');
     }
 
     /**
@@ -1197,7 +1209,12 @@ new #[Title('titles.projects')] class extends Component {
                                     {{-- Identity. Open and edit sit together as icon actions, exactly as on programs. --}}
                                     <div class="flex items-start justify-between gap-3">
                                         <div class="min-w-0">
-                                            <h3 class="line-clamp-2 text-[15px] leading-snug font-semibold text-secondary-dark dark:text-white" title="{{ $project->name }}">{{ $project->name }}</h3>
+                                            <div class="flex min-w-0 items-center gap-1.5">
+                                                @if (in_array($project->id, $this->unreadIds, true))
+                                                    <span class="size-2 shrink-0 rounded-full bg-primary" data-unread-dot="project-{{ $project->id }}" title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
+                                                @endif
+                                                <h3 class="line-clamp-2 min-w-0 text-[15px] leading-snug font-semibold text-secondary-dark dark:text-white" title="{{ $project->name }}">{{ $project->name }}</h3>
+                                            </div>
 
                                             {{-- City, program and strategy as one breadcrumb instead of three label rows. --}}
                                             <p class="type-meta mt-1 truncate text-secondary-medium dark:text-secondary-soft" title="{{ $pathTitle }}">
@@ -1361,7 +1378,12 @@ new #[Title('titles.projects')] class extends Component {
                             </x-ui.data-table.cell>
 
                             <x-ui.data-table.cell>
-                                <span class="line-clamp-2 text-sm font-semibold" title="{{ $project->name }}">{{ $project->name }}</span>
+                                <span class="flex min-w-0 items-center gap-1.5">
+                                    @if (in_array($project->id, $this->unreadIds, true))
+                                        <span class="size-2 shrink-0 rounded-full bg-primary" data-unread-dot="project-{{ $project->id }}" title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
+                                    @endif
+                                    <span class="line-clamp-2 min-w-0 text-sm font-semibold" title="{{ $project->name }}">{{ $project->name }}</span>
+                                </span>
                                 <span class="block truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $project->city?->name ?? __('common.unknown_city') }} · {{ $project->program->name }}</span>
                                 <span class="block truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $project->program->strategy?->name ?? __('common.strategy_not_assigned') }}</span>
                                 <span class="hidden truncate text-xs tabular-nums text-secondary-medium @max-6xl:block @max-3xl:hidden! dark:text-secondary-soft">

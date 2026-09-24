@@ -1289,6 +1289,7 @@ new #[Title('titles.calendar')] class extends Component {
                     @endphp
                     <x-ui.multi-select-popover
                         :label="__('tasks.assignees')"
+                        in-modal
                         class="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-secondary-light bg-white px-3 py-2 text-start text-sm dark:border-secondary-light dark:bg-secondary-medium"
                         data-test="task-assignee-picker"
                     >

@@ -70,24 +70,32 @@ test('a project ending inside the grant term is not flagged', function () {
 
 test('counting reached milestones does not query once per project', function () {
     $user = User::factory()->create();
-    $proposal = Proposal::factory()->create();
-
-    foreach (range(1, 4) as $index) {
-        $project = Project::factory()->create();
-        Milestone::factory()->count(2)->reached()->create(['project_id' => $project->id]);
-        $proposal->projects()->attach($project);
-    }
-
     $queries = 0;
     DB::listen(function () use (&$queries): void {
         $queries++;
     });
 
-    Livewire::actingAs($user)
-        ->test('pages::proposals.show', ['proposal' => $proposal])
-        ->set('tab', 'projects');
+    $countFor = function (int $projects) use ($user, &$queries): int {
+        $proposal = Proposal::factory()->create();
+
+        foreach (range(1, $projects) as $index) {
+            $project = Project::factory()->create();
+            Milestone::factory()->count(2)->reached()->create(['project_id' => $project->id]);
+            $proposal->projects()->attach($project);
+        }
+
+        $queries = 0;
+
+        Livewire::actingAs($user)
+            ->test('pages::proposals.show', ['proposal' => $proposal])
+            ->set('tab', 'projects');
+
+        return $queries;
+    };
+
+    $countFor(1); // warm per-request caches (permissions, settings)
 
     // The reached count rides on the projects query as a subquery. Four
-    // projects must not cost four extra statements.
-    expect($queries)->toBeLessThan(30);
+    // projects must not cost a single statement more than one.
+    expect($countFor(4))->toBe($countFor(1));
 });

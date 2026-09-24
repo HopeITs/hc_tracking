@@ -158,7 +158,7 @@ test('task detail renders a task with no attachments and no project link when th
         ->assertSeeText('No files recorded');
 });
 
-test('a subtask can be added from the task detail page and inherits the parent source and assignees', function () {
+test('a subtask can be added from the task detail page via the add subtask modal and inherits the parent source', function () {
     $user = User::factory()->create();
     $milestone = Milestone::factory()->create();
     $assignee = insertHrEmployee();
@@ -168,10 +168,14 @@ test('a subtask can be added from the task detail page and inherits the parent s
 
     Livewire::actingAs($user)
         ->test('pages::tasks.show', ['task' => $parent])
+        ->call('openAddSubtaskModal')
+        ->assertSet('newSubtaskAssignedTo', [(string) $assignee])
         ->set('newSubtaskTitle', '  Confirm the delivery window  ')
+        ->set('newSubtaskStatus', TaskStatus::InProgress->value)
+        ->set('newSubtaskDueDate', '2026-10-01')
         ->call('addSubtask')
         ->assertHasNoErrors()
-        ->assertSet('newSubtaskTitle', '')
+        ->assertSet('showAddSubtaskModal', false)
         ->assertSee('Confirm the delivery window');
 
     $subtask = Task::query()->where('title', 'Confirm the delivery window')->sole();
@@ -180,7 +184,8 @@ test('a subtask can be added from the task detail page and inherits the parent s
         ->and($subtask->source_type)->toBe('milestone')
         ->and($subtask->source_id)->toBe($milestone->id)
         ->and($subtask->taskAssignees->pluck('employee_id')->all())->toBe([$assignee])
-        ->and($subtask->status)->toBe(TaskStatus::Todo)
+        ->and($subtask->status)->toBe(TaskStatus::InProgress)
+        ->and($subtask->due_date->toDateString())->toBe('2026-10-01')
         ->and($subtask->created_by)->toBe($user->id);
 });
 
@@ -190,9 +195,25 @@ test('adding a subtask with a blank title is rejected', function () {
 
     Livewire::actingAs($user)
         ->test('pages::tasks.show', ['task' => $parent])
+        ->call('openAddSubtaskModal')
         ->set('newSubtaskTitle', '   ')
         ->call('addSubtask')
         ->assertHasErrors(['newSubtaskTitle' => 'required']);
+
+    expect(Task::query()->where('parent_task_id', $parent->id)->count())->toBe(0);
+});
+
+test('adding a subtask without an assignee is rejected', function () {
+    $user = User::factory()->create();
+    $parent = Task::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.show', ['task' => $parent])
+        ->call('openAddSubtaskModal')
+        ->set('newSubtaskTitle', 'Confirm the delivery window')
+        ->set('newSubtaskAssignedTo', [])
+        ->call('addSubtask')
+        ->assertHasErrors(['newSubtaskAssignedTo' => 'required']);
 
     expect(Task::query()->where('parent_task_id', $parent->id)->count())->toBe(0);
 });
@@ -213,35 +234,20 @@ test('subtasks persist and remain visible after navigating back to the task', fu
         ->assertSeeText('Existing subtask');
 });
 
-test('a subtask can be toggled complete from its parent task page', function () {
+test('the related tasks panel lists a subtask without inline editing controls', function () {
     $user = User::factory()->create();
     $parent = Task::factory()->create();
-    $subtask = Task::factory()->subtaskOf($parent)->create(['status' => TaskStatus::Todo, 'progress_percentage' => 0]);
+    $subtask = Task::factory()->subtaskOf($parent)->create([
+        'title' => 'Confirm the delivery window',
+        'status' => TaskStatus::InProgress,
+    ]);
 
     Livewire::actingAs($user)
         ->test('pages::tasks.show', ['task' => $parent])
-        ->call('toggleSubtaskComplete', $subtask->id);
-
-    expect($subtask->refresh()->status)->toBe(TaskStatus::Done)
-        ->and($subtask->progress_percentage)->toBe(100);
-
-    Livewire::actingAs($user)
-        ->test('pages::tasks.show', ['task' => $parent])
-        ->call('toggleSubtaskComplete', $subtask->id);
-
-    expect($subtask->refresh()->status)->toBe(TaskStatus::Todo);
-});
-
-test('toggling a task that is not a subtask of this parent is a no-op', function () {
-    $user = User::factory()->create();
-    $parent = Task::factory()->create();
-    $unrelated = Task::factory()->create(['status' => TaskStatus::Todo]);
-
-    Livewire::actingAs($user)
-        ->test('pages::tasks.show', ['task' => $parent])
-        ->call('toggleSubtaskComplete', $unrelated->id);
-
-    expect($unrelated->refresh()->status)->toBe(TaskStatus::Todo);
+        ->assertSeeText('Related tasks')
+        ->assertSeeText('Confirm the delivery window')
+        ->assertDontSee('data-test="subtask-toggle-complete-'.$subtask->id.'"', false)
+        ->assertDontSee('data-test="subtask-edit-button-'.$subtask->id.'"', false);
 });
 
 test('a subtask panel does not appear on a subtask s own detail page', function () {
@@ -253,4 +259,65 @@ test('a subtask panel does not appear on a subtask s own detail page', function 
         ->test('pages::tasks.show', ['task' => $subtask])
         ->assertDontSee('Add subtask')
         ->assertSeeText('Subtask of');
+});
+
+test('a task can be edited from its own detail page', function () {
+    $user = User::factory()->create();
+    $newAssignee = insertHrEmployee(firstNameEn: 'Nadia', lastNameEn: 'Younes');
+    $task = Task::factory()->create([
+        'title' => 'Draft distribution plan',
+        'status' => TaskStatus::Todo,
+    ]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.show', ['task' => $task])
+        ->set('title', '  Finalize distribution plan  ')
+        ->set('taskStatus', TaskStatus::InProgress->value)
+        ->set('progressPercentage', '40')
+        ->set('assignedTo', [(string) $newAssignee])
+        ->call('updateTask')
+        ->assertHasNoErrors();
+
+    $task->refresh();
+
+    expect($task->title)->toBe('Finalize distribution plan')
+        ->and($task->status)->toBe(TaskStatus::InProgress)
+        ->and($task->progress_percentage)->toBe(40)
+        ->and($task->taskAssignees->pluck('employee_id')->all())->toBe([$newAssignee]);
+});
+
+test('editing a task without an assignee is rejected', function () {
+    $user = User::factory()->create();
+    $task = Task::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.show', ['task' => $task])
+        ->set('assignedTo', [])
+        ->call('updateTask')
+        ->assertHasErrors(['assignedTo' => 'required']);
+});
+
+test('a subtask is edited from its own detail page, not from the parent', function () {
+    $user = User::factory()->create();
+    $newAssignee = insertHrEmployee(firstNameEn: 'Omar', lastNameEn: 'Saleh');
+    $parent = Task::factory()->create();
+    $subtask = Task::factory()->subtaskOf($parent)->create([
+        'title' => 'Confirm the delivery window',
+        'status' => TaskStatus::Todo,
+    ]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.show', ['task' => $subtask])
+        ->set('title', '  Confirm the final delivery window  ')
+        ->set('taskStatus', TaskStatus::Done->value)
+        ->set('progressPercentage', '100')
+        ->set('assignedTo', [(string) $newAssignee])
+        ->call('updateTask')
+        ->assertHasNoErrors();
+
+    $subtask->refresh();
+
+    expect($subtask->title)->toBe('Confirm the final delivery window')
+        ->and($subtask->status)->toBe(TaskStatus::Done)
+        ->and($subtask->taskAssignees->pluck('employee_id')->all())->toBe([$newAssignee]);
 });

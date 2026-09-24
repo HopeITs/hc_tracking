@@ -444,7 +444,17 @@ test('the my tasks rail stays visible and shows an empty state when the viewer h
         ->assertSee('My Tasks');
 });
 
-test('toggling completion marks a task done and back to todo', function () {
+test('the my tasks rail card title links to the task detail page', function () {
+    $user = User::factory()->create();
+    $task = Task::factory()->create(['title' => 'Reconcile the ledger', 'created_by' => $user->id]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->assertSeeHtml('href="'.route('tasks.show', $task).'"')
+        ->assertSeeHtml('data-test="my-task-title-'.$task->id.'"');
+});
+
+test('toggling completion marks a task done, and a completed task cannot be un-completed', function () {
     $user = User::factory()->create();
     $task = Task::factory()->create(['status' => TaskStatus::InProgress, 'progress_percentage' => 40, 'completed_date' => null]);
 
@@ -455,11 +465,13 @@ test('toggling completion marks a task done and back to todo', function () {
         ->and($task->progress_percentage)->toBe(100)
         ->and($task->completed_date?->toDateString())->toBe(now()->toDateString());
 
-    Livewire::actingAs($user)->test('pages::tasks.index')->call('toggleComplete', $task->id);
+    Livewire::actingAs($user)->test('pages::tasks.index')
+        ->call('toggleComplete', $task->id)
+        ->assertDispatched('toast-show');
 
     $task->refresh();
-    expect($task->status)->toBe(TaskStatus::Todo)
-        ->and($task->completed_date)->toBeNull();
+    expect($task->status)->toBe(TaskStatus::Done)
+        ->and($task->completed_date?->toDateString())->toBe(now()->toDateString());
 });
 
 test('clicking a column header sorts by it ascending, then toggles descending on a second click', function () {
@@ -594,7 +606,8 @@ test('the My Tasks rail visually distinguishes tasks assigned to the viewer from
         ->assertSee('data-test="my-task-role-assigned-'.$assignedToMe->id.'"', false)
         ->assertSee('data-test="my-task-role-delegated-'.$delegatedByMe->id.'"', false)
         ->assertDontSee('data-test="my-task-role-delegated-'.$assignedToMe->id.'"', false)
-        ->assertDontSee('data-test="my-task-role-assigned-'.$delegatedByMe->id.'"', false);
+        ->assertDontSee('data-test="my-task-role-assigned-'.$delegatedByMe->id.'"', false)
+        ->assertSee('Assigned to Someone Else');
 });
 
 test('the list view groups tasks by status with a colored collapsible header', function () {
@@ -947,6 +960,42 @@ test('the board view offers a keyboard accessible select as a non pointer altern
         ->assertSee('wire:change="quickSetStatus('.$task->id.', $event.target.value)"', false);
 });
 
+test('the board view marks a todo task missed once its due date passes', function () {
+    $user = User::factory()->create();
+    $missedTask = Task::factory()->create([
+        'title' => 'Still in todo',
+        'status' => TaskStatus::Todo,
+        'due_date' => now()->subDays(3)->toDateString(),
+    ]);
+    $onTimeTask = Task::factory()->create([
+        'title' => 'Not due yet',
+        'status' => TaskStatus::Todo,
+        'due_date' => now()->addDays(3)->toDateString(),
+    ]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->set('view', 'board')
+        ->assertSee('data-test="task-board-missed-'.$missedTask->id.'"', false)
+        ->assertDontSee('data-test="task-board-missed-'.$onTimeTask->id.'"', false);
+});
+
+test('the board view marks an in progress task overdue once its due date passes, not missed', function () {
+    $user = User::factory()->create();
+    $task = Task::factory()->create([
+        'status' => TaskStatus::InProgress,
+        'due_date' => now()->subDays(3)->toDateString(),
+    ]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->set('view', 'board')
+        ->assertDontSee('data-test="task-board-missed-'.$task->id.'"', false);
+
+    expect($task->isOverdue())->toBeTrue()
+        ->and($task->isMissed())->toBeFalse();
+});
+
 test('the board view shows a subtask count badge on parent cards', function () {
     $user = User::factory()->create();
     $parent = Task::factory()->create(['title' => 'Parent with subtasks']);
@@ -956,6 +1005,22 @@ test('the board view shows a subtask count badge on parent cards', function () {
         ->test('pages::tasks.index')
         ->set('view', 'board')
         ->assertSee('data-test="task-board-card-'.$parent->id.'"', false);
+});
+
+test('the board view offers an inline priority flag dropdown for subtasks, like the add task row', function () {
+    $user = User::factory()->create();
+    $parent = Task::factory()->create();
+    $subtask = Task::factory()->subtaskOf($parent)->create(['priority' => TaskPriority::Low]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->set('view', 'board')
+        ->assertSee('data-test="task-board-subtask-priority-trigger-'.$subtask->id.'"', false)
+        ->assertSee('quickSetPriority('.$subtask->id.', \''.TaskPriority::High->value.'\')', false)
+        ->call('quickSetPriority', $subtask->id, TaskPriority::High->value)
+        ->assertHasNoErrors();
+
+    expect($subtask->refresh()->priority)->toBe(TaskPriority::High);
 });
 
 test('a task with subtasks cannot be deleted until they are moved or removed', function () {
@@ -1007,6 +1072,57 @@ test('quickSetStatus moves a task and syncs its completion fields', function () 
     expect($task->refresh()->status)->toBe(TaskStatus::Done);
 });
 
+test('quickSetStatus sets the start date when a task moves into ongoing', function () {
+    $user = User::factory()->create();
+    $task = Task::factory()->create(['status' => TaskStatus::Todo, 'start_date' => null]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->call('quickSetStatus', $task->id, TaskStatus::InProgress->value)
+        ->assertHasNoErrors();
+
+    expect($task->refresh()->start_date?->toDateString())->toBe(now()->toDateString());
+});
+
+test('quickSetStatus does not overwrite an already-recorded start date', function () {
+    $user = User::factory()->create();
+    $task = Task::factory()->create(['status' => TaskStatus::Todo, 'start_date' => '2026-01-01']);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->call('quickSetStatus', $task->id, TaskStatus::InProgress->value)
+        ->assertHasNoErrors();
+
+    expect($task->refresh()->start_date?->toDateString())->toBe('2026-01-01');
+});
+
+test('the stats section counts overdue and missed tasks separately and filters by each', function () {
+    $user = User::factory()->create();
+    $missedTask = Task::factory()->create(['status' => TaskStatus::Todo, 'due_date' => now()->subDay()->toDateString()]);
+    Task::factory()->create(['status' => TaskStatus::InProgress, 'due_date' => now()->subDay()->toDateString()]);
+
+    $component = Livewire::actingAs($user)->test('pages::tasks.index');
+
+    expect($component->get('taskStats')['overdue'])->toBe(1)
+        ->and($component->get('taskStats')['missed'])->toBe(1);
+
+    $component->call('toggleDueFilter', 'missed')
+        ->assertSee($missedTask->title)
+        ->assertSet('dueFilter', 'missed');
+});
+
+test('quickSetStatus refuses to change the status of a completed task', function () {
+    $user = User::factory()->create();
+    $task = Task::factory()->completed()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->call('quickSetStatus', $task->id, TaskStatus::Todo->value)
+        ->assertDispatched('toast-show');
+
+    expect($task->refresh()->status)->toBe(TaskStatus::Done);
+});
+
 test('the calendar view places tasks on their due date and lists unscheduled tasks separately', function () {
     $user = User::factory()->create();
     Task::factory()->create(['title' => 'Scheduled task', 'due_date' => now()->startOfMonth()->addDays(2)->toDateString()]);
@@ -1018,6 +1134,26 @@ test('the calendar view places tasks on their due date and lists unscheduled tas
         ->assertSee('Scheduled task')
         ->assertSee('Unscheduled task')
         ->assertSee('data-test="task-calendar-unscheduled"', false);
+});
+
+test('the calendar view labels a missed todo chip differently from an overdue in progress chip', function () {
+    $user = User::factory()->create();
+    $missedTask = Task::factory()->create([
+        'title' => 'Missed on calendar',
+        'status' => TaskStatus::Todo,
+        'due_date' => now()->startOfMonth()->addDays(2)->toDateString(),
+    ]);
+    $overdueTask = Task::factory()->create([
+        'title' => 'Overdue on calendar',
+        'status' => TaskStatus::InProgress,
+        'due_date' => now()->startOfMonth()->addDays(2)->toDateString(),
+    ]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->set('view', 'calendar')
+        ->assertSee('data-test="task-calendar-chip-badge-'.$missedTask->id.'"', false)
+        ->assertSee('data-test="task-calendar-chip-badge-'.$overdueTask->id.'"', false);
 });
 
 test('the calendar view switches between day, 4-days, week and month periods', function () {
@@ -1067,7 +1203,7 @@ test('a task shows on its due date in the week calendar view', function () {
 
 test('rescheduleTask sets or clears a due date from calendar drag and drop', function () {
     $user = User::factory()->create();
-    $task = Task::factory()->create(['due_date' => null]);
+    $task = Task::factory()->create(['due_date' => null, 'created_by' => $user->id]);
 
     Livewire::actingAs($user)
         ->test('pages::tasks.index')
@@ -1087,4 +1223,17 @@ test('rescheduleTask sets or clears a due date from calendar drag and drop', fun
         ->call('rescheduleTask', $task->id, 'not-a-date');
 
     expect($task->refresh()->due_date)->toBeNull();
+});
+
+test('rescheduleTask refuses to change the due date for anyone but the task creator', function () {
+    $creator = User::factory()->create();
+    $otherUser = User::factory()->create();
+    $task = Task::factory()->create(['due_date' => '2026-05-01', 'created_by' => $creator->id]);
+
+    Livewire::actingAs($otherUser)
+        ->test('pages::tasks.index')
+        ->call('rescheduleTask', $task->id, '2026-05-10')
+        ->assertDispatched('toast-show');
+
+    expect($task->refresh()->due_date?->toDateString())->toBe('2026-05-01');
 });

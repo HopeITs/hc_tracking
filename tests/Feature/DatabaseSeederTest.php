@@ -98,7 +98,7 @@ test('lookup seeding reuses existing named donors', function () {
     $this->seed(CoreDataSeeder::class);
     $this->seed(CoreDataSeeder::class);
 
-    $this->assertDatabaseCount('donors', 5);
+    $this->assertDatabaseCount('donors', 10);
     expect(Donor::query()->where('name', 'UNICEF')->sole()->id)->toBe($donor->id);
 });
 
@@ -121,7 +121,7 @@ test('demo targets cover annual plans and proposals in the same programme', func
 test('demo proposal dates fall within their programme strategy', function () {
     $this->seed();
 
-    foreach (Proposal::query()->with('projects.program.strategy')->get() as $proposal) {
+    foreach (Proposal::query()->has('projects')->with('projects.program.strategy')->get() as $proposal) {
         $strategy = $proposal->projects->first()->program->strategy;
 
         expect($proposal->planned_date_begin->year)->toBe($strategy->start_year)

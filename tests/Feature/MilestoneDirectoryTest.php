@@ -231,6 +231,17 @@ test('each milestone links to its own edit page instead of an edit modal', funct
         ->assertDontSee('wire:click="openEditModal', false);
 });
 
+test('each milestone has a view button that opens its details page', function () {
+    $user = User::factory()->create();
+    $milestone = Milestone::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.index')
+        ->set('view', 'list')
+        ->assertSee('data-test="milestone-view-'.$milestone->id.'"', false)
+        ->assertSee('href="'.route('milestones.show', $milestone).'"', false);
+});
+
 test('the add button next to a project prefills its project on the create modal', function () {
     $user = User::factory()->create();
     $project = Project::factory()->create(['name' => 'Coastal Relief']);

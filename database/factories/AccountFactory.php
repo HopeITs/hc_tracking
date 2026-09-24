@@ -20,8 +20,14 @@ class AccountFactory extends Factory
      */
     public function definition(): array
     {
+        $currency = fake()->randomElement(Currency::values());
+
         return [
-            'name' => 'Operations '.fake()->randomElement(Currency::values()),
+            'account_name' => 'Operations '.$currency,
+            'bank_name' => fake()->company(),
+            'currency' => $currency,
+            'account_number' => fake()->numerify('##########'),
+            'country' => 'Syria',
             'opened_at' => fake()->dateTimeBetween('-8 years', '-1 year')->format('Y-m-d'),
         ];
     }

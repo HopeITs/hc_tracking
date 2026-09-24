@@ -14,7 +14,8 @@
      */
     $isSubtask ??= false;
     $isDone = $task->status === TaskStatus::Done;
-    $isOverdue = ! $isDone && $task->due_date !== null && $task->due_date->lt($today);
+    $isOverdue = $task->isOverdue();
+    $isMissed = $task->isMissed();
     $cardAssignees = $task->taskAssignees->pluck('employee')->filter();
     $priorityBorderClass = match ($task->priority) {
         TaskPriority::High => 'border-primary dark:border-status-critical',
@@ -34,13 +35,19 @@
         <button
             type="button"
             wire:click="toggleComplete({{ $task->id }})"
-            class="inline-flex size-9 shrink-0 cursor-pointer touch-manipulation items-center justify-center rounded-full text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium"
-            aria-label="{{ $isDone ? __('tasks.mark_incomplete') : __('tasks.mark_complete') }}"
+            @disabled($isDone)
+            class="inline-flex size-9 shrink-0 cursor-pointer touch-manipulation items-center justify-center rounded-full text-secondary-medium hover:bg-secondary-soft disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent dark:text-secondary-soft dark:hover:bg-secondary-medium"
+            aria-label="{{ __('tasks.mark_complete') }}"
         >
             <flux:icon.check-circle :variant="$isDone ? 'solid' : 'outline'" class="size-5 {{ $isDone ? 'text-status-good' : '' }}" />
         </button>
         <div class="min-w-0 flex-1">
-            <a href="{{ route('tasks.show', $task) }}" wire:navigate title="{{ $task->title }}" @class(['line-clamp-2 text-sm font-semibold break-words hover:underline', 'text-secondary-light line-through' => $isDone])>{{ $task->title }}</a>
+            <div class="flex min-w-0 items-center gap-1.5">
+                @if (in_array($task->id, $this->unreadIds, true))
+                    <span class="size-2 shrink-0 rounded-full bg-primary" data-unread-dot="task-{{ $task->id }}" title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
+                @endif
+                <a href="{{ route('tasks.show', $task) }}" wire:navigate title="{{ $task->title }}" @class(['min-w-0 line-clamp-2 text-sm font-semibold break-words hover:underline', 'text-secondary-light line-through' => $isDone])>{{ $task->title }}</a>
+            </div>
             @unless ($isSubtask)
                 <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $task->sourceLabel() }}</p>
             @endunless
@@ -62,8 +69,13 @@
                 {{ $task->subtasks_count }}
             </button>
         @endif
+        @if ($isMissed)
+            <span class="inline-flex items-center rounded-full bg-status-critical-soft px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-primary uppercase dark:text-status-critical" data-test="task-missed-mobile-{{ $task->id }}">{{ __('tasks.missed') }}</span>
+        @elseif ($isOverdue)
+            <span class="inline-flex items-center rounded-full bg-status-critical-soft px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-primary uppercase dark:text-status-critical" data-test="task-overdue-mobile-{{ $task->id }}">{{ __('tasks.overdue') }}</span>
+        @endif
         @if ($task->due_date !== null)
-            <span @class(['text-xs tabular-nums', 'font-semibold text-primary' => $isOverdue, 'text-secondary-medium dark:text-secondary-soft' => ! $isOverdue])>
+            <span @class(['text-xs tabular-nums', 'font-semibold text-primary' => $isOverdue || $isMissed, 'text-secondary-medium dark:text-secondary-soft' => ! $isOverdue && ! $isMissed])>
                 {{ $task->due_date->translatedFormat(__('formats.date_short')) }}
             </span>
         @endif

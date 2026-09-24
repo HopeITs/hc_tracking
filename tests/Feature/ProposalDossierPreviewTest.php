@@ -107,7 +107,7 @@ test('a tranche that has arrived shows what was sent and what actually landed', 
     [$proposal, $agreement] = fundedProposal();
 
     TransfersTracking::factory()
-        ->received(Account::factory()->create(['name' => 'Main USD Account']))
+        ->received(Account::factory()->create(['account_name' => 'Main USD Account']))
         ->create([
             'donor_proposal_id' => $agreement->id,
             'payment_amount' => '100000.00',

@@ -8,6 +8,7 @@ use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Report;
 use App\Models\User;
+use App\Notifications\UnreadSubjects;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -188,6 +189,17 @@ new #[Title('titles.reports')] class extends Component {
             'planIndicator.reports:id,plan_indicator_id,status,planned_date,value',
             'planIndicator.source' => fn (MorphTo $morphTo) => $morphTo->morphWith([AnnualPlan::class => [], Proposal::class => []]),
         ];
+    }
+
+    /**
+     * Records with unread notifications for me, for the row dots.
+     *
+     * @return list<int>
+     */
+    #[Computed]
+    public function unreadIds(): array
+    {
+        return app(UnreadSubjects::class)->ids(auth()->user(), 'report');
     }
 
     /** @return LengthAwarePaginator<int, Report> */
@@ -706,7 +718,10 @@ new #[Title('titles.reports')] class extends Component {
                                         </span>
                                     @endif
                                 </p>
-                                <p class="text-base font-bold">
+                                <p class="flex items-center gap-1.5 text-base font-bold">
+                                    @if (in_array($report->id, $this->unreadIds, true))
+                                        <span class="size-2 shrink-0 rounded-full bg-primary" data-unread-dot="report-{{ $report->id }}" title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
+                                    @endif
                                     {{ $rowTarget->indicator->name }}
                                 </p>
                                 <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">

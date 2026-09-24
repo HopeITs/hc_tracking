@@ -9,6 +9,7 @@ use App\Models\DonorProposal;
 use App\Models\Proposal;
 use App\Models\ProposalStatusNote;
 use App\Models\TransfersTracking;
+use App\Notifications\UnreadSubjects;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -126,6 +127,17 @@ new #[Title('titles.proposals')] class extends Component {
                 fn (Builder $query) => $query->whereIn('status', ProposalPhase::from($this->phase)->statuses())
             )
             ->when($donorId > 0, fn (Builder $query) => $query->whereHas('donorProposals', fn (Builder $query) => $query->where('donor_id', $donorId)));
+    }
+
+    /**
+     * Records with unread notifications for me, for the row dots.
+     *
+     * @return list<int>
+     */
+    #[Computed]
+    public function unreadIds(): array
+    {
+        return app(UnreadSubjects::class)->ids(auth()->user(), 'proposal');
     }
 
     /** @return LengthAwarePaginator<int, Proposal> */
@@ -1033,6 +1045,9 @@ new #[Title('titles.proposals')] class extends Component {
                             <div class="flex flex-col gap-3 @3xl/directory:flex-row @3xl/directory:items-start">
                                 <div class="min-w-0 flex-1">
                                     <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+                                        @if (in_array($proposal->id, $this->unreadIds, true))
+                                            <span class="size-2 shrink-0 rounded-full bg-primary" data-unread-dot="proposal-{{ $proposal->id }}" title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
+                                        @endif
                                         <span class="text-lg leading-tight font-bold {{ $inkText }}">{{ $proposal->name }}</span>
                                         <x-ui.enum-badge :case="$proposal->status" />
                                         {{-- phase is a read-only accessor over status->phase(), not a column. --}}

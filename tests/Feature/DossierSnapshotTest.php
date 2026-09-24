@@ -44,7 +44,7 @@ test('render the dossier to storage for visual inspection', function () {
         'project_num' => 'PRJ-0001',
     ]);
 
-    $account = Account::factory()->create(['name' => 'Main USD Account']);
+    $account = Account::factory()->create(['account_name' => 'Main USD Account']);
 
     TransfersTracking::factory()->received($account)->create([
         'donor_proposal_id' => $echo->id,

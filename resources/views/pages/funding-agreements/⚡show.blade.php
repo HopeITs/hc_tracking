@@ -98,7 +98,7 @@ new #[Title('titles.funding_agreement')] class extends Component {
             ->where('donor_proposal_id', $this->agreementId)
             // account_id is nullable: a tranche may be scheduled before an
             // account is assigned.
-            ->with('account:id,name,is_active')
+            ->with('account:id,account_name,is_active')
             ->orderByRaw('scheduled_date is null, scheduled_date')
             ->orderBy('id')
             ->get();
@@ -280,7 +280,7 @@ new #[Title('titles.funding_agreement')] class extends Component {
                 [
                     'key' => 'account',
                     'label' => __('funding_agreements.stop_in_account'),
-                    'detail' => $transfer->account?->name,
+                    'detail' => $transfer->account?->account_name,
                     'state' => $isReceived && $transfer->account !== null ? 'done' : 'ahead',
                 ],
             ];
@@ -653,7 +653,7 @@ new #[Title('titles.funding_agreement')] class extends Component {
             ->filter(fn (TransfersTracking $transfer): bool => $transfer->account !== null)
             ->groupBy('account_id')
             ->map(fn (Collection $group): array => [
-                'name' => $group->first()->account->name,
+                'name' => $group->first()->account->account_name,
                 'active' => (bool) $group->first()->account->is_active,
                 'tranches' => $group->count(),
                 'landed' => $group
@@ -974,6 +974,7 @@ new #[Title('titles.funding_agreement')] class extends Component {
             ['label' => $donor->name.' · '.$proposal->name],
         ]"
         :title="$donor->name.' · '.$proposal->name"
+        :unread="app(\App\Notifications\UnreadSubjects::class)->has(auth()->user(), 'donor_proposal', $this->agreementId)"
         title-class="text-3xl! font-bold! leading-tight! tracking-tight! text-balance @3xl/detail:text-[2.5rem]!"
     >
         <x-slot:meta>
@@ -1519,6 +1520,11 @@ new #[Title('titles.funding_agreement')] class extends Component {
             </ol>
         </aside>
     </div>
+
+    <section aria-labelledby="record-activity-heading" class="grid gap-3 mt-14" data-record-activity>
+        <h2 id="record-activity-heading" class="text-base font-bold">{{ __('activity.title') }}</h2>
+        <livewire:activity.timeline :subjects="['donor_proposal' => [$agreementId], 'transfer' => $this->transfers->pluck('id')->all(), 'donor_report' => $this->reports->pluck('id')->all()]" :key="'agreement-activity-'.$agreementId" />
+    </section>
 
     <x-funding.agreement-modal
         :editing="$editingAgreementId !== null"

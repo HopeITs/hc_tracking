@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\RecordsActivity;
 use App\Enums\Currency;
+use App\Notifications\TracksActivity;
 use Carbon\CarbonImmutable;
 use Database\Factories\DonorProposalFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -29,10 +31,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable|null $updated_at
  */
 #[Fillable(['donor_id', 'budget', 'currency', 'project_num', 'proposal_id'])]
-class DonorProposal extends Model
+class DonorProposal extends Model implements TracksActivity
 {
     /** @use HasFactory<DonorProposalFactory> */
-    use HasFactory;
+    use HasFactory, RecordsActivity;
 
     /**
      * Eloquent would otherwise pluralize this to donor_proposals.
@@ -110,5 +112,43 @@ class DonorProposal extends Model
             'budget' => 'decimal:2',
             'currency' => Currency::class,
         ];
+    }
+
+    public function activityModule(): string
+    {
+        return 'funding-agreements';
+    }
+
+    public function activityLabel(): string
+    {
+        return static::labelFor($this->getKey());
+    }
+
+    public function activityProgramId(): ?int
+    {
+        return null;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function activityEvents(): array
+    {
+        return ['budget' => 'updated', 'currency' => 'updated', 'project_num' => 'updated'];
+    }
+
+    /**
+     * "Donor · Proposal", read without loading the agreement.
+     */
+    public static function labelFor(mixed $id): string
+    {
+        $row = static::query()
+            ->join('donors', 'donors.id', '=', 'donor_proposal.donor_id')
+            ->join('proposals', 'proposals.id', '=', 'donor_proposal.proposal_id')
+            ->where('donor_proposal.id', $id)
+            ->toBase()
+            ->first(['donors.name as donor', 'proposals.name as proposal']);
+
+        return $row === null ? '' : $row->donor.' · '.$row->proposal;
     }
 }

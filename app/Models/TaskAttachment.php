@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\RecordsParentActivity;
 use App\Enums\FileType;
 use Carbon\CarbonImmutable;
 use Database\Factories\TaskAttachmentFactory;
@@ -11,21 +12,55 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * @property int $id
  * @property int $task_id
  * @property string $path
+ * @property string $disk
+ * @property string|null $original_name
+ * @property string|null $mime_type
+ * @property int|null $size
  * @property FileType $type
  * @property CarbonImmutable $date
+ * @property int|null $uploaded_by
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['task_id', 'path', 'type', 'date'])]
+#[Fillable(['task_id', 'path', 'disk', 'original_name', 'mime_type', 'size', 'type', 'date', 'uploaded_by'])]
 class TaskAttachment extends Model
 {
     /** @use HasFactory<TaskAttachmentFactory> */
-    use HasFactory;
+    use HasFactory, RecordsParentActivity;
+
+    public function activityParent(): ?Task
+    {
+        return $this->task()->first();
+    }
+
+    protected function parentActivityEvent(string $hook): ?string
+    {
+        return $hook === 'created' ? 'task.attachment_added' : null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function parentActivityProperties(string $hook): array
+    {
+        return ['file' => basename((string) $this->path)];
+    }
+
+    /**
+     * Mirror the column default so an unsaved model still reports its disk
+     * under strict mode (see Media::$attributes).
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'disk' => 'local',
+    ];
 
     /**
      * The task this file is attached to.
@@ -38,6 +73,45 @@ class TaskAttachment extends Model
     }
 
     /**
+     * The staff member who uploaded this file.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function uploader(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'uploaded_by');
+    }
+
+    /**
+     * The name shown to people and used as the downloaded filename.
+     *
+     * Reference-only rows recorded before real storage existed have no
+     * original name, so they fall back to the last segment of their path.
+     */
+    public function displayName(): string
+    {
+        return $this->original_name ?? basename($this->path);
+    }
+
+    /**
+     * Whether a real file sits on disk behind this row.
+     *
+     * Reference-only rows (and seeded demo rows) never had one written.
+     */
+    public function isStored(): bool
+    {
+        return $this->original_name !== null && Storage::disk($this->disk)->exists($this->path);
+    }
+
+    /**
+     * Whether the browser can render this file type inline (PDF or image).
+     */
+    public function isPreviewable(): bool
+    {
+        return in_array($this->type, [FileType::Pdf, FileType::Jpg, FileType::Png], true);
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string|class-string>
@@ -47,6 +121,7 @@ class TaskAttachment extends Model
         return [
             'date' => 'date',
             'type' => FileType::class,
+            'size' => 'integer',
         ];
     }
 }

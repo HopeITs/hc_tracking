@@ -3,6 +3,7 @@
 use App\Enums\Currency;
 use App\Enums\ProposalStatus;
 use App\Enums\TaskStatus;
+use App\Models\Activity;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\Indicator;
@@ -49,20 +50,22 @@ test('proposal detail shows only its own status notes newest first', function ()
     $proposal = Proposal::factory()->create();
     $other = Proposal::factory()->create();
 
-    ProposalStatusNote::factory()->create([
-        'proposal_id' => $proposal->id,
-        'context' => 'Older note',
-        'date' => '2026-01-01',
-    ]);
-    ProposalStatusNote::factory()->create([
-        'proposal_id' => $proposal->id,
-        'context' => 'Newer note',
-        'date' => '2026-06-01',
-    ]);
-    ProposalStatusNote::factory()->create([
-        'proposal_id' => $other->id,
-        'context' => 'Someone elses note',
-    ]);
+    Activity::withoutRecording(function () use ($proposal, $other): void {
+        ProposalStatusNote::factory()->create([
+            'proposal_id' => $proposal->id,
+            'context' => 'Older note',
+            'date' => '2026-01-01',
+        ]);
+        ProposalStatusNote::factory()->create([
+            'proposal_id' => $proposal->id,
+            'context' => 'Newer note',
+            'date' => '2026-06-01',
+        ]);
+        ProposalStatusNote::factory()->create([
+            'proposal_id' => $other->id,
+            'context' => 'Someone elses note',
+        ]);
+    });
 
     $this->actingAs($user)
         ->get(route('proposals.show', $proposal))
@@ -402,6 +405,43 @@ test('each tab shows only its own content and the strip counts its records', fun
         ->set('tab', 'tasks')
         ->assertSeeText('Draft the budget narrative')
         ->assertDontSeeText('UNICEF');
+});
+
+test('a task can be added from the proposal show page pre-filled with this proposal', function () {
+    $user = User::factory()->role('Financial')->create();
+    $assignee = insertHrEmployee();
+    $proposal = Proposal::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::proposals.show', ['proposal' => $proposal])
+        ->set('tab', 'tasks')
+        ->call('openAddTaskModal')
+        ->assertSet('showAddTaskModal', true)
+        ->set('newTaskTitle', '  Draft the budget narrative  ')
+        ->set('newTaskAssignedTo', [(string) $assignee])
+        ->call('addTask')
+        ->assertHasNoErrors()
+        ->assertSet('showAddTaskModal', false);
+
+    $task = Task::query()->where('title', 'Draft the budget narrative')->sole();
+
+    expect($task->source_type)->toBe('proposal')
+        ->and($task->source_id)->toBe($proposal->id)
+        ->and($task->taskAssignees->pluck('employee_id')->all())->toBe([$assignee]);
+});
+
+test('adding a task from the proposal show page requires a title and an assignee', function () {
+    $user = User::factory()->role('Financial')->create();
+    $proposal = Proposal::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::proposals.show', ['proposal' => $proposal])
+        ->set('tab', 'tasks')
+        ->call('openAddTaskModal')
+        ->set('newTaskTitle', '   ')
+        ->set('newTaskAssignedTo', [])
+        ->call('addTask')
+        ->assertHasErrors(['newTaskTitle', 'newTaskAssignedTo']);
 });
 
 test('the arrivals climb accumulates only received tranches, in the order they landed', function () {

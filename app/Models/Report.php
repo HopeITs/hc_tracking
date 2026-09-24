@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\RecordsActivity;
 use App\Enums\ReportStatus;
+use App\Notifications\TracksActivity;
 use Carbon\CarbonImmutable;
 use Database\Factories\ReportFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -54,10 +56,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'submit_date',
     'is_seen_by_meal',
 ])]
-class Report extends Model
+class Report extends Model implements TracksActivity
 {
     /** @use HasFactory<ReportFactory> */
-    use HasFactory;
+    use HasFactory, RecordsActivity;
 
     /**
      * Mirror the column defaults so a report that has not been round-tripped
@@ -164,5 +166,63 @@ class Report extends Model
             'submit_date' => 'date',
             'is_seen_by_meal' => 'boolean',
         ];
+    }
+
+    public function activityModule(): string
+    {
+        return 'reports';
+    }
+
+    /**
+     * The reported indicator's name.
+     */
+    public function activityLabel(): string
+    {
+        return (string) PlanIndicator::query()
+            ->join('indicators', 'indicators.id', '=', 'plan_indicators.indicator_id')
+            ->where('plan_indicators.id', $this->activityAttribute('plan_indicator_id'))
+            ->value('indicators.name');
+    }
+
+    public function activityProgramId(): ?int
+    {
+        return PlanIndicator::programIdFor($this->activityAttribute('plan_indicator_id'));
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function activityEvents(): array
+    {
+        return [
+            'status' => 'status_changed',
+            'is_seen_by_meal' => 'seen_by_meal',
+            'value' => 'updated',
+            'planned_date' => 'updated',
+        ];
+    }
+
+    /**
+     * Draft → Reviewed is the submission; → Approved is the approval; seeing
+     * a report only counts when it becomes seen.
+     */
+    protected function activityEventForChange(string $field, mixed $old, mixed $new): ?string
+    {
+        return match (true) {
+            $field === 'status' && $old === ReportStatus::Draft->value && $new === ReportStatus::Reviewed->value => 'submitted',
+            $field === 'status' && $new === ReportStatus::Approved->value => 'approved',
+            $field === 'is_seen_by_meal' => (bool) $new ? 'seen_by_meal' : null,
+            default => $this->activityEvents()[$field] ?? null,
+        };
+    }
+
+    /**
+     * The author, remembered for the deleted event.
+     *
+     * @return array<string, mixed>
+     */
+    protected function activityPropertiesBeforeDelete(): array
+    {
+        return ['author_id' => $this->activityAttribute('user_id')];
     }
 }

@@ -30,7 +30,7 @@
                 <flux:select.option value="">{{ __('transfers.not_yet_assigned') }}</flux:select.option>
                 @foreach ($accountOptions as $accountOption)
                     <flux:select.option :value="$accountOption->id" :wire:key="'tr-account-option-'.$accountOption->id">
-                        {{ $accountOption->name }}@unless ($accountOption->is_active) · {{ __('common.closed') }}@endunless
+                        {{ $accountOption->account_name }}@unless ($accountOption->is_active) · {{ __('common.closed') }}@endunless
                     </flux:select.option>
                 @endforeach
             </x-ui.select>

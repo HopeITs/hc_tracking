@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\RecordsActivity;
 use App\Enums\ProposalPhase;
 use App\Enums\ProposalStatus;
+use App\Notifications\TracksActivity;
 use App\Observers\MediaOwnerObserver;
 use App\Observers\PlanIndicatorSourceObserver;
 use Carbon\CarbonImmutable;
@@ -43,10 +45,10 @@ use Illuminate\Support\Facades\DB;
     'notes',
 ])]
 #[ObservedBy([PlanIndicatorSourceObserver::class, MediaOwnerObserver::class])]
-class Proposal extends Model
+class Proposal extends Model implements TracksActivity
 {
     /** @use HasFactory<ProposalFactory> */
-    use HasFactory;
+    use HasFactory, RecordsActivity;
 
     /**
      * Mirror the column default so an unrefreshed model can still report a
@@ -200,5 +202,28 @@ class Proposal extends Model
             'actual_date_begin' => 'date',
             'actual_date_end' => 'date',
         ];
+    }
+
+    public function activityModule(): string
+    {
+        return 'proposals';
+    }
+
+    public function activityLabel(): string
+    {
+        return (string) $this->activityAttribute('name');
+    }
+
+    public function activityProgramId(): ?int
+    {
+        return null;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function activityEvents(): array
+    {
+        return ['status' => 'status_changed', 'name' => 'updated', 'planned_date_begin' => 'updated', 'planned_date_end' => 'updated'];
     }
 }

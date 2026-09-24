@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\RecordsActivity;
 use App\Enums\ArStatus;
 use App\Enums\Currency;
+use App\Notifications\TracksActivity;
 use Carbon\CarbonImmutable;
 use Database\Factories\TransfersTrackingFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -50,10 +52,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'receive_date',
     'ar_status',
 ])]
-class TransfersTracking extends Model
+class TransfersTracking extends Model implements TracksActivity
 {
     /** @use HasFactory<TransfersTrackingFactory> */
-    use HasFactory;
+    use HasFactory, RecordsActivity;
 
     /**
      * Eloquent would otherwise pluralize this to transfers_trackings.
@@ -132,5 +134,52 @@ class TransfersTracking extends Model
             'fees_currency' => Currency::class,
             'amount_received_currency' => Currency::class,
         ];
+    }
+
+    public function activityModule(): string
+    {
+        return 'transfers';
+    }
+
+    /**
+     * "Donor · Proposal · amount currency".
+     */
+    public function activityLabel(): string
+    {
+        return DonorProposal::labelFor($this->activityAttribute('donor_proposal_id'))
+            .' · '.number_format((float) $this->activityAttribute('payment_amount'), 2).' '.$this->getRawOriginal('amount_transfered_currency', $this->getAttributes()['amount_transfered_currency'] ?? '');
+    }
+
+    public function activityProgramId(): ?int
+    {
+        return null;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function activityEvents(): array
+    {
+        return ['ar_status' => 'status_changed', 'scheduled_date' => 'updated', 'payment_amount' => 'updated'];
+    }
+
+    /**
+     * A new tranche is a scheduled one.
+     */
+    protected function activityCreatedEvent(): string
+    {
+        return 'transfer.scheduled';
+    }
+
+    /**
+     * Received and failed are their own events.
+     */
+    protected function activityEventForChange(string $field, mixed $old, mixed $new): ?string
+    {
+        return match (true) {
+            $field === 'ar_status' && $new === ArStatus::Received->value => 'received',
+            $field === 'ar_status' && $new === ArStatus::Failed->value => 'failed',
+            default => $this->activityEvents()[$field] ?? null,
+        };
     }
 }
