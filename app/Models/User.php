@@ -527,7 +527,7 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
     }
 
     /**
-     * Logins refresh the name and HR ids on every sign-in; that is not news.
+     * Logins refresh the HR employee link on every sign-in; that is not news.
      */
     protected function activityRecordsUpdates(): bool
     {

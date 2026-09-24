@@ -17,7 +17,6 @@ use App\Models\Task;
 use App\Models\TransfersTracking;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Features\SupportTesting\Testable;
@@ -127,8 +126,8 @@ test('an agreement recorded on the page is filed against this proposal even if t
 test('the page cannot open or edit a tranche belonging to another proposal', function () {
     $foreign = TransfersTracking::factory()->create();
 
-    proposalPage()->call('openTransferEdit', $foreign->id);
-})->throws(ModelNotFoundException::class);
+    proposalPage()->call('openTransferEdit', $foreign->id)->assertNotFound();
+});
 
 test('a new tranche opened against an agreement starts in its currency and saves against it', function () {
     $agreement = DonorProposal::factory()->create(['proposal_id' => $this->proposal->id, 'currency' => Currency::Eur]);

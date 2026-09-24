@@ -38,7 +38,7 @@ final class WeeklyDigestScanner implements Scanner
 
         $week = $now->format('o-\WW');
         $stats = $this->statsByProgram($today, $now);
-        $programs = Program::query()->whereIn('id', array_keys($stats))->get(['id', 'name', 'manager_id']);
+        $programs = Program::query()->whereIn('id', array_keys($stats))->get(['id', 'manager_id']);
         $managers = $this->employees->usersFor($programs->pluck('manager_id')->filter()->map(fn ($id): int => (int) $id)->unique()->values()->all());
         $sent = 0;
 

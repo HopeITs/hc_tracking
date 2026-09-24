@@ -50,10 +50,17 @@ class UserFactory extends Factory
      * works against the test suite's in-memory HR database; the real `hr`
      * connection is READ ONLY.
      *
+     * A bare instance (no attributes, e.g. the collection holder of count())
+     * is not a real user and gets no HR account.
+     *
      * @param  array<string, mixed>  $attributes
      */
     public function newModel(array $attributes = []): User
     {
+        if ($attributes === []) {
+            return parent::newModel();
+        }
+
         $name = (string) Arr::pull($attributes, 'name', fake()->name());
         $email = (string) Arr::pull($attributes, 'email', fake()->unique()->safeEmail());
 

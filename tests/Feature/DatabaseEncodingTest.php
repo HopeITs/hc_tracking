@@ -6,10 +6,11 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Columns backed by a `json_valid()` CHECK constraint, keyed as
- * `table.column`. MariaDB implements Laravel's `$table->json()` as
- * `longtext ... COLLATE utf8mb4_bin`, so those columns are a deliberate
- * exception to the utf8mb4_unicode_ci rule and must never be "corrected".
+ * Laravel `$table->json()` columns, keyed as `table.column`. MariaDB
+ * implements them as `longtext ... COLLATE utf8mb4_bin` with a `json_valid()`
+ * CHECK constraint, so those columns are a deliberate exception to the
+ * utf8mb4_unicode_ci rule and must never be "corrected". MySQL stores them as
+ * a native json type that carries no collation.
  *
  * @return array<int, string>
  */
@@ -20,6 +21,11 @@ function jsonColumns(): array
         ->where('CHECK_CLAUSE', 'like', 'json_valid(%')
         ->get()
         ->map(fn (object $constraint): string => "{$constraint->TABLE_NAME}.{$constraint->CONSTRAINT_NAME}")
+        ->merge(DB::table('information_schema.COLUMNS')
+            ->where('TABLE_SCHEMA', DB::getDatabaseName())
+            ->where('DATA_TYPE', 'json')
+            ->get()
+            ->map(fn (object $column): string => "{$column->TABLE_NAME}.{$column->COLUMN_NAME}"))
         ->all();
 }
 

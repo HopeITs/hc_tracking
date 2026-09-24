@@ -61,7 +61,7 @@ test('a quick action on work already done changes nothing and says so', function
 test('a quick action is re-authorised on the server', function () {
     $assignee = userWithRole('Managers', insertHrEmployee());
     [, $notification] = taskNotificationFor($assignee);
-    $assignee->syncRoles(['Media Team']); // no tasks.update any more
+    $assignee->syncRoles([]); // no tasks.update any more
 
     $result = app(QuickActions::class)->run($assignee->fresh(), $notification, 'task.mark_done');
 

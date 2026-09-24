@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Activity;
 use App\Models\Report;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -54,7 +55,7 @@ test('users of inactive hr employees are deleted unless records reference them',
 });
 
 test('syncing refreshes the hr employee an account belongs to', function () {
-    $user = User::factory()->create();
+    $user = Activity::withoutRecording(fn (): User => User::factory()->create());
     $employeeId = insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Darwish');
     DB::connection('hr')->table('users')->where('id', $user->hr_user_id)->update(['employee_id' => $employeeId]);
 

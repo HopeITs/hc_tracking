@@ -103,7 +103,7 @@ test('the manager of the task program is a cascade recipient', function () {
 
 test('users without tasks.view are never notified about tasks', function () {
     $employee = insertHrEmployee();
-    Activity::withoutRecording(fn () => User::factory()->role('Financial')->create(['employee_id' => $employee]));
+    Activity::withoutRecording(fn () => User::factory()->create(['employee_id' => $employee]));
     $actor = Activity::withoutRecording(fn () => User::factory()->role('Managers')->create());
     $task = taskAssignedTo([$employee], $actor->id);
 

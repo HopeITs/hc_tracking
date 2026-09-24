@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\SyncProgramsFromHr;
+use App\Models\Activity;
 use App\Models\HrProgram;
 use App\Models\Program;
 use App\Models\Project;
@@ -22,7 +23,7 @@ test('syncing mirrors every hr program under its hr id, inactive ones included',
 });
 
 test('syncing refreshes a renamed program but keeps its strategy and manager', function () {
-    $program = Program::factory()->create(['name' => 'Hope Center']);
+    $program = Activity::withoutRecording(fn (): Program => Program::factory()->create(['name' => 'Hope Center']));
     $strategyId = $program->strategy_id;
     $managerId = $program->manager_id;
     DB::connection('hr')->table('programs')->where('id', $program->id)->update(['name' => 'Hope Centre']);

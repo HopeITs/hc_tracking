@@ -85,9 +85,14 @@
                         x-on:dragend="$event.currentTarget.classList.remove('opacity-40')"
                     >
                         <div class="flex items-start justify-between gap-2">
-                            <a href="{{ route('tasks.show', $task) }}" wire:navigate class="min-w-0 truncate text-sm font-semibold text-secondary-dark hover:text-primary hover:underline dark:text-white dark:hover:text-status-critical" data-test="task-board-card-{{ $task->id }}">
-                                {{ $task->title }}
-                            </a>
+                            <div class="flex min-w-0 items-center gap-1.5">
+                                @if (in_array($task->id, $this->unreadIds, true))
+                                    <span class="size-2 shrink-0 rounded-full bg-primary" data-unread-dot="task-{{ $task->id }}" title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
+                                @endif
+                                <a href="{{ route('tasks.show', $task) }}" wire:navigate class="min-w-0 truncate text-sm font-semibold text-secondary-dark hover:text-primary hover:underline dark:text-white dark:hover:text-status-critical" data-test="task-board-card-{{ $task->id }}">
+                                    {{ $task->title }}
+                                </a>
+                            </div>
                             <div class="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
                                 <x-ui.button
                                     tone="ghost"

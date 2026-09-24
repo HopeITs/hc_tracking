@@ -83,8 +83,8 @@ new #[Title('titles.activity_log')] class extends Component {
     {
         return User::query()
             ->whereIn('id', Activity::query()->select('actor_id')->whereNotNull('actor_id')->distinct())
-            ->orderBy('name')
-            ->get(['id', 'name']);
+            ->orderByName()
+            ->get(['id', 'hr_user_id']);
     }
 
     private function validDate(string $value): bool

@@ -19,3 +19,6 @@ tests/Feature/Models/** is the other half: those use models directly and assert 
 
 ## Proposal/funding/transfer writes are permission-gated; one forbidden call per Livewire test instance
 Proposal pages authorize through ProposalPolicy (proposals.*), and the shared ManagesAgreementForm / ManagesTransferForm check funding-agreements.* / transfers.*. Tests that write must seed RolesAndPermissionsSeeder and use User::factory()->role('Financial'). After ->assertForbidden() the Livewire Testable snapshot is invalid ("Invalid Livewire snapshot structure"), so build a fresh component for each denied call: $fresh = fn () => Livewire::actingAs($u)->test(...).
+
+## Every role holds tasks.*: use a roleless user for "no task access"
+config/access-control.php gives every role baseline tasks.view/create/update (youssef merge, 2026-09). A test needing someone who cannot see or act on tasks must use a user with no role (User::factory()->create() / syncRoles([])), not Financial or Media Team. Also: activities.properties is a MySQL JSON column that re-sorts keys, so compare stored assoc arrays with toEqual, not toBe.

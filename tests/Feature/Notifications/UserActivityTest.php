@@ -31,10 +31,10 @@ test('saving access without a role change records nothing', function () {
     expect(Activity::query()->count())->toBe(0);
 });
 
-test('a login refreshing the user name records nothing', function () {
+test('a login refreshing the hr employee link records nothing', function () {
     $user = Activity::withoutRecording(fn () => User::factory()->create());
 
-    $user->forceFill(['name' => 'New Name'])->save();
+    $user->forceFill(['employee_id' => insertHrEmployee()])->save();
 
     expect(Activity::query()->count())->toBe(0);
 });

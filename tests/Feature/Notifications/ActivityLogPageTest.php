@@ -16,7 +16,6 @@ test('only super admins and the general manager can open the activity log', func
 
 test('the log filters by module, person, text and date range', function () {
     $sami = userWithRole('Managers');
-    $sami->forceFill(['name' => 'Sami'])->save();
     $rana = userWithRole('Managers');
 
     $this->actingAs($sami);

@@ -282,7 +282,7 @@ new #[Title('titles.task')] class extends Component
     {
         return TaskAttachment::query()
             ->select(['id', 'task_id', 'path', 'disk', 'original_name', 'size', 'date', 'type', 'uploaded_by'])
-            ->with('uploader:id,name')
+            ->with('uploader:id,hr_user_id')
             ->where('task_id', $this->taskId)
             ->orderByDesc('date')
             ->orderByDesc('id')

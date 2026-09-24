@@ -5,7 +5,6 @@ use App\Enums\MediaCollection;
 use App\Models\Media;
 use App\Models\Project;
 use App\Models\User;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -226,17 +225,17 @@ test('editing and deleting reject a media id belonging to a different project', 
         'mediable_id' => $otherProject->id,
     ]);
 
-    expect(fn () => Livewire::actingAs($user)
+    Livewire::actingAs($user)
         ->test('pages::projects.show', ['project' => $project])
         ->set('tab', 'files')
-        ->call('openEditFileModal', $media->id))
-        ->toThrow(ModelNotFoundException::class);
+        ->call('openEditFileModal', $media->id)
+        ->assertNotFound();
 
-    expect(fn () => Livewire::actingAs($user)
+    Livewire::actingAs($user)
         ->test('pages::projects.show', ['project' => $project])
         ->set('tab', 'files')
-        ->call('confirmDeleteFile', $media->id))
-        ->toThrow(ModelNotFoundException::class);
+        ->call('confirmDeleteFile', $media->id)
+        ->assertNotFound();
 
     expect(Media::find($media->id))->not->toBeNull();
 });
