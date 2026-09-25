@@ -1319,6 +1319,8 @@ new #[Title('titles.tasks')] class extends Component
         $task->progress_percentage = 100;
 
         $task->save();
+
+        Flux::toast(variant: 'success', text: __('tasks.task_marked_done'));
     }
 
     public function quickSetStatus(int $taskId, string $status): void
@@ -1360,6 +1362,8 @@ new #[Title('titles.tasks')] class extends Component
         }
 
         $task->save();
+
+        Flux::toast(variant: 'success', text: __('tasks.task_status_changed', ['status' => $newStatus->label()]));
     }
 
     public function quickSetPriority(int $taskId, string $priority): void
@@ -1373,6 +1377,8 @@ new #[Title('titles.tasks')] class extends Component
 
         $task->priority = $newPriority;
         $task->save();
+
+        Flux::toast(variant: 'success', text: __('tasks.task_priority_changed', ['priority' => $newPriority->label()]));
     }
 
     /**
@@ -1401,10 +1407,14 @@ new #[Title('titles.tasks')] class extends Component
 
             $existing->delete();
 
+            Flux::toast(variant: 'success', text: __('tasks.assignee_removed'));
+
             return;
         }
 
         $task->taskAssignees()->create(['employee_id' => $employeeId]);
+
+        Flux::toast(variant: 'success', text: __('tasks.assignee_added'));
     }
 
     public function rescheduleTask(int $taskId, string $date): void

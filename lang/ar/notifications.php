@@ -25,6 +25,8 @@ return [
     'filters' => ['module' => 'الوحدة', 'all_modules' => 'كل الوحدات', 'kind' => 'النوع', 'all_kinds' => 'كل الأنواع', 'priority' => 'الأولوية', 'all_priorities' => 'كل الأولويات', 'state' => 'الحالة'],
     'states' => ['all' => 'الكل', 'unread' => 'غير المقروءة', 'read' => 'المقروءة', 'snoozed' => 'المؤجَّلة'],
     'unsnooze' => 'إلغاء التأجيل',
+    'module_muted' => 'تم إسكات إشعارات هذه الوحدة.',
+    'module_unmuted' => 'تم إلغاء إسكات إشعارات هذه الوحدة.',
     'unread_count' => ':count غير مقروءة',
     'full_page' => 'فتح صندوق الإشعارات كاملًا',
     'filters_toggle' => 'عوامل التصفية',

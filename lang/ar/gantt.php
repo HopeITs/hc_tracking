@@ -13,6 +13,7 @@ return [
     'baseline' => 'خط الأساس',
     'baseline_default_name' => 'خط الأساس :date',
     'baseline_name' => 'اسم خط أساس جديد',
+    'baseline_deleted' => 'حُذف خط الأساس.',
     'baseline_saved' => 'حُفظ خط الأساس.',
     'cancel' => 'إلغاء',
     'cannot_nest_there' => 'لا يمكن وضع هذا المعلم هناك.',

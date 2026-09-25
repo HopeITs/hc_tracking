@@ -20,6 +20,8 @@ return [
     'risk_deleted' => 'Risk deleted.',
     'risk_impact_or_project' => 'Risk, impact, or project',
     'risk_logged' => 'Risk logged.',
+    'risk_marked_materialised' => 'Risk marked as materialised.',
+    'risk_marked_unmaterialised' => 'Risk marked as not materialised.',
     'risk_name' => 'Risk name',
     'section_assessment' => 'Assessment',
     'risk_updated' => 'Risk updated.',

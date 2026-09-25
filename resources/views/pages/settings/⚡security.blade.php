@@ -1,5 +1,6 @@
 <?php
 
+use Flux\Flux;
 use Laravel\Fortify\Actions\DisableTwoFactorAuthentication;
 use Laravel\Fortify\Features;
 use Laravel\Fortify\Fortify;
@@ -113,6 +114,8 @@ new #[Title('titles.security_settings')] class extends Component {
 
         $this->closeDeleteModal();
         $this->loadPasskeys();
+
+        Flux::toast(variant: 'success', text: __('settings.passkey_removed'));
     }
 
     /**
@@ -144,6 +147,8 @@ new #[Title('titles.security_settings')] class extends Component {
         $disableTwoFactorAuthentication(auth()->user());
 
         $this->twoFactorEnabled = false;
+
+        Flux::toast(variant: 'success', text: __('settings.two_factor_authentication_disabled'));
     }
     /* @end-chisel-2fa */
 }; ?>

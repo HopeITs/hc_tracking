@@ -1,5 +1,6 @@
 <?php
 
+use Flux\Flux;
 use Laravel\Fortify\Actions\GenerateNewRecoveryCodes;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -24,6 +25,8 @@ new class extends Component {
         $generateNewRecoveryCodes(auth()->user());
 
         $this->loadRecoveryCodes();
+
+        Flux::toast(variant: 'success', text: __('settings.recovery_codes_regenerated'));
     }
 
     /**

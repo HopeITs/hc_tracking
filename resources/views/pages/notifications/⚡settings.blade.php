@@ -2,6 +2,7 @@
 
 use App\Models\NotificationMute;
 use App\Models\Permission;
+use Flux\Flux;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -48,11 +49,18 @@ new #[Title('titles.notification_settings')] class extends Component {
 
         $mute = NotificationMute::query()->where('user_id', auth()->id())->where('module', $module)->first();
 
-        $mute === null
+        $muting = $mute === null;
+
+        $muting
             ? NotificationMute::query()->create(['user_id' => auth()->id(), 'module' => $module])
             : $mute->delete();
 
         $this->muted = $this->mutedModules();
+
+        Flux::toast(
+            variant: 'success',
+            text: $muting ? __('notifications.module_muted') : __('notifications.module_unmuted'),
+        );
     }
 
     /**

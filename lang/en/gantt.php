@@ -13,6 +13,7 @@ return [
     'baseline' => 'Baseline',
     'baseline_default_name' => 'Baseline :date',
     'baseline_name' => 'New baseline name',
+    'baseline_deleted' => 'Baseline deleted.',
     'baseline_saved' => 'Baseline saved.',
     'cancel' => 'Cancel',
     'cannot_nest_there' => 'That milestone cannot be nested there.',

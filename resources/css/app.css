@@ -1797,6 +1797,175 @@ textarea.form-box-input {
 }
 
 /*
+ * Flux toasts (Flux::toast(), CRUD confirmations), styled as a centred,
+ * SweetAlert-style popup instead of a corner snackbar. `position="center"` on
+ * <flux:toast.group> (see the app and auth layouts) is the hook for all of this.
+ *
+ * True centring: Flux's own [position*="center"] rule only centers horizontally.
+ * The group collapses to zero height (its dialog is absolutely positioned inside
+ * it), so auto margins alone don't centre it vertically — Flux's CSS only sets
+ * top/bottom for "top"/"bottom" positions, and "center" matches neither, leaving
+ * the dialog at its static position. `top: 50%` plus a same-height translateY
+ * fixes that regardless of the dialog's rendered height.
+ *
+ * The rest restyles Flux's fixed toast markup (vendor/livewire/flux/stubs/.../
+ * toast/index.blade.php has no class hooks of its own) by structural position:
+ * card (first div) > content row (its only child) > [icon+text row, action/close row].
+ */
+ui-toast-group[position='center'] {
+    margin-top: auto;
+    margin-bottom: auto;
+
+    [data-flux-toast-dialog] {
+        top: 50%;
+        /* !important: Flux's JS sets an inline `transform` on this element itself
+           (it positions stacked toasts by translating each one), which otherwise
+           always beats an external rule regardless of specificity. */
+        transform: translateY(-50%) scale(0.94) !important;
+        transition: opacity 0.25s allow-discrete, transform 0.25s allow-discrete, height 0.35s allow-discrete;
+
+        &.showing {
+            transform: translateY(-50%) scale(1) !important;
+        }
+
+        /* Card: Flux's own p-2/rounded-xl/shadow-lg wrapper, widened and padded into a popup.
+           The backdrop dimming the rest of the page is a giant-spread box-shadow rather than
+           a real ::backdrop — a real backdrop only paints while the popover is genuinely
+           open, and the group here never reliably reports "closed" once every toast in it
+           has been dismissed, which left the dimming stuck on screen. A shadow is just paint
+           tied to this element, so it appears and fades with the popup itself, every time. */
+        > div {
+            position: relative;
+            overflow: hidden;
+            width: 22rem;
+            max-width: calc(100vw - 2.5rem);
+            padding: 1.75rem 1.5rem 1.375rem;
+            border-radius: 1.25rem;
+            box-shadow:
+                0 2px 8px color-mix(in srgb, var(--color-secondary-dark) 22%, transparent),
+                0 24px 64px color-mix(in srgb, var(--color-secondary-dark) 40%, transparent),
+                0 0 0 100vmax color-mix(in srgb, var(--color-secondary-dark) 45%, transparent);
+        }
+
+        /* Content row: stack icon above text instead of side-by-side, and centre it. */
+        > div > div {
+            flex-direction: column;
+            align-items: center;
+            gap: 0.625rem;
+            overflow: visible;
+        }
+
+        /* Icon + text column: also stacked, icon first. */
+        > div > div > div:first-child {
+            flex-direction: column;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0;
+            text-align: center;
+        }
+
+        /* The variant icon becomes a colour-tinted circular badge. */
+        svg {
+            width: 2.75rem;
+            height: 2.75rem;
+            padding: 0.625rem;
+            border-radius: 9999px;
+        }
+
+        /* Action/close row: off the content flow, into the card's top-end corner,
+           clear of the icon badge's own padding. */
+        > div > div > div:last-child {
+            position: absolute;
+            top: 0.375rem;
+            inset-inline-end: 0.375rem;
+        }
+
+        /* The dismiss countdown. Flux tracks its own `duration` in JS with no CSS
+           hook, so this assumes the shared default (Flux::toast()'s 5s) — every
+           toast in this app relies on that default rather than passing its own. */
+        > div::after {
+            content: '';
+            position: absolute;
+            inset-inline: 0;
+            bottom: 0;
+            height: 3px;
+            transform-origin: left center;
+            animation: hc-center-toast-countdown 5s linear forwards;
+        }
+
+        &[data-variant='success'] {
+            svg {
+                background-color: var(--color-status-good-soft);
+                color: var(--color-status-good);
+            }
+
+            > div::after {
+                background-color: var(--color-status-good);
+            }
+        }
+
+        &[data-variant='warning'] {
+            svg {
+                background-color: var(--color-status-warn-soft);
+                color: var(--color-status-warn);
+            }
+
+            > div::after {
+                background-color: var(--color-status-warn);
+            }
+        }
+
+        &[data-variant='danger'] {
+            svg {
+                background-color: var(--color-status-critical-soft);
+                color: var(--color-status-critical);
+            }
+
+            > div::after {
+                background-color: var(--color-status-critical);
+            }
+        }
+
+        &:not([data-variant]),
+        &[data-variant='info'] {
+            svg {
+                background-color: var(--color-status-active-soft);
+                color: var(--color-status-active);
+            }
+
+            > div::after {
+                background-color: var(--color-status-active);
+            }
+        }
+    }
+}
+
+[dir='rtl'] ui-toast-group[position='center'] [data-flux-toast-dialog] > div::after {
+    transform-origin: right center;
+}
+
+@keyframes hc-center-toast-countdown {
+    from {
+        transform: scaleX(1);
+    }
+    to {
+        transform: scaleX(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    ui-toast-group[position='center'] [data-flux-toast-dialog] {
+        transition: opacity 0.2s;
+        transform: none !important;
+
+        > div::after {
+            animation: none;
+            opacity: 0;
+        }
+    }
+}
+
+/*
  * Notification toasts (resources/views/components/notifications/toasts.blade.php):
  * the thin line that runs down while an important toast is on screen.
  */

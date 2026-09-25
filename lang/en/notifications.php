@@ -25,6 +25,8 @@ return [
     'filters' => ['module' => 'Module', 'all_modules' => 'All modules', 'kind' => 'Type', 'all_kinds' => 'All types', 'priority' => 'Priority', 'all_priorities' => 'All priorities', 'state' => 'Status'],
     'states' => ['all' => 'All', 'unread' => 'Unread', 'read' => 'Read', 'snoozed' => 'Snoozed'],
     'unsnooze' => 'Unsnooze',
+    'module_muted' => 'Notifications for this module are muted.',
+    'module_unmuted' => 'Notifications for this module are unmuted.',
     'unread_count' => ':count unread',
     'full_page' => 'Open the full inbox',
     'filters_toggle' => 'Filters',

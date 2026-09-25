@@ -209,6 +209,11 @@ new #[Title('titles.risks')] class extends Component {
     public function setHappened(int $riskId, bool $happened): void
     {
         Risk::query()->findOrFail($riskId)->update(['happened' => $happened]);
+
+        Flux::toast(
+            variant: 'success',
+            text: $happened ? __('risks.risk_marked_materialised') : __('risks.risk_marked_unmaterialised'),
+        );
     }
 
     public function openEditModal(int $riskId): void

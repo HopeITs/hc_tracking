@@ -20,6 +20,8 @@ return [
     'risk_deleted' => 'تم حذف الخطر.',
     'risk_impact_or_project' => 'الخطر أو الأثر أو المشروع',
     'risk_logged' => 'تم تسجيل الخطر.',
+    'risk_marked_materialised' => 'تم تعليم الخطر كمتحقق.',
+    'risk_marked_unmaterialised' => 'تم تعليم الخطر كغير متحقق.',
     'risk_name' => 'اسم الخطر',
     'section_assessment' => 'التقييم',
     'risk_updated' => 'تم تحديث الخطر.',

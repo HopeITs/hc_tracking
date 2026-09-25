@@ -315,6 +315,8 @@ new #[Title('titles.user_directory')] class extends Component {
 
             $this->deleteError = __('users.this_user_is_linked_to_operational_records_and_cannot_be_del');
 
+            Flux::toast(variant: 'danger', text: $this->deleteError);
+
             return;
         }
 
@@ -404,6 +406,8 @@ new #[Title('titles.user_directory')] class extends Component {
 
         $this->newRoleName = '';
         $this->selectRole($role->id);
+
+        Flux::toast(variant: 'success', text: __('roles.role_created'));
     }
 
     public function renameRole(): void
@@ -419,6 +423,8 @@ new #[Title('titles.user_directory')] class extends Component {
         ]);
 
         $role->update(['name' => $validated['selectedRoleName']]);
+
+        Flux::toast(variant: 'success', text: __('roles.role_renamed'));
     }
 
     public function deleteRole(): void
@@ -433,6 +439,8 @@ new #[Title('titles.user_directory')] class extends Component {
 
         $this->selectedRoleId = Role::query()->orderBy('name')->value('id');
         $this->loadSelectedRole();
+
+        Flux::toast(variant: 'success', text: __('roles.role_deleted'));
     }
 
     public function selectAllRolePermissions(): void

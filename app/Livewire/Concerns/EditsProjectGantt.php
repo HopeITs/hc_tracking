@@ -321,6 +321,8 @@ trait EditsProjectGantt
             $this->ganttBaselineId = null;
         }
 
+        Flux::toast(variant: 'success', text: __('gantt.baseline_deleted'));
+
         return $this->ganttSaved();
     }
 

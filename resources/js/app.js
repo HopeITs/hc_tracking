@@ -1,3 +1,4 @@
+import './flux-toast-duration';
 import './preloader';
 import './assignee-picker';
 import './charts';
