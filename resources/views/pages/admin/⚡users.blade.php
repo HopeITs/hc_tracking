@@ -492,73 +492,63 @@ new #[Title('titles.user_directory')] class extends Component {
 ?>
 
 <section
-    class="@container/directory mx-auto flex min-h-full w-full max-w-[1800px] flex-1 flex-col gap-[clamp(1rem,1.5vw,1.5rem)]"
+    class="admin-directory @container/directory mx-auto flex min-h-full w-full max-w-[1800px] flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white"
     aria-labelledby="access-management-heading"
 >
-    <header class="rounded-xl border border-gray-200 border-s-4 border-s-primary bg-white px-[clamp(1rem,2vw,1.5rem)] py-[clamp(1rem,1.5vw,1.25rem)] shadow-sm dark:bg-secondary-dark">
-        <div class="flex flex-wrap items-center justify-between gap-4">
-            <h1 id="access-management-heading" class="text-[clamp(1.35rem,2vw,1.75rem)] font-bold leading-tight text-gray-900 dark:text-white">
+    <header class="flex flex-wrap items-center justify-between gap-4 border-b border-secondary-soft pb-6 dark:border-secondary-medium">
+        <div class="flex items-center gap-2.5">
+            <flux:heading id="access-management-heading" size="xl" class="text-3xl! font-bold! leading-none!">
                 {{ __('users.users') }}
-            </h1>
-
-            <nav class="flex min-h-11 items-center gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1 dark:border-secondary-medium dark:bg-secondary-dark" aria-label="{{ __('users.users') }}">
-                <button type="button" wire:click="showTab('users')" @class([
-                    'min-h-9 rounded-md px-4 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
-                    'bg-white text-primary shadow-sm ring-1 ring-gray-200' => $activeTab === 'users',
-                    'text-gray-600 hover:bg-white hover:text-gray-900 dark:text-secondary-soft' => $activeTab !== 'users',
-                ])>
-                    {{ __('users.users') }}
-                </button>
-                <button type="button" wire:click="showTab('roles')" @class([
-                    'min-h-9 rounded-md px-4 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
-                    'bg-white text-primary shadow-sm ring-1 ring-gray-200' => $activeTab === 'roles',
-                    'text-gray-600 hover:bg-white hover:text-gray-900 dark:text-secondary-soft' => $activeTab !== 'roles',
-                ])>
-                    {{ __('roles.title') }}
-                </button>
-            </nav>
+            </flux:heading>
+            <span class="inline-flex min-w-7 items-center justify-center rounded-md bg-primary px-2 py-0.5 text-xs font-bold tabular-nums text-white">
+                {{ $activeTab === 'users' ? $this->users->total() : $this->roles->count() }}
+            </span>
         </div>
+
+        <nav class="flex min-h-11 items-center gap-1 rounded-lg border border-secondary-soft bg-secondary-soft/40 p-1 dark:border-secondary-medium dark:bg-secondary-medium/40" aria-label="{{ __('users.users') }}">
+            <button type="button" wire:click="showTab('users')" @class([
+                'min-h-9 rounded-md px-4 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                'bg-white text-primary shadow-sm dark:bg-secondary-dark' => $activeTab === 'users',
+                'text-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => $activeTab !== 'users',
+            ])>
+                {{ __('users.users') }}
+            </button>
+            <button type="button" wire:click="showTab('roles')" @class([
+                'min-h-9 rounded-md px-4 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                'bg-white text-primary shadow-sm dark:bg-secondary-dark' => $activeTab === 'roles',
+                'text-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => $activeTab !== 'roles',
+            ])>
+                {{ __('roles.title') }}
+            </button>
+        </nav>
     </header>
 
     @if ($activeTab === 'users')
-        <div class="grid min-w-0 gap-[clamp(1rem,1.5vw,1.5rem)] xl:grid-cols-[21rem_minmax(0,1fr)]">
-            <section class="flex min-w-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:bg-secondary-dark">
-                <div class="space-y-2.5 border-b border-gray-200 p-3 dark:border-secondary-medium">
-                    <div class="flex items-center justify-between gap-2">
-                        <label class="sr-only" for="access-user-search">{{ __('users.search_users') }}</label>
-                        <input
-                            id="access-user-search"
-                            type="search"
-                            wire:model.live.debounce.350ms="search"
-                            placeholder="{{ __('users.search_users') }}"
-                            class="min-h-11 w-full min-w-0 rounded-lg border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:border-primary focus:ring-primary dark:bg-secondary-dark dark:text-white"
-                        >
-                        @can('create', App\Models\User::class)
-                            <flux:button size="sm" variant="primary" icon="user-plus" wire:click="openCreateModal" data-test="create-user-button" />
-                        @endcan
-                    </div>
+        <div class="directory-filters grid min-w-0 gap-3 @sm/directory:grid-cols-2 @3xl/directory:grid-cols-3">
+            <x-ui.input id="access-user-search" type="search" icon="magnifying-glass" :label="__('users.search_users')" :placeholder="__('users.search_users')" wire:model.live.debounce.350ms="search" clearable />
 
-                    <div class="grid grid-cols-[repeat(auto-fit,minmax(8rem,1fr))] gap-2">
-                        <select wire:model.live="role" aria-label="{{ __('users.all_roles') }}" class="min-h-11 min-w-0 rounded-lg border-gray-200 bg-white text-sm text-gray-700 focus:border-primary focus:ring-primary dark:bg-secondary-dark dark:text-white">
-                            <option value="">{{ __('users.all_roles') }}</option>
-                            @foreach ($this->roleOptions as $roleOption)
-                                <option value="{{ $roleOption->name }}" wire:key="role-filter-{{ $roleOption->id }}">{{ $roleOption->name }}</option>
-                            @endforeach
-                        </select>
-                        <select wire:model.live="status" aria-label="{{ __('common.status') }}" class="min-h-11 min-w-0 rounded-lg border-gray-200 bg-white text-sm text-gray-700 focus:border-primary focus:ring-primary dark:bg-secondary-dark dark:text-white">
-                            <option value="">{{ __('users.all_statuses') }}</option>
-                            <option value="active">{{ __('common.active') }}</option>
-                            <option value="inactive">{{ __('cities.inactive') }}</option>
-                        </select>
-                    </div>
-                </div>
+            <x-ui.header-filter-select id="access-role-filter" :label="__('users.all_roles')" wire:model.live="role" :value="$role">
+                <flux:select.option value="">{{ __('users.all_roles') }}</flux:select.option>
+                @foreach ($this->roleOptions as $roleOption)
+                    <flux:select.option :value="$roleOption->name" :wire:key="'role-filter-'.$roleOption->id">{{ $roleOption->name }}</flux:select.option>
+                @endforeach
+            </x-ui.header-filter-select>
 
-                <div class="max-h-[min(62vh,44rem)] divide-y divide-gray-100 overflow-y-auto overscroll-contain dark:divide-secondary-medium">
+            <x-ui.header-filter-select id="access-status-filter" :label="__('common.status')" wire:model.live="status" :value="$status">
+                <flux:select.option value="">{{ __('users.all_statuses') }}</flux:select.option>
+                <flux:select.option value="active">{{ __('common.active') }}</flux:select.option>
+                <flux:select.option value="inactive">{{ __('cities.inactive') }}</flux:select.option>
+            </x-ui.header-filter-select>
+        </div>
+
+        <div class="grid min-w-0 gap-6 xl:grid-cols-[21rem_minmax(0,1fr)]">
+            <section class="flex min-w-0 flex-col overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-secondary-medium dark:bg-secondary-dark dark:shadow-none">
+                <div class="max-h-[min(62vh,44rem)] divide-y divide-secondary-soft overflow-y-auto overscroll-contain dark:divide-secondary-medium">
                     @forelse ($this->users as $user)
                         <button type="button" wire:click="selectUser({{ $user->id }})" wire:key="access-user-{{ $user->id }}" @class([
                             'group relative flex min-h-[4.5rem] w-full items-center gap-3 px-3 py-2.5 text-start transition focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-primary',
-                            'bg-gray-50 dark:bg-secondary-medium' => $selectedUserId === $user->id,
-                            'bg-white hover:bg-gray-50 dark:bg-secondary-dark dark:hover:bg-secondary-medium' => $selectedUserId !== $user->id,
+                            'bg-secondary-soft/60 dark:bg-secondary-medium/60' => $selectedUserId === $user->id,
+                            'bg-white hover:bg-secondary-soft/40 dark:bg-secondary-dark dark:hover:bg-secondary-medium/40' => $selectedUserId !== $user->id,
                         ])>
                             @if ($selectedUserId === $user->id)
                                 <span class="absolute inset-y-2 start-0 w-0.5 rounded-full bg-primary" aria-hidden="true"></span>
@@ -568,106 +558,103 @@ new #[Title('titles.user_directory')] class extends Component {
                                 <span @class([
                                     'block truncate text-sm font-bold',
                                     'text-primary' => $selectedUserId === $user->id,
-                                    'text-gray-900 dark:text-white' => $selectedUserId !== $user->id,
+                                    'text-secondary-dark dark:text-white' => $selectedUserId !== $user->id,
                                 ])>{{ $user->name }}</span>
-                                <span class="block truncate text-xs text-gray-500 dark:text-secondary-soft">{{ $user->email }}</span>
+                                <span class="block truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $user->email }}</span>
                                 <span class="mt-1 flex flex-wrap gap-1">
                                     @forelse ($user->roles->take(2) as $userRole)
-                                        <span class="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[0.65rem] font-semibold leading-none text-gray-500 dark:border-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft">
+                                        <span class="rounded-md border border-secondary-soft bg-white px-1.5 py-0.5 text-[0.65rem] font-semibold leading-none text-secondary-medium dark:border-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft">
                                             {{ $userRole->name }}
                                         </span>
                                     @empty
-                                        <span class="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[0.65rem] font-semibold leading-none text-gray-400 dark:border-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft">
+                                        <span class="rounded-md border border-secondary-soft bg-white px-1.5 py-0.5 text-[0.65rem] font-semibold leading-none text-secondary-light dark:border-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft">
                                             {{ __('users.no_role') }}
                                         </span>
                                     @endforelse
                                 </span>
                             </span>
-                            @can('delete', $user)
-                                <span
-                                    role="button"
-                                    tabindex="0"
-                                    wire:click.stop="confirmUserDeletion({{ $user->id }})"
-                                    :aria-label="__('common.delete_name', ['name' => $user->name])"
-                                    class="grid size-8 shrink-0 place-items-center rounded-md text-gray-400 transition hover:bg-white hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
-                                >
-                                    <flux:icon.trash class="size-4" />
-                                </span>
-                            @endcan
                         </button>
                     @empty
-                        <div class="flex flex-col items-center justify-center px-5 py-12 text-center">
-                            <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('users.no_matching_users') }}</p>
-                            <p class="mt-1 max-w-64 text-xs leading-5 text-gray-500 dark:text-secondary-soft">{{ __('users.change_the_search_or_role_filter_and_try_again') }}</p>
-                        </div>
+                        <x-ui.empty-state icon="users" :heading="__('users.no_matching_users')" :body="__('users.change_the_search_or_role_filter_and_try_again')" />
                     @endforelse
                 </div>
 
-                <div class="border-t border-gray-100 px-3 pb-3 dark:border-secondary-medium">
-                    <flux:pagination :paginator="$this->users" scroll-to="#access-management-heading" />
+                <div class="border-t border-secondary-soft px-3 pb-3 dark:border-secondary-medium">
+                    <flux:pagination
+                        :paginator="$this->users"
+                        scroll-to="#access-management-heading"
+                        class="text-secondary-medium! [&_button]:text-secondary-medium! [&_button:hover]:bg-secondary-soft! dark:text-secondary-soft! dark:[&_button]:text-secondary-soft! dark:[&_button:hover]:bg-secondary-medium!"
+                    />
                 </div>
             </section>
 
-            <section class="flex min-w-0 flex-col rounded-xl border border-gray-200 bg-white shadow-sm dark:bg-secondary-dark">
+            <section class="flex min-w-0 flex-col rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-secondary-medium dark:bg-secondary-dark dark:shadow-none">
                 @if ($this->selectedUser)
-                    @php($selectedUser = $this->selectedUser)
+                    @php
+                        $selectedUser = $this->selectedUser;
+                        $checkboxAccentStyle = '--color-accent: var(--color-primary); --color-accent-foreground: var(--color-white);';
+                    @endphp
                     <form wire:submit="saveUserAccess">
-                        <div class="flex flex-wrap items-center gap-3 border-b border-gray-200 px-[clamp(1rem,2vw,1.5rem)] py-4 dark:border-secondary-medium">
+                        <div class="flex flex-wrap items-center gap-3 border-b border-secondary-soft px-6 py-4 dark:border-secondary-medium">
                             <div class="min-w-0 flex-1">
-                                <h2 class="truncate text-[clamp(1rem,1.5vw,1.2rem)] font-bold text-gray-900 dark:text-white">{{ $selectedUser->name }}</h2>
-                                <p class="truncate text-sm text-gray-500 dark:text-secondary-soft">{{ $selectedUser->email }}</p>
+                                <h2 class="truncate text-lg font-bold text-secondary-dark dark:text-white">{{ $selectedUser->name }}</h2>
+                                <p class="truncate text-sm text-secondary-medium dark:text-secondary-soft">{{ $selectedUser->email }}</p>
                             </div>
                         </div>
 
-                        <div class="space-y-[clamp(1.25rem,2vw,2rem)] p-[clamp(1rem,2vw,1.5rem)]">
+                        <div class="space-y-8 p-6">
                             <section aria-labelledby="assigned-roles-title">
-                                <h3 id="assigned-roles-title" class="mb-3 text-sm font-bold text-gray-900 dark:text-white">{{ __('access.assigned-roles') }}</h3>
-                                <div class="grid grid-cols-[repeat(auto-fit,minmax(min(100%,10rem),1fr))] gap-2">
+                                <h3 id="assigned-roles-title" class="mb-3 text-sm font-bold text-secondary-dark dark:text-white">{{ __('access.assigned-roles') }}</h3>
+                                <flux:checkbox.group
+                                    wire:model.live="userRoleIds"
+                                    style="{{ $checkboxAccentStyle }}"
+                                    class="grid! grid-cols-[repeat(auto-fit,minmax(min(100%,10rem),1fr))]! gap-x-4! gap-y-2.5! [&>[data-flux-field]]:mb-0!"
+                                >
                                     @foreach ($this->roleOptions as $roleOption)
-                                        <label class="relative flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg border border-gray-200 px-3 py-2 text-sm transition hover:border-gray-300 dark:border-secondary-medium">
-                                            <input type="checkbox" wire:model.live="userRoleIds" value="{{ $roleOption->id }}"
-                                                @disabled(! Gate::check('update', $selectedUser))
-                                                class="peer rounded border-gray-300 text-primary focus:ring-primary">
-                                            <span class="min-w-0 truncate font-semibold text-gray-700 peer-checked:text-primary dark:text-secondary-soft">
-                                                {{ $roleOption->name }}
-                                            </span>
-                                        </label>
+                                        <flux:checkbox
+                                            value="{{ $roleOption->id }}"
+                                            :label="$roleOption->name"
+                                            :disabled="! Gate::check('update', $selectedUser)"
+                                            wire:key="user-role-{{ $roleOption->id }}"
+                                        />
                                     @endforeach
-                                </div>
-                                @error('userRoleIds') <p class="mt-1.5 text-xs text-primary">{{ $message }}</p> @enderror
+                                </flux:checkbox.group>
+                                @error('userRoleIds') <p class="mt-1.5 text-xs text-status-critical">{{ $message }}</p> @enderror
                             </section>
 
-                            <section class="border-t border-gray-100 pt-5 dark:border-secondary-medium" aria-labelledby="active-role-title">
-                                <label id="active-role-title" for="user-active-role" class="mb-2 block text-sm font-bold text-gray-900 dark:text-white">{{ __('access.active-role') }}</label>
-                                <select id="user-active-role" wire:model.live="userActiveRoleId"
-                                    @disabled(! Gate::check('update', $selectedUser))
-                                    class="min-h-11 w-full rounded-lg border-gray-200 bg-white text-sm text-gray-700 focus:border-primary focus:ring-primary dark:bg-secondary-dark dark:text-white sm:max-w-sm">
-                                    <option value="">—</option>
+                            <section class="border-t border-secondary-soft pt-5 dark:border-secondary-medium" aria-labelledby="active-role-title">
+                                <label id="active-role-title" for="user-active-role" class="mb-2 block text-sm font-bold text-secondary-dark dark:text-white">{{ __('access.active-role') }}</label>
+                                <x-ui.select id="user-active-role" wire:model.live="userActiveRoleId" :disabled="! Gate::check('update', $selectedUser)" class="sm:max-w-sm">
+                                    <flux:select.option value="">—</flux:select.option>
                                     @foreach ($this->roleOptions->whereIn('id', $userRoleIds) as $roleOption)
-                                        <option value="{{ $roleOption->id }}">{{ $roleOption->name }}</option>
+                                        <flux:select.option :value="$roleOption->id">{{ $roleOption->name }}</flux:select.option>
                                     @endforeach
-                                </select>
-                                @error('userActiveRoleId') <p class="mt-1.5 text-xs text-primary">{{ $message }}</p> @enderror
+                                </x-ui.select>
+                                @error('userActiveRoleId') <p class="mt-1.5 text-xs text-status-critical">{{ $message }}</p> @enderror
                             </section>
 
-                            <section class="border-t border-gray-100 pt-5 dark:border-secondary-medium" aria-labelledby="direct-permissions-title">
-                                <h3 id="direct-permissions-title" class="text-sm font-bold text-gray-900 dark:text-white">{{ __('access.direct-permissions') }}</h3>
-                                <p class="mt-1 text-xs leading-5 text-gray-500 dark:text-secondary-soft">{{ __('access.direct-permissions-help') }}</p>
+                            <section class="border-t border-secondary-soft pt-5 dark:border-secondary-medium" aria-labelledby="direct-permissions-title">
+                                <h3 id="direct-permissions-title" class="text-sm font-bold text-secondary-dark dark:text-white">{{ __('access.direct-permissions') }}</h3>
+                                <p class="mt-1 text-xs leading-5 text-secondary-medium dark:text-secondary-soft">{{ __('access.direct-permissions-help') }}</p>
 
                                 <div class="mt-4 grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-3">
                                     @foreach ($this->permissionGroups as $group)
-                                        <fieldset class="min-w-0 rounded-lg border border-gray-200 p-3.5 dark:border-secondary-medium">
-                                            <legend class="px-1 text-xs font-bold uppercase tracking-wide text-gray-700 dark:text-secondary-soft">{{ $group['label'] }}</legend>
-                                            <div class="mt-1 grid grid-cols-[repeat(auto-fit,minmax(8.5rem,1fr))] gap-x-3 gap-y-2">
+                                        <fieldset class="min-w-0 rounded-lg border border-secondary-soft p-3.5 dark:border-secondary-medium">
+                                            <legend class="px-1 text-xs font-bold uppercase tracking-wide text-secondary-medium dark:text-secondary-soft">{{ $group['label'] }}</legend>
+                                            <flux:checkbox.group
+                                                wire:model.live="userPermissionIds"
+                                                style="{{ $checkboxAccentStyle }}"
+                                                class="mt-1! grid! grid-cols-[repeat(auto-fit,minmax(8.5rem,1fr))]! gap-x-3! gap-y-2! [&>[data-flux-field]]:mb-0!"
+                                            >
                                                 @foreach ($group['permissions'] as $permission)
-                                                    <label class="flex min-h-8 cursor-pointer items-center gap-2 text-sm text-gray-600 dark:text-secondary-soft">
-                                                        <input type="checkbox" wire:model.live="userPermissionIds" value="{{ $permission->id }}"
-                                                            @disabled(! Gate::check('update', $selectedUser))
-                                                            class="rounded border-gray-300 text-primary focus:ring-primary">
-                                                        <span>{{ $permission->name }}</span>
-                                                    </label>
+                                                    <flux:checkbox
+                                                        value="{{ $permission->id }}"
+                                                        :label="(string) str($permission->name)->afterLast('.')->replace('-', ' ')"
+                                                        :disabled="! Gate::check('update', $selectedUser)"
+                                                        wire:key="user-permission-{{ $permission->id }}"
+                                                    />
                                                 @endforeach
-                                            </div>
+                                            </flux:checkbox.group>
                                         </fieldset>
                                     @endforeach
                                 </div>
@@ -675,49 +662,42 @@ new #[Title('titles.user_directory')] class extends Component {
                         </div>
 
                         @can('update', $selectedUser)
-                            <div class="sticky bottom-0 flex justify-end border-t border-gray-200 bg-white/95 px-[clamp(1rem,2vw,1.5rem)] py-3 backdrop-blur-sm dark:border-secondary-medium dark:bg-secondary-dark/95">
-                                <flux:button type="submit" variant="primary" data-test="save-user-access-button">{{ __('access.save-access') }}</flux:button>
+                            <div class="sticky bottom-0 flex justify-end border-t border-secondary-soft bg-white/95 px-6 py-3 backdrop-blur-sm dark:border-secondary-medium dark:bg-secondary-dark/95">
+                                <x-ui.button type="submit" tone="primary" data-test="save-user-access-button">{{ __('access.save-access') }}</x-ui.button>
                             </div>
                         @endcan
                     </form>
                 @else
-                    <div class="flex min-h-[clamp(22rem,55vh,38rem)] flex-1 items-center justify-center p-6 text-center">
-                        <div class="max-w-md">
-                            <h2 class="mt-4 text-[clamp(1rem,1.5vw,1.15rem)] font-bold text-gray-900 dark:text-white">{{ __('access.select-employee') }}</h2>
-                            <p class="mt-2 text-sm leading-6 text-gray-500 dark:text-secondary-soft">{{ __('access.select-employee-help') }}</p>
-                        </div>
-                    </div>
+                    <x-ui.empty-state icon="user" :heading="__('access.select-employee')" :body="__('access.select-employee-help')" class="min-h-[clamp(22rem,55vh,38rem)] flex-1" />
                 @endif
             </section>
         </div>
     @else
-        <div class="grid min-w-0 gap-[clamp(1rem,1.5vw,1.5rem)] xl:grid-cols-[19rem_minmax(0,1fr)]">
-            <aside class="min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:bg-secondary-dark">
+        <div class="grid min-w-0 gap-6 xl:grid-cols-[19rem_minmax(0,1fr)]">
+            <aside class="min-w-0 overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-secondary-medium dark:bg-secondary-dark dark:shadow-none">
                 @can('access-management.manage-roles')
-                    <form wire:submit="createRole" class="border-b border-gray-200 p-3 dark:border-secondary-medium" data-test="create-role-form">
-                        <label for="new-role-name" class="mb-2 block text-sm font-bold text-gray-900 dark:text-white">{{ __('roles.new_role') }}</label>
+                    <form wire:submit="createRole" class="border-b border-secondary-soft p-3 dark:border-secondary-medium" data-test="create-role-form">
+                        <label for="new-role-name" class="mb-2 block text-sm font-bold text-secondary-dark dark:text-white">{{ __('roles.new_role') }}</label>
                         <div class="grid gap-2">
-                            <input id="new-role-name" wire:model="newRoleName"
-                                class="min-h-11 min-w-0 rounded-lg border-gray-200 text-sm focus:border-primary focus:ring-primary dark:bg-secondary-dark dark:text-white"
-                                placeholder="{{ __('roles.role_name_placeholder') }}">
-                            <flux:button type="submit" variant="primary">{{ __('roles.create_role') }}</flux:button>
+                            <x-ui.input id="new-role-name" wire:model="newRoleName" :placeholder="__('roles.role_name_placeholder')" />
+                            <x-ui.button type="submit" tone="primary">{{ __('roles.create_role') }}</x-ui.button>
                         </div>
-                        @error('newRoleName') <p class="mt-1.5 text-xs text-primary">{{ $message }}</p> @enderror
+                        @error('newRoleName') <p class="mt-1.5 text-xs text-status-critical">{{ $message }}</p> @enderror
                     </form>
                 @endcan
 
-                <div data-test="access-role-directory" class="divide-y divide-gray-100 dark:divide-secondary-medium">
+                <div data-test="access-role-directory" class="divide-y divide-secondary-soft dark:divide-secondary-medium">
                     @foreach ($this->roles as $roleRow)
                         <button type="button" wire:click="selectRole({{ $roleRow->id }})" wire:key="access-role-{{ $roleRow->id }}" @class([
                             'relative flex min-h-12 w-full items-center justify-between gap-3 px-3 py-2.5 text-start transition focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-primary',
-                            'bg-gray-50 text-primary dark:bg-secondary-medium' => $selectedRoleId === $roleRow->id,
-                            'bg-white text-gray-700 hover:bg-gray-50 dark:bg-secondary-dark dark:text-secondary-soft dark:hover:bg-secondary-medium' => $selectedRoleId !== $roleRow->id,
+                            'bg-secondary-soft/60 text-primary dark:bg-secondary-medium/60' => $selectedRoleId === $roleRow->id,
+                            'bg-white text-secondary-medium hover:bg-secondary-soft/40 dark:bg-secondary-dark dark:text-secondary-soft dark:hover:bg-secondary-medium/40' => $selectedRoleId !== $roleRow->id,
                         ])>
                             @if ($selectedRoleId === $roleRow->id)
                                 <span class="absolute inset-y-2 start-0 w-0.5 rounded-full bg-primary" aria-hidden="true"></span>
                             @endif
                             <span class="min-w-0 truncate text-sm font-bold">{{ $roleRow->name }}</span>
-                            <span class="inline-flex min-w-6 shrink-0 items-center justify-center rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[0.65rem] font-semibold text-gray-500 dark:border-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft">
+                            <span class="inline-flex min-w-6 shrink-0 items-center justify-center rounded-md border border-secondary-soft bg-white px-1.5 py-0.5 text-[0.65rem] font-semibold text-secondary-medium dark:border-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft">
                                 {{ $roleRow->users_count }}
                             </span>
                         </button>
@@ -725,17 +705,17 @@ new #[Title('titles.user_directory')] class extends Component {
                 </div>
             </aside>
 
-            <section class="min-w-0 rounded-xl border border-gray-200 bg-white shadow-sm dark:bg-secondary-dark">
+            <section class="min-w-0 rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-secondary-medium dark:bg-secondary-dark dark:shadow-none">
                 @if ($this->selectedRole)
-                    <div class="flex flex-wrap items-start justify-between gap-4 border-b border-gray-200 px-[clamp(1rem,2vw,1.5rem)] py-4 dark:border-secondary-medium">
+                    <div class="flex flex-wrap items-start justify-between gap-4 border-b border-secondary-soft px-6 py-4 dark:border-secondary-medium">
                         <div class="min-w-0">
                             <div class="flex flex-wrap items-center gap-2">
-                                <h2 class="truncate text-[clamp(1.1rem,1.6vw,1.35rem)] font-bold text-gray-900 dark:text-white">{{ $this->selectedRole->name }}</h2>
+                                <h2 class="truncate text-xl font-bold text-secondary-dark dark:text-white">{{ $this->selectedRole->name }}</h2>
                                 @if ($this->selectedRoleIsProtected)
                                     <span class="rounded-md border border-primary px-2 py-1 text-[0.7rem] font-bold text-primary">{{ __('roles.protected_role') }}</span>
                                 @endif
                             </div>
-                            <button type="button" wire:click="showAssignedUsers" class="group mt-1 inline-flex min-h-8 items-center gap-1.5 rounded-md text-sm font-semibold text-gray-600 underline decoration-gray-300 underline-offset-4 transition hover:text-primary hover:decoration-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-secondary-soft" aria-haspopup="dialog">
+                            <button type="button" wire:click="showAssignedUsers" class="group mt-1 inline-flex min-h-8 items-center gap-1.5 rounded-md text-sm font-semibold text-secondary-medium underline decoration-secondary-light underline-offset-4 transition hover:text-primary hover:decoration-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-secondary-soft" aria-haspopup="dialog">
                                 <flux:icon.users class="size-4 shrink-0 text-primary" />
                                 <span>{{ trans_choice('roles.users_count', $this->selectedRole->users_count, ['count' => $this->selectedRole->users_count]) }}</span>
                             </button>
@@ -746,52 +726,51 @@ new #[Title('titles.user_directory')] class extends Component {
 
                         @can('access-management.manage-roles')
                             @unless ($this->selectedRoleIsProtected)
-                                <div class="grid w-full items-end gap-2 sm:w-auto sm:grid-cols-[minmax(13rem,1fr)_auto_auto]">
-                                    <div class="min-w-0">
-                                        <label class="mb-1.5 block text-xs font-bold text-gray-700 dark:text-secondary-soft" for="selected-role-name">{{ __('roles.rename_role') }}</label>
-                                        <input id="selected-role-name" wire:model="selectedRoleName" autocomplete="off" spellcheck="false"
-                                            class="min-h-11 w-full min-w-0 rounded-lg border-gray-300 bg-gray-50 px-3 text-sm font-medium text-gray-900 shadow-sm transition hover:border-gray-400 focus:border-primary focus:bg-white focus:ring-primary dark:bg-secondary-dark dark:text-white">
-                                    </div>
-                                    <flux:button type="button" wire:click="renameRole">{{ __('roles.rename_role') }}</flux:button>
-                                    <flux:button type="button" variant="danger" wire:click="deleteRole" wire:confirm="{{ __('roles.delete_role') }}?">{{ __('roles.delete_role') }}</flux:button>
+                                <div class="grid w-full items-end gap-2 sm:w-auto sm:grid-cols-[minmax(13rem,1fr)_auto]">
+                                    <x-ui.input id="selected-role-name" wire:model="selectedRoleName" autocomplete="off" spellcheck="false" :label="__('roles.rename_role')" />
+                                    <x-ui.button type="button" wire:click="renameRole">{{ __('roles.rename_role') }}</x-ui.button>
                                 </div>
                             @endunless
                         @endcan
                     </div>
-                    @error('selectedRoleName') <p class="px-[clamp(1rem,2vw,1.5rem)] pt-2 text-xs text-primary">{{ $message }}</p> @enderror
+                    @error('selectedRoleName') <p class="px-6 pt-2 text-xs text-status-critical">{{ $message }}</p> @enderror
 
                     <form wire:submit="saveRolePermissions">
-                        <div class="flex flex-wrap items-center justify-between gap-3 px-[clamp(1rem,2vw,1.5rem)] pt-4">
-                            <h3 class="text-sm font-bold text-gray-900 dark:text-white">{{ __('roles.permissions') }}</h3>
+                        <div class="flex flex-wrap items-center justify-between gap-3 px-6 pt-4">
+                            <h3 class="text-sm font-bold text-secondary-dark dark:text-white">{{ __('roles.permissions') }}</h3>
                             @can('access-management.manage-permissions')
                                 <div class="flex flex-wrap gap-2">
-                                    <flux:button type="button" size="sm" variant="ghost" wire:click="selectAllRolePermissions">{{ __('roles.select_all') }}</flux:button>
-                                    <flux:button type="button" size="sm" variant="ghost" wire:click="clearRolePermissions" :disabled="$this->selectedRoleIsProtected">{{ __('roles.clear_all') }}</flux:button>
+                                    <x-ui.button type="button" tone="ghost" wire:click="selectAllRolePermissions">{{ __('roles.select_all') }}</x-ui.button>
+                                    <x-ui.button type="button" tone="ghost" wire:click="clearRolePermissions" :disabled="$this->selectedRoleIsProtected">{{ __('roles.clear_all') }}</x-ui.button>
                                 </div>
                             @endcan
                         </div>
 
-                        <div class="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-3 p-[clamp(1rem,2vw,1.5rem)]">
+                        <div class="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-3 p-6">
                             @foreach ($this->permissionGroups as $group)
-                                <fieldset class="min-w-0 rounded-lg border border-gray-200 p-3.5 dark:border-secondary-medium">
-                                    <legend class="px-1 text-xs font-bold uppercase tracking-wide text-gray-700 dark:text-secondary-soft">{{ $group['label'] }}</legend>
-                                    <div class="mt-1 grid grid-cols-[repeat(auto-fit,minmax(8.5rem,1fr))] gap-x-3 gap-y-2">
+                                <fieldset class="min-w-0 rounded-lg border border-secondary-soft p-3.5 dark:border-secondary-medium">
+                                    <legend class="px-1 text-xs font-bold uppercase tracking-wide text-secondary-medium dark:text-secondary-soft">{{ $group['label'] }}</legend>
+                                    <flux:checkbox.group
+                                        wire:model="rolePermissionIds"
+                                        style="--color-accent: var(--color-primary); --color-accent-foreground: var(--color-white);"
+                                        class="mt-1! grid! grid-cols-[repeat(auto-fit,minmax(8.5rem,1fr))]! gap-x-3! gap-y-2! [&>[data-flux-field]]:mb-0!"
+                                    >
                                         @foreach ($group['permissions'] as $permission)
-                                            <label class="flex min-h-8 items-center gap-2 text-sm text-gray-600 dark:text-secondary-soft">
-                                                <input type="checkbox" wire:model="rolePermissionIds" value="{{ $permission->id }}"
-                                                    @disabled($this->selectedRoleIsProtected)
-                                                    class="rounded border-gray-300 text-primary focus:ring-primary disabled:opacity-70">
-                                                <span>{{ $permission->name }}</span>
-                                            </label>
+                                            <flux:checkbox
+                                                value="{{ $permission->id }}"
+                                                :label="(string) str($permission->name)->afterLast('.')->replace('-', ' ')"
+                                                :disabled="$this->selectedRoleIsProtected"
+                                                wire:key="role-permission-{{ $permission->id }}"
+                                            />
                                         @endforeach
-                                    </div>
+                                    </flux:checkbox.group>
                                 </fieldset>
                             @endforeach
                         </div>
 
                         @can('access-management.manage-permissions')
-                            <div class="sticky bottom-0 flex justify-end border-t border-gray-200 bg-white/95 px-[clamp(1rem,2vw,1.5rem)] py-3 backdrop-blur-sm dark:border-secondary-medium dark:bg-secondary-dark/95">
-                                <flux:button type="submit" variant="primary" data-test="save-role-permissions">{{ __('roles.save_permissions') }}</flux:button>
+                            <div class="sticky bottom-0 flex justify-end border-t border-secondary-soft bg-white/95 px-6 py-3 backdrop-blur-sm dark:border-secondary-medium dark:bg-secondary-dark/95">
+                                <x-ui.button type="submit" tone="primary" data-test="save-role-permissions">{{ __('roles.save_permissions') }}</x-ui.button>
                             </div>
                         @endcan
                     </form>

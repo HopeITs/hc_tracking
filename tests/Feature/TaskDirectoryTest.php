@@ -56,6 +56,31 @@ test('tasks can be filtered by search status priority and assignee', function ()
         ->assertSee('Draft distribution plan')->assertSee('Verify beneficiary list');
 });
 
+test('the my tasks only filter is a checkbox that scopes every view', function () {
+    $user = User::factory()->create();
+    $me = insertHrEmployee(firstNameEn: 'Signed', lastNameEn: 'InUser');
+    $user->forceFill(['employee_id' => $me])->save();
+
+    $mine = Task::factory()->create(['title' => 'My own task']);
+    $mine->taskAssignees()->delete();
+    $mine->taskAssignees()->create(['employee_id' => $me]);
+
+    $other = Task::factory()->create(['title' => 'Someone else\'s task']);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->assertSeeHtml('data-test="task-filter-my-tasks-only"')
+        ->assertSee('My own task')->assertSee('Someone else\'s task')
+        ->set('myTasksOnly', true)
+        ->assertSee('My own task')->assertDontSee('Someone else\'s task')
+        ->set('view', 'list')
+        ->assertSee('My own task')->assertDontSee('Someone else\'s task')
+        ->set('view', 'calendar')
+        ->assertSee('My own task')->assertDontSee('Someone else\'s task')
+        ->set('myTasksOnly', false)
+        ->assertSee('My own task')->assertSee('Someone else\'s task');
+});
+
 test('tasks can be filtered by source type and by a specific source record', function () {
     $user = User::factory()->create();
     $milestone = Milestone::factory()->create(['name' => 'First distribution']);
@@ -444,7 +469,7 @@ test('the my tasks rail stays visible and shows an empty state when the viewer h
     Livewire::actingAs($user)->test('pages::tasks.index')
         ->assertSeeHtml('data-test="my-tasks-rail"')
         ->assertSeeHtml('data-test="my-tasks-empty"')
-        ->assertSee('My Tasks');
+        ->assertSee('Tasks Related to Me');
 });
 
 test('the my tasks rail card title links to the task detail page', function () {

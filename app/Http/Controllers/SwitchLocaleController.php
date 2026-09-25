@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Enums\Locale;
 use App\Http\Middleware\SetLocale;
+use App\Http\Requests\SwitchLocaleRequest;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 class SwitchLocaleController extends Controller
 {
@@ -18,11 +16,9 @@ class SwitchLocaleController extends Controller
      * The choice is saved on the signed-in user so it follows them to other
      * devices, and in the session so guests keep it too.
      */
-    public function __invoke(Request $request): RedirectResponse
+    public function __invoke(SwitchLocaleRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'locale' => ['required', Rule::enum(Locale::class)],
-        ]);
+        $validated = $request->validated();
 
         $request->session()->put(SetLocale::SessionKey, $validated['locale']);
         $request->user()?->forceFill(['locale' => $validated['locale']])->save();
