@@ -403,8 +403,10 @@ new #[Title('titles.project')] class extends Component {
     public function saveFile(): void
     {
         if ($this->editingFileId === null) {
+            $allowedTypes = implode(',', FileType::values());
+
             $validated = $this->validate([
-                'newFile' => ['required', 'file', 'max:5120', 'mimes:'.implode(',', FileType::values())],
+                'newFile' => ['required', 'file', 'max:5120', 'mimes:'.$allowedTypes, 'extensions:'.$allowedTypes],
                 'fileCategory' => ['required', Rule::enum(MediaCollection::class)],
                 'fileDisplayName' => ['nullable', 'string', 'max:255'],
             ], [
