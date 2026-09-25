@@ -218,6 +218,105 @@
         opacity: 1;
     }
 
+    /* Gantt surfaces: the sticky grid and header must stay opaque over the bars scrolling beneath them. */
+    [data-gantt] {
+        --gantt-surface: var(--color-white);
+        --gantt-surface-hover: var(--color-board-head);
+        --gantt-surface-group: color-mix(in oklab, var(--color-board-head), var(--color-secondary-soft) 30%);
+        --gantt-surface-selected: color-mix(in oklab, var(--color-white), var(--color-status-active) 11%);
+    }
+
+    .dark [data-gantt] {
+        --gantt-surface: var(--color-secondary-dark);
+        --gantt-surface-hover: color-mix(in oklab, var(--color-secondary-dark), var(--color-white) 6%);
+        --gantt-surface-group: color-mix(in oklab, var(--color-secondary-dark), var(--color-white) 9%);
+        --gantt-surface-selected: color-mix(in oklab, var(--color-secondary-dark), var(--color-status-active) 26%);
+    }
+
+    [data-gantt] .gantt-head,
+    [data-gantt] .gantt-cell {
+        background-color: var(--gantt-surface);
+    }
+
+    [data-gantt] [role='row'] > .gantt-cell {
+        transition: background-color 120ms ease-out;
+    }
+
+    [data-gantt] [role='row'][data-group='true'] > .gantt-cell {
+        background-color: var(--gantt-surface-group);
+    }
+
+    [data-gantt] [role='row']:hover > .gantt-cell {
+        background-color: var(--gantt-surface-hover);
+    }
+
+    [data-gantt] [role='row'][aria-selected='true'] > .gantt-cell {
+        background-color: var(--gantt-surface-selected);
+    }
+
+    [data-gantt] [role='row']:hover > .gantt-lane {
+        background-color: color-mix(in oklab, var(--gantt-surface-hover) 65%, transparent);
+    }
+
+    [data-gantt] [role='row'][aria-selected='true'] > .gantt-lane {
+        background-color: color-mix(in oklab, var(--gantt-surface-selected) 70%, transparent);
+    }
+
+    /* The row's "open" eye shows on hover and on the selected row. */
+    [data-gantt] .gantt-open {
+        display: none;
+    }
+
+    [data-gantt] [role='row']:hover .gantt-open,
+    [data-gantt] [role='row'][aria-selected='true'] .gantt-open {
+        display: grid;
+    }
+
+    /* Route tracing: rows off the traced route recede, their cells stay opaque. */
+    [data-gantt] [role='row'] > .gantt-cell > *,
+    [data-gantt] [role='row'] > .gantt-lane > * {
+        transition: opacity 150ms ease-out;
+    }
+
+    [data-gantt] [role='row'][data-dim='true'] > .gantt-cell > *,
+    [data-gantt] [role='row'][data-dim='true'] > .gantt-lane > * {
+        opacity: 0.26;
+    }
+
+    /* Slip: the hatched run from a late row's planned finish to today. */
+    .gantt-slip {
+        background-color: color-mix(in oklab, var(--color-status-critical) 12%, transparent);
+        background-image: repeating-linear-gradient(135deg, color-mix(in oklab, var(--color-status-critical) 70%, transparent) 0 1.5px, transparent 1.5px 5px);
+        box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-status-critical) 40%, transparent);
+    }
+
+    /* Bars draw in once from their start edge; milestones settle in after them. */
+    [data-gantt] .gantt-grow {
+        animation: gantt-grow 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+        animation-delay: var(--gantt-delay, 0ms);
+    }
+
+    [data-gantt] .gantt-pop {
+        animation: gantt-pop 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+        animation-delay: calc(var(--gantt-delay, 0ms) + 260ms);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        [data-gantt] .gantt-grow,
+        [data-gantt] .gantt-pop {
+            animation: none;
+        }
+    }
+
+    [data-gantt] .gantt-scroller {
+        scrollbar-width: thin;
+        scrollbar-color: var(--color-secondary-soft) transparent;
+    }
+
+    .dark [data-gantt] .gantt-scroller {
+        scrollbar-color: color-mix(in oklab, var(--color-white) 22%, transparent) transparent;
+    }
+
     /* Draggable Gantt bars show a grab cursor; the drag itself is JS. */
     [data-gantt] [data-draggable='true'] {
         cursor: grab;
@@ -2341,6 +2440,26 @@ textarea.form-box-input {
     }
 }
 
+@keyframes gantt-grow {
+    from {
+        clip-path: inset(0 100% 0 0 round 5px);
+    }
+    to {
+        clip-path: inset(0 0 0 0 round 5px);
+    }
+}
+
+@keyframes gantt-pop {
+    from {
+        opacity: 0;
+        scale: 0.4;
+    }
+    to {
+        opacity: 1;
+        scale: 1;
+    }
+}
+
 /*
  * Gantt print / "Save as PDF": only the chart being printed is shown, every
  * row is rendered (resources/js/gantt/export.js) and the scroller unrolls.
@@ -2369,6 +2488,7 @@ textarea.form-box-input {
         -webkit-print-color-adjust: exact;
     }
 
+    html.gantt-print-mode .gantt-printing .gantt-split,
     html.gantt-print-mode .gantt-printing .gantt-scroller {
         height: auto !important;
         overflow: visible !important;

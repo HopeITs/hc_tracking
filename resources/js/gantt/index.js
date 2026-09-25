@@ -1,5 +1,7 @@
 import { toDay, toIso, weekday, workingDays, unitCells, topCells, WEEKEND_PRESETS, ZOOM_LEVELS } from './timescale';
-import { linkPath } from './links';
+import { linkPath, routePath } from './links';
+import { buildGraph, traceRoute, ancestorsOf, descendantsOf, linkKey } from './trace';
+import { packLanes, horizonUnit } from './overview';
 import { exportCsv, printChart } from './export';
 
 /**
@@ -7,8 +9,13 @@ import { exportCsv, printChart } from './export';
  * server builds (App\Livewire\Concerns\BuildsProjectGantt and friends) and
  * draws an MS-Project-style split grid + timeline.
  *
- * Read-only: WBS tree, five zoom levels, working-week shading, critical path,
- * baselines, planned vs actual, search/filters, virtualized rows, export.
+ * Read-only: WBS tree, five zoom levels, outline levels, working-week shading,
+ * critical path, slip tails, baselines, planned vs actual, search/filters,
+ * column chooser, two row densities, virtualized rows, export.
+ * Explorer (the Timeline page): a signal line, the horizon band (the whole
+ * plan in one strip with a draggable window), route tracing (select a row and
+ * everything that drives it, depends on it, contains it or pays for it lights
+ * up) and an inspector that lists those connections.
  * Editable (project page): drag/resize/progress, inline cells, indent/outdent,
  * dependency links drawn bar-to-bar, working week, baselines, and an undo
  * stack that reverts every server-side ripple (auto-scheduled successors too).
@@ -16,14 +23,27 @@ import { exportCsv, printChart } from './export';
  * Every edit is applied optimistically, then replaced by the payload the
  * server answers with, so the chart always ends on what the database holds.
  *
- * Viewer preferences (zoom, grid width, folded rows, critical toggle) stay in
- * this browser; the working week is the project's and lives on the server.
+ * Viewer preferences (zoom, grid width, columns, density, folded rows,
+ * display toggles) stay in this browser; the working week is the project's
+ * and lives on the server.
  */
 
-const ROW_HEIGHT = 36;
+const ROW_HEIGHTS = { comfortable: 38, compact: 30 };
+const BAR_HEIGHTS = { comfortable: 18, compact: 14 };
 const OVERSCAN = 8;
 const PAD_DAYS = 14;
+const HEADER_HEIGHT = 56;
 const STORAGE_KEY = 'hc-gantt';
+const HORIZON_LANES = 6;
+const BAR_LABELS = ['name', 'owner', 'none'];
+
+/** Grid column widths in rem; WBS and name always show, the rest are optional. */
+const COLUMN_WIDTHS = { wbs: 3.25, name: 14, status: 6.5, owner: 7.5, start: 4.75, finish: 4.75, duration: 3, progress: 4.75, predecessors: 4.5, float: 3.25, variance: 3 };
+const OPTIONAL_COLUMNS = ['status', 'owner', 'start', 'finish', 'duration', 'progress', 'predecessors', 'float'];
+const DEFAULT_COLUMNS = {
+    explorer: { status: true, owner: false, start: true, finish: true, duration: false, progress: true, predecessors: false, float: false },
+    standard: { status: false, owner: false, start: true, finish: true, duration: true, progress: true, predecessors: true, float: false },
+};
 
 function readPreferences(scope) {
     try {
@@ -46,30 +66,57 @@ function restoreStep(result) {
     return result.changes?.length ? [{ method: 'ganttRestore', args: [result.changes] }] : [];
 }
 
+function isTyping(target) {
+    return Boolean(target?.closest?.('input, select, textarea, [contenteditable="true"]'));
+}
+
 document.addEventListener('alpine:init', () => {
-    window.Alpine.data('ganttChart', (payload, scope = 'default', editable = false, labels = {}) => ({
+    window.Alpine.data('ganttChart', (payload, scope = 'default', editable = false, labels = {}, options = {}) => ({
+        // Derived structures (graph, visible rows, trace, signals, horizon) are
+        // cached here. The holder cannot be extended, so Alpine never makes it
+        // reactive; each cache is keyed by the reactive values it depends on.
+        _memo: Object.preventExtensions({ store: {} }),
         editable,
+        explorer: Boolean(options.explorer),
         labels,
         scope,
-        rowHeight: ROW_HEIGHT,
+        tones: options.tones ?? { bar: {}, track: {}, edge: {}, pill: {} },
+        groupBy: options.groupBy ?? null,
         rows: [],
         links: [],
+        relations: [],
         baselines: [],
         baselineId: null,
+        rowsVersion: 0,
         collapsed: {},
-        zoom: 'week',
+        outlineLevel: null,
+        zoom: options.explorer ? 'month' : 'week',
         weekendPreset: payload.weekend ?? 'sat-sun',
-        gridWidth: 640,
+        gridWidth: 0,
+        fullGridWidth: null,
+        density: 'comfortable',
+        columns: { ...DEFAULT_COLUMNS[options.explorer ? 'explorer' : 'standard'] },
+        barLabels: options.explorer ? 'name' : 'owner',
         search: '',
         lateOnly: false,
         criticalOnly: false,
+        dueWindow: 0,
         showCritical: true,
         showLinks: true,
+        trace: true,
+        routes: 'selected',
+        showHorizon: true,
         selectedId: null,
+        inspectorOpen: false,
+        shortcutsOpen: false,
         hover: null,
         scrollTop: 0,
+        scrollLeft: 0,
         viewportHeight: 480,
+        viewportWidth: 960,
+        bandWidth: 0,
         printing: false,
+        settled: false,
         locale: document.documentElement.lang || 'en',
         todayDay: toDay(payload.today),
         fromDay: 0,
@@ -89,10 +136,21 @@ document.addEventListener('alpine:init', () => {
             const saved = readPreferences(scope);
 
             this.zoom = ZOOM_LEVELS[saved.zoom] ? saved.zoom : this.zoom;
-            this.gridWidth = Number(saved.gridWidth) || this.gridWidth;
+            this.gridWidth = Number(saved.gridWidth) || 0;
             this.collapsed = saved.collapsed ?? {};
             this.showCritical = saved.showCritical ?? true;
             this.showLinks = saved.showLinks ?? true;
+            this.density = ROW_HEIGHTS[saved.density] ? saved.density : this.density;
+            this.barLabels = BAR_LABELS.includes(saved.barLabels) ? saved.barLabels : this.barLabels;
+            this.trace = saved.trace ?? true;
+            this.routes = saved.routes === 'all' ? 'all' : 'selected';
+            this.showHorizon = saved.showHorizon ?? true;
+
+            for (const column of OPTIONAL_COLUMNS) {
+                if (typeof saved.columns?.[column] === 'boolean') {
+                    this.columns[column] = saved.columns[column];
+                }
+            }
 
             if (!this.editable && WEEKEND_PRESETS[saved.weekend]) {
                 this.weekendPreset = saved.weekend;
@@ -100,14 +158,35 @@ document.addEventListener('alpine:init', () => {
 
             this.load(payload);
 
-            this.$watch('zoom', () => this.persist());
-            this.$watch('showCritical', () => this.persist());
-            this.$watch('showLinks', () => this.persist());
+            if (!this.gridWidth) {
+                this.gridWidth = this.naturalGridWidth();
+            }
+
+            for (const setting of ['zoom', 'showCritical', 'showLinks', 'density', 'barLabels', 'trace', 'routes', 'showHorizon']) {
+                this.$watch(setting, () => this.persist());
+            }
+
+            this.$watch('showHorizon', () => this.$nextTick(() => this.measure()));
+            this.$watch('inspectorOpen', () => this.$nextTick(() => this.measure()));
+            this.$watch('compactGrid', (compact) => this.fitGrid(compact));
+
+            // After a search or filter changes, bring the selected row back into view.
+            for (const filter of ['search', 'lateOnly', 'criticalOnly', 'dueWindow']) {
+                this.$watch(filter, () => this.$nextTick(() => this.revealSelected()));
+            }
 
             this.$nextTick(() => {
+                if (!saved.gridWidth && this.$refs.scroller) {
+                    // A first visit leaves the timeline at least half the width.
+                    this.gridWidth = Math.min(this.gridWidth, Math.round(this.$refs.scroller.clientWidth * (this.explorer ? 0.46 : 0.6)));
+                }
+
                 this.measure();
-                this.scrollToDay(this.todayDay - 7, false);
+                this.scrollToDay(this.todayDay - (this.explorer ? 45 : 7), false);
             });
+
+            // Bars draw in once on arrival; rows scrolled into view later just appear.
+            setTimeout(() => (this.settled = true), 1400);
         },
 
         load(data) {
@@ -126,8 +205,15 @@ document.addEventListener('alpine:init', () => {
             }));
 
             this.links = data.links ?? [];
+            this.relations = data.relations ?? [];
             this.baselines = data.baselines ?? [];
             this.baselineId = data.baselineId ?? null;
+            this.rowsVersion++;
+
+            if (this.selectedId !== null && !this.rows.some((row) => row.id === this.selectedId)) {
+                this.selectedId = null;
+                this.inspectorOpen = false;
+            }
 
             if (this.editable && data.weekend) {
                 this.weekendPreset = data.weekend;
@@ -147,10 +233,16 @@ document.addEventListener('alpine:init', () => {
             writePreferences(scope, {
                 zoom: this.zoom,
                 weekend: this.weekendPreset,
-                gridWidth: this.gridWidth,
+                gridWidth: this.fullGridWidth ?? this.gridWidth,
                 collapsed: this.collapsed,
                 showCritical: this.showCritical,
                 showLinks: this.showLinks,
+                density: this.density,
+                columns: this.columns,
+                barLabels: this.barLabels,
+                trace: this.trace,
+                routes: this.routes,
+                showHorizon: this.showHorizon,
             });
         },
 
@@ -162,14 +254,29 @@ document.addEventListener('alpine:init', () => {
             }
 
             this.viewportHeight = scroller.clientHeight;
+            this.viewportWidth = scroller.clientWidth;
+            this.bandWidth = this.$refs.horizon?.clientWidth ?? 0;
             // Never let the table crowd out the timeline on a narrow screen.
-            this.gridWidth = Math.min(this.gridWidth, Math.max(240, Math.round(scroller.clientWidth * 0.6)));
+            this.gridWidth = Math.min(this.gridWidth, Math.max(200, Math.round(scroller.clientWidth * 0.6)));
+        },
+
+        onScroll(event) {
+            this.scrollTop = event.target.scrollTop;
+            this.scrollLeft = event.target.scrollLeft;
         },
 
         /* Geometry ------------------------------------------------------- */
 
         get ppd() {
             return ZOOM_LEVELS[this.zoom].ppd;
+        },
+
+        get rowHeight() {
+            return ROW_HEIGHTS[this.density] ?? ROW_HEIGHTS.comfortable;
+        },
+
+        get barHeight() {
+            return BAR_HEIGHTS[this.density] ?? BAR_HEIGHTS.comfortable;
         },
 
         get weekend() {
@@ -191,15 +298,70 @@ document.addEventListener('alpine:init', () => {
             return this.baselineId !== null;
         },
 
-        /** Grid columns: WBS · name · start · finish · duration · % · predecessors [· variance]. */
-        get gridTemplate() {
-            const columns = ['2.5rem', 'minmax(9rem, 1fr)', '4.5rem', '4.5rem', '2.75rem', '2.25rem', '4.25rem'];
+        /** While the inspector is open, or on a phone, the table narrows to WBS and name so the timeline keeps its room. */
+        get compactGrid() {
+            return (this.explorer && this.inspectorOpen && this.selectedId !== null) || this.viewportWidth < 640;
+        },
 
-            if (this.hasBaseline) {
-                columns.push('3rem');
+        /** Phones drop the WBS numbers and tighten the outline indent so names stay readable. */
+        get showWbs() {
+            return this.viewportWidth >= 640;
+        },
+
+        get indent() {
+            return this.showWbs ? 14 : 9;
+        },
+
+        /** The optional columns on screen right now. */
+        get shown() {
+            return this.compactGrid ? {} : this.columns;
+        },
+
+        fitGrid(compact) {
+            if (compact) {
+                const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+
+                this.fullGridWidth ??= this.gridWidth;
+                this.gridWidth = Math.min(this.gridWidth, Math.round((COLUMN_WIDTHS.wbs + 12.5) * rem + 24));
+            } else if (this.fullGridWidth !== null) {
+                this.gridWidth = this.fullGridWidth;
+                this.fullGridWidth = null;
             }
 
-            return `grid-template-columns:${columns.join(' ')}`;
+            this.$nextTick(() => this.measure());
+        },
+
+        /** Grid columns: WBS · name · [status · owner · start · finish · duration · % · predecessors · float] [· variance]. */
+        get gridTemplate() {
+            const widths = this.showWbs ? [`${COLUMN_WIDTHS.wbs}rem`, 'minmax(9rem, 1fr)'] : ['minmax(0, 1fr)'];
+
+            for (const column of OPTIONAL_COLUMNS) {
+                if (this.shown[column]) {
+                    widths.push(`${COLUMN_WIDTHS[column]}rem`);
+                }
+            }
+
+            if (this.hasBaseline) {
+                widths.push(`${COLUMN_WIDTHS.variance}rem`);
+            }
+
+            return `grid-template-columns:${widths.join(' ')}`;
+        },
+
+        /** The grid width that shows every chosen column with a comfortable name column. */
+        naturalGridWidth() {
+            const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+            const chosen = OPTIONAL_COLUMNS.filter((column) => this.columns[column]);
+            const total = COLUMN_WIDTHS.wbs + COLUMN_WIDTHS.name + chosen.reduce((sum, column) => sum + COLUMN_WIDTHS[column], 0) + (chosen.length + 1) * 0.5;
+
+            return Math.round(total * rem + 24);
+        },
+
+        toggleColumn(column) {
+            this.columns = { ...this.columns, [column]: !this.columns[column] };
+            this.gridWidth = this.naturalGridWidth();
+            this.measure();
+            this.persist();
         },
 
         get topTier() {
@@ -227,13 +389,41 @@ document.addEventListener('alpine:init', () => {
             return stripes;
         },
 
-        /** Rows that survive collapse, search and the "late"/"critical" filters. */
+        /** Rows, links and relations indexed for walking. */
+        get graph() {
+            if (this._memo.store.graph?.version !== this.rowsVersion) {
+                this._memo.store.graph = { version: this.rowsVersion, value: buildGraph(this.rows, this.links, this.relations) };
+            }
+
+            return this._memo.store.graph.value;
+        },
+
+        /** Rows that survive folding, search and the late / critical / due filters. */
         get visibleRows() {
+            const key = [this.rowsVersion, this.search, this.lateOnly, this.criticalOnly, this.dueWindow, this.printing].join('|');
+            const collapsed = this.collapsed;
+
+            if (this._memo.store.visible?.key === key && this._memo.store.visible.collapsed === collapsed) {
+                return this._memo.store.visible.rows;
+            }
+
+            const rows = this.filterRows(collapsed);
+
+            this._memo.store.visible = { key, collapsed, rows };
+
+            return rows;
+        },
+
+        get filtering() {
+            return this.search.trim() !== '' || this.lateOnly || this.criticalOnly || this.dueWindow > 0;
+        },
+
+        filterRows(collapsed) {
             const term = this.search.trim().toLowerCase();
-            const byId = Object.fromEntries(this.rows.map((row) => [row.id, row]));
+            const byId = this.graph.byId;
             const isHidden = (row) => {
                 for (let parent = byId[row.parent]; parent; parent = byId[parent.parent]) {
-                    if (this.collapsed[parent.id] && !this.printing) {
+                    if (collapsed[parent.id] && !this.printing) {
                         return true;
                     }
                 }
@@ -241,19 +431,21 @@ document.addEventListener('alpine:init', () => {
                 return false;
             };
 
-            if (term === '' && !this.lateOnly && !this.criticalOnly) {
+            if (!this.filtering) {
                 return this.rows.filter((row) => !isHidden(row));
             }
 
             // When filtering, keep every match plus its ancestors so the WBS context stays readable.
             const keep = new Set();
+            const today = this.todayDay;
 
             for (const row of this.rows) {
                 const matchesTerm = term === '' || row.name.toLowerCase().includes(term) || (row.owner ?? '').toLowerCase().includes(term);
-                const matchesLate = !this.lateOnly || row.late;
+                const matchesLate = !this.lateOnly || (row.late && row.progress < 100);
                 const matchesCritical = !this.criticalOnly || row.critical;
+                const matchesDue = this.dueWindow === 0 || (row.progress < 100 && row.endDay !== null && row.endDay >= today && row.endDay <= today + this.dueWindow);
 
-                if (matchesTerm && matchesLate && matchesCritical && row.kind !== 'group') {
+                if (matchesTerm && matchesLate && matchesCritical && matchesDue && row.kind !== 'group') {
                     keep.add(row.id);
 
                     for (let parent = byId[row.parent]; parent; parent = byId[parent.parent]) {
@@ -265,25 +457,39 @@ document.addEventListener('alpine:init', () => {
             return this.rows.filter((row) => keep.has(row.id));
         },
 
+        clearFilters() {
+            this.search = '';
+            this.lateOnly = false;
+            this.criticalOnly = false;
+            this.dueWindow = 0;
+        },
+
         get rowIndex() {
-            return Object.fromEntries(this.visibleRows.map((row, index) => [row.id, index]));
+            const rows = this.visibleRows;
+
+            if (this._memo.store.rowIndex?.rows !== rows) {
+                this._memo.store.rowIndex = { rows, value: Object.fromEntries(rows.map((row, index) => [row.id, index])) };
+            }
+
+            return this._memo.store.rowIndex.value;
         },
 
         get windowed() {
             const rows = this.visibleRows;
+            const height = this.rowHeight;
 
             if (this.printing) {
                 return rows.map((row, index) => ({ row, index }));
             }
 
-            const first = Math.max(0, Math.floor(this.scrollTop / ROW_HEIGHT) - OVERSCAN);
-            const last = Math.min(rows.length, Math.ceil((this.scrollTop + this.viewportHeight) / ROW_HEIGHT) + OVERSCAN);
+            const first = Math.max(0, Math.floor(this.scrollTop / height) - OVERSCAN);
+            const last = Math.min(rows.length, Math.ceil((this.scrollTop + this.viewportHeight) / height) + OVERSCAN);
 
             return rows.slice(first, last).map((row, offset) => ({ row, index: first + offset }));
         },
 
         get bodyHeight() {
-            return this.visibleRows.length * ROW_HEIGHT;
+            return this.visibleRows.length * this.rowHeight;
         },
 
         x(dayNumber) {
@@ -328,6 +534,61 @@ document.addEventListener('alpine:init', () => {
             return `left:${this.x(row.startDay) + this.ppd / 2}px`;
         },
 
+        /** Whether the row is unfinished and already past its planned finish. */
+        isSlipping(row) {
+            return row.late && row.kind !== 'group' && row.progress < 100 && row.endDay !== null && row.endDay < this.todayDay;
+        },
+
+        /** The hatched tail from a late row's planned finish up to today. */
+        slipStyle(row) {
+            if (!this.isSlipping(row)) {
+                return 'display:none';
+            }
+
+            const from = row.diamond ? this.x(row.startDay) + this.ppd / 2 + 7 : this.x(row.endDay + 1);
+
+            return `left:${from}px;width:${Math.max(2, this.x(this.todayDay + 1) - from)}px`;
+        },
+
+        daysLate(row) {
+            return this.isSlipping(row) ? this.todayDay - row.endDay : 0;
+        },
+
+        /** The label beside a bar sits after its slip tail, when it has one. */
+        labelStyle(row) {
+            if (row.startDay === null || row.kind === 'group') {
+                return 'display:none';
+            }
+
+            let left = row.diamond ? this.x(row.startDay) + this.ppd / 2 + 12 : this.x(row.endDay + 1) + 8;
+
+            if (this.isSlipping(row)) {
+                left = Math.max(left, this.x(this.todayDay + 1) + 8);
+            }
+
+            return `left:${left}px`;
+        },
+
+        barLabel(row) {
+            if (this.barLabels === 'none') {
+                return '';
+            }
+
+            if (this.barLabels === 'owner') {
+                return row.owner ?? '';
+            }
+
+            return row.diamond ? `${row.name} · ${this.formatShort(row.startDay)}` : row.name;
+        },
+
+        groupStyle(row) {
+            if (row.startDay === null) {
+                return 'display:none';
+            }
+
+            return `left:${this.x(row.startDay)}px;width:${Math.max(this.ppd, (row.endDay - row.startDay + 1) * this.ppd)}px`;
+        },
+
         duration(row) {
             if (row.startDay === null || row.endDay === null) {
                 return '—';
@@ -363,6 +624,15 @@ document.addEventListener('alpine:init', () => {
             return Math.max(0, finish - row.endDay);
         },
 
+        /** How far through its planned span today falls, 0–100. */
+        elapsed(row) {
+            if (row.startDay === null || row.endDay === null) {
+                return 0;
+            }
+
+            return Math.round(Math.min(1, Math.max(0, (this.todayDay - row.startDay + 1) / (row.endDay - row.startDay + 1))) * 100);
+        },
+
         formatDay(dayNumber) {
             if (dayNumber === null || dayNumber === undefined) {
                 return '—';
@@ -371,11 +641,442 @@ document.addEventListener('alpine:init', () => {
             return new Intl.DateTimeFormat(this.locale, { day: 'numeric', month: 'short', year: '2-digit', timeZone: 'UTC' }).format(new Date(toIso(dayNumber)));
         },
 
+        formatShort(dayNumber) {
+            if (dayNumber === null || dayNumber === undefined) {
+                return '—';
+            }
+
+            return new Intl.DateTimeFormat(this.locale, { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(toIso(dayNumber)));
+        },
+
+        formatMonth(dayNumber) {
+            if (dayNumber === null || dayNumber === undefined) {
+                return '—';
+            }
+
+            return new Intl.DateTimeFormat(this.locale, { month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(toIso(dayNumber)));
+        },
+
+        initials(name) {
+            return String(name ?? '')
+                .split(/[\s,]+/)
+                .filter(Boolean)
+                .slice(0, 2)
+                .map((part) => part[0])
+                .join('')
+                .toUpperCase();
+        },
+
         isCriticalShown(row) {
             return this.showCritical && row.critical === true;
         },
 
-        /* Dependency arrows ---------------------------------------------- */
+        /** The outline a bar wears: the traced route first, then the critical path. */
+        barRing(row) {
+            const role = this.roleOf(row);
+
+            if (role === 'self') {
+                return 'ring-2 ring-status-active ring-offset-2 ring-offset-white dark:ring-offset-secondary-dark';
+            }
+
+            if (role === 'up' || role === 'down') {
+                return 'ring-2 ring-status-active/60';
+            }
+
+            if (role === 'money') {
+                return 'ring-2 ring-funding/70';
+            }
+
+            if (this.isCriticalShown(row)) {
+                return 'ring-2 ring-status-critical ring-offset-1 ring-offset-white dark:ring-offset-secondary-dark';
+            }
+
+            return `ring-1 ring-inset ${this.tones.edge?.[row.tone] ?? ''}`;
+        },
+
+        diamondRing(row) {
+            const role = this.roleOf(row);
+
+            if (role === 'self' || role === 'up' || role === 'down') {
+                return 'ring-2 ring-status-active';
+            }
+
+            if (role === 'money') {
+                return 'ring-2 ring-funding';
+            }
+
+            return this.isCriticalShown(row) ? 'ring-2 ring-status-critical' : 'ring-2 ring-white dark:ring-secondary-dark';
+        },
+
+        /** Which glyph a row's name wears in the grid. */
+        iconKey(row) {
+            if (row.kind !== 'group') {
+                return row.kind;
+            }
+
+            if (row.id === 'fundraising') {
+                return 'money';
+            }
+
+            return row.id === 'obligations' ? 'calendar' : 'folder';
+        },
+
+        /* Signals and the horizon band (explorer) ------------------------ */
+
+        /** One reading of the whole plan: its span, how much is done, and what needs attention. */
+        get signals() {
+            const key = `${this.rowsVersion}|${this.todayDay}`;
+
+            if (this._memo.store.signals?.key === key) {
+                return this._memo.store.signals.value;
+            }
+
+            const today = this.todayDay;
+            const work = this.rows.filter((row) => row.kind !== 'group');
+            const dated = work.filter((row) => row.startDay !== null);
+            const projects = work.filter((row) => row.kind === 'project' && !String(row.id).startsWith('funded-'));
+            const records = (projects.length > 0 ? projects : work.filter((row) => row.kind === 'proposal')).filter((row) => row.startDay !== null);
+            const open = (row) => row.progress < 100 && row.endDay !== null;
+
+            let weight = 0;
+            let done = 0;
+
+            for (const row of records) {
+                const days = row.endDay - row.startDay + 1;
+
+                weight += days;
+                done += days * row.progress;
+            }
+
+            const start = dated.length ? Math.min(...dated.map((row) => row.startDay)) : null;
+            const end = dated.length ? Math.max(...dated.map((row) => row.endDay)) : null;
+
+            const value = {
+                start,
+                end,
+                progress: weight > 0 ? Math.round(done / weight) : 0,
+                elapsed: start === null ? 0 : Math.round(Math.min(1, Math.max(0, (today - start + 1) / (end - start + 1))) * 100),
+                records: records.length,
+                late: work.filter((row) => row.late && row.progress < 100).length,
+                critical: work.filter((row) => row.critical).length,
+                due30: work.filter((row) => open(row) && row.endDay >= today && row.endDay <= today + 30).length,
+                due90: work.filter((row) => open(row) && row.endDay >= today && row.endDay <= today + 90).length,
+                fundingLinks: this.relations.length,
+            };
+
+            // Work trailing the calendar by more than ten points reads as behind schedule.
+            value.behind = records.length > 0 && value.elapsed - value.progress > 10 && value.elapsed < 100;
+
+            this._memo.store.signals = { key, value };
+
+            return value;
+        },
+
+        toggleDue(days) {
+            this.dueWindow = this.dueWindow === days ? 0 : days;
+
+            if (this.dueWindow > 0) {
+                this.$nextTick(() => this.scrollToDay(this.todayDay - 3, true));
+            }
+        },
+
+        /** The whole plan squeezed into the band: packed record lanes, point ticks and calendar labels. */
+        get horizon() {
+            const width = this.bandWidth;
+            const key = `${this.rowsVersion}|${width}|${this.fromDay}|${this.toDay}`;
+
+            if (this._memo.store.horizon?.key === key) {
+                return this._memo.store.horizon.value;
+            }
+
+            if (!this.explorer || width <= 0) {
+                return { lanes: 1, bars: [], ticks: [], years: [], units: [], scale: 0 };
+            }
+
+            const scale = width / (this.toDay - this.fromDay + 1);
+            const place = (day) => (day - this.fromDay) * scale;
+            const records = this.rows.filter(
+                (row) => row.startDay !== null && ((row.kind === 'project' && !String(row.id).startsWith('funded-')) || row.kind === 'proposal'),
+            );
+            const packed = packLanes(
+                records.map((row) => ({ id: row.id, start: row.startDay, end: row.endDay, tone: row.tone, kind: row.kind, name: row.name })),
+                HORIZON_LANES,
+                Math.ceil(3 / scale),
+            );
+            const unit = horizonUnit(scale);
+            const yearFormat = new Intl.DateTimeFormat(this.locale, { year: 'numeric', timeZone: 'UTC' });
+
+            const value = {
+                lanes: packed.lanes,
+                scale,
+                bars: packed.items.map((item) => ({ ...item, left: place(item.start), width: Math.max(3, (item.end - item.start + 1) * scale) })),
+                ticks: this.rows
+                    .filter((row) => row.diamond && row.startDay !== null)
+                    .map((row) => ({ id: row.id, left: place(row.startDay), tone: row.tone, kind: row.kind })),
+                years: unitCells(this.fromDay, this.toDay, 'year', this.locale, this.weekStart).map((cell) => ({
+                    key: cell.key,
+                    left: Math.max(0, place(cell.start)),
+                    label: yearFormat.format(new Date(toIso(Math.max(cell.start, this.fromDay)))),
+                })),
+                units:
+                    unit === 'year'
+                        ? []
+                        : unitCells(this.fromDay, this.toDay, unit, this.locale, this.weekStart)
+                              .filter((cell) => cell.start > this.fromDay)
+                              .map((cell) => ({ key: cell.key, left: place(cell.start), width: cell.days * scale, label: cell.label })),
+            };
+
+            this._memo.store.horizon = { key, value };
+
+            return value;
+        },
+
+        get horizonLaneHeight() {
+            return this.horizon.lanes > 4 ? 5 : 7;
+        },
+
+        horizonPlace(day) {
+            return (day - this.fromDay) * this.horizon.scale;
+        },
+
+        /** The band's window: the stretch of time the chart below is showing. */
+        get horizonWindow() {
+            const scale = this.horizon.scale;
+
+            if (!scale) {
+                return 'display:none';
+            }
+
+            const left = Math.max(0, (this.scrollLeft / this.ppd) * scale);
+            const width = Math.max(10, ((this.viewportWidth - this.gridWidth) / this.ppd) * scale);
+
+            return `left:${left}px;width:${Math.min(width, Math.max(10, this.bandWidth - left))}px`;
+        },
+
+        /** Press on the band to jump there, then keep dragging to pan. */
+        horizonDown(event) {
+            const scale = this.horizon.scale;
+            const scroller = this.$refs.scroller;
+
+            if (!scale || !scroller || event.button !== 0) {
+                return;
+            }
+
+            event.preventDefault();
+
+            const band = this.$refs.horizon.getBoundingClientRect();
+
+            if (!event.target.closest('[data-horizon-window]')) {
+                const day = this.fromDay + (event.clientX - band.left) / scale;
+
+                this.scrollToDay(day, false, true);
+            }
+
+            const startX = event.clientX;
+            const startScroll = scroller.scrollLeft;
+            const move = (moveEvent) => {
+                scroller.scrollLeft = startScroll + ((moveEvent.clientX - startX) / scale) * this.ppd;
+            };
+            const up = () => {
+                window.removeEventListener('pointermove', move);
+                window.removeEventListener('pointerup', up);
+            };
+
+            window.addEventListener('pointermove', move);
+            window.addEventListener('pointerup', up);
+        },
+
+        horizonKeydown(event) {
+            const scroller = this.$refs.scroller;
+            const step = (event.shiftKey ? 90 : 30) * this.ppd;
+
+            if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+                event.preventDefault();
+                scroller.scrollBy({ left: event.key === 'ArrowLeft' ? -step : step, behavior: 'smooth' });
+            } else if (event.key === 'Home' || event.key === 'End') {
+                event.preventDefault();
+                scroller.scrollTo({ left: event.key === 'Home' ? 0 : scroller.scrollWidth, behavior: 'smooth' });
+            }
+        },
+
+        /* Route tracing and the inspector (explorer) --------------------- */
+
+        /** Everything connected to the selected row, whether or not the chart dims the rest. */
+        get route() {
+            if (!this.explorer || this.selectedId === null) {
+                return null;
+            }
+
+            const key = `${this.rowsVersion}|${this.selectedId}`;
+
+            if (this._memo.store.route?.key !== key) {
+                this._memo.store.route = { key, value: traceRoute(this.graph, this.selectedId) };
+            }
+
+            return this._memo.store.route.value;
+        },
+
+        /** The route the chart is highlighting, or null when nothing is traced. */
+        get traced() {
+            return this.trace ? this.route : null;
+        },
+
+        roleOf(row) {
+            return this.traced?.roles.get(row.id) ?? null;
+        },
+
+        isDimmed(row) {
+            const traced = this.traced;
+
+            return traced !== null && !traced.roles.has(row.id);
+        },
+
+        /** The short tag a traced row wears to say why it lit up. */
+        routeTag(row) {
+            const role = this.roleOf(row);
+            const tags = this.labels.roles ?? {};
+
+            if (role === 'up' || role === 'down') {
+                return tags[role] ?? role;
+            }
+
+            if (role === 'money') {
+                if (row.kind === 'proposal') {
+                    return tags.funds ?? role;
+                }
+
+                return row.kind === 'project' ? tags.cofunded ?? role : tags.obligation ?? role;
+            }
+
+            return '';
+        },
+
+        selectRow(rowId) {
+            const graph = this.graph;
+            const row = graph.byId[rowId];
+
+            if (!row) {
+                return;
+            }
+
+            const folded = ancestorsOf(graph, rowId).filter((ancestor) => this.collapsed[ancestor.id]);
+
+            if (folded.length > 0) {
+                const collapsed = { ...this.collapsed };
+
+                folded.forEach((ancestor) => delete collapsed[ancestor.id]);
+                this.collapsed = collapsed;
+                this.outlineLevel = null;
+                this.persist();
+            }
+
+            if (this.filtering && this.rowIndex[rowId] === undefined) {
+                this.clearFilters();
+            }
+
+            this.selectedId = rowId;
+            this.inspectorOpen = this.explorer;
+
+            this.$nextTick(() => {
+                const index = this.rowIndex[rowId];
+
+                if (index !== undefined) {
+                    this.ensureVisible(index, true);
+                }
+
+                if (row.startDay !== null) {
+                    this.scrollToDay(row.startDay - 3);
+                }
+            });
+        },
+
+        onRowClick(row) {
+            this.selectedId = row.id;
+            this.inspectorOpen = this.explorer;
+        },
+
+        clearSelection() {
+            this.selectedId = null;
+            this.inspectorOpen = false;
+        },
+
+        linkCode(link) {
+            const lag = link.lag ? ` ${link.lag > 0 ? '+' : ''}${link.lag}d` : '';
+
+            return `${String(link.type).toUpperCase()}${lag}`;
+        },
+
+        /** Everything the inspector lists about the selected row. */
+        get inspected() {
+            if (!this.explorer || !this.inspectorOpen || this.selectedId === null) {
+                return null;
+            }
+
+            const graph = this.graph;
+            const row = graph.byId[this.selectedId];
+
+            if (!row) {
+                return null;
+            }
+
+            const route = this.route;
+            const roles = route ? [...route.roles.entries()] : [];
+            const inRole = (role) => roles.filter(([, value]) => value === role).map(([id]) => graph.byId[id]).filter(Boolean);
+            const byStart = (a, b) => (a.startDay ?? Infinity) - (b.startDay ?? Infinity);
+            const money = inRole('money').sort(byStart);
+            const parts = descendantsOf(graph, row.id).map((id) => graph.byId[id]).filter((part) => part && part.kind !== 'group');
+            const children = (graph.children[row.id] ?? []).map((id) => graph.byId[id]);
+            const connection = (link, id) => ({ row: graph.byId[id], code: this.linkCode(link), label: link.label });
+
+            return {
+                row,
+                ancestors: ancestorsOf(graph, row.id),
+                drivers: (graph.incoming[row.id] ?? []).map((link) => connection(link, link.from)).filter((entry) => entry.row),
+                dependents: (graph.outgoing[row.id] ?? []).map((link) => connection(link, link.to)).filter((entry) => entry.row),
+                upstream: inRole('up').length,
+                downstream: inRole('down').length,
+                proposals: money.filter((entry) => entry.kind === 'proposal'),
+                funded: money.filter((entry) => entry.kind === 'project'),
+                obligations: money.filter((entry) => entry.kind === 'transfer' || entry.kind === 'report'),
+                children: children.slice(0, 8),
+                moreChildren: Math.max(0, children.length - 8),
+                parts: {
+                    total: parts.length,
+                    done: parts.filter((part) => part.progress >= 100).length,
+                    late: parts.filter((part) => part.late && part.progress < 100).length,
+                    critical: parts.filter((part) => part.critical).length,
+                },
+            };
+        },
+
+        openPlan(row) {
+            if (row.planUrl) {
+                window.Livewire?.navigate ? window.Livewire.navigate(row.planUrl) : (window.location.href = row.planUrl);
+            }
+        },
+
+        /** Zoom so the whole bar fits, then bring it into view. */
+        zoomToRow(row) {
+            if (row.startDay === null) {
+                return;
+            }
+
+            const available = this.viewportWidth - this.gridWidth - 48;
+            const days = row.endDay - row.startDay + 1 + 6;
+            const fitting = Object.entries(ZOOM_LEVELS).find(([, level]) => days * level.ppd <= available);
+
+            this.zoom = fitting ? fitting[0] : 'year';
+            this.$nextTick(() => this.scrollToDay(row.startDay - 3, true));
+        },
+
+        setGroup(grouping) {
+            if (this.groupBy !== grouping) {
+                this.groupBy = grouping;
+                this.$wire.$set('group', grouping);
+            }
+        },
+
+        /* Dependency arrows and funding routes ---------------------------- */
 
         /** Anchor x of a row's start or finish edge. */
         edgeX(row, side) {
@@ -392,27 +1093,32 @@ document.addEventListener('alpine:init', () => {
             }
 
             const index = this.rowIndex;
-            const byId = Object.fromEntries(this.rows.map((row) => [row.id, row]));
+            const byId = this.graph.byId;
+            const height = this.rowHeight;
+            const traced = this.traced;
 
             return this.links
-                .filter((link) => index[link.from] !== undefined && index[link.to] !== undefined && byId[link.from].startDay !== null && byId[link.to].startDay !== null)
+                .filter((link) => index[link.from] !== undefined && index[link.to] !== undefined && byId[link.from]?.startDay != null && byId[link.to]?.startDay != null)
                 .map((link) => {
                     const from = byId[link.from];
                     const to = byId[link.to];
                     const fromSide = link.type[0] === 'f' ? 'end' : 'start';
                     const toSide = link.type[1] === 's' ? 'start' : 'end';
+                    const onRoute = traced !== null && traced.links.has(linkKey(link));
 
                     return {
                         ...link,
+                        onRoute,
+                        faded: traced !== null && !onRoute,
                         critical: this.showCritical && from.critical && to.critical,
                         d: linkPath(
                             this.edgeX(from, fromSide),
-                            index[link.from] * ROW_HEIGHT + ROW_HEIGHT / 2,
+                            index[link.from] * height + height / 2,
                             this.edgeX(to, toSide),
-                            index[link.to] * ROW_HEIGHT + ROW_HEIGHT / 2,
+                            index[link.to] * height + height / 2,
                             fromSide,
                             toSide,
-                            ROW_HEIGHT,
+                            height,
                         ),
                     };
                 });
@@ -424,16 +1130,75 @@ document.addEventListener('alpine:init', () => {
 
             return this.drawnLinks
                 .map((link, index) => {
-                    const stroke = link.critical ? 'stroke-status-critical' : 'stroke-secondary-dark/70 dark:stroke-white/70';
-                    const marker = link.critical ? `gantt-arrow-critical-${markerScope}` : `gantt-arrow-${markerScope}`;
+                    let stroke = 'stroke-secondary-dark/65 dark:stroke-white/70';
+                    let marker = `gantt-arrow-${markerScope}`;
+
+                    if (link.onRoute) {
+                        stroke = 'stroke-status-active';
+                        marker = `gantt-arrow-active-${markerScope}`;
+                    } else if (link.critical) {
+                        stroke = 'stroke-status-critical';
+                        marker = `gantt-arrow-critical-${markerScope}`;
+                    }
+
                     const lag = link.lag ? ` ${link.lag > 0 ? '+' : ''}${link.lag}d` : '';
                     const title = `${this.rowName(link.from)} → ${this.rowName(link.to)} · ${link.label}${lag}`;
                     const hitClass = this.editable ? 'cursor-pointer' : '';
+                    const faded = link.faded ? ' opacity="0.16"' : '';
 
-                    return `<path d="${link.d}" fill="none" stroke-width="1.5" class="${stroke}" marker-end="url(#${escape(marker)})"></path>`
+                    return `<path d="${link.d}" fill="none" stroke-width="${link.onRoute ? 2.25 : 1.5}" stroke-linejoin="round" class="${stroke}"${faded} marker-end="url(#${escape(marker)})"></path>`
                         + `<path d="${link.d}" fill="none" stroke="transparent" stroke-width="10" class="${hitClass}" style="pointer-events:stroke" data-link-index="${index}"><title>${escape(title)}</title></path>`;
                 })
                 .join('');
+        },
+
+        /**
+         * Funding routes: a proposal's line into each project it funds, and
+         * each transfer or donor report dropped onto its proposal at its date.
+         * Drawn for the traced row, or for every relation when asked to.
+         */
+        relationsMarkup(markerScope) {
+            if (!this.explorer || this.relations.length === 0) {
+                return '';
+            }
+
+            const traced = this.traced;
+            const shown = traced !== null ? [...traced.relations] : this.routes === 'all' ? this.relations.map((relation, index) => index) : [];
+            const index = this.rowIndex;
+            const byId = this.graph.byId;
+            const height = this.rowHeight;
+            const half = this.barHeight / 2;
+            let markup = '';
+
+            for (const at of shown) {
+                const relation = this.relations[at];
+                const from = byId[relation.from];
+                const to = byId[relation.to];
+
+                if (!from || !to || index[from.id] === undefined || index[to.id] === undefined || from.startDay === null || to.startDay === null) {
+                    continue;
+                }
+
+                const y1 = index[from.id] * height + height / 2;
+                const y2 = index[to.id] * height + height / 2;
+                const direction = y2 > y1 ? 1 : -1;
+
+                if (relation.type === 'funds') {
+                    const x1 = this.x(from.startDay) + Math.min(14, ((from.endDay - from.startDay + 1) * this.ppd) / 2);
+                    const x2 = to.diamond ? this.x(to.startDay) + this.ppd / 2 - 9 : this.x(to.startDay) - 3;
+                    const startY = y1 + direction * half;
+
+                    markup += `<path d="${routePath(x1, startY, x2, y2)}" fill="none" stroke-width="2" stroke-linecap="round" class="stroke-funding" marker-end="url(#gantt-arrow-funding-${markerScope})"></path>`
+                        + `<circle cx="${x1}" cy="${startY}" r="3" class="fill-funding"></circle>`;
+                } else {
+                    const x = this.x(from.startDay) + this.ppd / 2;
+
+                    markup += `<path d="M${x},${y1 + direction * 8} V${y2}" fill="none" stroke-width="1.5" stroke-dasharray="2 3" stroke-linecap="round" class="stroke-funding"></path>`
+                        + `<circle cx="${x}" cy="${y2}" r="3.5" stroke-width="1.5" class="fill-funding stroke-white dark:stroke-secondary-dark"></circle>`;
+                }
+            }
+
+            return markup;
         },
 
         onLinkClick(event) {
@@ -452,17 +1217,35 @@ document.addEventListener('alpine:init', () => {
             }
 
             this.collapsed = { ...this.collapsed, [row.id]: !this.collapsed[row.id] };
+            this.outlineLevel = null;
             this.persist();
         },
 
         expandAll() {
             this.collapsed = {};
+            this.outlineLevel = 0;
             this.persist();
         },
 
         collapseAll() {
-            this.collapsed = Object.fromEntries(this.rows.filter((row) => row.hasChildren && row.depth > 0).map((row) => [row.id, true]));
+            this.outline(2);
+        },
+
+        /** Show the plan down to an outline level, as MS Project's Outline menu does (0 = everything). */
+        outline(level) {
+            if (level === 0) {
+                this.expandAll();
+
+                return;
+            }
+
+            this.collapsed = Object.fromEntries(this.rows.filter((row) => row.hasChildren && row.depth >= level - 1).map((row) => [row.id, true]));
+            this.outlineLevel = level;
             this.persist();
+        },
+
+        get maxDepth() {
+            return this.rows.reduce((deepest, row) => Math.max(deepest, row.depth), 0);
         },
 
         setZoom(level) {
@@ -564,7 +1347,9 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
-            if (event.key === 'Escape') {
+            if (event.key === 'Escape' && this.linkMenu !== null) {
+                // Closing the link editor is all this Escape does.
+                event.stopPropagation();
                 this.linkMenu = null;
 
                 return;
@@ -591,6 +1376,7 @@ document.addEventListener('alpine:init', () => {
                     if (current?.hasChildren) {
                         event.preventDefault();
                         this.collapsed = { ...this.collapsed, [current.id]: event.key === 'ArrowLeft' };
+                        this.outlineLevel = null;
                         this.persist();
                     }
                     break;
@@ -608,23 +1394,106 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
-        ensureVisible(index) {
-            const scroller = this.$refs.scroller;
-            const top = index * ROW_HEIGHT;
-            const headerHeight = 56;
+        /** One-key shortcuts anywhere in the chart, except while typing. */
+        onRootKeydown(event) {
+            if (event.defaultPrevented || isTyping(event.target) || event.ctrlKey || event.metaKey || event.altKey) {
+                return;
+            }
 
-            if (top < scroller.scrollTop) {
+            const levels = Object.keys(ZOOM_LEVELS);
+
+            switch (event.key) {
+                case 'Escape':
+                    if (this.shortcutsOpen) {
+                        this.shortcutsOpen = false;
+                    } else if (this.linkMenu !== null) {
+                        this.linkMenu = null;
+                    } else if (this.explorer) {
+                        this.clearSelection();
+                    }
+                    break;
+                case '/':
+                    event.preventDefault();
+                    this.$refs.search?.focus();
+                    break;
+                case '?':
+                    this.shortcutsOpen = !this.shortcutsOpen;
+                    break;
+                case 't':
+                case 'T':
+                    this.goToToday();
+                    break;
+                case 'f':
+                case 'F':
+                    this.zoomToFit();
+                    break;
+                case '+':
+                case '=':
+                    this.zoomBy(-1);
+                    break;
+                case '-':
+                    this.zoomBy(1);
+                    break;
+                case 'l':
+                case 'L':
+                    this.showLinks = !this.showLinks;
+                    break;
+                case 'c':
+                case 'C':
+                    this.showCritical = !this.showCritical;
+                    break;
+                case 'r':
+                case 'R':
+                    if (this.explorer) {
+                        this.trace = !this.trace;
+                    }
+                    break;
+                default:
+                    if (/^[1-5]$/.test(event.key)) {
+                        this.setZoom(levels[Number(event.key) - 1]);
+                    }
+            }
+        },
+
+        /** "/" jumps to the chart search from anywhere on the page that is not a field. */
+        onWindowKeydown(event) {
+            if (event.key === '/' && this.explorer && document.activeElement === document.body) {
+                event.preventDefault();
+                this.$refs.search?.focus();
+            }
+        },
+
+        revealSelected() {
+            const index = this.selectedId === null ? undefined : this.rowIndex[this.selectedId];
+
+            if (index !== undefined) {
+                this.ensureVisible(index, true);
+            }
+        },
+
+        ensureVisible(index, centre = false) {
+            const scroller = this.$refs.scroller;
+            const height = this.rowHeight;
+            const top = index * height;
+            const outside = top < scroller.scrollTop || top + height > scroller.scrollTop + scroller.clientHeight - HEADER_HEIGHT;
+
+            if (centre && outside) {
+                scroller.scrollTop = Math.max(0, top - (scroller.clientHeight - HEADER_HEIGHT) / 2);
+            } else if (top < scroller.scrollTop) {
                 scroller.scrollTop = top;
-            } else if (top + ROW_HEIGHT > scroller.scrollTop + scroller.clientHeight - headerHeight) {
-                scroller.scrollTop = top + ROW_HEIGHT - scroller.clientHeight + headerHeight;
+            } else if (top + height > scroller.scrollTop + scroller.clientHeight - HEADER_HEIGHT) {
+                scroller.scrollTop = top + height - scroller.clientHeight + HEADER_HEIGHT;
             }
         },
 
         startResize(event) {
+            // A width chosen by hand is kept once the table widens again.
+            this.fullGridWidth = null;
+
             const startX = event.clientX;
             const startWidth = this.gridWidth;
             const move = (moveEvent) => {
-                this.gridWidth = Math.min(1100, Math.max(240, startWidth + (moveEvent.clientX - startX)));
+                this.gridWidth = Math.min(1100, Math.max(200, startWidth + (moveEvent.clientX - startX)));
             };
             const up = () => {
                 window.removeEventListener('pointermove', move);
@@ -851,26 +1720,25 @@ document.addEventListener('alpine:init', () => {
             this.linkMenu = null;
 
             const index = this.rowIndex[row.id];
+            const height = this.rowHeight;
+            const point = this.chartPoint(event);
 
             this.linkDraft = {
                 from: row,
                 side,
                 x1: this.edgeX(row, side),
-                y1: index * ROW_HEIGHT + ROW_HEIGHT / 2,
-                ...(() => {
-                    const point = this.chartPoint(event);
-
-                    return { x2: point.x, y2: point.y };
-                })(),
+                y1: index * height + height / 2,
+                x2: point.x,
+                y2: point.y,
                 target: null,
             };
 
             const move = (moveEvent) => {
-                const point = this.chartPoint(moveEvent);
+                const moved = this.chartPoint(moveEvent);
                 const over = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY)?.closest('[data-row-id]');
                 const target = over ? this.rows.find((candidate) => candidate.id === over.dataset.rowId) : null;
 
-                this.linkDraft = { ...this.linkDraft, x2: point.x, y2: point.y, target: target && target.id !== row.id && this.canLink(target) ? target : null };
+                this.linkDraft = { ...this.linkDraft, x2: moved.x, y2: moved.y, target: target && target.id !== row.id && this.canLink(target) ? target : null };
             };
             const up = async (upEvent) => {
                 window.removeEventListener('pointermove', move);
@@ -885,9 +1753,9 @@ document.addEventListener('alpine:init', () => {
                 }
 
                 // Dropping on the target's first half ties to its start, on the second half to its finish.
-                const point = this.chartPoint(upEvent);
+                const dropped = this.chartPoint(upEvent);
                 const targetMiddle = (this.edgeX(draft.target, 'start') + this.edgeX(draft.target, 'end')) / 2;
-                const type = (side === 'end' ? 'f' : 's') + (point.x <= targetMiddle || draft.target.diamond ? 's' : 'f');
+                const type = (side === 'end' ? 'f' : 's') + (dropped.x <= targetMiddle || draft.target.diamond ? 's' : 'f');
 
                 await this.createLink(row.id, draft.target.id, type, 0);
             };
@@ -951,7 +1819,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         rowName(rowId) {
-            return this.rows.find((row) => row.id === rowId)?.name ?? '';
+            return this.graph.byId[rowId]?.name ?? '';
         },
 
         /* Working week, baselines ------------------------------------------ */
@@ -1220,9 +2088,10 @@ document.addEventListener('alpine:init', () => {
                 return '';
             }
 
-            const left = Math.min(this.hover.x + 14, window.innerWidth - 300);
+            const left = Math.min(this.hover.x + 14, window.innerWidth - 316);
+            const top = this.hover.y + 300 > window.innerHeight ? this.hover.y - 290 : this.hover.y + 16;
 
-            return `left:${left}px;top:${this.hover.y + 16}px`;
+            return `left:${Math.max(8, left)}px;top:${Math.max(8, top)}px`;
         },
     }));
 });

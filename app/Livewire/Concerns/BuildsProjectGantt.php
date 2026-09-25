@@ -45,6 +45,7 @@ use Illuminate\Support\Collection;
  *     summary: bool,
  *     diamond: bool,
  *     url: string|null,
+ *     money: string|null,
  *     editable: bool,
  *     progressEditable: bool,
  *     float?: int|null,
@@ -338,15 +339,23 @@ trait BuildsProjectGantt
      * Transfers and donor reports of every agreement funding this project,
      * each drawn as a diamond on its due or scheduled date.
      *
-     * Pass a donor proposal id to narrow the rows to that one agreement.
+     * Pass a donor proposal id to narrow the rows to that one agreement, or a
+     * list of proposal ids for every agreement signed against them. When a
+     * $relations collection is given, each row is tied to its proposal
+     * ('pays' for a transfer, 'reports' for a donor report) so the timeline
+     * can trace the money back to the work it funds.
      *
+     * @param  int|list<int>|Project  $source
      * @param  Collection<int, GanttRow>  $rows
+     * @param  Collection<int, array{from: string, to: string, type: string}>|null  $relations
      */
-    private function pushObligationRows(Project|int $source, Collection $rows): void
+    private function pushObligationRows(Project|int|array $source, Collection $rows, ?Collection $relations = null): void
     {
-        $scope = $source instanceof Project
-            ? fn ($query) => $query->whereIn('proposal_id', $source->proposals()->pluck('proposals.id'))
-            : fn ($query) => $query->whereKey($source);
+        $scope = match (true) {
+            $source instanceof Project => fn ($query) => $query->whereIn('proposal_id', $source->proposals()->pluck('proposals.id')),
+            is_array($source) => fn ($query) => $query->whereIn('proposal_id', $source),
+            default => fn ($query) => $query->whereKey($source),
+        };
 
         $transfers = TransfersTracking::query()
             ->whereHas('donorProposal', $scope)
@@ -402,7 +411,10 @@ trait BuildsProjectGantt
                 },
                 diamond: true,
                 url: route('transfers.index'),
+                money: $this->ganttMoney([[$transfer->payment_amount, $transfer->amount_transfered_currency?->value]]),
             )]);
+
+            $relations?->push(['from' => 'transfer-'.$transfer->id, 'to' => 'proposal-'.$transfer->donorProposal?->proposal_id, 'type' => 'pays']);
         }
 
         foreach ($reports as $report) {
@@ -433,6 +445,8 @@ trait BuildsProjectGantt
                 diamond: true,
                 url: $report->donorProposal === null ? null : route('funding-agreements.show', $report->donorProposal),
             )]);
+
+            $relations?->push(['from' => 'report-'.$report->id, 'to' => 'proposal-'.$report->donorProposal?->proposal_id, 'type' => 'reports']);
         }
 
         foreach ($entries->sortBy(fn (array $entry): int => $entry['date']->getTimestamp())->values() as $index => $entry) {
@@ -511,6 +525,7 @@ trait BuildsProjectGantt
         bool $diamond = false,
         ?string $url = null,
         bool $editable = false,
+        ?string $money = null,
     ): array {
         if ($start !== null && $end !== null && $end->lt($start)) {
             $end = $start;
@@ -535,9 +550,37 @@ trait BuildsProjectGantt
             'summary' => $summary,
             'diamond' => $diamond,
             'url' => $url,
+            'money' => $money,
             'editable' => $editable,
             'progressEditable' => $editable && $kind === 'task' && ! $summary,
         ];
+    }
+
+    /**
+     * Amounts as "12,500 USD · 3,000 EUR", one figure per currency — USD, EUR
+     * and SYP are never converted or added together.
+     *
+     * @param  iterable<array{0: string|float|int|null, 1: string|null}>  $amounts  [amount, currency] pairs
+     */
+    private function ganttMoney(iterable $amounts): ?string
+    {
+        $totals = [];
+
+        foreach ($amounts as [$amount, $currency]) {
+            if ($amount === null || $currency === null || $currency === '') {
+                continue;
+            }
+
+            $totals[$currency] = ($totals[$currency] ?? 0) + (float) $amount;
+        }
+
+        if ($totals === []) {
+            return null;
+        }
+
+        return collect($totals)
+            ->map(fn (float $total, string $currency): string => number_format($total, fmod($total, 1.0) === 0.0 ? 0 : 2).' '.$currency)
+            ->implode(' · ');
     }
 
     private function milestoneTone(Milestone $milestone): string
