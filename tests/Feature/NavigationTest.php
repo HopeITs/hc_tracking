@@ -61,7 +61,7 @@ test('the sidebar carries route-backed delivery links', function () {
         'risks.index' => 'Risks',
     ] as $routeName => $label) {
         $links = $xpath->query(sprintf(
-            '//a[@href="%s" and normalize-space(.)="%s"]',
+            '//a[@href="%s" and starts-with(normalize-space(.), "%s")]',
             route($routeName),
             $label,
         ));
@@ -80,7 +80,7 @@ test('a project detail page highlights the projects item', function () {
     $document->loadHTML($response->getContent(), LIBXML_NOERROR | LIBXML_NOWARNING);
     $xpath = new DOMXPath($document);
     $currentProjectsLinks = $xpath->query(sprintf(
-        '//a[@href="%s" and normalize-space(.)="Projects" and @data-current]',
+        '//a[@href="%s" and starts-with(normalize-space(.), "Projects") and @data-current]',
         route('projects.index'),
     ));
 

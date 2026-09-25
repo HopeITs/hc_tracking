@@ -14,7 +14,6 @@ use App\Models\Project;
 use App\Models\Report;
 use App\Models\Result;
 use App\Models\User;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
@@ -609,8 +608,9 @@ test('a reading of another indicator cannot be deleted from this one', function 
         ->call('openInspectModal', $inspected->id)
         ->call('confirmDeleteReading', $foreign->id);
 
-    expect(fn () => $component->call('deleteReading'))->toThrow(ModelNotFoundException::class)
-        ->and(DB::table('indicator_progress')->find($foreign->id))->not->toBeNull();
+    $component->call('deleteReading')->assertNotFound();
+
+    expect(DB::table('indicator_progress')->find($foreign->id))->not->toBeNull();
 });
 
 test('an inspected target that does not fit its chain says why', function () {

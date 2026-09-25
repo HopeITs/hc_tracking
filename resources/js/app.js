@@ -1,4 +1,5 @@
 import './preloader';
+import './assignee-picker';
 import './charts';
 import './count-up';
 import './form-fields';
@@ -9,6 +10,7 @@ import './notification-inbox';
 import './notification-rules';
 import './file-preview';
 import './proposal-clock';
+import './scroll-lock';
 import './section-rail';
 import './task-board';
 import './theme-color';

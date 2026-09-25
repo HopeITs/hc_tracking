@@ -323,6 +323,7 @@ new #[Title('titles.projects')] class extends Component {
         $query = Project::query()
             ->select([
                 'id',
+                'slug',
                 'name',
                 'status',
                 'start_date',

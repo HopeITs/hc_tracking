@@ -30,6 +30,17 @@ class DatabaseSeeder extends Seeder
                 DeliverySeeder::class,
                 MealSeeder::class,
                 FinanceSeeder::class,
+                NotificationDemoSeeder::class,
+                RealAccountsSeeder::class,
+                RealDonorsSeeder::class,
+                  RealProjectsSeeder::class,
+                RealMilestonesSeeder::class,
+
+                RealProposalsSeeder::class,
+                RealResultsSeeder::class,
+                RealRisksSeeder::class,
+                RealTasksSeeder::class,
+                RolesAndPermissionsSeeder::class
             ]);
         });
     }

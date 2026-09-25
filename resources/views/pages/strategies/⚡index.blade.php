@@ -306,7 +306,7 @@ new #[Title('titles.strategies')] class extends Component {
         'start' => Carbon::create($strategy['start_year'], 1, 1),
         'end' => Carbon::create($strategy['end_year'], 12, 31),
         'tone' => $toneFor($strategy['status']),
-        'href' => route('strategies.show', $strategy['id']),
+        'href' => route('strategies.show', tap(new Strategy, fn ($s) => $s->id = $strategy['id'])),
     ])->all();
 
     $timelineFrom = $portfolio['first_year'] !== null ? Carbon::create($portfolio['first_year'], 1, 1) : null;
@@ -419,7 +419,7 @@ new #[Title('titles.strategies')] class extends Component {
                         </x-ui.data-table.cell>
                         <x-ui.data-table.cell :label="__('common.actions')">
                             <div class="flex items-center justify-end gap-1 @3xl:justify-start">
-                                <x-ui.button tone="ghost" size="sm" icon="eye" class="size-9!" :href="route('strategies.show', $strategy['id'])" wire:navigate :aria-label="__('common.view_name', ['name' => $strategy['name']])" />
+                                <x-ui.button tone="ghost" size="sm" icon="eye" class="size-9!" :href="route('strategies.show', tap(new Strategy, fn ($s) => $s->id = $strategy['id']))" wire:navigate :aria-label="__('common.view_name', ['name' => $strategy['name']])" />
 
                                 @if ($this->canManage)
                                     <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $strategy['id'] }})" :aria-label="__('common.edit_name', ['name' => $strategy['name']])" />

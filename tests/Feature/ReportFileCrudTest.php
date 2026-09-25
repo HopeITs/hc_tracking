@@ -5,7 +5,6 @@ use App\Enums\ReportStatus;
 use App\Models\Report;
 use App\Models\ReportFile;
 use App\Models\User;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -192,8 +191,9 @@ test('edit and delete refuse a file that belongs to another report', function (s
 
     Livewire::actingAs(User::factory()->create())
         ->test('pages::reports.show', ['report' => $report])
-        ->call($method, $foreignFile->id);
-})->with(['openEditFileModal', 'confirmDeleteFile'])->throws(ModelNotFoundException::class);
+        ->call($method, $foreignFile->id)
+        ->assertNotFound();
+})->with(['openEditFileModal', 'confirmDeleteFile']);
 
 test('stored files stay downloadable once the report is locked', function () {
     Storage::fake('local');
@@ -265,5 +265,6 @@ test('the preview modal renders the right viewer and steps between files, even o
 test('opening a preview refuses a file from another report', function () {
     Livewire::actingAs(User::factory()->create())
         ->test('pages::reports.show', ['report' => Report::factory()->create()])
-        ->call('openPreview', ReportFile::factory()->create()->id);
-})->throws(ModelNotFoundException::class);
+        ->call('openPreview', ReportFile::factory()->create()->id)
+        ->assertNotFound();
+});

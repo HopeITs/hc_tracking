@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureHrAccountIsActive;
+use App\Models\Activity;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -209,7 +210,7 @@ test('tracking keeps no copy of hr names, emails or passwords', function () {
 });
 
 test('a user shows the name and email hr holds', function () {
-    $user = User::factory()->create(['name' => 'Rana Darwish', 'email' => 'rana@example.org']);
+    $user = Activity::withoutRecording(fn (): User => User::factory()->create(['name' => 'Rana Darwish', 'email' => 'rana@example.org']));
     DB::connection('hr')->table('users')->where('id', $user->hr_user_id)->update(['email' => 'rana.d@example.org']);
 
     expect($user->fresh())
@@ -315,7 +316,7 @@ test('password reset is not offered because passwords live in hr', function () {
 });
 
 test('an email changed in hr still logs in as the same user', function () {
-    $user = User::factory()->withHrAccount('hr-secret')->create(['email' => 'old@example.org']);
+    $user = Activity::withoutRecording(fn (): User => User::factory()->withHrAccount('hr-secret')->create(['email' => 'old@example.org']));
     DB::connection('hr')->table('users')->where('id', $user->hr_user_id)->update(['email' => 'new@example.org']);
 
     $this->post(route('login.store'), [

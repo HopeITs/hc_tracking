@@ -934,12 +934,12 @@ new #[Title('titles.transfers')] class extends Component {
                                     }]) aria-hidden="true"></span>
                                     <div class="min-w-0">
                                         <a
-                                            href="{{ route('donors.show', $transfer->donorProposal->donor_id) }}"
+                                            href="{{ route('donors.show', $transfer->donorProposal->donor) }}"
                                             wire:navigate
                                             class="block truncate text-sm font-semibold underline-offset-2 hover:underline {{ $inkText }}"
                                         >{{ $transfer->donorProposal->donor->name }}</a>
                                         <p class="flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs text-secondary-medium dark:text-secondary-soft">
-                                            <a href="{{ route('proposals.show', $transfer->donorProposal->proposal_id) }}" wire:navigate class="truncate underline-offset-2 hover:underline">{{ $transfer->donorProposal->proposal->name }}</a>
+                                            <a href="{{ route('proposals.show', $transfer->donorProposal->proposal) }}" wire:navigate class="truncate underline-offset-2 hover:underline">{{ $transfer->donorProposal->proposal->name }}</a>
                                             <span aria-hidden="true">·</span>
                                             <a href="{{ route('funding-agreements.show', $transfer->donorProposal) }}" wire:navigate class="shrink-0 underline-offset-2 hover:underline" data-agreement-link>{{ filled($transfer->donorProposal->project_num) ? __('proposals.agreement_number', ['number' => $transfer->donorProposal->project_num]) : __('proposals.view_agreement') }}</a>
                                         </p>

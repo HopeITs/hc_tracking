@@ -1031,7 +1031,7 @@ new #[Title('titles.project')] class extends Component {
 
                 <div class="grid gap-3 p-3.5 @lg/detail:grid-cols-2 @4xl/detail:grid-cols-3 @6xl/detail:p-5">
                     @forelse ($this->filteredProjectFiles as $media)
-                        <x-ui.file-card :media="$media" :project-id="$this->projectId" wire:key="project-file-{{ $media->id }}" />
+                        <x-ui.file-card :media="$media" :project="$this->project" wire:key="project-file-{{ $media->id }}" />
                     @empty
                         <div class="col-span-full">
                             <x-ui.empty-state icon="funnel" :heading="__('projects.no_files_in_this_category')" />

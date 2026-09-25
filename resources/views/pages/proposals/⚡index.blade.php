@@ -6,6 +6,7 @@ use App\Enums\ProposalStatus;
 use App\Enums\TaskStatus;
 use App\Models\Donor;
 use App\Models\DonorProposal;
+use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalStatusNote;
 use App\Models\TransfersTracking;
@@ -707,7 +708,7 @@ new #[Title('titles.proposals')] class extends Component {
     // The flow names every matching proposal but the list below shows one page
     // of them: a proposal on this page is scrolled to, any other one opened.
     $pageProposalIds = $this->proposals->getCollection()->modelKeys();
-    $proposalHref = fn (int $id): string => in_array($id, $pageProposalIds, true) ? '#proposal-'.$id : route('proposals.show', $id);
+    $proposalHref = fn (int $id): string => in_array($id, $pageProposalIds, true) ? '#proposal-'.$id : route('proposals.show', tap(new Proposal, fn ($proposal) => $proposal->id = $id));
 @endphp
 
 <section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="proposal-pipeline-heading">
@@ -946,7 +947,7 @@ new #[Title('titles.proposals')] class extends Component {
                                     @forelse ($graph['projects'] as $node)
                                         <li wire:key="flow-project-{{ $graph['currency'] }}-{{ $node['id'] }}">
                                             <a
-                                                href="{{ route('projects.show', $node['id']) }}"
+                                                href="{{ route('projects.show', tap(new Project, fn ($project) => $project->id = $node['id'])) }}"
                                                 wire:navigate
                                                 x-on:mouseenter="$store.proposalFlow.focus = '{{ $node['key'] }}'"
                                                 x-on:mouseleave="$store.proposalFlow.focus = null"
@@ -1137,7 +1138,7 @@ new #[Title('titles.proposals')] class extends Component {
                                         <div class="mt-2 [&+&]:mt-4" wire:key="agreement-{{ $agreement->id }}">
                                             <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
                                                 <p class="min-w-0 text-sm">
-                                                    <a href="{{ route('donors.show', $agreement->donor_id) }}" wire:navigate class="font-bold underline-offset-4 hover:underline {{ $inkText }}">{{ $agreement->donor->name }}</a>
+                                                    <a href="{{ route('donors.show', $agreement->donor) }}" wire:navigate class="font-bold underline-offset-4 hover:underline {{ $inkText }}">{{ $agreement->donor->name }}</a>
                                                     <a href="{{ route('funding-agreements.show', $agreement) }}" wire:navigate class="ms-1.5 text-xs underline-offset-4 hover:underline {{ $mutedText }}">{{ filled($agreement->project_num) ? __('proposals.agreement_number', ['number' => $agreement->project_num]) : __('proposals.view_agreement') }}</a>
                                                 </p>
                                                 <p class="text-xl font-extrabold tracking-tight tabular-nums {{ $inkText }}">{{ $amount($budget) }} <span class="text-xs font-semibold tracking-normal {{ $mutedText }}">{{ $agreement->currency->value }}</span></p>

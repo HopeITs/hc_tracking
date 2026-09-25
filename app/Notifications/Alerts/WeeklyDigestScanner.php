@@ -38,7 +38,7 @@ final class WeeklyDigestScanner implements Scanner
 
         $week = $now->format('o-\WW');
         $stats = $this->statsByProgram($today, $now);
-        $programs = Program::query()->whereIn('id', array_keys($stats))->get(['id', 'name', 'manager_id']);
+        $programs = Program::query()->whereIn('id', array_keys($stats))->get(['id', 'manager_id']);
         $managers = $this->employees->usersFor($programs->pluck('manager_id')->filter()->map(fn ($id): int => (int) $id)->unique()->values()->all());
         $sent = 0;
 
@@ -49,7 +49,7 @@ final class WeeklyDigestScanner implements Scanner
                 continue;
             }
 
-            $payload = $this->digest('notifications.digests.weekly_program', ['program' => $program->name, ...$stats[$program->id]], 'program', $program->id, ['route' => 'programs.show', 'parameters' => ['program' => $program->id]]);
+            $payload = $this->digest('notifications.digests.weekly_program', ['program' => $program->name, ...$stats[$program->id]], 'program', $program->id, ['route' => 'programs.show', 'parameters' => ['program' => $program->slug]]);
             $sent += $this->dispatcher->send('weekly_digest', $week, $payload, [$managerId], [], [$managerId]);
         }
 
@@ -109,7 +109,7 @@ final class WeeklyDigestScanner implements Scanner
 
     /**
      * @param  array<string, int|string>  $params
-     * @param  array{route: string, parameters?: array<string, int>}  $link
+     * @param  array{route: string, parameters?: array<string, string>}  $link
      */
     private function digest(string $key, array $params, string $subjectType, int $subjectId, array $link): NotificationPayload
     {

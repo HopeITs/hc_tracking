@@ -1373,7 +1373,7 @@ new #[Title('titles.results_framework')] class extends Component {
                         </span>
 
                         @if ($groupProgram !== null)
-                            <a href="{{ route('programs.show', ['program' => $groupProgram->id]) }}" wire:navigate class="type-meta font-semibold text-secondary-medium hover:text-primary hover:underline dark:text-secondary-soft">
+                            <a href="{{ route('programs.show', $groupProgram) }}" wire:navigate class="type-meta font-semibold text-secondary-medium hover:text-primary hover:underline dark:text-secondary-soft">
                                 {{ __('common.view_name', ['name' => $groupProgram->name]) }}
                             </a>
                         @endif

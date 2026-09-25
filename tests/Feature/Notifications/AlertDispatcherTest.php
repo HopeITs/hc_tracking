@@ -1,7 +1,9 @@
 <?php
 
 use App\Enums\NotificationPriority;
+use App\Models\Activity;
 use App\Models\NotificationMute;
+use App\Models\User;
 use App\Models\UserNotification;
 use App\Notifications\Alerts\AlertDispatcher;
 use App\Notifications\Alerts\AlertLedger;
@@ -30,7 +32,7 @@ test('a stage fires once per user and can be re-armed', function () {
 test('alerts respect the view permission and mutes, except for direct people', function () {
     $direct = userWithRole('Managers');
     $mutedWatcher = userWithRole('Managers');
-    $blind = userWithRole('Financial');
+    $blind = Activity::withoutRecording(fn (): User => User::factory()->create());
     NotificationMute::query()->create(['user_id' => $direct->id, 'module' => 'tasks']);
     NotificationMute::query()->create(['user_id' => $mutedWatcher->id, 'module' => 'tasks']);
 

@@ -5,7 +5,6 @@ use App\Models\Task;
 use App\Models\TaskAttachment;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -207,8 +206,9 @@ test('edit and delete refuse an attachment that belongs to another task', functi
 
     Livewire::actingAs(User::factory()->role('Super Admin')->create())
         ->test('pages::tasks.show', ['task' => $task])
-        ->call($method, $foreignFile->id);
-})->with(['openEditFileModal', 'confirmDeleteFile'])->throws(ModelNotFoundException::class);
+        ->call($method, $foreignFile->id)
+        ->assertNotFound();
+})->with(['openEditFileModal', 'confirmDeleteFile']);
 
 test('the preview route serves pdfs and images inline with a safe content type', function (string $name, string $contentType) {
     Storage::fake('local');
@@ -264,5 +264,6 @@ test('the preview modal renders the right viewer and steps between files', funct
 test('opening a preview refuses an attachment from another task', function () {
     Livewire::actingAs(User::factory()->create())
         ->test('pages::tasks.show', ['task' => Task::factory()->create()])
-        ->call('openPreview', TaskAttachment::factory()->create()->id);
-})->throws(ModelNotFoundException::class);
+        ->call('openPreview', TaskAttachment::factory()->create()->id)
+        ->assertNotFound();
+});

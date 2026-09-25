@@ -744,7 +744,7 @@ new #[Title('titles.proposal')] class extends Component {
             <article class="mt-6 border-t pt-6 {{ $hairline }}" wire:key="agreement-{{ $agreement->id }}" data-agreement="{{ $agreement->id }}">
                 <div class="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
                     <p class="min-w-0">
-                        <a href="{{ route('donors.show', $agreement->donor_id) }}" wire:navigate class="text-base font-bold underline-offset-4 hover:underline {{ $inkText }}">{{ $agreement->donor->name }}</a>
+                        <a href="{{ route('donors.show', $agreement->donor) }}" wire:navigate class="text-base font-bold underline-offset-4 hover:underline {{ $inkText }}">{{ $agreement->donor->name }}</a>
                         <a href="{{ route('funding-agreements.show', $agreement) }}" wire:navigate class="ms-2 text-xs underline-offset-4 hover:underline {{ $mutedText }}">{{ filled($agreement->project_num) ? __('proposals.agreement_number', ['number' => $agreement->project_num]) : __('proposals.view_agreement') }}</a>
                     </p>
                     <p class="text-2xl font-extrabold tracking-tight tabular-nums {{ $inkText }}">{{ $exact($budget) }} <span class="text-xs font-semibold tracking-normal {{ $mutedText }}">{{ $agreement->currency->value }}</span></p>

@@ -83,7 +83,7 @@ test('assigning and unassigning are recorded on the task', function () {
 
     expect($activities->pluck('event')->all())->toBe(['task.assigned', 'task.unassigned'])
         ->and($activities->pluck('subject_id')->unique()->all())->toBe([$task->id])
-        ->and($activities->first()->properties['employee'])->toBe(['en' => 'Nour Ali', 'ar' => 'سامي حداد']);
+        ->and($activities->first()->properties['employee'])->toEqual(['en' => 'Nour Ali', 'ar' => 'سامي حداد']);
 });
 
 test('deleting a task remembers who it named', function () {

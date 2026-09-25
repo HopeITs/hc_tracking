@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\HasSlug;
 use App\Concerns\RecordsActivity;
 use App\Enums\DonorType;
 use App\Notifications\TracksActivity;
@@ -18,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * @property int $id
  * @property string $name
+ * @property string $slug
  * @property DonorType|null $type
  * @property string|null $contact_person
  * @property string|null $email
@@ -34,7 +36,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Donor extends Model implements TracksActivity
 {
     /** @use HasFactory<DonorFactory> */
-    use HasFactory, RecordsActivity;
+    use HasFactory, HasSlug, RecordsActivity;
+
+    protected function slugSource(): string
+    {
+        return $this->name;
+    }
 
     /**
      * The funding agreements this donor has signed.

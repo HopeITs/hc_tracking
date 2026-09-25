@@ -8,7 +8,7 @@ test('only modules I can see are offered for muting', function () {
 
     Livewire::actingAs($financial)->test('pages::notifications.settings')
         ->assertSeeText(__('notifications.modules.transfers'))
-        ->assertDontSeeText(__('notifications.modules.tasks'));
+        ->assertDontSeeText(__('notifications.modules.reports'));
 });
 
 test('muting and unmuting a module', function () {

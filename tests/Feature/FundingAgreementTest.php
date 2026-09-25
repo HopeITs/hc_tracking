@@ -12,7 +12,6 @@ use App\Models\Proposal;
 use App\Models\TransfersTracking;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -720,8 +719,8 @@ test('a donor report cannot be submitted in the future or reached from another a
         ->call('saveReport')
         ->assertHasErrors(['reportSubmittedOn' => 'before_or_equal']);
 
-    expect(fn () => $fresh()->call('openReportEdit', $foreign->id))->toThrow(ModelNotFoundException::class)
-        ->and(fn () => $fresh()->call('markReportSubmitted', $foreign->id))->toThrow(ModelNotFoundException::class);
+    $fresh()->call('openReportEdit', $foreign->id)->assertNotFound();
+    $fresh()->call('markReportSubmitted', $foreign->id)->assertNotFound();
 
     expect($foreign->fresh()->submitted_on)->toBeNull();
 });

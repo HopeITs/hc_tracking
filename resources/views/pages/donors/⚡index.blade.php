@@ -567,7 +567,7 @@ new #[Title('titles.donors')] class extends Component {
                                     @php
                                         $receivedShare = $segment['committed'] > 0 ? min(100, round($segment['received'] / $segment['committed'] * 100, 2)) : 0;
                                         $isRest = $segment['donorId'] === null;
-                                        $rowHref = $isRest ? null : (in_array($segment['donorId'], $pageDonorIds, true) ? '#donor-'.$segment['donorId'] : route('donors.show', $segment['donorId']));
+                                        $rowHref = $isRest ? null : (in_array($segment['donorId'], $pageDonorIds, true) ? '#donor-'.$segment['donorId'] : route('donors.show', tap(new Donor, fn ($donor) => $donor->id = $segment['donorId'])));
                                     @endphp
                                     <li wire:key="wallet-{{ $line['currency'] }}-{{ $segment['donorId'] ?? 'rest' }}">
                                         <a
@@ -621,8 +621,8 @@ new #[Title('titles.donors')] class extends Component {
                                             <p class="shrink-0 text-sm font-extrabold tabular-nums {{ $inkText }}">{{ $shortAmount($transfer['amount']) }} <span class="text-[11px] font-semibold {{ $mutedText }}">{{ $transfer['currency'] }}</span></p>
                                         </div>
                                         <p class="mt-0.5 truncate text-sm">
-                                            <a href="{{ route('donors.show', $transfer['donorId']) }}" wire:navigate class="font-semibold underline-offset-4 hover:underline {{ $inkText }}">{{ $transfer['donor'] }}</a>
-                                            <a href="{{ route('funding-agreements.show', $transfer['agreementId']) }}" wire:navigate class="text-xs underline-offset-4 hover:underline {{ $mutedText }}">· {{ $transfer['proposal'] }}</a>
+                                            <a href="{{ route('donors.show', tap(new Donor, fn ($donor) => $donor->id = $transfer['donorId'])) }}" wire:navigate class="font-semibold underline-offset-4 hover:underline {{ $inkText }}">{{ $transfer['donor'] }}</a>
+                                            <a href="{{ route('funding-agreements.show', tap(new DonorProposal, fn ($agreement) => $agreement->id = $transfer['agreementId'])) }}" wire:navigate class="text-xs underline-offset-4 hover:underline {{ $mutedText }}">· {{ $transfer['proposal'] }}</a>
                                         </p>
                                     </li>
                                 @endforeach
@@ -800,7 +800,7 @@ new #[Title('titles.donors')] class extends Component {
                                             <li class="relative flex items-start gap-3 ps-5" wire:key="donor-{{ $donor->id }}-agreement-{{ $agreement->id }}">
                                                 <span class="absolute start-0 top-1.5 size-2 rounded-full border-2 border-secondary-dark bg-white dark:border-white dark:bg-secondary-dark" aria-hidden="true"></span>
                                                 <span class="min-w-0 flex-1">
-                                                    <a href="{{ route('proposals.show', $agreement->proposal_id) }}" wire:navigate class="block truncate text-sm leading-snug font-semibold underline-offset-4 hover:underline {{ $inkText }}">{{ $agreement->proposal?->name }}</a>
+                                                    <a href="{{ route('proposals.show', $agreement->proposal) }}" wire:navigate class="block truncate text-sm leading-snug font-semibold underline-offset-4 hover:underline {{ $inkText }}">{{ $agreement->proposal?->name }}</a>
                                                     <span class="block truncate text-[11px] {{ $mutedText }}">
                                                         {{ $agreement->proposal?->status->label() }}
                                                         @if ($agreement->proposal?->projects->isNotEmpty())

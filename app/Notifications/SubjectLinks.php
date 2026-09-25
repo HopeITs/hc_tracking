@@ -4,8 +4,19 @@ declare(strict_types=1);
 
 namespace App\Notifications;
 
+use App\Models\AnnualPlan;
+use App\Models\Donor;
+use App\Models\DonorProposal;
 use App\Models\DonorReport;
+use App\Models\Milestone;
+use App\Models\Program;
+use App\Models\Project;
+use App\Models\Proposal;
+use App\Models\Report;
+use App\Models\Strategy;
+use App\Models\Task;
 use App\Models\UserNotification;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 
 /**
@@ -47,16 +58,16 @@ final class SubjectLinks
     public function routeFor(string $type, int $id): ?string
     {
         return match ($type) {
-            'task' => route('tasks.show', $id),
-            'milestone' => route('milestones.show', $id),
-            'project' => route('projects.show', $id),
-            'program' => route('programs.show', $id),
-            'annual_plan' => route('annual-plans.show', $id),
-            'strategy' => route('strategies.show', $id),
-            'proposal' => route('proposals.show', $id),
-            'report' => route('reports.show', $id),
-            'donor' => route('donors.show', $id),
-            'donor_proposal' => route('funding-agreements.show', $id),
+            'task' => $this->showRoute('tasks.show', Task::class, $id),
+            'milestone' => $this->showRoute('milestones.show', Milestone::class, $id),
+            'project' => $this->showRoute('projects.show', Project::class, $id),
+            'program' => $this->showRoute('programs.show', Program::class, $id),
+            'annual_plan' => $this->showRoute('annual-plans.show', AnnualPlan::class, $id),
+            'strategy' => $this->showRoute('strategies.show', Strategy::class, $id),
+            'proposal' => $this->showRoute('proposals.show', Proposal::class, $id),
+            'report' => $this->showRoute('reports.show', Report::class, $id),
+            'donor' => $this->showRoute('donors.show', Donor::class, $id),
+            'donor_proposal' => $this->showRoute('funding-agreements.show', DonorProposal::class, $id),
             'donor_report' => $this->donorReportRoute($id),
             'risk' => route('risks.index'),
             'indicator' => route('indicators.index', ['inspect' => $id]),
@@ -100,6 +111,20 @@ final class SubjectLinks
     {
         $agreementId = DonorReport::query()->whereKey($id)->value('donor_proposal_id');
 
-        return $agreementId === null ? null : route('funding-agreements.show', $agreementId);
+        return $agreementId === null ? null : $this->showRoute('funding-agreements.show', DonorProposal::class, $agreementId);
+    }
+
+    /**
+     * A show route bound by slug needs the record itself, not its id — the
+     * id a notification or activity row stores is no longer a valid route
+     * parameter on its own.
+     *
+     * @param  class-string<Model>  $modelClass
+     */
+    private function showRoute(string $routeName, string $modelClass, int $id): ?string
+    {
+        $record = $modelClass::query()->find($id);
+
+        return $record === null ? null : route($routeName, $record);
     }
 }
