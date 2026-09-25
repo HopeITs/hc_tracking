@@ -109,6 +109,8 @@
             @persist('notification-toasts')
                 <x-notifications.toasts />
             @endpersist
+
+            <x-notifications.install-modal />
         @endauth
 
         @fluxScripts

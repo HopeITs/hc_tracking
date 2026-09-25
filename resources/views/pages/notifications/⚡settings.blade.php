@@ -77,10 +77,6 @@ new #[Title('titles.notification_settings')] class extends Component {
                 init() {
                     window.addEventListener('hc-app-install-change', (event) => (this.state = event.detail));
                 },
-                async install() {
-                    await window.hcApp?.install();
-                    this.state = window.hcApp?.state() ?? this.state;
-                },
             }"
             data-desktop-app
         >
@@ -98,7 +94,7 @@ new #[Title('titles.notification_settings')] class extends Component {
                     {{ __('notifications.app.installed') }}
                 </p>
 
-                <x-ui.button x-show="state === 'available'" x-cloak tone="primary" size="sm" icon="arrow-down-tray" x-on:click="install()" data-test="install-app-button">
+                <x-ui.button x-show="state === 'available'" x-cloak tone="primary" size="sm" icon="arrow-down-tray" x-on:click="$flux.modal('install-app').show()" aria-haspopup="dialog" data-test="install-app-button">
                     {{ __('notifications.app.install') }}
                 </x-ui.button>
 

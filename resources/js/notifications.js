@@ -12,7 +12,7 @@
  * Desktop popups go through the service worker (public/sw.js) so they carry
  * the app's name and banner artwork, and a click opens the record. The same file
  * makes the site installable as the "HC Tracking" app; the install prompt is
- * exposed on window.hcApp for the notification settings page.
+ * exposed on window.hcApp, and the install dialog (appInstallDialog) uses it.
  */
 const POLL_INTERVAL_MS = 60_000;
 const TOAST_DURATION_MS = 6_000;
@@ -334,6 +334,38 @@ document.addEventListener('visibilitychange', () => {
 /* ------------------------------------------------------------------ */
 
 document.addEventListener('alpine:init', () => {
+    /**
+     * The Install HC Tracking dialog (x-notifications.install-modal). Install
+     * hands over to the browser's own confirm and the dialog closes after its
+     * answer, whichever it is. If the prompt goes away while the dialog is
+     * open (installed from the address bar), there is nothing left to offer,
+     * so it closes by itself.
+     */
+    window.Alpine.data('appInstallDialog', () => ({
+        installing: false,
+
+        async install() {
+            if (this.installing) {
+                return;
+            }
+
+            this.installing = true;
+
+            try {
+                await window.hcApp?.install();
+            } finally {
+                this.installing = false;
+                this.$flux.modal('install-app').close();
+            }
+        },
+
+        closeWhenGone(state) {
+            if (state !== 'available' && !this.installing) {
+                this.$flux.modal('install-app').close();
+            }
+        },
+    }));
+
     /**
      * The bell's panel. Its rows are fetched the first time it opens
      * (loadPanel), focus moves into it on open and back to the bell when
