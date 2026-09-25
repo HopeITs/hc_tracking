@@ -21,6 +21,8 @@
 
             <flux:spacer />
 
+            <x-notifications.install-button />
+
             <livewire:notifications.bell />
 
             <flux:dropdown position="top" align="end">
@@ -68,6 +70,8 @@
             <flux:spacer />
 
             <div class="flex items-center gap-1.5">
+                <x-notifications.install-button />
+
                 <livewire:notifications.bell />
 
                 <flux:button

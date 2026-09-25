@@ -98,6 +98,26 @@ test('the settings page offers the desktop app install', function () {
         ->assertSeeHtml('data-app-install-hint');
 });
 
+test('both top headers offer the desktop app install right before the notification bell', function () {
+    $response = $this->actingAs(Activity::withoutRecording(fn () => User::factory()->create()))
+        ->get(route('dashboard'))
+        ->assertOk();
+
+    $document = new DOMDocument;
+    $document->loadHTML($response->getContent(), LIBXML_NOERROR | LIBXML_NOWARNING);
+    $xpath = new DOMXPath($document);
+
+    $installButtons = $xpath->query('//*[@data-test="header-install-app-button"]');
+
+    expect($installButtons->length)->toBe(2);
+
+    foreach ($installButtons as $installButton) {
+        expect($installButton->getAttribute('aria-label'))->toBe(__('notifications.app.install'))
+            ->and($installButton->getAttribute('x-show'))->toBe("state === 'available'")
+            ->and($xpath->query('following-sibling::*[1][@data-notification-bell]', $installButton)->length)->toBe(1);
+    }
+});
+
 test('every module has a desktop icon for both popup urgencies', function () {
     $modules = [...array_keys(config('notifications.modules')), 'system'];
 
