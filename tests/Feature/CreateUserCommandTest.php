@@ -23,7 +23,7 @@ test('the command gives an hr account access with the given role', function () {
         ->and($user->email_verified_at)->not->toBeNull();
 });
 
-test('a user has no role when none is given', function () {
+test('a user gets the default Team Member role when none is given', function () {
     insertHrUser(insertHrEmployee(), 'dana@example.org');
 
     $this->artisan('user:create', [
@@ -31,7 +31,7 @@ test('a user has no role when none is given', function () {
         '--no-interaction' => true,
     ])->assertSuccessful();
 
-    expect(User::query()->sole()->roles)->toBeEmpty();
+    expect(User::query()->sole()->roles->pluck('name')->all())->toBe(['Team Member']);
 });
 
 test('the unverified flag leaves the address unverified', function () {

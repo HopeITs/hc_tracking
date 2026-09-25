@@ -24,6 +24,7 @@ return [
     'name_or_email' => 'الاسم أو البريد الإلكتروني',
     'no_matching_users' => 'لا يوجد مستخدمون مطابقون',
     'no_role' => 'بلا دور',
+    'default_role_option' => ':role (افتراضي)',
     'operational_access_for_assigned_projects_tasks_and_reports' => 'صلاحيات تشغيلية للمشاريع والمهام والتقارير المسندة.',
     'pending' => 'قيد الانتظار',
     'pending_verification' => 'بانتظار التحقق',

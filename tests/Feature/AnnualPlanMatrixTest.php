@@ -23,7 +23,7 @@ test('guests are redirected from the annual plan matrix', function () {
     $this->get(route('annual-plans.index'))->assertRedirect(route('login'));
 });
 
-test('all authenticated roles can access the annual plan matrix while permissions are deferred', function (string $roleName) {
+test('all authenticated roles can access the annual plan matrix', function (string $roleName) {
     $user = User::factory()->role($roleName)->create();
 
     $this->actingAs($user)
@@ -31,14 +31,14 @@ test('all authenticated roles can access the annual plan matrix while permission
         ->assertOk()
         ->assertSeeText('Annual Plans');
 })->with([
-    'officer' => 'Officer',
+    'team member' => 'Team Member',
     'manager' => 'Managers',
     'meal' => 'MEAL',
     'admin' => 'Super Admin',
 ]);
 
 test('renders one row per program and one column per fiscal year in the span', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $water = matrixProgram('Water Security');
     $shelter = matrixProgram('Safe Shelter');
 
@@ -54,7 +54,7 @@ test('renders one row per program and one column per fiscal year in the span', f
 });
 
 test('a planned cell names its manager and target count while an unplanned cell is marked empty', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $manager = insertHrEmployee(firstNameEn: 'Layla', lastNameEn: 'Haddad');
     $water = matrixProgram('Water Security');
 
@@ -74,7 +74,7 @@ test('a planned cell names its manager and target count while an unplanned cell 
 });
 
 test('filtering by assigned manager keeps only the plans that manager owns', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $layla = insertHrEmployee(firstNameEn: 'Layla', lastNameEn: 'Haddad');
     $omar = insertHrEmployee(firstNameEn: 'Omar', lastNameEn: 'Khalil');
     $water = matrixProgram('Water Security');
@@ -94,7 +94,7 @@ test('filtering by assigned manager keeps only the plans that manager owns', fun
 });
 
 test('the manager filter only offers hr employees who are accountable for a plan', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $planned = insertHrEmployee(firstNameEn: 'Layla', lastNameEn: 'Haddad');
     insertHrEmployee(firstNameEn: 'Unassigned', lastNameEn: 'Person');
 
@@ -107,7 +107,7 @@ test('the manager filter only offers hr employees who are accountable for a plan
 });
 
 test('selecting a fiscal year drops the columns outside the selection', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $water = matrixProgram('Water Security');
 
     AnnualPlan::factory()->create(['program_id' => $water->id, 'year' => 2023]);
@@ -124,7 +124,7 @@ test('selecting a fiscal year drops the columns outside the selection', function
 });
 
 test('years ticked out of order are still shown in ascending order', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $water = matrixProgram('Water Security');
 
     AnnualPlan::factory()->create(['program_id' => $water->id, 'year' => 2024]);
@@ -142,7 +142,7 @@ test('years ticked out of order are still shown in ascending order', function ()
 });
 
 test('a default span wider than ten fiscal years is narrowed to the most recent ten', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $water = matrixProgram('Water Security');
 
     AnnualPlan::factory()->create(['program_id' => $water->id, 'year' => 2010]);
@@ -156,7 +156,7 @@ test('a default span wider than ten fiscal years is narrowed to the most recent 
 });
 
 test('a selection of more than ten fiscal years keeps the most recent ten', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $water = matrixProgram('Water Security');
 
     foreach (range(2010, 2030) as $year) {
@@ -178,8 +178,8 @@ test('a selection of more than ten fiscal years keeps the most recent ten', func
 });
 
 test('a program with no plan keeps its row until the matrix is filtered by manager', function () {
-    $user = User::factory()->create();
-    $manager = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
+    $manager = User::factory()->role('General Manager')->create();
     matrixProgram('Unplanned Program');
 
     AnnualPlan::factory()->create([
@@ -197,7 +197,7 @@ test('a program with no plan keeps its row until the matrix is filtered by manag
 });
 
 test('a fiscal year column counts every plan in it, not only those on the current page', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     foreach (range(1, 17) as $index) {
         AnnualPlan::factory()->create([
@@ -212,8 +212,8 @@ test('a fiscal year column counts every plan in it, not only those on the curren
 });
 
 test('changing a filter returns the matrix to its first page', function () {
-    $user = User::factory()->create();
-    $manager = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
+    $manager = User::factory()->role('General Manager')->create();
 
     foreach (range(1, 16) as $index) {
         matrixProgram('Program '.str_pad((string) $index, 2, '0', STR_PAD_LEFT));
@@ -235,8 +235,8 @@ test('changing a filter returns the matrix to its first page', function () {
 });
 
 test('resetting the filters restores the full span and every manager', function () {
-    $user = User::factory()->create();
-    $manager = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
+    $manager = User::factory()->role('General Manager')->create();
     $water = matrixProgram('Water Security');
 
     AnnualPlan::factory()->create(['program_id' => $water->id, 'manager_id' => $manager->id, 'year' => 2024]);
@@ -255,7 +255,7 @@ test('resetting the filters restores the full span and every manager', function 
 });
 
 test('an empty matrix explains itself rather than rendering a grid', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     matrixProgram('Water Security');
 
     Livewire::actingAs($user)
@@ -265,8 +265,8 @@ test('an empty matrix explains itself rather than rendering a grid', function ()
 });
 
 test('the matrix reads the plans of every visible cell in a fixed number of queries', function (int $programCount, int $yearCount) {
-    $user = User::factory()->create();
-    $manager = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
+    $manager = User::factory()->role('General Manager')->create();
 
     foreach (range(1, $programCount) as $index) {
         $program = matrixProgram('Program '.str_pad((string) $index, 2, '0', STR_PAD_LEFT));
@@ -300,7 +300,7 @@ test('the matrix reads the plans of every visible cell in a fixed number of quer
 ]);
 
 test('the cockpit lands on the current fiscal year when the span covers it', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $thisYear = (int) now()->year;
 
     AnnualPlan::factory()->create(['program_id' => matrixProgram('Water Security')->id, 'year' => $thisYear - 1]);
@@ -314,7 +314,7 @@ test('the cockpit lands on the current fiscal year when the span covers it', fun
 });
 
 test('focusing a fiscal year moves the cockpit without filtering the grid', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $water = matrixProgram('Water Security');
 
     AnnualPlan::factory()->create(['program_id' => $water->id, 'year' => 2024]);
@@ -331,7 +331,7 @@ test('focusing a fiscal year moves the cockpit without filtering the grid', func
 });
 
 test('a focus year outside the visible span falls back to a column that exists', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     AnnualPlan::factory()->create(['program_id' => matrixProgram('Water Security')->id, 'year' => 2024]);
     AnnualPlan::factory()->create(['program_id' => matrixProgram('Safe Shelter')->id, 'year' => 2026]);
@@ -345,7 +345,7 @@ test('a focus year outside the visible span falls back to a column that exists',
 });
 
 test('a planned cell carries the targets committed in it and the year rail counts them', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $water = matrixProgram('Water Security');
 
     $plan = AnnualPlan::factory()->create(['program_id' => $water->id, 'year' => 2026]);
@@ -359,7 +359,7 @@ test('a planned cell carries the targets committed in it and the year rail count
 });
 
 test('filling the cells with delivery signal leaves the four reads of annual_plans untouched', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     foreach (range(1, 6) as $index) {
         $program = matrixProgram('Program '.str_pad((string) $index, 2, '0', STR_PAD_LEFT));
@@ -384,7 +384,7 @@ test('filling the cells with delivery signal leaves the four reads of annual_pla
 });
 
 test('the program search narrows the matrix to programs whose name matches', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     AnnualPlan::factory()->create(['program_id' => matrixProgram('Water Security')->id, 'year' => 2026]);
     AnnualPlan::factory()->create(['program_id' => matrixProgram('Safe Shelter')->id, 'year' => 2026]);
@@ -397,7 +397,7 @@ test('the program search narrows the matrix to programs whose name matches', fun
 });
 
 test('resetting the filters restores every program and clears the search', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $water = matrixProgram('Water Security');
 
     AnnualPlan::factory()->create(['program_id' => $water->id, 'year' => 2026]);
@@ -413,7 +413,7 @@ test('resetting the filters restores every program and clears the search', funct
 });
 
 test('searching for a program returns the matrix to its first page', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     foreach (range(1, 16) as $index) {
         matrixProgram('Program '.str_pad((string) $index, 2, '0', STR_PAD_LEFT));
@@ -429,7 +429,7 @@ test('searching for a program returns the matrix to its first page', function ()
 });
 
 test('a fiscal year can be unticked again', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $water = matrixProgram('Water Security');
 
     AnnualPlan::factory()->create(['program_id' => $water->id, 'year' => 2024]);

@@ -17,6 +17,11 @@
     $isOverdue = $task->isOverdue();
     $isMissed = $task->isMissed();
     $cardAssignees = $task->taskAssignees->pluck('employee')->filter();
+    // What the viewer may do to this card (TaskPolicy).
+    $canUpdate = auth()->user()->can('update', $task);
+    $canMove = $canUpdate || auth()->user()->can('updateStatus', $task);
+    $canDelete = auth()->user()->can('delete', $task);
+    $canCreate = auth()->user()->can('create', App\Models\Task::class);
     $priorityBorderClass = match ($task->priority) {
         TaskPriority::High => 'border-primary dark:border-status-critical',
         TaskPriority::Medium => 'border-status-warn',
@@ -35,7 +40,7 @@
         <button
             type="button"
             wire:click="toggleComplete({{ $task->id }})"
-            @disabled($isDone)
+            @disabled($isDone || ! $canMove)
             class="inline-flex size-9 shrink-0 cursor-pointer touch-manipulation items-center justify-center rounded-full text-secondary-medium hover:bg-secondary-soft disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent dark:text-secondary-soft dark:hover:bg-secondary-medium"
             aria-label="{{ __('tasks.mark_complete') }}"
         >
@@ -86,7 +91,7 @@
         @endif
     </div>
     <div class="flex items-center justify-end gap-1 ps-12">
-        @if (! $isSubtask)
+        @if (! $isSubtask && $canCreate)
             <x-ui.button
                 tone="ghost"
                 size="sm"
@@ -97,7 +102,11 @@
                 data-test="task-add-subtask-mobile-{{ $task->id }}"
             />
         @endif
-        <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation" wire:click="openEditDrawer({{ $task->id }})" :aria-label="__('tasks.edit_title', ['title' => $task->title])" />
-        <x-ui.button tone="ghost" size="sm" icon="trash" class="size-11! touch-manipulation" wire:click="confirmDelete({{ $task->id }})" :aria-label="__('tasks.delete_title', ['title' => $task->title])" />
+        @if ($canUpdate)
+            <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation" wire:click="openEditDrawer({{ $task->id }})" :aria-label="__('tasks.edit_title', ['title' => $task->title])" />
+        @endif
+        @if ($canDelete)
+            <x-ui.button tone="ghost" size="sm" icon="trash" class="size-11! touch-manipulation" wire:click="confirmDelete({{ $task->id }})" :aria-label="__('tasks.delete_title', ['title' => $task->title])" />
+        @endif
     </div>
 </article>

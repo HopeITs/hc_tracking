@@ -218,7 +218,7 @@ test('a user shows the name and email hr holds', function () {
         ->email->toBe('rana.d@example.org');
 });
 
-test('an hr account logging in for the first time gets a tracking user with no role', function () {
+test('an hr account logging in for the first time gets a Team Member tracking user', function () {
     $employeeId = insertHrEmployee(firstNameEn: 'Mai', lastNameEn: 'Nasser');
     $hrUserId = insertHrUser($employeeId, 'new.person@example.org', 'password');
 
@@ -230,7 +230,7 @@ test('an hr account logging in for the first time gets a tracking user with no r
     $user = User::query()->where('hr_user_id', $hrUserId)->sole();
 
     $this->assertAuthenticatedAs($user);
-    expect($user->roles)->toBeEmpty()
+    expect($user->roles->pluck('name')->all())->toBe(['Team Member'])
         ->and($user->name)->toBe('Mai Nasser')
         ->and($user->employee_id)->toBe($employeeId);
 });

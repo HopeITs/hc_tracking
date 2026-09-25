@@ -9,6 +9,7 @@ use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalStatusNote;
+use App\Models\Scopes\TaskVisibilityScope;
 use App\Models\Task;
 use App\Models\TransfersTracking;
 use Carbon\CarbonImmutable;
@@ -18,12 +19,15 @@ use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
 new #[Title('titles.proposal')] class extends Component {
+    #[Locked]
     public int $proposalId;
 
     public bool $showStatusModal = false;
@@ -41,7 +45,7 @@ new #[Title('titles.proposal')] class extends Component {
     {
         return Proposal::query()
             ->select(['id', 'name', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end', 'status', 'notes', 'updated_at'])
-            ->withCount(['donorProposals', 'projects', 'tasks', 'statusNotes', 'planIndicators'])
+            ->withCount(['donorProposals', 'projects', 'tasks' => fn ($query) => $query->withoutGlobalScope(TaskVisibilityScope::class), 'statusNotes', 'planIndicators'])
             ->findOrFail($this->proposalId);
     }
 
@@ -433,6 +437,8 @@ new #[Title('titles.proposal')] class extends Component {
 
     public function openStatusModal(): void
     {
+        Gate::authorize('update', $this->proposal);
+
         $this->resetValidation();
         $this->newStatus = $this->proposal->status->value;
         $this->statusContext = '';
@@ -449,6 +455,8 @@ new #[Title('titles.proposal')] class extends Component {
      */
     public function changeStatus(): void
     {
+        Gate::authorize('update', $this->proposal);
+
         $this->statusContext = trim($this->statusContext);
 
         $validated = $this->validate([
@@ -536,7 +544,9 @@ new #[Title('titles.proposal')] class extends Component {
         <x-slot:actions>
             <div class="flex flex-wrap items-center gap-2">
                 <x-ui.enum-badge :case="$proposal->status" />
-                <x-ui.button tone="primary" size="sm" icon="arrow-path" class="min-h-10 touch-manipulation" wire:click="openStatusModal" data-test="open-status-modal">{{ __('proposals.change_status') }}</x-ui.button>
+                @can('update', $proposal)
+                    <x-ui.button tone="primary" size="sm" icon="arrow-path" class="min-h-10 touch-manipulation" wire:click="openStatusModal" data-test="open-status-modal">{{ __('proposals.change_status') }}</x-ui.button>
+                @endcan
             </div>
         </x-slot:actions>
     </x-ui.detail-header>

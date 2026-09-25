@@ -12,6 +12,7 @@ use App\Models\TransfersTracking;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Support\Facades\DB;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -300,7 +301,7 @@ test('each proposal row shows its task progress and overdue work', function () {
 });
 
 test('a user without proposal permissions sees no edit controls and cannot create, move or delete', function () {
-    $viewer = User::factory()->role('General Manager')->create();
+    $viewer = User::factory()->role('Team Member')->create();
     $proposal = Proposal::factory()->create();
 
     $fresh = fn () => Livewire::actingAs($viewer)->test('pages::proposals.index');
@@ -311,7 +312,8 @@ test('a user without proposal permissions sees no edit controls and cannot creat
     $fresh()->call('openCreateModal')->assertForbidden();
     $fresh()->set('name', 'Sneaked in')->set('plannedDateBegin', '2026-01-01')->set('plannedDateEnd', '2026-12-31')->set('proposalStatus', 'concept note')->call('saveProposal')->assertForbidden();
     $fresh()->call('openStageModal', $proposal->id)->assertForbidden();
-    $fresh()->set('deletingProposalId', $proposal->id)->call('deleteProposal')->assertForbidden();
+    $fresh()->call('confirmDelete', $proposal->id)->assertForbidden();
+    expect(fn () => $fresh()->set('deletingProposalId', $proposal->id))->toThrow(CannotUpdateLockedPropertyException::class);
 
     expect(DB::table('proposals')->where('name', 'Sneaked in')->exists())->toBeFalse()
         ->and(DB::table('proposals')->find($proposal->id))->not->toBeNull();

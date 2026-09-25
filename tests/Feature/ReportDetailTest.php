@@ -16,7 +16,7 @@ test('guests are redirected from report detail', function () {
 });
 
 test('report detail shows the figure its target and its author', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $author = User::factory()->create(['name' => 'Layla Haddad']);
     $report = Report::factory()->create(['user_id' => $author->id, 'value' => '9500.00']);
 
@@ -29,7 +29,7 @@ test('report detail shows the figure its target and its author', function () {
 });
 
 test('report detail renders the five narrative sections and the narrative window', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $report = Report::factory()->withNarrative()->create([
         'executive_summary' => 'Summary text goes here.',
         'key_achievements' => 'Achievements text goes here.',
@@ -51,7 +51,7 @@ test('report detail renders the five narrative sections and the narrative window
 });
 
 test('report detail renders without narrative sections when they are null', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $report = Report::factory()->create();
 
     $this->actingAs($user)
@@ -60,8 +60,8 @@ test('report detail renders without narrative sections when they are null', func
 });
 
 test('submitting for review moves a draft report to reviewed and stamps the submit date', function () {
-    $user = User::factory()->create();
     $report = Report::factory()->create(['status' => ReportStatus::Draft, 'submit_date' => null]);
+    $user = reportAuthor($report);
 
     Livewire::actingAs($user)
         ->test('pages::reports.show', ['report' => $report])
@@ -75,7 +75,7 @@ test('submitting for review moves a draft report to reviewed and stamps the subm
 });
 
 test('submitting for review is a no-op when the report is not a draft', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $report = Report::factory()->create(['status' => ReportStatus::Reviewed, 'submit_date' => '2026-03-01']);
 
     Livewire::actingAs($user)
@@ -86,7 +86,7 @@ test('submitting for review is a no-op when the report is not a draft', function
 });
 
 test('approving a reviewed report moves it to approved', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $report = Report::factory()->create(['status' => ReportStatus::Reviewed]);
 
     Livewire::actingAs($user)
@@ -98,7 +98,7 @@ test('approving a reviewed report moves it to approved', function () {
 });
 
 test('approving is a no-op when the report is not reviewed', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $report = Report::factory()->create(['status' => ReportStatus::Draft]);
 
     Livewire::actingAs($user)
@@ -109,7 +109,7 @@ test('approving is a no-op when the report is not reviewed', function () {
 });
 
 test('returning to draft is valid from reviewed or approved', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     $reviewed = Report::factory()->create(['status' => ReportStatus::Reviewed]);
 
@@ -131,7 +131,7 @@ test('returning to draft is valid from reviewed or approved', function () {
 });
 
 test('returning to draft is a no-op when the report is already a draft', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $report = Report::factory()->create(['status' => ReportStatus::Draft]);
 
     Livewire::actingAs($user)
@@ -142,7 +142,7 @@ test('returning to draft is a no-op when the report is already a draft', functio
 });
 
 test('marking a report seen by meal is a one way acknowledgement', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('MEAL')->create();
     $report = Report::factory()->create(['is_seen_by_meal' => false]);
 
     $component = Livewire::actingAs($user)->test('pages::reports.show', ['report' => $report]);
@@ -154,7 +154,7 @@ test('marking a report seen by meal is a one way acknowledgement', function () {
 });
 
 test('report detail renders a report with no files', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $report = Report::factory()->create();
 
     $this->actingAs($user)
@@ -164,7 +164,7 @@ test('report detail renders a report with no files', function () {
 });
 
 test('file records cannot be added, edited or deleted on a locked report', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $report = Report::factory()->approved()->create();
     $file = ReportFile::factory()->create(['report_id' => $report->id, 'path' => 'untouched.pdf']);
 
@@ -178,7 +178,7 @@ test('file records cannot be added, edited or deleted on a locked report', funct
 });
 
 test('the add file action is hidden once a report is locked', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $report = Report::factory()->approved()->create();
 
     $this->actingAs($user)
@@ -188,7 +188,7 @@ test('the add file action is hidden once a report is locked', function () {
 });
 
 test('returning a report to draft clears its submit date', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $report = Report::factory()->reviewed()->create(['submit_date' => '2026-04-02']);
 
     Livewire::actingAs($user)
@@ -202,10 +202,10 @@ test('returning a report to draft clears its submit date', function () {
 });
 
 test('a draft can be edited from its own page, and deleting it returns to the directory', function () {
-    $user = User::factory()->create();
     $report = Report::factory()
         ->for(PlanIndicator::factory()->forAnnualPlan(AnnualPlan::factory()->create(['year' => 2026])))
         ->create(['value' => 100, 'planned_date' => '2026-06-30']);
+    $user = reportAuthor($report);
 
     $component = Livewire::actingAs($user)
         ->test('pages::reports.show', ['report' => $report])
@@ -226,7 +226,7 @@ test('a draft can be edited from its own page, and deleting it returns to the di
 });
 
 test('a locked report offers neither edit nor delete', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $report = Report::factory()->approved()->create();
 
     Livewire::actingAs($user)
@@ -236,7 +236,7 @@ test('a locked report offers neither edit nor delete', function () {
 });
 
 test('the detail page rates the whole target from approved reports, not this one figure', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $target = PlanIndicator::factory()->create(['target' => 1000]);
     Report::factory()->approved()->for($target)->create(['value' => 300]);
     $draft = Report::factory()->for($target)->create(['value' => 900]);
@@ -248,7 +248,7 @@ test('the detail page rates the whole target from approved reports, not this one
 });
 
 test('the detail page links back along the chain to the indicator and its targets', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $report = Report::factory()->create();
     $indicatorId = $report->planIndicator->indicator_id;
 

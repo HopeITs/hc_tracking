@@ -19,7 +19,7 @@ function userForPolicy(int $id, ?string $roleName): User
 }
 
 beforeEach(function () {
-    Permission::query()->create(['name' => 'access-management.manage-users', 'guard_name' => 'web']);
+    Permission::query()->firstOrCreate(['name' => 'access-management.manage-users', 'guard_name' => 'web']);
     Role::findOrCreate('Super Admin', 'web')->givePermissionTo('access-management.manage-users');
     Role::findOrCreate('Managers', 'web');
 });

@@ -523,6 +523,21 @@ function userWithRole(string $role, ?int $employeeId = null): User
 }
 
 /**
+ * The author of a report, holding a role that writes reports: the one person
+ * who may change, submit or file evidence on the draft (see ReportPolicy).
+ */
+function reportAuthor(Report $report): User
+{
+    $author = User::query()->findOrFail($report->user_id);
+
+    if (! $author->hasRole('Media Team')) {
+        $author->assignRole('Media Team');
+    }
+
+    return $author;
+}
+
+/**
  * Every notification a user received, oldest first, as English sentences.
  *
  * @return list<string>

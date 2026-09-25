@@ -1,4 +1,4 @@
-@props(['media', 'project'])
+@props(['media', 'project', 'editable' => true])
 
 @php
     $icon = match ($media->type) {
@@ -59,21 +59,23 @@
         >
             <flux:icon name="arrow-down-tray" variant="micro" class="size-4" />
         </a>
-        <x-ui.button
-            tone="ghost"
-            size="sm"
-            icon="pencil-square"
-            class="size-8!"
-            wire:click="openEditFileModal({{ $media->id }})"
-            :aria-label="__('common.edit_name', ['name' => $media->original_name])"
-        />
-        <x-ui.button
-            tone="ghost"
-            size="sm"
-            icon="trash"
-            class="size-8! text-primary! hover:bg-status-critical-soft!"
-            wire:click="confirmDeleteFile({{ $media->id }})"
-            :aria-label="__('common.delete_name', ['name' => $media->original_name])"
-        />
+        @if ($editable)
+            <x-ui.button
+                tone="ghost"
+                size="sm"
+                icon="pencil-square"
+                class="size-8!"
+                wire:click="openEditFileModal({{ $media->id }})"
+                :aria-label="__('common.edit_name', ['name' => $media->original_name])"
+            />
+            <x-ui.button
+                tone="ghost"
+                size="sm"
+                icon="trash"
+                class="size-8! text-primary! hover:bg-status-critical-soft!"
+                wire:click="confirmDeleteFile({{ $media->id }})"
+                :aria-label="__('common.delete_name', ['name' => $media->original_name])"
+            />
+        @endif
     </div>
 </article>

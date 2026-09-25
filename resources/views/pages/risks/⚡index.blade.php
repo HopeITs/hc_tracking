@@ -3,11 +3,13 @@
 use App\Models\Project;
 use App\Models\Risk;
 use Flux\Flux;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -30,8 +32,10 @@ new #[Title('titles.risks')] class extends Component {
 
     public bool $showRiskModal = false;
 
+    #[Locked]
     public ?int $editingRiskId = null;
 
+    #[Locked]
     public ?int $deletingRiskId = null;
 
     public bool $showDeleteModal = false;
@@ -201,6 +205,8 @@ new #[Title('titles.risks')] class extends Component {
 
     public function openCreateModal(): void
     {
+        Gate::authorize('create', Risk::class);
+
         $this->resetRiskForm();
         $this->showRiskModal = true;
     }
@@ -208,7 +214,11 @@ new #[Title('titles.risks')] class extends Component {
     /** Quick-toggle a risk's materialised state directly from its card, without opening the edit modal. */
     public function setHappened(int $riskId, bool $happened): void
     {
-        Risk::query()->findOrFail($riskId)->update(['happened' => $happened]);
+        $risk = Risk::query()->findOrFail($riskId);
+
+        Gate::authorize('update', $risk);
+
+        $risk->update(['happened' => $happened]);
     }
 
     public function openEditModal(int $riskId): void
@@ -216,6 +226,8 @@ new #[Title('titles.risks')] class extends Component {
         $risk = Risk::query()
             ->select(['id', 'name', 'impact', 'solution', 'happened', 'project_id'])
             ->findOrFail($riskId);
+
+        Gate::authorize('update', $risk);
 
         $this->resetValidation();
         $this->editingRiskId = $risk->id;
@@ -229,6 +241,12 @@ new #[Title('titles.risks')] class extends Component {
 
     public function saveRisk(): void
     {
+        if ($this->editingRiskId === null) {
+            Gate::authorize('create', Risk::class);
+        } else {
+            Gate::authorize('update', Risk::query()->findOrFail($this->editingRiskId));
+        }
+
         $this->name = trim($this->name);
         $this->impact = trim($this->impact);
         $this->solution = trim($this->solution);
@@ -249,6 +267,12 @@ new #[Title('titles.risks')] class extends Component {
         $risk = $this->editingRiskId === null
             ? new Risk
             : Risk::query()->findOrFail($this->editingRiskId);
+
+        // Logging a risk on a project, or moving one onto it, needs the right
+        // to log risks there.
+        if (! $risk->exists || $risk->project_id !== (int) $validated['riskProjectId']) {
+            Gate::authorize('create', [Risk::class, (int) $validated['riskProjectId']]);
+        }
 
         $risk->fill([
             'name' => $validated['name'],
@@ -272,6 +296,8 @@ new #[Title('titles.risks')] class extends Component {
 
     public function confirmDelete(int $riskId): void
     {
+        Gate::authorize('delete', Risk::query()->findOrFail($riskId));
+
         $this->deletingRiskId = $riskId;
         $this->showDeleteModal = true;
     }
@@ -292,7 +318,11 @@ new #[Title('titles.risks')] class extends Component {
             return;
         }
 
-        Risk::query()->findOrFail($this->deletingRiskId)->delete();
+        $risk = Risk::query()->findOrFail($this->deletingRiskId);
+
+        Gate::authorize('delete', $risk);
+
+        $risk->delete();
 
         $this->showDeleteModal = false;
         $this->deletingRiskId = null;
@@ -342,9 +372,9 @@ new #[Title('titles.risks')] class extends Component {
         </x-slot:filters>
 
         <x-slot:actions>
-            <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-risk-button">
+            @can('create', App\Models\Risk::class)<x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-risk-button">
                 {{ __('risks.log_risk') }}
-            </x-ui.button>
+            </x-ui.button>@endcan
         </x-slot:actions>
 
         <x-slot:summary>
@@ -440,7 +470,7 @@ new #[Title('titles.risks')] class extends Component {
                     @if ($filtersAreActive)
                         <x-ui.button size="sm" wire:click="clearFilters">{{ __('common.reset_filters') }}</x-ui.button>
                     @else
-                        <x-ui.button size="sm" tone="primary" icon="plus" wire:click="openCreateModal">{{ __('risks.log_risk') }}</x-ui.button>
+                        @can('create', App\Models\Risk::class)<x-ui.button size="sm" tone="primary" icon="plus" wire:click="openCreateModal">{{ __('risks.log_risk') }}</x-ui.button>@endcan
                     @endif
                 </x-slot:action>
             </x-ui.empty-state>
@@ -460,6 +490,7 @@ new #[Title('titles.risks')] class extends Component {
                                     role="radio"
                                     aria-checked="{{ $risk->happened ? 'false' : 'true' }}"
                                     wire:click="setHappened({{ $risk->id }}, false)"
+                                    @disabled(! auth()->user()->can('update', $risk))
                                     @class([
                                         'inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold transition-colors',
                                         'bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white' => ! $risk->happened,
@@ -478,6 +509,7 @@ new #[Title('titles.risks')] class extends Component {
                                     role="radio"
                                     aria-checked="{{ $risk->happened ? 'true' : 'false' }}"
                                     wire:click="setHappened({{ $risk->id }}, true)"
+                                    @disabled(! auth()->user()->can('update', $risk))
                                     @class([
                                         'inline-flex items-center gap-1.5 border-s border-secondary-light px-2.5 py-1 text-xs font-semibold transition-colors dark:border-secondary-medium',
                                         'bg-primary text-white' => $risk->happened,
@@ -493,8 +525,8 @@ new #[Title('titles.risks')] class extends Component {
                                 </button>
                             </div>
                             <div class="flex shrink-0 items-center gap-1.5">
-                                <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation @sm/directory:size-9!" wire:click="openEditModal({{ $risk->id }})" :aria-label="__('common.edit_name', ['name' => $risk->name])" />
-                                <x-ui.button tone="ghost" size="sm" icon="trash" class="size-11! touch-manipulation @sm/directory:size-9!" wire:click="confirmDelete({{ $risk->id }})" :aria-label="__('common.delete_name', ['name' => $risk->name])" />
+                                @can('update', $risk)<x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation @sm/directory:size-9!" wire:click="openEditModal({{ $risk->id }})" :aria-label="__('common.edit_name', ['name' => $risk->name])" />@endcan
+                                @can('delete', $risk)<x-ui.button tone="ghost" size="sm" icon="trash" class="size-11! touch-manipulation @sm/directory:size-9!" wire:click="confirmDelete({{ $risk->id }})" :aria-label="__('common.delete_name', ['name' => $risk->name])" />@endcan
                             </div>
                         </div>
 
@@ -523,6 +555,7 @@ new #[Title('titles.risks')] class extends Component {
                                     <button
                                         type="button"
                                         wire:click="openEditModal({{ $risk->id }})"
+                                        @disabled(! auth()->user()->can('update', $risk))
                                         class="inline-flex w-fit items-center gap-1 rounded-md border border-status-warn/30 bg-status-warn-soft px-2 py-0.5 text-xs font-semibold text-status-warn hover:opacity-80"
                                     >
                                         <flux:icon.exclamation-circle variant="micro" class="size-3.5" />

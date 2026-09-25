@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -15,6 +16,7 @@ use Livewire\WithPagination;
 new #[Title('titles.strategy')] class extends Component {
     use WithPagination;
 
+    #[Locked]
     public int $strategyId;
 
     #[Url(except: 'name')]

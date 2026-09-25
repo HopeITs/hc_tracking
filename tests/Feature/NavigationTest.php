@@ -4,7 +4,7 @@ use App\Models\Project;
 use App\Models\User;
 
 test('the sidebar groups navigation in the application workflow order', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Team Member')->create();
 
     $this->actingAs($user)
         ->get(route('dashboard'))
@@ -13,7 +13,7 @@ test('the sidebar groups navigation in the application workflow order', function
 });
 
 test('the sidebar carries a funding group once its routes exist', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Team Member')->create();
 
     $this->actingAs($user)
         ->get(route('dashboard'))
@@ -27,7 +27,7 @@ test('the sidebar carries a funding group once its routes exist', function () {
 });
 
 test('the sidebar carries a results and learning group once its routes exist', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Team Member')->create();
 
     $this->actingAs($user)
         ->get(route('dashboard'))
@@ -40,13 +40,13 @@ test('the sidebar carries a results and learning group once its routes exist', f
 });
 
 test('every sidebar link resolves to a registered route', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Team Member')->create();
 
     $this->actingAs($user)->get(route('dashboard'))->assertOk();
 });
 
 test('the sidebar carries route-backed delivery links', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Team Member')->create();
 
     $response = $this->actingAs($user)->get(route('dashboard'))->assertOk();
 
@@ -71,7 +71,7 @@ test('the sidebar carries route-backed delivery links', function () {
 });
 
 test('a project detail page highlights the projects item', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Team Member')->create();
     $project = Project::factory()->create();
 
     $response = $this->actingAs($user)->get(route('projects.show', $project))->assertOk();
@@ -88,7 +88,7 @@ test('a project detail page highlights the projects item', function () {
 });
 
 test('the sidebar collapse toggle carries a translated accessible name, not an Alpine binding', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Team Member')->create();
 
     $response = $this->actingAs($user)->get(route('dashboard'))->assertOk();
 
@@ -110,7 +110,7 @@ test('the sidebar collapse toggle carries a translated accessible name, not an A
 });
 
 test('the sidebar stacks above the desktop top header so its edge toggle is not covered', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Team Member')->create();
 
     $response = $this->actingAs($user)->get(route('dashboard'))->assertOk();
 
@@ -127,7 +127,7 @@ test('the sidebar stacks above the desktop top header so its edge toggle is not 
 });
 
 test('the sidebar header matches the desktop top header height so their bottom borders form one line', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Team Member')->create();
 
     $response = $this->actingAs($user)->get(route('dashboard'))->assertOk();
 

@@ -40,7 +40,7 @@ test('guests are redirected from the executive summary', function () {
     $this->get(route('executive-summary.index'))->assertRedirect(route('login'));
 });
 
-test('all authenticated roles can access the executive summary while permissions are deferred', function (string $roleName) {
+test('all authenticated roles can access the executive summary', function (string $roleName) {
     $user = User::factory()->role($roleName)->create();
 
     $this->actingAs($user)
@@ -48,14 +48,14 @@ test('all authenticated roles can access the executive summary while permissions
         ->assertOk()
         ->assertSeeText('Executive Summary');
 })->with([
-    'officer' => 'Officer',
+    'team member' => 'Team Member',
     'manager' => 'Managers',
     'meal' => 'MEAL',
     'admin' => 'Super Admin',
 ]);
 
 test('the fiscal year picker shows the year the page is actually summarising', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     // A later year exists, so it heads the picker's option list. The page still
     // summarises the current year until the picker is touched, and the trigger
@@ -71,7 +71,7 @@ test('the fiscal year picker shows the year the page is actually summarising', f
 });
 
 test('annual plan coverage counts the programs holding a plan for the selected year', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $programs = Program::factory(4)->create();
 
     foreach ($programs->take(3) as $program) {
@@ -85,7 +85,7 @@ test('annual plan coverage counts the programs holding a plan for the selected y
 });
 
 test('indicators targeted counts only the indicators committed in an annual plan of the year', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $result = Result::factory()->create();
     $indicators = Indicator::factory(4)->create(['result_id' => $result->id]);
     $plan = AnnualPlan::factory()->create(['year' => currentFiscalYear()]);
@@ -102,7 +102,7 @@ test('indicators targeted counts only the indicators committed in an annual plan
 });
 
 test('a target committed in a donor proposal is not counted as annual plan coverage', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $result = Result::factory()->create();
     $indicators = Indicator::factory(2)->create(['result_id' => $result->id]);
 
@@ -114,7 +114,7 @@ test('a target committed in a donor proposal is not counted as annual plan cover
 });
 
 test('projects carrying a target counts the projects named by this year plans', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create();
     $projects = Project::factory(4)->create(['program_id' => $program->id]);
     $plan = AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => currentFiscalYear()]);
@@ -128,7 +128,7 @@ test('projects carrying a target counts the projects named by this year plans', 
 });
 
 test('geographic reach counts the cities holding a project across the whole portfolio', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create();
     $cities = [insertHrCity('Aleppo'), insertHrCity('Homs'), insertHrCity('Hama')];
 
@@ -141,7 +141,7 @@ test('geographic reach counts the cities holding a project across the whole port
 });
 
 test('changing the fiscal year moves the year scoped measures but leaves geographic reach alone', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $programs = Program::factory(3)->create();
     $cities = [insertHrCity('Aleppo'), insertHrCity('Homs')];
 
@@ -162,7 +162,7 @@ test('changing the fiscal year moves the year scoped measures but leaves geograp
 });
 
 test('a fiscal year with no plans reports no coverage rather than disappearing', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Program::factory(2)->create();
 
     Livewire::actingAs($user)
@@ -173,7 +173,7 @@ test('a fiscal year with no plans reports no coverage rather than disappearing',
 });
 
 test('a fiscal year outside the offered options falls back to the current one', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create();
 
     AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => currentFiscalYear()]);
@@ -186,7 +186,7 @@ test('a fiscal year outside the offered options falls back to the current one', 
 });
 
 test('an empty portfolio renders a dash instead of dividing by zero', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
         ->test('pages::executive-summary.index')
@@ -198,7 +198,7 @@ test('an empty portfolio renders a dash instead of dividing by zero', function (
 });
 
 test('a partial share never rounds up to full coverage', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     $component = Livewire::actingAs($user)->test('pages::executive-summary.index')->instance();
 
@@ -210,7 +210,7 @@ test('a partial share never rounds up to full coverage', function () {
 });
 
 test('a partial share of an amount never rounds up to fully landed', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     $component = Livewire::actingAs($user)->test('pages::executive-summary.index')->instance();
 
@@ -222,7 +222,7 @@ test('a partial share of an amount never rounds up to fully landed', function ()
 });
 
 test('the targets row pairs what the year committed with what it reached', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $result = Result::factory()->create();
     $indicators = Indicator::factory(3)->create([
         'result_id' => $result->id,
@@ -260,7 +260,7 @@ test('the targets row pairs what the year committed with what it reached', funct
 });
 
 test('an unapproved report does not count as a target reached', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $result = Result::factory()->create();
     $indicator = Indicator::factory()->create([
         'result_id' => $result->id,
@@ -283,7 +283,7 @@ test('an unapproved report does not count as a target reached', function () {
 });
 
 test('money is one ledger row per currency and the currencies are never summed', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $account = Account::factory()->create();
     $dollars = DonorProposal::factory()->create(['currency' => Currency::Usd]);
     $euros = DonorProposal::factory()->create(['currency' => Currency::Eur]);
@@ -320,7 +320,7 @@ test('money is one ledger row per currency and the currencies are never summed',
 });
 
 test('a received tranche whose net amount nobody recorded counts as nothing landed', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $account = Account::factory()->create();
     $agreement = DonorProposal::factory()->create(['currency' => Currency::Usd]);
 
@@ -341,7 +341,7 @@ test('a received tranche whose net amount nobody recorded counts as nothing land
 });
 
 test('milestones are dated by their end date and fall back to their start date', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
 
     // No end date recorded: the start date is what dates it into the year.
@@ -375,7 +375,7 @@ test('milestones are dated by their end date and fall back to their start date',
 });
 
 test('a report is delivered only once it is approved', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $plannedDate = currentFiscalYear().'-06-30';
 
     Report::factory()->approved()->create(['planned_date' => $plannedDate]);
@@ -393,7 +393,7 @@ test('a report is delivered only once it is approved', function () {
 });
 
 test('a headline figure carries its movement against the prior year', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $programs = Program::factory(2)->create();
 
     // Last year: one of two programs planned. This year: both.
@@ -410,7 +410,7 @@ test('a headline figure carries its movement against the prior year', function (
 });
 
 test('a year with nothing to compare against carries no delta', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create();
 
     AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => currentFiscalYear()]);
@@ -423,7 +423,7 @@ test('a year with nothing to compare against carries no delta', function () {
 });
 
 test('opening a ledger row decomposes its gap into the records that own it', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create(['name' => 'Water and Sanitation']);
     $result = Result::factory()->create(['program_id' => $program->id]);
     $indicator = Indicator::factory()->create([
@@ -447,7 +447,7 @@ test('opening a ledger row decomposes its gap into the records that own it', fun
 });
 
 test('the reach section states planned beneficiaries by group for the running projects', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create();
     $city = insertHrCity('Aleppo');
 
@@ -487,7 +487,7 @@ test('the reach section states planned beneficiaries by group for the running pr
 });
 
 test('a portfolio with no beneficiary targets says so rather than drawing an empty split', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create();
 
     Project::factory()->withoutDemographics()->create([

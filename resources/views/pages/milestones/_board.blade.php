@@ -30,7 +30,7 @@
             wire:key="milestone-board-column-{{ $case->value }}"
             data-test="milestone-board-column-{{ $case->value }}"
             x-data="{ dragOver: false }"
-            x-on:click="$event.target.closest('[data-milestone-card]') || $wire.openCreateModal(null, '{{ $case->value }}')"
+            @can('create', App\Models\Milestone::class) x-on:click="$event.target.closest('[data-milestone-card]') || $wire.openCreateModal(null, '{{ $case->value }}')" @endcan
             x-on:dragover.prevent="dragOver = true"
             x-on:dragleave="dragOver = false"
             x-on:drop.prevent="
@@ -51,13 +51,14 @@
                 @forelse ($columnMilestones as $milestone)
                     @php
                         $milestoneDueDate = $milestone->planned_end_date ?? $milestone->planned_start_date;
+                        $canMoveMilestone = auth()->user()->can('updateProgress', $milestone);
                     @endphp
                     <div
                         class="flex flex-col gap-2 rounded-lg border border-secondary-soft bg-white p-3 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-opacity dark:border-secondary-medium dark:bg-secondary-dark"
                         wire:key="milestone-board-card-{{ $milestone->id }}"
                         data-milestone-card
-                        draggable="true"
-                        style="cursor: grab"
+                        draggable="{{ $canMoveMilestone ? 'true' : 'false' }}"
+                        @if ($canMoveMilestone) style="cursor: grab" @endif
                         x-on:dragstart="$event.dataTransfer.setData('text/plain', JSON.stringify({ id: {{ $milestone->id }}, status: '{{ $milestone->status->value }}' })); $event.currentTarget.classList.add('opacity-40')"
                         x-on:dragend="$event.currentTarget.classList.remove('opacity-40')"
                     >
@@ -70,7 +71,9 @@
                             </div>
 
                             @if ($milestone->children_count === 0 && $milestone->tasks_count === 0)
+                                @can('milestones.delete')
                                 <x-ui.button tone="ghost" size="sm" icon="trash" class="size-8! shrink-0" wire:click="confirmDelete({{ $milestone->id }})" :aria-label="__('common.delete_name', ['name' => $milestone->name])" />
+                                @endcan
                             @else
                                 <flux:tooltip :content="__('milestones.only_a_milestone_with_no_nested_milestones_and_no_tasks_can')">
                                     <span class="inline-flex size-8 shrink-0 cursor-not-allowed items-center justify-center text-secondary-light" aria-disabled="true">
@@ -97,6 +100,7 @@
                             <span class="sr-only">{{ __('milestones.change_status') }}</span>
                             <select
                                 wire:change="quickSetStatus({{ $milestone->id }}, $event.target.value)"
+                                @disabled(! $canMoveMilestone)
                                 class="w-full rounded-md border border-secondary-soft bg-white px-2 py-1.5 text-xs text-secondary-dark dark:border-secondary-medium dark:bg-secondary-dark dark:text-white"
                                 data-test="milestone-quick-status-{{ $milestone->id }}"
                             >

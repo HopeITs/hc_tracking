@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Collection as SupportCollection;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -65,13 +66,16 @@ new #[Title('titles.reports')] class extends Component {
      */
     public function mount(): void
     {
-        if (request()->boolean('create')) {
+        if (request()->boolean('create') && Gate::allows('create', Report::class)) {
             $this->openCreateModal($this->target === '' ? null : (int) $this->target);
         }
 
         $edit = request()->integer('edit');
+        $editing = $edit > 0 ? Report::query()->find($edit) : null;
 
-        if ($edit > 0 && Report::query()->whereKey($edit)->exists()) {
+        // A deep link only opens someone else's draft for its author; anyone
+        // else lands on the list.
+        if ($editing !== null && (! $editing->isEditable() || Gate::allows('update', $editing))) {
             $this->openEditModal($edit);
         }
     }
@@ -480,11 +484,13 @@ new #[Title('titles.reports')] class extends Component {
             </x-ui.header-filter-select>
         </x-slot:filters>
 
-        <x-slot:actions>
-            <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-report-button">
-                {{ __('reports.record_report') }}
-            </x-ui.button>
-        </x-slot:actions>
+        @can('create', App\Models\Report::class)
+            <x-slot:actions>
+                <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-report-button">
+                    {{ __('reports.record_report') }}
+                </x-ui.button>
+            </x-slot:actions>
+        @endcan
 
         <x-slot:summary>
             <div class="flex flex-col gap-6">
@@ -563,7 +569,9 @@ new #[Title('titles.reports')] class extends Component {
                 <flux:icon.x-mark variant="micro" class="size-3.5 shrink-0" aria-hidden="true" />
                 <span class="sr-only">{{ __('common.reset_filters') }}</span>
             </button>
-            <x-ui.button size="sm" icon="plus" wire:click="openCreateModal({{ (int) $target }})">{{ __('reports.record_another_for_this_target') }}</x-ui.button>
+            @can('create', App\Models\Report::class)
+                <x-ui.button size="sm" icon="plus" wire:click="openCreateModal({{ (int) $target }})">{{ __('reports.record_another_for_this_target') }}</x-ui.button>
+            @endcan
         </div>
     @endif
 
@@ -758,8 +766,12 @@ new #[Title('titles.reports')] class extends Component {
                             <div class="flex items-center gap-0.5">
                                 <x-ui.button tone="ghost" size="sm" icon="eye" class="size-9!" :href="route('reports.show', $report)" wire:navigate :aria-label="__('common.view_name', ['name' => $rowTarget->indicator->name])" />
                                 @if ($report->isEditable())
-                                    <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $report->id }})" :aria-label="__('reports.edit_report')" />
-                                    <x-ui.button tone="ghost" size="sm" icon="trash" class="size-9!" wire:click="confirmDeleteReport({{ $report->id }})" :aria-label="__('reports.delete_report')" data-test="delete-report-{{ $report->id }}" />
+                                    @can('update', $report)
+                                        <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $report->id }})" :aria-label="__('reports.edit_report')" />
+                                    @endcan
+                                    @can('delete', $report)
+                                        <x-ui.button tone="ghost" size="sm" icon="trash" class="size-9!" wire:click="confirmDeleteReport({{ $report->id }})" :aria-label="__('reports.delete_report')" data-test="delete-report-{{ $report->id }}" />
+                                    @endcan
                                 @else
                                     <flux:tooltip :content="__('reports.only_draft_reports_can_be_edited')">
                                         <span class="inline-flex size-9 cursor-not-allowed items-center justify-center text-secondary-light" aria-disabled="true">

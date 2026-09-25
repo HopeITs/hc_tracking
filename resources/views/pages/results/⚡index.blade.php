@@ -15,9 +15,11 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Collection as BaseCollection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -49,8 +51,10 @@ new #[Title('titles.results_framework')] class extends Component {
 
     public bool $showDeleteModal = false;
 
+    #[Locked]
     public ?int $editingResultId = null;
 
+    #[Locked]
     public ?int $deletingResultId = null;
 
     public string $statement = '';
@@ -722,6 +726,8 @@ new #[Title('titles.results_framework')] class extends Component {
      */
     public function openCreateModal(?int $parentResultId = null): void
     {
+        Gate::authorize('results.create');
+
         $this->resetResultForm();
 
         if ($parentResultId !== null) {
@@ -744,6 +750,8 @@ new #[Title('titles.results_framework')] class extends Component {
 
     public function openEditModal(int $resultId): void
     {
+        Gate::authorize('results.update');
+
         $result = Result::query()
             ->select(['id', 'statement', 'parent_id', 'program_id', 'type', 'checkout_period'])
             ->findOrFail($resultId);
@@ -760,6 +768,8 @@ new #[Title('titles.results_framework')] class extends Component {
 
     public function saveResult(): void
     {
+        Gate::authorize($this->editingResultId === null ? 'results.create' : 'results.update');
+
         $this->statement = trim($this->statement);
 
         $validated = $this->validate([
@@ -872,6 +882,8 @@ new #[Title('titles.results_framework')] class extends Component {
 
     public function confirmDelete(int $resultId): void
     {
+        Gate::authorize('results.delete');
+
         $this->deletingResultId = $resultId;
         $this->showDeleteModal = true;
     }
@@ -884,6 +896,8 @@ new #[Title('titles.results_framework')] class extends Component {
 
     public function deleteResult(): void
     {
+        Gate::authorize('results.delete');
+
         if ($this->deletingResultId === null) {
             return;
         }
@@ -1008,9 +1022,9 @@ new #[Title('titles.results_framework')] class extends Component {
         </x-slot:filters>
 
         <x-slot:actions>
-            <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-result-button">
+            @can('results.create')<x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-result-button">
                 {{ __('results_framework.add_result') }}
-            </x-ui.button>
+            </x-ui.button>@endcan
         </x-slot:actions>
     </x-ui.page-header>
 
@@ -1219,9 +1233,9 @@ new #[Title('titles.results_framework')] class extends Component {
                 :body="$filtersAreActive ? __('common.change_the_search_or_filters_and_try_again') : __('results_framework.add_the_first_impact_statement_to_start_the_logframe')"
             >
                 <x-slot:action>
-                    <x-ui.button tone="primary" :icon="$filtersAreActive ? 'arrow-path' : 'plus'" wire:click="{{ $filtersAreActive ? 'clearFilters' : 'openCreateModal' }}">
+                    @if ($filtersAreActive || auth()->user()->can('results.create'))<x-ui.button tone="primary" :icon="$filtersAreActive ? 'arrow-path' : 'plus'" wire:click="{{ $filtersAreActive ? 'clearFilters' : 'openCreateModal' }}">
                         {{ $filtersAreActive ? __('common.reset_filters') : __('results_framework.add_result') }}
-                    </x-ui.button>
+                    </x-ui.button>@endif
                 </x-slot:action>
             </x-ui.empty-state>
         </x-ui.panel>
@@ -1315,23 +1329,23 @@ new #[Title('titles.results_framework')] class extends Component {
                                 </div>
 
                                 <div class="flex items-center justify-end gap-0.5">
-                                    <x-ui.button
+                                    @can('results.update')<x-ui.button
                                         tone="ghost"
                                         size="sm"
                                         icon="pencil-square"
                                         class="size-8!"
                                         wire:click="openEditModal({{ $matrixResult->id }})"
                                         :aria-label="__('common.edit_name', ['name' => $matrixResult->statement])"
-                                    />
+                                    />@endcan
                                     @if ($node['deletable'])
-                                        <x-ui.button
+                                        @can('results.delete')<x-ui.button
                                             tone="ghost"
                                             size="sm"
                                             icon="trash"
                                             class="size-8!"
                                             wire:click="confirmDelete({{ $matrixResult->id }})"
                                             :aria-label="__('common.delete_name', ['name' => $matrixResult->statement])"
-                                        />
+                                        />@endcan
                                     @else
                                         <flux:tooltip :content="__('results_framework.locked_while_it_carries_nested_results_or_indicators')">
                                             <span class="inline-flex size-8 cursor-not-allowed items-center justify-center text-secondary-light" aria-disabled="true">

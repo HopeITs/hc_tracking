@@ -1,18 +1,20 @@
 <?php
 
 use App\Enums\ReportStatus;
+use App\Models\AnnualPlan;
 use App\Models\HrEmployee;
 use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Strategy;
-use App\Models\AnnualPlan;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Query\JoinClause;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -59,8 +61,10 @@ new #[Title('titles.annual_plans')] class extends Component {
 
     public bool $showPlanModal = false;
 
+    #[Locked]
     public ?int $editingPlanId = null;
 
+    #[Locked]
     public ?int $deletingPlanId = null;
 
     /**
@@ -587,6 +591,8 @@ new #[Title('titles.annual_plans')] class extends Component {
      */
     public function openCreateModal(?int $programId = null, ?int $year = null): void
     {
+        Gate::authorize('create', AnnualPlan::class);
+
         $this->resetPlanForm();
         $this->planProgramId = $programId === null ? '' : (string) $programId;
         $this->planYear = $year === null ? '' : (string) $year;
@@ -598,6 +604,8 @@ new #[Title('titles.annual_plans')] class extends Component {
         $plan = AnnualPlan::query()
             ->select(['id', 'program_id', 'manager_id', 'year'])
             ->findOrFail($planId);
+
+        Gate::authorize('update', $plan);
 
         $this->resetValidation();
         $this->editingPlanId = $plan->id;
@@ -616,6 +624,12 @@ new #[Title('titles.annual_plans')] class extends Component {
      */
     public function savePlan(): void
     {
+        if ($this->editingPlanId === null) {
+            Gate::authorize('create', AnnualPlan::class);
+        } else {
+            Gate::authorize('update', AnnualPlan::query()->findOrFail($this->editingPlanId));
+        }
+
         $validated = $this->validate([
             'planProgramId' => ['required', 'integer', Rule::exists(Program::class, 'id')],
             'planManagerId' => ['required', 'integer', Rule::exists(HrEmployee::class, 'id')],
@@ -641,9 +655,13 @@ new #[Title('titles.annual_plans')] class extends Component {
             ? new AnnualPlan
             : AnnualPlan::query()->findOrFail($this->editingPlanId);
 
+        // A plan's own manager or its program's manager edits the plan but
+        // does not hand it to another program or manager.
+        $mayReassign = ! $plan->exists || Gate::allows('reassign', $plan);
+
         $plan->fill([
-            'program_id' => (int) $validated['planProgramId'],
-            'manager_id' => (int) $validated['planManagerId'],
+            'program_id' => $mayReassign ? (int) $validated['planProgramId'] : $plan->program_id,
+            'manager_id' => $mayReassign ? (int) $validated['planManagerId'] : $plan->manager_id,
             'year' => (int) $validated['planYear'],
         ])->save();
 
@@ -674,6 +692,8 @@ new #[Title('titles.annual_plans')] class extends Component {
 
     public function confirmDelete(int $planId): void
     {
+        Gate::authorize('delete', AnnualPlan::query()->findOrFail($planId));
+
         $this->deletingPlanId = $planId;
         $this->showDeleteModal = true;
     }
@@ -697,7 +717,11 @@ new #[Title('titles.annual_plans')] class extends Component {
             return;
         }
 
-        AnnualPlan::query()->findOrFail($this->deletingPlanId)->delete();
+        $plan = AnnualPlan::query()->findOrFail($this->deletingPlanId);
+
+        Gate::authorize('delete', $plan);
+
+        $plan->delete();
 
         $this->deletingPlanId = null;
         $this->showDeleteModal = false;
@@ -824,9 +848,9 @@ new #[Title('titles.annual_plans')] class extends Component {
 
         <x-slot:actions>
             {{-- Held at 44px, not the usual 40: this button shares a row with the filter controls, which are 2.75rem, and a 4px difference reads as a misalignment. --}}
-            <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation" wire:click="openCreateModal" data-test="create-annual-plan-button">
+            @can('create', App\Models\AnnualPlan::class)<x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation" wire:click="openCreateModal" data-test="create-annual-plan-button">
                 {{ __('annual_plans.new_annual_plan') }}
-            </x-ui.button>
+            </x-ui.button>@endcan
         </x-slot:actions>
     </x-ui.page-header>
 
@@ -847,7 +871,7 @@ new #[Title('titles.annual_plans')] class extends Component {
             class="rounded-xl border border-secondary-soft dark:border-secondary-medium"
         >
             <x-slot:action>
-                <x-ui.button size="sm" tone="primary" icon="plus" wire:click="openCreateModal">{{ __('annual_plans.new_annual_plan') }}</x-ui.button>
+                @can('create', App\Models\AnnualPlan::class)<x-ui.button size="sm" tone="primary" icon="plus" wire:click="openCreateModal">{{ __('annual_plans.new_annual_plan') }}</x-ui.button>@endcan
             </x-slot:action>
         </x-ui.empty-state>
     @else
@@ -1191,7 +1215,7 @@ new #[Title('titles.annual_plans')] class extends Component {
                                     @php($stats = $plan === null ? null : ($delivery[$plan->id] ?? ['targets' => 0, 'attributed' => 0, 'reports' => 0, 'approved' => 0]))
                                     <li wire:key="mobile-cell-{{ $program->id }}-{{ $year }}">
                                         @if ($plan === null)
-                                            <button
+                                            @can('create', App\Models\AnnualPlan::class)<button
                                                 type="button"
                                                 wire:click="openCreateModal({{ $program->id }}, {{ $year }})"
                                                 class="flex w-full min-h-11 touch-manipulation items-center justify-between gap-3 rounded-md border border-dashed border-board-line px-3 py-2 text-start transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
@@ -1202,7 +1226,7 @@ new #[Title('titles.annual_plans')] class extends Component {
                                                     <flux:icon.plus class="size-3.5" />
                                                     {{ __('annual_plans.add_plan') }}
                                                 </span>
-                                            </button>
+                                            </button>@endcan
                                         @else
                                             <div class="flex items-stretch gap-1.5">
                                             <a
@@ -1227,22 +1251,22 @@ new #[Title('titles.annual_plans')] class extends Component {
                                                 <span class="truncate type-meta text-secondary-medium dark:text-secondary-soft">{{ $plan->manager?->name ?? __('common.not_assigned') }}</span>
                                             </a>
 
-                                                <x-ui.button
+                                                @can('update', $plan)<x-ui.button
                                                     tone="ghost"
                                                     size="sm"
                                                     icon="pencil-square"
                                                     class="size-11! shrink-0 touch-manipulation"
                                                     wire:click="openEditModal({{ $plan->id }})"
                                                     :aria-label="__('annual_plans.edit_the_plan_for_program_in_year', ['program' => $program->name, 'year' => $year])"
-                                                />
-                                                <x-ui.button
+                                                />@endcan
+                                                @can('delete', $plan)<x-ui.button
                                                     tone="ghost"
                                                     size="sm"
                                                     icon="trash"
                                                     class="size-11! shrink-0 touch-manipulation"
                                                     wire:click="confirmDelete({{ $plan->id }})"
                                                     :aria-label="__('annual_plans.delete_the_plan_for_program_in_year', ['program' => $program->name, 'year' => $year])"
-                                                />
+                                                />@endcan
                                             </div>
                                         @endif
                                     </li>
@@ -1348,7 +1372,7 @@ new #[Title('titles.annual_plans')] class extends Component {
                                     >
                                         @if ($plan === null)
                                             {{-- A gap is the one thing a coverage matrix exists to show, so it is also the fastest place to close it: the cell writes the plan it is missing. --}}
-                                            <button
+                                            @can('create', App\Models\AnnualPlan::class)<button
                                                 type="button"
                                                 wire:click="openCreateModal({{ $program->id }}, {{ $year }})"
                                                 x-on:mouseenter="hoverYear = {{ $year }}"
@@ -1364,7 +1388,7 @@ new #[Title('titles.annual_plans')] class extends Component {
                                             >
                                                 <span aria-hidden="true" class="text-secondary-light group-hover/gap:hidden">—</span>
                                                 <flux:icon.plus aria-hidden="true" class="hidden size-4 text-primary group-hover/gap:block" />
-                                            </button>
+                                            </button>@endcan
                                         @else
                                             @php($reportShare = $stats['reports'] > 0 ? (int) round($stats['approved'] / $stats['reports'] * 100) : 0)
                                             <a
@@ -1405,22 +1429,22 @@ new #[Title('titles.annual_plans')] class extends Component {
 
                                             {{-- Siblings of the link, not children: a cell is a link first, so its controls sit over it and only surface on hover or keyboard focus. --}}
                                             <div class="absolute start-2.5 top-2.5 flex gap-0.5 opacity-0 transition-opacity group-hover/cell:opacity-100 group-focus-within/cell:opacity-100 motion-reduce:transition-none">
-                                                <button
+                                                @can('update', $plan)<button
                                                     type="button"
                                                     wire:click="openEditModal({{ $plan->id }})"
                                                     class="grid size-5 place-items-center rounded border border-secondary-soft bg-board text-secondary-medium transition-colors hover:border-primary hover:text-primary focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary dark:border-secondary-medium dark:text-secondary-soft"
                                                     aria-label="{{ __('annual_plans.edit_the_plan_for_program_in_year', ['program' => $program->name, 'year' => $year]) }}"
                                                 >
                                                     <flux:icon.pencil-square class="size-3" />
-                                                </button>
-                                                <button
+                                                </button>@endcan
+                                                @can('delete', $plan)<button
                                                     type="button"
                                                     wire:click="confirmDelete({{ $plan->id }})"
                                                     class="grid size-5 place-items-center rounded border border-secondary-soft bg-board text-secondary-medium transition-colors hover:border-primary hover:text-primary focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary dark:border-secondary-medium dark:text-secondary-soft"
                                                     aria-label="{{ __('annual_plans.delete_the_plan_for_program_in_year', ['program' => $program->name, 'year' => $year]) }}"
                                                 >
                                                     <flux:icon.trash class="size-3" />
-                                                </button>
+                                                </button>@endcan
                                             </div>
                                         @endif
                                     </div>

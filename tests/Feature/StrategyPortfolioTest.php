@@ -11,7 +11,7 @@ test('guests are redirected from the strategy portfolio', function () {
 });
 
 test('the duration column shows a plain year count, not "strategic period"', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Strategy::factory()->create(['name' => 'Five Year Strategy', 'start_year' => 2026, 'end_year' => 2030]);
 
     $this->actingAs($user)
@@ -22,7 +22,7 @@ test('the duration column shows a plain year count, not "strategic period"', fun
 });
 
 test('authenticated users see active upcoming and completed strategies in planning order', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Strategy::factory()->create([
         'name' => 'Completed country strategy',
         'start_year' => 2021,
@@ -64,7 +64,7 @@ test('authenticated users see active upcoming and completed strategies in planni
 });
 
 test('the active status chip uses the good/green status tone, not the brand red', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Strategy::factory()->create(['start_year' => 2026, 'end_year' => 2030]);
 
     $response = Date::withTestNow(
@@ -79,7 +79,7 @@ test('the active status chip uses the good/green status tone, not the brand red'
 });
 
 test('the strategy portfolio search narrows the results', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Strategy::factory()->create(['name' => 'Water Security Strategy', 'start_year' => 2026, 'end_year' => 2030]);
     Strategy::factory()->create(['name' => 'Shelter Strategy', 'start_year' => 2026, 'end_year' => 2030]);
 
@@ -91,7 +91,7 @@ test('the strategy portfolio search narrows the results', function () {
 });
 
 test('the strategy portfolio status strip filters the results and counts correctly', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Strategy::factory()->create(['name' => 'Active strategy', 'start_year' => 2026, 'end_year' => 2030]);
     Strategy::factory()->create(['name' => 'Upcoming strategy', 'start_year' => 2031, 'end_year' => 2035]);
 
@@ -107,7 +107,7 @@ test('the strategy portfolio status strip filters the results and counts correct
 });
 
 test('the status dropdown filters the list and ignores an unknown status', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Strategy::factory()->create(['name' => 'Active strategy', 'start_year' => 2026, 'end_year' => 2030]);
     Strategy::factory()->create(['name' => 'Upcoming strategy', 'start_year' => 2031, 'end_year' => 2035]);
 
@@ -127,7 +127,7 @@ test('the status dropdown filters the list and ignores an unknown status', funct
 });
 
 test('the strategy portfolio table paginates at 15 rows while the timeline shows every strategy', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Strategy::factory()->count(17)->sequence(fn ($sequence) => [
         'name' => 'Strategy '.str_pad((string) ($sequence->index + 1), 2, '0', STR_PAD_LEFT),
         'start_year' => 2000 + $sequence->index,
@@ -152,7 +152,7 @@ test('the strategy portfolio table paginates at 15 rows while the timeline shows
 });
 
 test('the strategy portfolio timeline and list link to the strategy and show its program count', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $strategy = Strategy::factory()->create(['name' => 'Water Security Strategy', 'start_year' => 2026, 'end_year' => 2030]);
     Program::factory()->create(['strategy_id' => $strategy->id]);
     Program::factory()->create(['strategy_id' => $strategy->id]);
@@ -165,7 +165,7 @@ test('the strategy portfolio timeline and list link to the strategy and show its
 });
 
 test('the strategy portfolio explains when the current year has no active period', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Strategy::factory()->create([
         'start_year' => 2021,
         'end_year' => 2025,
@@ -182,7 +182,7 @@ test('the strategy portfolio explains when the current year has no active period
 });
 
 test('a strategy remains active through its ending year', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Strategy::factory()->create([
         'name' => 'Final-year country strategy',
         'start_year' => 2022,
@@ -202,7 +202,7 @@ test('a strategy remains active through its ending year', function () {
 });
 
 test('the strategy portfolio has a clear empty state', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     $this->actingAs($user)
         ->get(route('strategies.index'))
@@ -213,7 +213,7 @@ test('the strategy portfolio has a clear empty state', function () {
 });
 
 test('strategy names are escaped in the portfolio', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $unsafeName = '<script>alert("strategy")</script>';
     Strategy::factory()->create(['name' => $unsafeName]);
 

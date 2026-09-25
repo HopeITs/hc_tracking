@@ -12,6 +12,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -32,6 +33,7 @@ new #[Title('titles.user_directory')] class extends Component {
     #[Url(except: '')]
     public string $status = '';
 
+    #[Locked]
     public ?int $selectedUserId = null;
 
     /** @var array<int, int> */
@@ -46,10 +48,12 @@ new #[Title('titles.user_directory')] class extends Component {
     public bool $showDeleteModal = false;
     public string $hrUserId = '';
     public string $initialRoleId = '';
+    #[Locked]
     public ?int $deletingUserId = null;
     public string $deletingUserName = '';
     public ?string $deleteError = null;
 
+    #[Locked]
     public ?int $selectedRoleId = null;
 
     /** @var array<int, int> */
@@ -122,7 +126,7 @@ new #[Title('titles.user_directory')] class extends Component {
     #[Computed]
     public function roleOptions(): Collection
     {
-        return Role::query()->orderBy('name')->get();
+        return Role::query()->with('permissions')->orderBy('name')->get();
     }
 
     #[Computed]
@@ -223,6 +227,8 @@ new #[Title('titles.user_directory')] class extends Component {
             'userPermissionIds.*' => ['integer', 'distinct', Rule::exists('permissions', 'id')],
         ]);
 
+        $this->authorizeAccessChanges($user, $validated['userRoleIds'], $validated['userPermissionIds']);
+
         $rolesBefore = $user->roles()->pluck('name')->all();
         $user->roles()->sync($validated['userRoleIds']);
         $user->recordRoleChange($rolesBefore, $user->roles()->pluck('name')->all());
@@ -232,6 +238,33 @@ new #[Title('titles.user_directory')] class extends Component {
         Flux::toast(variant: 'success', text: __('users.user_updated'));
 
         $this->selectUser($user->id);
+    }
+
+    /**
+     * Every role and direct permission being added or removed must be one the
+     * actor may hand out: user-management rights stay with administrators.
+     *
+     * @param  array<int, int|string>  $roleIds
+     * @param  array<int, int|string>  $permissionIds
+     */
+    protected function authorizeAccessChanges(User $user, array $roleIds, array $permissionIds): void
+    {
+        $rolesBefore = $user->roles()->pluck('roles.id')->map(fn (mixed $id): int => (int) $id)->all();
+        $rolesAfter = array_map('intval', $roleIds);
+
+        Role::query()
+            ->whereKey(array_merge(array_diff($rolesAfter, $rolesBefore), array_diff($rolesBefore, $rolesAfter)))
+            ->with('permissions')
+            ->get()
+            ->each(fn (Role $role) => Gate::authorize('assignRole', [User::class, $role]));
+
+        $permissionsBefore = $user->permissions()->pluck('permissions.id')->map(fn (mixed $id): int => (int) $id)->all();
+        $permissionsAfter = array_map('intval', $permissionIds);
+
+        Permission::query()
+            ->whereKey(array_merge(array_diff($permissionsAfter, $permissionsBefore), array_diff($permissionsBefore, $permissionsAfter)))
+            ->get()
+            ->each(fn (Permission $permission) => Gate::authorize('grantPermission', [User::class, $permission]));
     }
 
     public function openCreateModal(): void
@@ -279,7 +312,13 @@ new #[Title('titles.user_directory')] class extends Component {
 
         $roleName = $validated['initialRoleId'] !== null && $validated['initialRoleId'] !== ''
             ? Role::query()->find($validated['initialRoleId'])?->name
-            : null;
+            : (string) config('access-control.default_role');
+
+        $startingRole = $roleName === null ? null : Role::query()->with('permissions')->where('name', $roleName)->first();
+
+        if ($startingRole !== null) {
+            Gate::authorize('assignRole', [User::class, $startingRole]);
+        }
 
         User::createFromHrAccount($hrUser, $roleName);
 
@@ -614,7 +653,7 @@ new #[Title('titles.user_directory')] class extends Component {
                                         <flux:checkbox
                                             value="{{ $roleOption->id }}"
                                             :label="$roleOption->name"
-                                            :disabled="! Gate::check('update', $selectedUser)"
+                                            :disabled="! Gate::check('update', $selectedUser) || ! Gate::check('assignRole', [App\Models\User::class, $roleOption])"
                                             wire:key="user-role-{{ $roleOption->id }}"
                                         />
                                     @endforeach
@@ -650,7 +689,7 @@ new #[Title('titles.user_directory')] class extends Component {
                                                     <flux:checkbox
                                                         value="{{ $permission->id }}"
                                                         :label="(string) str($permission->name)->afterLast('.')->replace('-', ' ')"
-                                                        :disabled="! Gate::check('update', $selectedUser)"
+                                                        :disabled="! Gate::check('update', $selectedUser) || ! Gate::check('grantPermission', [App\Models\User::class, $permission])"
                                                         wire:key="user-permission-{{ $permission->id }}"
                                                     />
                                                 @endforeach
@@ -818,9 +857,11 @@ new #[Title('titles.user_directory')] class extends Component {
             </x-ui.form-select>
 
             <x-ui.form-select wire:model="initialRoleId" :label="__('users.role')">
-                <flux:select.option value="">{{ __('users.no_role') }}</flux:select.option>
+                <flux:select.option value="">{{ __('users.default_role_option', ['role' => config('access-control.default_role')]) }}</flux:select.option>
                 @foreach ($this->roleOptions as $roleOption)
-                    <flux:select.option :value="$roleOption->id">{{ $roleOption->name }}</flux:select.option>
+                    @can('assignRole', [App\Models\User::class, $roleOption])
+                        <flux:select.option :value="$roleOption->id">{{ $roleOption->name }}</flux:select.option>
+                    @endcan
                 @endforeach
             </x-ui.form-select>
         </div>

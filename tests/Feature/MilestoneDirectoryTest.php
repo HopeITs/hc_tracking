@@ -16,9 +16,9 @@ test('guests are redirected from the milestone directory', function () {
 });
 
 test('milestones render as a responsive tree grouped by project with reachable actions', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create(['name' => 'Aleppo Wells']);
-    $responsible = User::factory()->create(['name' => 'Rana Hamad']);
+    $responsible = User::factory()->role('General Manager')->create(['name' => 'Rana Hamad']);
     $parent = Milestone::factory()->create([
         'project_id' => $project->id,
         'responsible_user_id' => $responsible->id,
@@ -46,7 +46,7 @@ test('milestones render as a responsive tree grouped by project with reachable a
 });
 
 test('milestones can be filtered by project and status', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $first = Project::factory()->create();
     $second = Project::factory()->create();
 
@@ -65,7 +65,7 @@ test('milestones can be filtered by project and status', function () {
 });
 
 test('the dropdown filter actions set and clear the project, status and responsible filters', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $responsible = insertHrEmployee();
 
@@ -86,10 +86,10 @@ test('the dropdown filter actions set and clear the project, status and responsi
 });
 
 test('a matching child remains visible with its necessary ancestors for status and responsible filters', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
-    $parentOwner = User::factory()->create();
-    $childOwner = User::factory()->create();
+    $parentOwner = User::factory()->role('General Manager')->create();
+    $childOwner = User::factory()->role('General Manager')->create();
     $parent = Milestone::factory()->create([
         'project_id' => $project->id,
         'responsible_user_id' => $parentOwner->id,
@@ -122,7 +122,7 @@ test('a matching child remains visible with its necessary ancestors for status a
 });
 
 test('the create modal renders a project dropdown with every project option', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create(['name' => 'Coastal Relief']);
 
     Livewire::actingAs($user)
@@ -134,7 +134,7 @@ test('the create modal renders a project dropdown with every project option', fu
 });
 
 test('a milestone can be created under a parent in the same project', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $responsible = insertHrEmployee();
     $parent = Milestone::factory()->create(['project_id' => $project->id]);
@@ -160,7 +160,7 @@ test('a milestone can be created under a parent in the same project', function (
 });
 
 test('milestones created through the form are sequenced after their existing siblings, not entered by hand', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $responsible = insertHrEmployee();
     $parent = Milestone::factory()->create(['project_id' => $project->id]);
@@ -184,7 +184,7 @@ test('milestones created through the form are sequenced after their existing sib
 });
 
 test('the create modal has a description field and saves it', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $responsible = insertHrEmployee();
 
@@ -206,7 +206,7 @@ test('the create modal has a description field and saves it', function () {
 });
 
 test('changing the project while creating clears the selected parent', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $first = Project::factory()->create();
     $second = Project::factory()->create();
     $parent = Milestone::factory()->create(['project_id' => $first->id]);
@@ -221,7 +221,7 @@ test('changing the project while creating clears the selected parent', function 
 });
 
 test('each milestone links to its own edit page instead of an edit modal', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $milestone = Milestone::factory()->create();
 
     Livewire::actingAs($user)
@@ -232,7 +232,7 @@ test('each milestone links to its own edit page instead of an edit modal', funct
 });
 
 test('each milestone has a view button that opens its details page', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $milestone = Milestone::factory()->create();
 
     Livewire::actingAs($user)
@@ -243,7 +243,7 @@ test('each milestone has a view button that opens its details page', function ()
 });
 
 test('the add button next to a project prefills its project on the create modal', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create(['name' => 'Coastal Relief']);
     Milestone::factory()->create(['project_id' => $project->id]);
     $otherProject = Project::factory()->create();
@@ -264,7 +264,7 @@ test('the add button next to a project prefills its project on the create modal'
 });
 
 test('the add button next to a milestone prefills its project and nests the new milestone under it', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $parent = Milestone::factory()->create(['project_id' => $project->id, 'name' => 'Root gate']);
 
@@ -279,7 +279,7 @@ test('the add button next to a milestone prefills its project and nests the new 
 });
 
 test('creating a milestone requires its core delivery fields', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
         ->test('pages::milestones.index')
@@ -293,7 +293,7 @@ test('creating a milestone requires its core delivery fields', function () {
 });
 
 test('the create parent picker is limited to the selected project', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $otherProject = Project::factory()->create();
     Milestone::factory()->create(['project_id' => $project->id, 'name' => 'Sibling gate']);
@@ -311,7 +311,7 @@ test('the create parent picker is limited to the selected project', function () 
 });
 
 test('the list view no longer displays milestone files', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $milestone = Milestone::factory()->create();
     $media = Media::factory()->forMilestone($milestone->id)->create([
         'original_name' => 'signed-evidence.pdf',
@@ -332,7 +332,7 @@ test('the list view no longer displays milestone files', function () {
 });
 
 test('confirming delete opens the delete modal with the milestone name', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $milestone = Milestone::factory()->create(['name' => 'Foundation poured']);
 
     Livewire::actingAs($user)
@@ -344,7 +344,7 @@ test('confirming delete opens the delete modal with the milestone name', functio
 });
 
 test('cancelling delete closes the modal without deleting the milestone', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $milestone = Milestone::factory()->create();
 
     Livewire::actingAs($user)
@@ -358,7 +358,7 @@ test('cancelling delete closes the modal without deleting the milestone', functi
 });
 
 test('a leaf milestone with no tasks can be deleted', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $milestone = Milestone::factory()->create();
 
     Livewire::actingAs($user)
@@ -373,7 +373,7 @@ test('a leaf milestone with no tasks can be deleted', function () {
 });
 
 test('a milestone with children is not deleted because the subtree would cascade', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $parent = Milestone::factory()->create();
     $child = Milestone::factory()->childOf($parent)->create();
 
@@ -387,7 +387,7 @@ test('a milestone with children is not deleted because the subtree would cascade
 });
 
 test('a milestone carrying tasks is not deleted because tasks would be orphaned', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $milestone = Milestone::factory()->create();
     $task = Task::factory()->create(['source_type' => 'milestone', 'source_id' => $milestone->id]);
 
@@ -401,7 +401,7 @@ test('a milestone carrying tasks is not deleted because tasks would be orphaned'
 });
 
 test('the stat cards summarise reached, missed and upcoming milestones', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $today = now()->startOfDay();
 
     Milestone::factory()->create(['status' => MilestoneStatus::Reached, 'planned_start_date' => $today->copy()->subDays(10)]);
@@ -424,7 +424,7 @@ test('the stat cards summarise reached, missed and upcoming milestones', functio
 });
 
 test('the milestone directory distinguishes empty and filtered states', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
         ->test('pages::milestones.index')
@@ -435,7 +435,7 @@ test('the milestone directory distinguishes empty and filtered states', function
 });
 
 test('the timeline view plots milestones as clickable markers grouped by project', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create(['name' => 'Homs Clinic']);
     $milestone = Milestone::factory()->create([
         'project_id' => $project->id,
@@ -451,7 +451,7 @@ test('the timeline view plots milestones as clickable markers grouped by project
 });
 
 test('the timeline view counts only root milestones next to the project name, like the list view', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create(['name' => 'Homs Clinic']);
     $parent = Milestone::factory()->create(['project_id' => $project->id, 'name' => 'Root gate']);
     Milestone::factory()->childOf($parent)->create(['name' => 'Child gate']);
@@ -467,7 +467,7 @@ test('the timeline view counts only root milestones next to the project name, li
 });
 
 test('a nested milestone marker is dropped one row below its parent in the timeline view, and connected to it', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $parent = Milestone::factory()->create(['name' => 'Root gate']);
     $child = Milestone::factory()->childOf($parent)->create(['name' => 'Child gate']);
     $standalone = Milestone::factory()->create(['name' => 'Standalone gate']);
@@ -491,7 +491,7 @@ test('a nested milestone marker is dropped one row below its parent in the timel
 });
 
 test('the timeline view lets clicking a marker offer to add a related milestone nested under it, and clicking empty timeline space add a root milestone', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $parent = Milestone::factory()->create(['project_id' => $project->id]);
 
@@ -505,7 +505,7 @@ test('the timeline view lets clicking a marker offer to add a related milestone 
 });
 
 test('the timeline view offers a zoom slider that switches the tick resolution between months, weeks and days', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $milestone = Milestone::factory()->create(['project_id' => $project->id]);
 
@@ -518,7 +518,7 @@ test('the timeline view offers a zoom slider that switches the tick resolution b
 });
 
 test('a deletable milestone shows a delete action in the timeline view, and a locked one does not', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $parent = Milestone::factory()->create(['name' => 'Root gate']);
     $child = Milestone::factory()->childOf($parent)->create(['name' => 'Child gate']);
 
@@ -530,7 +530,7 @@ test('a deletable milestone shows a delete action in the timeline view, and a lo
 });
 
 test('a deletable milestone shows a delete action in the board view, and a locked one does not', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $parent = Milestone::factory()->create(['name' => 'Root gate']);
     $child = Milestone::factory()->childOf($parent)->create(['name' => 'Child gate']);
 
@@ -542,7 +542,7 @@ test('a deletable milestone shows a delete action in the board view, and a locke
 });
 
 test('the board view renders a card per milestone and honours the status filter', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $reached = Milestone::factory()->create(['name' => 'Reached gate', 'status' => MilestoneStatus::Reached]);
     $pending = Milestone::factory()->create(['name' => 'Pending gate', 'status' => MilestoneStatus::Planned]);
 
@@ -557,7 +557,7 @@ test('the board view renders a card per milestone and honours the status filter'
 });
 
 test('the board view wires each card to be dragged and each column to accept a drop', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $milestone = Milestone::factory()->create(['name' => 'Planned gate', 'status' => MilestoneStatus::Planned]);
 
     Livewire::actingAs($user)
@@ -574,7 +574,7 @@ test('the board view wires each card to be dragged and each column to accept a d
 });
 
 test('the board view wires each column to open the create modal with that status when its empty space is clicked', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Milestone::factory()->create(['status' => MilestoneStatus::Planned]);
 
     Livewire::actingAs($user)
@@ -589,7 +589,7 @@ test('the board view wires each column to open the create modal with that status
 });
 
 test('opening the create modal with a status prefills it, and an invalid status is ignored', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
         ->test('pages::milestones.index')
@@ -602,7 +602,7 @@ test('opening the create modal with a status prefills it, and an invalid status 
 });
 
 test('a milestone status can be changed from the board view', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $milestone = Milestone::factory()->create(['status' => MilestoneStatus::Planned]);
 
     Livewire::actingAs($user)
@@ -614,7 +614,7 @@ test('a milestone status can be changed from the board view', function () {
 });
 
 test('an invalid quick status change is ignored', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $milestone = Milestone::factory()->create(['status' => MilestoneStatus::Planned]);
 
     Livewire::actingAs($user)
@@ -625,7 +625,7 @@ test('an invalid quick status change is ignored', function () {
 });
 
 test('the calendar view places milestones on their planned date and honours the project filter', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $inMonth = Project::factory()->create();
     $otherProject = Project::factory()->create();
 
@@ -653,7 +653,7 @@ test('the calendar view places milestones on their planned date and honours the 
 });
 
 test('the calendar view month navigation moves the visible month', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
         ->test('pages::milestones.index')
@@ -668,7 +668,7 @@ test('the calendar view month navigation moves the visible month', function () {
 });
 
 test('clicking a day in the calendar view opens the create modal with that date prefilled', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
         ->test('pages::milestones.index')
@@ -680,7 +680,7 @@ test('clicking a day in the calendar view opens the create modal with that date 
 });
 
 test('a deletable milestone shows a delete action in the calendar view, and a locked one does not', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $parent = Milestone::factory()->create(['name' => 'Root gate', 'planned_start_date' => '2026-04-10']);
     $child = Milestone::factory()->childOf($parent)->create(['name' => 'Child gate', 'planned_start_date' => '2026-04-11']);
 
@@ -694,7 +694,7 @@ test('a deletable milestone shows a delete action in the calendar view, and a lo
 });
 
 test('the calendar view switches between day, 4-days, week and month periods', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
         ->test('pages::milestones.index')
@@ -711,7 +711,7 @@ test('the calendar view switches between day, 4-days, week and month periods', f
 });
 
 test('the calendar view period navigation moves the anchor date in day/week/4-day modes', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
         ->test('pages::milestones.index')
@@ -727,7 +727,7 @@ test('the calendar view period navigation moves the anchor date in day/week/4-da
 });
 
 test('a milestone shows on its planned date in the week calendar view', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $milestone = Milestone::factory()->create(['name' => 'Foundation poured', 'planned_start_date' => '2026-04-15']);
 
     Livewire::actingAs($user)

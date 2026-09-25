@@ -72,7 +72,7 @@
                         $isToday = $day->isSameDay($today);
                     @endphp
                     <div
-                        x-on:click="$event.target.closest('[data-milestone-chip]') || $wire.openCreateModal('{{ $day->toDateString() }}')"
+                        @can('create', App\Models\Milestone::class) x-on:click="$event.target.closest('[data-milestone-chip]') || $wire.openCreateModal('{{ $day->toDateString() }}')" @endcan
                         wire:key="milestone-calendar-day-{{ $day->toDateString() }}"
                         class="flex min-h-28 cursor-pointer flex-col gap-1 border-b border-e border-secondary-soft p-1.5 text-start last:border-e-0 [&:nth-child(7n)]:border-e-0 hover:bg-secondary-soft/40 dark:border-secondary-medium dark:hover:bg-secondary-medium/40 {{ $isCurrentMonth ? '' : 'opacity-40' }}"
                         data-test="milestone-calendar-day-{{ $day->toDateString() }}"
@@ -92,9 +92,11 @@
                                     {{ $milestone->name }}
                                 </a>
                                 @if ($milestone->children_count === 0 && $milestone->tasks_count === 0)
+                                    @can('milestones.delete')
                                     <button type="button" wire:click="confirmDelete({{ $milestone->id }})" class="hidden shrink-0 cursor-pointer group-hover:block" aria-label="{{ __('common.delete_name', ['name' => $milestone->name]) }}">
                                         <flux:icon.x-mark variant="micro" class="size-3" />
                                     </button>
+                                    @endcan
                                 @endif
                             </div>
                         @endforeach
@@ -129,7 +131,7 @@
                 @foreach ($periodDays as $day)
                     @php $dayMilestones = $calendar['milestonesByDay']->get($day->toDateString(), new \Illuminate\Support\Collection); @endphp
                     <div
-                        x-on:click="$event.target.closest('[data-milestone-chip]') || $wire.openCreateModal('{{ $day->toDateString() }}')"
+                        @can('create', App\Models\Milestone::class) x-on:click="$event.target.closest('[data-milestone-chip]') || $wire.openCreateModal('{{ $day->toDateString() }}')" @endcan
                         wire:key="milestone-calendar-allday-{{ $day->toDateString() }}"
                         class="flex min-h-10 cursor-pointer flex-col gap-1 border-e border-secondary-soft p-1.5 text-start last:border-e-0 hover:bg-secondary-soft/40 dark:border-secondary-medium dark:hover:bg-secondary-medium/40"
                         data-test="milestone-calendar-allday-{{ $day->toDateString() }}"
@@ -141,9 +143,11 @@
                                     {{ $milestone->name }}
                                 </a>
                                 @if ($milestone->children_count === 0 && $milestone->tasks_count === 0)
+                                    @can('milestones.delete')
                                     <button type="button" wire:click="confirmDelete({{ $milestone->id }})" class="hidden shrink-0 cursor-pointer group-hover:block" aria-label="{{ __('common.delete_name', ['name' => $milestone->name]) }}">
                                         <flux:icon.x-mark variant="micro" class="size-3" />
                                     </button>
+                                    @endcan
                                 @endif
                             </div>
                         @endforeach

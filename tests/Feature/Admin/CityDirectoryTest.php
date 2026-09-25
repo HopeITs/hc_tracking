@@ -17,7 +17,7 @@ test('all authenticated roles can view the city directory', function (string $ro
         ->assertSeeText('Cities')
         ->assertSee(route('admin.cities.index'), false);
 })->with([
-    'officer' => 'Officer',
+    'team member' => 'Team Member',
     'manager' => 'Managers',
     'meal' => 'MEAL',
     'admin' => 'Super Admin',
@@ -27,7 +27,7 @@ test('the directory lists every hr city in english and arabic, active or not', f
     insertHrCity('Damascus', 'دمشق');
     insertHrCity('Tartus', 'طرطوس', isActive: false);
 
-    Livewire::actingAs(User::factory()->create())
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::admin.cities')
         ->assertSee('Damascus')
         ->assertSee('دمشق')
@@ -39,7 +39,7 @@ test('the directory searches english and arabic names and clears the search', fu
     insertHrCity('Damascus', 'دمشق');
     insertHrCity('Aleppo', 'حلب');
 
-    Livewire::actingAs(User::factory()->create())
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::admin.cities')
         ->set('view', 'grid') // the map keeps every city visible; this exercises the grid's own hide-on-search behaviour
         ->set('search', 'Damas')
@@ -58,7 +58,7 @@ test('each city shows how many projects run in it', function () {
     insertHrCity('Homs');
     Project::factory(2)->create(['city_id' => $aleppo]);
 
-    Livewire::actingAs(User::factory()->create())
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::admin.cities')
         ->assertSee('2 projects')
         ->assertSee('0 projects');
@@ -68,14 +68,14 @@ test('city names are escaped in the directory', function () {
     $unsafeName = '<script>alert("city")</script>';
     insertHrCity($unsafeName);
 
-    Livewire::actingAs(User::factory()->create())
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::admin.cities')
         ->assertSee($unsafeName)
         ->assertDontSee($unsafeName, false);
 });
 
 test('the directory offers no way to change hr cities', function () {
-    Livewire::actingAs(User::factory()->create())
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::admin.cities')
         ->assertDontSee('Add city')
         ->assertDontSee('data-test="create-city-button"', false);
@@ -88,7 +88,7 @@ test('the summary strip reports the portfolio footprint independent of the searc
     Project::factory()->active()->create(['city_id' => $aleppo, 'target_beneficiaries' => 500]);
     Project::factory()->closed()->create(['city_id' => $aleppo, 'target_beneficiaries' => 300]);
 
-    $component = Livewire::actingAs(User::factory()->create())
+    $component = Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::admin.cities')
         ->set('search', 'Homs'); // search narrows the grid, not the portfolio-wide summary
 
@@ -105,7 +105,7 @@ test('the directory filters by active status', function () {
     insertHrCity('Damascus');
     insertHrCity('Tartus', 'طرطوس', isActive: false);
 
-    Livewire::actingAs(User::factory()->create())
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::admin.cities')
         ->set('view', 'grid') // the map keeps every city visible; this exercises the grid's own hide-on-filter behaviour
         ->set('status', 'active')
@@ -125,7 +125,7 @@ test('the directory sorts cities by project count', function () {
     Project::factory(3)->create(['city_id' => $aleppo]);
     Project::factory(1)->create(['city_id' => $homs]);
 
-    $component = Livewire::actingAs(User::factory()->create())
+    $component = Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::admin.cities')
         ->set('sort', 'projects');
 
@@ -137,7 +137,7 @@ test('the directory sorts cities by project count', function () {
 test('a city links straight to its filtered project list', function () {
     $aleppo = insertHrCity('Aleppo');
 
-    Livewire::actingAs(User::factory()->create())
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::admin.cities')
         ->assertSee(route('projects.index', ['city' => $aleppo]), false);
 });
@@ -146,7 +146,7 @@ test('the map view plots every city with a real link, even one the search would 
     insertHrCity('Aleppo');
     $homs = insertHrCity('Homs');
 
-    Livewire::actingAs(User::factory()->create())
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::admin.cities')
         ->set('view', 'map')
         ->set('search', 'Homs')
@@ -158,7 +158,7 @@ test('the map view plots every city with a real link, even one the search would 
 test('a city with no plotted position falls into the "not shown on map" tray', function () {
     insertHrCity('Neverland');
 
-    Livewire::actingAs(User::factory()->create())
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::admin.cities')
         ->set('view', 'map')
         ->assertSee('Neverland')
@@ -168,7 +168,7 @@ test('a city with no plotted position falls into the "not shown on map" tray', f
 test('the coverage map is the default view', function () {
     insertHrCity('Aleppo');
 
-    Livewire::actingAs(User::factory()->create())
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::admin.cities')
         ->assertSet('view', 'map')
         ->assertSee(__('cities.coverage_map'));

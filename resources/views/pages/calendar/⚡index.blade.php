@@ -14,6 +14,7 @@ use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Report;
+use App\Models\Scopes\TaskVisibilityScope;
 use App\Models\Task;
 use App\Models\TransfersTracking;
 use App\Models\User;
@@ -23,9 +24,11 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -58,7 +61,9 @@ new #[Title('titles.calendar')] class extends Component {
 
     public bool $showMilestoneModal = false;
     public bool $showDeleteModal = false;
+    #[Locked]
     public ?int $editingMilestoneId = null;
+    #[Locked]
     public ?int $deletingMilestoneId = null;
     public string $name = '';
     public string $plannedStartDate = '';
@@ -72,7 +77,9 @@ new #[Title('titles.calendar')] class extends Component {
 
     public bool $showTaskModal = false;
     public bool $showTaskDeleteModal = false;
+    #[Locked]
     public ?int $editingTaskId = null;
+    #[Locked]
     public ?int $deletingTaskId = null;
     public string $title = '';
     public string $description = '';
@@ -275,7 +282,7 @@ new #[Title('titles.calendar')] class extends Component {
                 ->whereIn('responsible_user_id', $employeeIds)
                 ->whereBetween('planned_start_date', [$gridStart->toDateString(), $gridEnd->toDateString()])
                 ->with('project:id,name')
-                ->withCount(['children', 'tasks'])
+                ->withCount(['children', 'tasks' => fn ($query) => $query->withoutGlobalScope(TaskVisibilityScope::class)])
                 ->orderBy('planned_start_date')
                 ->orderBy('sequence')
                 ->get()
@@ -284,7 +291,7 @@ new #[Title('titles.calendar')] class extends Component {
         $tasksByDay = $employeeIds === [] || ! $this->showTasks
             ? new Collection
             : Task::query()
-                ->select(['id', 'title', 'status', 'due_date'])
+                ->select(['id', 'slug', 'title', 'status', 'due_date', 'created_by'])
                 ->whereHas('taskAssignees', fn (Builder $query) => $query->whereIn('employee_id', $employeeIds))
                 ->whereNotNull('due_date')
                 ->whereBetween('due_date', [$gridStart->toDateString(), $gridEnd->toDateString()])
@@ -310,7 +317,7 @@ new #[Title('titles.calendar')] class extends Component {
         $unscheduledTasks = $employeeIds === [] || ! $this->showTasks
             ? new Collection
             : Task::query()
-                ->select(['id', 'title', 'status', 'priority', 'due_date'])
+                ->select(['id', 'slug', 'title', 'status', 'priority', 'due_date', 'created_by'])
                 ->whereHas('taskAssignees', fn (Builder $query) => $query->whereIn('employee_id', $employeeIds))
                 ->whereNull('due_date')
                 ->orderBy('title')
@@ -493,6 +500,8 @@ new #[Title('titles.calendar')] class extends Component {
 
     public function openCreateModal(?string $date = null): void
     {
+        Gate::authorize('create', Milestone::class);
+
         $this->resetMilestoneForm();
 
         if ($date !== null) {
@@ -508,6 +517,13 @@ new #[Title('titles.calendar')] class extends Component {
         $milestone = Milestone::query()
             ->select(['id', 'project_id', 'name', 'planned_start_date', 'planned_end_date', 'status', 'sequence', 'weight_percentage', 'responsible_user_id', 'parent_milestone_id'])
             ->findOrFail($milestoneId);
+
+        // Someone who may not edit the milestone is taken to its own page.
+        if (Gate::denies('update', $milestone)) {
+            $this->redirectRoute('milestones.show', ['milestone' => $milestone], navigate: true);
+
+            return;
+        }
 
         $this->resetValidation();
         $this->editingMilestoneId = $milestone->id;
@@ -531,6 +547,12 @@ new #[Title('titles.calendar')] class extends Component {
             ? null
             : Milestone::query()->findOrFail($this->editingMilestoneId);
         $projectId = $existingMilestone?->project_id ?? (int) $this->milestoneProjectId;
+
+        if ($existingMilestone !== null) {
+            Gate::authorize('update', $existingMilestone);
+        } else {
+            Gate::authorize('create', [Milestone::class, $projectId]);
+        }
         $invalidParentIds = $this->invalidParentIds();
 
         $validated = $this->validate([
@@ -600,6 +622,8 @@ new #[Title('titles.calendar')] class extends Component {
 
     public function confirmDelete(int $milestoneId): void
     {
+        Gate::authorize('delete', Milestone::query()->findOrFail($milestoneId));
+
         $this->deletingMilestoneId = $milestoneId;
         $this->showDeleteModal = true;
     }
@@ -611,7 +635,12 @@ new #[Title('titles.calendar')] class extends Component {
         }
 
         $milestone = Milestone::query()->find($this->deletingMilestoneId);
-        $deleted = $milestone !== null && $milestone->children()->doesntExist() && $milestone->tasks()->doesntExist()
+
+        if ($milestone !== null) {
+            Gate::authorize('delete', $milestone);
+        }
+
+        $deleted = $milestone !== null && $milestone->children()->doesntExist() && $milestone->tasks()->withoutGlobalScope(TaskVisibilityScope::class)->doesntExist()
             ? $milestone->delete()
             : false;
 
@@ -706,6 +735,8 @@ new #[Title('titles.calendar')] class extends Component {
 
     public function openCreateTaskModal(?string $date = null): void
     {
+        Gate::authorize('create', Task::class);
+
         $this->resetTaskForm();
 
         if ($date !== null) {
@@ -720,9 +751,17 @@ new #[Title('titles.calendar')] class extends Component {
     public function openEditTaskModal(int $taskId): void
     {
         $task = Task::query()
-            ->select(['id', 'source_type', 'source_id', 'title', 'description', 'status', 'priority', 'start_date', 'due_date', 'completed_date', 'progress_percentage'])
+            ->select(['id', 'slug', 'source_type', 'source_id', 'title', 'description', 'status', 'priority', 'start_date', 'due_date', 'completed_date', 'progress_percentage', 'created_by'])
             ->with('taskAssignees:id,task_id,employee_id')
             ->findOrFail($taskId);
+
+        // Someone who may not edit the task (an assignee moves only its
+        // status) is taken to the task's own page instead of the edit form.
+        if (Gate::denies('update', $task)) {
+            $this->redirectRoute('tasks.show', ['task' => $task->slug], navigate: true);
+
+            return;
+        }
 
         $this->resetValidation();
         $this->editingTaskId = $task->id;
@@ -743,6 +782,12 @@ new #[Title('titles.calendar')] class extends Component {
 
     public function saveTask(): void
     {
+        if ($this->editingTaskId === null) {
+            Gate::authorize('create', Task::class);
+        } else {
+            Gate::authorize('update', Task::query()->findOrFail($this->editingTaskId));
+        }
+
         $this->title = trim($this->title);
         $this->description = trim($this->description);
 
@@ -778,13 +823,22 @@ new #[Title('titles.calendar')] class extends Component {
 
         $isCreate = $this->editingTaskId === null;
         $task = $isCreate ? new Task : Task::query()->findOrFail($this->editingTaskId);
+        $dueDate = $validated['dueDate'] === '' ? null : $validated['dueDate'];
+
+        // Only the task's creator moves its due date, as on the tasks page.
+        if (! $isCreate && $task->created_by !== auth()->id() && $dueDate !== $task->due_date?->toDateString()) {
+            Flux::toast(variant: 'danger', text: __('tasks.only_the_task_creator_can_change_the_due_date'));
+
+            $dueDate = $task->due_date?->toDateString();
+        }
+
         $attributes = [
             'title' => $validated['title'],
             'description' => $validated['description'] === '' ? null : $validated['description'],
             'status' => $validated['taskStatus'],
             'priority' => $validated['taskPriority'],
             'start_date' => $validated['startDate'] === '' ? null : $validated['startDate'],
-            'due_date' => $validated['dueDate'] === '' ? null : $validated['dueDate'],
+            'due_date' => $dueDate,
             'completed_date' => $validated['completedDate'] === '' ? null : $validated['completedDate'],
             'progress_percentage' => (int) $validated['progressPercentage'],
             'source_type' => $validated['taskSourceType'],
@@ -817,6 +871,8 @@ new #[Title('titles.calendar')] class extends Component {
 
     public function confirmDeleteTask(int $taskId): void
     {
+        Gate::authorize('delete', Task::query()->findOrFail($taskId));
+
         $this->deletingTaskId = $taskId;
         $this->showTaskDeleteModal = true;
     }
@@ -831,9 +887,11 @@ new #[Title('titles.calendar')] class extends Component {
         $deleted = DB::transaction(function () use ($taskId): bool {
             $task = Task::query()->lockForUpdate()->find($taskId);
 
-            if ($task === null || $task->subtasks()->exists()) {
+            if ($task === null || $task->subtasks()->withoutGlobalScope(TaskVisibilityScope::class)->exists()) {
                 return false;
             }
+
+            Gate::authorize('delete', $task);
 
             return (bool) $task->delete();
         });
@@ -871,6 +929,14 @@ new #[Title('titles.calendar')] class extends Component {
         $task = Task::query()->find($taskId);
 
         if ($task === null) {
+            return;
+        }
+
+        Gate::authorize('update', $task);
+
+        if ($task->created_by !== auth()->id()) {
+            Flux::toast(variant: 'danger', text: __('tasks.only_the_task_creator_can_change_the_due_date'));
+
             return;
         }
 
@@ -1627,14 +1693,18 @@ new #[Title('titles.calendar')] class extends Component {
             <flux:dropdown position="bottom-end" class="filter-picker">
                 <x-ui.button tone="primary" icon="plus" icon:trailing="chevron-down" data-test="calendar-add-button">{{ __('common.add') }}</x-ui.button>
                 <flux:menu class="filter-menu">
-                    <flux:menu.item wire:click="openCreateModal" data-test="calendar-add-milestone-button">
-                        <flux:icon.flag variant="micro" class="size-4" />
-                        {{ __('milestones.add_milestone') }}
-                    </flux:menu.item>
-                    <flux:menu.item wire:click="openCreateTaskModal" data-test="calendar-add-task-button">
-                        <flux:icon.clipboard-document-check variant="micro" class="size-4" />
-                        {{ __('tasks.add_task') }}
-                    </flux:menu.item>
+                    @can('create', App\Models\Milestone::class)
+                        <flux:menu.item wire:click="openCreateModal" data-test="calendar-add-milestone-button">
+                            <flux:icon.flag variant="micro" class="size-4" />
+                            {{ __('milestones.add_milestone') }}
+                        </flux:menu.item>
+                    @endcan
+                    @can('create', App\Models\Task::class)
+                        <flux:menu.item wire:click="openCreateTaskModal" data-test="calendar-add-task-button">
+                            <flux:icon.clipboard-document-check variant="micro" class="size-4" />
+                            {{ __('tasks.add_task') }}
+                        </flux:menu.item>
+                    @endcan
                 </flux:menu>
             </flux:dropdown>
         </div>
@@ -1810,6 +1880,7 @@ new #[Title('titles.calendar')] class extends Component {
                 class="fixed z-50 min-w-40 rounded-md border border-secondary-soft bg-white py-1 shadow-lg dark:border-secondary-medium dark:bg-secondary-dark"
                 data-test="calendar-context-menu"
             >
+                @can('create', App\Models\Milestone::class)
                 <button
                     type="button"
                     x-on:click="menuOpen = false; $wire.openCreateModal(menuDate)"
@@ -1819,15 +1890,18 @@ new #[Title('titles.calendar')] class extends Component {
                     <flux:icon.flag variant="micro" class="size-4" />
                     {{ __('milestones.add_milestone') }}
                 </button>
-                <button
-                    type="button"
-                    x-on:click="menuOpen = false; $wire.openCreateTaskModal(menuDate)"
-                    class="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-start text-sm text-secondary-dark hover:bg-secondary-soft dark:text-white dark:hover:bg-secondary-medium"
-                    data-test="calendar-context-add-task"
-                >
-                    <flux:icon.clipboard-document-check variant="micro" class="size-4" />
-                    {{ __('tasks.add_task') }}
-                </button>
+                @endcan
+                @can('create', App\Models\Task::class)
+                    <button
+                        type="button"
+                        x-on:click="menuOpen = false; $wire.openCreateTaskModal(menuDate)"
+                        class="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-start text-sm text-secondary-dark hover:bg-secondary-soft dark:text-white dark:hover:bg-secondary-medium"
+                        data-test="calendar-context-add-task"
+                    >
+                        <flux:icon.clipboard-document-check variant="micro" class="size-4" />
+                        {{ __('tasks.add_task') }}
+                    </button>
+                @endcan
             </div>
         </div>
 

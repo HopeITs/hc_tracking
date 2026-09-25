@@ -25,7 +25,7 @@ use App\Models\TransfersTracking;
 use App\Models\User;
 
 test('render the dossier to storage for visual inspection', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     $proposal = Proposal::factory()->create([
         'name' => 'Hope Center Emergency Response',

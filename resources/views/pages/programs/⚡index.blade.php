@@ -6,8 +6,10 @@ use App\Models\Strategy;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -28,6 +30,7 @@ new #[Title('titles.programs')] class extends Component {
     public int $visibleProgramCount = 8;
 
     public bool $showProgramModal = false;
+    #[Locked]
     public ?int $editingProgramId = null;
     public string $editingProgramName = '';
     public string $strategyId = '';
@@ -176,6 +179,8 @@ new #[Title('titles.programs')] class extends Component {
             ->select(['id', 'strategy_id', 'manager_id'])
             ->findOrFail($programId);
 
+        Gate::authorize('update', $program);
+
         $this->resetValidation();
         $this->editingProgramId = $program->id;
         $this->editingProgramName = $program->name;
@@ -192,6 +197,8 @@ new #[Title('titles.programs')] class extends Component {
      */
     public function saveProgram(): void
     {
+        Gate::authorize('update', Program::query()->findOrFail($this->editingProgramId));
+
         $validated = $this->validate([
             'strategyId' => ['nullable', 'integer', Rule::exists(Strategy::class, 'id')],
             'managerId' => ['nullable', 'integer', Rule::exists(HrEmployee::class, 'id')],
@@ -277,7 +284,7 @@ new #[Title('titles.programs')] class extends Component {
                 @foreach ($visiblePrograms as $program)
                     <article class="group relative flex min-h-56 min-w-0 flex-col gap-4 rounded-lg border border-secondary-soft bg-white p-4 transition-colors duration-200 hover:border-primary focus-within:border-primary dark:border-secondary-medium dark:bg-secondary-dark dark:hover:border-primary" wire:key="program-card-{{ $program->id }}">
                         <a href="{{ route('programs.show', $program) }}" wire:navigate class="absolute inset-0 z-0 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" :aria-label="__('programs.open_name', ['name' => $program->name])"></a>
-                        <div class="relative z-10 flex items-start justify-between gap-3 pointer-events-none"><div class="flex min-w-0 items-center gap-3"><div class="grid size-10 shrink-0 place-items-center rounded-md bg-primary text-white"><flux:icon.briefcase class="size-5" /></div><div class="min-w-0"><p class="text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary-medium dark:text-secondary-soft">{{ __('common.program') }}</p><h2 class="mt-1 truncate text-base font-semibold text-secondary-dark dark:text-white">{{ $program->name }}</h2></div></div><div class="pointer-events-auto flex shrink-0 items-center gap-1"><a href="{{ route('programs.show', $program) }}" wire:navigate class="grid size-11 place-items-center rounded-md border-0! bg-transparent! text-secondary-dark! transition-colors hover:bg-secondary-soft! dark:text-white! dark:hover:bg-secondary-medium! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary @3xl/directory:size-8!" :aria-label="__('programs.open_name', ['name' => $program->name])"><flux:icon.eye class="size-4.5" /></a><x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation @3xl/directory:size-8!" wire:click="openEditModal({{ $program->id }})" :aria-label="__('common.edit_name', ['name' => $program->name])" /></div></div>
+                        <div class="relative z-10 flex items-start justify-between gap-3 pointer-events-none"><div class="flex min-w-0 items-center gap-3"><div class="grid size-10 shrink-0 place-items-center rounded-md bg-primary text-white"><flux:icon.briefcase class="size-5" /></div><div class="min-w-0"><p class="text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary-medium dark:text-secondary-soft">{{ __('common.program') }}</p><h2 class="mt-1 truncate text-base font-semibold text-secondary-dark dark:text-white">{{ $program->name }}</h2></div></div><div class="pointer-events-auto flex shrink-0 items-center gap-1"><a href="{{ route('programs.show', $program) }}" wire:navigate class="grid size-11 place-items-center rounded-md border-0! bg-transparent! text-secondary-dark! transition-colors hover:bg-secondary-soft! dark:text-white! dark:hover:bg-secondary-medium! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary @3xl/directory:size-8!" :aria-label="__('programs.open_name', ['name' => $program->name])"><flux:icon.eye class="size-4.5" /></a>@can('programs.update')<x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation @3xl/directory:size-8!" wire:click="openEditModal({{ $program->id }})" :aria-label="__('common.edit_name', ['name' => $program->name])" />@endcan</div></div>
                         <dl class="relative z-10 grid grid-cols-2 gap-4 pointer-events-none"><div class="min-w-0"><dt class="text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary-medium dark:text-secondary-soft">{{ __('common.strategy') }}</dt><dd class="mt-1 truncate text-sm font-medium text-secondary-dark dark:text-white">{{ $program->strategy?->name ?? __('common.not_assigned') }}</dd>@if ($program->strategy)<p class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $program->strategy->start_year }}–{{ $program->strategy->end_year }}</p>@endif</div><div class="min-w-0"><dt class="text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary-medium dark:text-secondary-soft">{{ __('programs.manager') }}</dt><dd class="mt-1">@if ($program->manager)<x-ui.employee-chip :employee="$program->manager" compact />@else<span class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('common.not_assigned') }}</span>@endif</dd></div></dl>
                         <div class="relative z-10 mt-auto grid grid-cols-2 border-t border-secondary-soft pt-3 dark:border-secondary-medium pointer-events-none"><div><p class="text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary-medium dark:text-secondary-soft">{{ __('common.projects') }}</p><p class="mt-1 text-2xl font-bold tabular-nums text-secondary-dark dark:text-white">{{ $program->projects_count }}</p></div><div><p class="text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary-medium dark:text-secondary-soft">{{ __('programs.annual_plans') }}</p><p class="mt-1 text-2xl font-bold tabular-nums text-secondary-dark dark:text-white">{{ $program->annual_plans_count }}</p></div></div>
                     </article>

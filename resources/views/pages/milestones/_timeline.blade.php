@@ -243,7 +243,7 @@
                             style="height: {{ $riverHeight }}px"
                             x-on:mousemove="hover = $event.target.closest('[data-milestone-marker]') ? null : pointerInfo($event)"
                             x-on:mouseleave="hover = null"
-                            x-on:click="if ($event.target.closest('[data-milestone-marker]')) { return; } hover = null; $wire.openCreateModal(pointerInfo($event).iso, null, {{ $projectRow->id }})"
+                            @can('create', App\Models\Milestone::class) x-on:click="if ($event.target.closest('[data-milestone-marker]')) { return; } hover = null; $wire.openCreateModal(pointerInfo($event).iso, null, {{ $projectRow->id }})" @endcan
                             data-test="milestone-timeline-river-{{ $projectRow->id }}"
                         >
                             {{-- main rail --}}
@@ -308,9 +308,11 @@
                                                     <span class="line-clamp-2">{{ $milestone->name }}</span>
                                                 </a>
                                                 @if ($canDeleteMarker)
+                                                    @can('milestones.delete')
                                                     <button type="button" wire:click="confirmDelete({{ $milestone->id }})" class="shrink-0 cursor-pointer rounded-md p-1 text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium" aria-label="{{ __('common.delete_name', ['name' => $milestone->name]) }}">
                                                         <flux:icon.trash class="size-3.5" />
                                                     </button>
+                                                    @endcan
                                                 @else
                                                     <span class="shrink-0 cursor-not-allowed p-1 text-secondary-light" aria-disabled="true" title="{{ __('milestones.only_a_milestone_with_no_nested_milestones_and_no_tasks_can') }}">
                                                         <flux:icon.lock-closed class="size-3.5" />
@@ -327,7 +329,7 @@
 
                                             <x-ui.employee-chip :employee="$milestone->responsibleUser" compact class="mt-1" />
 
-                                            <button
+                                            @can('create', [App\Models\Milestone::class, $milestone->project_id])<button
                                                 type="button"
                                                 wire:click="openCreateModal(null, null, null, {{ $milestone->id }})"
                                                 data-test="milestone-timeline-add-related-{{ $milestone->id }}"
@@ -335,7 +337,7 @@
                                             >
                                                 <flux:icon.plus variant="micro" class="size-3" />
                                                 {{ __('milestones.add_related_milestone') }}
-                                            </button>
+                                            </button>@endcan
                                         </div>
                                     </div>
                                 </div>

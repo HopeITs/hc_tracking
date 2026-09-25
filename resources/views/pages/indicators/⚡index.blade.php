@@ -19,9 +19,11 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection as BaseCollection;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -70,6 +72,7 @@ new #[Title('titles.indicators')] class extends Component {
     public string $view = 'cards';
 
     public bool $showIndicatorModal = false;
+    #[Locked]
     public ?int $editingIndicatorId = null;
     public string $name = '';
     public string $indicatorResultId = '';
@@ -81,11 +84,15 @@ new #[Title('titles.indicators')] class extends Component {
     public string $indicatorProjectId = '';
 
     public bool $showDeleteModal = false;
+    #[Locked]
     public ?int $deletingIndicatorId = null;
 
     public bool $showProgressModal = false;
+    #[Locked]
     public ?int $progressIndicatorId = null;
+    #[Locked]
     public ?int $editingReadingId = null;
+    #[Locked]
     public ?int $deletingReadingId = null;
     public string $progressDate = '';
     public string $progressValue = '';
@@ -107,7 +114,7 @@ new #[Title('titles.indicators')] class extends Component {
     {
         $createForResult = request()->integer('create');
 
-        if ($createForResult > 0 && Result::query()->whereKey($createForResult)->exists()) {
+        if ($createForResult > 0 && Gate::allows('indicators.create') && Result::query()->whereKey($createForResult)->exists()) {
             $this->openCreateModal();
             $this->indicatorResultId = (string) $createForResult;
         }
@@ -729,12 +736,16 @@ new #[Title('titles.indicators')] class extends Component {
 
     public function openCreateModal(): void
     {
+        Gate::authorize('indicators.create');
+
         $this->resetIndicatorForm();
         $this->showIndicatorModal = true;
     }
 
     public function openEditModal(int $indicatorId): void
     {
+        Gate::authorize('indicators.update');
+
         $indicator = Indicator::query()
             ->select(['id', 'name', 'result_id', 'project_id', 'measure', 'unit', 'baseline', 'target', 'frequency'])
             ->findOrFail($indicatorId);
@@ -754,6 +765,8 @@ new #[Title('titles.indicators')] class extends Component {
 
     public function saveIndicator(): void
     {
+        Gate::authorize($this->editingIndicatorId === null ? 'indicators.create' : 'indicators.update');
+
         $this->name = trim($this->name);
         $this->unit = trim($this->unit);
         $isPercentage = $this->indicatorMeasure === IndicatorMeasure::Percentage->value;
@@ -882,6 +895,8 @@ new #[Title('titles.indicators')] class extends Component {
 
     public function confirmDelete(int $indicatorId): void
     {
+        Gate::authorize('indicators.delete');
+
         $this->deletingIndicatorId = $indicatorId;
         $this->showDeleteModal = true;
     }
@@ -894,6 +909,8 @@ new #[Title('titles.indicators')] class extends Component {
 
     public function deleteIndicator(): void
     {
+        Gate::authorize('indicators.delete');
+
         if ($this->deletingIndicatorId === null) {
             return;
         }
@@ -926,6 +943,8 @@ new #[Title('titles.indicators')] class extends Component {
 
     public function openProgressModal(int $indicatorId): void
     {
+        Gate::authorize('indicators.update');
+
         $this->resetValidation();
         $this->progressIndicatorId = $indicatorId;
         $this->editingReadingId = null;
@@ -942,6 +961,8 @@ new #[Title('titles.indicators')] class extends Component {
      */
     public function openEditReadingModal(int $readingId): void
     {
+        Gate::authorize('indicators.update');
+
         $reading = IndicatorProgress::query()->findOrFail($readingId);
 
         $this->resetValidation();
@@ -956,6 +977,8 @@ new #[Title('titles.indicators')] class extends Component {
 
     public function saveProgress(): void
     {
+        Gate::authorize('indicators.update');
+
         if ($this->progressIndicatorId === null) {
             return;
         }
@@ -1015,6 +1038,8 @@ new #[Title('titles.indicators')] class extends Component {
      */
     public function confirmDeleteReading(int $readingId): void
     {
+        Gate::authorize('indicators.update');
+
         $this->deletingReadingId = $readingId;
     }
 
@@ -1025,6 +1050,8 @@ new #[Title('titles.indicators')] class extends Component {
 
     public function deleteReading(): void
     {
+        Gate::authorize('indicators.update');
+
         if ($this->deletingReadingId === null || $this->inspectingIndicatorId === null) {
             return;
         }
@@ -1238,9 +1265,9 @@ new #[Title('titles.indicators')] class extends Component {
         </x-slot:filters>
 
         <x-slot:actions>
-            <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-indicator-button">
+            @can('indicators.create')<x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-indicator-button">
                 {{ __('indicators.add_indicator') }}
-            </x-ui.button>
+            </x-ui.button>@endcan
         </x-slot:actions>
     </x-ui.page-header>
 
@@ -1466,9 +1493,9 @@ new #[Title('titles.indicators')] class extends Component {
                 :body="$filtersAreActive ? __('common.change_the_search_or_filters_and_try_again') : __('indicators.add_the_first_indicator_against_a_result')"
             >
                 <x-slot:action>
-                    <x-ui.button tone="primary" :icon="$filtersAreActive ? 'arrow-path' : 'plus'" wire:click="{{ $filtersAreActive ? 'clearFilters' : 'openCreateModal' }}">
+                    @if ($filtersAreActive || auth()->user()->can('indicators.create'))<x-ui.button tone="primary" :icon="$filtersAreActive ? 'arrow-path' : 'plus'" wire:click="{{ $filtersAreActive ? 'clearFilters' : 'openCreateModal' }}">
                         {{ $filtersAreActive ? __('common.reset_filters') : __('indicators.add_indicator') }}
-                    </x-ui.button>
+                    </x-ui.button>@endif
                 </x-slot:action>
             </x-ui.empty-state>
         </x-ui.panel>
@@ -1568,10 +1595,10 @@ new #[Title('titles.indicators')] class extends Component {
 
                                 <div class="flex items-center justify-end gap-0.5">
                                     <x-ui.button tone="ghost" size="sm" icon="arrows-pointing-out" class="size-9!" wire:click="openInspectModal({{ $indicator->id }})" :aria-label="__('indicators.view_the_chain_for_name', ['name' => $indicator->name])" />
-                                    <x-ui.button tone="ghost" size="sm" icon="plus-circle" class="size-9!" wire:click="openProgressModal({{ $indicator->id }})" :aria-label="__('indicators.log_a_reading_for_name', ['name' => $indicator->name])" data-test="log-reading-button-{{ $indicator->id }}" />
-                                    <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $indicator->id }})" :aria-label="__('common.edit_name', ['name' => $indicator->name])" />
+                                    @can('indicators.update')<x-ui.button tone="ghost" size="sm" icon="plus-circle" class="size-9!" wire:click="openProgressModal({{ $indicator->id }})" :aria-label="__('indicators.log_a_reading_for_name', ['name' => $indicator->name])" data-test="log-reading-button-{{ $indicator->id }}" />@endcan
+                                    @can('indicators.update')<x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $indicator->id }})" :aria-label="__('common.edit_name', ['name' => $indicator->name])" />@endcan
                                     @if ($row['targets'] === [])
-                                        <x-ui.button tone="ghost" size="sm" icon="trash" class="size-9!" wire:click="confirmDelete({{ $indicator->id }})" :aria-label="__('common.delete_name', ['name' => $indicator->name])" />
+                                        @can('indicators.delete')<x-ui.button tone="ghost" size="sm" icon="trash" class="size-9!" wire:click="confirmDelete({{ $indicator->id }})" :aria-label="__('common.delete_name', ['name' => $indicator->name])" />@endcan
                                     @else
                                         <flux:tooltip :content="__('indicators.indicators_carrying_targets_cannot_be_deleted')">
                                             <span class="inline-flex size-9 cursor-not-allowed items-center justify-center text-secondary-light" aria-disabled="true">
@@ -1784,10 +1811,10 @@ new #[Title('titles.indicators')] class extends Component {
                         </x-ui.button>
 
                         <div class="ms-auto flex items-center gap-0.5">
-                            <x-ui.button tone="ghost" size="sm" icon="plus-circle" class="size-9!" wire:click="openProgressModal({{ $indicator->id }})" :aria-label="__('indicators.log_a_reading_for_name', ['name' => $indicator->name])" data-test="log-reading-button-{{ $indicator->id }}" />
-                            <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $indicator->id }})" :aria-label="__('common.edit_name', ['name' => $indicator->name])" />
+                            @can('indicators.update')<x-ui.button tone="ghost" size="sm" icon="plus-circle" class="size-9!" wire:click="openProgressModal({{ $indicator->id }})" :aria-label="__('indicators.log_a_reading_for_name', ['name' => $indicator->name])" data-test="log-reading-button-{{ $indicator->id }}" />@endcan
+                            @can('indicators.update')<x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $indicator->id }})" :aria-label="__('common.edit_name', ['name' => $indicator->name])" />@endcan
                             @if ($row['targets'] === [])
-                                <x-ui.button tone="ghost" size="sm" icon="trash" class="size-9!" wire:click="confirmDelete({{ $indicator->id }})" :aria-label="__('common.delete_name', ['name' => $indicator->name])" />
+                                @can('indicators.delete')<x-ui.button tone="ghost" size="sm" icon="trash" class="size-9!" wire:click="confirmDelete({{ $indicator->id }})" :aria-label="__('common.delete_name', ['name' => $indicator->name])" />@endcan
                             @else
                                 <flux:tooltip :content="__('indicators.indicators_carrying_targets_cannot_be_deleted')">
                                     <span class="inline-flex size-9 cursor-not-allowed items-center justify-center text-secondary-light" aria-disabled="true">
@@ -1926,8 +1953,8 @@ new #[Title('titles.indicators')] class extends Component {
                                                 </span>
                                             @else
                                                 <span class="ms-auto inline-flex items-center gap-0.5">
-                                                    <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-7!" wire:click="openEditReadingModal({{ $entry['reading']->id }})" :aria-label="__('indicators.edit_reading_from_date', ['date' => $entry['reading']->date->translatedFormat(__('formats.date'))])" data-test="edit-reading-{{ $entry['reading']->id }}" />
-                                                    <x-ui.button tone="ghost" size="sm" icon="trash" class="size-7!" wire:click="confirmDeleteReading({{ $entry['reading']->id }})" :aria-label="__('indicators.delete_reading_from_date', ['date' => $entry['reading']->date->translatedFormat(__('formats.date'))])" data-test="delete-reading-{{ $entry['reading']->id }}" />
+                                                    @can('indicators.update')<x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-7!" wire:click="openEditReadingModal({{ $entry['reading']->id }})" :aria-label="__('indicators.edit_reading_from_date', ['date' => $entry['reading']->date->translatedFormat(__('formats.date'))])" data-test="edit-reading-{{ $entry['reading']->id }}" />@endcan
+                                                    @can('indicators.update')<x-ui.button tone="ghost" size="sm" icon="trash" class="size-7!" wire:click="confirmDeleteReading({{ $entry['reading']->id }})" :aria-label="__('indicators.delete_reading_from_date', ['date' => $entry['reading']->date->translatedFormat(__('formats.date'))])" data-test="delete-reading-{{ $entry['reading']->id }}" />@endcan
                                                 </span>
                                             @endif
                                         </div>
@@ -2067,9 +2094,9 @@ new #[Title('titles.indicators')] class extends Component {
                         {{ __('indicators.commit_a_target') }}
                     </x-ui.button>
                 @endif
-                <x-ui.button type="button" tone="primary" icon="plus-circle" wire:click="openProgressModal({{ $indicator->id }})">
+                @can('indicators.update')<x-ui.button type="button" tone="primary" icon="plus-circle" wire:click="openProgressModal({{ $indicator->id }})">
                     {{ __('indicators.log_reading') }}
-                </x-ui.button>
+                </x-ui.button>@endcan
             </x-slot:actions>
         @endif
     </x-ui.modal>

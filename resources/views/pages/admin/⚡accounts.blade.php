@@ -3,12 +3,14 @@
 use App\Enums\ArStatus;
 use App\Enums\Currency;
 use App\Models\Account;
+use App\Models\TransfersTracking;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
-use App\Models\TransfersTracking;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -27,6 +29,7 @@ new #[Title('titles.accounts')] class extends Component {
     public string $currencyFilter = '';
 
     public bool $showAccountModal = false;
+    #[Locked]
     public ?int $editingAccountId = null;
     public string $accountName = '';
     public string $bankName = '';
@@ -54,6 +57,7 @@ new #[Title('titles.accounts')] class extends Component {
      * Paired with $closingAccountId — see the flux:modal binding note below.
      */
     public bool $showCloseModal = false;
+    #[Locked]
     public ?int $closingAccountId = null;
 
     public function updatedSearch(): void
@@ -174,12 +178,16 @@ new #[Title('titles.accounts')] class extends Component {
 
     public function openCreateModal(): void
     {
+        Gate::authorize('accounts.create');
+
         $this->resetAccountForm();
         $this->showAccountModal = true;
     }
 
     public function openEditModal(int $accountId): void
     {
+        Gate::authorize('accounts.update');
+
         $account = Account::query()
             ->select(['id', 'account_name', 'bank_name', 'currency', 'authorized_person', 'account_number', 'iban', 'swift_code', 'country', 'po_box_street', 'company_address', 'opened_at', 'closed_at', 'is_active'])
             ->withCount('transfers')
@@ -206,6 +214,8 @@ new #[Title('titles.accounts')] class extends Component {
 
     public function saveAccount(): void
     {
+        Gate::authorize($this->editingAccountId === null ? 'accounts.create' : 'accounts.update');
+
         $this->accountName = trim($this->accountName);
         $this->bankName = trim($this->bankName);
         $this->authorizedPerson = trim($this->authorizedPerson);
@@ -269,6 +279,8 @@ new #[Title('titles.accounts')] class extends Component {
 
     public function confirmClose(int $accountId): void
     {
+        Gate::authorize('accounts.delete');
+
         $this->closingAccountId = $accountId;
         $this->showCloseModal = true;
     }
@@ -292,6 +304,9 @@ new #[Title('titles.accounts')] class extends Component {
         if ($this->closingAccountId === null) {
             return;
         }
+
+        // Closing is the account's end of life, so it sits behind accounts.delete.
+        Gate::authorize('accounts.delete');
 
         Account::query()->findOrFail($this->closingAccountId)->close();
 
@@ -375,11 +390,13 @@ new #[Title('titles.accounts')] class extends Component {
             </x-ui.header-filter-select>
         </x-slot:filters>
 
-        <x-slot:actions>
-            <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-account-button">
-                {{ __('accounts.open_account') }}
-            </x-ui.button>
-        </x-slot:actions>
+        @can('accounts.create')
+            <x-slot:actions>
+                <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-account-button">
+                    {{ __('accounts.open_account') }}
+                </x-ui.button>
+            </x-slot:actions>
+        @endcan
 
         <x-slot:summary>
             <div class="grid grid-cols-1 gap-4 @2xl/directory:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
@@ -513,10 +530,12 @@ new #[Title('titles.accounts')] class extends Component {
 
                         <div class="flex shrink-0 items-center gap-1">
                             <x-ui.button tone="ghost" size="sm" icon="eye" class="size-9!" :href="route('transfers.index', ['account' => $account->id])" wire:navigate :aria-label="__('accounts.view_transfers_for_name', ['name' => $account->account_name])" />
-                            <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $account->id }})" :aria-label="__('common.edit_name', ['name' => $account->account_name])" />
+                            @can('accounts.update')
+                                <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $account->id }})" :aria-label="__('common.edit_name', ['name' => $account->account_name])" />
+                            @endcan
 
-                            {{-- No delete anywhere: transfers_tracking.account_id RESTRICTs. --}}
-                            @if ($account->is_active)
+                            {{-- No delete anywhere: transfers_tracking.account_id RESTRICTs. Closing needs accounts.delete. --}}
+                            @if ($account->is_active && auth()->user()->can('accounts.delete'))
                                 <x-ui.button tone="ghost" size="sm" icon="lock-closed" class="size-9!" wire:click="confirmClose({{ $account->id }})" :aria-label="__('accounts.close_name', ['name' => $account->account_name])" />
                             @endif
                         </div>

@@ -5,7 +5,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
 test('a reading keeps its exact figure and its source of verification', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $indicatorId = insertIndicator(insertResult());
 
     $readingId = DB::table('indicator_progress')->insertGetId([
@@ -26,7 +26,7 @@ test('a reading keeps its exact figure and its source of verification', function
 });
 
 test('deleting an indicator deletes the readings taken against it', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $indicatorId = insertIndicator(insertResult());
     insertIndicatorProgress($indicatorId, $user->id);
 
@@ -36,7 +36,7 @@ test('deleting an indicator deletes the readings taken against it', function () 
 });
 
 test('a recorder is not deletable while their readings remain', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     insertIndicatorProgress(insertIndicator(insertResult()), $user->id);
 
     expect(fn () => DB::table('users')->where('id', $user->id)->delete())
@@ -63,7 +63,7 @@ test('an indicator carries an optional baseline target unit and frequency', func
 });
 
 test('an indicator scoped to a project loses that scope when the project goes', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $projectId = insertProject(insertCity(), insertProgram(insertStrategy(), $user->id), $user->id);
     $indicatorId = insertIndicator(insertResult());
 

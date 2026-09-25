@@ -8,10 +8,12 @@ use App\Models\Report;
 use App\Models\ReportFile;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -21,10 +23,12 @@ new #[Title('titles.report')] class extends Component {
     use ManagesReportForm;
     use WithFileUploads;
 
+    #[Locked]
     public int $reportId;
 
     public bool $showFileModal = false;
 
+    #[Locked]
     public ?int $editingFileId = null;
 
     /** @var TemporaryUploadedFile|null */
@@ -36,10 +40,12 @@ new #[Title('titles.report')] class extends Component {
 
     public bool $showDeleteFileModal = false;
 
+    #[Locked]
     public ?int $deletingFileId = null;
 
     public bool $showPreviewModal = false;
 
+    #[Locked]
     public ?int $previewingFileId = null;
 
     public function mount(Report $report): void
@@ -163,6 +169,8 @@ new #[Title('titles.report')] class extends Component {
             return;
         }
 
+        Gate::authorize('submit', $report);
+
         $report->fill([
             'status' => ReportStatus::Reviewed,
             'submit_date' => now()->toDateString(),
@@ -185,6 +193,8 @@ new #[Title('titles.report')] class extends Component {
         if ($report->status !== ReportStatus::Reviewed) {
             return;
         }
+
+        Gate::authorize('approve', $report);
 
         $report->fill(['status' => ReportStatus::Approved])->save();
 
@@ -209,6 +219,8 @@ new #[Title('titles.report')] class extends Component {
             return;
         }
 
+        Gate::authorize('returnToDraft', $report);
+
         $report->fill(['status' => ReportStatus::Draft, 'submit_date' => null])->save();
 
         unset($this->report);
@@ -225,7 +237,11 @@ new #[Title('titles.report')] class extends Component {
      */
     public function markSeenByMeal(): void
     {
-        Report::query()->findOrFail($this->reportId)->fill(['is_seen_by_meal' => true])->save();
+        $report = Report::query()->findOrFail($this->reportId);
+
+        Gate::authorize('markSeen', $report);
+
+        $report->fill(['is_seen_by_meal' => true])->save();
 
         unset($this->report);
 
@@ -238,6 +254,8 @@ new #[Title('titles.report')] class extends Component {
             return;
         }
 
+        Gate::authorize('update', $this->report);
+
         $this->resetFileForm();
         $this->fileDate = now()->toDateString();
         $this->showFileModal = true;
@@ -248,6 +266,8 @@ new #[Title('titles.report')] class extends Component {
         if (! $this->report->isEditable()) {
             return;
         }
+
+        Gate::authorize('update', $this->report);
 
         $file = $this->reportFile($fileId);
 
@@ -273,6 +293,8 @@ new #[Title('titles.report')] class extends Component {
 
             return;
         }
+
+        Gate::authorize('update', $this->report);
 
         $isCreate = $this->editingFileId === null;
         $allowedTypes = implode(',', FileType::values());
@@ -351,6 +373,8 @@ new #[Title('titles.report')] class extends Component {
             return;
         }
 
+        Gate::authorize('update', $this->report);
+
         $this->deletingFileId = $this->reportFile($fileId)->id;
         $this->showDeleteFileModal = true;
     }
@@ -365,6 +389,8 @@ new #[Title('titles.report')] class extends Component {
 
             return;
         }
+
+        Gate::authorize('update', $this->report);
 
         $file = $this->reportFile($this->deletingFileId);
 
@@ -547,7 +573,7 @@ new #[Title('titles.report')] class extends Component {
 
         <x-slot:actions>
             <x-ui.user-chip :user="$report->user" class="rounded-lg border border-secondary-soft p-2.5 dark:border-secondary-medium" />
-            @if ($planIndicator->source !== null)
+            @if ($planIndicator->source !== null && auth()->user()->can('create', App\Models\Report::class))
                 <x-ui.button icon="document-plus" wire:click="openCreateModal({{ $planIndicator->id }})" data-test="record-next-report-button">{{ __('reports.record_next_report') }}</x-ui.button>
             @endif
         </x-slot:actions>
@@ -676,26 +702,29 @@ new #[Title('titles.report')] class extends Component {
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
-                    @if ($report->isEditable())
+                    {{-- Maker-checker: the author changes and submits; a second person approves (see ReportPolicy). --}}
+                    @can('update', $report)
                         <x-ui.button size="sm" icon="pencil-square" wire:click="openEditModal({{ $report->id }})" data-test="edit-report-button">{{ __('reports.edit_report') }}</x-ui.button>
+                    @endcan
+                    @can('delete', $report)
                         <x-ui.button size="sm" icon="trash" wire:click="confirmDeleteReport({{ $report->id }})" data-test="delete-report-button">{{ __('reports.delete_report') }}</x-ui.button>
-                    @endif
+                    @endcan
 
-                    @if ($report->status === ReportStatus::Draft)
+                    @can('submit', $report)
                         <x-ui.button size="sm" tone="primary" icon="paper-airplane" wire:click="submitForReview" data-test="submit-for-review-button">{{ __('reports.submit_for_review') }}</x-ui.button>
-                    @endif
+                    @endcan
 
-                    @if ($report->status === ReportStatus::Reviewed)
+                    @can('approve', $report)
                         <x-ui.button size="sm" tone="primary" icon="check" wire:click="approve" data-test="approve-button">{{ __('reports.approve') }}</x-ui.button>
-                    @endif
+                    @endcan
 
-                    @if (in_array($report->status, [ReportStatus::Reviewed, ReportStatus::Approved], true))
+                    @can('returnToDraft', $report)
                         <x-ui.button size="sm" icon="arrow-uturn-left" class="rtl:[&_svg]:-scale-x-100" wire:click="returnToDraft" data-test="return-to-draft-button">{{ __('reports.return_to_draft') }}</x-ui.button>
-                    @endif
+                    @endcan
 
-                    @unless ($report->is_seen_by_meal)
+                    @if (! $report->is_seen_by_meal && auth()->user()->can('markSeen', $report))
                         <x-ui.button size="sm" icon="eye" wire:click="markSeenByMeal" data-test="mark-seen-button">{{ __('reports.mark_seen_by_meal') }}</x-ui.button>
-                    @endunless
+                    @endif
                 </div>
             </div>
         </div>
@@ -783,21 +812,21 @@ new #[Title('titles.report')] class extends Component {
     @endif
 
     <x-ui.panel :title="__('reports.supporting_files')" :count="$this->files->count()" :subtitle="__('reports.supporting_files_subtitle')">
-        @if ($report->isEditable())
+        @can('update', $report)
             <x-slot:toolbar>
                 <x-ui.button size="sm" tone="primary" icon="arrow-up-tray" wire:click="openCreateFileModal" data-test="create-file-button">
                     {{ __('reports.upload_file') }}
                 </x-ui.button>
             </x-slot:toolbar>
-        @endif
+        @endcan
 
         @if ($this->files->isEmpty())
             <x-ui.empty-state icon="paper-clip" :heading="__('common.no_files_recorded')" :body="__('reports.supporting_files_for_this_report_will_appear_here')">
-                @if ($report->isEditable())
+                @can('update', $report)
                     <x-slot:action>
                         <x-ui.button size="sm" tone="primary" icon="arrow-up-tray" wire:click="openCreateFileModal">{{ __('reports.upload_file') }}</x-ui.button>
                     </x-slot:action>
-                @endif
+                @endcan
             </x-ui.empty-state>
         @else
             <ul class="divide-y divide-secondary-soft dark:divide-secondary-medium">
@@ -858,10 +887,10 @@ new #[Title('titles.report')] class extends Component {
                                 </a>
                             @endif
 
-                            @if ($report->isEditable())
+                            @can('update', $report)
                                 <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-8!" wire:click="openEditFileModal({{ $file->id }})" :aria-label="__('common.edit_name', ['name' => $fileName])" data-test="edit-file-button" />
                                 <x-ui.button tone="ghost" size="sm" icon="trash" class="size-8! text-primary! hover:bg-status-critical-soft!" wire:click="confirmDeleteFile({{ $file->id }})" :aria-label="__('common.delete_name', ['name' => $fileName])" data-test="delete-file-button" />
-                            @endif
+                            @endcan
                         </div>
                     </li>
                 @endforeach

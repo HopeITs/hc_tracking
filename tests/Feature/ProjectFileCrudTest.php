@@ -11,7 +11,7 @@ use Livewire\Livewire;
 
 test('uploading a valid file creates a media row and writes the file to disk', function () {
     Storage::fake('local');
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $file = UploadedFile::fake()->create('signed-agreement.pdf', 100, 'application/pdf');
 
@@ -38,7 +38,7 @@ test('uploading a valid file creates a media row and writes the file to disk', f
 
 test('a display name typed without an extension keeps the uploaded files real extension, so the download filename still opens correctly', function () {
     Storage::fake('local');
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $file = UploadedFile::fake()->create('photo.jpg', 100, 'image/jpeg');
 
@@ -59,7 +59,7 @@ test('a display name typed without an extension keeps the uploaded files real ex
 
 test('uploading a file over 5mb fails validation and stores no row or disk file', function () {
     Storage::fake('local');
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $file = UploadedFile::fake()->create('too-big.pdf', 5121, 'application/pdf');
 
@@ -78,7 +78,7 @@ test('uploading a file over 5mb fails validation and stores no row or disk file'
 
 test('uploading a file with a disallowed extension fails validation and stores no row or disk file', function () {
     Storage::fake('local');
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $file = UploadedFile::fake()->create('script.exe', 100, 'application/x-msdownload');
 
@@ -95,7 +95,7 @@ test('uploading a file with a disallowed extension fails validation and stores n
 });
 
 test('editing a file updates its category and display name only', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $media = Media::factory()->inCollection(MediaCollection::Other)->create([
         'mediable_type' => 'project',
@@ -125,7 +125,7 @@ test('editing a file updates its category and display name only', function () {
 });
 
 test('editing a file with a display name that already carries the right extension does not double it', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $media = Media::factory()->create([
         'mediable_type' => 'project',
@@ -147,7 +147,7 @@ test('editing a file with a display name that already carries the right extensio
 
 test('deleting a file removes the media row and the file from disk', function () {
     Storage::fake('local');
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $path = 'media/projects/'.$project->id.'/doomed.pdf';
     Storage::disk('local')->put($path, 'content');
@@ -169,7 +169,7 @@ test('deleting a file removes the media row and the file from disk', function ()
 
 test('the download route streams a file that belongs to the project in the url', function () {
     Storage::fake('local');
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $path = 'media/projects/'.$project->id.'/report.pdf';
     Storage::disk('local')->put($path, 'file contents');
@@ -188,7 +188,7 @@ test('the download route streams a file that belongs to the project in the url',
 
 test('the download route returns 404 instead of crashing when the media row has no real file on disk', function () {
     Storage::fake('local');
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $media = Media::factory()->create([
         'mediable_type' => 'project',
@@ -203,7 +203,7 @@ test('the download route returns 404 instead of crashing when the media row has 
 
 test('the download route rejects a media id belonging to a different project', function () {
     Storage::fake('local');
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $otherProject = Project::factory()->create();
     $media = Media::factory()->create([
@@ -217,7 +217,7 @@ test('the download route rejects a media id belonging to a different project', f
 });
 
 test('editing and deleting reject a media id belonging to a different project', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $otherProject = Project::factory()->create();
     $media = Media::factory()->create([

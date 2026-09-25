@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
@@ -30,6 +31,7 @@ new #[Title('titles.funding_agreement')] class extends Component {
         saveTransfer as private saveTransferForAgreement;
     }
 
+    #[Locked]
     public int $agreementId;
 
     /** How many days ahead a term end counts as close enough to warn about. */

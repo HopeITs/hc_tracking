@@ -2,6 +2,7 @@
 
 use App\Enums\IndicatorMeasure;
 use App\Enums\Period;
+use App\Models\AnnualPlan;
 use App\Models\Donor;
 use App\Models\Indicator;
 use App\Models\PlanIndicator;
@@ -9,16 +10,17 @@ use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Report;
-use App\Models\AnnualPlan;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -79,7 +81,9 @@ new #[Title('titles.targets')] class extends Component {
     public string $result = '';
 
     public bool $showTargetModal = false;
+    #[Locked]
     public ?int $editingTargetId = null;
+    #[Locked]
     public ?int $deletingTargetId = null;
     public bool $showDeleteModal = false;
     public ?int $expandedTargetId = null;
@@ -97,7 +101,7 @@ new #[Title('titles.targets')] class extends Component {
      */
     public function mount(): void
     {
-        if (request()->boolean('create')) {
+        if (request()->boolean('create') && Gate::allows('targets.create')) {
             $this->openCreateModal();
 
             if ($this->indicator !== '' && Indicator::query()->whereKey((int) $this->indicator)->exists()) {
@@ -621,12 +625,16 @@ new #[Title('titles.targets')] class extends Component {
 
     public function openCreateModal(): void
     {
+        Gate::authorize('targets.create');
+
         $this->resetTargetForm();
         $this->showTargetModal = true;
     }
 
     public function openEditModal(int $targetId): void
     {
+        Gate::authorize('targets.update');
+
         $target = PlanIndicator::query()
             ->select(['id', 'source_type', 'source_id', 'indicator_id', 'target', 'project_id', 'period'])
             ->findOrFail($targetId);
@@ -645,6 +653,8 @@ new #[Title('titles.targets')] class extends Component {
 
     public function saveTarget(): void
     {
+        Gate::authorize($this->editingTargetId === null ? 'targets.create' : 'targets.update');
+
         $validated = $this->validate([
             'targetSourceType' => ['required', Rule::in(self::SOURCE_TYPES)],
             'targetSourceId' => ['required', 'integer'],
@@ -758,6 +768,8 @@ new #[Title('titles.targets')] class extends Component {
 
     public function confirmDelete(int $targetId): void
     {
+        Gate::authorize('targets.delete');
+
         $this->deletingTargetId = $targetId;
         $this->showDeleteModal = true;
     }
@@ -770,6 +782,8 @@ new #[Title('titles.targets')] class extends Component {
 
     public function deleteTarget(): void
     {
+        Gate::authorize('targets.delete');
+
         if ($this->deletingTargetId === null) {
             return;
         }
@@ -892,9 +906,9 @@ new #[Title('titles.targets')] class extends Component {
         </x-slot:filters>
 
         <x-slot:actions>
-            <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-target-button">
+            @can('targets.create')<x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-target-button">
                 {{ __('targets.commit_target') }}
-            </x-ui.button>
+            </x-ui.button>@endcan
         </x-slot:actions>
     </x-ui.page-header>
 
@@ -1174,10 +1188,10 @@ new #[Title('titles.targets')] class extends Component {
                                                     <x-ui.button tone="ghost" size="sm" icon="document-plus" class="size-9!" :href="route('reports.index', ['create' => 1, 'target' => $target->id])" wire:navigate :aria-label="__('targets.record_a_report_for', ['indicator' => $targetIndicator->name])" data-test="record-report-{{ $target->id }}" />
                                                 </flux:tooltip>
                                             @endif
-                                            <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $target->id }})" :aria-label="__('targets.edit_target')" />
+                                            @can('targets.update')<x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $target->id }})" :aria-label="__('targets.edit_target')" />@endcan
 
                                             @if ($target->reports_count === 0)
-                                                <x-ui.button tone="ghost" size="sm" icon="trash" class="size-9!" wire:click="confirmDelete({{ $target->id }})" :aria-label="__('targets.delete_target')" />
+                                                @can('targets.delete')<x-ui.button tone="ghost" size="sm" icon="trash" class="size-9!" wire:click="confirmDelete({{ $target->id }})" :aria-label="__('targets.delete_target')" />@endcan
                                             @else
                                                 <flux:tooltip :content="__('targets.targets_that_have_been_reported_against_cannot_be_deleted')">
                                                     <span class="inline-flex size-9 cursor-not-allowed items-center justify-center text-secondary-light" aria-disabled="true">

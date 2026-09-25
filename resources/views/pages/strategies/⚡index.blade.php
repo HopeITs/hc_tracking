@@ -7,6 +7,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -22,8 +23,10 @@ new #[Title('titles.strategies')] class extends Component {
     public string $status = '';
 
     public bool $showStrategyModal = false;
+    #[Locked]
     public ?int $editingStrategyId = null;
     public bool $showDeleteModal = false;
+    #[Locked]
     public ?int $deletingStrategyId = null;
     public string $name = '';
     public string $startYear = '';

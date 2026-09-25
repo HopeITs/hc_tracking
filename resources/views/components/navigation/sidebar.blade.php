@@ -79,278 +79,326 @@
                 {{ __('common.dashboard') }}
             </flux:sidebar.item>
 
-            <flux:sidebar.item
-                icon="chart-pie"
-                :href="route('executive-summary.index')"
-                :current="request()->routeIs('executive-summary.*')"
-                :class="$navigationItemClasses"
-                wire:navigate
-            >
-                {{ __('common.executive_summary') }}
-            </flux:sidebar.item>
+            @can('executive-summary.view')
+                <flux:sidebar.item
+                    icon="chart-pie"
+                    :href="route('executive-summary.index')"
+                    :current="request()->routeIs('executive-summary.*')"
+                    :class="$navigationItemClasses"
+                    wire:navigate
+                >
+                    {{ __('common.executive_summary') }}
+                </flux:sidebar.item>
+            @endcan
 
-            <flux:sidebar.item
-                icon="calendar"
-                :href="route('calendar.index')"
-                :current="request()->routeIs('calendar.*')"
-                :class="$navigationItemClasses"
-                wire:navigate
-            >
-                {{ __('common.my_calendar') }}
-            </flux:sidebar.item>
+            @can('calendar.view')
+                <flux:sidebar.item
+                    icon="calendar"
+                    :href="route('calendar.index')"
+                    :current="request()->routeIs('calendar.*')"
+                    :class="$navigationItemClasses"
+                    wire:navigate
+                >
+                    {{ __('common.my_calendar') }}
+                </flux:sidebar.item>
+            @endcan
         </flux:sidebar.group>
 
-        <flux:sidebar.group
-            :heading="__('common.strategy')"
-            :class="$navigationGroupClasses"
-        >
-            <flux:sidebar.item
-                icon="chart-bar-square"
-                :href="route('strategies.index')"
-                :current="request()->routeIs('strategies.*')"
-                :class="$navigationItemClasses"
-                wire:navigate
+        @canany(['strategies.view', 'programs.view', 'annual-plans.view'])
+            <flux:sidebar.group
+                :heading="__('common.strategy')"
+                :class="$navigationGroupClasses"
             >
-                {{ __('common.strategies') }}
-                <x-slot:icon-trailing>
-                    <x-notifications.module-badge module="strategies" :count="$moduleCounts['strategies'] ?? 0" />
-                </x-slot:icon-trailing>
-            </flux:sidebar.item>
+                @can('strategies.view')
+                    <flux:sidebar.item
+                        icon="chart-bar-square"
+                        :href="route('strategies.index')"
+                        :current="request()->routeIs('strategies.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate
+                    >
+                        {{ __('common.strategies') }}
+                        <x-slot:icon-trailing>
+                            <x-notifications.module-badge module="strategies" :count="$moduleCounts['strategies'] ?? 0" />
+                        </x-slot:icon-trailing>
+                    </flux:sidebar.item>
+                @endcan
 
-            <flux:sidebar.item
-                icon="briefcase"
-                :href="route('programs.index')"
-                :current="request()->routeIs('programs.*')"
-                :class="$navigationItemClasses"
-                wire:navigate
-            >
-                {{ __('common.programs') }}
-                <x-slot:icon-trailing>
-                    <x-notifications.module-badge module="programs" :count="$moduleCounts['programs'] ?? 0" />
-                </x-slot:icon-trailing>
-            </flux:sidebar.item>
+                @can('programs.view')
+                    <flux:sidebar.item
+                        icon="briefcase"
+                        :href="route('programs.index')"
+                        :current="request()->routeIs('programs.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate
+                    >
+                        {{ __('common.programs') }}
+                        <x-slot:icon-trailing>
+                            <x-notifications.module-badge module="programs" :count="$moduleCounts['programs'] ?? 0" />
+                        </x-slot:icon-trailing>
+                    </flux:sidebar.item>
+                @endcan
 
-            <flux:sidebar.item
-                icon="calendar-days"
-                :href="route('annual-plans.index')"
-                :current="request()->routeIs('annual-plans.*')"
-                :class="$navigationItemClasses"
-                wire:navigate
-            >
-                {{ __('common.annual_plans') }}
-                <x-slot:icon-trailing>
-                    <x-notifications.module-badge module="annual-plans" :count="$moduleCounts['annual-plans'] ?? 0" />
-                </x-slot:icon-trailing>
-            </flux:sidebar.item>
-        </flux:sidebar.group>
+                @can('annual-plans.view')
+                    <flux:sidebar.item
+                        icon="calendar-days"
+                        :href="route('annual-plans.index')"
+                        :current="request()->routeIs('annual-plans.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate
+                    >
+                        {{ __('common.annual_plans') }}
+                        <x-slot:icon-trailing>
+                            <x-notifications.module-badge module="annual-plans" :count="$moduleCounts['annual-plans'] ?? 0" />
+                        </x-slot:icon-trailing>
+                    </flux:sidebar.item>
+                @endcan
+            </flux:sidebar.group>
+        @endcanany
 
-        <flux:sidebar.group
-            :heading="__('common.delivery')"
-            :class="$navigationGroupClasses"
-        >
-            <flux:sidebar.item
-                icon="rectangle-stack"
-                :href="route('projects.index')"
-                :current="request()->routeIs('projects.*')"
-                :class="$navigationItemClasses"
-                wire:navigate
+        @canany(['projects.view', 'milestones.view', 'tasks.view', 'risks.view'])
+            <flux:sidebar.group
+                :heading="__('common.delivery')"
+                :class="$navigationGroupClasses"
             >
-                {{ __('common.projects') }}
-                <x-slot:icon-trailing>
-                    <x-notifications.module-badge module="projects" :count="$moduleCounts['projects'] ?? 0" />
-                </x-slot:icon-trailing>
-            </flux:sidebar.item>
+                @can('projects.view')
+                    <flux:sidebar.item
+                        icon="rectangle-stack"
+                        :href="route('projects.index')"
+                        :current="request()->routeIs('projects.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate
+                    >
+                        {{ __('common.projects') }}
+                        <x-slot:icon-trailing>
+                            <x-notifications.module-badge module="projects" :count="$moduleCounts['projects'] ?? 0" />
+                        </x-slot:icon-trailing>
+                    </flux:sidebar.item>
+                @endcan
 
-            <flux:sidebar.item
-                icon="chart-bar-square"
-                :href="route('timeline.index')"
-                :current="request()->routeIs('timeline.*')"
-                :class="$navigationItemClasses"
-                wire:navigate
-            >
-                {{ __('titles.timeline') }}
-            </flux:sidebar.item>
+                @can('projects.view')
+                    <flux:sidebar.item
+                        icon="chart-bar-square"
+                        :href="route('timeline.index')"
+                        :current="request()->routeIs('timeline.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate
+                    >
+                        {{ __('titles.timeline') }}
+                    </flux:sidebar.item>
+                @endcan
 
-            <flux:sidebar.item
-                icon="flag"
-                :href="route('milestones.index')"
-                :current="request()->routeIs('milestones.*')"
-                :class="$navigationItemClasses"
-                wire:navigate
-            >
-                {{ __('common.milestones') }}
-                <x-slot:icon-trailing>
-                    <x-notifications.module-badge module="milestones" :count="$moduleCounts['milestones'] ?? 0" />
-                </x-slot:icon-trailing>
-            </flux:sidebar.item>
+                @can('milestones.view')
+                    <flux:sidebar.item
+                        icon="flag"
+                        :href="route('milestones.index')"
+                        :current="request()->routeIs('milestones.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate
+                    >
+                        {{ __('common.milestones') }}
+                        <x-slot:icon-trailing>
+                            <x-notifications.module-badge module="milestones" :count="$moduleCounts['milestones'] ?? 0" />
+                        </x-slot:icon-trailing>
+                    </flux:sidebar.item>
+                @endcan
 
-            <flux:sidebar.item
-                icon="clipboard-document-check"
-                :href="route('tasks.index')"
-                :current="request()->routeIs('tasks.*')"
-                :class="$navigationItemClasses"
-                wire:navigate
-            >
-                {{ __('common.tasks') }}
-                <x-slot:icon-trailing>
-                    <x-notifications.module-badge module="tasks" :count="$moduleCounts['tasks'] ?? 0" />
-                </x-slot:icon-trailing>
-            </flux:sidebar.item>
+                @can('tasks.view')
+                    <flux:sidebar.item
+                        icon="clipboard-document-check"
+                        :href="route('tasks.index')"
+                        :current="request()->routeIs('tasks.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate
+                    >
+                        {{ __('common.tasks') }}
+                        <x-slot:icon-trailing>
+                            <x-notifications.module-badge module="tasks" :count="$moduleCounts['tasks'] ?? 0" />
+                        </x-slot:icon-trailing>
+                    </flux:sidebar.item>
+                @endcan
 
-            <flux:sidebar.item
-                icon="exclamation-triangle"
-                :href="route('risks.index')"
-                :current="request()->routeIs('risks.*')"
-                :class="$navigationItemClasses"
-                wire:navigate
-            >
-                {{ __('common.risks') }}
-                <x-slot:icon-trailing>
-                    <x-notifications.module-badge module="risks" :count="$moduleCounts['risks'] ?? 0" />
-                </x-slot:icon-trailing>
-            </flux:sidebar.item>
-        </flux:sidebar.group>
+                @can('risks.view')
+                    <flux:sidebar.item
+                        icon="exclamation-triangle"
+                        :href="route('risks.index')"
+                        :current="request()->routeIs('risks.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate
+                    >
+                        {{ __('common.risks') }}
+                        <x-slot:icon-trailing>
+                            <x-notifications.module-badge module="risks" :count="$moduleCounts['risks'] ?? 0" />
+                        </x-slot:icon-trailing>
+                    </flux:sidebar.item>
+                @endcan
+            </flux:sidebar.group>
+        @endcanany
 
-        <flux:sidebar.group
-            :heading="__('navigation.results_learning')"
-            :class="$navigationGroupClasses"
-        >
-            <flux:sidebar.item
-                icon="chart-bar"
-                :href="route('results.index')"
-                :current="request()->routeIs('results.*')"
-                :class="$navigationItemClasses"
-                wire:navigate
+        @canany(['results.view', 'indicators.view', 'targets.view', 'reports.view'])
+            <flux:sidebar.group
+                :heading="__('navigation.results_learning')"
+                :class="$navigationGroupClasses"
             >
-                {{ __('common.results_framework') }}
-                <x-slot:icon-trailing>
-                    <x-notifications.module-badge module="results" :count="$moduleCounts['results'] ?? 0" />
-                </x-slot:icon-trailing>
-            </flux:sidebar.item>
+                @can('results.view')
+                    <flux:sidebar.item
+                        icon="chart-bar"
+                        :href="route('results.index')"
+                        :current="request()->routeIs('results.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate
+                    >
+                        {{ __('common.results_framework') }}
+                        <x-slot:icon-trailing>
+                            <x-notifications.module-badge module="results" :count="$moduleCounts['results'] ?? 0" />
+                        </x-slot:icon-trailing>
+                    </flux:sidebar.item>
+                @endcan
 
-            <flux:sidebar.item
-                icon="variable"
-                :href="route('indicators.index')"
-                :current="request()->routeIs('indicators.*')"
-                :class="$navigationItemClasses"
-                wire:navigate
-            >
-                {{ __('common.indicators') }}
-                <x-slot:icon-trailing>
-                    <x-notifications.module-badge module="indicators" :count="$moduleCounts['indicators'] ?? 0" />
-                </x-slot:icon-trailing>
-            </flux:sidebar.item>
+                @can('indicators.view')
+                    <flux:sidebar.item
+                        icon="variable"
+                        :href="route('indicators.index')"
+                        :current="request()->routeIs('indicators.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate
+                    >
+                        {{ __('common.indicators') }}
+                        <x-slot:icon-trailing>
+                            <x-notifications.module-badge module="indicators" :count="$moduleCounts['indicators'] ?? 0" />
+                        </x-slot:icon-trailing>
+                    </flux:sidebar.item>
+                @endcan
 
-            <flux:sidebar.item
-                icon="flag"
-                :href="route('targets.index')"
-                :current="request()->routeIs('targets.*')"
-                :class="$navigationItemClasses"
-                wire:navigate
-            >
-                {{ __('common.targets') }}
-                <x-slot:icon-trailing>
-                    <x-notifications.module-badge module="targets" :count="$moduleCounts['targets'] ?? 0" />
-                </x-slot:icon-trailing>
-            </flux:sidebar.item>
+                @can('targets.view')
+                    <flux:sidebar.item
+                        icon="flag"
+                        :href="route('targets.index')"
+                        :current="request()->routeIs('targets.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate
+                    >
+                        {{ __('common.targets') }}
+                        <x-slot:icon-trailing>
+                            <x-notifications.module-badge module="targets" :count="$moduleCounts['targets'] ?? 0" />
+                        </x-slot:icon-trailing>
+                    </flux:sidebar.item>
+                @endcan
 
-            <flux:sidebar.item
-                icon="document-chart-bar"
-                :href="route('reports.index')"
-                :current="request()->routeIs('reports.*')"
-                :class="$navigationItemClasses"
-                wire:navigate
-            >
-                {{ __('common.reports') }}
-                <x-slot:icon-trailing>
-                    <x-notifications.module-badge module="reports" :count="$moduleCounts['reports'] ?? 0" />
-                </x-slot:icon-trailing>
-            </flux:sidebar.item>
-        </flux:sidebar.group>
+                @can('reports.view')
+                    <flux:sidebar.item
+                        icon="document-chart-bar"
+                        :href="route('reports.index')"
+                        :current="request()->routeIs('reports.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate
+                    >
+                        {{ __('common.reports') }}
+                        <x-slot:icon-trailing>
+                            <x-notifications.module-badge module="reports" :count="$moduleCounts['reports'] ?? 0" />
+                        </x-slot:icon-trailing>
+                    </flux:sidebar.item>
+                @endcan
+            </flux:sidebar.group>
+        @endcanany
 
-        <flux:sidebar.group
-            :heading="__('common.funding')"
-            :class="$navigationGroupClasses"
-        >
-            <flux:sidebar.item
-                icon="document-text"
-                :href="route('proposals.index')"
-                :current="request()->routeIs('proposals.*')"
-                :class="$navigationItemClasses"
-                wire:navigate
+        @canany(['proposals.view', 'donors.view', 'funding-agreements.view', 'transfers.view'])
+            <flux:sidebar.group
+                :heading="__('common.funding')"
+                :class="$navigationGroupClasses"
             >
-                {{ __('common.proposals') }}
-                <x-slot:icon-trailing>
-                    <x-notifications.module-badge module="proposals" :count="$moduleCounts['proposals'] ?? 0" />
-                </x-slot:icon-trailing>
-            </flux:sidebar.item>
+                @can('proposals.view')
+                    <flux:sidebar.item
+                        icon="document-text"
+                        :href="route('proposals.index')"
+                        :current="request()->routeIs('proposals.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate
+                    >
+                        {{ __('common.proposals') }}
+                        <x-slot:icon-trailing>
+                            <x-notifications.module-badge module="proposals" :count="$moduleCounts['proposals'] ?? 0" />
+                        </x-slot:icon-trailing>
+                    </flux:sidebar.item>
+                @endcan
 
-            <flux:sidebar.item
-                icon="building-library"
-                :href="route('donors.index')"
-                :current="request()->routeIs('donors.*')"
-                :class="$navigationItemClasses"
-                wire:navigate
-            >
-                {{ __('common.donors') }}
-                <x-slot:icon-trailing>
-                    <x-notifications.module-badge module="donors" :count="$moduleCounts['donors'] ?? 0" />
-                </x-slot:icon-trailing>
-            </flux:sidebar.item>
+                @can('donors.view')
+                    <flux:sidebar.item
+                        icon="building-library"
+                        :href="route('donors.index')"
+                        :current="request()->routeIs('donors.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate
+                    >
+                        {{ __('common.donors') }}
+                        <x-slot:icon-trailing>
+                            <x-notifications.module-badge module="donors" :count="$moduleCounts['donors'] ?? 0" />
+                        </x-slot:icon-trailing>
+                    </flux:sidebar.item>
+                @endcan
 
-            <flux:sidebar.item
-                icon="banknotes"
-                :href="route('funding-agreements.index')"
-                :current="request()->routeIs('funding-agreements.*')"
-                :class="$navigationItemClasses"
-                wire:navigate
-            >
-                {{ __('common.funding_agreements') }}
-                <x-slot:icon-trailing>
-                    <x-notifications.module-badge module="funding-agreements" :count="$moduleCounts['funding-agreements'] ?? 0" />
-                </x-slot:icon-trailing>
-            </flux:sidebar.item>
+                @can('funding-agreements.view')
+                    <flux:sidebar.item
+                        icon="banknotes"
+                        :href="route('funding-agreements.index')"
+                        :current="request()->routeIs('funding-agreements.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate
+                    >
+                        {{ __('common.funding_agreements') }}
+                        <x-slot:icon-trailing>
+                            <x-notifications.module-badge module="funding-agreements" :count="$moduleCounts['funding-agreements'] ?? 0" />
+                        </x-slot:icon-trailing>
+                    </flux:sidebar.item>
+                @endcan
 
-            <flux:sidebar.item
-                icon="arrow-right-circle"
-                :href="route('transfers.index')"
-                :current="request()->routeIs('transfers.*')"
-                :class="$navigationItemClasses.' rtl:[&_svg]:-scale-x-100'"
-                wire:navigate
-            >
-                {{ __('common.transfers') }}
-                <x-slot:icon-trailing>
-                    <x-notifications.module-badge module="transfers" :count="$moduleCounts['transfers'] ?? 0" />
-                </x-slot:icon-trailing>
-            </flux:sidebar.item>
-        </flux:sidebar.group>
+                @can('transfers.view')
+                    <flux:sidebar.item
+                        icon="arrow-right-circle"
+                        :href="route('transfers.index')"
+                        :current="request()->routeIs('transfers.*')"
+                        :class="$navigationItemClasses.' rtl:[&_svg]:-scale-x-100'"
+                        wire:navigate
+                    >
+                        {{ __('common.transfers') }}
+                        <x-slot:icon-trailing>
+                            <x-notifications.module-badge module="transfers" :count="$moduleCounts['transfers'] ?? 0" />
+                        </x-slot:icon-trailing>
+                    </flux:sidebar.item>
+                @endcan
+            </flux:sidebar.group>
+        @endcanany
 
         <flux:sidebar.group
             :heading="__('navigation.administration')"
             :class="$navigationGroupClasses"
         >
-            <flux:sidebar.item
-                icon="credit-card"
-                :href="route('admin.accounts.index')"
-                :current="request()->routeIs('admin.accounts.*')"
-                :class="$navigationItemClasses"
-                wire:navigate
-            >
-                {{ __('common.accounts') }}
-                <x-slot:icon-trailing>
-                    <x-notifications.module-badge module="accounts" :count="$moduleCounts['accounts'] ?? 0" />
-                </x-slot:icon-trailing>
-            </flux:sidebar.item>
+            @can('accounts.view')
+                <flux:sidebar.item
+                    icon="credit-card"
+                    :href="route('admin.accounts.index')"
+                    :current="request()->routeIs('admin.accounts.*')"
+                    :class="$navigationItemClasses"
+                    wire:navigate
+                >
+                    {{ __('common.accounts') }}
+                    <x-slot:icon-trailing>
+                        <x-notifications.module-badge module="accounts" :count="$moduleCounts['accounts'] ?? 0" />
+                    </x-slot:icon-trailing>
+                </flux:sidebar.item>
+            @endcan
 
-            <flux:sidebar.item
-                icon="map-pin"
-                :href="route('admin.cities.index')"
-                :current="request()->routeIs('admin.cities.*')"
-                :class="$navigationItemClasses"
-                wire:navigate
-            >
-                {{ __('common.cities') }}
-            </flux:sidebar.item>
+            @can('cities.view')
+                <flux:sidebar.item
+                    icon="map-pin"
+                    :href="route('admin.cities.index')"
+                    :current="request()->routeIs('admin.cities.*')"
+                    :class="$navigationItemClasses"
+                    wire:navigate
+                >
+                    {{ __('common.cities') }}
+                </flux:sidebar.item>
+            @endcan
 
             @can('view-activity-log')
                 <flux:sidebar.item

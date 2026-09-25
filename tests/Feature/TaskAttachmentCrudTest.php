@@ -157,9 +157,13 @@ test('a reference-only attachment record can still be deleted', function () {
 });
 
 test('a user without update permission cannot open the upload, edit or delete actions', function (string $method, array $args) {
+    // An assignee sees the task but holds no right to change its files.
+    $employeeId = insertHrEmployee();
+    $assignee = User::factory()->role('Team Member')->create(['employee_id' => $employeeId]);
     $task = Task::factory()->create();
+    $task->taskAssignees()->create(['employee_id' => $employeeId]);
 
-    Livewire::actingAs(User::factory()->create())
+    Livewire::actingAs($assignee)
         ->test('pages::tasks.show', ['task' => $task])
         ->call($method, ...$args)
         ->assertForbidden();
@@ -262,7 +266,7 @@ test('the preview modal renders the right viewer and steps between files', funct
 });
 
 test('opening a preview refuses an attachment from another task', function () {
-    Livewire::actingAs(User::factory()->create())
+    Livewire::actingAs(User::factory()->role('Super Admin')->create())
         ->test('pages::tasks.show', ['task' => Task::factory()->create()])
         ->call('openPreview', TaskAttachment::factory()->create()->id)
         ->assertNotFound();

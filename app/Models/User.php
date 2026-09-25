@@ -165,7 +165,8 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
      * The tracking user for an HR account, created on first use.
      *
      * Only active HR accounts (see HrUser::isActive()) may use tracking; the
-     * caller checks that first. A new user starts with no role, except an email
+     * caller checks that first. A new user starts with the default role
+     * (config('access-control.default_role'), Team Member), except an email
      * listed in auth.hr_admin_emails, which starts as Super Admin.
      */
     public static function forHrAccount(HrUser $hrUser): self
@@ -178,7 +179,7 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
 
         $role = in_array(mb_strtolower($hrUser->email), config('auth.hr_admin_emails', []), true)
             ? 'Super Admin'
-            : null;
+            : (string) config('access-control.default_role');
 
         return static::createFromHrAccount($hrUser, $role);
     }
@@ -450,7 +451,65 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
      */
     public function departmentId(): ?int
     {
-        return $this->employee?->currentDepartmentId();
+        // An explicit load, not a lazy one: this runs for users read in bulk
+        // too (notification recipients), where lazy loading is refused.
+        return $this->loadMissing('employee')->employee?->currentDepartmentId();
+    }
+
+    /**
+     * HR employee ids in this user's current department. Memoized per user
+     * instance, since task visibility reads it on every task query.
+     *
+     * @return list<int>
+     */
+    public function departmentEmployeeIds(): array
+    {
+        return once(function (): array {
+            $departmentId = $this->departmentId();
+
+            return $departmentId === null
+                ? []
+                : array_map('intval', HrDepartment::employeeIdsInDepartment($departmentId));
+        });
+    }
+
+    /**
+     * Programs this user manages (programs.manager_id is their HR employee).
+     * Memoized per user instance.
+     *
+     * @return list<int>
+     */
+    public function managedProgramIds(): array
+    {
+        return once(fn (): array => $this->employee_id === null
+            ? []
+            : array_values(Program::query()->where('manager_id', $this->employee_id)->pluck('id')->map(fn (mixed $id): int => (int) $id)->all()));
+    }
+
+    /**
+     * Projects this user answers for: the ones they own (projects.user_id is
+     * their HR employee) and every project in a program they manage.
+     * Memoized per user instance.
+     *
+     * @return list<int>
+     */
+    public function ownedProjectIds(): array
+    {
+        return once(function (): array {
+            if ($this->employee_id === null) {
+                return [];
+            }
+
+            $programIds = $this->managedProgramIds();
+
+            return array_values(Project::query()
+                ->where(fn (Builder $query) => $query
+                    ->where('user_id', $this->employee_id)
+                    ->when($programIds !== [], fn (Builder $query) => $query->orWhereIn('program_id', $programIds)))
+                ->pluck('id')
+                ->map(fn (mixed $id): int => (int) $id)
+                ->all());
+        });
     }
 
     /**
@@ -468,13 +527,14 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
      * Whether this user's default task visibility is hard-scoped to their
      * own HR department, with no filter able to widen it.
      *
-     * Only the named team roles are scoped this way. Anyone else — an
-     * elevated role, or an account holding no role at all yet — sees every
-     * department unfiltered.
+     * Only the named team roles are scoped this way, and a bypass role always
+     * wins: someone holding both (e.g. Managers and Team Member) sees every
+     * department. An account holding neither sees every department too.
      */
     public function isTaskDepartmentScoped(): bool
     {
-        return $this->hasAnyRole(config('access-control.task_department_scoped_roles', []));
+        return $this->hasAnyRole(config('access-control.task_department_scoped_roles', []))
+            && ! $this->canViewAllTaskDepartments();
     }
 
     /**

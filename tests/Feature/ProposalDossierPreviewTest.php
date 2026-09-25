@@ -45,7 +45,7 @@ function fundedProposal(array $attributes = [], string $budget = '500000.00'): a
 }
 
 test('every connection renders at once with no tab to click', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     [$proposal, $agreement] = fundedProposal();
 
     $project = Project::factory()->create(['name' => 'Aleppo Water Points']);
@@ -74,7 +74,7 @@ test('every connection renders at once with no tab to click', function () {
 });
 
 test('funding is totalled per currency and never summed across them', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $proposal = Proposal::factory()->create();
 
     DonorProposal::factory()->create([
@@ -103,7 +103,7 @@ test('funding is totalled per currency and never summed across them', function (
 });
 
 test('a tranche that has arrived shows what was sent and what actually landed', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     [$proposal, $agreement] = fundedProposal();
 
     TransfersTracking::factory()
@@ -124,7 +124,7 @@ test('a tranche that has arrived shows what was sent and what actually landed', 
 });
 
 test('a pending tranche past its scheduled date is called overdue', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     [$proposal, $agreement] = fundedProposal();
 
     TransfersTracking::factory()->create([
@@ -142,7 +142,7 @@ test('a pending tranche past its scheduled date is called overdue', function () 
 });
 
 test('a tranche still to come is not reported as money received', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     [$proposal, $agreement] = fundedProposal();
 
     // The factory fills net_amount_received even on a pending tranche, so the
@@ -161,7 +161,7 @@ test('a tranche still to come is not reported as money received', function () {
 });
 
 test('the planned window places today between the planned dates', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     [$proposal] = fundedProposal([
         'planned_date_begin' => now()->subDays(100)->toDateString(),
@@ -175,7 +175,7 @@ test('the planned window places today between the planned dates', function () {
 });
 
 test('a proposal past its planned end says so rather than counting days left', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     [$proposal] = fundedProposal([
         'planned_date_begin' => now()->subDays(400)->toDateString(),
@@ -188,7 +188,7 @@ test('a proposal past its planned end says so rather than counting days left', f
 });
 
 test('delivery counts what is finished and what is overdue', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $proposal = Proposal::factory()->create();
 
     Task::factory()->completed()->create(['source_type' => 'proposal', 'source_id' => $proposal->id, 'title' => 'Signed agreement filed']);
@@ -207,7 +207,7 @@ test('delivery counts what is finished and what is overdue', function () {
 });
 
 test('a target reports what approved reports achieved against what was committed', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $proposal = Proposal::factory()->create();
 
     $target = PlanIndicator::factory()->forProposal($proposal)->create([
@@ -226,7 +226,7 @@ test('a target reports what approved reports achieved against what was committed
 });
 
 test('a report still awaiting approval is not counted as achievement', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $proposal = Proposal::factory()->create();
 
     $target = PlanIndicator::factory()->forProposal($proposal)->create([
@@ -243,7 +243,7 @@ test('a report still awaiting approval is not counted as achievement', function 
 });
 
 test('the proposal notes are shown when there are any', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $proposal = Proposal::factory()->create(['notes' => 'Co-funded with the 2026 resilience window.']);
 
     Livewire::actingAs($user)
@@ -252,7 +252,7 @@ test('the proposal notes are shown when there are any', function () {
 });
 
 test('the lifecycle spine dates the stops the proposal has reached', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $proposal = Proposal::factory()->create(['status' => ProposalStatus::Approved]);
 
     ProposalStatusNote::factory()->create([
@@ -271,7 +271,7 @@ test('the lifecycle spine dates the stops the proposal has reached', function ()
 });
 
 test('changing status updates the proposal and appends an audit note in one act', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $proposal = Proposal::factory()->create(['status' => ProposalStatus::ProposalDraft]);
 
     Livewire::actingAs($user)
@@ -292,7 +292,7 @@ test('changing status updates the proposal and appends an audit note in one act'
 });
 
 test('a status change with no context is rejected and changes nothing', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $proposal = Proposal::factory()->create(['status' => ProposalStatus::ProposalDraft]);
 
     Livewire::actingAs($user)
@@ -309,7 +309,7 @@ test('a status change with no context is rejected and changes nothing', function
 });
 
 test('a proposal with nothing attached still renders every section', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $proposal = Proposal::factory()->create(['name' => 'Bare Proposal']);
 
     $this->actingAs($user)

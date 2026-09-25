@@ -27,6 +27,12 @@
     };
     $assignedIds = $task->taskAssignees->pluck('employee_id')->all();
     $assignees = $task->taskAssignees->pluck('employee')->filter();
+    // What the viewer may do to this row (TaskPolicy): editors change every
+    // field, assignees only move status, and anything else is shown read-only.
+    $canUpdate = auth()->user()->can('update', $task);
+    $canMove = $canUpdate || auth()->user()->can('updateStatus', $task);
+    $canDelete = auth()->user()->can('delete', $task);
+    $canCreate = auth()->user()->can('create', App\Models\Task::class);
     $priorityBorderClass = match ($task->priority) {
         TaskPriority::High => 'border-primary dark:border-status-critical',
         TaskPriority::Medium => 'border-status-warn',
@@ -53,7 +59,7 @@
         <button
             type="button"
             wire:click="toggleComplete({{ $task->id }})"
-            @disabled($isDone)
+            @disabled($isDone || ! $canMove)
             aria-label="{{ __('tasks.mark_complete') }}"
             class="inline-flex size-6 cursor-pointer touch-manipulation items-center justify-center rounded-full text-secondary-medium hover:bg-secondary-soft disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent dark:text-secondary-soft dark:hover:bg-secondary-medium"
             data-test="task-toggle-complete-{{ $task->id }}"
@@ -107,10 +113,12 @@
         <div
             x-data
             role="button"
+            @if ($canUpdate)
             tabindex="0"
             x-on:click="$store.assigneePicker.openFor({{ $task->id }}, {{ Js::from($assignedIds) }}, $el.getBoundingClientRect())"
             x-on:keydown.enter="$store.assigneePicker.openFor({{ $task->id }}, {{ Js::from($assignedIds) }}, $el.getBoundingClientRect())"
             x-on:keydown.space.prevent="$store.assigneePicker.openFor({{ $task->id }}, {{ Js::from($assignedIds) }}, $el.getBoundingClientRect())"
+            @endif
             aria-haspopup="listbox"
             x-bind:aria-expanded="$store.assigneePicker.open && $store.assigneePicker.taskId === {{ $task->id }} ? 'true' : 'false'"
             aria-label="{{ __('tasks.assignees') }}: {{ $assignees->isEmpty() ? __('common.not_assigned') : $assignees->map->name->implode(', ') }}"
@@ -127,6 +135,7 @@
                         <span class="inline-flex size-7 items-center justify-center rounded-full bg-secondary-dark text-[11px] font-semibold text-white ring-2 ring-white transition-transform group-hover/row:ring-secondary-soft/40 dark:bg-secondary-medium dark:ring-secondary-dark dark:group-hover/row:ring-secondary-medium/40">
                             {{ Illuminate\Support\Str::of($employee->name)->explode(' ')->map(fn ($part) => mb_substr($part, 0, 1))->take(2)->implode('') }}
                         </span>
+                        @if ($canUpdate)
                         <button
                             type="button"
                             wire:click.stop="toggleAssignee({{ $task->id }}, {{ $employee->id }})"
@@ -136,6 +145,7 @@
                         >
                             <flux:icon.x-mark variant="micro" class="size-2.5" />
                         </button>
+                        @endif
                     </div>
                 @endforeach
                 @if ($assignees->count() > 3)
@@ -157,6 +167,7 @@
                 type="date"
                 value="{{ $task->due_date?->toDateString() }}"
                 wire:change="rescheduleTask({{ $task->id }}, $event.target.value)"
+                @disabled(! $canUpdate)
                 aria-label="{{ __('tasks.due_date_2') }}: {{ $task->title }}"
                 class="w-full min-w-0 rounded border-0 bg-transparent p-1 text-xs tabular-nums focus:ring-1 focus:ring-primary focus:outline-none {{ $dueDateClasses }}"
                 data-test="task-due-date-{{ $task->id }}"
@@ -164,6 +175,11 @@
         </div>
     </td>
     <td class="px-2">
+        @if (! $canUpdate)
+            <span class="inline-flex size-7 items-center justify-center" aria-label="{{ __('tasks.priority') }}: {{ $task->priority->label() }}" data-test="task-priority-{{ $task->id }}">
+                <flux:icon.flag :variant="$task->priority === TaskPriority::Low ? 'outline' : 'solid'" class="size-4 {{ $priorityIconClasses($task->priority) }}" />
+            </span>
+        @else
         <flux:dropdown position="bottom" align="start">
             <button type="button" aria-label="{{ __('tasks.priority') }}: {{ $task->priority->label() }}" class="inline-flex size-7 cursor-pointer items-center justify-center rounded hover:bg-secondary-soft dark:hover:bg-secondary-medium" data-test="task-priority-trigger-{{ $task->id }}">
                 <flux:icon.flag :variant="$task->priority === TaskPriority::Low ? 'outline' : 'solid'" class="size-4 {{ $priorityIconClasses($task->priority) }}" />
@@ -178,8 +194,12 @@
                 @endforeach
             </flux:menu>
         </flux:dropdown>
+        @endif
     </td>
     <td class="px-2">
+        @if (! $canMove)
+            <x-ui.status-pill :case="$task->status" />
+        @else
         <flux:dropdown position="bottom" align="start">
             <button type="button" class="cursor-pointer" data-test="task-status-trigger-{{ $task->id }}">
                 <x-ui.status-pill :case="$task->status" />
@@ -193,10 +213,11 @@
                 @endforeach
             </flux:menu>
         </flux:dropdown>
+        @endif
     </td>
     <td class="pe-3 text-end opacity-0 group-hover/row:opacity-100 group-focus-within/row:opacity-100 focus-within:opacity-100">
         <div class="inline-flex items-center gap-0.5">
-            @if (! $isSubtask)
+            @if (! $isSubtask && $canCreate)
                 <x-ui.button
                     tone="ghost"
                     size="sm"
@@ -207,7 +228,9 @@
                     data-test="task-add-subtask-{{ $task->id }}"
                 />
             @endif
-            <x-ui.button tone="ghost" size="sm" icon="trash" class="size-8!" wire:click="confirmDelete({{ $task->id }})" :aria-label="__('tasks.delete_title', ['title' => $task->title])" />
+            @if ($canDelete)
+                <x-ui.button tone="ghost" size="sm" icon="trash" class="size-8!" wire:click="confirmDelete({{ $task->id }})" :aria-label="__('tasks.delete_title', ['title' => $task->title])" />
+            @endif
         </div>
     </td>
 </tr>

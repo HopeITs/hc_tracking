@@ -9,6 +9,7 @@ use App\Models\DonorProposal;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalStatusNote;
+use App\Models\Scopes\TaskVisibilityScope;
 use App\Models\TransfersTracking;
 use App\Notifications\UnreadSubjects;
 use Flux\Flux;
@@ -19,6 +20,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -40,12 +42,15 @@ new #[Title('titles.proposals')] class extends Component {
     public string $donor = '';
 
     public bool $showProposalModal = false;
+    #[Locked]
     public ?int $editingProposalId = null;
 
     public bool $showDeleteModal = false;
+    #[Locked]
     public ?int $deletingProposalId = null;
 
     public bool $showStageModal = false;
+    #[Locked]
     public ?int $stageProposalId = null;
     public string $newStatus = '';
     public string $statusContext = '';
@@ -156,10 +161,11 @@ new #[Title('titles.proposals')] class extends Component {
                 'projects' => fn ($query) => $query->select(['projects.id', 'projects.name', 'projects.status'])->orderBy('projects.name'),
                 'statusNotes' => fn ($query) => $query->select(['id', 'proposal_id', 'status', 'context', 'date'])->orderByDesc('date')->orderByDesc('id')->limit(1),
             ])
+            // Task progress is organisation-wide: every viewer sees the same figures.
             ->withCount([
-                'tasks',
-                'tasks as done_tasks_count' => fn ($query) => $query->where('status', TaskStatus::Done),
-                'tasks as overdue_tasks_count' => fn ($query) => $query->where('status', '!=', TaskStatus::Done)->whereDate('due_date', '<', $today),
+                'tasks' => fn ($query) => $query->withoutGlobalScope(TaskVisibilityScope::class),
+                'tasks as done_tasks_count' => fn ($query) => $query->withoutGlobalScope(TaskVisibilityScope::class)->where('status', TaskStatus::Done),
+                'tasks as overdue_tasks_count' => fn ($query) => $query->withoutGlobalScope(TaskVisibilityScope::class)->where('status', '!=', TaskStatus::Done)->whereDate('due_date', '<', $today),
                 'statusNotes',
                 'planIndicators',
             ])

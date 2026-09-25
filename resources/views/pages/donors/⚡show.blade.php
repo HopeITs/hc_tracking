@@ -9,9 +9,10 @@ use App\Models\Project;
 use App\Models\Report;
 use App\Models\TransfersTracking;
 use Carbon\CarbonImmutable;
-use Illuminate\Database\Eloquent\Collection;
 use Flux\Flux;
+use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
@@ -22,6 +23,7 @@ new #[Title('titles.donor')] class extends Component {
     /** How many reports each agreement lists before pointing at the rest. */
     public const LISTED_REPORTS = 5;
 
+    #[Locked]
     public int $donorId;
 
     public function mount(Donor $donor): void

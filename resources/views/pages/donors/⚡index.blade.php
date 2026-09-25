@@ -14,6 +14,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -42,6 +43,7 @@ new #[Title('titles.donors')] class extends Component {
     public string $sort = 'name';
 
     public bool $showDeleteModal = false;
+    #[Locked]
     public ?int $deletingDonorId = null;
 
     public function updatedSearch(): void

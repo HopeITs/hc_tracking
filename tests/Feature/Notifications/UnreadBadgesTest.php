@@ -25,7 +25,7 @@ function notifyAbout(User $user, string $module, string $type, int $id): void
 }
 
 test('unread subjects are listed per type', function () {
-    $user = Activity::withoutRecording(fn () => User::factory()->create());
+    $user = Activity::withoutRecording(fn () => User::factory()->role('General Manager')->create());
     notifyAbout($user, 'tasks', 'task', 4);
     notifyAbout($user, 'tasks', 'task', 9);
     notifyAbout($user, 'projects', 'project', 4);
@@ -36,7 +36,7 @@ test('unread subjects are listed per type', function () {
 });
 
 test('the sidebar shows the unread count of each module', function () {
-    $user = Activity::withoutRecording(fn () => User::factory()->create());
+    $user = Activity::withoutRecording(fn () => User::factory()->role('General Manager')->create());
     notifyAbout($user, 'tasks', 'task', 1);
     notifyAbout($user, 'tasks', 'task', 2);
 

@@ -36,6 +36,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -47,6 +48,7 @@ new #[Title('titles.proposal')] class extends Component
     use ManagesTransferForm;
     use WithFileUploads;
 
+    #[Locked]
     public int $proposalId;
 
     /** The tabs this page offers, in strip order. */
@@ -93,6 +95,7 @@ new #[Title('titles.proposal')] class extends Component
 
     public bool $showUnlinkModal = false;
 
+    #[Locked]
     public ?int $unlinkingProjectId = null;
 
     public bool $showFileModal = false;
@@ -394,6 +397,8 @@ new #[Title('titles.proposal')] class extends Component
 
     public function openAddTaskModal(): void
     {
+        Gate::authorize('create', Task::class);
+
         $this->resetValidation();
         $this->newTaskTitle = '';
         $this->newTaskStatus = TaskStatus::Todo->value;
@@ -415,6 +420,8 @@ new #[Title('titles.proposal')] class extends Component
      */
     public function addTask(): void
     {
+        Gate::authorize('create', Task::class);
+
         $this->newTaskTitle = trim($this->newTaskTitle);
 
         $validated = $this->validate([
@@ -2414,13 +2421,13 @@ new #[Title('titles.proposal')] class extends Component
             @endif
         @elseif ($tab === 'tasks')
             <div class="mb-6 flex flex-wrap items-center justify-end gap-2">
-                <x-ui.button tone="primary" size="sm" icon="plus" class="min-h-10 touch-manipulation" wire:click="openAddTaskModal" data-test="add-proposal-task-button">{{ __('tasks.add_task') }}</x-ui.button>
+                @can('create', App\Models\Task::class)<x-ui.button tone="primary" size="sm" icon="plus" class="min-h-10 touch-manipulation" wire:click="openAddTaskModal" data-test="add-proposal-task-button">{{ __('tasks.add_task') }}</x-ui.button>@endcan
             </div>
 
             @if ($this->tasks->isEmpty())
                 <x-ui.empty-state icon="clipboard-document-list" :heading="__('common.no_tasks_yet')" :body="__('proposals.tasks_delivering_against_this_proposal_will_appear_here')">
                     <x-slot:action>
-                        <x-ui.button size="sm" tone="primary" icon="plus" wire:click="openAddTaskModal">{{ __('tasks.add_task') }}</x-ui.button>
+                        @can('create', App\Models\Task::class)<x-ui.button size="sm" tone="primary" icon="plus" wire:click="openAddTaskModal">{{ __('tasks.add_task') }}</x-ui.button>@endcan
                     </x-slot:action>
                 </x-ui.empty-state>
             @else

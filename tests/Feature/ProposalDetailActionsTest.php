@@ -221,6 +221,8 @@ test('deleting a proposal removes its file rows', function () {
 });
 
 test('deadlines list only open items in date order and group them by urgency', function () {
+    // A viewer who sees every department's tasks, so the task deadline counts.
+    $this->user = User::factory()->role('General Manager')->create();
     $agreement = usdAgreement($this->proposal);
     TransfersTracking::factory()->create(['donor_proposal_id' => $agreement->id, 'scheduled_date' => '2026-06-01', 'ar_status' => ArStatus::Pending]);
     TransfersTracking::factory()->create(['donor_proposal_id' => $agreement->id, 'scheduled_date' => '2026-06-02', 'ar_status' => ArStatus::Received]);
@@ -371,7 +373,7 @@ test('the money reading names every currency after the one its figure leads with
 });
 
 test('a user without proposal permissions sees no edit controls and cannot change anything', function () {
-    $viewer = User::factory()->role('General Manager')->create();
+    $viewer = User::factory()->role('Team Member')->create();
     $agreement = usdAgreement($this->proposal);
     $media = Media::factory()->create(['mediable_type' => 'proposal', 'mediable_id' => $this->proposal->id]);
     $page = Livewire::actingAs($viewer)->test('pages::proposals.show', ['proposal' => $this->proposal]);

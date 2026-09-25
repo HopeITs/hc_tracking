@@ -23,7 +23,7 @@ test('guests are redirected from program detail', function () {
 });
 
 test('program detail shows the program its strategy and its manager', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $manager = insertHrEmployee(firstNameEn: 'Layla', lastNameEn: 'Haddad', firstNameAr: 'ليلى', lastNameAr: 'حداد');
     $strategy = Strategy::factory()->create(['name' => 'Country Strategy']);
     $program = Program::factory()->create([
@@ -42,7 +42,7 @@ test('program detail shows the program its strategy and its manager', function (
 });
 
 test('program detail lists only its own projects', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $subject = Program::factory()->create();
     $other = Program::factory()->create();
 
@@ -57,7 +57,7 @@ test('program detail lists only its own projects', function () {
 });
 
 test('program detail switches to annual plans and results', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create();
     AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2026]);
     Result::factory()->create([
@@ -75,7 +75,7 @@ test('program detail switches to annual plans and results', function () {
 });
 
 test('program detail tasks tab shows tasks raised on the program, its projects and their milestones, but not on another program', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create();
     $project = Project::factory()->create(['program_id' => $program->id]);
     $milestone = Milestone::factory()->create(['project_id' => $project->id]);
@@ -96,7 +96,7 @@ test('program detail tasks tab shows tasks raised on the program, its projects a
 });
 
 test('a task can be added from the program show page pre-filled with this program', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $assignee = insertHrEmployee();
     $program = Program::factory()->create();
 
@@ -119,7 +119,7 @@ test('a task can be added from the program show page pre-filled with this progra
 });
 
 test('adding a task from the program show page requires a title and an assignee', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create();
 
     Livewire::actingAs($user)
@@ -133,7 +133,7 @@ test('adding a task from the program show page requires a title and an assignee'
 });
 
 test('program detail renders the results logframe as a tree', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create();
     $impact = Result::factory()->create([
         'program_id' => $program->id,
@@ -156,7 +156,7 @@ test('program detail renders the results logframe as a tree', function () {
 });
 
 test('program logframe counts statements per level and flags unmeasured ones', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create();
     $impact = Result::factory()->create(['program_id' => $program->id, 'type' => ResultType::Impact]);
     $outcome = Result::factory()->create(['program_id' => $program->id, 'parent_id' => $impact->id, 'type' => ResultType::Outcome]);
@@ -177,7 +177,7 @@ test('program logframe counts statements per level and flags unmeasured ones', f
 });
 
 test('program plan timeline fills the strategy window and totals each plan', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $strategy = Strategy::factory()->create(['start_year' => 2025, 'end_year' => 2027]);
     $program = Program::factory()->create(['strategy_id' => $strategy->id]);
     $plan = AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2026]);
@@ -208,7 +208,7 @@ test('program plan timeline fills the strategy window and totals each plan', fun
 });
 
 test('program detail renders a program with nothing attached', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create(['name' => 'Bare Program']);
 
     $this->actingAs($user)
@@ -238,7 +238,7 @@ test('program detail calculates milestone progress without cancelled milestones'
         'weight_percentage' => '100.00',
     ]);
 
-    Livewire::actingAs(User::factory()->create())
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::programs.show', ['program' => $program])
         ->assertSee('40%')
         ->assertSee('40 of 100 weighted points reached');
@@ -249,7 +249,7 @@ test('program detail narrows projects with its delivery search', function () {
     Project::factory()->create(['program_id' => $program->id, 'name' => 'Water Network Expansion']);
     Project::factory()->create(['program_id' => $program->id, 'name' => 'Shelter Rehabilitation']);
 
-    Livewire::actingAs(User::factory()->create())
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::programs.show', ['program' => $program])
         ->set('projectSearch', 'Water')
         ->assertSee('Water Network Expansion')
@@ -261,7 +261,7 @@ test('program delivery timeline filters projects by status', function () {
     Project::factory()->create(['program_id' => $program->id, 'name' => 'Water Network Expansion', 'status' => ProjectStatus::Active]);
     Project::factory()->create(['program_id' => $program->id, 'name' => 'Shelter Rehabilitation', 'status' => ProjectStatus::Closed]);
 
-    Livewire::actingAs(User::factory()->create())
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::programs.show', ['program' => $program])
         ->set('projectStatus', 'closed')
         ->assertSee('Shelter Rehabilitation')
@@ -284,7 +284,7 @@ test('program delivery timeline shows weighted progress per project', function (
     Milestone::factory()->create(['project_id' => $project->id, 'status' => MilestoneStatus::Planned, 'weight_percentage' => '75.00', 'planned_start_date' => '2026-10-01']);
     Milestone::factory()->create(['project_id' => $project->id, 'status' => MilestoneStatus::Cancelled, 'weight_percentage' => '50.00', 'planned_start_date' => '2020-01-01']);
 
-    $component = Livewire::actingAs(User::factory()->create())
+    $component = Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::programs.show', ['program' => $program])
         ->assertSee('25%')
         ->assertSee('1 of 2 milestones reached');
@@ -305,7 +305,7 @@ test('program delivery timeline flags schedule slippage and milestones outside t
     Milestone::factory()->create(['project_id' => $project->id, 'status' => MilestoneStatus::Reached, 'weight_percentage' => '25.00', 'planned_start_date' => '2026-03-01']);
     Milestone::factory()->create(['project_id' => $project->id, 'status' => MilestoneStatus::Planned, 'weight_percentage' => '75.00', 'planned_start_date' => '2027-05-01']);
 
-    $component = Livewire::actingAs(User::factory()->create())
+    $component = Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::programs.show', ['program' => $program])
         ->assertSee('Behind schedule')
         ->assertSee('50% expected by today')
@@ -326,7 +326,7 @@ test('program delivery timeline marks open projects past their end date', functi
     ]);
     Milestone::factory()->create(['project_id' => $project->id, 'status' => MilestoneStatus::Planned, 'weight_percentage' => '100.00', 'planned_start_date' => '2026-05-01']);
 
-    Livewire::actingAs(User::factory()->create())
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::programs.show', ['program' => $program])
         ->assertSee('Past end date')
         ->assertDontSee('outside the delivery window');
@@ -337,7 +337,7 @@ test('program delivery timeline ignores an unknown status from the url', functio
     Project::factory()->create(['program_id' => $program->id, 'name' => 'Water Network Expansion']);
 
     Livewire::withQueryParams(['projectStatus' => 'not-a-status'])
-        ->actingAs(User::factory()->create())
+        ->actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::programs.show', ['program' => $program])
         ->assertSet('projectStatus', '')
         ->assertSee('Water Network Expansion');
@@ -348,7 +348,7 @@ test('program delivery timeline status buttons filter and clear the list', funct
     Project::factory()->create(['program_id' => $program->id, 'name' => 'Water Network Expansion', 'status' => ProjectStatus::Active]);
     Project::factory()->create(['program_id' => $program->id, 'name' => 'Shelter Rehabilitation', 'status' => ProjectStatus::Closed]);
 
-    Livewire::actingAs(User::factory()->create())
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::programs.show', ['program' => $program])
         ->call('filterProjectsByStatus', 'active')
         ->assertSet('projectStatus', 'active')
@@ -365,7 +365,7 @@ test('program delivery search treats wildcard characters literally', function ()
     Project::factory()->create(['program_id' => $program->id, 'name' => 'Water Network Expansion']);
     Project::factory()->create(['program_id' => $program->id, 'name' => '100% Coverage Drive']);
 
-    Livewire::actingAs(User::factory()->create())
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::programs.show', ['program' => $program])
         ->set('projectSearch', '%')
         ->assertSee('100% Coverage Drive')
@@ -384,7 +384,7 @@ test('program delivery timeline does not rate projects that have not started del
     ]);
     Milestone::factory()->create(['project_id' => $project->id, 'status' => MilestoneStatus::Planned, 'weight_percentage' => '100.00', 'planned_start_date' => '2026-06-01']);
 
-    Livewire::actingAs(User::factory()->create())
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::programs.show', ['program' => $program])
         ->assertSee('Not started')
         ->assertDontSee('Behind schedule')
@@ -402,7 +402,7 @@ test('program delivery timeline marks a finished window as past end even without
         'end_date' => '2026-03-31',
     ]);
 
-    Livewire::actingAs(User::factory()->create())
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::programs.show', ['program' => $program])
         ->assertSee('Past end date');
 });
@@ -418,7 +418,7 @@ test('program delivery window is not stretched by a mistyped milestone date', fu
     ]);
     Milestone::factory()->create(['project_id' => $project->id, 'status' => MilestoneStatus::Planned, 'weight_percentage' => '100.00', 'planned_start_date' => '2035-01-01']);
 
-    $window = Livewire::actingAs(User::factory()->create())
+    $window = Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::programs.show', ['program' => $program])
         ->assertSee('1 milestone outside the delivery window')
         ->instance()
@@ -431,7 +431,7 @@ test('program detail links each annual plan year to its plan', function () {
     $program = Program::factory()->create();
     $plan = AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2026]);
 
-    Livewire::actingAs(User::factory()->create())
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::programs.show', ['program' => $program])
         ->set('tab', 'plans')
         ->assertSee(route('annual-plans.show', $plan), false);

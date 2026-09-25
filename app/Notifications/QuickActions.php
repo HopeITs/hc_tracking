@@ -8,11 +8,13 @@ use App\Enums\ArStatus;
 use App\Enums\ReportStatus;
 use App\Enums\TaskStatus;
 use App\Models\Report;
+use App\Models\Scopes\TaskVisibilityScope;
 use App\Models\Task;
 use App\Models\TransfersTracking;
 use App\Models\User;
 use App\Models\UserNotification;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * One-click actions offered inside a notification. Offered only to people
@@ -34,22 +36,55 @@ final class QuickActions
         }
 
         $types = match ($subjectType) {
-            'task' => $user->can('tasks.update') ? match (Task::query()->whereKey($subjectId)->toBase()->value('status')) {
-                TaskStatus::Todo->value => ['task.start', 'task.mark_done'],
-                TaskStatus::InProgress->value, TaskStatus::UnderReview->value => ['task.mark_done'],
-                default => [],
-            } : [],
-            'report' => $user->can('reports.update') ? match (Report::query()->whereKey($subjectId)->toBase()->value('status')) {
-                ReportStatus::Draft->value => ['report.mark_reviewed'],
-                ReportStatus::Reviewed->value => ['report.approve'],
-                default => [],
-            } : [],
+            'task' => $this->taskActions($subjectId, $user),
+            'report' => $this->reportActions($subjectId, $user),
             'transfer' => $user->can('transfers.update') && TransfersTracking::query()->whereKey($subjectId)->toBase()->value('ar_status') === ArStatus::Pending->value
                 ? ['transfer.mark_received'] : [],
             default => [],
         };
 
         return array_map(fn (string $type): array => ['type' => $type], $types);
+    }
+
+    /**
+     * The workflow step offered on a report, by the same rules as the report
+     * page (ReportPolicy): its author submits a draft, a second person
+     * approves a reviewed report.
+     *
+     * @return list<string>
+     */
+    private function reportActions(int $reportId, User $user): array
+    {
+        $report = Report::query()->find($reportId);
+
+        return match (true) {
+            $report === null => [],
+            Gate::forUser($user)->allows('submit', $report) => ['report.mark_reviewed'],
+            Gate::forUser($user)->allows('approve', $report) => ['report.approve'],
+            default => [],
+        };
+    }
+
+    /**
+     * The status moves offered on a task: only to someone who can see it and
+     * may move it (see TaskPolicy::updateStatus). Loaded without the viewer's
+     * scope because this is built for the recipient, not the signed-in user.
+     *
+     * @return list<string>
+     */
+    private function taskActions(int $taskId, User $user): array
+    {
+        $task = Task::query()->withoutGlobalScope(TaskVisibilityScope::class)->with('taskAssignees:id,task_id,employee_id')->find($taskId);
+
+        if ($task === null || ! Gate::forUser($user)->allows('view', $task) || ! Gate::forUser($user)->allows('updateStatus', $task)) {
+            return [];
+        }
+
+        return match ($task->status) {
+            TaskStatus::Todo => ['task.start', 'task.mark_done'],
+            TaskStatus::InProgress, TaskStatus::UnderReview => ['task.mark_done'],
+            TaskStatus::Done => [],
+        };
     }
 
     /**
@@ -79,14 +114,14 @@ final class QuickActions
      */
     private function runTask(User $user, int $id, string $type): array
     {
-        if (! $user->can('tasks.update')) {
-            return $this->result(false, 'forbidden');
-        }
-
         $task = Task::query()->find($id);
 
         if ($task === null) {
             return $this->result(false, 'missing');
+        }
+
+        if (! Gate::forUser($user)->allows('updateStatus', $task)) {
+            return $this->result(false, 'forbidden');
         }
 
         if ($type === 'task.start') {
@@ -115,10 +150,6 @@ final class QuickActions
      */
     private function runReport(User $user, int $id, string $type): array
     {
-        if (! $user->can('reports.update')) {
-            return $this->result(false, 'forbidden');
-        }
-
         $report = Report::query()->find($id);
 
         if ($report === null) {
@@ -130,10 +161,18 @@ final class QuickActions
                 return $this->result(false, 'already_done');
             }
 
+            if (! Gate::forUser($user)->allows('submit', $report)) {
+                return $this->result(false, 'forbidden');
+            }
+
             $report->fill(['status' => ReportStatus::Reviewed, 'submit_date' => now()->toDateString()])->save();
         } else {
             if ($report->status !== ReportStatus::Reviewed) {
                 return $this->result(false, 'already_done');
+            }
+
+            if (! Gate::forUser($user)->allows('approve', $report)) {
+                return $this->result(false, 'forbidden');
             }
 
             $report->fill(['status' => ReportStatus::Approved])->save();
