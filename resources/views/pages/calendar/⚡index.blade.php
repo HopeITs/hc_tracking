@@ -1530,7 +1530,8 @@ new #[Title('titles.calendar')] class extends Component {
             <flux:heading size="lg">{{ $periodHeading }}</flux:heading>
         </div>
 
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-3">
+            <div class="inline-flex items-center rounded-lg border border-secondary-light bg-white dark:border-secondary-light dark:bg-secondary-dark">
             <div class="filter-picker relative">
                 <button
                     type="button"
@@ -1540,9 +1541,10 @@ new #[Title('titles.calendar')] class extends Component {
                     aria-haspopup="listbox"
                     aria-label="{{ __('calendar.filter_by_type') }}"
                     data-test="calendar-type-filter-button"
-                    class="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border px-2.5"
+                    class="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-s-lg px-2.5 py-1.5 text-secondary-dark hover:bg-secondary-soft dark:text-white dark:hover:bg-secondary-medium"
                 >
                     <flux:icon.funnel variant="micro" class="size-4" />
+                    <span class="hidden text-sm sm:inline">{{ __('calendar.filter_by_type') }}</span>
                 </button>
 
                 @if ($showTypeFilterMenu)
@@ -1594,13 +1596,16 @@ new #[Title('titles.calendar')] class extends Component {
                 @endif
             </div>
 
+            <div class="h-5 w-px shrink-0 bg-secondary-light dark:bg-secondary-medium"></div>
+
             <x-ui.multi-select-popover
                 :label="__('calendar.filter_by_responsible')"
-                class="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-secondary-light bg-white px-2.5 py-1.5 text-secondary-dark hover:bg-secondary-soft dark:border-secondary-light dark:bg-secondary-dark dark:text-white dark:hover:bg-secondary-medium"
+                class="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-e-lg px-2.5 py-1.5 text-secondary-dark hover:bg-secondary-soft dark:text-white dark:hover:bg-secondary-medium"
                 data-test="calendar-responsible-filter-button"
             >
                 <x-slot:trigger>
                     <flux:icon.user variant="micro" class="size-4" />
+                    <span class="hidden text-sm sm:inline">{{ __('calendar.filter_by_responsible') }}</span>
                     @if ($selectedFilterEmployees->isNotEmpty())
                         <span class="inline-flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-white" data-test="calendar-responsible-filter-count">{{ $selectedFilterEmployees->count() }}</span>
                     @endif
@@ -1622,6 +1627,7 @@ new #[Title('titles.calendar')] class extends Component {
                     </label>
                 @endforeach
             </x-ui.multi-select-popover>
+            </div>
 
             <flux:dropdown position="bottom-end" class="filter-picker">
                 <x-ui.button tone="primary" icon="plus" icon:trailing="chevron-down" data-test="calendar-add-button">{{ __('common.add') }}</x-ui.button>
