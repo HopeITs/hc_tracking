@@ -25,14 +25,18 @@ use App\Models\TransfersTracking;
 use App\Models\User;
 use App\Notifications\Alerts\NotificationSettings;
 use Carbon\CarbonImmutable;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Foundation\DevCommands;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Fortify\Actions\DisableTwoFactorAuthentication;
@@ -99,6 +103,7 @@ class AppServiceProvider extends ServiceProvider
         $this->configureMorphMap();
         $this->configureGates();
         $this->configureLivewire();
+        $this->configureRateLimiting();
     }
 
     /**
@@ -119,6 +124,16 @@ class AppServiceProvider extends ServiceProvider
                 EnsureTwoFactorIsEnabled::guardLivewireComponent($component);
             }
         });
+
+        // Every wire:click/wire:model/etc in the app posts to this single
+        // endpoint, so it's the highest-value target for a volumetric
+        // (resource-exhaustion) attack. Persistent middleware only re-applies
+        // middleware already present on the page route being driven, so it
+        // can't rate limit the endpoint itself; the update route has to be
+        // throttled directly instead. $path keeps Livewire's obfuscated,
+        // per-install endpoint path rather than hardcoding it.
+        Livewire::setUpdateRoute(fn ($handle, $path) => Route::post($path, $handle)
+            ->middleware(['throttle:livewire']));
     }
 
     /**
@@ -137,6 +152,21 @@ class AppServiceProvider extends ServiceProvider
     {
         Gate::define('view-activity-log', fn (User $user): bool => $user->hasAnyRole(['Super Admin', 'General Manager']));
         Gate::define('manage-notification-settings', fn (User $user): bool => $user->hasAnyRole(config('access-control.administrator_roles')));
+    }
+
+    /**
+     * Rate limiters shared across the app (outside Fortify's own auth
+     * limiters, which live in FortifyServiceProvider).
+     *
+     * Keyed by user id where available, falling back to IP for guests, so an
+     * office sharing one IP never throttles each other the way a plain
+     * per-IP limit would.
+     */
+    protected function configureRateLimiting(): void
+    {
+        RateLimiter::for('livewire', fn (Request $request) => Limit::perMinute(180)->by(
+            (string) ($request->user()?->id ?? $request->ip()),
+        ));
     }
 
     /**

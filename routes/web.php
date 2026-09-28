@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => redirect()->route(Auth::check() ? 'dashboard' : 'login'))->name('home');
 
-Route::post('locale', SwitchLocaleController::class)->name('locale.update');
+Route::post('locale', SwitchLocaleController::class)->middleware('throttle:10,1')->name('locale.update');
 
 // Second login step for people who turned on email codes (after the HR password).
 Route::middleware('guest')->controller(EmailTwoFactorController::class)->group(function () {
