@@ -8,7 +8,8 @@ test('only modules I can see are offered for muting', function () {
 
     Livewire::actingAs($financial)->test('pages::notifications.settings')
         ->assertSeeText(__('notifications.modules.transfers'))
-        ->assertDontSeeText(__('notifications.modules.reports'));
+        ->assertSeeText(__('notifications.modules.reports'))
+        ->assertDontSeeText(__('notifications.modules.access-management'));
 });
 
 test('muting and unmuting a module', function () {
@@ -24,7 +25,7 @@ test('muting and unmuting a module', function () {
 test('a module outside my permissions cannot be muted by a crafted call', function () {
     $user = userWithRole('Media Team');
 
-    Livewire::actingAs($user)->test('pages::notifications.settings')->call('toggleMute', 'transfers');
+    Livewire::actingAs($user)->test('pages::notifications.settings')->call('toggleMute', 'access-management');
 
     expect(NotificationMute::query()->count())->toBe(0);
 });

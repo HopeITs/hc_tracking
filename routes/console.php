@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Activity;
+use App\Models\TrustedDevice;
 use App\Models\UserNotification;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -15,4 +16,5 @@ Schedule::command('notifications:wake-snoozed')->everyMinute()->withoutOverlappi
 Schedule::command('notifications:scan frequent')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('notifications:scan daily')->dailyAt('06:00')->withoutOverlapping();
 Schedule::command('notifications:digests')->everyMinute()->withoutOverlapping();
-Schedule::command('model:prune', ['--model' => [Activity::class, UserNotification::class]])->daily();
+Schedule::command('model:prune', ['--model' => [Activity::class, TrustedDevice::class, UserNotification::class]])->daily();
+Schedule::command('files:prune')->dailyAt('03:00')->withoutOverlapping();

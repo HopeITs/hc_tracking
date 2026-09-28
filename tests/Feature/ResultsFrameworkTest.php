@@ -21,7 +21,7 @@ test('guests are redirected from the results framework', function () {
 });
 
 test('results render as a nested logframe grouped by program', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create(['name' => 'Water Security']);
 
     $impact = Result::factory()->create([
@@ -45,7 +45,7 @@ test('results render as a nested logframe grouped by program', function () {
 });
 
 test('a result with no program still appears under unassigned', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Result::factory()->create([
         'program_id' => null,
@@ -59,7 +59,7 @@ test('a result with no program still appears under unassigned', function () {
 });
 
 test('results can be filtered by program and type', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $first = Program::factory()->create();
     $second = Program::factory()->create();
 
@@ -78,7 +78,7 @@ test('results can be filtered by program and type', function () {
 });
 
 test('a result can be created under a parent', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create();
     $parent = Result::factory()->create(['program_id' => $program->id, 'type' => ResultType::Outcome]);
 
@@ -100,7 +100,7 @@ test('a result can be created under a parent', function () {
 });
 
 test('the parent picker excludes the edited result and its own descendants', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     $root = Result::factory()->create(['statement' => 'Root statement.', 'type' => ResultType::Outcome]);
     Result::factory()->create(['parent_id' => $root->id, 'statement' => 'Child statement.', 'type' => ResultType::Output]);
@@ -118,7 +118,7 @@ test('the parent picker excludes the edited result and its own descendants', fun
 });
 
 test('a leaf result with no indicators can be deleted', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $result = Result::factory()->create();
 
     Livewire::actingAs($user)
@@ -131,7 +131,7 @@ test('a leaf result with no indicators can be deleted', function () {
 });
 
 test('a result with children is not deleted because the subtree would cascade', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $parent = Result::factory()->create();
     $child = Result::factory()->create(['parent_id' => $parent->id]);
 
@@ -145,7 +145,7 @@ test('a result with children is not deleted because the subtree would cascade', 
 });
 
 test('a result carrying indicators is not deleted because targets and reports would cascade', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $result = Result::factory()->create();
     $indicator = Indicator::factory()->create(['result_id' => $result->id]);
 
@@ -159,13 +159,13 @@ test('a result carrying indicators is not deleted because targets and reports wo
 });
 
 test('the results framework renders with no results', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)->test('pages::results.index')->assertSee('No results yet');
 });
 
 test('the overview counts statements, indicators, targets and measurement coverage', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create();
 
     $measured = Result::factory()->create(['program_id' => $program->id, 'type' => ResultType::Outcome]);
@@ -194,7 +194,7 @@ test('the overview counts statements, indicators, targets and measurement covera
 });
 
 test('the search matches an indicator name as well as a statement', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     $measured = Result::factory()->create(['statement' => 'Households reached with cash.']);
     Result::factory()->create(['statement' => 'Unrelated statement.']);
@@ -208,7 +208,7 @@ test('the search matches an indicator name as well as a statement', function () 
 });
 
 test('the needs indicators chip keeps only statements carrying no indicator', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     $measured = Result::factory()->create(['statement' => 'Measured statement.']);
     Result::factory()->create(['statement' => 'Unmeasured statement.']);
@@ -228,7 +228,7 @@ test('the needs indicators chip keeps only statements carrying no indicator', fu
 test('the off track chip keeps only statements whose indicators are rating amber or red', function () {
     $this->travelTo(CarbonImmutable::parse('2026-06-30 12:00:00'));
 
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     $behind = Result::factory()->create(['statement' => 'Statement falling behind.']);
     $ahead = Result::factory()->create(['statement' => 'Statement on track.']);
@@ -247,7 +247,7 @@ test('the off track chip keeps only statements whose indicators are rating amber
 });
 
 test('a statement whose parent a filter hides is promoted to the top and keeps its lineage', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $first = Program::factory()->create();
     $second = Program::factory()->create();
 
@@ -273,7 +273,7 @@ test('a statement whose parent a filter hides is promoted to the top and keeps i
 });
 
 test('the matrix view lists every visible statement', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create();
 
     $impact = Result::factory()->create([
@@ -297,7 +297,7 @@ test('the matrix view lists every visible statement', function () {
 });
 
 test('adding a result from a statement pre-wires it as the parent', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create();
     $parent = Result::factory()->create(['program_id' => $program->id, 'type' => ResultType::Impact]);
 
@@ -311,7 +311,7 @@ test('adding a result from a statement pre-wires it as the parent', function () 
 });
 
 test('confirming a delete opens the dialog, and cancelling closes it', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $result = Result::factory()->create();
 
     Livewire::actingAs($user)
@@ -326,7 +326,7 @@ test('confirming a delete opens the dialog, and cancelling closes it', function 
 });
 
 test('a statement shows the plan, the proposal and the donor its targets were committed in', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create();
     $result = Result::factory()->create(['program_id' => $program->id, 'statement' => 'Funded output statement.']);
     $indicator = Indicator::factory()->create(['result_id' => $result->id, 'name' => 'Households reached']);
@@ -349,7 +349,7 @@ test('a statement shows the plan, the proposal and the donor its targets were co
 });
 
 test('the attention chips count under the other active filters, not the whole table', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $first = Program::factory()->create();
     $second = Program::factory()->create();
 
@@ -366,7 +366,7 @@ test('the attention chips count under the other active filters, not the whole ta
 });
 
 test('a level in the results chain toggles the type filter', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
         ->test('pages::results.index')
@@ -377,7 +377,7 @@ test('a level in the results chain toggles the type filter', function () {
 });
 
 test('the parent picker offers only statements one level up the chain', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Result::factory()->type(ResultType::Impact)->create(['statement' => 'An impact.']);
     Result::factory()->type(ResultType::Outcome)->create(['statement' => 'An outcome.']);
     Result::factory()->type(ResultType::Output)->create(['statement' => 'An output.']);
@@ -397,7 +397,7 @@ test('the parent picker offers only statements one level up the chain', function
 });
 
 test('a result cannot contribute to a statement that is not directly above it', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $impact = Result::factory()->type(ResultType::Impact)->create();
 
     Livewire::actingAs($user)
@@ -413,7 +413,7 @@ test('a result cannot contribute to a statement that is not directly above it', 
 });
 
 test('changing the level clears a parent that can no longer hold it', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $outcome = Result::factory()->type(ResultType::Outcome)->create();
 
     Livewire::actingAs($user)
@@ -425,7 +425,7 @@ test('changing the level clears a parent that can no longer hold it', function (
 });
 
 test('nothing can be added under an output', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $output = Result::factory()->type(ResultType::Output)->create();
 
     Livewire::actingAs($user)
@@ -436,7 +436,7 @@ test('nothing can be added under an output', function () {
 });
 
 test('a contributing result always takes its parent program', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create();
     $outcome = Result::factory()->type(ResultType::Outcome)->create(['program_id' => $program->id]);
 
@@ -455,7 +455,7 @@ test('a contributing result always takes its parent program', function () {
 });
 
 test('a level change is refused while nested results sit at the old level below it', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $outcome = Result::factory()->type(ResultType::Outcome)->create();
     Result::factory()->type(ResultType::Output)->create(['parent_id' => $outcome->id]);
 
@@ -470,7 +470,7 @@ test('a level change is refused while nested results sit at the old level below 
 });
 
 test('moving a statement to another program moves its whole subtree', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $from = Program::factory()->create();
     $to = Program::factory()->create();
     $impact = Result::factory()->type(ResultType::Impact)->create(['program_id' => $from->id]);
@@ -489,7 +489,7 @@ test('moving a statement to another program moves its whole subtree', function (
 });
 
 test('a program move is refused when it would strand an indicator or a plan target', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $from = Program::factory()->create();
     $to = Program::factory()->create();
 
@@ -514,7 +514,7 @@ test('a program move is refused when it would strand an indicator or a plan targ
 });
 
 test('a target reads its achievement from approved reports only, and an unmeasured statement links to adding an indicator', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $measured = Result::factory()->type(ResultType::Outcome)->create();
     $unmeasured = Result::factory()->type(ResultType::Outcome)->create();
     $target = PlanIndicator::factory()->create([

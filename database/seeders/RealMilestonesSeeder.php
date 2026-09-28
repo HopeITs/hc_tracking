@@ -20,6 +20,8 @@ use RuntimeException;
  *
  *     php artisan db:seed --class=RealMilestonesSeeder
  *
+ * or with every other real seeder, in dependency order, via RealDataSeeder.
+ *
  * The source data carries no responsible person per milestone, so each one
  * is assigned a random active HR employee, the same as DeliverySeeder does
  * for demo milestones. `firstOrCreate` on project_id + sequence makes

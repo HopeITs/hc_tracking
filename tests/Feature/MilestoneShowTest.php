@@ -15,7 +15,7 @@ test('guests are redirected from the milestone show page', function () {
 });
 
 test('the milestone show page renders the edit form with the current values', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create(['name' => 'Aleppo Wells']);
     $milestone = Milestone::factory()->create([
         'project_id' => $project->id,
@@ -31,7 +31,7 @@ test('the milestone show page renders the edit form with the current values', fu
 });
 
 test('a milestone can be updated from its own page', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $milestone = Milestone::factory()->create(['name' => 'Initial gate', 'sequence' => 5]);
 
     Livewire::actingAs($user)
@@ -49,7 +49,7 @@ test('a milestone can be updated from its own page', function () {
 });
 
 test('updating a milestone requires its core delivery fields', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $milestone = Milestone::factory()->create();
 
     Livewire::actingAs($user)
@@ -62,7 +62,7 @@ test('updating a milestone requires its core delivery fields', function () {
 });
 
 test('the edit parent picker is project local and excludes the milestone and its descendants', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $otherProject = Project::factory()->create();
     $root = Milestone::factory()->create(['project_id' => $project->id, 'name' => 'Root gate']);
@@ -86,7 +86,7 @@ test('the edit parent picker is project local and excludes the milestone and its
 });
 
 test('a related milestone can be added from the show page as a child by default', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $responsible = insertHrEmployee();
     $milestone = Milestone::factory()->create(['project_id' => $project->id]);
@@ -111,7 +111,7 @@ test('a related milestone can be added from the show page as a child by default'
 });
 
 test('a related milestone can instead be created at the top level of the same project', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $responsible = insertHrEmployee();
     $milestone = Milestone::factory()->create();
 
@@ -131,7 +131,7 @@ test('a related milestone can instead be created at the top level of the same pr
 });
 
 test('newly related milestones appear in the related milestones panel', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $parent = Milestone::factory()->create();
     $child = Milestone::factory()->childOf($parent)->create(['name' => 'Household survey']);
 
@@ -142,7 +142,7 @@ test('newly related milestones appear in the related milestones panel', function
 });
 
 test('creating a related milestone requires its core delivery fields', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $milestone = Milestone::factory()->create();
 
     Livewire::actingAs($user)
@@ -156,7 +156,7 @@ test('creating a related milestone requires its core delivery fields', function 
 });
 
 test('a task can be added from the milestone show page pre-filled with this milestone', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $assignee = insertHrEmployee();
     $milestone = Milestone::factory()->create();
 
@@ -179,7 +179,7 @@ test('a task can be added from the milestone show page pre-filled with this mile
 });
 
 test('adding a task from the milestone show page requires a title and an assignee', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $milestone = Milestone::factory()->create();
 
     Livewire::actingAs($user)
@@ -192,7 +192,7 @@ test('adding a task from the milestone show page requires a title and an assigne
 });
 
 test('tasks linked to this milestone appear in the related tasks panel', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $milestone = Milestone::factory()->create();
     $task = Task::factory()->create([
         'source_type' => 'milestone',
@@ -215,7 +215,7 @@ test('tasks linked to this milestone appear in the related tasks panel', functio
 });
 
 test('the status can be changed from the edit form', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $milestone = Milestone::factory()->create(['status' => MilestoneStatus::Planned]);
 
     Livewire::actingAs($user)

@@ -24,7 +24,7 @@ test('guests are redirected to the login page', function () {
 });
 
 test('authenticated users see the application navigation on the dashboard', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $this->actingAs($user);
 
     $response = $this->get(route('dashboard'));
@@ -41,7 +41,7 @@ test('authenticated users see the application navigation on the dashboard', func
 });
 
 test('authenticated pages show the copyright footer', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $this->actingAs($user);
 
     $response = $this->get(route('dashboard'));
@@ -50,7 +50,7 @@ test('authenticated pages show the copyright footer', function () {
 });
 
 test('an empty portfolio renders every empty state', function () {
-    Livewire::actingAs(User::factory()->create())
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::dashboard.index')
         ->assertOk()
         ->assertSee('Nothing is late today')
@@ -67,7 +67,7 @@ test('the attention queue lists late work and materialised risks, most overdue f
     Milestone::factory()->create(['name' => 'Handover of wells', 'planned_start_date' => '2026-08-16', 'planned_end_date' => '2026-08-16']);
     Risk::factory()->happened()->create(['name' => 'Road closure']);
 
-    Livewire::actingAs(User::factory()->create())
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::dashboard.index')
         ->assertSee('3 items need attention')
         ->assertSeeInOrder(['Handover of wells', '30 days late', 'Submit the water survey', '5 days late', 'Road closure', 'Materialised'])
@@ -83,7 +83,7 @@ test('late transfers join the attention queue tagged for the funding filter', fu
         'scheduled_date' => '2026-09-05',
     ]);
 
-    Livewire::actingAs(User::factory()->create())
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::dashboard.index')
         ->assertSeeInOrder(['data-attention-group="funding"', '25,000 EUR from', '10 days late'], false);
 });
@@ -92,7 +92,7 @@ test('the all view keeps room for materialised risks when late work fills the qu
     Task::factory(9)->create(['due_date' => '2026-09-01']);
     Risk::factory()->happened()->create(['name' => 'Road closure']);
 
-    $items = Livewire::actingAs(User::factory()->create())
+    $items = Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::dashboard.index')
         ->instance()
         ->attentionItems;
@@ -112,7 +112,7 @@ test('funding position keeps each currency on its own line', function () {
         'scheduled_date' => '2026-06-01',
     ]);
 
-    $component = Livewire::actingAs(User::factory()->create())->test('pages::dashboard.index');
+    $component = Livewire::actingAs(User::factory()->role('General Manager')->create())->test('pages::dashboard.index');
 
     $lines = $component->instance()->fundingPosition->keyBy('currency');
 
@@ -140,7 +140,7 @@ test('my work counts only the signed-in person\'s open tasks', function () {
     $doneTask->taskAssignees()->create(['employee_id' => $employeeId]);
 
     Task::factory()->create(['due_date' => '2026-09-01']);
-    $user = User::factory()->create(['employee_id' => $employeeId]);
+    $user = User::factory()->role('General Manager')->create(['employee_id' => $employeeId]);
 
     $myWork = Livewire::actingAs($user)->test('pages::dashboard.index')->instance()->myWork;
 
@@ -149,7 +149,7 @@ test('my work counts only the signed-in person\'s open tasks', function () {
 });
 
 test('my draft reports links to the signed-in person\'s drafts only', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
         ->test('pages::dashboard.index')
@@ -161,7 +161,7 @@ test('the proposal pipeline counts only open proposals', function () {
     Proposal::factory()->create(['status' => ProposalStatus::Rejected]);
     Proposal::factory()->create(['status' => ProposalStatus::Completed]);
 
-    $pipeline = Livewire::actingAs(User::factory()->create())
+    $pipeline = Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::dashboard.index')
         ->instance()
         ->pipelineChart;
@@ -178,7 +178,7 @@ test('recent activity describes proposal status changes', function () {
         'date' => '2026-09-14',
     ]);
 
-    Livewire::actingAs(User::factory()->create())
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::dashboard.index')
         ->assertSee('Winter shelter appeal moved to Submitted');
 });
@@ -192,7 +192,7 @@ test('pending transfers are not counted as money received', function () {
         'ar_status' => ArStatus::Pending,
     ]);
 
-    $receipts = Livewire::actingAs(User::factory()->create())
+    $receipts = Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::dashboard.index')
         ->instance()
         ->receiptsChart;

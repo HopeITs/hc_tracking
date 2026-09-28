@@ -14,6 +14,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -42,6 +43,7 @@ new #[Title('titles.donors')] class extends Component {
     public string $sort = 'name';
 
     public bool $showDeleteModal = false;
+    #[Locked]
     public ?int $deletingDonorId = null;
 
     public function updatedSearch(): void
@@ -328,7 +330,7 @@ new #[Title('titles.donors')] class extends Component {
      *
      * @return array{lines: array<string, array{committed: float, received: float, pending: float, share: int}>, next: ?array{amount: float, currency: string, date: CarbonImmutable, overdue: bool}, overdue: int, lastReceived: ?CarbonImmutable, projects: int}
      */
-    public function donorMoney(Donor $donor): array
+    protected function donorMoney(Donor $donor): array
     {
         $lines = [];
         $pendingTransfers = collect();
@@ -385,7 +387,7 @@ new #[Title('titles.donors')] class extends Component {
      *
      * donor_proposal.donor_id RESTRICTs: a donor that has signed anything stays.
      */
-    public function canDelete(int $donorId): bool
+    protected function canDelete(int $donorId): bool
     {
         $donor = Donor::query()->select(['id'])->withCount('donorProposals')->find($donorId);
 

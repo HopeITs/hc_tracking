@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Concerns\RequiresConfirmedPassword;
 use Laravel\Fortify\Actions\ConfirmTwoFactorAuthentication;
 use Laravel\Fortify\Actions\EnableTwoFactorAuthentication;
 use Livewire\Attributes\Computed;
@@ -9,6 +10,8 @@ use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 new class extends Component {
+    use RequiresConfirmedPassword;
+
     #[Locked]
     public bool $requiresConfirmation;
 
@@ -36,6 +39,10 @@ new class extends Component {
     #[On('start-two-factor-setup')]
     public function startTwoFactorSetup(): void
     {
+        if (! $this->ensurePasswordIsConfirmed()) {
+            return;
+        }
+
         $enableTwoFactorAuthentication = app(EnableTwoFactorAuthentication::class);
         $enableTwoFactorAuthentication(auth()->user());
 
@@ -85,6 +92,10 @@ new class extends Component {
      */
     public function confirmTwoFactor(ConfirmTwoFactorAuthentication $confirmTwoFactorAuthentication): void
     {
+        if (! $this->ensurePasswordIsConfirmed()) {
+            return;
+        }
+
         $this->validate();
 
         $confirmTwoFactorAuthentication(auth()->user(), $this->code);

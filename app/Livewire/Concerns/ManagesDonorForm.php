@@ -8,6 +8,7 @@ use App\Enums\DonorType;
 use App\Models\Donor;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 
 /**
  * The donor profile form, shared by the donor directory and the donor page so
@@ -22,6 +23,7 @@ trait ManagesDonorForm
 {
     public bool $showDonorModal = false;
 
+    #[Locked]
     public ?int $editingDonorId = null;
 
     public string $name = '';

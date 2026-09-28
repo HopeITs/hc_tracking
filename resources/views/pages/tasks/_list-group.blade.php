@@ -21,9 +21,13 @@
                 @foreach ($task->subtasks as $subtask)
                     @include('pages.tasks._list-row', ['task' => $subtask, 'today' => $today, 'priorityIconClasses' => $priorityIconClasses, 'isSubtask' => true])
                 @endforeach
-                @include('pages.tasks._list-subtask-composer', ['task' => $task, 'priorityIconClasses' => $priorityIconClasses])
+                @can('create', App\Models\Task::class)
+                    @include('pages.tasks._list-subtask-composer', ['task' => $task, 'priorityIconClasses' => $priorityIconClasses])
+                @endcan
             @endforeach
-            @include('pages.tasks._list-task-composer', ['group' => $group, 'groupKeyString' => $groupKeyString, 'priorityIconClasses' => $priorityIconClasses])
+            @can('create', App\Models\Task::class)
+                @include('pages.tasks._list-task-composer', ['group' => $group, 'groupKeyString' => $groupKeyString, 'priorityIconClasses' => $priorityIconClasses])
+            @endcan
         </tbody>
     </table>
 
@@ -34,8 +38,12 @@
             @foreach ($task->subtasks as $subtask)
                 @include('pages.tasks._list-card', ['task' => $subtask, 'today' => $today, 'priorityIconClasses' => $priorityIconClasses, 'isSubtask' => true])
             @endforeach
-            @include('pages.tasks._list-subtask-composer-mobile', ['task' => $task])
+            @can('create', App\Models\Task::class)
+                @include('pages.tasks._list-subtask-composer-mobile', ['task' => $task])
+            @endcan
         @endforeach
-        @include('pages.tasks._list-task-composer-mobile', ['group' => $group, 'groupKeyString' => $groupKeyString])
+        @can('create', App\Models\Task::class)
+            @include('pages.tasks._list-task-composer-mobile', ['group' => $group, 'groupKeyString' => $groupKeyString])
+        @endcan
     </div>
 </div>

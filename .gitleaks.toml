@@ -1,0 +1,40 @@
+# Secret scanning rules for gitleaks (run by .gitlab-ci.yml).
+# Known findings in old history are pinned in .gitleaksignore.
+
+title = "HC Tracking secret scanning"
+
+[extend]
+useDefault = true
+
+# The default rules do not recognise Laravel's encryption key, which is how a
+# real APP_KEY once reached .env.example unnoticed.
+[[rules]]
+id = "laravel-app-key"
+description = "Laravel APP_KEY / APP_PREVIOUS_KEYS encryption key"
+regex = '''base64:[A-Za-z0-9+/]{43}='''
+keywords = ["base64:"]
+
+# The generic rule misses env values it cannot score (symbols in a password)
+# and a value on the line after an empty NAME= line. Any env line whose name
+# ends in PASSWORD, SECRET, KEY(S) or TOKEN may only be empty, null or a
+# ${REFERENCE} (or a <placeholder> in docs); eight or more other characters
+# count as a secret.
+[[rules]]
+id = "env-secret-assignment"
+description = "Secret-named env variable with a real value"
+regex = '''(?m)^[A-Z0-9_]*(?:PASSWORD|SECRET|KEYS?|TOKEN)[ \t]*=[ \t]*["']?([^\s"'$#<][^\s"'#]{7,})'''
+secretGroup = 1
+keywords = ["password", "secret", "key", "token"]
+
+[[allowlists]]
+description = "Vendored AI agent skill docs that quote fake secrets as bad examples"
+paths = ['''^\.(agents|claude|cursor|junie)/skills/''']
+
+# .env.example's empty DB_PASSWORD= makes the generic rule read the next line
+# as its value. Only that exact line is excused: a broader pattern would also
+# hide a real secret written on the line after an empty one.
+[[allowlists]]
+description = "DB_CHARSET line read as the value of the empty DB_PASSWORD above it"
+targetRules = ["generic-api-key"]
+regexTarget = "secret"
+regexes = ['''^DB_CHARSET=utf8mb4$''']

@@ -6,6 +6,7 @@ use App\Enums\ReportStatus;
 use App\Enums\ResultType;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Models\AnnualPlan;
 use App\Models\HrEmployee;
 use App\Models\Milestone;
 use App\Models\PlanIndicator;
@@ -14,7 +15,6 @@ use App\Models\Project;
 use App\Models\Report;
 use App\Models\Result;
 use App\Models\Risk;
-use App\Models\AnnualPlan;
 use App\Models\Task;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
@@ -23,9 +23,11 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -34,6 +36,7 @@ use Livewire\WithPagination;
 new #[Title('titles.program')] class extends Component {
     use WithPagination;
 
+    #[Locked]
     public int $programId;
 
     #[Url(except: 'projects')]
@@ -425,7 +428,7 @@ new #[Title('titles.program')] class extends Component {
      * milestone's project. A program-direct task has no project and groups
      * separately.
      */
-    public function taskProjectId(Task $task): ?int
+    protected function taskProjectId(Task $task): ?int
     {
         return match ($task->source_type) {
             'project' => $task->source_id,
@@ -443,6 +446,8 @@ new #[Title('titles.program')] class extends Component {
 
     public function openAddTaskModal(): void
     {
+        Gate::authorize('create', Task::class);
+
         $this->resetValidation();
         $this->newTaskTitle = '';
         $this->newTaskStatus = TaskStatus::Todo->value;
@@ -465,6 +470,8 @@ new #[Title('titles.program')] class extends Component {
      */
     public function addTask(): void
     {
+        Gate::authorize('create', Task::class);
+
         $this->newTaskTitle = trim($this->newTaskTitle);
 
         $validated = $this->validate([
@@ -654,13 +661,13 @@ new #[Title('titles.program')] class extends Component {
     @elseif ($tab === 'tasks')
         <x-ui.panel :title="__('common.tasks')" :count="$this->tasks->count()" :subtitle="__('programs.tasks_across_the_program_its_projects_and_their_milestones')">
             <x-slot:toolbar>
-                <x-ui.button tone="primary" size="sm" icon="plus" wire:click="openAddTaskModal" data-test="add-program-task-button">{{ __('tasks.add_task') }}</x-ui.button>
+                @can('create', App\Models\Task::class)<x-ui.button tone="primary" size="sm" icon="plus" wire:click="openAddTaskModal" data-test="add-program-task-button">{{ __('tasks.add_task') }}</x-ui.button>@endcan
             </x-slot:toolbar>
 
             @if ($this->tasks->isEmpty())
                 <x-ui.empty-state icon="clipboard-document-list" :heading="__('common.no_tasks_yet')" :body="__('programs.tasks_for_this_program_will_appear_here')">
                     <x-slot:action>
-                        <x-ui.button size="sm" tone="primary" icon="plus" wire:click="openAddTaskModal">{{ __('tasks.add_task') }}</x-ui.button>
+                        @can('create', App\Models\Task::class)<x-ui.button size="sm" tone="primary" icon="plus" wire:click="openAddTaskModal">{{ __('tasks.add_task') }}</x-ui.button>@endcan
                     </x-slot:action>
                 </x-ui.empty-state>
             @else

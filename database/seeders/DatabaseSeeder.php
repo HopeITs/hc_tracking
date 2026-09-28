@@ -19,6 +19,10 @@ class DatabaseSeeder extends Seeder
      *
      * Runs with activity recording off: seeded data is history, not news, so
      * it must never produce activity or notifications.
+     *
+     * Only demo data belongs here. The organisation's real records are
+     * opt-in via RealDataSeeder, and demo notifications via
+     * NotificationDemoSeeder.
      */
     public function run(): void
     {
@@ -30,17 +34,6 @@ class DatabaseSeeder extends Seeder
                 DeliverySeeder::class,
                 MealSeeder::class,
                 FinanceSeeder::class,
-                NotificationDemoSeeder::class,
-                RealAccountsSeeder::class,
-                RealDonorsSeeder::class,
-                  RealProjectsSeeder::class,
-                RealMilestonesSeeder::class,
-
-                RealProposalsSeeder::class,
-                RealResultsSeeder::class,
-                RealRisksSeeder::class,
-                RealTasksSeeder::class,
-                RolesAndPermissionsSeeder::class
             ]);
         });
     }

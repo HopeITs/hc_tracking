@@ -144,8 +144,13 @@ return [
 
     'passkeys' => [
         'relying_party_id' => parse_url(config('app.url'), PHP_URL_HOST),
-        'allowed_origins' => [config('app.url')],
-        'user_handle_secret' => env('PASSKEYS_USER_HANDLE_SECRET', config('app.key')),
+        // A WebAuthn origin is scheme://host[:port], so any path or trailing
+        // slash on APP_URL (http://127.0.0.1:8000/) is cut off here.
+        'allowed_origins' => [preg_replace('#^([a-z][a-z0-9+.-]*://[^/?\#]+).*$#i', '$1', (string) config('app.url'))],
+        // Falls back to APP_KEY, which existing passkeys were registered with.
+        // `?:` so an empty PASSKEYS_USER_HANDLE_SECRET= also falls back rather
+        // than keying user handles with an empty string.
+        'user_handle_secret' => env('PASSKEYS_USER_HANDLE_SECRET') ?: config('app.key'),
         'timeout' => 60000,
     ],
 
@@ -167,7 +172,10 @@ return [
         //
         // Password reset is disabled too: passwords belong to the HR system and
         // are changed there, so a tracking reset link could never change them.
-        Features::emailVerification(),
+        //
+        // Email verification is off as well: addresses come from HR, the User
+        // model never required it, and its resend endpoint only let a signed-in
+        // user trigger outgoing emails.
         Features::twoFactorAuthentication([
             'confirm' => true,
             'confirmPassword' => true,

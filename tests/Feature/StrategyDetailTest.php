@@ -14,7 +14,7 @@ test('guests are redirected from strategy detail', function () {
 });
 
 test('strategy detail shows the strategy its period and its programs', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $manager = insertHrEmployee(firstNameEn: 'Layla', lastNameEn: 'Haddad');
     $strategy = Strategy::factory()->create([
         'name' => 'Country Strategy',
@@ -37,7 +37,7 @@ test('strategy detail shows the strategy its period and its programs', function 
 });
 
 test('strategy detail does not show another strategy programs', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $subject = Strategy::factory()->create(['name' => 'Country Strategy']);
     $other = Strategy::factory()->create(['name' => 'Regional Strategy']);
 
@@ -52,7 +52,7 @@ test('strategy detail does not show another strategy programs', function () {
 });
 
 test('strategy detail renders a strategy with no programs', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $strategy = Strategy::factory()->create(['name' => 'Empty Strategy']);
 
     $this->actingAs($user)
@@ -63,7 +63,7 @@ test('strategy detail renders a strategy with no programs', function () {
 });
 
 test('plan coverage is the share of the strategy span with an annual plan carrying a committed target, capped at 100', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $strategy = Strategy::factory()->create(['start_year' => 2026, 'end_year' => 2029]);
     $program = Program::factory()->create(['name' => 'Water Security', 'strategy_id' => $strategy->id]);
 
@@ -83,7 +83,7 @@ test('plan coverage is the share of the strategy span with an annual plan carryi
 });
 
 test('an annual plan with no committed indicator targets does not count toward coverage', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $strategy = Strategy::factory()->create(['start_year' => 2026, 'end_year' => 2027]);
     $program = Program::factory()->create(['strategy_id' => $strategy->id]);
 
@@ -97,7 +97,7 @@ test('an annual plan with no committed indicator targets does not count toward c
 });
 
 test('each program row shows its own covered-years fraction and tones the bar accordingly', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $strategy = Strategy::factory()->create(['start_year' => 2026, 'end_year' => 2027]);
     $uncovered = Program::factory()->create(['name' => 'Uncovered Program', 'strategy_id' => $strategy->id]);
     $fullyCovered = Program::factory()->create(['name' => 'Fully Covered Program', 'strategy_id' => $strategy->id]);
@@ -118,7 +118,7 @@ test('each program row shows its own covered-years fraction and tones the bar ac
 });
 
 test('the strategy detail stat tiles each carry an icon badge', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $strategy = Strategy::factory()->create();
 
     $html = $this->actingAs($user)->get(route('strategies.show', $strategy))->getContent();
@@ -131,7 +131,7 @@ test('the strategy detail stat tiles each carry an icon badge', function () {
 });
 
 test('the strategy detail programs table sorts by projects descending', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $strategy = Strategy::factory()->create();
     $fewer = Program::factory()->create(['name' => 'Fewer Projects Program', 'strategy_id' => $strategy->id]);
     $more = Program::factory()->create(['name' => 'More Projects Program', 'strategy_id' => $strategy->id]);
@@ -145,7 +145,7 @@ test('the strategy detail programs table sorts by projects descending', function
 });
 
 test('the strategy detail programs table paginates at 15 rows and totals reflect every program', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $strategy = Strategy::factory()->create(['start_year' => 2026, 'end_year' => 2026]);
     Program::factory()->count(17)->sequence(fn ($sequence) => ['name' => 'Program '.str_pad((string) ($sequence->index + 1), 2, '0', STR_PAD_LEFT)])->create(['strategy_id' => $strategy->id]);
 
@@ -168,7 +168,7 @@ test('the strategy detail programs table paginates at 15 rows and totals reflect
 });
 
 test('an active strategy is shown with the good/green status tone, not the brand red', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $strategy = Strategy::factory()->create(['start_year' => now()->year, 'end_year' => now()->year + 2]);
 
     $this->actingAs($user)
@@ -179,7 +179,7 @@ test('an active strategy is shown with the good/green status tone, not the brand
 });
 
 test('the strategy detail page has no timeline, only the aggregate plan coverage tile', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $strategy = Strategy::factory()->create(['start_year' => 2026, 'end_year' => 2030]);
     $program = Program::factory()->create(['strategy_id' => $strategy->id]);
     AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2026]);
@@ -193,7 +193,7 @@ test('the strategy detail page has no timeline, only the aggregate plan coverage
 });
 
 test('the strategy detail stat row totals equal the sum across programs', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $strategy = Strategy::factory()->create();
     $first = Program::factory()->create(['strategy_id' => $strategy->id]);
     $second = Program::factory()->create(['strategy_id' => $strategy->id]);
@@ -210,7 +210,7 @@ test('the strategy detail stat row totals equal the sum across programs', functi
 });
 
 test('the projects and annual plans stat tiles link to their own pages, not programs', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $strategy = Strategy::factory()->create();
 
     $this->actingAs($user)

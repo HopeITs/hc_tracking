@@ -19,6 +19,9 @@
             </div>
         </div>
         <flux:menu.separator />
+        <flux:menu.item :href="route('security.edit')" icon="shield-check" class="touch-manipulation" data-test="security-menu-item">
+            {{ __('common.security') }}
+        </flux:menu.item>
         <form method="POST" action="{{ route('logout') }}" class="w-full">
             @csrf
             <flux:menu.item

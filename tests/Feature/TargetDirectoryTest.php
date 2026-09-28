@@ -20,7 +20,7 @@ test('guests are redirected from the target directory', function () {
 });
 
 test('targets can be filtered by source type', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $planIndicator = Indicator::factory()->create(['name' => 'Committed in a plan']);
     $proposalIndicator = Indicator::factory()->create(['name' => 'Committed in a proposal']);
 
@@ -49,7 +49,7 @@ test('targets can be filtered by source type', function () {
 });
 
 test('a target stores the morph map key and never a class name', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $plan = AnnualPlan::factory()->create();
     $indicator = Indicator::factory()->create();
 
@@ -72,7 +72,7 @@ test('a target stores the morph map key and never a class name', function () {
 });
 
 test('the source type select offers exactly the two mapped sources', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
         ->test('pages::targets.index')
@@ -83,7 +83,7 @@ test('the source type select offers exactly the two mapped sources', function ()
 });
 
 test('changing the source type clears the chosen source', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $plan = AnnualPlan::factory()->create();
 
     Livewire::actingAs($user)
@@ -96,7 +96,7 @@ test('changing the source type clears the chosen source', function () {
 });
 
 test('a target whose source was removed renders instead of throwing', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $plan = AnnualPlan::factory()->create();
     $indicator = Indicator::factory()->create(['name' => 'Orphaned target indicator']);
 
@@ -118,7 +118,7 @@ test('a target whose source was removed renders instead of throwing', function (
 });
 
 test('a target with no project reads as organisation wide', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     PlanIndicator::factory()->create([
         'source_type' => 'annual_plan',
@@ -131,7 +131,7 @@ test('a target with no project reads as organisation wide', function () {
 });
 
 test('an unreported target can be deleted', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $target = PlanIndicator::factory()->create([
         'source_type' => 'annual_plan',
         'source_id' => AnnualPlan::factory()->create()->id,
@@ -147,7 +147,7 @@ test('an unreported target can be deleted', function () {
 });
 
 test('a reported target is not deleted because its reports would cascade', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $target = PlanIndicator::factory()->create([
         'source_type' => 'annual_plan',
         'source_id' => AnnualPlan::factory()->create()->id,
@@ -164,7 +164,7 @@ test('a reported target is not deleted because its reports would cascade', funct
 });
 
 test('a target value that would overflow the decimal column is rejected', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $plan = AnnualPlan::factory()->create();
     $indicator = Indicator::factory()->create();
 
@@ -180,13 +180,13 @@ test('a target value that would overflow the decimal column is rejected', functi
 });
 
 test('the target directory renders with no targets', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)->test('pages::targets.index')->assertSee('No targets yet');
 });
 
 test('achievement counts only approved reports and sums numeric indicators', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $target = PlanIndicator::factory()->create([
         'source_type' => 'annual_plan',
         'source_id' => AnnualPlan::factory()->create()->id,
@@ -208,7 +208,7 @@ test('achievement counts only approved reports and sums numeric indicators', fun
 });
 
 test('a percentage indicator uses its latest approved value instead of a sum', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $target = PlanIndicator::factory()->create([
         'source_type' => 'annual_plan',
         'source_id' => AnnualPlan::factory()->create()->id,
@@ -225,7 +225,7 @@ test('a percentage indicator uses its latest approved value instead of a sum', f
 });
 
 test('the pulse counts and filters targets by achievement status', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $plan = AnnualPlan::factory()->create();
     $make = fn (string $name, float $target) => PlanIndicator::factory()->create([
         'source_type' => 'annual_plan',
@@ -255,7 +255,7 @@ test('the pulse counts and filters targets by achievement status', function () {
 });
 
 test('confirming a delete opens the dialog and cancelling closes it', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $target = PlanIndicator::factory()->create([
         'source_type' => 'annual_plan',
         'source_id' => AnnualPlan::factory()->create()->id,
@@ -271,7 +271,7 @@ test('confirming a delete opens the dialog and cancelling closes it', function (
 });
 
 test('a target shows the program behind its plan and the donors behind its proposal', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create(['name' => 'Livelihoods Programme']);
     $plan = AnnualPlan::factory()->create(['program_id' => $program->id]);
     $proposal = Proposal::factory()->create(['name' => 'Winter Response Proposal']);
@@ -292,7 +292,7 @@ test('a target shows the program behind its plan and the donors behind its propo
 });
 
 test('expanding a target lists its reports with links', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $target = PlanIndicator::factory()->create([
         'source_type' => 'annual_plan',
         'source_id' => AnnualPlan::factory()->create()->id,
@@ -311,7 +311,7 @@ test('expanding a target lists its reports with links', function () {
 });
 
 test('a result with more targets than a page never splits across pages', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $plan = AnnualPlan::factory()->create();
     $indicator = Indicator::factory()->create(['name' => 'Crowded indicator']);
 
@@ -328,7 +328,7 @@ test('a result with more targets than a page never splits across pages', functio
 });
 
 test('targets can be filtered by donor, program and year', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     $program = Program::factory()->create();
     $plan2026 = AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2026]);
@@ -366,7 +366,7 @@ test('targets can be filtered by donor, program and year', function () {
 });
 
 test('the report trail shows evidence files and MEAL visibility', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $target = PlanIndicator::factory()->create([
         'source_type' => 'annual_plan',
         'source_id' => AnnualPlan::factory()->create()->id,
@@ -381,7 +381,7 @@ test('the report trail shows evidence files and MEAL visibility', function () {
 });
 
 test('the indicator chain can open the commit form already tied to an indicator', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $indicator = Indicator::factory()->create(['project_id' => $project->id, 'frequency' => Period::Monthly]);
 
@@ -395,7 +395,7 @@ test('the indicator chain can open the commit form already tied to an indicator'
 });
 
 test('the form offers only the plans and projects that fit the chosen indicator and source', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create();
     $indicator = Indicator::factory()->for(Result::factory()->for($program))->create();
     $fittingPlan = AnnualPlan::factory()->for($program)->create();
@@ -422,7 +422,7 @@ test('the form offers only the plans and projects that fit the chosen indicator 
 });
 
 test('a target that does not fit its chain is refused', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $indicator = Indicator::factory()->for(Result::factory()->for(Program::factory()))->create();
     $otherPlan = AnnualPlan::factory()->create();
 
@@ -453,7 +453,7 @@ test('a target that does not fit its chain is refused', function () {
 });
 
 test('a percentage target above 100 is refused', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $indicator = Indicator::factory()->create(['measure' => IndicatorMeasure::Percentage]);
 
     Livewire::actingAs($user)
@@ -469,7 +469,7 @@ test('a percentage target above 100 is refused', function () {
 });
 
 test('the same indicator cannot be targeted twice in one source for one project', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $existing = PlanIndicator::factory()->create();
 
     Livewire::actingAs($user)
@@ -486,7 +486,7 @@ test('the same indicator cannot be targeted twice in one source for one project'
 });
 
 test('a reported target keeps its indicator and source but its value can still change', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $target = PlanIndicator::factory()->create(['target' => 100]);
     Report::factory()->for($target)->create();
 
@@ -508,7 +508,7 @@ test('a reported target keeps its indicator and source but its value can still c
 });
 
 test('a target already out of step is flagged but its value can still be corrected', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $indicator = Indicator::factory()->for(Result::factory()->for(Program::factory()))->create();
     $target = PlanIndicator::factory()
         ->forAnnualPlan(AnnualPlan::factory()->create())
@@ -527,7 +527,7 @@ test('a target already out of step is flagged but its value can still be correct
 });
 
 test('targets can be scoped to one indicator or one result from a deep link', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $shown = Indicator::factory()->create(['name' => 'Scoped indicator']);
     $hidden = Indicator::factory()->create(['name' => 'Other indicator']);
     PlanIndicator::factory()->create(['indicator_id' => $shown->id]);
@@ -550,7 +550,7 @@ test('targets can be scoped to one indicator or one result from a deep link', fu
 });
 
 test('the program filter reaches an organisation-wide proposal target through its result', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create();
     $indicator = Indicator::factory()->for(Result::factory()->for($program))->create(['name' => 'Program logframe indicator']);
     PlanIndicator::factory()->forProposal(Proposal::factory()->create())->create(['indicator_id' => $indicator->id]);
@@ -562,7 +562,7 @@ test('the program filter reaches an organisation-wide proposal target through it
 });
 
 test('each target links to recording a report against it', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $target = PlanIndicator::factory()->create();
 
     Livewire::actingAs($user)

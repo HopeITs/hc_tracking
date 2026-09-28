@@ -7,6 +7,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -22,8 +23,10 @@ new #[Title('titles.strategies')] class extends Component {
     public string $status = '';
 
     public bool $showStrategyModal = false;
+    #[Locked]
     public ?int $editingStrategyId = null;
     public bool $showDeleteModal = false;
+    #[Locked]
     public ?int $deletingStrategyId = null;
     public string $name = '';
     public string $startYear = '';
@@ -70,7 +73,7 @@ new #[Title('titles.strategies')] class extends Component {
      *
      * programs.strategy_id RESTRICTs: a strategy carrying any programs stays.
      */
-    public function canDelete(int $strategyId): bool
+    protected function canDelete(int $strategyId): bool
     {
         $strategy = Strategy::query()->select(['id'])->withCount('programs')->find($strategyId);
 

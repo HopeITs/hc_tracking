@@ -9,6 +9,7 @@ use App\Models\Milestone;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\Scopes\TaskVisibilityScope;
 use App\Models\Task;
 use App\Models\TaskAssignee;
 use App\Notifications\UnreadSubjects;
@@ -20,9 +21,11 @@ use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -100,10 +103,13 @@ new #[Title('titles.tasks')] class extends Component
 
     public bool $showTaskDrawer = false;
 
+    #[Locked]
     public ?int $editingTaskId = null;
 
+    #[Locked]
     public ?int $editingTaskCreatedBy = null;
 
+    #[Locked]
     public ?int $deletingTaskId = null;
 
     public bool $showDeleteModal = false;
@@ -393,7 +399,7 @@ new #[Title('titles.tasks')] class extends Component
                 // a subtask panel in place (client-side, no extra round trip) instead
                 // of sending people to the parent task's own page to see them. Each
                 // subtask's own assignees are loaded the same way as the parent's.
-                'subtasks:id,parent_task_id,title,status,priority,due_date',
+                'subtasks:id,parent_task_id,title,status,priority,due_date,created_by',
                 'subtasks.taskAssignees.employee:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
             ])
             ->when($search !== '', function (Builder $query) use ($search): void {
@@ -434,8 +440,7 @@ new #[Title('titles.tasks')] class extends Component
                         fn (Builder $query) => $query->where('employee_id', $employeeId),
                     ))
                     ->orWhere('created_by', $user->id));
-            })
-            ->tap(fn (Builder $query) => $this->applyViewerDepartmentScope($query));
+            });
     }
 
     /**
@@ -862,6 +867,8 @@ new #[Title('titles.tasks')] class extends Component
 
     public function openCreateDrawer(?string $dueDate = null, ?string $status = null, ?string $milestoneId = null): void
     {
+        Gate::authorize('create', Task::class);
+
         $this->resetTaskForm();
 
         if ($dueDate !== null) {
@@ -899,6 +906,8 @@ new #[Title('titles.tasks')] class extends Component
      */
     public function quickCreateTask(string $title, ?string $status = null, ?string $milestoneId = null, ?string $rowKey = null, ?string $dueDate = null): void
     {
+        Gate::authorize('create', Task::class);
+
         $title = trim($title);
 
         if ($title === '') {
@@ -974,7 +983,7 @@ new #[Title('titles.tasks')] class extends Component
      *
      * @return array{status: string, priority: string, due_date: string, assignees: array<int, string>}
      */
-    public function taskDraft(string $rowKey, ?string $defaultStatus = null): array
+    protected function taskDraft(string $rowKey, ?string $defaultStatus = null): array
     {
         $defaults = [
             'status' => $defaultStatus ?? TaskStatus::Todo->value,
@@ -1044,7 +1053,7 @@ new #[Title('titles.tasks')] class extends Component
      *
      * @return array{status: string, priority: string, due_date: string, assignees: array<int, string>}
      */
-    public function subtaskDraft(Task $parent): array
+    protected function subtaskDraft(Task $parent): array
     {
         $defaults = [
             'status' => TaskStatus::Todo->value,
@@ -1100,6 +1109,8 @@ new #[Title('titles.tasks')] class extends Component
             return;
         }
 
+        Gate::authorize('create', Task::class);
+
         $draft = $this->subtaskDraft($parent);
         $status = TaskStatus::tryFrom($draft['status']) ?? TaskStatus::Todo;
         $priority = TaskPriority::tryFrom($draft['priority']) ?? TaskPriority::Medium;
@@ -1144,6 +1155,8 @@ new #[Title('titles.tasks')] class extends Component
             ->with('taskAssignees:id,task_id,employee_id')
             ->findOrFail($taskId);
 
+        Gate::authorize('update', $task);
+
         $this->resetValidation();
         $this->editingTaskId = $task->id;
         $this->editingTaskCreatedBy = $task->created_by;
@@ -1163,6 +1176,12 @@ new #[Title('titles.tasks')] class extends Component
 
     public function saveTask(): void
     {
+        if ($this->editingTaskId === null) {
+            Gate::authorize('create', Task::class);
+        } else {
+            Gate::authorize('update', Task::query()->findOrFail($this->editingTaskId));
+        }
+
         $this->trimTaskForm();
 
         $validated = $this->validate([
@@ -1256,6 +1275,8 @@ new #[Title('titles.tasks')] class extends Component
 
     public function confirmDelete(int $taskId): void
     {
+        Gate::authorize('delete', Task::query()->findOrFail($taskId));
+
         $this->deletingTaskId = $taskId;
         $this->showDeleteModal = true;
         unset($this->deletingTask);
@@ -1278,9 +1299,11 @@ new #[Title('titles.tasks')] class extends Component
         $deleted = DB::transaction(function () use ($taskId): bool {
             $task = Task::query()->lockForUpdate()->find($taskId);
 
-            if ($task === null || $task->subtasks()->exists()) {
+            if ($task === null || $task->subtasks()->withoutGlobalScope(TaskVisibilityScope::class)->exists()) {
                 return false;
             }
+
+            Gate::authorize('delete', $task);
 
             return (bool) $task->delete();
         });
@@ -1307,6 +1330,8 @@ new #[Title('titles.tasks')] class extends Component
         if ($task === null) {
             return;
         }
+
+        Gate::authorize('updateStatus', $task);
 
         if ($task->status === TaskStatus::Done) {
             Flux::toast(variant: 'danger', text: __('tasks.completed_tasks_cannot_change_status'));
@@ -1342,6 +1367,8 @@ new #[Title('titles.tasks')] class extends Component
             return;
         }
 
+        Gate::authorize('updateStatus', $task);
+
         if ($task->status === TaskStatus::Done) {
             Flux::toast(variant: 'danger', text: __('tasks.completed_tasks_cannot_change_status'));
 
@@ -1375,6 +1402,8 @@ new #[Title('titles.tasks')] class extends Component
             return;
         }
 
+        Gate::authorize('update', $task);
+
         $task->priority = $newPriority;
         $task->save();
 
@@ -1395,6 +1424,8 @@ new #[Title('titles.tasks')] class extends Component
         if ($task === null || ! HrEmployee::query()->whereKey($employeeId)->exists()) {
             return;
         }
+
+        Gate::authorize('update', $task);
 
         $existing = $task->taskAssignees()->where('employee_id', $employeeId)->first();
 
@@ -1428,6 +1459,8 @@ new #[Title('titles.tasks')] class extends Component
         if ($task === null) {
             return;
         }
+
+        Gate::authorize('update', $task);
 
         if ($task->created_by !== auth()->id()) {
             Flux::toast(variant: 'danger', text: __('tasks.only_the_task_creator_can_change_the_due_date'));
@@ -1525,7 +1558,9 @@ new #[Title('titles.tasks')] class extends Component
             @endif
         </x-slot:filters>
         <x-slot:actions>
-            <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateDrawer" data-test="create-task-button">{{ __('tasks.add_task') }}</x-ui.button>
+            @can('create', App\Models\Task::class)
+                <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateDrawer" data-test="create-task-button">{{ __('tasks.add_task') }}</x-ui.button>
+            @endcan
         </x-slot:actions>
     </x-ui.page-header>
 
@@ -1567,10 +1602,16 @@ new #[Title('titles.tasks')] class extends Component
                     <div
                         role="button"
                         tabindex="0"
-                        wire:click="openEditDrawer({{ $myTask->id }})"
+                        @can('update', $myTask)
+                            wire:click="openEditDrawer({{ $myTask->id }})"
+                            x-on:keydown="if (! $event.target.closest('a') && ($event.key === 'Enter' || $event.key === ' ')) { $event.preventDefault(); $wire.openEditDrawer({{ $myTask->id }}) }"
+                        @else
+                            {{-- Only the status is theirs to change: open the task's own page. --}}
+                            x-on:click="if (! $event.target.closest('a')) { Livewire.navigate({{ Illuminate\Support\Js::from(route('tasks.show', $myTask)) }}) }"
+                            x-on:keydown="if (! $event.target.closest('a') && ($event.key === 'Enter' || $event.key === ' ')) { $event.preventDefault(); Livewire.navigate({{ Illuminate\Support\Js::from(route('tasks.show', $myTask)) }}) }"
+                        @endcan
                         wire:key="my-task-{{ $myTask->id }}"
                         data-test="my-task-card-{{ $myTask->id }}"
-                        x-on:keydown="if (! $event.target.closest('a') && ($event.key === 'Enter' || $event.key === ' ')) { $event.preventDefault(); $wire.openEditDrawer({{ $myTask->id }}) }"
                         @class([
                             'flex w-64 shrink-0 flex-col gap-2 rounded-xl border p-3 text-left shadow-sm transition-shadow hover:shadow-md dark:bg-secondary-dark',
                             'border-primary/30 bg-white dark:border-status-critical/30' => $isAssignedToMe,
@@ -1695,7 +1736,7 @@ new #[Title('titles.tasks')] class extends Component
                 <x-slot:action>
                     @if ($filtersAreActive)
                         <x-ui.button size="sm" wire:click="clearFilters">{{ __('common.reset_filters') }}</x-ui.button>
-                    @else
+                    @elseif (auth()->user()->can('create', App\Models\Task::class))
                         <x-ui.button size="sm" tone="primary" icon="plus" wire:click="openCreateDrawer">{{ __('tasks.add_task') }}</x-ui.button>
                     @endif
                 </x-slot:action>

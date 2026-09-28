@@ -8,12 +8,14 @@ use App\Concerns\HasSlug;
 use App\Concerns\RecordsActivity;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Models\Scopes\TaskVisibilityScope;
 use App\Notifications\TracksActivity;
 use App\Observers\ScheduleItemObserver;
 use Carbon\CarbonImmutable;
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -53,6 +55,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
     'created_by',
 ])]
 #[ObservedBy(ScheduleItemObserver::class)]
+#[ScopedBy([TaskVisibilityScope::class])]
 class Task extends Model implements TracksActivity
 {
     /** @use HasFactory<TaskFactory> */

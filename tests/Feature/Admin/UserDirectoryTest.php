@@ -138,7 +138,7 @@ test('administrators can give an hr account access with an initial role', functi
         ->and($user->email_verified_at)->not->toBeNull();
 });
 
-test('administrators can give an hr account access with no role', function () {
+test('an hr account given access with no role chosen starts as Team Member', function () {
     $admin = accessAdmin();
     $hrUserId = insertHrUser(insertHrEmployee(), 'dana@example.org');
 
@@ -151,8 +151,8 @@ test('administrators can give an hr account access with no role', function () {
 
     $user = User::query()->where('hr_user_id', $hrUserId)->sole();
 
-    expect($user->roles)->toBeEmpty()
-        ->and($user->active_role_id)->toBeNull();
+    expect($user->roles->pluck('name')->all())->toBe(['Team Member'])
+        ->and($user->activeRole?->name)->toBe('Team Member');
 });
 
 test('hr accounts that already have access are not offered again', function () {
@@ -208,7 +208,7 @@ test('selecting a user loads their assigned roles, active role, and direct permi
     Livewire::actingAs($admin)
         ->test('pages::admin.users')
         ->call('selectUser', $user->id)
-        ->assertSet('userRoleIds', [$managers->id, $meal->id])
+        ->assertSet('userRoleIds', fn (array $ids): bool => collect($ids)->sort()->values()->all() === collect([$managers->id, $meal->id])->sort()->values()->all())
         ->assertSet('userActiveRoleId', $meal->id)
         ->assertSet('userPermissionIds', [$permission->id]);
 });
@@ -231,7 +231,7 @@ test('administrators can assign multiple roles, pick an active role, and grant a
 
     $refreshed = $user->refresh();
 
-    expect($refreshed->roles->pluck('id')->sort()->values()->all())->toBe([$officer->id, $managers->id])
+    expect($refreshed->roles->pluck('id')->all())->toEqualCanonicalizing([$officer->id, $managers->id])
         ->and($refreshed->active_role_id)->toBe($managers->id)
         ->and($refreshed->permissions->pluck('id')->all())->toBe([$permission->id])
         ->and($refreshed->name)->toBe('Rana Darwish')

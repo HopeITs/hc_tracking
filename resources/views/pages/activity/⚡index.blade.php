@@ -191,7 +191,7 @@ new #[Title('titles.activity_log')] class extends Component {
      * risk runs warn amber, everything else runs the neutral program-delivery
      * ink.
      */
-    public function moduleTone(string $module): string
+    protected function moduleTone(string $module): string
     {
         return match ($module) {
             'donors', 'proposals', 'funding-agreements', 'transfers', 'accounts' => 'funding',

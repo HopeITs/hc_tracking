@@ -22,7 +22,7 @@ test('guests are redirected from the indicator directory', function () {
 });
 
 test('indicators can be filtered by search result and measure', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $first = Result::factory()->create(['statement' => 'Access improved.']);
     $second = Result::factory()->create(['statement' => 'Hygiene improved.']);
 
@@ -47,7 +47,7 @@ test('indicators can be filtered by search result and measure', function () {
 });
 
 test('an indicator can be created against a result', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $result = Result::factory()->create();
 
     Livewire::actingAs($user)
@@ -66,7 +66,7 @@ test('an indicator can be created against a result', function () {
 });
 
 test('creating an indicator requires a name and a result', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
         ->test('pages::indicators.index')
@@ -78,7 +78,7 @@ test('creating an indicator requires a name and a result', function () {
 });
 
 test('an indicator can be created with a unit baseline target frequency and project', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $result = Result::factory()->create();
     $project = Project::factory()->create();
 
@@ -106,7 +106,7 @@ test('an indicator can be created with a unit baseline target frequency and proj
 });
 
 test('an indicator unit longer than the column can hold is rejected', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $result = Result::factory()->create();
 
     Livewire::actingAs($user)
@@ -123,7 +123,7 @@ test('an indicator unit longer than the column can hold is rejected', function (
 });
 
 test('a reading can be logged against an indicator', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $indicator = Indicator::factory()->create(['baseline' => 100, 'target' => 500]);
 
     Livewire::actingAs($user)
@@ -144,7 +144,7 @@ test('a reading can be logged against an indicator', function () {
 });
 
 test('an indicator with no target shows an em dash instead of percent achieved', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $indicator = Indicator::factory()->untargeted()->create(['name' => 'Untargeted indicator']);
 
     Livewire::actingAs($user)
@@ -156,7 +156,7 @@ test('an indicator with no target shows an em dash instead of percent achieved',
 });
 
 test('an untargeted indicator can be deleted', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $indicator = Indicator::factory()->create();
 
     Livewire::actingAs($user)
@@ -169,7 +169,7 @@ test('an untargeted indicator can be deleted', function () {
 });
 
 test('an indicator carrying a target is not deleted because targets and reports would cascade', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $indicator = Indicator::factory()->create();
     $target = PlanIndicator::factory()->create([
         'indicator_id' => $indicator->id,
@@ -187,13 +187,13 @@ test('an indicator carrying a target is not deleted because targets and reports 
 });
 
 test('the indicator directory renders with no indicators', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)->test('pages::indicators.index')->assertSee('No indicators yet');
 });
 
 test('the rating band narrows the directory to indicators rated that colour', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     // Sitting on its target all year rates green; sitting on its baseline rates red.
     $green = Indicator::factory()->create(['name' => 'Wells fully repaired', 'baseline' => 0, 'target' => 100]);
@@ -216,7 +216,7 @@ test('the rating band narrows the directory to indicators rated that colour', fu
 });
 
 test('the attention chips narrow the directory and count what they would show', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     $measured = Indicator::factory()->create(['name' => 'Measured indicator']);
     IndicatorProgress::factory()->create(['indicator_id' => $measured->id, 'date' => now()->toDateString()]);
@@ -242,7 +242,7 @@ test('the attention chips narrow the directory and count what they would show', 
 });
 
 test('an indicator whose last reading is older than its own frequency needs a reading', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     $stale = Indicator::factory()->measuredEvery(Period::Monthly)->create(['name' => 'Monthly indicator']);
     IndicatorProgress::factory()->create(['indicator_id' => $stale->id, 'date' => now()->subMonths(3)->toDateString()]);
@@ -258,8 +258,8 @@ test('an indicator whose last reading is older than its own frequency needs a re
 });
 
 test('the chain inspector shows the readings and the targets behind one indicator', function () {
-    $user = User::factory()->create();
-    $recorder = User::factory()->create(['name' => 'Rana Saleh']);
+    $user = User::factory()->role('General Manager')->create();
+    $recorder = User::factory()->role('General Manager')->create(['name' => 'Rana Saleh']);
     $indicator = Indicator::factory()->create(['name' => 'Households reached']);
 
     IndicatorProgress::factory()->create([
@@ -290,7 +290,7 @@ test('the chain inspector shows the readings and the targets behind one indicato
 });
 
 test('the delete and reading dialogs are driven by a boolean the modal can bind to', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $indicator = Indicator::factory()->create();
 
     Livewire::actingAs($user)
@@ -307,7 +307,7 @@ test('the delete and reading dialogs are driven by a boolean the modal can bind 
 });
 
 test('the table view renders the same indicators as the cards', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Indicator::factory()->create(['name' => 'Wells rehabilitated']);
 
     Livewire::actingAs($user)
@@ -318,7 +318,7 @@ test('the table view renders the same indicators as the cards', function () {
 });
 
 test('a new reading refreshes the figures in the same request', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $indicator = Indicator::factory()->create(['baseline' => 0, 'target' => 200]);
 
     $component = Livewire::actingAs($user)->test('pages::indicators.index');
@@ -335,7 +335,7 @@ test('a new reading refreshes the figures in the same request', function () {
 });
 
 test('the directory reads a flat number of queries however many indicators there are', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     $seed = function (int $indicators): void {
         foreach (range(1, $indicators) as $index) {
@@ -374,7 +374,7 @@ test('the directory reads a flat number of queries however many indicators there
 });
 
 test('the page shows what was achieved against what was committed, counting approved reports only', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $indicator = Indicator::factory()->create(['name' => 'Meals distributed']);
 
     $target = PlanIndicator::factory()->create([
@@ -402,7 +402,7 @@ test('the page shows what was achieved against what was committed, counting appr
 });
 
 test('a draft report past its planned date counts as reporting overdue', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     $late = Indicator::factory()->create(['name' => 'Late reporter']);
     $lateTarget = PlanIndicator::factory()->create([
@@ -440,7 +440,7 @@ test('a draft report past its planned date counts as reporting overdue', functio
 });
 
 test('the chain inspector shows the statements this indicator rolls up through', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     $outcome = Result::factory()->create(['statement' => 'Livelihoods restored.', 'type' => ResultType::Outcome]);
     $output = Result::factory()->create([
@@ -459,7 +459,7 @@ test('the chain inspector shows the statements this indicator rolls up through',
 });
 
 test('the results framework can open the form already tied to a statement, or open one indicator chain', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $result = Result::factory()->create();
     $indicator = Indicator::factory()->create();
 
@@ -477,7 +477,7 @@ test('the results framework can open the form already tied to a statement, or op
 });
 
 test('only projects delivering the result program are offered, and any other is refused', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create();
     $result = Result::factory()->for($program)->create();
     $inside = Project::factory()->for($program)->create();
@@ -500,7 +500,7 @@ test('only projects delivering the result program are offered, and any other is 
 });
 
 test('a percentage indicator carries no unit and cannot target more than 100', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $result = Result::factory()->create();
 
     Livewire::actingAs($user)
@@ -522,7 +522,7 @@ test('a percentage indicator carries no unit and cannot target more than 100', f
 });
 
 test('the measure is locked once a target is committed against the indicator', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $indicator = Indicator::factory()->create(['measure' => IndicatorMeasure::Numeric]);
     PlanIndicator::factory()->create(['indicator_id' => $indicator->id]);
 
@@ -539,7 +539,7 @@ test('the measure is locked once a target is committed against the indicator', f
 });
 
 test('an edit that would put a committed target out of its chain is refused', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create();
     $indicator = Indicator::factory()->for(Result::factory()->for($program))->create();
     PlanIndicator::factory()
@@ -558,7 +558,7 @@ test('an edit that would put a committed target out of its chain is refused', fu
 });
 
 test('a reading cannot be dated in the future', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $indicator = Indicator::factory()->create();
 
     Livewire::actingAs($user)
@@ -573,8 +573,8 @@ test('a reading cannot be dated in the future', function () {
 });
 
 test('a logged reading can be corrected and deleted, keeping who recorded it', function () {
-    $user = User::factory()->create();
-    $recorder = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
+    $recorder = User::factory()->role('General Manager')->create();
     $reading = IndicatorProgress::factory()->create(['value' => 10, 'recorded_by' => $recorder->id, 'date' => now()->subWeek()->toDateString()]);
 
     $component = Livewire::actingAs($user)
@@ -599,7 +599,7 @@ test('a logged reading can be corrected and deleted, keeping who recorded it', f
 });
 
 test('a reading of another indicator cannot be deleted from this one', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $inspected = Indicator::factory()->create();
     $foreign = IndicatorProgress::factory()->create();
 
@@ -614,7 +614,7 @@ test('a reading of another indicator cannot be deleted from this one', function 
 });
 
 test('an inspected target that does not fit its chain says why', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $indicator = Indicator::factory()->for(Result::factory()->for(Program::factory()))->create();
     PlanIndicator::factory()
         ->forAnnualPlan(AnnualPlan::factory()->create())

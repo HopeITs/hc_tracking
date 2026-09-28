@@ -435,7 +435,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
     /**
      * The key a month's quarter is filed under, e.g. 2026-Q3.
      */
-    public function quarterKey(CarbonInterface $date): string
+    protected function quarterKey(CarbonInterface $date): string
     {
         return $date->year.'-Q'.$date->quarter;
     }
@@ -444,7 +444,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
      * How many months a date sits after the calendar's first month, with the
      * day as a fraction, so a lane can place it at `offset × month width`.
      */
-    public function monthOffset(CarbonInterface $start, CarbonInterface $date): float
+    protected function monthOffset(CarbonInterface $start, CarbonInterface $date): float
     {
         $wholeMonths = ($date->year - $start->year) * 12 + ($date->month - $start->month);
 
@@ -456,7 +456,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
      *
      * @return 'received'|'failed'|'transit'|'late'|'upcoming'
      */
-    public function trancheState(TransfersTracking $transfer): string
+    protected function trancheState(TransfersTracking $transfer): string
     {
         return $transfer->state();
     }
@@ -465,7 +465,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
      * A whole percentage of $of, floored so nothing is claimed early, but
      * never shown as 0 while there is something to count.
      */
-    public function percentLabel(float $value, float $of): string
+    protected function percentLabel(float $value, float $of): string
     {
         return DonorProposal::percentLabel($value, $of);
     }
@@ -480,7 +480,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
      *
      * @return array{received: float, pending: float, unscheduled: float, share: int, percentLabel: string, missingNet: int, otherCurrencies: array<string, float>, overdueSince: ?CarbonImmutable, overdueAmount: float, failedAmount: float, nextDue: ?CarbonImmutable, accounts: list<string>}
      */
-    public function agreementMoney(DonorProposal $agreement): array
+    protected function agreementMoney(DonorProposal $agreement): array
     {
         $currency = $agreement->currency;
         $budget = (float) $agreement->budget;

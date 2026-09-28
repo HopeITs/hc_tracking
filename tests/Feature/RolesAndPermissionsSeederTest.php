@@ -4,7 +4,7 @@ use App\Models\Permission;
 use App\Models\Role;
 use Database\Seeders\RolesAndPermissionsSeeder;
 
-test('the seeder creates one permission per module action and all 8 roles', function () {
+test('the seeder creates one permission per module action and all 9 roles', function () {
     (new RolesAndPermissionsSeeder)->run();
 
     foreach (config('access-control.groups') as $module => $actions) {
@@ -15,7 +15,7 @@ test('the seeder creates one permission per module action and all 8 roles', func
 
     expect(Role::query()->pluck('name')->all())->toEqualCanonicalizing([
         'Financial', 'Media Team', 'MEAL', 'Public Relations',
-        'Public Relations Manager', 'Managers', 'Super Admin', 'General Manager',
+        'Public Relations Manager', 'Managers', 'Super Admin', 'General Manager', 'Team Member',
     ]);
 });
 
@@ -32,7 +32,7 @@ test('running the seeder twice does not duplicate roles or permissions', functio
     (new RolesAndPermissionsSeeder)->run();
     (new RolesAndPermissionsSeeder)->run();
 
-    expect(Role::query()->count())->toBe(8)
+    expect(Role::query()->count())->toBe(9)
         ->and(Permission::query()->count())->toBe(
             collect(config('access-control.groups'))->flatten()->count()
         );

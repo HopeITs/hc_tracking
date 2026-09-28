@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 
 /**
  * The funding agreement form, shared by the agreement directory and the
@@ -33,6 +34,7 @@ trait ManagesAgreementForm
 
     public bool $showAgreementModal = false;
 
+    #[Locked]
     public ?int $editingAgreementId = null;
 
     public bool $confirmingAgreementDelete = false;

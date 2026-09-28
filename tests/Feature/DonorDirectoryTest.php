@@ -15,6 +15,7 @@ use App\Models\TransfersTracking;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Support\Facades\DB;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -417,14 +418,16 @@ test('a donor can be edited from its own page and only that donor', function () 
     $donor = Donor::factory()->create(['name' => 'Before']);
     $other = Donor::factory()->create(['name' => 'Untouched']);
 
-    Livewire::actingAs($user)
+    $page = Livewire::actingAs($user)
         ->test('pages::donors.show', ['donor' => $donor])
         ->assertSeeHtml('data-test="edit-donor-button"')
         ->call('openEditModal', $other->id)
         ->assertSet('showDonorModal', true)
-        ->assertSet('name', 'Before')
-        ->set('editingDonorId', $other->id)
-        ->set('name', 'After')
+        ->assertSet('name', 'Before');
+
+    expect(fn () => $page->set('editingDonorId', $other->id))->toThrow(CannotUpdateLockedPropertyException::class);
+
+    $page->set('name', 'After')
         ->call('saveDonor')
         ->assertHasNoErrors()
         ->assertSet('showDonorModal', false)

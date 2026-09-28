@@ -15,8 +15,10 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -68,8 +70,10 @@ new #[Title('titles.projects')] class extends Component {
 
     public bool $showProjectModal = false;
 
+    #[Locked]
     public ?int $editingProjectId = null;
 
+    #[Locked]
     public ?int $archivingProjectId = null;
 
     /**
@@ -374,7 +378,7 @@ new #[Title('titles.projects')] class extends Component {
      * Weights that add up to more than 100 are capped rather than rejected:
      * the figure is a reading of the record, not a validation of it.
      */
-    public function progressFor(Project $project): ?float
+    protected function progressFor(Project $project): ?float
     {
         $planned = (float) ($project->planned_weight ?? 0);
 
@@ -590,6 +594,8 @@ new #[Title('titles.projects')] class extends Component {
 
     public function openCreateModal(): void
     {
+        Gate::authorize('create', Project::class);
+
         $this->resetProjectForm();
         $this->showProjectModal = true;
     }
@@ -615,6 +621,8 @@ new #[Title('titles.projects')] class extends Component {
             ])
             ->findOrFail($projectId);
 
+        Gate::authorize('update', $project);
+
         $this->resetValidation();
         $this->editingProjectId = $project->id;
         $this->name = $project->name;
@@ -635,6 +643,12 @@ new #[Title('titles.projects')] class extends Component {
 
     public function saveProject(): void
     {
+        if ($this->editingProjectId === null) {
+            Gate::authorize('create', Project::class);
+        } else {
+            Gate::authorize('update', Project::query()->findOrFail($this->editingProjectId));
+        }
+
         $this->name = trim($this->name);
         $this->description = trim($this->description);
 
@@ -671,6 +685,14 @@ new #[Title('titles.projects')] class extends Component {
             ? new Project
             : Project::query()->findOrFail($this->editingProjectId);
 
+        // An owner edits their project but does not move it to another
+        // program or owner, and archiving goes through archiveProject().
+        $mayReassign = ! $project->exists || Gate::allows('reassign', $project);
+
+        if ($project->exists && ProjectStatus::from($validated['projectStatus']) === ProjectStatus::Archived && $project->status !== ProjectStatus::Archived) {
+            Gate::authorize('delete', $project);
+        }
+
         $project->fill([
             'name' => $validated['name'],
             'description' => $validated['description'] === '' ? null : $validated['description'],
@@ -683,8 +705,8 @@ new #[Title('titles.projects')] class extends Component {
             'target_boys' => self::nullableInteger($validated['targetBoys']),
             'target_girls' => self::nullableInteger($validated['targetGirls']),
             'city_id' => (int) $validated['cityId'],
-            'program_id' => (int) $validated['programId'],
-            'user_id' => (int) $validated['userId'],
+            'program_id' => $mayReassign ? (int) $validated['programId'] : $project->program_id,
+            'user_id' => $mayReassign ? (int) $validated['userId'] : $project->user_id,
         ])->save();
 
         $wasRecentlyCreated = $project->wasRecentlyCreated;
@@ -707,6 +729,8 @@ new #[Title('titles.projects')] class extends Component {
 
     public function confirmArchive(int $projectId): void
     {
+        Gate::authorize('delete', Project::query()->findOrFail($projectId));
+
         $this->archivingProjectId = $projectId;
         $this->showArchiveModal = true;
     }
@@ -764,6 +788,10 @@ new #[Title('titles.projects')] class extends Component {
 
         $project = Project::query()->find($this->archivingProjectId);
 
+        if ($project !== null) {
+            Gate::authorize('delete', $project);
+        }
+
         if ($project === null) {
             $this->cancelArchive();
 
@@ -790,6 +818,8 @@ new #[Title('titles.projects')] class extends Component {
         if ($project === null || $project->status !== ProjectStatus::Archived) {
             return;
         }
+
+        Gate::authorize('delete', $project);
 
         $project->update(['status' => ProjectStatus::Draft]);
         $this->resetPage();
@@ -1007,9 +1037,9 @@ new #[Title('titles.projects')] class extends Component {
         </x-slot:filters>
 
         <x-slot:actions>
-            <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-project-button">
+            @can('create', App\Models\Project::class)<x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-project-button">
                 {{ __('projects.add_project') }}
-            </x-ui.button>
+            </x-ui.button>@endcan
         </x-slot:actions>
     </x-ui.page-header>
 
@@ -1157,7 +1187,7 @@ new #[Title('titles.projects')] class extends Component {
                     @if ($filtersAreActive)
                         <x-ui.button size="sm" wire:click="clearFilters">{{ __('common.reset_filters') }}</x-ui.button>
                     @else
-                        <x-ui.button size="sm" tone="primary" icon="plus" wire:click="openCreateModal">{{ __('projects.add_project') }}</x-ui.button>
+                        @can('create', App\Models\Project::class)<x-ui.button size="sm" tone="primary" icon="plus" wire:click="openCreateModal">{{ __('projects.add_project') }}</x-ui.button>@endcan
                     @endif
                 </x-slot:action>
             </x-ui.empty-state>
@@ -1239,11 +1269,11 @@ new #[Title('titles.projects')] class extends Component {
                                                 <flux:icon.eye class="size-4.5" />
                                             </a>
 
-                                            <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation @3xl/directory:size-8!" wire:click="openEditModal({{ $project->id }})" :aria-label="__('common.edit_name', ['name' => $project->name])" />
+                                            @can('update', $project)<x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation @3xl/directory:size-8!" wire:click="openEditModal({{ $project->id }})" :aria-label="__('common.edit_name', ['name' => $project->name])" />@endcan
                                             @if ($project->status === ProjectStatus::Archived)
-                                                <x-ui.button tone="ghost" size="sm" icon="arrow-uturn-left" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="restoreProject({{ $project->id }})" :aria-label="__('projects.restore_name', ['name' => $project->name])" />
+                                                @can('delete', $project)<x-ui.button tone="ghost" size="sm" icon="arrow-uturn-left" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="restoreProject({{ $project->id }})" :aria-label="__('projects.restore_name', ['name' => $project->name])" />@endcan
                                             @else
-                                                <x-ui.button tone="ghost" size="sm" icon="archive-box" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="confirmArchive({{ $project->id }})" :aria-label="__('projects.archive_name', ['name' => $project->name])" />
+                                                @can('delete', $project)<x-ui.button tone="ghost" size="sm" icon="archive-box" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="confirmArchive({{ $project->id }})" :aria-label="__('projects.archive_name', ['name' => $project->name])" />@endcan
                                             @endif
                                         </div>
                                     </div>
@@ -1473,11 +1503,11 @@ new #[Title('titles.projects')] class extends Component {
                                     >
                                         <flux:icon.eye class="size-4.5" />
                                     </a>
-                                    <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="openEditModal({{ $project->id }})" :aria-label="__('common.edit_name', ['name' => $project->name])" />
+                                    @can('update', $project)<x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="openEditModal({{ $project->id }})" :aria-label="__('common.edit_name', ['name' => $project->name])" />@endcan
                                     @if ($project->status === ProjectStatus::Archived)
-                                        <x-ui.button tone="ghost" size="sm" icon="arrow-uturn-left" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="restoreProject({{ $project->id }})" :aria-label="__('projects.restore_name', ['name' => $project->name])" />
+                                        @can('delete', $project)<x-ui.button tone="ghost" size="sm" icon="arrow-uturn-left" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="restoreProject({{ $project->id }})" :aria-label="__('projects.restore_name', ['name' => $project->name])" />@endcan
                                     @else
-                                        <x-ui.button tone="ghost" size="sm" icon="archive-box" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="confirmArchive({{ $project->id }})" :aria-label="__('projects.archive_name', ['name' => $project->name])" />
+                                        @can('delete', $project)<x-ui.button tone="ghost" size="sm" icon="archive-box" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="confirmArchive({{ $project->id }})" :aria-label="__('projects.archive_name', ['name' => $project->name])" />@endcan
                                     @endif
                                 </div>
                             </x-ui.data-table.cell>
@@ -1562,11 +1592,11 @@ new #[Title('titles.projects')] class extends Component {
                                             >
                                                 <flux:icon.eye class="size-4.5" />
                                             </a>
-                                            <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="openEditModal({{ $project->id }})" :aria-label="__('common.edit_name', ['name' => $project->name])" />
+                                            @can('update', $project)<x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="openEditModal({{ $project->id }})" :aria-label="__('common.edit_name', ['name' => $project->name])" />@endcan
                                                 @if ($project->status === ProjectStatus::Archived)
-                                                    <x-ui.button tone="ghost" size="sm" icon="arrow-uturn-left" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="restoreProject({{ $project->id }})" :aria-label="__('projects.restore_name', ['name' => $project->name])" />
+                                                    @can('delete', $project)<x-ui.button tone="ghost" size="sm" icon="arrow-uturn-left" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="restoreProject({{ $project->id }})" :aria-label="__('projects.restore_name', ['name' => $project->name])" />@endcan
                                                 @else
-                                                    <x-ui.button tone="ghost" size="sm" icon="archive-box" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="confirmArchive({{ $project->id }})" :aria-label="__('projects.archive_name', ['name' => $project->name])" />
+                                                    @can('delete', $project)<x-ui.button tone="ghost" size="sm" icon="archive-box" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="confirmArchive({{ $project->id }})" :aria-label="__('projects.archive_name', ['name' => $project->name])" />@endcan
                                                 @endif
                                             </div>
                                         </div>

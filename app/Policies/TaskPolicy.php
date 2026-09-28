@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
-use App\Models\HrDepartment;
+use App\Models\Scopes\TaskVisibilityScope;
 use App\Models\Task;
 use App\Models\User;
 
@@ -15,53 +15,18 @@ class TaskPolicy
      */
     public function viewAny(User $user): bool
     {
-        return true;
+        return $user->can('tasks.view');
     }
 
     /**
      * Determine whether the user can view the model.
      *
-     * Only the named team roles (config('access-control.
-     * task_department_scoped_roles')) are limited to their own department (a
-     * task is "in" a department when any of its assignees, or its creator,
-     * is) — everyone else (an elevated bypass role, or an account with
-     * neither kind of role) may view any task, matching the tasks page's
-     * long-standing "any authenticated user" access before departments
-     * existed. A scoped viewer can always see a task they created or are
-     * assigned to themselves — the "My Tasks" case — even if its other
-     * assignees sit in another department.
+     * The module permission, plus the task department rule — decided in one
+     * place, TaskVisibilityScope, which every task query also goes through.
      */
     public function view(User $user, Task $task): bool
     {
-        if (! $user->isTaskDepartmentScoped()) {
-            return true;
-        }
-
-        if ($task->created_by === $user->id) {
-            return true;
-        }
-
-        $assigneeIds = $task->taskAssignees->pluck('employee_id');
-
-        if ($user->employee_id !== null && $assigneeIds->contains($user->employee_id)) {
-            return true;
-        }
-
-        $departmentId = $user->departmentId();
-
-        if ($departmentId === null) {
-            return false;
-        }
-
-        $departmentEmployeeIds = HrDepartment::employeeIdsInDepartment($departmentId);
-
-        if ($assigneeIds->intersect($departmentEmployeeIds)->isNotEmpty()) {
-            return true;
-        }
-
-        $creator = $task->creator;
-
-        return $creator !== null && $creator->departmentId() === $departmentId;
+        return $user->can('tasks.view') && TaskVisibilityScope::allows($user, $task);
     }
 
     /**
@@ -73,19 +38,32 @@ class TaskPolicy
     }
 
     /**
-     * Determine whether the user can update the model.
+     * Determine whether the user can edit every field of the task: holders of
+     * tasks.update, and the task's own creator. Which tasks a department-
+     * scoped user can reach at all is decided by TaskVisibilityScope when the
+     * task is loaded.
      */
     public function update(User $user, Task $task): bool
     {
-        return $user->can('tasks.update');
+        return $user->can('tasks.update') || $this->isCreator($user, $task);
     }
 
     /**
-     * Determine whether the user can delete the model.
+     * Determine whether the user can move the task's status and progress:
+     * everyone who may edit it, plus the people it is assigned to.
+     */
+    public function updateStatus(User $user, Task $task): bool
+    {
+        return $this->update($user, $task) || $this->isAssignee($user, $task);
+    }
+
+    /**
+     * Determine whether the user can delete the model: holders of
+     * tasks.delete, and the task's own creator.
      */
     public function delete(User $user, Task $task): bool
     {
-        return $user->can('tasks.delete');
+        return $user->can('tasks.delete') || $this->isCreator($user, $task);
     }
 
     /**
@@ -102,5 +80,28 @@ class TaskPolicy
     public function forceDelete(User $user, Task $task): bool
     {
         return false;
+    }
+
+    /**
+     * Whether the user raised this task.
+     */
+    private function isCreator(User $user, Task $task): bool
+    {
+        return $task->created_by === $user->id;
+    }
+
+    /**
+     * Whether the task is assigned to the user's HR employee. Uses the loaded
+     * assignees when a list already eager-loaded them.
+     */
+    private function isAssignee(User $user, Task $task): bool
+    {
+        if ($user->employee_id === null) {
+            return false;
+        }
+
+        return $task->relationLoaded('taskAssignees')
+            ? $task->taskAssignees->contains('employee_id', $user->employee_id)
+            : $task->taskAssignees()->where('employee_id', $user->employee_id)->exists();
     }
 }

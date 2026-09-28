@@ -4,12 +4,15 @@ namespace App\Providers;
 
 use App\Actions\Fortify\AuthenticateWithHrAccount;
 use App\Actions\Fortify\CreateNewUser;
+use App\Actions\Fortify\RedirectIfTwoFactorRequired;
 use App\Actions\Fortify\ResetUserPassword;
 use App\Http\Responses\LoginResponse;
 use App\Http\Responses\TwoFactorLoginResponse;
 use App\Models\User;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
@@ -47,11 +50,17 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
         Fortify::createUsersUsing(CreateNewUser::class);
 
+        // After the password: the authenticator app challenge, or an emailed code.
+        Fortify::redirectUserForTwoFactorAuthenticationUsing(RedirectIfTwoFactorRequired::class);
+
         // Passwords live in the HR system: log in and confirm against HR.
         Fortify::authenticateUsing(new AuthenticateWithHrAccount);
         Fortify::confirmPasswordsUsing(
             fn (User $user, ?string $password): bool => AuthenticateWithHrAccount::confirmsPassword($user, $password),
         );
+
+        // The HR password typed at login also counts as a password confirmation.
+        Event::listen(fn (Login $event) => AuthenticateWithHrAccount::confirmPasswordCheckedAtLogin($event));
 
         // A passkey skips the HR password check, so ask HR whether the account is still active.
         Passkeys::authorizeLoginUsing(fn (Request $request, User $user): bool => ! $user->hasLostHrAccess());
@@ -63,7 +72,6 @@ class FortifyServiceProvider extends ServiceProvider
     private function configureViews(): void
     {
         Fortify::loginView(fn () => view('pages::auth.login'));
-        Fortify::verifyEmailView(fn () => view('pages::auth.verify-email'));
         Fortify::twoFactorChallengeView(fn () => view('pages::auth.two-factor-challenge'));
         Fortify::confirmPasswordView(fn () => view('pages::auth.confirm-password'));
         Fortify::registerView(fn () => view('pages::auth.register'));

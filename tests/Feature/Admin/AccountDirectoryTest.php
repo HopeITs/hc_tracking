@@ -11,7 +11,7 @@ test('guests are redirected from the account directory', function () {
 });
 
 test('accounts can be filtered by open and closed state', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
 
     Account::factory()->create(['account_name' => 'Operations USD', 'is_active' => true]);
     Account::factory()->create(['account_name' => 'Legacy EUR', 'is_active' => false, 'closed_at' => '2026-01-31']);
@@ -30,7 +30,7 @@ test('accounts can be filtered by open and closed state', function () {
 });
 
 test('an account can be opened', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
 
     Livewire::actingAs($user)
         ->test('pages::admin.accounts')
@@ -52,7 +52,7 @@ test('an account can be opened', function () {
 });
 
 test('an account can be opened with no known opening date', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
 
     Livewire::actingAs($user)
         ->test('pages::admin.accounts')
@@ -71,7 +71,7 @@ test('an account can be opened with no known opening date', function () {
 });
 
 test('opening an account requires the core banking fields', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
 
     Livewire::actingAs($user)
         ->test('pages::admin.accounts')
@@ -85,7 +85,7 @@ test('opening an account requires the core banking fields', function () {
 });
 
 test('closing an account sets both the flag and the date together', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $account = Account::factory()->create(['is_active' => true]);
 
     Livewire::actingAs($user)
@@ -101,7 +101,7 @@ test('closing an account sets both the flag and the date together', function () 
 });
 
 test('accounts offer no delete because transfers restrict it', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
     $account = Account::factory()->create();
     TransfersTracking::factory()->create(['account_id' => $account->id]);
 
@@ -114,7 +114,7 @@ test('accounts offer no delete because transfers restrict it', function () {
 });
 
 test('the account directory renders with no accounts', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Financial')->create();
 
     Livewire::actingAs($user)->test('pages::admin.accounts')->assertSee('No accounts yet');
 });

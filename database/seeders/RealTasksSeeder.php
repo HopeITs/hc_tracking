@@ -22,6 +22,8 @@ use RuntimeException;
  *
  *     php artisan db:seed --class=RealTasksSeeder
  *
+ * or with every other real seeder, in dependency order, via RealDataSeeder.
+ *
  * The source sheet gives no assignee or creator per task (task_assignees is
  * a separate multi-assignee table with no source data here), so tasks are
  * seeded with no assignees and a random existing user as creator.

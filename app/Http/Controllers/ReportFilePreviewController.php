@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Enums\FileType;
 use App\Models\Report;
 use App\Models\ReportFile;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -22,6 +23,8 @@ class ReportFilePreviewController extends Controller
      */
     public function __invoke(Report $report, ReportFile $reportFile): StreamedResponse
     {
+        Gate::authorize('view', $report);
+
         abort_unless($reportFile->report_id === $report->id, 404);
         abort_unless($reportFile->isPreviewable() && $reportFile->isStored(), 404);
 
@@ -31,10 +34,19 @@ class ReportFilePreviewController extends Controller
             default => 'image/jpeg',
         };
 
-        return Storage::disk($reportFile->disk)->response($reportFile->path, $reportFile->displayName(), [
+        $headers = [
             'Content-Type' => $contentType,
             'X-Content-Type-Options' => 'nosniff',
             'Cache-Control' => 'private, max-age=300',
-        ], 'inline');
+        ];
+
+        // A sandboxed image opened in its own tab can never act as the app.
+        // PDFs are left out: Chrome refuses to render a PDF in a sandboxed
+        // document, and its viewer already isolates the file's scripts.
+        if ($reportFile->type !== FileType::Pdf) {
+            $headers['Content-Security-Policy'] = 'sandbox';
+        }
+
+        return Storage::disk($reportFile->disk)->response($reportFile->path, $reportFile->displayName(), $headers, 'inline');
     }
 }

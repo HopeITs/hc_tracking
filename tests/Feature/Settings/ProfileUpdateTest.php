@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use Livewire\Exceptions\ComponentNotFoundException;
 use Livewire\Livewire;
 
 test('profile page is displayed', function () {
@@ -23,33 +24,24 @@ test('the profile shows the name and email from hr without letting them change',
         ->toThrow(Exception::class);
 });
 
-test('user can delete their account with their hr password', function () {
-    $user = User::factory()->withHrAccount()->create();
+/**
+ * Accounts belong to HR and administrators (Admin > Users keeps its own
+ * delete), so the profile no longer lets people delete themselves.
+ */
+test('the profile page does not offer self-service account deletion', function () {
+    $this->actingAs(User::factory()->create());
 
-    $this->actingAs($user);
-
-    $response = Livewire::test('pages::settings.delete-user-modal')
-        ->set('password', 'password')
-        ->call('deleteUser');
-
-    $response
-        ->assertHasNoErrors()
-        ->assertRedirect('/');
-
-    expect($user->fresh())->toBeNull();
-    expect(auth()->check())->toBeFalse();
+    $this->get(route('profile.edit'))
+        ->assertOk()
+        ->assertDontSee('delete-user-button', false)
+        ->assertDontSee(__('settings.delete_account'));
 });
 
-test('correct password must be provided to delete account', function () {
-    $user = User::factory()->withHrAccount()->create();
+test('the self-service account deletion components no longer exist', function (string $component) {
+    $this->actingAs(User::factory()->create());
 
-    $this->actingAs($user);
-
-    $response = Livewire::test('pages::settings.delete-user-modal')
-        ->set('password', 'wrong-password')
-        ->call('deleteUser');
-
-    $response->assertHasErrors(['password']);
-
-    expect($user->fresh())->not->toBeNull();
-});
+    expect(fn () => Livewire::test($component))->toThrow(ComponentNotFoundException::class);
+})->with([
+    'pages::settings.delete-user-form',
+    'pages::settings.delete-user-modal',
+]);

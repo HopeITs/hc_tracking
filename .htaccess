@@ -1,0 +1,9 @@
+# The project root is never a web root: the app is served from public/.
+# Locally XAMPP's Apache serves all of C:\xampp\htdocs, which would hand out
+# .env, .git, storage/logs and vendor at http://localhost/hc-tracking/...
+# This refuses every request resolved here. public/.htaccess has its own
+# rewrite rules, which replace these ones, so public/ keeps working.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^ - [F]
+</IfModule>

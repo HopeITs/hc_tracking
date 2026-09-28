@@ -157,9 +157,13 @@ test('a reference-only attachment record can still be deleted', function () {
 });
 
 test('a user without update permission cannot open the upload, edit or delete actions', function (string $method, array $args) {
+    // An assignee sees the task but holds no right to change its files.
+    $employeeId = insertHrEmployee();
+    $assignee = User::factory()->role('Team Member')->create(['employee_id' => $employeeId]);
     $task = Task::factory()->create();
+    $task->taskAssignees()->create(['employee_id' => $employeeId]);
 
-    Livewire::actingAs(User::factory()->create())
+    Livewire::actingAs($assignee)
         ->test('pages::tasks.show', ['task' => $task])
         ->call($method, ...$args)
         ->assertForbidden();
@@ -178,7 +182,8 @@ test('the download route streams a stored file under its display name', function
     $this->actingAs($user)
         ->get(route('tasks.files.download', [$task, $file]))
         ->assertOk()
-        ->assertDownload('Signed sheet.pdf');
+        ->assertDownload('Signed sheet.pdf')
+        ->assertHeader('X-Content-Type-Options', 'nosniff');
 
     $this->actingAs($user)
         ->get(route('tasks.show', $task))
@@ -210,7 +215,7 @@ test('edit and delete refuse an attachment that belongs to another task', functi
         ->assertNotFound();
 })->with(['openEditFileModal', 'confirmDeleteFile']);
 
-test('the preview route serves pdfs and images inline with a safe content type', function (string $name, string $contentType) {
+test('the preview route serves pdfs and images inline with a safe content type', function (string $name, string $contentType, ?string $policy) {
     Storage::fake('local');
     $user = User::factory()->role('Super Admin')->create();
     $task = Task::factory()->create();
@@ -220,10 +225,11 @@ test('the preview route serves pdfs and images inline with a safe content type',
 
     expect($response->headers->get('Content-Type'))->toBe($contentType)
         ->and($response->headers->get('Content-Disposition'))->toStartWith('inline')
-        ->and($response->headers->get('X-Content-Type-Options'))->toBe('nosniff');
+        ->and($response->headers->get('X-Content-Type-Options'))->toBe('nosniff')
+        ->and($response->headers->get('Content-Security-Policy'))->toBe($policy);
 })->with([
-    'pdf' => ['a.pdf', 'application/pdf'],
-    'png' => ['a.png', 'image/png'],
+    'pdf' => ['a.pdf', 'application/pdf', null],
+    'png' => ['a.png', 'image/png', 'sandbox'],
 ]);
 
 test('the preview route refuses office files, reference-only rows and files from another task', function () {
@@ -262,7 +268,7 @@ test('the preview modal renders the right viewer and steps between files', funct
 });
 
 test('opening a preview refuses an attachment from another task', function () {
-    Livewire::actingAs(User::factory()->create())
+    Livewire::actingAs(User::factory()->role('Super Admin')->create())
         ->test('pages::tasks.show', ['task' => Task::factory()->create()])
         ->call('openPreview', TaskAttachment::factory()->create()->id)
         ->assertNotFound();

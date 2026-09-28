@@ -65,6 +65,7 @@ new #[Title('titles.task')] class extends Component
 
     public bool $showFileModal = false;
 
+    #[Locked]
     public ?int $editingFileId = null;
 
     public $newFile = null;
@@ -75,10 +76,12 @@ new #[Title('titles.task')] class extends Component
 
     public bool $showDeleteFileModal = false;
 
+    #[Locked]
     public ?int $deletingFileId = null;
 
     public bool $showPreviewModal = false;
 
+    #[Locked]
     public ?int $previewingFileId = null;
 
     public function mount(Task $task): void
@@ -151,8 +154,20 @@ new #[Title('titles.task')] class extends Component
         return HrEmployee::pickerOptions();
     }
 
+    /**
+     * Save the task. Editors (tasks.update, or the task's creator) change
+     * every field; its assignees may only move status and progress, so for
+     * them every other field keeps its stored value.
+     */
     public function updateTask(): void
     {
+        $task = Task::query()->findOrFail($this->taskId);
+        $canEdit = Gate::allows('update', $task);
+
+        if (! $canEdit) {
+            Gate::authorize('updateStatus', $task);
+        }
+
         $this->title = trim($this->title);
         $this->description = trim($this->description);
 
@@ -177,18 +192,26 @@ new #[Title('titles.task')] class extends Component
             'progressPercentage.max' => __('tasks.progress_cannot_exceed_100_percent'),
         ]);
 
-        $task = Task::query()->findOrFail($this->taskId);
+        DB::transaction(function () use ($task, $validated, $canEdit): void {
+            $progress = [
+                'status' => $validated['taskStatus'],
+                'completed_date' => $validated['completedDate'] === '' ? null : $validated['completedDate'],
+                'progress_percentage' => (int) $validated['progressPercentage'],
+            ];
 
-        DB::transaction(function () use ($task, $validated): void {
+            if (! $canEdit) {
+                $task->fill($progress)->save();
+
+                return;
+            }
+
             $task->fill([
+                ...$progress,
                 'title' => $validated['title'],
                 'description' => $validated['description'] === '' ? null : $validated['description'],
-                'status' => $validated['taskStatus'],
                 'priority' => $validated['taskPriority'],
                 'start_date' => $validated['startDate'] === '' ? null : $validated['startDate'],
                 'due_date' => $validated['dueDate'] === '' ? null : $validated['dueDate'],
-                'completed_date' => $validated['completedDate'] === '' ? null : $validated['completedDate'],
-                'progress_percentage' => (int) $validated['progressPercentage'],
             ])->save();
 
             $employeeIds = collect($validated['assignedTo'])->map(fn ($id): int => (int) $id)->unique()->values();
@@ -215,6 +238,8 @@ new #[Title('titles.task')] class extends Component
      */
     public function openAddSubtaskModal(): void
     {
+        Gate::authorize('create', Task::class);
+
         $this->resetValidation();
         $this->newSubtaskTitle = '';
         $this->newSubtaskStatus = TaskStatus::Todo->value;
@@ -231,6 +256,14 @@ new #[Title('titles.task')] class extends Component
 
     public function addSubtask(): void
     {
+        // Subtasks are one level deep: judged by the column, since the parent
+        // itself may be hidden from this viewer.
+        if ($this->task->parent_task_id !== null) {
+            return;
+        }
+
+        Gate::authorize('create', Task::class);
+
         $this->newSubtaskTitle = trim($this->newSubtaskTitle);
 
         $validated = $this->validate([
@@ -668,16 +701,16 @@ new #[Title('titles.task')] class extends Component
         </form>
     </x-ui.panel>
 
-    @if ($this->task->parentTask === null)
+    @if ($this->task->parent_task_id === null)
         <x-ui.panel :title="__('tasks.related_tasks')" :count="$this->subtasks->count()" :subtitle="__('tasks.subtasks_inherit_this_task_s_proposal_milestone_and_assign')">
             <x-slot:toolbar>
-                <x-ui.button tone="primary" size="sm" icon="plus" wire:click="openAddSubtaskModal" data-test="add-subtask-button">{{ __('tasks.add_subtask') }}</x-ui.button>
+                @can('create', App\Models\Task::class)<x-ui.button tone="primary" size="sm" icon="plus" wire:click="openAddSubtaskModal" data-test="add-subtask-button">{{ __('tasks.add_subtask') }}</x-ui.button>@endcan
             </x-slot:toolbar>
 
             @if ($this->subtasks->isEmpty())
                 <x-ui.empty-state icon="rectangle-stack" :heading="__('tasks.no_subtasks_yet')" :body="__('tasks.break_this_task_down_into_smaller_steps')">
                     <x-slot:action>
-                        <x-ui.button size="sm" tone="primary" icon="plus" wire:click="openAddSubtaskModal">{{ __('tasks.add_subtask') }}</x-ui.button>
+                        @can('create', App\Models\Task::class)<x-ui.button size="sm" tone="primary" icon="plus" wire:click="openAddSubtaskModal">{{ __('tasks.add_subtask') }}</x-ui.button>@endcan
                     </x-slot:action>
                 </x-ui.empty-state>
             @else
@@ -798,7 +831,7 @@ new #[Title('titles.task')] class extends Component
         <livewire:activity.timeline :subjects="['task' => [$this->task->id]]" :key="'task-activity-'.$this->task->id" />
     </section>
 
-    @if ($this->task->parentTask === null)
+    @if ($this->task->parent_task_id === null)
         <x-ui.modal
             wire:model="showAddSubtaskModal"
             size="md"

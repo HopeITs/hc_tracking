@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Media;
 use App\Models\Project;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -20,6 +21,8 @@ class ProjectFileDownloadController extends Controller
      */
     public function __invoke(Project $project, Media $media): StreamedResponse
     {
+        Gate::authorize('view', $project);
+
         abort_unless(
             $media->mediable_type === 'project' && $media->mediable_id === $project->id,
             404
@@ -30,6 +33,8 @@ class ProjectFileDownloadController extends Controller
         // via a Flysystem UnableToRetrieveMetadata exception. 404 instead.
         abort_unless(Storage::disk($media->disk)->exists($media->path), 404);
 
-        return Storage::disk($media->disk)->download($media->path, $media->original_name);
+        return Storage::disk($media->disk)->download($media->path, $media->original_name, [
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 }

@@ -76,7 +76,7 @@
                 {{-- An output is the bottom of the chain: nothing contributes to it. --}}
                 @unless ($result->type === ResultType::Output)
                     <flux:tooltip :content="__('results_framework.add_a_contributing_result')">
-                        <x-ui.button
+                        @can('results.create')<x-ui.button
                             tone="ghost"
                             size="sm"
                             icon="plus"
@@ -84,12 +84,12 @@
                             wire:click="openCreateModal({{ $result->id }})"
                             :aria-label="__('results_framework.add_a_contributing_result')"
                             data-test="add-child-result-{{ $result->id }}"
-                        />
+                        />@endcan
                     </flux:tooltip>
                 @endunless
 
                 <flux:tooltip :content="__('results_framework.edit_result')">
-                    <x-ui.button
+                    @can('results.update')<x-ui.button
                         tone="ghost"
                         size="sm"
                         icon="pencil-square"
@@ -97,12 +97,12 @@
                         wire:click="openEditModal({{ $result->id }})"
                         :aria-label="__('common.edit_name', ['name' => $result->statement])"
                         data-test="edit-result-{{ $result->id }}"
-                    />
+                    />@endcan
                 </flux:tooltip>
 
                 @if ($node['deletable'])
                     <flux:tooltip :content="__('results_framework.delete_result')">
-                        <x-ui.button
+                        @can('results.delete')<x-ui.button
                             tone="ghost"
                             size="sm"
                             icon="trash"
@@ -110,7 +110,7 @@
                             wire:click="confirmDelete({{ $result->id }})"
                             :aria-label="__('common.delete_name', ['name' => $result->statement])"
                             data-test="delete-result-{{ $result->id }}"
-                        />
+                        />@endcan
                     </flux:tooltip>
                 @else
                     <flux:tooltip :content="__('results_framework.locked_while_it_carries_nested_results_or_indicators')">

@@ -69,18 +69,23 @@
                         $isDone = $task->status === TaskStatus::Done;
                         $isMissed = $task->isMissed();
                         $isOverdue = $task->isOverdue();
-                        $isDueDateLocked = $task->created_by !== auth()->id();
+                        // What the viewer may do to this card (TaskPolicy).
+                        $canUpdate = auth()->user()->can('update', $task);
+                        $canMove = $canUpdate || auth()->user()->can('updateStatus', $task);
+                        $canDelete = auth()->user()->can('delete', $task);
+                        $canCreate = auth()->user()->can('create', App\Models\Task::class);
+                        $isDueDateLocked = ! $canUpdate || $task->created_by !== auth()->id();
                         $assignedIds = $task->taskAssignees->pluck('employee_id')->all();
                         $boardAssignees = $task->taskAssignees->pluck('employee')->filter();
                     @endphp
                     <div
                         @class([
                             'group flex flex-col gap-2.5 rounded-xl border border-secondary-soft bg-white p-3 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md dark:border-secondary-medium dark:bg-secondary-dark',
-                            'cursor-grab active:cursor-grabbing' => ! $isDone,
+                            'cursor-grab active:cursor-grabbing' => ! $isDone && $canMove,
                         ])
                         wire:key="task-board-card-{{ $task->id }}"
                         data-task-id="{{ $task->id }}"
-                        draggable="{{ $isDone ? 'false' : 'true' }}"
+                        draggable="{{ $isDone || ! $canMove ? 'false' : 'true' }}"
                         x-on:dragstart="$event.dataTransfer.setData('text/plain', JSON.stringify({ id: {{ $task->id }}, status: '{{ $case->value }}' })); $event.currentTarget.classList.add('opacity-40')"
                         x-on:dragend="$event.currentTarget.classList.remove('opacity-40')"
                     >
@@ -94,23 +99,35 @@
                                 </a>
                             </div>
                             <div class="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
-                                <x-ui.button
-                                    tone="ghost"
-                                    size="sm"
-                                    icon="plus"
-                                    class="size-7!"
-                                    x-on:click="subtasksOpen[{{ $task->id }}] = true; $nextTick(() => $refs['subtaskAddInputBoard{{ $task->id }}']?.focus())"
-                                    :aria-label="__('tasks.add_subtask')"
-                                    data-test="task-board-add-subtask-{{ $task->id }}"
-                                />
-                                <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-7!" wire:click="openEditDrawer({{ $task->id }})" :aria-label="__('tasks.edit_title', ['title' => $task->title])" />
-                                <x-ui.button tone="ghost" size="sm" icon="trash" class="size-7!" wire:click="confirmDelete({{ $task->id }})" :aria-label="__('tasks.delete_title', ['title' => $task->title])" />
+                                @if ($canCreate)
+                                    <x-ui.button
+                                        tone="ghost"
+                                        size="sm"
+                                        icon="plus"
+                                        class="size-7!"
+                                        x-on:click="subtasksOpen[{{ $task->id }}] = true; $nextTick(() => $refs['subtaskAddInputBoard{{ $task->id }}']?.focus())"
+                                        :aria-label="__('tasks.add_subtask')"
+                                        data-test="task-board-add-subtask-{{ $task->id }}"
+                                    />
+                                @endif
+                                @if ($canUpdate)
+                                    <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-7!" wire:click="openEditDrawer({{ $task->id }})" :aria-label="__('tasks.edit_title', ['title' => $task->title])" />
+                                @endif
+                                @if ($canDelete)
+                                    <x-ui.button tone="ghost" size="sm" icon="trash" class="size-7!" wire:click="confirmDelete({{ $task->id }})" :aria-label="__('tasks.delete_title', ['title' => $task->title])" />
+                                @endif
                             </div>
                         </div>
 
                         <p class="-mt-1.5 truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $task->sourceLabel() }}</p>
 
                         <div class="flex flex-wrap items-center gap-1.5 text-xs">
+                            @if (! $canUpdate)
+                                <span class="inline-flex items-center gap-1 rounded-full px-2 py-1 font-semibold {{ $priorityChipClasses($task->priority) }}" data-test="task-board-priority-{{ $task->id }}">
+                                    <flux:icon.flag :variant="$task->priority === TaskPriority::Low ? 'outline' : 'solid'" class="size-3 shrink-0" />
+                                    {{ $task->priority->label() }}
+                                </span>
+                            @else
                             <flux:dropdown position="bottom" align="start">
                                 <button type="button" aria-label="{{ __('tasks.priority') }}: {{ $task->priority->label() }}" class="inline-flex cursor-pointer items-center gap-1 rounded-full px-2 py-1 font-semibold {{ $priorityChipClasses($task->priority) }}" data-test="task-board-priority-trigger-{{ $task->id }}">
                                     <flux:icon.flag :variant="$task->priority === TaskPriority::Low ? 'outline' : 'solid'" class="size-3 shrink-0" />
@@ -126,6 +143,7 @@
                                     @endforeach
                                 </flux:menu>
                             </flux:dropdown>
+                            @endif
 
                             @if ($isMissed)
                                 <span class="inline-flex items-center gap-1 rounded-full bg-status-critical-soft px-2 py-1 font-semibold text-primary dark:text-status-critical" data-test="task-board-missed-{{ $task->id }}">
@@ -184,6 +202,7 @@
                                             <span class="inline-flex size-7 items-center justify-center rounded-full bg-secondary-dark text-[11px] font-semibold text-white ring-2 ring-white dark:bg-secondary-medium dark:ring-secondary-dark">
                                                 {{ Illuminate\Support\Str::of($employee->name)->explode(' ')->map(fn ($part) => mb_substr($part, 0, 1))->take(2)->implode('') }}
                                             </span>
+                                            @if ($canUpdate)
                                             <button
                                                 type="button"
                                                 wire:click.stop="toggleAssignee({{ $task->id }}, {{ $employee->id }})"
@@ -193,6 +212,7 @@
                                             >
                                                 <flux:icon.x-mark variant="micro" class="size-2.5" />
                                             </button>
+                                            @endif
                                         </div>
                                     @endforeach
                                     @if ($boardAssignees->count() > 3)
@@ -210,6 +230,7 @@
                                     role="option"
                                     aria-selected="{{ $isAssigned ? 'true' : 'false' }}"
                                     wire:click="toggleAssignee({{ $task->id }}, {{ $userOption['id'] }})"
+                                    @disabled(! $canUpdate)
                                     wire:key="task-board-{{ $task->id }}-assignee-option-{{ $userOption['id'] }}"
                                     x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
                                     class="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm hover:bg-secondary-soft dark:hover:bg-secondary-medium"
@@ -231,7 +252,7 @@
                                 wire:change="quickSetStatus({{ $task->id }}, $event.target.value)"
                                 wire:loading.attr="disabled"
                                 wire:target="quickSetStatus"
-                                @disabled($isDone)
+                                @disabled($isDone || ! $canMove)
                                 title="{{ $isDone ? __('tasks.completed_tasks_cannot_change_status') : '' }}"
                                 class="w-full rounded-lg border border-secondary-soft bg-white px-2 py-1.5 text-xs text-secondary-dark disabled:cursor-not-allowed disabled:opacity-60 dark:border-secondary-medium dark:bg-secondary-dark dark:text-white"
                                 data-test="task-quick-status-{{ $task->id }}"
@@ -249,7 +270,7 @@
                                     <button
                                         type="button"
                                         wire:click="toggleComplete({{ $subtask->id }})"
-                                        @disabled($subtask->status === TaskStatus::Done)
+                                        @disabled($subtask->status === TaskStatus::Done || ! auth()->user()->can('updateStatus', $subtask))
                                         aria-label="{{ __('tasks.mark_complete') }}"
                                         class="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-secondary-medium hover:bg-secondary-soft disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:bg-transparent dark:text-secondary-soft dark:hover:bg-secondary-medium"
                                     >
@@ -261,6 +282,9 @@
                                         title="{{ $subtask->title }}"
                                         @class(['min-w-0 flex-1 truncate text-xs hover:underline', 'text-secondary-light line-through' => $subtask->status === TaskStatus::Done, 'text-secondary-dark dark:text-white' => $subtask->status !== TaskStatus::Done])
                                     >{{ $subtask->title }}</a>
+                                    @if (! auth()->user()->can('update', $subtask))
+                                        <flux:icon.flag :variant="$subtask->priority === TaskPriority::Low ? 'outline' : 'solid'" class="size-3 shrink-0 {{ $priorityIconClasses($subtask->priority) }}" />
+                                    @else
                                     <flux:dropdown position="bottom" align="start">
                                         <button type="button" aria-label="{{ __('tasks.priority') }}: {{ $subtask->priority->label() }}" class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded hover:bg-secondary-soft dark:hover:bg-secondary-medium" data-test="task-board-subtask-priority-trigger-{{ $subtask->id }}">
                                             <flux:icon.flag :variant="$subtask->priority === TaskPriority::Low ? 'outline' : 'solid'" class="size-3 shrink-0 {{ $priorityIconClasses($subtask->priority) }}" />
@@ -275,6 +299,7 @@
                                             @endforeach
                                         </flux:menu>
                                     </flux:dropdown>
+                                    @endif
                                     <x-ui.status-pill :case="$subtask->status" class="shrink-0" />
                                     <div class="basis-full ps-7 text-[11px] text-secondary-medium dark:text-secondary-soft">
                                         {{ $boardSubtaskAssignees->isEmpty() ? __('common.not_assigned') : $boardSubtaskAssignees->map->name->implode(', ') }}
@@ -285,6 +310,7 @@
                                 </div>
                             @endforeach
 
+                            @if ($canCreate)
                             @php $boardSubtaskDraft = $this->subtaskDraft($task); @endphp
                             <div class="flex flex-col gap-1.5 pt-0.5" data-test="task-board-subtask-add-row-{{ $task->id }}">
                                 <label class="flex items-center gap-2">
@@ -366,6 +392,7 @@
                                     </select>
                                 </div>
                             </div>
+                            @endif
                         </div>
                     </div>
                 @empty
@@ -373,6 +400,7 @@
                 @endforelse
             </div>
 
+            @can('create', App\Models\Task::class)
             @php
                 $boardRowKey = 'board|'.$case->value;
                 $boardTaskDraft = $this->taskDraft($boardRowKey, $case->value);
@@ -461,6 +489,7 @@
                     </flux:dropdown>
                 </div>
             </div>
+            @endcan
         </div>
     @endforeach
 </div>

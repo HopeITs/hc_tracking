@@ -119,7 +119,7 @@ new #[Title('titles.notification_rules')] class extends Component {
      *
      * @return array<string, mixed>
      */
-    public function defaultRules(): array
+    protected function defaultRules(): array
     {
         return $this->toForm(config('notifications.defaults'));
     }
@@ -130,7 +130,7 @@ new #[Title('titles.notification_rules')] class extends Component {
      *
      * @return array{defaults: array<string, mixed>, strings: array<string, string>, plurals: array<string, array<1|2|3|11, string>>, weekdays: list<string>}
      */
-    public function clientConfig(): array
+    protected function clientConfig(): array
     {
         $plurals = fn (string $key): array => collect([1, 2, 3, 11])->mapWithKeys(fn (int $count): array => [$count => trans_choice($key, $count, ['count' => ':count'])])->all();
 
@@ -158,7 +158,7 @@ new #[Title('titles.notification_rules')] class extends Component {
      *
      * @return list<string>
      */
-    public function weekdayNames(string $format): array
+    protected function weekdayNames(string $format): array
     {
         $monday = CarbonImmutable::now()->startOfWeek(CarbonImmutable::MONDAY);
 

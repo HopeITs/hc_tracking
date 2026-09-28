@@ -2,19 +2,22 @@
 
 use App\Enums\Period;
 use App\Enums\ReportStatus;
+use App\Models\AnnualPlan;
 use App\Models\HrEmployee;
 use App\Models\PlanIndicator;
 use App\Models\Report;
-use App\Models\AnnualPlan;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Collection as SupportCollection;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
 new #[Title('titles.annual_plan')] class extends Component {
+    #[Locked]
     public int $annualPlanId;
 
     public bool $showPlanModal = false;
@@ -284,6 +287,8 @@ new #[Title('titles.annual_plan')] class extends Component {
     {
         $plan = $this->plan;
 
+        Gate::authorize('update', $plan);
+
         $this->resetValidation();
         $this->planManagerId = (string) $plan->manager_id;
         $this->planYear = (string) $plan->year;
@@ -300,6 +305,8 @@ new #[Title('titles.annual_plan')] class extends Component {
     public function savePlan(): void
     {
         $plan = $this->plan;
+
+        Gate::authorize('update', $plan);
 
         $validated = $this->validate([
             'planManagerId' => ['required', 'integer', Rule::exists(HrEmployee::class, 'id')],
@@ -320,7 +327,7 @@ new #[Title('titles.annual_plan')] class extends Component {
         ]);
 
         $plan->fill([
-            'manager_id' => (int) $validated['planManagerId'],
+            'manager_id' => Gate::allows('reassign', $plan) ? (int) $validated['planManagerId'] : $plan->manager_id,
             'year' => (int) $validated['planYear'],
         ])->save();
 
@@ -343,6 +350,8 @@ new #[Title('titles.annual_plan')] class extends Component {
      */
     public function deletePlan(): void
     {
+        Gate::authorize('delete', $this->plan);
+
         $this->plan->delete();
 
         Flux::toast(variant: 'success', text: __('annual_plans.annual_plan_deleted'));
@@ -407,8 +416,8 @@ new #[Title('titles.annual_plan')] class extends Component {
             <div class="flex shrink-0 flex-wrap items-center gap-2">
                 <x-ui.employee-chip :employee="$plan->manager" class="rounded-lg border border-secondary-soft p-2.5 dark:border-secondary-medium" />
                 <div class="flex items-center gap-1.5">
-                    <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation @sm/detail:size-10!" wire:click="openEditModal" :aria-label="__('annual_plans.edit_this_annual_plan')" data-test="edit-annual-plan-button" />
-                    <x-ui.button tone="ghost" size="sm" icon="trash" class="size-11! touch-manipulation @sm/detail:size-10!" wire:click="$set('confirmingDelete', true)" :aria-label="__('annual_plans.delete_this_annual_plan')" data-test="delete-annual-plan-button" />
+                    @can('update', $plan)<x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation @sm/detail:size-10!" wire:click="openEditModal" :aria-label="__('annual_plans.edit_this_annual_plan')" data-test="edit-annual-plan-button" />@endcan
+                    @can('delete', $plan)<x-ui.button tone="ghost" size="sm" icon="trash" class="size-11! touch-manipulation @sm/detail:size-10!" wire:click="$set('confirmingDelete', true)" :aria-label="__('annual_plans.delete_this_annual_plan')" data-test="delete-annual-plan-button" />@endcan
                 </div>
             </div>
         </x-slot:actions>

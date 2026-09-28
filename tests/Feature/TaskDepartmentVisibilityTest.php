@@ -41,9 +41,11 @@ test('a scoped team role only sees tasks assigned within its own department by d
 });
 
 test('a scoped team role cannot open another department\'s task show page', function () {
+    // Not found rather than forbidden: a hidden task's link does not even
+    // confirm that the task exists.
     $this->actingAs($this->mediaUser)
         ->get(route('tasks.show', $this->financeTask))
-        ->assertForbidden();
+        ->assertNotFound();
 
     $this->actingAs($this->mediaUser)
         ->get(route('tasks.show', $this->mediaTask))

@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 
 /**
  * The payment tranche form, shared by the transfer directory and the proposal
@@ -42,6 +43,7 @@ trait ManagesTransferForm
 
     public bool $confirmingTransferDelete = false;
 
+    #[Locked]
     public ?int $editingTransferId = null;
 
     public string $transferAgreementId = '';

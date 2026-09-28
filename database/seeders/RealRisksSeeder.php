@@ -19,6 +19,8 @@ use RuntimeException;
  *
  *     php artisan db:seed --class=RealRisksSeeder
  *
+ * or with every other real seeder, in dependency order, via RealDataSeeder.
+ *
  * `firstOrCreate` on name + project_id makes re-running it a no-op for
  * risks already inserted. Runs with activity recording off, same as
  * DatabaseSeeder — see .ai/rules/database-seeders.md.

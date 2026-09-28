@@ -10,7 +10,7 @@ paths:
 
 TRAP: disabling it broke the login page. resources/views/pages/auth/login.blade.php called route('register') unguarded and threw RouteNotFoundException, 500ing /login. It is now wrapped in @if (Route::has('register')), matching welcome.blade.php which was already guarded. Guard any new link to an optional Fortify route the same way.
 
-Accounts are created with `php artisan user:create` (interactive, or fully scripted with --name --email --role --password --no-interaction). It marks the address verified unless --unverified is passed, because /dashboard sits behind the `verified` middleware and there may be no mail transport configured.
+Accounts are created with `php artisan user:create` (interactive, or fully scripted with --name --email --role --password --no-interaction). It marks the address verified unless --unverified is passed, although the `verified` middleware and email verification were removed in 2026-09 (User is not MustVerifyEmail; emails come from HR).
 
 `users.role` casts to App\Enums\UserRole (Officer, Manager, MEAL, Admin). Casing is part of the value — 'meal' is NOT 'MEAL' and now throws a ValueError on read rather than silently being a fourth role. `role` stays out of the User model's #[Fillable] so it can never be set by mass assignment; user:create uses forceFill.
 

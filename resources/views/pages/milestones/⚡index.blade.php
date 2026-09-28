@@ -4,15 +4,18 @@ use App\Enums\MilestoneStatus;
 use App\Models\HrEmployee;
 use App\Models\Milestone;
 use App\Models\Project;
+use App\Models\Scopes\TaskVisibilityScope;
 use App\Notifications\UnreadSubjects;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -40,6 +43,7 @@ new #[Title('titles.milestones')] class extends Component {
     public string $viewMode = 'month';
 
     public bool $showMilestoneModal = false;
+    #[Locked]
     public ?int $deletingMilestoneId = null;
     public bool $showDeleteModal = false;
     public string $name = '';
@@ -294,7 +298,7 @@ new #[Title('titles.milestones')] class extends Component {
                         'parent_milestone_id',
                     ])
                     ->with(['responsibleUser:id,first_name_en,last_name_en,first_name_ar,last_name_ar'])
-                    ->withCount(['children', 'tasks'])
+                    ->withCount(['children', 'tasks' => fn ($query) => $query->withoutGlobalScope(TaskVisibilityScope::class)])
                     ->orderBy('sequence')
                     ->orderBy('id'),
             ])
@@ -404,11 +408,11 @@ new #[Title('titles.milestones')] class extends Component {
         return Milestone::query()->select(['id', 'name'])->find($this->deletingMilestoneId);
     }
 
-    public function canDelete(int $milestoneId): bool
+    protected function canDelete(int $milestoneId): bool
     {
         $milestone = Milestone::query()
             ->select(['id'])
-            ->withCount(['children', 'tasks'])
+            ->withCount(['children', 'tasks' => fn ($query) => $query->withoutGlobalScope(TaskVisibilityScope::class)])
             ->find($milestoneId);
 
         return $milestone !== null
@@ -418,6 +422,8 @@ new #[Title('titles.milestones')] class extends Component {
 
     public function openCreateModal(?string $date = null, ?string $status = null, ?int $projectId = null, ?int $parentId = null): void
     {
+        Gate::authorize('create', [Milestone::class, $projectId]);
+
         $this->resetMilestoneForm();
 
         if ($date !== null) {
@@ -475,6 +481,8 @@ new #[Title('titles.milestones')] class extends Component {
             'weightPercentage.max' => __('milestones.weight_cannot_exceed_100_percent'),
         ]);
 
+        Gate::authorize('create', [Milestone::class, (int) $validated['milestoneProjectId']]);
+
         Milestone::query()->create([
             'project_id' => (int) $validated['milestoneProjectId'],
             'name' => $validated['name'],
@@ -505,6 +513,8 @@ new #[Title('titles.milestones')] class extends Component {
             return;
         }
 
+        Gate::authorize('updateProgress', $milestone);
+
         $milestone->status = $newStatus;
         $milestone->save();
         unset($this->projectsWithMilestones);
@@ -514,6 +524,8 @@ new #[Title('titles.milestones')] class extends Component {
 
     public function confirmDelete(int $milestoneId): void
     {
+        Gate::authorize('delete', Milestone::query()->findOrFail($milestoneId));
+
         $this->deletingMilestoneId = $milestoneId;
         $this->showDeleteModal = true;
         unset($this->deletingMilestone);
@@ -536,9 +548,11 @@ new #[Title('titles.milestones')] class extends Component {
         $deleted = DB::transaction(function () use ($milestoneId): bool {
             $milestone = Milestone::query()->lockForUpdate()->find($milestoneId);
 
-            if ($milestone === null || $milestone->children()->exists() || $milestone->tasks()->exists()) {
+            if ($milestone === null || $milestone->children()->exists() || $milestone->tasks()->withoutGlobalScope(TaskVisibilityScope::class)->exists()) {
                 return false;
             }
+
+            Gate::authorize('delete', $milestone);
 
             return (bool) $milestone->delete();
         });
@@ -588,7 +602,7 @@ new #[Title('titles.milestones')] class extends Component {
      * @param  Collection<int, Milestone>  $milestones
      * @return Collection<int, Milestone>
      */
-    public function flattenMilestones(Collection $milestones): Collection
+    protected function flattenMilestones(Collection $milestones): Collection
     {
         return $milestones->reduce(
             fn (Collection $flat, Milestone $milestone): Collection => $flat
@@ -638,7 +652,7 @@ new #[Title('titles.milestones')] class extends Component {
         </x-slot:filters>
 
         <x-slot:actions>
-            <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-milestone-button">{{ __('milestones.add_milestone') }}</x-ui.button>
+            @can('create', App\Models\Milestone::class)<x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-milestone-button">{{ __('milestones.add_milestone') }}</x-ui.button>@endcan
         </x-slot:actions>
     </x-ui.page-header>
 
@@ -688,7 +702,7 @@ new #[Title('titles.milestones')] class extends Component {
                     @if ($filtersAreActive)
                         <x-ui.button size="sm" wire:click="clearFilters">{{ __('common.reset_filters') }}</x-ui.button>
                     @else
-                        <x-ui.button size="sm" tone="primary" icon="plus" wire:click="openCreateModal">{{ __('milestones.add_milestone') }}</x-ui.button>
+                        @can('create', App\Models\Milestone::class)<x-ui.button size="sm" tone="primary" icon="plus" wire:click="openCreateModal">{{ __('milestones.add_milestone') }}</x-ui.button>@endcan
                     @endif
                 </x-slot:action>
             </x-ui.empty-state>

@@ -28,7 +28,7 @@ class CreateUserCommand extends Command
      */
     protected $signature = 'user:create
         {--email= : The email of an existing HR system account}
-        {--role= : An existing role name; omit for no role}
+        {--role= : An existing role name; omit for the default role}
         {--unverified : Leave the email address unverified}';
 
     /**
@@ -47,16 +47,16 @@ class CreateUserCommand extends Command
 
         $roleNames = Role::query()->orderBy('name')->pluck('name')->all();
 
+        $defaultRole = (string) config('access-control.default_role');
         $role = $this->option('role')
-            ?? ($interactive ? select('Role', array_merge(['(none)'], $roleNames), '(none)') : null);
-        $role = $role === '(none)' ? null : $role;
+            ?? ($interactive ? select('Role', $roleNames, in_array($defaultRole, $roleNames, true) ? $defaultRole : null) : $defaultRole);
 
         $validator = Validator::make([
             'email' => $email,
             'role' => $role,
         ], [
             'email' => ['required', 'string', 'email'],
-            'role' => ['nullable', 'string', Rule::in($roleNames)],
+            'role' => ['required', 'string', Rule::in($roleNames)],
         ]);
 
         if ($validator->fails()) {
@@ -91,7 +91,7 @@ class CreateUserCommand extends Command
 
         $user = User::createFromHrAccount($hrUser, $validated['role'], verified: ! $this->option('unverified'));
 
-        $this->components->info("Created {$user->email}".($validated['role'] !== null ? " as {$validated['role']}." : ' with no role.'));
+        $this->components->info("Created {$user->email} as {$validated['role']}.");
 
         return self::SUCCESS;
     }

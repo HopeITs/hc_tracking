@@ -1,5 +1,7 @@
 <?php
 
+use App\Enums\FileType;
+
 return [
 
     /*
@@ -130,14 +132,18 @@ return [
 
     'temporary_file_upload' => [
         'disk' => env('LIVEWIRE_TEMPORARY_FILE_UPLOAD_DISK'), // Example: 'local', 's3'             | Default: 'default'
-        'rules' => null,                                      // Example: ['file', 'mimes:png,jpg'] | Default: ['required', 'file', 'max:12288'] (12MB)
+        // The same limits every upload form applies on save, enforced before
+        // the file is even written to livewire-tmp.
+        'rules' => [
+            'required', 'file', 'max:5120',
+            'mimes:'.implode(',', FileType::values()),
+            'extensions:'.implode(',', FileType::values()),
+        ],
         'directory' => null,                                  // Example: 'tmp'                     | Default: 'livewire-tmp'
         'middleware' => null,                                 // Example: 'throttle:5,1'            | Default: 'throttle:60,1'
-        'preview_mimes' => [                                  // Supported file types for temporary pre-signed file URLs...
-            'png', 'gif', 'bmp', 'svg', 'wav', 'mp4',
-            'mov', 'avi', 'wmv', 'mp3', 'm4a',
-            'jpg', 'jpeg', 'mpga', 'webp', 'wma',
-        ],
+        // Only the image types an upload may be. SVG is excluded: served from
+        // the app's own origin, an SVG can run script.
+        'preview_mimes' => ['png', 'jpg', 'jpeg'],
         'max_upload_time' => 5, // Max duration (in minutes) before an upload is invalidated...
         'cleanup' => true, // Should cleanup temporary uploads older than 24 hrs...
     ],

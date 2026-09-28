@@ -62,7 +62,7 @@ trait BuildsProjectGantt
     /**
      * @return array{rows: list<GanttRow>, links: list<array<string, mixed>>, baselines: list<array<string, mixed>>, baselineId: int|null, weekend: string, from: string, to: string, today: string}
      */
-    public function projectGanttPayload(Project $project, ?int $baselineId = null): array
+    protected function projectGanttPayload(Project $project, ?int $baselineId = null): array
     {
         $rows = collect();
 

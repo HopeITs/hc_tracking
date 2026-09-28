@@ -186,6 +186,7 @@ return [
         'executiveSummary' => 'الملخص التنفيذي',
         'fees' => 'الرسوم',
         'feesCurrency' => 'عملة الرسوم',
+        'files.*' => 'الملف',
         'frequency' => 'التكرار',
         'hrUserId' => 'حساب الموارد البشرية',
         'impact' => 'الأثر',

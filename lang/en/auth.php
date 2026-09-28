@@ -16,5 +16,6 @@ return [
     'failed' => 'Please check your credentials.',
     'password' => 'The provided password is incorrect.',
     'throttle' => 'Too many login attempts. Please try again in :seconds seconds.',
+    'confirm_throttle' => 'Too many password attempts. Please try again in :seconds seconds.',
 
 ];

@@ -26,12 +26,14 @@ use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -42,6 +44,7 @@ new #[Title('titles.project')] class extends Component {
     use EditsProjectGantt;
     use WithFileUploads;
 
+    #[Locked]
     public int $projectId;
 
     #[Url(except: 'milestones')]
@@ -55,8 +58,10 @@ new #[Title('titles.project')] class extends Component {
 
     public bool $confirmingFileDelete = false;
 
+    #[Locked]
     public ?int $editingFileId = null;
 
+    #[Locked]
     public ?int $deletingFileId = null;
 
     public $newFile = null;
@@ -223,6 +228,8 @@ new #[Title('titles.project')] class extends Component {
 
     public function openAddTaskModal(): void
     {
+        Gate::authorize('create', Task::class);
+
         $this->resetValidation();
         $this->newTaskTitle = '';
         $this->newTaskStatus = TaskStatus::Todo->value;
@@ -244,6 +251,8 @@ new #[Title('titles.project')] class extends Component {
      */
     public function addTask(): void
     {
+        Gate::authorize('create', Task::class);
+
         $this->newTaskTitle = trim($this->newTaskTitle);
 
         $validated = $this->validate([
@@ -373,6 +382,8 @@ new #[Title('titles.project')] class extends Component {
 
     public function openCreateFileModal(): void
     {
+        Gate::authorize('update', Project::query()->findOrFail($this->projectId));
+
         $this->resetValidation();
         $this->editingFileId = null;
         $this->newFile = null;
@@ -383,6 +394,8 @@ new #[Title('titles.project')] class extends Component {
 
     public function openEditFileModal(int $mediaId): void
     {
+        Gate::authorize('update', Project::query()->findOrFail($this->projectId));
+
         $media = $this->projectFile($mediaId);
 
         $this->resetValidation();
@@ -402,6 +415,8 @@ new #[Title('titles.project')] class extends Component {
      */
     public function saveFile(): void
     {
+        Gate::authorize('update', Project::query()->findOrFail($this->projectId));
+
         if ($this->editingFileId === null) {
             $allowedTypes = implode(',', FileType::values());
 
@@ -461,6 +476,8 @@ new #[Title('titles.project')] class extends Component {
 
     public function confirmDeleteFile(int $mediaId): void
     {
+        Gate::authorize('update', Project::query()->findOrFail($this->projectId));
+
         $media = $this->projectFile($mediaId);
 
         $this->deletingFileId = $media->id;
@@ -475,6 +492,8 @@ new #[Title('titles.project')] class extends Component {
      */
     public function deleteFile(): void
     {
+        Gate::authorize('update', Project::query()->findOrFail($this->projectId));
+
         $media = $this->projectFile($this->deletingFileId);
 
         try {
@@ -597,7 +616,7 @@ new #[Title('titles.project')] class extends Component {
      * indicator reads "42.00%", an indicator with a recorded unit reads
      * "42.00 households", and one with neither reads as a bare number.
      */
-    public function formatTargetValue(PlanIndicator $target): string
+    protected function formatTargetValue(PlanIndicator $target): string
     {
         $value = number_format((float) $target->target, 2);
 
@@ -643,7 +662,7 @@ new #[Title('titles.project')] class extends Component {
      *
      * @return \Illuminate\Support\Collection<string, array{currency: \App\Enums\Currency, committed: float, received: float}>
      */
-    public function proposalFunding(Proposal $proposal): \Illuminate\Support\Collection
+    protected function proposalFunding(Proposal $proposal): \Illuminate\Support\Collection
     {
         return $proposal->donorProposals
             ->groupBy(fn (DonorProposal $donorProposal) => $donorProposal->currency->value)
@@ -690,6 +709,8 @@ new #[Title('titles.project')] class extends Component {
 
     public function attachProposal(): void
     {
+        Gate::authorize('update', Project::query()->findOrFail($this->projectId));
+
         $validated = $this->validate([
             'proposalToAttach' => ['required', 'integer', Rule::exists(Proposal::class, 'id')],
         ], [
@@ -707,6 +728,8 @@ new #[Title('titles.project')] class extends Component {
 
     public function detachProposal(int $proposalId): void
     {
+        Gate::authorize('update', Project::query()->findOrFail($this->projectId));
+
         $this->project->proposals()->detach($proposalId);
 
         unset($this->project, $this->attachedProposals, $this->attachableProposals);
@@ -854,13 +877,13 @@ new #[Title('titles.project')] class extends Component {
     @elseif ($tab === 'tasks')
         <x-ui.panel :title="__('common.tasks')" :count="$this->tasks->count()" :subtitle="__('projects.tasks_raised_against_this_project_or_its_milestones')">
             <x-slot:toolbar>
-                <x-ui.button tone="primary" size="sm" icon="plus" wire:click="openAddTaskModal" data-test="add-project-task-button">{{ __('tasks.add_task') }}</x-ui.button>
+                @can('create', App\Models\Task::class)<x-ui.button tone="primary" size="sm" icon="plus" wire:click="openAddTaskModal" data-test="add-project-task-button">{{ __('tasks.add_task') }}</x-ui.button>@endcan
             </x-slot:toolbar>
 
             @if ($this->tasks->isEmpty())
                 <x-ui.empty-state icon="clipboard-document-list" :heading="__('common.no_tasks_yet')" :body="__('projects.tasks_raised_against_this_project_will_appear_here')">
                     <x-slot:action>
-                        <x-ui.button size="sm" tone="primary" icon="plus" wire:click="openAddTaskModal">{{ __('tasks.add_task') }}</x-ui.button>
+                        @can('create', App\Models\Task::class)<x-ui.button size="sm" tone="primary" icon="plus" wire:click="openAddTaskModal">{{ __('tasks.add_task') }}</x-ui.button>@endcan
                     </x-slot:action>
                 </x-ui.empty-state>
             @else
@@ -898,7 +921,7 @@ new #[Title('titles.project')] class extends Component {
             @if ($this->ganttPayload['rows'] === [])
                 <x-ui.empty-state icon="chart-bar" :heading="__('gantt.nothing_to_plan')" :body="__('gantt.nothing_to_plan_body')" />
             @else
-                <x-ui.gantt :payload="$this->ganttPayload" :scope="'project-'.$this->projectId" editable wire:ignore wire:key="project-gantt-{{ $this->projectId }}" />
+                <x-ui.gantt :payload="$this->ganttPayload" :scope="'project-'.$this->projectId" :editable="auth()->user()->can('update', $this->project)" wire:ignore wire:key="project-gantt-{{ $this->projectId }}" />
             @endif
         </x-ui.panel>
     @elseif ($tab === 'risks')
@@ -995,13 +1018,13 @@ new #[Title('titles.project')] class extends Component {
     @elseif ($tab === 'files')
         <x-ui.panel :title="__('projects.project_files')" :count="$this->project->media_count" :subtitle="__('projects.project_files_subtitle')">
             <x-slot:toolbar>
-                <x-ui.button tone="primary" size="sm" icon="plus" wire:click="openCreateFileModal" data-test="add-project-file-button">{{ __('projects.add_file') }}</x-ui.button>
+                @can('update', $this->project)<x-ui.button tone="primary" size="sm" icon="plus" wire:click="openCreateFileModal" data-test="add-project-file-button">{{ __('projects.add_file') }}</x-ui.button>@endcan
             </x-slot:toolbar>
 
             @if ($this->project->media->isEmpty())
                 <x-ui.empty-state icon="paper-clip" :heading="__('common.no_files_recorded')" :body="__('projects.file_records_for_this_project_will_appear_here')">
                     <x-slot:action>
-                        <x-ui.button size="sm" tone="primary" icon="plus" wire:click="openCreateFileModal">{{ __('projects.add_file') }}</x-ui.button>
+                        @can('update', $this->project)<x-ui.button size="sm" tone="primary" icon="plus" wire:click="openCreateFileModal">{{ __('projects.add_file') }}</x-ui.button>@endcan
                     </x-slot:action>
                 </x-ui.empty-state>
             @else
@@ -1033,7 +1056,7 @@ new #[Title('titles.project')] class extends Component {
 
                 <div class="grid gap-3 p-3.5 @lg/detail:grid-cols-2 @4xl/detail:grid-cols-3 @6xl/detail:p-5">
                     @forelse ($this->filteredProjectFiles as $media)
-                        <x-ui.file-card :media="$media" :project="$this->project" wire:key="project-file-{{ $media->id }}" />
+                        <x-ui.file-card :media="$media" :project="$this->project" :editable="auth()->user()->can('update', $this->project)" wire:key="project-file-{{ $media->id }}" />
                     @empty
                         <div class="col-span-full">
                             <x-ui.empty-state icon="funnel" :heading="__('projects.no_files_in_this_category')" />
@@ -1047,6 +1070,7 @@ new #[Title('titles.project')] class extends Component {
     @else
         <x-ui.panel :title="__('projects.linked_proposals')" :count="$this->attachedProposals->count()" :subtitle="__('projects.a_project_may_be_funded_by_several_proposals_and_a_proposal')">
             <x-slot:toolbar>
+                @can('update', $this->project)
                 <div class="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-end">
                     <x-ui.select :label="__('projects.link_a_proposal')" wire:model="proposalToAttach" class="min-w-56">
                         <flux:select.option value="">{{ __('common.select_a_proposal') }}</flux:select.option>
@@ -1056,6 +1080,7 @@ new #[Title('titles.project')] class extends Component {
                     </x-ui.select>
                     <x-ui.button tone="primary" size="sm" icon="link" class="min-h-10" wire:click="attachProposal">{{ __('projects.link') }}</x-ui.button>
                 </div>
+                @endcan
             </x-slot:toolbar>
 
             @if ($this->attachedProposals->isEmpty())
@@ -1082,14 +1107,16 @@ new #[Title('titles.project')] class extends Component {
                                         <span class="tabular-nums">{{ $proposal->planned_date_begin?->translatedFormat(__('formats.date')) }} – {{ $proposal->planned_date_end?->translatedFormat(__('formats.date')) }}</span>
                                     </p>
                                 </div>
-                                <x-ui.button
-                                    tone="ghost"
-                                    size="sm"
-                                    icon="x-mark"
-                                    class="size-8! shrink-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
-                                    wire:click="detachProposal({{ $proposal->id }})"
-                                    :aria-label="__('projects.unlink_name', ['name' => $proposal->name])"
-                                />
+                                @can('update', $this->project)
+                                    <x-ui.button
+                                        tone="ghost"
+                                        size="sm"
+                                        icon="x-mark"
+                                        class="size-8! shrink-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+                                        wire:click="detachProposal({{ $proposal->id }})"
+                                        :aria-label="__('projects.unlink_name', ['name' => $proposal->name])"
+                                    />
+                                @endcan
                             </div>
 
                             <div class="flex flex-wrap items-center gap-2">

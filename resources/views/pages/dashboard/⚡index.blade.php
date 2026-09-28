@@ -14,9 +14,12 @@ use App\Models\Proposal;
 use App\Models\ProposalStatusNote;
 use App\Models\Report;
 use App\Models\Risk;
+use App\Models\Scopes\TaskVisibilityScope;
 use App\Models\Task;
 use App\Models\TransfersTracking;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Number;
@@ -36,6 +39,20 @@ new #[Title('titles.dashboard')] class extends Component {
     private const RiskSlots = 2;
 
     /**
+     * Keep a query empty unless the viewer may view its module, so the
+     * dashboard never shows figures or rows from a module they cannot open.
+     *
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
+     * @return Builder<TModel>
+     */
+    private function visible(Builder $query, string $module): Builder
+    {
+        return auth()->user()?->can("{$module}.view") === true ? $query : $query->whereRaw('1 = 0');
+    }
+
+    /**
      * Everything that is late or has gone wrong, most overdue first.
      *
      * Dated items (tasks, milestones, transfers) sort by days late; materialised
@@ -52,7 +69,7 @@ new #[Title('titles.dashboard')] class extends Component {
     {
         $today = CarbonImmutable::today();
 
-        $tasks = Task::query()
+        $tasks = $this->visible(Task::query(), 'tasks')
             ->select(['id', 'source_type', 'source_id', 'title', 'due_date', 'status'])
             ->with(['source' => fn (MorphTo $morphTo) => $morphTo->morphWith([Milestone::class => ['project:id,name']])])
             ->where('status', '!=', TaskStatus::Done)
@@ -70,7 +87,7 @@ new #[Title('titles.dashboard')] class extends Component {
                 href: route('tasks.show', $task),
             ));
 
-        $milestones = Milestone::query()
+        $milestones = $this->visible(Milestone::query(), 'milestones')
             ->select(['id', 'project_id', 'name', 'planned_end_date', 'status'])
             ->with('project:id,name')
             ->where('status', MilestoneStatus::Planned)
@@ -88,7 +105,7 @@ new #[Title('titles.dashboard')] class extends Component {
                 href: route('milestones.index', ['project' => $milestone->project_id, 'status' => MilestoneStatus::Planned->value]),
             ));
 
-        $transfers = TransfersTracking::query()
+        $transfers = $this->visible(TransfersTracking::query(), 'transfers')
             ->select(['id', 'donor_proposal_id', 'payment_amount', 'amount_transfered_currency', 'scheduled_date', 'ar_status'])
             ->with(['donorProposal:id,donor_id,proposal_id', 'donorProposal.donor:id,name', 'donorProposal.proposal:id,name,status'])
             ->where('ar_status', ArStatus::Pending)
@@ -110,7 +127,7 @@ new #[Title('titles.dashboard')] class extends Component {
                 href: route('funding-agreements.show', $transfer->donorProposal),
             ));
 
-        $risks = Risk::query()
+        $risks = $this->visible(Risk::query(), 'risks')
             ->select(['id', 'project_id', 'name', 'updated_at'])
             ->with('project:id,name')
             ->where('happened', true)
@@ -171,10 +188,11 @@ new #[Title('titles.dashboard')] class extends Component {
     {
         $today = CarbonImmutable::today();
 
-        $delivery = Task::query()->where('status', '!=', TaskStatus::Done)->whereDate('due_date', '<', $today)->count()
-            + Milestone::query()->where('status', MilestoneStatus::Planned)->whereDate('planned_end_date', '<', $today)->count();
-        $funding = TransfersTracking::query()->where('ar_status', ArStatus::Pending)->whereDate('scheduled_date', '<', $today)->count();
-        $risks = Risk::query()->where('happened', true)->count();
+        // Organisation-wide: a count on the dashboard is the same for everyone.
+        $delivery = $this->visible(Task::query(), 'tasks')->withoutGlobalScope(TaskVisibilityScope::class)->where('status', '!=', TaskStatus::Done)->whereDate('due_date', '<', $today)->count()
+            + $this->visible(Milestone::query(), 'milestones')->where('status', MilestoneStatus::Planned)->whereDate('planned_end_date', '<', $today)->count();
+        $funding = $this->visible(TransfersTracking::query(), 'transfers')->where('ar_status', ArStatus::Pending)->whereDate('scheduled_date', '<', $today)->count();
+        $risks = $this->visible(Risk::query(), 'risks')->where('happened', true)->count();
 
         return [
             'all' => $delivery + $funding + $risks,
@@ -195,18 +213,18 @@ new #[Title('titles.dashboard')] class extends Component {
     #[Computed]
     public function fundingPosition(): Collection
     {
-        $committed = DonorProposal::query()
+        $committed = $this->visible(DonorProposal::query(), 'funding-agreements')
             ->selectRaw('currency, sum(budget) as total')
             ->groupBy('currency')
             ->pluck('total', 'currency');
 
-        $received = TransfersTracking::query()
+        $received = $this->visible(TransfersTracking::query(), 'transfers')
             ->where('ar_status', ArStatus::Received)
             ->selectRaw('amount_received_currency as currency, sum(net_amount_received) as total')
             ->groupBy('amount_received_currency')
             ->pluck('total', 'currency');
 
-        $pending = TransfersTracking::query()
+        $pending = $this->visible(TransfersTracking::query(), 'transfers')
             ->where('ar_status', ArStatus::Pending)
             ->selectRaw('amount_transfered_currency as currency, sum(payment_amount) as total, count(*) as transfers')
             ->groupBy('amount_transfered_currency')
@@ -247,21 +265,21 @@ new #[Title('titles.dashboard')] class extends Component {
         $materialisedRisks = $this->attentionCounts['risks'];
         // Counted exactly as the reports page filters ?seenByMeal=unseen, so the
         // figure matches the list it links to.
-        $awaitingReview = Report::query()->where('is_seen_by_meal', false)->count();
+        $awaitingReview = $this->visible(Report::query(), 'reports')->where('is_seen_by_meal', false)->count();
 
         return [
             [
                 'key' => 'active-projects',
                 'label' => __('dashboard.active_projects'),
-                'value' => Project::query()->where('status', ProjectStatus::Active)->count(),
-                'denominator' => Project::query()->count(),
+                'value' => $this->visible(Project::query(), 'projects')->where('status', ProjectStatus::Active)->count(),
+                'denominator' => $this->visible(Project::query(), 'projects')->count(),
                 'tone' => 'neutral',
                 'href' => route('projects.index', ['status' => ProjectStatus::Active->value]),
             ],
             [
                 'key' => 'open-proposals',
                 'label' => __('dashboard.proposals_in_pipeline'),
-                'value' => Proposal::query()->whereNotIn('status', [ProposalStatus::Completed, ProposalStatus::Rejected])->count(),
+                'value' => $this->visible(Proposal::query(), 'proposals')->whereNotIn('status', [ProposalStatus::Completed, ProposalStatus::Rejected])->count(),
                 'denominator' => null,
                 'tone' => 'funding',
                 'href' => route('proposals.index'),
@@ -299,7 +317,7 @@ new #[Title('titles.dashboard')] class extends Component {
         $user = auth()->user();
         $employeeId = $user->employee_id;
         $today = CarbonImmutable::today();
-        $openTasks = fn () => Task::query()
+        $openTasks = fn () => $this->visible(Task::query(), 'tasks')
             ->whereHas('taskAssignees', fn ($query) => $query->where('employee_id', $employeeId))
             ->where('status', '!=', TaskStatus::Done);
 
@@ -307,7 +325,7 @@ new #[Title('titles.dashboard')] class extends Component {
             'employeeId' => $employeeId,
             'overdue' => $employeeId === null ? 0 : $openTasks()->whereDate('due_date', '<', $today)->count(),
             'dueThisWeek' => $employeeId === null ? 0 : $openTasks()->whereBetween('due_date', [$today->toDateString(), $today->addDays(7)->toDateString()])->count(),
-            'draftReports' => Report::query()->where('user_id', $user->id)->where('status', ReportStatus::Draft)->count(),
+            'draftReports' => $this->visible(Report::query(), 'reports')->where('user_id', $user->id)->where('status', ReportStatus::Draft)->count(),
         ];
     }
 
@@ -319,7 +337,7 @@ new #[Title('titles.dashboard')] class extends Component {
     #[Computed]
     public function projectStatusChart(): array
     {
-        $counts = Project::query()->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
+        $counts = $this->visible(Project::query(), 'projects')->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
         $tones = [
             ProjectStatus::Draft->value => 'muted',
             ProjectStatus::Submitted->value => 'neutral',
@@ -344,7 +362,7 @@ new #[Title('titles.dashboard')] class extends Component {
     #[Computed]
     public function pipelineChart(): array
     {
-        $byStatus = Proposal::query()->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
+        $byStatus = $this->visible(Proposal::query(), 'proposals')->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
 
         // Only open proposals, matching the "Proposals in pipeline" figure: a
         // rejected or completed proposal is no longer in the pipeline, which also
@@ -373,7 +391,7 @@ new #[Title('titles.dashboard')] class extends Component {
         $start = CarbonImmutable::today()->startOfMonth()->subMonths(11);
         $months = collect(range(0, 11))->map(fn (int $offset): CarbonImmutable => $start->addMonths($offset));
 
-        $rows = TransfersTracking::query()
+        $rows = $this->visible(TransfersTracking::query(), 'transfers')
             ->select(['receive_date', 'amount_received_currency', 'net_amount_received'])
             ->where('ar_status', ArStatus::Received)
             ->whereBetween('receive_date', [$start->toDateString(), CarbonImmutable::today()->toDateString()])
@@ -408,7 +426,7 @@ new #[Title('titles.dashboard')] class extends Component {
         $today = CarbonImmutable::today();
         $horizon = [$today->toDateString(), $today->addDays(30)->toDateString()];
 
-        $milestones = Milestone::query()
+        $milestones = $this->visible(Milestone::query(), 'milestones')
             ->select(['id', 'project_id', 'name', 'planned_end_date'])
             ->with('project:id,name')
             ->where('status', MilestoneStatus::Planned)
@@ -426,7 +444,7 @@ new #[Title('titles.dashboard')] class extends Component {
                 'href' => route('milestones.index', ['project' => $milestone->project_id]),
             ]);
 
-        $transfers = TransfersTracking::query()
+        $transfers = $this->visible(TransfersTracking::query(), 'transfers')
             ->select(['id', 'donor_proposal_id', 'payment_amount', 'amount_transfered_currency', 'scheduled_date'])
             ->with(['donorProposal:id,donor_id', 'donorProposal.donor:id,name'])
             ->where('ar_status', ArStatus::Pending)
@@ -448,7 +466,7 @@ new #[Title('titles.dashboard')] class extends Component {
                 'href' => route('funding-agreements.show', $transfer->donorProposal),
             ]);
 
-        $tasks = Task::query()
+        $tasks = $this->visible(Task::query(), 'tasks')
             ->select(['id', 'source_type', 'source_id', 'title', 'due_date'])
             ->with(['source' => fn (MorphTo $morphTo) => $morphTo->morphWith([Milestone::class => ['project:id,name']])])
             ->where('status', '!=', TaskStatus::Done)
@@ -466,7 +484,7 @@ new #[Title('titles.dashboard')] class extends Component {
                 'href' => route('tasks.show', $task),
             ]);
 
-        $reports = Report::query()
+        $reports = $this->visible(Report::query(), 'reports')
             ->select(['id', 'plan_indicator_id', 'planned_date', 'status'])
             ->with(['planIndicator:id,indicator_id', 'planIndicator.indicator:id,name'])
             ->where('status', ReportStatus::Draft)
@@ -501,7 +519,7 @@ new #[Title('titles.dashboard')] class extends Component {
     #[Computed]
     public function activity(): Collection
     {
-        $notes = ProposalStatusNote::query()
+        $notes = $this->visible(ProposalStatusNote::query(), 'proposals')
             ->select(['id', 'proposal_id', 'status', 'date'])
             ->with('proposal:id,name')
             ->latest('date')
@@ -516,7 +534,7 @@ new #[Title('titles.dashboard')] class extends Component {
                 'href' => route('proposals.show', $note->proposal),
             ]);
 
-        $reports = Report::query()
+        $reports = $this->visible(Report::query(), 'reports')
             ->select(['id', 'plan_indicator_id', 'user_id', 'submit_date'])
             ->with(['user:id,hr_user_id', 'planIndicator:id,indicator_id', 'planIndicator.indicator:id,name'])
             ->whereNotNull('submit_date')
@@ -542,7 +560,7 @@ new #[Title('titles.dashboard')] class extends Component {
     /**
      * The greeting for the current time of day.
      */
-    public function greeting(): string
+    protected function greeting(): string
     {
         $hour = (int) now()->format('G');
         $key = match (true) {

@@ -13,6 +13,7 @@ use App\Models\ScheduleDependency;
 use App\Models\Task;
 use Flux\Flux;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 
 /**
@@ -46,6 +47,8 @@ trait EditsProjectGantt
      */
     public function ganttReschedule(string $rowId, string $start, string $end): array
     {
+        $this->authorizeGanttEdit();
+
         $record = $this->ganttRecord($rowId);
 
         if ($record === null || ! $this->validDateRange($start, $end)) {
@@ -71,6 +74,8 @@ trait EditsProjectGantt
      */
     public function ganttRestore(array $rows): array
     {
+        $this->authorizeGanttEdit();
+
         $targets = [];
 
         foreach (array_slice($rows, 0, 500) as $row) {
@@ -102,6 +107,8 @@ trait EditsProjectGantt
      */
     public function ganttSetProgress(string $rowId, int $progress): array
     {
+        $this->authorizeGanttEdit();
+
         $record = $this->ganttRecord($rowId);
 
         if (! $record instanceof Task || $progress < 0 || $progress > 100 || $record->subtasks()->exists()) {
@@ -118,6 +125,8 @@ trait EditsProjectGantt
      */
     public function ganttRename(string $rowId, string $name): array
     {
+        $this->authorizeGanttEdit();
+
         $name = trim($name);
         $record = $this->ganttRecord($rowId);
 
@@ -143,6 +152,8 @@ trait EditsProjectGantt
      */
     public function ganttSetParent(string $rowId, ?string $parentRowId): array
     {
+        $this->authorizeGanttEdit();
+
         $record = $this->ganttRecord($rowId);
         $parent = $parentRowId === null ? null : $this->ganttRecord($parentRowId);
 
@@ -182,6 +193,8 @@ trait EditsProjectGantt
      */
     public function ganttLink(string $fromRowId, string $toRowId, string $type = 'fs', int $lag = 0): array
     {
+        $this->authorizeGanttEdit();
+
         $from = $this->ganttRecord($fromRowId);
         $to = $this->ganttRecord($toRowId);
 
@@ -222,6 +235,8 @@ trait EditsProjectGantt
      */
     public function ganttUnlink(string $fromRowId, string $toRowId): array
     {
+        $this->authorizeGanttEdit();
+
         $existing = $this->findLink($fromRowId, $toRowId);
 
         if ($existing === null) {
@@ -242,6 +257,8 @@ trait EditsProjectGantt
      */
     public function ganttSetWeekend(string $preset): array
     {
+        $this->authorizeGanttEdit();
+
         if (! array_key_exists($preset, self::WEEKEND_PRESETS)) {
             return $this->ganttRefused(__('gantt.edit_refused'));
         }
@@ -263,6 +280,8 @@ trait EditsProjectGantt
      */
     public function ganttSaveBaseline(string $name = ''): array
     {
+        $this->authorizeGanttEdit();
+
         $name = trim($name) === ''
             ? __('gantt.baseline_default_name', ['date' => now()->translatedFormat(__('formats.date'))])
             : mb_substr(trim($name), 0, 255);
@@ -311,6 +330,8 @@ trait EditsProjectGantt
      */
     public function ganttDeleteBaseline(int $baselineId): array
     {
+        $this->authorizeGanttEdit();
+
         $deleted = ScheduleBaseline::query()->where('project_id', $this->projectId)->whereKey($baselineId)->delete();
 
         if ($deleted === 0) {
@@ -357,6 +378,16 @@ trait EditsProjectGantt
         }
 
         return false;
+    }
+
+    /**
+     * Every schedule edit needs edit rights on the project (see
+     * ProjectPolicy::update): its owner, its program's manager, or a holder
+     * of projects.update.
+     */
+    private function authorizeGanttEdit(): void
+    {
+        Gate::authorize('update', $this->ganttProject());
     }
 
     private function ganttProject(): Project

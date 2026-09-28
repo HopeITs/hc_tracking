@@ -1,20 +1,27 @@
 <?php
 
+use App\Livewire\Concerns\RequiresConfirmedPassword;
 use Flux\Flux;
 use Laravel\Fortify\Actions\GenerateNewRecoveryCodes;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 new class extends Component {
+    use RequiresConfirmedPassword;
+
     #[Locked]
     public array $recoveryCodes = [];
 
     /**
-     * Mount the component.
+     * Mount the component. The codes are only read while the password
+     * confirmation is fresh: this component can also be mounted inside a
+     * Livewire update of the security page, which skips password.confirm.
      */
     public function mount(): void
     {
-        $this->loadRecoveryCodes();
+        if ($this->passwordRecentlyConfirmed()) {
+            $this->loadRecoveryCodes();
+        }
     }
 
     /**
@@ -22,6 +29,10 @@ new class extends Component {
      */
     public function regenerateRecoveryCodes(GenerateNewRecoveryCodes $generateNewRecoveryCodes): void
     {
+        if (! $this->ensurePasswordIsConfirmed()) {
+            return;
+        }
+
         $generateNewRecoveryCodes(auth()->user());
 
         $this->loadRecoveryCodes();

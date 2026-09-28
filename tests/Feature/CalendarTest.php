@@ -27,7 +27,7 @@ test('guests are redirected from the calendar', function () {
 });
 
 test('a user with no linked HR employee sees an explanation instead of a calendar', function () {
-    $user = User::factory()->create(['employee_id' => null]);
+    $user = User::factory()->role('General Manager')->create(['employee_id' => null]);
 
     Livewire::actingAs($user)
         ->test('pages::calendar.index')
@@ -38,7 +38,7 @@ test('a user with no linked HR employee sees an explanation instead of a calenda
 test('a linked user sees their own responsible milestones on the correct day, and not another employee\'s', function () {
     $employeeId = insertHrEmployee();
     $otherEmployeeId = insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Nassar');
-    $user = linkUserToEmployee(User::factory()->create(), $employeeId);
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
 
     $mine = Milestone::factory()->create([
         'name' => 'My milestone',
@@ -65,7 +65,7 @@ test('a linked user sees their own responsible milestones on the correct day, an
 
 test('clicking a day pre-fills the add milestone form with that date', function () {
     $employeeId = insertHrEmployee();
-    $user = linkUserToEmployee(User::factory()->create(), $employeeId);
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
 
     Livewire::actingAs($user)
         ->test('pages::calendar.index')
@@ -77,7 +77,7 @@ test('clicking a day pre-fills the add milestone form with that date', function 
 
 test('saving from the calendar creates a milestone on the clicked date', function () {
     $employeeId = insertHrEmployee();
-    $user = linkUserToEmployee(User::factory()->create(), $employeeId);
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
     $project = Project::factory()->create();
 
     Livewire::actingAs($user)
@@ -97,7 +97,7 @@ test('saving from the calendar creates a milestone on the clicked date', functio
 
 test('month navigation shows the new month and hides the old one', function () {
     $employeeId = insertHrEmployee();
-    $user = linkUserToEmployee(User::factory()->create(), $employeeId);
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
 
     $june = Milestone::factory()->create([
         'name' => 'June gate',
@@ -123,7 +123,7 @@ test('month navigation shows the new month and hides the old one', function () {
 
 test('a milestone can be edited and deleted from the calendar', function () {
     $employeeId = insertHrEmployee();
-    $user = linkUserToEmployee(User::factory()->create(), $employeeId);
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
     $milestone = Milestone::factory()->create([
         'name' => 'Original name',
         'responsible_user_id' => $employeeId,
@@ -154,7 +154,7 @@ test('a milestone can be edited and deleted from the calendar', function () {
 test('a linked user sees their own assigned tasks on the correct day, and not another employee\'s', function () {
     $employeeId = insertHrEmployee();
     $otherEmployeeId = insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Nassar');
-    $user = linkUserToEmployee(User::factory()->create(), $employeeId);
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
 
     $mine = Task::factory()->create([
         'title' => 'My task',
@@ -179,7 +179,7 @@ test('a linked user sees their own assigned tasks on the correct day, and not an
 
 test('the right-click context menu offers to add either a milestone or a task, targeting the clicked date', function () {
     $employeeId = insertHrEmployee();
-    $user = linkUserToEmployee(User::factory()->create(), $employeeId);
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
 
     Livewire::actingAs($user)
         ->test('pages::calendar.index')
@@ -193,7 +193,7 @@ test('the right-click context menu offers to add either a milestone or a task, t
 
 test('clicking a day pre-fills the add task form with that date and defaults the assignee to the signed-in employee', function () {
     $employeeId = insertHrEmployee();
-    $user = linkUserToEmployee(User::factory()->create(), $employeeId);
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
 
     Livewire::actingAs($user)
         ->test('pages::calendar.index')
@@ -205,7 +205,7 @@ test('clicking a day pre-fills the add task form with that date and defaults the
 
 test('saving a task from the calendar creates it with the clicked due date', function () {
     $employeeId = insertHrEmployee();
-    $user = linkUserToEmployee(User::factory()->create(), $employeeId);
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
     $proposal = Proposal::factory()->create();
 
     Livewire::actingAs($user)
@@ -228,8 +228,8 @@ test('saving a task from the calendar creates it with the clicked due date', fun
 
 test('a linked user sees their own report deadlines on the correct day, and not another user\'s', function () {
     $employeeId = insertHrEmployee();
-    $user = linkUserToEmployee(User::factory()->create(), $employeeId);
-    $otherUser = User::factory()->create();
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
+    $otherUser = User::factory()->role('General Manager')->create();
 
     $mine = Report::factory()->create([
         'user_id' => $user->id,
@@ -250,7 +250,7 @@ test('a linked user sees their own report deadlines on the correct day, and not 
 test('a linked user sees their own unscheduled tasks in the unscheduled panel', function () {
     $employeeId = insertHrEmployee();
     $otherEmployeeId = insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Nassar');
-    $user = linkUserToEmployee(User::factory()->create(), $employeeId);
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
 
     $mine = Task::factory()->create(['title' => 'My unscheduled task', 'due_date' => null]);
     $mine->taskAssignees()->delete();
@@ -274,8 +274,9 @@ test('a linked user sees their own unscheduled tasks in the unscheduled panel', 
 
 test('rescheduling a task from the calendar sets its due date, and clearing it unschedules it again', function () {
     $employeeId = insertHrEmployee();
-    $user = linkUserToEmployee(User::factory()->create(), $employeeId);
-    $task = Task::factory()->create(['title' => 'Drag me', 'due_date' => null]);
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
+    // Only a task's creator moves its due date.
+    $task = Task::factory()->create(['title' => 'Drag me', 'due_date' => null, 'created_by' => $user->id]);
     $task->taskAssignees()->delete();
     $task->taskAssignees()->create(['employee_id' => $employeeId]);
 
@@ -294,7 +295,7 @@ test('rescheduling a task from the calendar sets its due date, and clearing it u
 
 test('a task can be edited and deleted from the calendar', function () {
     $employeeId = insertHrEmployee();
-    $user = linkUserToEmployee(User::factory()->create(), $employeeId);
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
     $task = Task::factory()->create([
         'title' => 'Original task',
         'due_date' => Carbon::create(2026, 6, 15),
@@ -325,7 +326,7 @@ test('a task can be edited and deleted from the calendar', function () {
 
 test('turning off a type filter hides that type\'s chips without affecting the others', function () {
     $employeeId = insertHrEmployee();
-    $user = linkUserToEmployee(User::factory()->create(), $employeeId);
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
 
     $milestone = Milestone::factory()->create([
         'responsible_user_id' => $employeeId,
@@ -350,7 +351,7 @@ test('turning off a type filter hides that type\'s chips without affecting the o
 test('the responsible filter switches the calendar to another employee\'s items, and back to mine', function () {
     $myEmployeeId = insertHrEmployee();
     $otherEmployeeId = insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Nassar');
-    $user = linkUserToEmployee(User::factory()->create(), $myEmployeeId);
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $myEmployeeId);
 
     $mine = Milestone::factory()->create([
         'name' => 'Mine',
@@ -379,7 +380,7 @@ test('the responsible filter switches the calendar to another employee\'s items,
 test('adding a milestone while viewing another employee\'s calendar assigns it to them by default', function () {
     $myEmployeeId = insertHrEmployee();
     $otherEmployeeId = insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Nassar');
-    $user = linkUserToEmployee(User::factory()->create(), $myEmployeeId);
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $myEmployeeId);
 
     Livewire::actingAs($user)
         ->test('pages::calendar.index')
@@ -391,7 +392,7 @@ test('adding a milestone while viewing another employee\'s calendar assigns it t
 test('selecting several employees in the responsible filter merges their milestones', function () {
     $myEmployeeId = insertHrEmployee();
     $otherEmployeeId = insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Nassar');
-    $user = linkUserToEmployee(User::factory()->create(), $myEmployeeId);
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $myEmployeeId);
 
     $mine = Milestone::factory()->create([
         'name' => 'Mine',
@@ -417,7 +418,7 @@ test('selecting several employees in the responsible filter merges their milesto
 
 test('switching to day view shows only the anchor date, and week view shows its whole week', function () {
     $employeeId = insertHrEmployee();
-    $user = linkUserToEmployee(User::factory()->create(), $employeeId);
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
 
     $inWeek = Milestone::factory()->create([
         'responsible_user_id' => $employeeId,
@@ -442,7 +443,7 @@ test('switching to day view shows only the anchor date, and week view shows its 
 
 test('previous and next move by the active view\'s period, not always by a month', function () {
     $employeeId = insertHrEmployee();
-    $user = linkUserToEmployee(User::factory()->create(), $employeeId);
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
 
     Livewire::actingAs($user)
         ->test('pages::calendar.index')
@@ -458,7 +459,7 @@ test('previous and next move by the active view\'s period, not always by a month
 test('a linked user sees start/end dates for their own projects, and not another employee\'s', function () {
     $employeeId = insertHrEmployee();
     $otherEmployeeId = insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Nassar');
-    $user = linkUserToEmployee(User::factory()->create(), $employeeId);
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
 
     $mine = Project::factory()->create([
         'user_id' => $employeeId,
@@ -483,7 +484,7 @@ test('a linked user sees start/end dates for their own projects, and not another
 test('a linked user sees deadlines for proposals funding their own projects, and not another employee\'s projects', function () {
     $employeeId = insertHrEmployee();
     $otherEmployeeId = insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Nassar');
-    $user = linkUserToEmployee(User::factory()->create(), $employeeId);
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
 
     $myProject = Project::factory()->create(['user_id' => $employeeId]);
     $theirProject = Project::factory()->create(['user_id' => $otherEmployeeId]);
@@ -504,7 +505,7 @@ test('a linked user sees deadlines for proposals funding their own projects, and
 test('a linked user sees transfer dates for funding agreements under their own projects', function () {
     $employeeId = insertHrEmployee();
     $otherEmployeeId = insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Nassar');
-    $user = linkUserToEmployee(User::factory()->create(), $employeeId);
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
 
     $myProject = Project::factory()->create(['user_id' => $employeeId]);
     $theirProject = Project::factory()->create(['user_id' => $otherEmployeeId]);
@@ -535,7 +536,7 @@ test('a linked user sees transfer dates for funding agreements under their own p
 test('a linked user sees donor follow-ups and donor report deadlines tied to their own projects', function () {
     $employeeId = insertHrEmployee();
     $otherEmployeeId = insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Nassar');
-    $user = linkUserToEmployee(User::factory()->create(), $employeeId);
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
 
     $myProject = Project::factory()->create(['user_id' => $employeeId]);
     $theirProject = Project::factory()->create(['user_id' => $otherEmployeeId]);
@@ -563,7 +564,7 @@ test('a linked user sees donor follow-ups and donor report deadlines tied to the
 
 test('toggling off the new type filters hides their chips without affecting the others', function () {
     $employeeId = insertHrEmployee();
-    $user = linkUserToEmployee(User::factory()->create(), $employeeId);
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
 
     $project = Project::factory()->create([
         'user_id' => $employeeId,
@@ -586,7 +587,7 @@ test('toggling off the new type filters hides their chips without affecting the 
 test('narrowing the type filter to exactly one type shows the focused banner, and resetting restores the legend and the responsible filter', function () {
     $employeeId = insertHrEmployee();
     $otherEmployeeId = insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Nassar');
-    $user = linkUserToEmployee(User::factory()->create(), $employeeId);
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
 
     Milestone::factory()->create([
         'responsible_user_id' => $employeeId,
@@ -615,7 +616,7 @@ test('narrowing the type filter to exactly one type shows the focused banner, an
 
 test('focusOnlyType isolates one type in a single call, closes the menu and jumps to its nearest occurrence', function () {
     $employeeId = insertHrEmployee();
-    $user = linkUserToEmployee(User::factory()->create(), $employeeId);
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
     $targetDate = Carbon::today()->addDays(40);
 
     Milestone::factory()->create([
@@ -640,7 +641,7 @@ test('focusOnlyType isolates one type in a single call, closes the menu and jump
 
 test('toggling a type keeps the menu open, so unchecking several types in a row needs no reopening', function () {
     $employeeId = insertHrEmployee();
-    $user = linkUserToEmployee(User::factory()->create(), $employeeId);
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
 
     Livewire::actingAs($user)
         ->test('pages::calendar.index')
@@ -653,7 +654,7 @@ test('toggling a type keeps the menu open, so unchecking several types in a row 
 
 test('narrowing to a single type via toggleType jumps the grid to its nearest occurrence', function () {
     $employeeId = insertHrEmployee();
-    $user = linkUserToEmployee(User::factory()->create(), $employeeId);
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
     $targetDate = Carbon::today()->addDays(40);
 
     Milestone::factory()->create([
@@ -674,7 +675,7 @@ test('narrowing to a single type via toggleType jumps the grid to its nearest oc
 
 test('the related-dates panel lists both occurrences of a composite type with click-through', function () {
     $employeeId = insertHrEmployee();
-    $user = linkUserToEmployee(User::factory()->create(), $employeeId);
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
     $project = Project::factory()->create([
         'user_id' => $employeeId,
         'start_date' => Carbon::today()->addDays(5),
@@ -698,7 +699,7 @@ test('the related-dates panel lists both occurrences of a composite type with cl
 
 test('opening the day-detail list shows every visible item on that day and can edit or navigate to each', function () {
     $employeeId = insertHrEmployee();
-    $user = linkUserToEmployee(User::factory()->create(), $employeeId);
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
     $milestone = Milestone::factory()->create([
         'name' => 'Kickoff review',
         'responsible_user_id' => $employeeId,
@@ -722,7 +723,7 @@ test('opening the day-detail list shows every visible item on that day and can e
 
 test('a day with no visible items has no clickable content area', function () {
     $employeeId = insertHrEmployee();
-    $user = linkUserToEmployee(User::factory()->create(), $employeeId);
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
 
     Livewire::actingAs($user)
         ->test('pages::calendar.index')
@@ -732,7 +733,7 @@ test('a day with no visible items has no clickable content area', function () {
 
 test('the today button resets both the month grid and the day/week anchor', function () {
     $employeeId = insertHrEmployee();
-    $user = linkUserToEmployee(User::factory()->create(), $employeeId);
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
 
     Livewire::actingAs($user)
         ->test('pages::calendar.index')

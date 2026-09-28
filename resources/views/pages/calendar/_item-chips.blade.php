@@ -23,9 +23,11 @@
             {{ $milestone->name }}
         </button>
         @if ($milestone->children_count === 0 && $milestone->tasks_count === 0)
+            @can('milestones.delete')
             <button type="button" wire:click.stop="confirmDelete({{ $milestone->id }})" class="hidden shrink-0 cursor-pointer group-hover:block" aria-label="{{ __('common.delete_name', ['name' => $milestone->name]) }}">
                 <flux:icon.x-mark variant="micro" class="size-3" />
             </button>
+            @endcan
         @endif
     </div>
 @endforeach
@@ -37,9 +39,11 @@
         <button type="button" wire:click.stop="openEditTaskModal({{ $task->id }})" class="min-w-0 flex-1 cursor-pointer truncate text-start font-medium" data-test="calendar-task-{{ $task->id }}">
             {{ $task->title }}
         </button>
-        <button type="button" wire:click.stop="confirmDeleteTask({{ $task->id }})" class="hidden shrink-0 cursor-pointer group-hover:block" aria-label="{{ __('common.delete_name', ['name' => $task->title]) }}">
-            <flux:icon.x-mark variant="micro" class="size-3" />
-        </button>
+        @can('delete', $task)
+            <button type="button" wire:click.stop="confirmDeleteTask({{ $task->id }})" class="hidden shrink-0 cursor-pointer group-hover:block" aria-label="{{ __('common.delete_name', ['name' => $task->title]) }}">
+                <flux:icon.x-mark variant="micro" class="size-3" />
+            </button>
+        @endcan
     </div>
 @endforeach
 

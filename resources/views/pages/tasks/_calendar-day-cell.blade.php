@@ -38,6 +38,7 @@
     @endforeach
 </div>
 
+@can('create', App\Models\Task::class)
 <button
     type="button"
     x-show="!addOpen[{{ Js::from($day->toDateString()) }}]"
@@ -120,3 +121,4 @@
         </flux:dropdown>
     </div>
 </div>
+@endcan
