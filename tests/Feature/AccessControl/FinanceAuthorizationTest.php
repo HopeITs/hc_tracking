@@ -1,9 +1,7 @@
 <?php
 
-use App\Enums\ProposalStatus;
 use App\Models\Account;
 use App\Models\Donor;
-use App\Models\Proposal;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 
@@ -36,30 +34,7 @@ test('Financial closes an account', function () {
     expect($account->fresh()->is_active)->toBeFalse();
 });
 
-test('only whoever may update a proposal moves its status from the dossier', function () {
-    $proposal = Proposal::factory()->create(['status' => ProposalStatus::Submitted]);
-    $move = fn (string $role) => Livewire::actingAs(userWithRole($role))
-        ->test('pages::proposals.dossier', ['proposal' => $proposal])
-        ->set('newStatus', ProposalStatus::Approved->value)
-        ->set('statusContext', 'Countersigned.')
-        ->set('statusDate', '2026-04-01')
-        ->call('changeStatus');
-
-    $move('Team Member')->assertForbidden();
-    expect($proposal->fresh()->status)->toBe(ProposalStatus::Submitted);
-
-    $move('Public Relations Manager')->assertHasNoErrors();
-    expect($proposal->fresh()->status)->toBe(ProposalStatus::Approved);
-});
-
 test('the browser cannot swap the record a page or form is working on', function () {
-    $proposal = Proposal::factory()->create();
-
-    expect(fn () => Livewire::actingAs(userWithRole('Financial'))
-        ->test('pages::proposals.dossier', ['proposal' => $proposal])
-        ->set('proposalId', Proposal::factory()->create()->id))
-        ->toThrow(CannotUpdateLockedPropertyException::class);
-
     expect(fn () => Livewire::actingAs(userWithRole('Financial'))
         ->test('pages::donors.index')
         ->set('editingDonorId', Donor::factory()->create()->id))

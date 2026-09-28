@@ -183,6 +183,9 @@ test('the download route rejects guests, reference-only rows and files from anot
 
     $this->actingAs($user)->get(route('reports.files.download', [$otherReport, $stored]))->assertNotFound();
     $this->actingAs($user)->get(route('reports.files.download', [$report, $referenceOnly]))->assertNotFound();
+
+    $this->actingAs(User::factory()->create())->get(route('reports.files.download', [$report, $stored]))->assertForbidden();
+    $this->actingAs(User::factory()->create())->get(route('reports.files.preview', [$report, $stored]))->assertForbidden();
 });
 
 test('edit and delete refuse a file that belongs to another report', function (string $method) {

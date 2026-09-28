@@ -171,32 +171,12 @@ test('fees, a missing net amount and a failed transfer never turn money back int
 
     $show = Livewire::actingAs($user)->test('pages::proposals.show', ['proposal' => $agreement->proposal_id])->instance();
     $index = Livewire::actingAs($user)->test('pages::proposals.index')->instance();
-    $dossier = Livewire::actingAs($user)->test('pages::proposals.dossier', ['proposal' => $agreement->proposal_id])->instance();
     $donor = Livewire::actingAs($user)->test('pages::donors.show', ['donor' => $agreement->donor_id])->instance();
 
     expect($show->agreementMoney[$agreement->id]['unscheduled'])->toBe(100.0)
         ->and($index->fundingPosition->firstWhere('currency', 'USD')['unscheduled'])->toBe(100.0)
         ->and($index->agreementMoney($index->proposals->first()->donorProposals->first())['unscheduled'])->toBe(100.0)
-        ->and($dossier->money[0]['unscheduled'])->toBe(100.0)
         ->and($donor->agreementMoney($donor->agreements->first()))->toMatchArray(['failed' => 200.0, 'unscheduled' => 100.0]);
-});
-
-test('the dossier reads a sent tranche past its date as in transit, never overdue', function () {
-    $user = User::factory()->role('Financial')->create();
-    $agreement = DonorProposal::factory()->create(['currency' => Currency::Usd]);
-    $sent = TransfersTracking::factory()->create([
-        'donor_proposal_id' => $agreement->id,
-        'amount_transfered_currency' => Currency::Usd,
-        'scheduled_date' => CarbonImmutable::today()->subDays(10),
-        'transfer_date' => CarbonImmutable::today()->subDays(5),
-        'ar_status' => ArStatus::Pending,
-    ]);
-
-    $dossier = Livewire::actingAs($user)->test('pages::proposals.dossier', ['proposal' => $agreement->proposal_id])
-        ->assertSeeHtml('data-tranche-state="transit"');
-
-    expect($dossier->instance()->trancheState($sent))->toBe('transit')
-        ->and($dossier->instance()->agreementMoney($dossier->instance()->agreements->first())['nextDue'])->toBeNull();
 });
 
 test('the donor directory never lists money already sent as the next transfer due', function () {

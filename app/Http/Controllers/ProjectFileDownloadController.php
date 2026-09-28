@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Media;
 use App\Models\Project;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -20,6 +21,8 @@ class ProjectFileDownloadController extends Controller
      */
     public function __invoke(Project $project, Media $media): StreamedResponse
     {
+        Gate::authorize('view', $project);
+
         abort_unless(
             $media->mediable_type === 'project' && $media->mediable_id === $project->id,
             404

@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Enums\FileType;
 use App\Models\Media;
 use App\Models\Proposal;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -24,6 +25,8 @@ class ProposalFilePreviewController extends Controller
      */
     public function __invoke(Proposal $proposal, Media $media): StreamedResponse
     {
+        Gate::authorize('view', $proposal);
+
         $belongsHere = match ($media->mediable_type) {
             'proposal' => $media->mediable_id === $proposal->id,
             'project' => $proposal->projects()->whereKey($media->mediable_id)->exists(),

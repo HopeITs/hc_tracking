@@ -125,11 +125,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->can('proposals.view')
         ->name('proposals.files.preview');
 
-    // TEMPORARY dossier preview — remove before merge.
-    Route::livewire('proposals/{proposal}/dossier-preview', 'pages::proposals.dossier')
-        ->can('proposals.view')
-        ->name('proposals.dossier-preview');
-
     Route::livewire('donors', 'pages::donors.index')
         ->can('donors.view')
         ->name('donors.index');
