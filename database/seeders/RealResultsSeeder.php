@@ -25,6 +25,8 @@ use RuntimeException;
  *
  *     php artisan db:seed --class=RealResultsSeeder
  *
+ * or with every other real seeder, in dependency order, via RealDataSeeder.
+ *
  * Results are resolved by statement text (unique across the source sheet) so
  * a result's `parent_id` can point at a sibling inserted earlier in the same
  * run. Indicator names are likewise unique across the whole sheet.

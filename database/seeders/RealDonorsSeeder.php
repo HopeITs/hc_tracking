@@ -15,6 +15,8 @@ use Illuminate\Database\Seeder;
  *
  *     php artisan db:seed --class=RealDonorsSeeder
  *
+ * or with every other real seeder, in dependency order, via RealDataSeeder.
+ *
  * `firstOrCreate` on `name` makes re-running it a no-op for donors already
  * inserted, so it is safe to run again after adding a new row here.
  */

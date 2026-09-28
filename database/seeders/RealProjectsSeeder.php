@@ -18,6 +18,8 @@ use Illuminate\Database\Seeder;
  *
  *     php artisan db:seed --class=RealProjectsSeeder
  *
+ * or with every other real seeder, in dependency order, via RealDataSeeder.
+ *
  * `city_id` and `program_id` are real HR ids, not demo ones — see the HR
  * note in .ai/rules/models.md. `Program::syncFromHr()` mirrors the programs
  * table first so the local FK on `program_id` is satisfiable. `user_id` has

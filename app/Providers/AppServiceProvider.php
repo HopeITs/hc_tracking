@@ -26,9 +26,11 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Foundation\DevCommands;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -39,10 +41,36 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->disableDebugInProduction();
+
         // One instance per request or job, so queue workers never hold stale values.
         $this->app->scoped(NotificationSettings::class);
 
         $this->registerDevCommands();
+    }
+
+    /**
+     * Debug error pages show code, SQL with its bindings, file paths and
+     * request data, so production never renders them, even when
+     * APP_DEBUG=true slips into the live .env. This runs in register(), before
+     * any provider boots, so an error thrown during boot is covered too.
+     *
+     * The misconfiguration is logged once a day rather than on every request;
+     * a cache failure falls back to logging, never to breaking the request.
+     */
+    protected function disableDebugInProduction(): void
+    {
+        if (! $this->app->isProduction() || ! config('app.debug')) {
+            return;
+        }
+
+        config(['app.debug' => false]);
+
+        $this->app->booted(function (): void {
+            if (rescue(fn (): bool => Cache::add('security.debug-forced-off', true, now()->addDay()), true, report: false)) {
+                Log::critical('APP_DEBUG=true is set in production; debug mode was forced off. Set APP_DEBUG=false in the live .env.');
+            }
+        });
     }
 
     /**

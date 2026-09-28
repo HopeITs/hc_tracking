@@ -10,6 +10,12 @@ test('confirm password screen can be rendered', function () {
     $response->assertOk();
 });
 
+test('a passkey confirmation without a redirect falls back to the dashboard route', function () {
+    $this->actingAs(User::factory()->create())
+        ->get(route('password.confirm'))
+        ->assertSee("response.redirect || '".route('dashboard', absolute: false)."'", false);
+});
+
 test('the hr password confirms the session', function () {
     $user = User::factory()->withHrAccount('hr-secret')->create();
 

@@ -77,7 +77,8 @@ test('staff are the hr accounts and assigned programmes have hr employee manager
 
     expect(User::query()->pluck('hr_user_id')->sort()->values()->all())
         ->toBe(DB::connection('hr')->table('users')->pluck('id')->sort()->values()->all())
-        ->and(User::query()->whereHas('roles')->exists())->toBeFalse();
+        ->and(User::query()->with('roles')->get()->map(fn (User $user): array => $user->roles->pluck('name')->all())->unique()->values()->all())
+        ->toBe([[config('access-control.default_role')]]);
 
     foreach (Program::query()->whereNotNull('manager_id')->with('manager', 'projects', 'annualPlans')->get() as $program) {
         expect($program->manager)->toBeInstanceOf(HrEmployee::class);

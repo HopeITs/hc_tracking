@@ -23,6 +23,8 @@ use RuntimeException;
  *
  *     php artisan db:seed --class=RealProposalsSeeder
  *
+ * or with every other real seeder, in dependency order, via RealDataSeeder.
+ *
  * `firstOrCreate` on `name` makes re-running it a no-op for proposals already
  * inserted, so it is safe to run again after adding a new row here.
  *

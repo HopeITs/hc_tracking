@@ -15,6 +15,8 @@ use Illuminate\Database\Seeder;
  *
  *     php artisan db:seed --class=RealAccountsSeeder
  *
+ * or with every other real seeder, in dependency order, via RealDataSeeder.
+ *
  * `firstOrCreate` on `account_number` makes re-running it a no-op for
  * accounts already inserted, so it is safe to run again after adding a new
  * row here.

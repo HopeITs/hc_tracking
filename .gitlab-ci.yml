@@ -1,0 +1,25 @@
+# Secret scanning: the pipeline fails when a key, token or password is
+# committed. Rules live in .gitleaks.toml; reviewed historical findings are
+# pinned in .gitleaksignore. The image is pinned by digest (gitleaks v8.30.1).
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+
+stages:
+  - security
+
+gitleaks:
+  stage: security
+  image:
+    name: ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+    entrypoint: [""]
+  variables:
+    # Full history, so a secret added and removed in the same push is still caught.
+    GIT_DEPTH: "0"
+  script:
+    - git config --global --add safe.directory "$CI_PROJECT_DIR" || true
+    - gitleaks git --config .gitleaks.toml --redact --verbose --no-banner "$CI_PROJECT_DIR"
