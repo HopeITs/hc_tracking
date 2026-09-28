@@ -74,7 +74,7 @@ test('logging in links the user to their hr account and refreshes their name', f
         ->and($user->employee->name_ar)->toBe('سامي حداد');
 });
 
-test('remember me issues a long-lived remember cookie', function () {
+test('remember me issues a remember cookie that lasts 30 days', function () {
     $user = User::factory()->withHrAccount()->create();
 
     $response = $this->post(route('login.store'), [
@@ -90,6 +90,11 @@ test('remember me issues a long-lived remember cookie', function () {
     // browser close; remember_token itself isn't a reliable signal here
     // since the factory always seeds one regardless of login.
     $response->assertCookie(Auth::guard()->getRecallerName());
+
+    $recallerCookie = $response->getCookie(Auth::guard()->getRecallerName(), decrypt: false);
+    expect($recallerCookie->getExpiresTime())
+        ->toBeGreaterThan(now()->addDays(30)->subMinute()->timestamp)
+        ->toBeLessThanOrEqual(now()->addDays(30)->addMinute()->timestamp);
 });
 
 test('without remember me no remember cookie is issued', function () {
@@ -138,7 +143,7 @@ test('the session cookie itself expires when the browser closes, remember me or 
     expect($sessionCookieRemembered->getExpiresTime())->toBe(0);
 
     $recallerCookie = $withRemember->getCookie(Auth::guard()->getRecallerName(), decrypt: false);
-    expect($recallerCookie->getExpiresTime())->toBeGreaterThan(now()->addYear()->timestamp);
+    expect($recallerCookie->getExpiresTime())->toBeGreaterThan(now()->addDays(29)->timestamp);
 });
 
 test('logging in never writes to hr', function () {

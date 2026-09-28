@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Actions\Fortify\DisableTwoFactorAuthenticationUnlessRequired;
+use App\Http\Middleware\EnsureTwoFactorIsEnabled;
 use App\Models\Account;
 use App\Models\AnnualPlan;
 use App\Models\Donor;
@@ -33,6 +35,9 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Laravel\Fortify\Actions\DisableTwoFactorAuthentication;
+use Livewire\Component;
+use Livewire\Livewire;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -47,6 +52,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scoped(NotificationSettings::class);
 
         $this->registerDevCommands();
+
+        $this->configureFortifyActions();
     }
 
     /**
@@ -91,6 +98,36 @@ class AppServiceProvider extends ServiceProvider
         $this->configureDefaults();
         $this->configureMorphMap();
         $this->configureGates();
+        $this->configureLivewire();
+    }
+
+    /**
+     * Livewire re-runs only its own list of route middleware (auth and
+     * authorization) on update requests. The two-factor requirement joins it,
+     * so a component rendered on a page that requires two-factor cannot be
+     * driven by someone who still has to turn it on. Components rendered on
+     * the security page itself (the layout's notification bell, say) carry
+     * that page's route instead, so every hydrated component outside the
+     * enrolment set is checked as well.
+     */
+    protected function configureLivewire(): void
+    {
+        Livewire::addPersistentMiddleware([EnsureTwoFactorIsEnabled::class]);
+
+        Livewire::listen('hydrate', function (mixed $component): void {
+            if ($component instanceof Component) {
+                EnsureTwoFactorIsEnabled::guardLivewireComponent($component);
+            }
+        });
+    }
+
+    /**
+     * Fortify's own "disable two-factor" endpoint cannot switch it off for a
+     * role that requires it; half-finished set-ups are still cleared.
+     */
+    protected function configureFortifyActions(): void
+    {
+        $this->app->bind(DisableTwoFactorAuthentication::class, DisableTwoFactorAuthenticationUnlessRequired::class);
     }
 
     /**

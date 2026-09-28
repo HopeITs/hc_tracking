@@ -73,6 +73,27 @@ return [
             'replace_placeholders' => true,
         ],
 
+        /*
+        | Authentication audit trail (App\Listeners\LogAuthenticationEvent):
+        | sign-ins, failures, lockouts, sign-outs, two-factor and passkey
+        | changes. Kept apart from laravel.log, at info level whatever
+        | LOG_LEVEL says, for 90 days. LOG_AUTH_STACK picks the channels it
+        | writes to; the test suite sets it to "null" so no file is written.
+        */
+        'auth' => [
+            'driver' => 'stack',
+            'channels' => explode(',', env('LOG_AUTH_STACK', 'auth_daily') ?? 'null'),
+            'ignore_exceptions' => false,
+        ],
+
+        'auth_daily' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/auth.log'),
+            'level' => 'info',
+            'max_files' => 90,
+            'replace_placeholders' => true,
+        ],
+
         'monthly' => [
             'driver' => 'monthly',
             'path' => storage_path('logs/laravel.log'),

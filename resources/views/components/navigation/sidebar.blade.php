@@ -1,5 +1,7 @@
 @php
-    $moduleCounts = auth()->check() ? app(\App\Notifications\UnreadCounts::class)->for(auth()->user())['modules'] : [];
+    $moduleCounts = auth()->check() && ! \App\Http\Middleware\EnsureTwoFactorIsEnabled::mustEnrol(auth()->user())
+        ? app(\App\Notifications\UnreadCounts::class)->for(auth()->user())['modules']
+        : [];
     $navigationGroupClasses = '[&>div:first-child>div]:text-[11px]! [&>div:first-child>div]:font-semibold! [&>div:first-child>div]:tracking-[0.12em] [&>div:first-child>div]:text-secondary-light! [&>div:first-child>div]:uppercase dark:[&>div:first-child>div]:text-secondary-soft! in-data-flux-sidebar-collapsed-desktop:flex! in-data-flux-sidebar-collapsed-desktop:[&>div:first-child]:hidden!';
     $navigationItemClasses = 'touch-manipulation rounded-lg! text-secondary-dark! hover:bg-secondary-soft/70! max-lg:h-11! data-current:border-primary! data-current:bg-primary! data-current:font-semibold! data-current:text-white! data-current:shadow-sm! dark:text-secondary-soft! dark:hover:bg-white/10! dark:hover:text-white! dark:data-current:border-primary! dark:data-current:bg-primary! dark:data-current:text-white!';
 @endphp

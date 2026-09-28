@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\EmailTwoFactorController;
 use App\Http\Controllers\MarkNotificationReadController;
 use App\Http\Controllers\OpenNotificationController;
 use App\Http\Controllers\ProjectFileDownloadController;
@@ -10,6 +11,7 @@ use App\Http\Controllers\ReportFilePreviewController;
 use App\Http\Controllers\SwitchLocaleController;
 use App\Http\Controllers\TaskFileDownloadController;
 use App\Http\Controllers\TaskFilePreviewController;
+use App\Http\Middleware\EnsureTwoFactorIsEnabled;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -18,7 +20,14 @@ Route::get('/', fn () => redirect()->route(Auth::check() ? 'dashboard' : 'login'
 
 Route::post('locale', SwitchLocaleController::class)->name('locale.update');
 
-Route::middleware(['auth', 'verified'])->group(function () {
+// Second login step for people who turned on email codes (after the HR password).
+Route::middleware('guest')->controller(EmailTwoFactorController::class)->group(function () {
+    Route::get('email-two-factor-challenge', 'create')->name('email-two-factor.login');
+    Route::post('email-two-factor-challenge', 'store')->middleware('throttle:two-factor')->name('email-two-factor.login.store');
+    Route::post('email-two-factor-challenge/resend', 'resend')->middleware('throttle:2,1')->name('email-two-factor.resend');
+});
+
+Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () {
     Route::livewire('home', 'pages::dashboard.index')->name('dashboard');
 
     Route::livewire('executive-summary', 'pages::executive-summary.index')

@@ -1,9 +1,17 @@
+@php
+    /*
+     * Someone who still has to turn on two-factor authentication only reaches
+     * the security page: the inbox bell, its live channel and the badge
+     * counts stay hidden until they have (see EnsureTwoFactorIsEnabled).
+     */
+    $showsInbox = auth()->check() && ! \App\Http\Middleware\EnsureTwoFactorIsEnabled::mustEnrol(auth()->user());
+@endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ \App\Enums\Locale::current()->direction() }}" class="dark">
     <head>
         @include('partials.head')
     </head>
-    <body class="min-h-screen bg-white dark:bg-zinc-800" @auth data-user-id="{{ auth()->id() }}" data-notification-popups="{{ auth()->user()->notification_popups ? 'on' : 'off' }}" @endauth>
+    <body class="min-h-screen bg-white dark:bg-zinc-800" @if ($showsInbox) data-user-id="{{ auth()->id() }}" data-notification-popups="{{ auth()->user()->notification_popups ? 'on' : 'off' }}" @endif>
         @persist('preloader')
             <x-preloader />
         @endpersist
@@ -23,7 +31,9 @@
 
             <x-notifications.install-button />
 
-            <livewire:notifications.bell />
+            @if ($showsInbox)
+                <livewire:notifications.bell />
+            @endif
 
             <flux:dropdown position="top" align="end">
                 <flux:profile
@@ -49,6 +59,10 @@
 
                     <flux:menu.separator />
 
+                    <flux:menu.item :href="route('security.edit')" icon="shield-check" class="min-h-11 touch-manipulation" data-test="security-menu-item">
+                        {{ __('common.security') }}
+                    </flux:menu.item>
+
                     <form method="POST" action="{{ route('logout') }}" class="w-full">
                         @csrf
                         <flux:menu.item
@@ -72,7 +86,9 @@
             <div class="flex items-center gap-1.5">
                 <x-notifications.install-button />
 
-                <livewire:notifications.bell />
+                @if ($showsInbox)
+                    <livewire:notifications.bell />
+                @endif
 
                 <flux:button
                     x-data

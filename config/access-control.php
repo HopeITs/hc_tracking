@@ -46,6 +46,11 @@ foreach ($groups as $module => $actions) {
 // Every role views every module (user decision 2026-09-25).
 $viewEverything = array_values(array_filter($allPermissions, fn (string $permission): bool => str_ends_with($permission, '.view')));
 
+// Two-factor enforcement fails closed: only an explicit false/0/off/no turns
+// it off; unset, empty or unrecognised values keep it on.
+$twoFactorSetting = env('AUTH_TWO_FACTOR_ENFORCED');
+$twoFactorEnforced = ! in_array(is_string($twoFactorSetting) ? strtolower(trim($twoFactorSetting)) : $twoFactorSetting, [false, '0', 'off', 'no'], true);
+
 $taskWriter = ['tasks.create', 'tasks.update'];
 $reportWriter = ['reports.create', 'reports.update'];
 
@@ -73,6 +78,21 @@ return [
     | Admin > Users create form and `user:create` when no role is chosen.
     */
     'default_role' => 'Team Member',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Required two-factor authentication
+    |--------------------------------------------------------------------------
+    |
+    | Anyone holding one of these roles is kept on the security settings page
+    | until they turn on two-factor authentication, and may not switch it off
+    | (App\Http\Middleware\EnsureTwoFactorIsEnabled). AUTH_TWO_FACTOR_ENFORCED
+    | switches the requirement off, as phpunit.xml does for the test suite.
+    */
+    'two_factor' => [
+        'enforced' => $twoFactorEnforced,
+        'required_roles' => ['Super Admin', 'General Manager', 'Managers', 'Financial'],
+    ],
 
     /*
     |--------------------------------------------------------------------------

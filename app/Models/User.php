@@ -6,6 +6,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Concerns\RecordsActivity;
+use App\Http\Middleware\EnsureTwoFactorIsEnabled;
 use App\Notifications\TracksActivity;
 use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
@@ -26,6 +27,7 @@ use Illuminate\Support\Str;
 use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use PDOException;
 use Spatie\Permission\Traits\HasRoles;
 
 /**
@@ -50,6 +52,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property string|null $two_factor_secret
  * @property string|null $two_factor_recovery_codes
  * @property CarbonImmutable|null $two_factor_confirmed_at
+ * @property bool $email_two_factor_enabled
  * @property string|null $remember_token
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
@@ -63,7 +66,8 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
     /**
      * Mirror the columns' DB defaults so a user that has not been round-tripped
      * through the database still reports them under strict mode: no language
-     * chosen, no linked HR employee and no desktop notification popups.
+     * chosen, no linked HR employee, no desktop notification popups and no
+     * emailed sign-in codes.
      *
      * @var array<string, mixed>
      */
@@ -71,6 +75,7 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
         'employee_id' => null,
         'locale' => null,
         'notification_popups' => false,
+        'email_two_factor_enabled' => false,
     ];
 
     /**
@@ -100,6 +105,16 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
     public function preferredLocale(): ?string
     {
         return $this->locale;
+    }
+
+    /**
+     * The browsers that skip this user's second sign-in step.
+     *
+     * @return HasMany<TrustedDevice, $this>
+     */
+    public function trustedDevices(): HasMany
+    {
+        return $this->hasMany(TrustedDevice::class);
     }
 
     /**
@@ -330,6 +345,16 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
     }
 
     /**
+     * Whether each password sign-in must be followed by an emailed code: the
+     * user turned it on, or their role requires two-factor authentication.
+     */
+    public function usesEmailTwoFactor(): bool
+    {
+        return ($this->email_two_factor_enabled && $this->email !== '')
+            || EnsureTwoFactorIsEnabled::emailCodeRequiredFor($this);
+    }
+
+    /**
      * Whether HR has deactivated or removed the account this user logs in with.
      */
     public function hasLostHrAccess(): bool
@@ -361,14 +386,32 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
     }
 
     /**
-     * No password is stored here: people log in with their HR password.
+     * The HR password hash, or an empty string when HR has no account for
+     * this user. No password is stored here: people log in with their HR
+     * password.
      *
-     * The session guard still hashes this into the remember-me cookie, so it
-     * returns a constant instead of reading a column that does not exist.
+     * The session guard fingerprints this into the session at login and into
+     * the remember-me cookie, so once HR changes the password a remember
+     * cookie issued before stops working and EnsureHrAccountIsActive signs
+     * open sessions out. Read from HR once per user instance (one query), so a
+     * login that also queues a remember cookie asks HR only once; the guard
+     * loads a new instance on every request, so the hash is never stale.
+     *
+     * When HR cannot be reached the failure is reported and a random value is
+     * returned that no session or cookie can match: a remember cookie then
+     * signs nobody in (the visitor sees the login page instead of an error),
+     * and a cookie from before sessions followed the HR password is never
+     * accepted again.
      */
     public function getAuthPassword(): string
     {
-        return '';
+        try {
+            return once(fn (): string => (string) HrUser::query()->whereKey($this->hr_user_id)->value('password'));
+        } catch (QueryException|PDOException $exception) {
+            report($exception);
+
+            return Str::random(64);
+        }
     }
 
     /**
@@ -559,6 +602,7 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
         return [
             'email_verified_at' => 'datetime',
             'two_factor_confirmed_at' => 'datetime',
+            'email_two_factor_enabled' => 'boolean',
             'notification_popups' => 'boolean',
         ];
     }

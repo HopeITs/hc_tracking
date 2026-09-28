@@ -33,7 +33,11 @@ test('every english group has an arabic file with exactly the same keys', functi
     foreach (langGroups() as $group) {
         expect(file_exists(lang_path("ar/{$group}.php")))->toBeTrue("lang/ar/{$group}.php is missing");
 
-        $english = array_keys(Arr::except(langKeys('en', $group), ['attributes']));
+        $english = array_keys(array_filter(
+            langKeys('en', $group),
+            fn (string $key): bool => ! str_starts_with($key, 'attributes.'),
+            ARRAY_FILTER_USE_KEY,
+        ));
         $arabic = array_keys(array_filter(
             langKeys('ar', $group),
             fn (string $key): bool => ! str_starts_with($key, 'attributes.'),

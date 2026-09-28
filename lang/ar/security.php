@@ -1,0 +1,20 @@
+<?php
+
+return [
+    'browser_on_unrecognised_platform' => ':browser على نظام غير معروف',
+    'new_sign_in_action' => 'فتح إعدادات الأمان',
+    'new_sign_in_device' => 'الجهاز: :device',
+    'new_sign_in_greeting' => 'مرحبًا :name،',
+    'new_sign_in_if_it_was_you' => 'إذا كنت أنت من سجّل الدخول، فلا حاجة لأي إجراء آخر.',
+    'new_sign_in_if_it_was_not_you' => 'إذا لم تكن أنت، فغيّر كلمة مرور حسابك في نظام الموارد البشرية الآن وأبلغ قسم تقنية المعلومات. يمكنك تسجيل الخروج من الأجهزة الأخرى من الإعدادات ← الأمان.',
+    'new_sign_in_intro' => 'استُخدم حسابك للتو لتسجيل الدخول من متصفح أو جهاز لم يُستخدم معه من قبل.',
+    'new_sign_in_ip' => 'عنوان IP: :ip',
+    'new_sign_in_subject' => 'تسجيل دخول جديد إلى حسابك في :app',
+    'new_sign_in_when' => 'الوقت: :time (:timezone)',
+    'unrecognised_browser_on_platform' => 'متصفح غير معروف على :platform',
+    'unrecognised_device' => 'جهاز غير معروف',
+    'login_code_subject' => 'رمز الدخول إلى :app',
+    'login_code_intro' => 'استخدم هذا الرمز لإكمال تسجيل الدخول:',
+    'login_code_expires' => 'يعمل الرمز مرة واحدة وتنتهي صلاحيته خلال :minutes دقائق.',
+    'login_code_if_it_was_not_you' => 'إذا لم تحاول تسجيل الدخول، فقد يعرف أحدهم كلمة مرورك: غيّر كلمة مرور الموارد البشرية الآن وأبلغ قسم تقنية المعلومات.',
+];
