@@ -14,6 +14,10 @@ export default defineConfig({
         }),
         tailwindcss(),
     ]),
+    build: {
+        // apexcharts and xlsx are single vendor libraries, already split into their own lazy chunks.
+        chunkSizeWarningLimit: 600,
+    },
     server: {
         cors: true,
         watch: {
