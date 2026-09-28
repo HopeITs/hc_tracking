@@ -167,6 +167,26 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('livewire', fn (Request $request) => Limit::perMinute(180)->by(
             (string) ($request->user()?->id ?? $request->ip()),
         ));
+
+        // File download/preview routes had no limiter at all: a signed-in
+        // user (or a hijacked session) could otherwise script sequential
+        // requests to exfiltrate every attachment in the system.
+        RateLimiter::for('files', fn (Request $request) => Limit::perMinute(60)->by(
+            (string) ($request->user()?->id ?? $request->ip()),
+        ));
+
+        RateLimiter::for('locale', fn (Request $request) => Limit::perMinute(10)->by(
+            (string) ($request->user()?->id ?? $request->ip()),
+        ));
+
+        // The resend endpoint used a flat, IP-only throttle: a distributed
+        // caller could spam resends for one still-authenticating login from
+        // many IPs. Stacked with a per-IP limit so a single IP can't spam
+        // resends across many guest sessions either.
+        RateLimiter::for('email-two-factor-resend', fn (Request $request) => [
+            Limit::perMinute(2)->by((string) $request->session()->get('login.id')),
+            Limit::perMinute(5)->by($request->ip()),
+        ]);
     }
 
     /**
