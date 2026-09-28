@@ -33,6 +33,8 @@ class ProjectFileDownloadController extends Controller
         // via a Flysystem UnableToRetrieveMetadata exception. 404 instead.
         abort_unless(Storage::disk($media->disk)->exists($media->path), 404);
 
-        return Storage::disk($media->disk)->download($media->path, $media->original_name);
+        return Storage::disk($media->disk)->download($media->path, $media->original_name, [
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 }

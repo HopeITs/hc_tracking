@@ -35,10 +35,19 @@ class TaskFilePreviewController extends Controller
             default => 'image/jpeg',
         };
 
-        return Storage::disk($taskAttachment->disk)->response($taskAttachment->path, $taskAttachment->displayName(), [
+        $headers = [
             'Content-Type' => $contentType,
             'X-Content-Type-Options' => 'nosniff',
             'Cache-Control' => 'private, max-age=300',
-        ], 'inline');
+        ];
+
+        // A sandboxed image opened in its own tab can never act as the app.
+        // PDFs are left out: Chrome refuses to render a PDF in a sandboxed
+        // document, and its viewer already isolates the file's scripts.
+        if ($taskAttachment->type !== FileType::Pdf) {
+            $headers['Content-Security-Policy'] = 'sandbox';
+        }
+
+        return Storage::disk($taskAttachment->disk)->response($taskAttachment->path, $taskAttachment->displayName(), $headers, 'inline');
     }
 }

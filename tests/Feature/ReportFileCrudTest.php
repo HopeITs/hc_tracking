@@ -163,7 +163,8 @@ test('the download route streams a stored file under its display name', function
     $this->actingAs($user)
         ->get(route('reports.files.download', [$report, $file]))
         ->assertOk()
-        ->assertDownload('Signed sheet.pdf');
+        ->assertDownload('Signed sheet.pdf')
+        ->assertHeader('X-Content-Type-Options', 'nosniff');
 
     $this->actingAs($user)
         ->get(route('reports.show', $report))
@@ -213,7 +214,7 @@ test('stored files stay downloadable once the report is locked', function () {
     $this->actingAs($user)->get(route('reports.files.download', [$report, $file]))->assertOk();
 });
 
-test('the preview route serves pdfs and images inline with a safe content type', function (string $name, string $contentType) {
+test('the preview route serves pdfs and images inline with a safe content type', function (string $name, string $contentType, ?string $policy) {
     Storage::fake('local');
     $report = Report::factory()->create(['status' => ReportStatus::Draft]);
     $user = reportAuthor($report);
@@ -223,10 +224,11 @@ test('the preview route serves pdfs and images inline with a safe content type',
 
     expect($response->headers->get('Content-Type'))->toBe($contentType)
         ->and($response->headers->get('Content-Disposition'))->toStartWith('inline')
-        ->and($response->headers->get('X-Content-Type-Options'))->toBe('nosniff');
+        ->and($response->headers->get('X-Content-Type-Options'))->toBe('nosniff')
+        ->and($response->headers->get('Content-Security-Policy'))->toBe($policy);
 })->with([
-    'pdf' => ['a.pdf', 'application/pdf'],
-    'png' => ['a.png', 'image/png'],
+    'pdf' => ['a.pdf', 'application/pdf', null],
+    'png' => ['a.png', 'image/png', 'sandbox'],
 ]);
 
 test('the preview route refuses office files, reference-only rows and files from another report', function () {

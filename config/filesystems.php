@@ -40,13 +40,15 @@ return [
             'report' => false,
         ],
 
+        // There is deliberately no usable 'public' disk. Every upload is a
+        // record's document (agreements, reports, evidence), so none may ever
+        // sit at a URL that skips the record's policy. Anything genuinely
+        // public (logos, icons) is a static asset committed under public/.
+        // The key must stay: Laravel merges its own default disks into this
+        // list, so leaving it out would bring the framework's public disk
+        // back. With no driver, Storage::disk('public') throws.
         'public' => [
-            'driver' => 'local',
-            'root' => storage_path('app/public'),
-            'url' => rtrim((string) env('APP_URL', 'http://localhost'), '/').'/storage',
-            'visibility' => 'public',
-            'throw' => false,
-            'report' => false,
+            'driver' => null,
         ],
 
         's3' => [
@@ -58,6 +60,9 @@ return [
             'url' => env('AWS_URL'),
             'endpoint' => env('AWS_ENDPOINT'),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+            // Objects are written private. Serve them through the record's
+            // controller or a short-lived temporaryUrl(), never a public ACL.
+            'visibility' => 'private',
             'throw' => false,
             'report' => false,
         ],
@@ -73,10 +78,11 @@ return [
     | `storage:link` Artisan command is executed. The array keys should be
     | the locations of the links and the values should be their targets.
     |
+    | None: linking a storage folder into public/ would publish every file
+    | in it to anyone with the URL.
+    |
     */
 
-    'links' => [
-        public_path('storage') => storage_path('app/public'),
-    ],
+    'links' => [],
 
 ];

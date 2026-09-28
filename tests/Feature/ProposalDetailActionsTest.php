@@ -197,7 +197,9 @@ test('a file uploads to the proposal and downloads only through its own proposal
     expect($media->mediable_id)->toBe($this->proposal->id)
         ->and($media->original_name)->toBe('ECHO agreement.pdf');
 
-    $this->actingAs($this->user)->get(route('proposals.files.download', [$this->proposal, $media]))->assertOk();
+    $this->actingAs($this->user)->get(route('proposals.files.download', [$this->proposal, $media]))
+        ->assertOk()
+        ->assertHeader('X-Content-Type-Options', 'nosniff');
     $this->actingAs($this->user)->get(route('proposals.files.download', [Proposal::factory()->create(), $media]))->assertNotFound();
 });
 
@@ -325,8 +327,11 @@ test('the preview serves a proposal pdf and a funded project file inline, and no
     $this->actingAs($this->user)->get(route('proposals.files.preview', [$this->proposal, $own]))
         ->assertOk()
         ->assertHeader('Content-Type', 'application/pdf')
-        ->assertHeader('X-Content-Type-Options', 'nosniff');
-    $this->actingAs($this->user)->get(route('proposals.files.preview', [$this->proposal, $projectFile]))->assertOk();
+        ->assertHeader('X-Content-Type-Options', 'nosniff')
+        ->assertHeaderMissing('Content-Security-Policy');
+    $this->actingAs($this->user)->get(route('proposals.files.preview', [$this->proposal, $projectFile]))
+        ->assertOk()
+        ->assertHeader('Content-Security-Policy', 'sandbox');
     $this->actingAs($this->user)->get(route('proposals.files.preview', [$this->proposal, $unfunded]))->assertNotFound();
     $this->actingAs($this->user)->get(route('proposals.files.preview', [$this->proposal, $word]))->assertNotFound();
 });

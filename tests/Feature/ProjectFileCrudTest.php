@@ -57,8 +57,9 @@ test('a display name typed without an extension keeps the uploaded files real ex
     expect($media->original_name)->toBe('Site visit.jpg');
 });
 
-test('uploading a file over 5mb fails validation and stores no row or disk file', function () {
+test('uploading a file over 5mb is refused on upload and stores no row, disk file or temporary file', function () {
     Storage::fake('local');
+    Storage::fake('tmp-for-tests');
     $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $file = UploadedFile::fake()->create('too-big.pdf', 5121, 'application/pdf');
@@ -68,16 +69,20 @@ test('uploading a file over 5mb fails validation and stores no row or disk file'
         ->set('tab', 'files')
         ->call('openCreateFileModal')
         ->set('newFile', $file)
+        ->assertHasErrors(['newFile' => fn (array $rules, array $messages) => in_array('The file field must not be greater than 5120 kilobytes.', $messages, true)])
+        ->assertSet('newFile', null)
         ->set('fileCategory', MediaCollection::Agreement->value)
         ->call('saveFile')
-        ->assertHasErrors(['newFile' => 'max']);
+        ->assertHasErrors('newFile');
 
-    expect(Media::where('mediable_type', 'project')->where('mediable_id', $project->id)->count())->toBe(0);
+    expect(Media::where('mediable_type', 'project')->where('mediable_id', $project->id)->count())->toBe(0)
+        ->and(Storage::disk('tmp-for-tests')->allFiles())->toBe([]);
     Storage::disk('local')->assertDirectoryEmpty('media/projects/'.$project->id);
 });
 
-test('uploading a file with a disallowed extension fails validation and stores no row or disk file', function () {
+test('uploading a file with a disallowed extension is refused on upload and stores no row or temporary file', function () {
     Storage::fake('local');
+    Storage::fake('tmp-for-tests');
     $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $file = UploadedFile::fake()->create('script.exe', 100, 'application/x-msdownload');
@@ -87,11 +92,14 @@ test('uploading a file with a disallowed extension fails validation and stores n
         ->set('tab', 'files')
         ->call('openCreateFileModal')
         ->set('newFile', $file)
+        ->assertHasErrors(['newFile' => fn (array $rules, array $messages) => in_array('The file field must be a file of type: pdf, docx, xlsx, jpg, png.', $messages, true)])
+        ->assertSet('newFile', null)
         ->set('fileCategory', MediaCollection::Agreement->value)
         ->call('saveFile')
-        ->assertHasErrors(['newFile' => 'mimes']);
+        ->assertHasErrors('newFile');
 
-    expect(Media::where('mediable_type', 'project')->where('mediable_id', $project->id)->count())->toBe(0);
+    expect(Media::where('mediable_type', 'project')->where('mediable_id', $project->id)->count())->toBe(0)
+        ->and(Storage::disk('tmp-for-tests')->allFiles())->toBe([]);
 });
 
 test('editing a file updates its category and display name only', function () {
@@ -183,7 +191,8 @@ test('the download route streams a file that belongs to the project in the url',
     $this->actingAs($user)
         ->get(route('projects.files.download', [$project, $media]))
         ->assertOk()
-        ->assertDownload('report.pdf');
+        ->assertDownload('report.pdf')
+        ->assertHeader('X-Content-Type-Options', 'nosniff');
 });
 
 test('the download route returns 404 instead of crashing when the media row has no real file on disk', function () {

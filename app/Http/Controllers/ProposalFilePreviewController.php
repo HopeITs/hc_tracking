@@ -42,10 +42,19 @@ class ProposalFilePreviewController extends Controller
             default => 'image/jpeg',
         };
 
-        return Storage::disk($media->disk)->response($media->path, $media->original_name, [
+        $headers = [
             'Content-Type' => $contentType,
             'X-Content-Type-Options' => 'nosniff',
             'Cache-Control' => 'private, max-age=300',
-        ], 'inline');
+        ];
+
+        // A sandboxed image opened in its own tab can never act as the app.
+        // PDFs are left out: Chrome refuses to render a PDF in a sandboxed
+        // document, and its viewer already isolates the file's scripts.
+        if ($media->type !== FileType::Pdf) {
+            $headers['Content-Security-Policy'] = 'sandbox';
+        }
+
+        return Storage::disk($media->disk)->response($media->path, $media->original_name, $headers, 'inline');
     }
 }

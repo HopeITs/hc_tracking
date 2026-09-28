@@ -26,6 +26,8 @@ class ReportFileDownloadController extends Controller
         abort_unless($reportFile->report_id === $report->id, 404);
         abort_unless($reportFile->isStored(), 404);
 
-        return Storage::disk($reportFile->disk)->download($reportFile->path, $reportFile->displayName());
+        return Storage::disk($reportFile->disk)->download($reportFile->path, $reportFile->displayName(), [
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 }

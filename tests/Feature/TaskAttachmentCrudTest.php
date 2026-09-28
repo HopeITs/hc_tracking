@@ -182,7 +182,8 @@ test('the download route streams a stored file under its display name', function
     $this->actingAs($user)
         ->get(route('tasks.files.download', [$task, $file]))
         ->assertOk()
-        ->assertDownload('Signed sheet.pdf');
+        ->assertDownload('Signed sheet.pdf')
+        ->assertHeader('X-Content-Type-Options', 'nosniff');
 
     $this->actingAs($user)
         ->get(route('tasks.show', $task))
@@ -214,7 +215,7 @@ test('edit and delete refuse an attachment that belongs to another task', functi
         ->assertNotFound();
 })->with(['openEditFileModal', 'confirmDeleteFile']);
 
-test('the preview route serves pdfs and images inline with a safe content type', function (string $name, string $contentType) {
+test('the preview route serves pdfs and images inline with a safe content type', function (string $name, string $contentType, ?string $policy) {
     Storage::fake('local');
     $user = User::factory()->role('Super Admin')->create();
     $task = Task::factory()->create();
@@ -224,10 +225,11 @@ test('the preview route serves pdfs and images inline with a safe content type',
 
     expect($response->headers->get('Content-Type'))->toBe($contentType)
         ->and($response->headers->get('Content-Disposition'))->toStartWith('inline')
-        ->and($response->headers->get('X-Content-Type-Options'))->toBe('nosniff');
+        ->and($response->headers->get('X-Content-Type-Options'))->toBe('nosniff')
+        ->and($response->headers->get('Content-Security-Policy'))->toBe($policy);
 })->with([
-    'pdf' => ['a.pdf', 'application/pdf'],
-    'png' => ['a.png', 'image/png'],
+    'pdf' => ['a.pdf', 'application/pdf', null],
+    'png' => ['a.png', 'image/png', 'sandbox'],
 ]);
 
 test('the preview route refuses office files, reference-only rows and files from another task', function () {

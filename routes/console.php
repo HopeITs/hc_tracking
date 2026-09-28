@@ -16,3 +16,4 @@ Schedule::command('notifications:scan frequent')->everyFifteenMinutes()->without
 Schedule::command('notifications:scan daily')->dailyAt('06:00')->withoutOverlapping();
 Schedule::command('notifications:digests')->everyMinute()->withoutOverlapping();
 Schedule::command('model:prune', ['--model' => [Activity::class, UserNotification::class]])->daily();
+Schedule::command('files:prune')->dailyAt('03:00')->withoutOverlapping();
