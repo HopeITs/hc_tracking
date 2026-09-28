@@ -33,6 +33,7 @@ $groups = [
     'executive-summary' => ['view'],
     'accounts' => ['view', 'create', 'update', 'delete'],
     'cities' => ['view', 'create', 'update', 'delete'],
+    'activity-log' => ['view'],
 ];
 
 $allPermissions = [];
@@ -43,8 +44,13 @@ foreach ($groups as $module => $actions) {
     }
 }
 
-// Every role views every module (user decision 2026-09-25).
-$viewEverything = array_values(array_filter($allPermissions, fn (string $permission): bool => str_ends_with($permission, '.view')));
+// Every role views every module (user decision 2026-09-25) — except the
+// activity log, which only Super Admin and General Manager hold by default.
+$restrictedViews = ['activity-log.view'];
+$viewEverything = array_values(array_filter(
+    $allPermissions,
+    fn (string $permission): bool => str_ends_with($permission, '.view') && ! in_array($permission, $restrictedViews, true),
+));
 
 // Two-factor enforcement fails closed: only an explicit false/0/off/no turns
 // it off; unset, empty or unrecognised values keep it on.

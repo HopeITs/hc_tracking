@@ -20,7 +20,7 @@ final class ActivityParameters
     /**
      * Properties copied through verbatim when present.
      */
-    private const PassThrough = ['subtask', 'file', 'note', 'role', 'baseline', 'value'];
+    private const PassThrough = ['subtask', 'file', 'note', 'role', 'baseline', 'value', 'added', 'removed', 'action', 'ip'];
 
     /**
      * @return array<string, mixed>

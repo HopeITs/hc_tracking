@@ -394,7 +394,15 @@ return [
         'user' => [
             'created' => 'أنشأ :actor حساب :subject',
             'role_changed' => 'غيّر :actor أدوار :subject إلى :role',
+            'permissions_changed' => 'غيّر :actor الصلاحيات المباشرة لـ :subject (أُضيف: :added؛ أُزيل: :removed)',
+            'access_denied' => 'رُفض وصول :subject إلى :action (عنوان IP :ip)',
             'deleted' => 'أزال :actor حساب :subject',
+        ],
+        'role' => [
+            'created' => 'أنشأ :actor الدور «:subject»',
+            'renamed' => 'غيّر :actor اسم الدور من «:from» إلى «:to»',
+            'permissions_changed' => 'غيّر :actor صلاحيات الدور «:subject» (أُضيف: :added؛ أُزيل: :removed)',
+            'deleted' => 'حذف :actor الدور «:subject»',
         ],
     ],
 ];

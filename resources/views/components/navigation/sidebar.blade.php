@@ -402,7 +402,7 @@
                 </flux:sidebar.item>
             @endcan
 
-            @can('view-activity-log')
+            @can('activity-log.view')
                 <flux:sidebar.item
                     icon="clock"
                     :href="route('activity.index')"

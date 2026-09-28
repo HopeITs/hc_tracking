@@ -16,6 +16,7 @@ use App\Models\Report;
 use App\Models\ReportFile;
 use App\Models\Result;
 use App\Models\Risk;
+use App\Models\Role;
 use App\Models\Strategy;
 use App\Models\Task;
 use App\Models\TransfersTracking;
@@ -44,6 +45,7 @@ test('the morph map registers exactly the target sources, task sources, media ow
         'donor_report' => DonorReport::class,
         'transfer' => TransfersTracking::class,
         'account' => Account::class,
+        'role' => Role::class,
     ]);
 });
 

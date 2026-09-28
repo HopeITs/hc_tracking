@@ -78,6 +78,41 @@ class UserPolicy
     }
 
     /**
+     * Whether the user may rename or delete one role. Administrator roles are
+     * never renamed or deleted; a non-administrator may not touch a role they
+     * hold themselves or one carrying user-management rights.
+     */
+    public function manageRole(User $user, Role $role): bool
+    {
+        return $user->can('access-management.manage-roles') && $this->mayReshapeRole($user, $role);
+    }
+
+    /**
+     * Whether the user may change which permissions one role holds, under the
+     * same limits as manageRole(). Each access-management permission being
+     * added or removed is checked separately through grantPermission().
+     */
+    public function editRolePermissions(User $user, Role $role): bool
+    {
+        return $user->can('access-management.manage-permissions') && $this->mayReshapeRole($user, $role);
+    }
+
+    /**
+     * Shared limits for changing a role: administrator roles stay fixed, and
+     * only administrators change their own role or a privileged one — so
+     * nobody can promote themselves through the roles they belong to.
+     */
+    private function mayReshapeRole(User $user, Role $role): bool
+    {
+        if (in_array($role->name, config('access-control.administrator_roles', []), true)) {
+            return false;
+        }
+
+        return $this->isAdministrator($user)
+            || (! $user->hasRole($role) && ! self::isPrivileged($role));
+    }
+
+    /**
      * Whether a role carries user-management rights.
      */
     public static function isPrivileged(Role $role): bool

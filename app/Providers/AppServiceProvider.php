@@ -19,6 +19,7 @@ use App\Models\Proposal;
 use App\Models\Report;
 use App\Models\Result;
 use App\Models\Risk;
+use App\Models\Role;
 use App\Models\Strategy;
 use App\Models\Task;
 use App\Models\TransfersTracking;
@@ -135,7 +136,6 @@ class AppServiceProvider extends ServiceProvider
      */
     protected function configureGates(): void
     {
-        Gate::define('view-activity-log', fn (User $user): bool => $user->hasAnyRole(['Super Admin', 'General Manager']));
         Gate::define('manage-notification-settings', fn (User $user): bool => $user->hasAnyRole(config('access-control.administrator_roles')));
     }
 
@@ -153,7 +153,8 @@ class AppServiceProvider extends ServiceProvider
      * `milestone`, `proposal`, `project`, `program` and `department` are the
      * sources a task can be raised against; `user` is the model side of
      * spatie/laravel-permission's `model_has_roles`/`model_has_permissions`
-     * polymorphic pivots and the notifiable side of the inbox. Every model
+     * polymorphic pivots and the notifiable side of the inbox; `role` is the
+     * subject of role and permission changes in the audit trail. Every model
      * activity is recorded against (see App\Notifications\TracksActivity) is
      * mapped too, because `activities.subject_type` and
      * `notifications.subject_type` store these keys.
@@ -180,6 +181,7 @@ class AppServiceProvider extends ServiceProvider
             'donor_report' => DonorReport::class,
             'transfer' => TransfersTracking::class,
             'account' => Account::class,
+            'role' => Role::class,
         ]);
     }
 

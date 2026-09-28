@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Notifications\ActivityRecorder;
+use App\Notifications\TracksActivity;
 use Spatie\Permission\Models\Role as SpatieRole;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -15,8 +17,12 @@ use Spatie\Permission\PermissionRegistrar;
  * says — new modules must never leave it locked out. Every other role starts
  * with its configured baseline, editable afterward from the Roles &
  * Permissions admin page.
+ *
+ * Changes made from that page (create, rename, delete, permissions) are
+ * recorded explicitly through recordActivity(); there are no automatic
+ * model-event hooks, so seeders and tests creating roles log nothing.
  */
-class Role extends SpatieRole
+class Role extends SpatieRole implements TracksActivity
 {
     protected static function booted(): void
     {
@@ -37,5 +43,37 @@ class Role extends SpatieRole
 
             app(PermissionRegistrar::class)->forgetCachedPermissions();
         });
+    }
+
+    public function activityModule(): string
+    {
+        return 'access-management';
+    }
+
+    public function activityProgramId(): ?int
+    {
+        return null;
+    }
+
+    public function activityLabel(): string
+    {
+        return $this->name;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function activityEmployeeFields(): array
+    {
+        return [];
+    }
+
+    /**
+     * @param  array<string, array{0: mixed, 1: mixed}>  $changes
+     * @param  array<string, mixed>  $properties
+     */
+    public function recordActivity(string $event, array $changes = [], array $properties = []): ?Activity
+    {
+        return app(ActivityRecorder::class)->record($this, $event, $changes, $properties);
     }
 }

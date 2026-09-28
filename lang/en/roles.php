@@ -12,6 +12,8 @@ return [
     'role_deleted' => 'Role deleted.',
     'protected_role' => 'Protected role',
     'protected_role_help' => 'Super Admin always holds every permission and cannot be renamed or deleted.',
+    'admin_only_role_help' => 'Only a Super Admin can change this role: it is one of your own roles or it carries user-management rights.',
+    'admin_only_permission_help' => 'Only a Super Admin can give or remove user-management permissions.',
     'permissions' => 'Permissions',
     'select_all' => 'Select all',
     'clear_all' => 'Clear all',

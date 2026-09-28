@@ -102,8 +102,10 @@ new #[Title('titles.proposal')] class extends Component
 
     public bool $confirmingFileDelete = false;
 
+    #[Locked]
     public ?int $editingFileId = null;
 
+    #[Locked]
     public ?int $deletingFileId = null;
 
     public $newFile = null;
