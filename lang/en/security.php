@@ -17,4 +17,8 @@ return [
     'login_code_intro' => 'Use this code to finish signing in:',
     'login_code_expires' => 'The code works once and expires in :minutes minutes.',
     'login_code_if_it_was_not_you' => 'If you didn\'t try to sign in, someone may know your password: change your HR password now and tell IT.',
+    'second_step_failed_subject' => 'Someone entered your password on :app',
+    'second_step_failed_intro' => 'Your correct password was just entered, but the security code that followed was wrong several times.',
+    'second_step_failed_if_it_was_you' => 'If this was you mistyping the code, there is nothing more to do.',
+    'second_step_failed_if_it_was_not_you' => "If it wasn't you, someone knows your password: change your HR password now and tell IT.",
 ];

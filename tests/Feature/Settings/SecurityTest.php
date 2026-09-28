@@ -215,7 +215,7 @@ test('the browser cannot mark two factor as enabled on the security page', funct
 });
 
 test('a role that requires two factor cannot switch the app off when it has no email for codes', function () {
-    config(['access-control.two_factor.enforced' => true]);
+    config(['access-control.two_factor' => ['enforced' => true, 'required_roles' => ['Super Admin', 'General Manager', 'Managers', 'Financial']]]);
 
     $superAdmin = User::factory()->role('Super Admin')->withTwoFactor()->create(['email' => '']);
 
@@ -231,7 +231,7 @@ test('a role that requires two factor cannot switch the app off when it has no e
 });
 
 test('a team member can still switch two factor off while other roles require it', function () {
-    config(['access-control.two_factor.enforced' => true]);
+    config(['access-control.two_factor' => ['enforced' => true, 'required_roles' => ['Super Admin', 'General Manager', 'Managers', 'Financial']]]);
 
     $teamMember = User::factory()->role('Team Member')->withTwoFactor()->create();
 

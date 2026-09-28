@@ -94,10 +94,14 @@ return [
     | until they turn on two-factor authentication, and may not switch it off
     | (App\Http\Middleware\EnsureTwoFactorIsEnabled). AUTH_TWO_FACTOR_ENFORCED
     | switches the requirement off, as phpunit.xml does for the test suite.
+    |
+    | Two-factor is optional for every role (user decision 2026-09-28): each
+    | person turns on email codes, the authenticator app or passkeys from the
+    | security page. List role names here to make it required for them again.
     */
     'two_factor' => [
         'enforced' => $twoFactorEnforced,
-        'required_roles' => ['Super Admin', 'General Manager', 'Managers', 'Financial'],
+        'required_roles' => [],
     ],
 
     /*
