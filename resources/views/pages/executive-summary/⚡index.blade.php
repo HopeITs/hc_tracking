@@ -451,7 +451,7 @@ new #[Title('titles.executive_summary')] class extends Component {
      * A partial figure never rounds up to 100: a single unplanned program out of
      * a thousand must not report full coverage.
      */
-    public function percentageOf(int $covered, int $total): ?int
+    protected function percentageOf(int $covered, int $total): ?int
     {
         if ($total <= 0) {
             return null;
@@ -467,7 +467,7 @@ new #[Title('titles.executive_summary')] class extends Component {
     /**
      * percentageOf() for money, which is decimal rather than a count.
      */
-    public function shareOfAmount(float $landed, float $scheduled): ?int
+    protected function shareOfAmount(float $landed, float $scheduled): ?int
     {
         if ($scheduled <= 0.0) {
             return null;

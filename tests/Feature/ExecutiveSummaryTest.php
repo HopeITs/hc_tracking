@@ -17,6 +17,8 @@ use App\Models\TransfersTracking;
 use App\Models\User;
 use Livewire\Livewire;
 
+use function Livewire\invade;
+
 /**
  * The fiscal year the summary defaults to when the picker is untouched.
  */
@@ -200,7 +202,7 @@ test('an empty portfolio renders a dash instead of dividing by zero', function (
 test('a partial share never rounds up to full coverage', function () {
     $user = User::factory()->role('General Manager')->create();
 
-    $component = Livewire::actingAs($user)->test('pages::executive-summary.index')->instance();
+    $component = invade(Livewire::actingAs($user)->test('pages::executive-summary.index')->instance());
 
     expect($component->percentageOf(199, 200))->toBe(99)
         ->and($component->percentageOf(200, 200))->toBe(100)
@@ -212,7 +214,7 @@ test('a partial share never rounds up to full coverage', function () {
 test('a partial share of an amount never rounds up to fully landed', function () {
     $user = User::factory()->role('General Manager')->create();
 
-    $component = Livewire::actingAs($user)->test('pages::executive-summary.index')->instance();
+    $component = invade(Livewire::actingAs($user)->test('pages::executive-summary.index')->instance());
 
     expect($component->shareOfAmount(9999.99, 10000.0))->toBe(99)
         ->and($component->shareOfAmount(10000.0, 10000.0))->toBe(100)

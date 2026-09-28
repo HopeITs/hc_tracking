@@ -113,12 +113,12 @@ new #[Title('titles.funding_agreement')] class extends Component {
      * Money the donor has sent is in transit until it lands; a tranche is
      * late only while still unsent, from the day after its scheduled date.
      */
-    public function trancheState(TransfersTracking $transfer): string
+    protected function trancheState(TransfersTracking $transfer): string
     {
         return $transfer->state();
     }
 
-    public function trancheStateLabel(string $state): string
+    protected function trancheStateLabel(string $state): string
     {
         return match ($state) {
             'received' => __('funding_agreements.tranche_state_received'),
@@ -714,7 +714,7 @@ new #[Title('titles.funding_agreement')] class extends Component {
     /**
      * Nobody has spoken to the donor in a while, or ever.
      */
-    public function donorContactIsStale(): bool
+    protected function donorContactIsStale(): bool
     {
         $lastContact = $this->agreement->donor->last_contacted_on;
 
@@ -852,7 +852,7 @@ new #[Title('titles.funding_agreement')] class extends Component {
         $this->reportSubmittedOn = '';
     }
 
-    public function paperworkUrl(Media $media): string
+    protected function paperworkUrl(Media $media): string
     {
         return $media->mediable_type === 'proposal'
             ? route('proposals.files.download', [Proposal::query()->findOrFail($media->mediable_id), $media])

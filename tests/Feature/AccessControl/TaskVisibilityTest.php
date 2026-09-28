@@ -7,6 +7,8 @@ use App\Models\Task;
 use App\Models\TaskAttachment;
 use Livewire\Livewire;
 
+use function Livewire\invade;
+
 beforeEach(function () {
     $media = insertHrDepartment('Media');
     $finance = insertHrDepartment('Finance');
@@ -102,7 +104,7 @@ test('proposal progress counts every task, including hidden ones', function () {
 });
 
 test('a milestone whose only task is hidden still cannot be deleted', function () {
-    $page = Livewire::actingAs($this->member)->test('pages::milestones.index')->instance();
+    $page = invade(Livewire::actingAs($this->member)->test('pages::milestones.index')->instance());
 
     expect($page->canDelete($this->milestone->id))->toBeFalse();
 });

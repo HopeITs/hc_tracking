@@ -616,7 +616,7 @@ new #[Title('titles.project')] class extends Component {
      * indicator reads "42.00%", an indicator with a recorded unit reads
      * "42.00 households", and one with neither reads as a bare number.
      */
-    public function formatTargetValue(PlanIndicator $target): string
+    protected function formatTargetValue(PlanIndicator $target): string
     {
         $value = number_format((float) $target->target, 2);
 
@@ -662,7 +662,7 @@ new #[Title('titles.project')] class extends Component {
      *
      * @return \Illuminate\Support\Collection<string, array{currency: \App\Enums\Currency, committed: float, received: float}>
      */
-    public function proposalFunding(Proposal $proposal): \Illuminate\Support\Collection
+    protected function proposalFunding(Proposal $proposal): \Illuminate\Support\Collection
     {
         return $proposal->donorProposals
             ->groupBy(fn (DonorProposal $donorProposal) => $donorProposal->currency->value)

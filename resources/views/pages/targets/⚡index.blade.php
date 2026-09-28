@@ -590,7 +590,7 @@ new #[Title('titles.targets')] class extends Component {
      * report_files cascade from reports. A measurement is not discarded to tidy
      * up a target.
      */
-    public function canDelete(int $targetId): bool
+    protected function canDelete(int $targetId): bool
     {
         $target = PlanIndicator::query()->select(['id'])->withCount('reports')->find($targetId);
 
@@ -604,7 +604,7 @@ new #[Title('titles.targets')] class extends Component {
      * foreign key, so a raw delete of a plan or proposal leaves this dangling
      * and the caller must render an explicit fallback.
      */
-    public function sourceLabel(PlanIndicator $target): ?string
+    protected function sourceLabel(PlanIndicator $target): ?string
     {
         $source = $target->source;
 

@@ -983,7 +983,7 @@ new #[Title('titles.tasks')] class extends Component
      *
      * @return array{status: string, priority: string, due_date: string, assignees: array<int, string>}
      */
-    public function taskDraft(string $rowKey, ?string $defaultStatus = null): array
+    protected function taskDraft(string $rowKey, ?string $defaultStatus = null): array
     {
         $defaults = [
             'status' => $defaultStatus ?? TaskStatus::Todo->value,
@@ -1053,7 +1053,7 @@ new #[Title('titles.tasks')] class extends Component
      *
      * @return array{status: string, priority: string, due_date: string, assignees: array<int, string>}
      */
-    public function subtaskDraft(Task $parent): array
+    protected function subtaskDraft(Task $parent): array
     {
         $defaults = [
             'status' => TaskStatus::Todo->value,

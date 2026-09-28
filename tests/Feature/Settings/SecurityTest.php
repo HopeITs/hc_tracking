@@ -2,7 +2,17 @@
 
 use App\Models\User;
 use Laravel\Fortify\Features;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
+
+/**
+ * A password confirmation older than auth.password_timeout, so the
+ * RequiresConfirmedPassword guard treats it as lapsed.
+ */
+function lapsedPasswordConfirmation(): int
+{
+    return time() - (int) config('auth.password_timeout') - 1;
+}
 
 beforeEach(function () {
     $this->skipUnlessFortifyHas(Features::twoFactorAuthentication());
@@ -87,4 +97,98 @@ test('the security page sends people to hr to change their password', function (
         ->assertSee('Your password is managed in the HR system.')
         ->assertDontSee('update-password-button', false)
         ->assertDontSee('New password');
+});
+
+test('switching off two factor sends a lapsed password confirmation back to be confirmed', function () {
+    $user = User::factory()->withTwoFactor()->create();
+
+    $this->actingAs($user)->withSession(['auth.password_confirmed_at' => lapsedPasswordConfirmation()]);
+
+    Livewire::test('pages::settings.security')
+        ->call('disable')
+        ->assertRedirect(route('password.confirm'))
+        ->assertSet('twoFactorEnabled', true);
+
+    expect($user->fresh()->hasEnabledTwoFactorAuthentication())->toBeTrue()
+        ->and(session('url.intended'))->toBe(route('security.edit'));
+});
+
+test('two factor can be switched off while the password confirmation is fresh', function () {
+    $user = User::factory()->withTwoFactor()->create();
+
+    $this->actingAs($user)->withSession(['auth.password_confirmed_at' => time()]);
+
+    Livewire::test('pages::settings.security')
+        ->call('disable')
+        ->assertNoRedirect()
+        ->assertSet('twoFactorEnabled', false);
+
+    expect($user->fresh()->two_factor_secret)->toBeNull();
+});
+
+test('a passkey is not deleted once the password confirmation has lapsed', function () {
+    $user = User::factory()->create();
+    $passkey = $user->passkeys()->create(['name' => 'Office laptop', 'credential_id' => 'credential-1', 'credential' => []]);
+
+    $this->actingAs($user)->withSession(['auth.password_confirmed_at' => time()]);
+
+    $component = Livewire::test('pages::settings.security')->call('confirmDelete', $passkey->id);
+
+    session()->put('auth.password_confirmed_at', lapsedPasswordConfirmation());
+
+    $component->call('deletePasskey')->assertRedirect(route('password.confirm'));
+
+    expect($passkey->fresh())->not->toBeNull();
+});
+
+test('two factor setup does not start once the password confirmation has lapsed', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->withSession(['auth.password_confirmed_at' => lapsedPasswordConfirmation()]);
+
+    Livewire::test('pages::settings.two-factor-setup-modal', ['requiresConfirmation' => true])
+        ->call('startTwoFactorSetup')
+        ->assertRedirect(route('password.confirm'))
+        ->assertSet('manualSetupKey', '');
+
+    expect($user->fresh()->two_factor_secret)->toBeNull();
+});
+
+test('recovery codes are neither shown nor regenerated once the password confirmation has lapsed', function () {
+    $user = User::factory()->withTwoFactor()->create();
+    $storedCodes = $user->two_factor_recovery_codes;
+
+    $this->actingAs($user)->withSession(['auth.password_confirmed_at' => lapsedPasswordConfirmation()]);
+
+    Livewire::test('pages::settings.two-factor.recovery-codes')
+        ->assertSet('recoveryCodes', [])
+        ->call('regenerateRecoveryCodes')
+        ->assertRedirect(route('password.confirm'));
+
+    expect($user->fresh()->two_factor_recovery_codes)->toBe($storedCodes);
+});
+
+test('recovery codes are shown and regenerated while the password confirmation is fresh', function () {
+    $user = User::factory()->withTwoFactor()->create();
+
+    $this->actingAs($user)->withSession(['auth.password_confirmed_at' => time()]);
+
+    $component = Livewire::test('pages::settings.two-factor.recovery-codes')
+        ->assertSet('recoveryCodes', ['recovery-code-1'])
+        ->call('regenerateRecoveryCodes')
+        ->assertNoRedirect();
+
+    expect($component->get('recoveryCodes'))->toHaveCount(8)->not->toContain('recovery-code-1');
+});
+
+test('the browser cannot mark two factor as enabled on the security page', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->withSession(['auth.password_confirmed_at' => time()]);
+
+    $component = Livewire::test('pages::settings.security')
+        ->dispatch('two-factor-enabled')
+        ->assertSet('twoFactorEnabled', false);
+
+    expect(fn () => $component->set('twoFactorEnabled', true))->toThrow(CannotUpdateLockedPropertyException::class);
 });

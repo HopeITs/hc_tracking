@@ -408,7 +408,7 @@ new #[Title('titles.milestones')] class extends Component {
         return Milestone::query()->select(['id', 'name'])->find($this->deletingMilestoneId);
     }
 
-    public function canDelete(int $milestoneId): bool
+    protected function canDelete(int $milestoneId): bool
     {
         $milestone = Milestone::query()
             ->select(['id'])
@@ -602,7 +602,7 @@ new #[Title('titles.milestones')] class extends Component {
      * @param  Collection<int, Milestone>  $milestones
      * @return Collection<int, Milestone>
      */
-    public function flattenMilestones(Collection $milestones): Collection
+    protected function flattenMilestones(Collection $milestones): Collection
     {
         return $milestones->reduce(
             fn (Collection $flat, Milestone $milestone): Collection => $flat

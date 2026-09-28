@@ -378,7 +378,7 @@ new #[Title('titles.projects')] class extends Component {
      * Weights that add up to more than 100 are capped rather than rejected:
      * the figure is a reading of the record, not a validation of it.
      */
-    public function progressFor(Project $project): ?float
+    protected function progressFor(Project $project): ?float
     {
         $planned = (float) ($project->planned_weight ?? 0);
 

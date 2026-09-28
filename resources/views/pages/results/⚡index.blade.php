@@ -711,7 +711,7 @@ new #[Title('titles.results_framework')] class extends Component {
      * indicators (indicators cascade, and plan_indicators and reports cascade
      * from those — three tables lost behind one click).
      */
-    public function canDelete(int $resultId): bool
+    protected function canDelete(int $resultId): bool
     {
         $result = Result::query()
             ->select(['id'])

@@ -173,7 +173,7 @@ trait ManagesReportForm
      *
      * @return array{0: CarbonImmutable, 1: CarbonImmutable}|null
      */
-    public function formWindow(): ?array
+    protected function formWindow(): ?array
     {
         return $this->coverableWindow($this->formTarget);
     }

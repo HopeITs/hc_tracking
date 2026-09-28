@@ -10,6 +10,8 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
+use function Livewire\invade;
+
 test('guests are redirected from the task directory', function () {
     $this->get(route('tasks.index'))->assertRedirect(route('login'));
 });
@@ -802,11 +804,11 @@ test('toggleTaskDraftAssignee toggles an employee in and out of the add-task dra
         ->test('pages::tasks.index')
         ->call('toggleTaskDraftAssignee', 'row-1', $alice);
 
-    expect($component->instance()->taskDraft('row-1')['assignees'])->toBe([(string) $alice]);
+    expect(invade($component->instance())->taskDraft('row-1')['assignees'])->toBe([(string) $alice]);
 
     $component->call('toggleTaskDraftAssignee', 'row-1', $alice);
 
-    expect($component->instance()->taskDraft('row-1')['assignees'])->toBe([]);
+    expect(invade($component->instance())->taskDraft('row-1')['assignees'])->toBe([]);
 });
 
 test('quickCreateTask uses the calendar days own due date over any draft due date', function () {
@@ -879,9 +881,7 @@ test('subtaskDraft defaults to todo medium priority no due date and the parents 
     $parent->taskAssignees()->delete();
     $parent->taskAssignees()->create(['employee_id' => $alice]);
 
-    $draft = Livewire::actingAs($user)
-        ->test('pages::tasks.index')
-        ->instance()
+    $draft = invade(Livewire::actingAs($user)->test('pages::tasks.index')->instance())
         ->subtaskDraft($parent->fresh(['taskAssignees']));
 
     expect($draft)->toBe([
@@ -929,7 +929,7 @@ test('toggleSubtaskDraftAssignee removes an employee already in the draft', func
         ->test('pages::tasks.index')
         ->call('toggleSubtaskDraftAssignee', $parent->id, $alice);
 
-    expect($component->instance()->subtaskDraft($parent->fresh(['taskAssignees']))['assignees'])->toBe([]);
+    expect(invade($component->instance())->subtaskDraft($parent->fresh(['taskAssignees']))['assignees'])->toBe([]);
 });
 
 test('addSubtaskQuick falls back to the parents own assignees when the draft has none', function () {

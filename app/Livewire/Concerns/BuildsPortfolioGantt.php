@@ -45,7 +45,7 @@ trait BuildsPortfolioGantt
     /**
      * @return array<string, mixed>
      */
-    public function portfolioGanttPayload(?int $programId = null, ?string $status = null, string $groupBy = 'program'): array
+    protected function portfolioGanttPayload(?int $programId = null, ?string $status = null, string $groupBy = 'program'): array
     {
         $projects = $this->timelineProjects($programId, $status);
         $milestones = $this->timelineMilestones($projects);
@@ -62,7 +62,7 @@ trait BuildsPortfolioGantt
      *
      * @return array<string, mixed>
      */
-    public function connectedGanttPayload(?int $programId = null, ?string $status = null, string $groupBy = 'program'): array
+    protected function connectedGanttPayload(?int $programId = null, ?string $status = null, string $groupBy = 'program'): array
     {
         $projects = $this->timelineProjects($programId, $status);
         $milestones = $this->timelineMilestones($projects);
@@ -103,7 +103,7 @@ trait BuildsPortfolioGantt
     /**
      * @return array<string, mixed>
      */
-    public function pipelineGanttPayload(?string $phase = null): array
+    protected function pipelineGanttPayload(?string $phase = null): array
     {
         $proposals = Proposal::query()
             ->select(['id', 'name', 'status', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end'])
@@ -167,7 +167,7 @@ trait BuildsPortfolioGantt
     /**
      * @return array<string, mixed>
      */
-    public function agreementGanttPayload(DonorProposal $agreement): array
+    protected function agreementGanttPayload(DonorProposal $agreement): array
     {
         $proposal = $agreement->proposal()->first(['id', 'name', 'status', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end']);
         $rows = collect();

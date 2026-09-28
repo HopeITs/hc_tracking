@@ -560,7 +560,7 @@ new #[Title('titles.dashboard')] class extends Component {
     /**
      * The greeting for the current time of day.
      */
-    public function greeting(): string
+    protected function greeting(): string
     {
         $hour = (int) now()->format('G');
         $key = match (true) {

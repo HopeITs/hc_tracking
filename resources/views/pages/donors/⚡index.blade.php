@@ -330,7 +330,7 @@ new #[Title('titles.donors')] class extends Component {
      *
      * @return array{lines: array<string, array{committed: float, received: float, pending: float, share: int}>, next: ?array{amount: float, currency: string, date: CarbonImmutable, overdue: bool}, overdue: int, lastReceived: ?CarbonImmutable, projects: int}
      */
-    public function donorMoney(Donor $donor): array
+    protected function donorMoney(Donor $donor): array
     {
         $lines = [];
         $pendingTransfers = collect();
@@ -387,7 +387,7 @@ new #[Title('titles.donors')] class extends Component {
      *
      * donor_proposal.donor_id RESTRICTs: a donor that has signed anything stays.
      */
-    public function canDelete(int $donorId): bool
+    protected function canDelete(int $donorId): bool
     {
         $donor = Donor::query()->select(['id'])->withCount('donorProposals')->find($donorId);
 

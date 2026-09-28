@@ -79,7 +79,7 @@ new #[Title('titles.donor')] class extends Component {
      *
      * @return 'received'|'failed'|'transit'|'overdue'|'due'|'undated'
      */
-    public function transferState(TransfersTracking $transfer): string
+    protected function transferState(TransfersTracking $transfer): string
     {
         return match ($transfer->state()) {
             'received' => 'received',
@@ -104,7 +104,7 @@ new #[Title('titles.donor')] class extends Component {
      *
      * @return array{committed: float, received: float, due: float, overdue: float, failed: float, unscheduled: float, missingNet: int}
      */
-    public function agreementMoney(DonorProposal $agreement): array
+    protected function agreementMoney(DonorProposal $agreement): array
     {
         $committed = (float) $agreement->budget;
         $money = ['committed' => $committed, 'received' => 0.0, 'due' => 0.0, 'overdue' => 0.0, 'failed' => 0.0, 'unscheduled' => 0.0, 'missingNet' => 0];

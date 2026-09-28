@@ -73,7 +73,7 @@ new #[Title('titles.strategies')] class extends Component {
      *
      * programs.strategy_id RESTRICTs: a strategy carrying any programs stays.
      */
-    public function canDelete(int $strategyId): bool
+    protected function canDelete(int $strategyId): bool
     {
         $strategy = Strategy::query()->select(['id'])->withCount('programs')->find($strategyId);
 

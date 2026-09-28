@@ -5,6 +5,8 @@ use App\Notifications\Alerts\WorkingCalendar;
 use Carbon\CarbonImmutable;
 use Livewire\Livewire;
 
+use function Livewire\invade;
+
 test('only administrators open notification settings', function (string $role, int $status) {
     $this->actingAs(userWithRole($role))->get(route('admin.notification-settings.edit'))->assertStatus($status);
 })->with([
@@ -105,7 +107,7 @@ test('the reset-to-defaults values are the shipped defaults, not the stored rule
     $component = Livewire::actingAs(userWithRole('Super Admin'))->test('pages::admin.notification-settings');
 
     expect($component->get('stalledProposal'))->toBe(45)
-        ->and($component->instance()->clientConfig()['defaults'])->toBe([
+        ->and(invade($component->instance())->clientConfig()['defaults'])->toBe([
             'workingDays' => [1, 2, 3, 4, 5],
             'dueSoonDays' => '7, 3, 1',
             'overdueRepeat' => 3,
@@ -136,7 +138,7 @@ test('discarding the draft clears the errors of a failed save', function () {
 test('in arabic the page script gets one plural form per arabic range', function () {
     app()->setLocale('ar');
 
-    $plurals = Livewire::actingAs(userWithRole('Super Admin'))->test('pages::admin.notification-settings')->instance()->clientConfig()['plurals'];
+    $plurals = invade(Livewire::actingAs(userWithRole('Super Admin'))->test('pages::admin.notification-settings')->instance())->clientConfig()['plurals'];
 
     expect($plurals['workingDays'])->toBe([1 => 'يوم عمل', 2 => 'يوما عمل', 3 => 'أيام عمل', 11 => 'يوم عمل'])
         ->and($plurals['unsaved'][11])->toBe(':count تغييرًا غير محفوظ');

@@ -727,7 +727,7 @@ new #[Title('titles.indicators')] class extends Component {
      * Refused once any target exists: plan_indicators cascades from indicators,
      * and reports and report_files cascade from those.
      */
-    public function canDelete(int $indicatorId): bool
+    protected function canDelete(int $indicatorId): bool
     {
         $indicator = Indicator::query()->select(['id'])->withCount('planIndicators')->find($indicatorId);
 

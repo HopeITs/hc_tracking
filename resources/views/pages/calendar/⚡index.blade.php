@@ -1125,7 +1125,7 @@ new #[Title('titles.calendar')] class extends Component {
      * more than one type (or none) is visible, since "filtered to one thing"
      * only means something when it is actually just one thing.
      */
-    public function focusedType(): ?string
+    protected function focusedType(): ?string
     {
         $active = array_filter([
             'milestone' => $this->showMilestones,

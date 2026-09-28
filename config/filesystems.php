@@ -33,7 +33,9 @@ return [
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),
-            'serve' => true,
+            // No signed storage/{path} GET or PUT routes: every private file is
+            // streamed by its own controller, which checks the record's policy.
+            'serve' => false,
             'throw' => false,
             'report' => false,
         ],

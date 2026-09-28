@@ -1,24 +1,30 @@
 <?php
 
+use App\Livewire\Concerns\RequiresConfirmedPassword;
 use Laravel\Fortify\Actions\DisableTwoFactorAuthentication;
 use Laravel\Fortify\Features;
 use Laravel\Fortify\Fortify;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 /* @chisel-passkeys */
 use Laravel\Passkeys\Actions\DeletePasskey;
-use Livewire\Attributes\Locked;
 /* @end-chisel-passkeys */
 /* @chisel-2fa */
 use Livewire\Attributes\On;
 /* @end-chisel-2fa */
 
 new #[Title('titles.security_settings')] class extends Component {
+    use RequiresConfirmedPassword;
+
     /* @chisel-2fa */
+    #[Locked]
     public bool $canManageTwoFactor;
 
+    #[Locked]
     public bool $twoFactorEnabled;
 
+    #[Locked]
     public bool $requiresConfirmation;
     /* @end-chisel-2fa */
 
@@ -91,6 +97,10 @@ new #[Title('titles.security_settings')] class extends Component {
      */
     public function confirmDelete(int $passkeyId): void
     {
+        if (! $this->ensurePasswordIsConfirmed()) {
+            return;
+        }
+
         $passkey = auth()->user()->passkeys()->findOrFail($passkeyId);
 
         $this->deletingPasskeyId = $passkey->id;
@@ -103,7 +113,7 @@ new #[Title('titles.security_settings')] class extends Component {
      */
     public function deletePasskey(DeletePasskey $deletePasskey): void
     {
-        if (! $this->deletingPasskeyId) {
+        if (! $this->deletingPasskeyId || ! $this->ensurePasswordIsConfirmed()) {
             return;
         }
 
@@ -133,7 +143,7 @@ new #[Title('titles.security_settings')] class extends Component {
     #[On('two-factor-enabled')]
     public function onTwoFactorEnabled(): void
     {
-        $this->twoFactorEnabled = true;
+        $this->twoFactorEnabled = auth()->user()->fresh()->hasEnabledTwoFactorAuthentication();
     }
 
     /**
@@ -141,6 +151,10 @@ new #[Title('titles.security_settings')] class extends Component {
      */
     public function disable(DisableTwoFactorAuthentication $disableTwoFactorAuthentication): void
     {
+        if (! $this->ensurePasswordIsConfirmed()) {
+            return;
+        }
+
         $disableTwoFactorAuthentication(auth()->user());
 
         $this->twoFactorEnabled = false;

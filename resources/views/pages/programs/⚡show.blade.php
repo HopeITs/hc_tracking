@@ -428,7 +428,7 @@ new #[Title('titles.program')] class extends Component {
      * milestone's project. A program-direct task has no project and groups
      * separately.
      */
-    public function taskProjectId(Task $task): ?int
+    protected function taskProjectId(Task $task): ?int
     {
         return match ($task->source_type) {
             'project' => $task->source_id,

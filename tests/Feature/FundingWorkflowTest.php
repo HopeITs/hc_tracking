@@ -14,6 +14,8 @@ use Carbon\CarbonImmutable;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Livewire\Livewire;
 
+use function Livewire\invade;
+
 beforeEach(function () {
     $this->seed(RolesAndPermissionsSeeder::class);
 });
@@ -48,7 +50,7 @@ test('a sent tranche past its date is in transit on the donor page, never overdu
     $page = Livewire::actingAs($user)->test('pages::donors.show', ['donor' => $agreement->donor])->instance();
 
     expect($page->overdueTranches)->toBe([])
-        ->and($page->agreementMoney($page->agreements->first()))->toMatchArray(['due' => 400.0, 'overdue' => 0.0]);
+        ->and(invade($page)->agreementMoney($page->agreements->first()))->toMatchArray(['due' => 400.0, 'overdue' => 0.0]);
 });
 
 test('the donor page never sets a tranche in another currency against the budget', function () {
@@ -64,7 +66,7 @@ test('the donor page never sets a tranche in another currency against the budget
 
     $page = Livewire::actingAs($user)->test('pages::donors.show', ['donor' => $agreement->donor])->instance();
 
-    expect($page->agreementMoney($page->agreements->first())['unscheduled'])->toBe(1000.0);
+    expect(invade($page)->agreementMoney($page->agreements->first())['unscheduled'])->toBe(1000.0);
 });
 
 test('the donor page lists reports still owed to the donor and records an agreement for it', function () {
@@ -108,7 +110,7 @@ test('a sent tranche is not an overdue deadline on the proposal page', function 
 
     $page = Livewire::actingAs($user)->test('pages::proposals.show', ['proposal' => $agreement->proposal])->instance();
 
-    expect($page->transferIsOverdue($transfer))->toBeFalse()
+    expect(invade($page)->transferIsOverdue($transfer))->toBeFalse()
         ->and(collect($page->deadlines)->pluck('key'))->not->toContain('transfer-'.$transfer->id);
 });
 
@@ -175,8 +177,8 @@ test('fees, a missing net amount and a failed transfer never turn money back int
 
     expect($show->agreementMoney[$agreement->id]['unscheduled'])->toBe(100.0)
         ->and($index->fundingPosition->firstWhere('currency', 'USD')['unscheduled'])->toBe(100.0)
-        ->and($index->agreementMoney($index->proposals->first()->donorProposals->first())['unscheduled'])->toBe(100.0)
-        ->and($donor->agreementMoney($donor->agreements->first()))->toMatchArray(['failed' => 200.0, 'unscheduled' => 100.0]);
+        ->and(invade($index)->agreementMoney($index->proposals->first()->donorProposals->first())['unscheduled'])->toBe(100.0)
+        ->and(invade($donor)->agreementMoney($donor->agreements->first()))->toMatchArray(['failed' => 200.0, 'unscheduled' => 100.0]);
 });
 
 test('the donor directory never lists money already sent as the next transfer due', function () {
@@ -201,7 +203,7 @@ test('the donor directory never lists money already sent as the next transfer du
     $page = Livewire::actingAs($user)->test('pages::donors.index')->instance();
     $donor = $page->donors->first();
 
-    expect($page->donorMoney($donor)['next']['amount'])->toBe(300.0)
+    expect(invade($page)->donorMoney($donor)['next']['amount'])->toBe(300.0)
         ->and($donor->next_due_date)->toBe($unsent->scheduled_date->toDateString())
         ->and($page->upcomingTransfers->pluck('amount')->all())->toBe([300.0]);
 });

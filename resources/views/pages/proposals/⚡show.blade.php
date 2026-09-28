@@ -269,7 +269,7 @@ new #[Title('titles.proposal')] class extends Component
      * every funding page shares: money the donor has already sent is in
      * transit, never overdue, and due today is not yet late.
      */
-    public function transferIsOverdue(TransfersTracking $transfer): bool
+    protected function transferIsOverdue(TransfersTracking $transfer): bool
     {
         return $transfer->state() === 'late';
     }
@@ -539,7 +539,7 @@ new #[Title('titles.proposal')] class extends Component
     /**
      * Whether a report is still owed: drafted but never submitted for review.
      */
-    public function reportIsOwed(Report $report): bool
+    protected function reportIsOwed(Report $report): bool
     {
         return $report->status === ReportStatus::Draft && $report->submit_date === null;
     }
@@ -1723,7 +1723,7 @@ new #[Title('titles.proposal')] class extends Component
      * Where a document downloads from: its own proposal route, or the route
      * of the project it is filed on.
      */
-    public function documentDownloadUrl(Media $media): string
+    protected function documentDownloadUrl(Media $media): string
     {
         return $media->mediable_type === 'proposal'
             ? route('proposals.files.download', [$this->proposal, $media])

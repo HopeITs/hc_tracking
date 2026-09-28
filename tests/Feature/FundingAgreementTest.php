@@ -14,6 +14,8 @@ use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Livewire\Livewire;
 
+use function Livewire\invade;
+
 beforeEach(function () {
     $this->seed(RolesAndPermissionsSeeder::class);
 });
@@ -521,7 +523,7 @@ test('a tranche the donor sent that has not landed past its date is in transit o
 
     $index = Livewire::actingAs($user)->test('pages::funding-agreements.index');
 
-    expect($index->instance()->trancheState($sent))->toBe('transit')
+    expect(invade($index->instance())->trancheState($sent))->toBe('transit')
         ->and($index->instance()->stageCounts)->toMatchArray(['in_transit' => 1, 'overdue' => 0])
         ->and($index->instance()->ledger->first())->toMatchArray(['inTransit' => 400.0, 'overdue' => 0.0]);
 
@@ -530,7 +532,7 @@ test('a tranche the donor sent that has not landed past its date is in transit o
         ->assertSeeText('in transit, 12 days past its date')
         ->assertDontSeeText('12 days late');
 
-    expect($show->instance()->trancheState($sent))->toBe('transit')
+    expect(invade($show->instance())->trancheState($sent))->toBe('transit')
         ->and($show->instance()->money)->toMatchArray(['transit' => 400.0, 'late' => 0.0])
         ->and(array_column($show->instance()->attention, 'key'))->toContain('transit-'.$sent->id);
 });
@@ -609,7 +611,7 @@ test('a received tranche with no net recorded counts as nothing landed on both p
         'netMissing' => 300.0,
         'netMissingCount' => 1,
         'lost' => 5.0,
-    ])->and($index->instance()->agreementMoney($agreement->load('transfers.account')))->toMatchArray([
+    ])->and(invade($index->instance())->agreementMoney($agreement->load('transfers.account')))->toMatchArray([
         'received' => 195.0,
         'share' => 19,
         'missingNet' => 1,
@@ -660,9 +662,9 @@ test('a sliver of money landed reads as under one percent, not zero', function (
 
     $index = Livewire::actingAs($user)->test('pages::funding-agreements.index');
 
-    expect($index->instance()->percentLabel(500.0, 100000.0))->toBe('<1')
-        ->and($index->instance()->percentLabel(0.0, 100000.0))->toBe('0')
-        ->and($index->instance()->percentLabel(40000.0, 100000.0))->toBe('40');
+    expect(invade($index->instance())->percentLabel(500.0, 100000.0))->toBe('<1')
+        ->and(invade($index->instance())->percentLabel(0.0, 100000.0))->toBe('0')
+        ->and(invade($index->instance())->percentLabel(40000.0, 100000.0))->toBe('40');
 
     Livewire::actingAs($user)
         ->test('pages::funding-agreements.show', ['donorProposal' => $agreement])

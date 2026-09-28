@@ -779,7 +779,7 @@ new #[Title('titles.annual_plans')] class extends Component {
     /**
      * The plan of one program in one fiscal year, or null where none exists.
      */
-    public function planFor(int $programId, int $year): ?AnnualPlan
+    protected function planFor(int $programId, int $year): ?AnnualPlan
     {
         return $this->planCells[$programId.':'.$year] ?? null;
     }

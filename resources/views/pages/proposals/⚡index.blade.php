@@ -426,7 +426,7 @@ new #[Title('titles.proposals')] class extends Component {
      *
      * @return array{received: float, pending: float, unscheduled: float, share: int, otherCurrencies: array<string, float>, nextDue: ?\Carbon\CarbonImmutable}
      */
-    public function agreementMoney(DonorProposal $agreement): array
+    protected function agreementMoney(DonorProposal $agreement): array
     {
         $currency = $agreement->currency->value;
         $received = $agreement->transfers->where('ar_status', ArStatus::Received);
@@ -463,7 +463,7 @@ new #[Title('titles.proposals')] class extends Component {
      * transfers_tracking and erase every record of money received. The UI
      * refuses first so the user gets a reason instead of a query exception.
      */
-    public function canDelete(int $proposalId): bool
+    protected function canDelete(int $proposalId): bool
     {
         $proposal = Proposal::query()
             ->select(['id'])

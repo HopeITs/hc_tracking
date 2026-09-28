@@ -14,6 +14,8 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
+use function Livewire\invade;
+
 test('guests are redirected from the project directory', function () {
     $this->get(route('projects.index'))->assertRedirect(route('login'));
 });
@@ -429,9 +431,9 @@ test('weighted milestone progress is derived from the reached weight and capped 
     $component = Livewire::actingAs($user)->test('pages::projects.index');
     $page = $component->instance()->projects->getCollection()->keyBy('name');
 
-    expect($component->instance()->progressFor($page['Weighted Works']))->toBe(40.0)
-        ->and($component->instance()->progressFor($page['Unweighted Works']))->toBeNull()
-        ->and($component->instance()->progressFor($page['Overweight Works']))->toBe(100.0);
+    expect(invade($component->instance())->progressFor($page['Weighted Works']))->toBe(40.0)
+        ->and(invade($component->instance())->progressFor($page['Unweighted Works']))->toBeNull()
+        ->and(invade($component->instance())->progressFor($page['Overweight Works']))->toBe(100.0);
 });
 
 test('every view renders the same filtered project set and an unknown view falls back to the board', function () {
