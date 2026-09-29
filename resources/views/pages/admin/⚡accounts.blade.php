@@ -99,7 +99,7 @@ new #[Title('titles.accounts')] class extends Component {
                 fn ($query) => $query->where(fn ($query) => $query
                     ->where('account_name', 'like', Like::contains($search))
                     ->orWhere('bank_name', 'like', Like::contains($search))
-                    ->orWhere('account_number', 'like', Like::contains($search))),
+                    ->orWhere('account_number_last4', Account::lastFour($search))),
             )
             ->when($this->state === 'active', fn ($query) => $query->where('is_active', true))
             ->when($this->state === 'closed', fn ($query) => $query->where('is_active', false))

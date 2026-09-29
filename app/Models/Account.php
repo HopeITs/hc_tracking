@@ -25,6 +25,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * must go through isUsable(), the active scope or close() rather than reading
  * either column directly, so the two can never be interpreted apart.
  *
+ * `account_number`, `iban`, `swift_code` and `authorized_person` are encrypted
+ * at rest, so they cannot be searched or sorted in SQL. `account_number_last4`
+ * (the last four letters/digits, kept in step by the saving hook) is the only
+ * searchable trace of the number. The four are also $hidden, which keeps them
+ * out of serialisation and out of the activity log's field diffs.
+ *
  * `po_box_street` is the bank's own branch address (the same value repeats
  * across every account held at that branch); `company_address` is the
  * account holder company's own registered address, when it differs from the
@@ -36,6 +42,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property Currency $currency
  * @property string|null $authorized_person
  * @property string $account_number
+ * @property string|null $account_number_last4
  * @property string|null $iban
  * @property string|null $swift_code
  * @property string $country
@@ -68,6 +75,11 @@ class Account extends Model implements TracksActivity
     use HasFactory, RecordsActivity;
 
     /**
+     * @var list<string>
+     */
+    protected $hidden = ['account_number', 'iban', 'swift_code', 'authorized_person'];
+
+    /**
      * Mirror the column default so a model that has not been round-tripped
      * through the database still reports itself as usable.
      *
@@ -76,6 +88,24 @@ class Account extends Model implements TracksActivity
     protected $attributes = [
         'is_active' => true,
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $account): void {
+            if (array_key_exists('account_number', $account->getAttributes())) {
+                $account->account_number_last4 = self::lastFour($account->account_number);
+            }
+        });
+    }
+
+    /**
+     * The last four letters or digits of an account number, ignoring
+     * separators, so "21.13.0000803.11" and "2113000080311" search alike.
+     */
+    public static function lastFour(string $value): string
+    {
+        return substr(preg_replace('/[^A-Za-z0-9]/', '', $value), -4);
+    }
 
     /**
      * The transfers that have landed in this account.
@@ -130,6 +160,10 @@ class Account extends Model implements TracksActivity
     {
         return [
             'currency' => Currency::class,
+            'account_number' => 'encrypted',
+            'iban' => 'encrypted',
+            'swift_code' => 'encrypted',
+            'authorized_person' => 'encrypted',
             'opened_at' => 'date',
             'closed_at' => 'date',
             'is_active' => 'boolean',

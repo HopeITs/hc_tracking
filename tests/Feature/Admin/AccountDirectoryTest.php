@@ -118,3 +118,19 @@ test('the account directory renders with no accounts', function () {
 
     Livewire::actingAs($user)->test('pages::admin.accounts')->assertSee('No accounts yet');
 });
+
+test('the directory finds an account by the last four characters of its number', function () {
+    $user = User::factory()->role('Financial')->create();
+
+    Account::factory()->create(['account_name' => 'Ends Eleven', 'account_number' => '21.13.0000803.11']);
+    Account::factory()->create(['account_name' => 'Ends Other', 'account_number' => '5550001234']);
+
+    Livewire::actingAs($user)
+        ->test('pages::admin.accounts')
+        ->set('search', '0311')
+        ->assertSee('Ends Eleven')
+        ->assertDontSee('Ends Other')
+        ->set('search', '21.13.0000803.11')
+        ->assertSee('Ends Eleven')
+        ->assertDontSee('Ends Other');
+});
