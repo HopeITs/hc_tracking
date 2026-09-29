@@ -1,5 +1,8 @@
 <?php
 
+use App\Actions\Proposals\ChangeProposalStatus;
+use App\Actions\Proposals\DeleteProposalFile;
+use App\Actions\Proposals\SaveProposalFile;
 use App\Enums\ArStatus;
 use App\Enums\FileType;
 use App\Enums\MediaCollection;
@@ -24,7 +27,6 @@ use App\Models\Report;
 use App\Models\Task;
 use App\Models\TransfersTracking;
 use App\Rules\SecureUpload;
-use App\Support\UploadName;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
@@ -1371,17 +1373,12 @@ new #[Title('titles.proposal')] class extends Component
             'statusDate.required' => __('proposals.set_the_date_this_change_took_effect'),
         ]);
 
-        DB::transaction(function () use ($validated): void {
-            $proposal = Proposal::query()->findOrFail($this->proposalId);
-            $proposal->fill(['status' => $validated['newStatus']])->save();
-
-            ProposalStatusNote::query()->create([
-                'proposal_id' => $this->proposalId,
-                'status' => $validated['newStatus'],
-                'context' => $validated['statusContext'],
-                'date' => $validated['statusDate'],
-            ]);
-        });
+        app(ChangeProposalStatus::class)->handle(
+            Proposal::query()->findOrFail($this->proposalId),
+            $validated['newStatus'],
+            $validated['statusContext'],
+            $validated['statusDate'],
+        );
 
         $this->showStatusModal = false;
         $this->statusContext = '';
@@ -1522,21 +1519,6 @@ new #[Title('titles.proposal')] class extends Component
             ->findOrFail($mediaId);
     }
 
-    /**
-     * A typed display name, guaranteed to carry the file's real extension so
-     * the downloaded copy still opens.
-     */
-    private function displayNameWithExtension(string $displayName, FileType $type): string
-    {
-        $displayName = UploadName::clean($displayName);
-
-        if (Str::lower(pathinfo($displayName, PATHINFO_EXTENSION)) === $type->value) {
-            return $displayName;
-        }
-
-        return $displayName.'.'.$type->value;
-    }
-
     public function openCreateFileModal(): void
     {
         Gate::authorize('update', $this->proposal);
@@ -1588,40 +1570,12 @@ new #[Title('titles.proposal')] class extends Component
             'fileDisplayName.required' => __('proposals.enter_a_file_name'),
         ]);
 
-        $media = $isCreate
-            ? new Media(['mediable_type' => 'proposal', 'mediable_id' => $this->proposalId, 'disk' => 'local'])
-            : $this->proposalFile($this->editingFileId);
-
-        $replaced = null;
-
-        if ($this->newFile !== null) {
-            if (! $isCreate) {
-                $replaced = ['disk' => $media->disk, 'path' => $media->path];
-            }
-
-            $media->fill([
-                'disk' => 'local',
-                'path' => $this->newFile->store('media/proposals/'.$this->proposalId, 'local'),
-                'type' => FileType::from(Str::lower($this->newFile->getClientOriginalExtension())),
-                'mime_type' => $this->newFile->getMimeType(),
-                'size' => $this->newFile->getSize(),
-                'uploaded_at' => now(),
-                'uploaded_by' => auth()->id(),
-            ]);
-        }
-
-        $displayName = UploadName::clean((string) ($validated['fileDisplayName'] ?? ''), '');
-
-        $media->fill([
-            'collection' => $validated['fileCategory'],
-            'original_name' => $displayName !== ''
-                ? $this->displayNameWithExtension($displayName, $media->type)
-                : UploadName::clean($this->newFile->getClientOriginalName()),
-        ])->save();
-
-        if ($replaced !== null) {
-            $this->removeFromDisk($media->id, $replaced['disk'], $replaced['path']);
-        }
+        app(SaveProposalFile::class)->handle(
+            $this->proposal,
+            $isCreate ? null : $this->proposalFile($this->editingFileId),
+            $this->newFile,
+            $validated,
+        );
 
         $this->closeFileModal();
         unset($this->proposalFiles, $this->documents, $this->tabs);
@@ -1651,32 +1605,13 @@ new #[Title('titles.proposal')] class extends Component
             return;
         }
 
-        $media = $this->proposalFile($this->deletingFileId);
-        $media->delete();
-        $this->removeFromDisk($media->id, $media->disk, $media->path);
+        app(DeleteProposalFile::class)->handle($this->proposal, $this->proposalFile($this->deletingFileId));
 
         $this->confirmingFileDelete = false;
         $this->deletingFileId = null;
         unset($this->proposalFiles, $this->documents, $this->tabs);
 
         Flux::toast(variant: 'success', text: __('proposals.file_deleted'));
-    }
-
-    /**
-     * Remove a stored document, logging rather than surfacing a storage
-     * failure so a disk hiccup never leaves a row stuck in the UI.
-     */
-    private function removeFromDisk(int $mediaId, string $disk, string $path): void
-    {
-        try {
-            Storage::disk($disk)->delete($path);
-        } catch (\Throwable $exception) {
-            Log::warning('Failed to delete proposal file from disk.', [
-                'media_id' => $mediaId,
-                'path' => $path,
-                'exception' => $exception->getMessage(),
-            ]);
-        }
     }
 
     /**

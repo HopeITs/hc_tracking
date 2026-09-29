@@ -1,6 +1,8 @@
 <?php
 
 use App\Support\Like;
+use App\Actions\Tasks\ChangeTaskStatus;
+use App\Actions\Tasks\CompleteTask;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Livewire\Concerns\ManagesTaskVisibility;
@@ -1332,19 +1334,11 @@ new #[Title('titles.tasks')] class extends Component
             return;
         }
 
-        Gate::authorize('updateStatus', $task);
-
-        if ($task->status === TaskStatus::Done) {
+        if (! app(CompleteTask::class)->handle($task)) {
             Flux::toast(variant: 'danger', text: __('tasks.completed_tasks_cannot_change_status'));
 
             return;
         }
-
-        $task->status = TaskStatus::Done;
-        $task->completed_date = CarbonImmutable::today();
-        $task->progress_percentage = 100;
-
-        $task->save();
 
         Flux::toast(variant: 'success', text: __('tasks.task_marked_done'));
     }
@@ -1368,28 +1362,11 @@ new #[Title('titles.tasks')] class extends Component
             return;
         }
 
-        Gate::authorize('updateStatus', $task);
-
-        if ($task->status === TaskStatus::Done) {
+        if (! app(ChangeTaskStatus::class)->handle($task, $newStatus)) {
             Flux::toast(variant: 'danger', text: __('tasks.completed_tasks_cannot_change_status'));
 
             return;
         }
-
-        $task->status = $newStatus;
-
-        if ($newStatus === TaskStatus::InProgress) {
-            $task->start_date ??= CarbonImmutable::today();
-        }
-
-        if ($newStatus === TaskStatus::Done) {
-            $task->completed_date ??= CarbonImmutable::today();
-            $task->progress_percentage = 100;
-        } elseif ($task->completed_date !== null) {
-            $task->completed_date = null;
-        }
-
-        $task->save();
 
         Flux::toast(variant: 'success', text: __('tasks.task_status_changed', ['status' => $newStatus->label()]));
     }

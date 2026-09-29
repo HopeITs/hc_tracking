@@ -1,6 +1,8 @@
 <?php
 
 use App\Support\Like;
+use App\Actions\Projects\ArchiveProject;
+use App\Actions\Projects\RestoreProject;
 use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\RagStatus;
@@ -789,17 +791,13 @@ new #[Title('titles.projects')] class extends Component {
 
         $project = Project::query()->find($this->archivingProjectId);
 
-        if ($project !== null) {
-            Gate::authorize('delete', $project);
-        }
-
         if ($project === null) {
             $this->cancelArchive();
 
             return;
         }
 
-        $project->update(['status' => ProjectStatus::Archived]);
+        app(ArchiveProject::class)->handle($project);
 
         $this->archivingProjectId = null;
         $this->showArchiveModal = false;
@@ -816,13 +814,10 @@ new #[Title('titles.projects')] class extends Component {
     {
         $project = Project::query()->find($projectId);
 
-        if ($project === null || $project->status !== ProjectStatus::Archived) {
+        if ($project === null || ! app(RestoreProject::class)->handle($project)) {
             return;
         }
 
-        Gate::authorize('delete', $project);
-
-        $project->update(['status' => ProjectStatus::Draft]);
         $this->resetPage();
 
         Flux::toast(variant: 'success', text: __('projects.project_restored'));

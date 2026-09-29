@@ -1,5 +1,8 @@
 <?php
 
+use App\Actions\FundingAgreements\DeleteDonorReport;
+use App\Actions\FundingAgreements\MarkDonorReportSubmitted;
+use App\Actions\FundingAgreements\SaveDonorReport;
 use App\Enums\ArStatus;
 use App\Enums\DonorReportType;
 use App\Enums\MediaCollection;
@@ -763,15 +766,11 @@ new #[Title('titles.funding_agreement')] class extends Component {
             'reportSubmittedOn.before_or_equal' => __('funding_agreements.a_report_cannot_be_submitted_in_the_future'),
         ]);
 
-        $report = $this->editingReportId === null ? new DonorReport : $this->scopedReport($this->editingReportId);
-
-        $report->fill([
-            'donor_proposal_id' => $this->agreementId,
-            'title' => $validated['reportTitle'],
-            'type' => $validated['reportType'],
-            'due_on' => $validated['reportDueOn'],
-            'submitted_on' => $validated['reportSubmittedOn'] === '' ? null : $validated['reportSubmittedOn'],
-        ])->save();
+        $report = app(SaveDonorReport::class)->handle(
+            $this->agreementId,
+            $this->editingReportId === null ? null : $this->scopedReport($this->editingReportId),
+            $validated,
+        );
 
         $isCreate = $report->wasRecentlyCreated;
 
@@ -791,11 +790,7 @@ new #[Title('titles.funding_agreement')] class extends Component {
     {
         Gate::authorize('funding-agreements.update');
 
-        $report = $this->scopedReport($reportId);
-
-        if (! $report->isSubmitted()) {
-            $report->update(['submitted_on' => CarbonImmutable::today()->toDateString()]);
-        }
+        app(MarkDonorReportSubmitted::class)->handle($this->scopedReport($reportId));
 
         $this->forgetReadings();
 
@@ -821,7 +816,7 @@ new #[Title('titles.funding_agreement')] class extends Component {
         Gate::authorize('funding-agreements.update');
 
         if ($this->deletingReportId !== null) {
-            $this->scopedReport($this->deletingReportId)->delete();
+            app(DeleteDonorReport::class)->handle($this->scopedReport($this->deletingReportId));
         }
 
         $this->closeReportDeleteModal();

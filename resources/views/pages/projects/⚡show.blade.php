@@ -1,5 +1,7 @@
 <?php
 
+use App\Actions\Projects\DeleteProjectFile;
+use App\Actions\Projects\SaveProjectFile;
 use App\Enums\FileType;
 use App\Enums\IndicatorMeasure;
 use App\Enums\MediaCollection;
@@ -22,16 +24,12 @@ use App\Models\Result;
 use App\Models\Risk;
 use App\Models\Task;
 use App\Rules\SecureUpload;
-use App\Support\UploadName;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
@@ -362,26 +360,6 @@ new #[Title('titles.project')] class extends Component {
             ->findOrFail($mediaId);
     }
 
-    /**
-     * A user-typed display name, guaranteed to carry the file's real
-     * extension.
-     *
-     * The download controller sends this value as the saved filename, so a
-     * display name typed without an extension (the common case — nobody
-     * types ".pdf" into a "name" field) must not silently drop it; that
-     * left downloaded files without the extension needed to open them.
-     */
-    private function displayNameWithExtension(string $displayName, FileType $type): string
-    {
-        $displayName = UploadName::clean($displayName);
-
-        if (Str::lower(pathinfo($displayName, PATHINFO_EXTENSION)) === $type->value) {
-            return $displayName;
-        }
-
-        return $displayName.'.'.$type->value;
-    }
-
     public function openCreateFileModal(): void
     {
         Gate::authorize('update', Project::query()->findOrFail($this->projectId));
@@ -431,25 +409,7 @@ new #[Title('titles.project')] class extends Component {
                 'fileCategory.required' => __('projects.select_a_file_category'),
             ]);
 
-            $path = $this->newFile->store('media/projects/'.$this->projectId, 'local');
-            $type = FileType::from(strtolower($this->newFile->getClientOriginalExtension()));
-            $displayName = UploadName::clean((string) ($validated['fileDisplayName'] ?? ''), '');
-
-            Media::create([
-                'mediable_type' => 'project',
-                'mediable_id' => $this->projectId,
-                'collection' => $validated['fileCategory'],
-                'disk' => 'local',
-                'path' => $path,
-                'original_name' => $displayName !== ''
-                    ? $this->displayNameWithExtension($displayName, $type)
-                    : UploadName::clean($this->newFile->getClientOriginalName()),
-                'mime_type' => $this->newFile->getMimeType(),
-                'size' => $this->newFile->getSize(),
-                'type' => $type,
-                'uploaded_at' => now(),
-                'uploaded_by' => auth()->id(),
-            ]);
+            app(SaveProjectFile::class)->handle(Project::query()->findOrFail($this->projectId), null, $this->newFile, $validated);
 
             $toast = __('projects.file_uploaded');
         } else {
@@ -462,10 +422,7 @@ new #[Title('titles.project')] class extends Component {
                 'fileCategory.required' => __('projects.select_a_file_category'),
             ]);
 
-            $media->update([
-                'collection' => $validated['fileCategory'],
-                'original_name' => $this->displayNameWithExtension($validated['fileDisplayName'], $media->type),
-            ]);
+            app(SaveProjectFile::class)->handle(Project::query()->findOrFail($this->projectId), $media, null, $validated);
 
             $toast = __('projects.file_updated');
         }
@@ -498,17 +455,7 @@ new #[Title('titles.project')] class extends Component {
 
         $media = $this->projectFile($this->deletingFileId);
 
-        try {
-            Storage::disk($media->disk)->delete($media->path);
-        } catch (\Throwable $exception) {
-            Log::warning('Failed to delete project file from disk.', [
-                'media_id' => $media->id,
-                'path' => $media->path,
-                'exception' => $exception->getMessage(),
-            ]);
-        }
-
-        $media->delete();
+        app(DeleteProjectFile::class)->handle(Project::query()->findOrFail($this->projectId), $media);
 
         $this->confirmingFileDelete = false;
         $this->deletingFileId = null;

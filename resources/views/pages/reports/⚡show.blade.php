@@ -3,16 +3,19 @@
 use App\Enums\FileType;
 use App\Enums\IndicatorMeasure;
 use App\Enums\ReportStatus;
+use App\Actions\Reports\ApproveReport;
+use App\Actions\Reports\DeleteReportFile;
+use App\Actions\Reports\MarkReportSeenByMeal;
+use App\Actions\Reports\ReturnReportToDraft;
+use App\Actions\Reports\SaveReportFile;
+use App\Actions\Reports\SubmitReportForReview;
 use App\Livewire\Concerns\ManagesReportForm;
 use App\Models\Report;
 use App\Models\ReportFile;
 use App\Rules\SecureUpload;
-use App\Support\UploadName;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
@@ -163,20 +166,11 @@ new #[Title('titles.report')] class extends Component {
      * Only valid from Draft. Writes status and submit_date together so the two
      * can never disagree about whether — and when — this was submitted.
      */
-    public function submitForReview(): void
+    public function submitForReview(SubmitReportForReview $submit): void
     {
-        $report = Report::query()->findOrFail($this->reportId);
-
-        if ($report->status !== ReportStatus::Draft) {
+        if (! $submit->handle(Report::query()->findOrFail($this->reportId))) {
             return;
         }
-
-        Gate::authorize('submit', $report);
-
-        $report->fill([
-            'status' => ReportStatus::Reviewed,
-            'submit_date' => now()->toDateString(),
-        ])->save();
 
         unset($this->report);
 
@@ -188,17 +182,11 @@ new #[Title('titles.report')] class extends Component {
      *
      * Only valid from Reviewed.
      */
-    public function approve(): void
+    public function approve(ApproveReport $approve): void
     {
-        $report = Report::query()->findOrFail($this->reportId);
-
-        if ($report->status !== ReportStatus::Reviewed) {
+        if (! $approve->handle(Report::query()->findOrFail($this->reportId))) {
             return;
         }
-
-        Gate::authorize('approve', $report);
-
-        $report->fill(['status' => ReportStatus::Approved])->save();
 
         unset($this->report);
 
@@ -213,17 +201,11 @@ new #[Title('titles.report')] class extends Component {
      * lock/unlock action any more. submit_date is cleared with it: a draft
      * has not been submitted, and submitting again stamps a fresh date.
      */
-    public function returnToDraft(): void
+    public function returnToDraft(ReturnReportToDraft $returnToDraft): void
     {
-        $report = Report::query()->findOrFail($this->reportId);
-
-        if (! in_array($report->status, [ReportStatus::Reviewed, ReportStatus::Approved], true)) {
+        if (! $returnToDraft->handle(Report::query()->findOrFail($this->reportId))) {
             return;
         }
-
-        Gate::authorize('returnToDraft', $report);
-
-        $report->fill(['status' => ReportStatus::Draft, 'submit_date' => null])->save();
 
         unset($this->report);
 
@@ -237,13 +219,9 @@ new #[Title('titles.report')] class extends Component {
      * is nothing to record about un-seeing it, and "MEAL never looked at this"
      * is not a state a reviewer can restore.
      */
-    public function markSeenByMeal(): void
+    public function markSeenByMeal(MarkReportSeenByMeal $markSeen): void
     {
-        $report = Report::query()->findOrFail($this->reportId);
-
-        Gate::authorize('markSeen', $report);
-
-        $report->fill(['is_seen_by_meal' => true])->save();
+        $markSeen->handle(Report::query()->findOrFail($this->reportId));
 
         unset($this->report);
 
@@ -311,39 +289,12 @@ new #[Title('titles.report')] class extends Component {
             'fileDate.required' => __('reports.set_the_file_date'),
         ]);
 
-        $file = $isCreate
-            ? new ReportFile(['report_id' => $this->reportId])
-            : $this->reportFile($this->editingFileId);
-
-        $replacedFile = null;
-
-        if ($this->newFile !== null) {
-            if (! $isCreate && $file->original_name !== null) {
-                $replacedFile = ['disk' => $file->disk, 'path' => $file->path];
-            }
-
-            $file->fill([
-                'disk' => 'local',
-                'path' => $this->newFile->store('report-files/'.$this->reportId, 'local'),
-                'type' => FileType::from(Str::lower($this->newFile->getClientOriginalExtension())),
-                'mime_type' => $this->newFile->getMimeType(),
-                'size' => $this->newFile->getSize(),
-                'uploaded_by' => auth()->id(),
-            ]);
-        }
-
-        $displayName = UploadName::clean((string) ($validated['fileDisplayName'] ?? ''), '');
-
-        $file->fill([
-            'original_name' => $displayName !== ''
-                ? $this->displayNameWithExtension($displayName, $file->type)
-                : UploadName::clean($this->newFile->getClientOriginalName()),
-            'date' => $validated['fileDate'],
-        ])->save();
-
-        if ($replacedFile !== null) {
-            $this->removeFromDisk($file->id, $replacedFile['disk'], $replacedFile['path']);
-        }
+        app(SaveReportFile::class)->handle(
+            $this->report,
+            $isCreate ? null : $this->reportFile($this->editingFileId),
+            $this->newFile,
+            $validated,
+        );
 
         $this->closeFileModal();
         unset($this->files);
@@ -394,13 +345,7 @@ new #[Title('titles.report')] class extends Component {
 
         Gate::authorize('update', $this->report);
 
-        $file = $this->reportFile($this->deletingFileId);
-
-        if ($file->original_name !== null) {
-            $this->removeFromDisk($file->id, $file->disk, $file->path);
-        }
-
-        $file->delete();
+        app(DeleteReportFile::class)->handle($this->report, $this->reportFile($this->deletingFileId));
 
         $this->closeDeleteFileModal();
         unset($this->files);
@@ -455,36 +400,6 @@ new #[Title('titles.report')] class extends Component {
     private function reportFile(int $fileId): ReportFile
     {
         return ReportFile::query()->where('report_id', $this->reportId)->findOrFail($fileId);
-    }
-
-    /**
-     * A user-typed display name, guaranteed to carry the file's real
-     * extension, since it becomes the downloaded filename.
-     */
-    private function displayNameWithExtension(string $displayName, FileType $type): string
-    {
-        if (Str::lower(pathinfo($displayName, PATHINFO_EXTENSION)) === $type->value) {
-            return $displayName;
-        }
-
-        return $displayName.'.'.$type->value;
-    }
-
-    /**
-     * Remove a stored file, logging rather than surfacing a storage failure so
-     * a disk hiccup never leaves a record stuck in the UI.
-     */
-    private function removeFromDisk(int $fileId, string $disk, string $path): void
-    {
-        try {
-            Storage::disk($disk)->delete($path);
-        } catch (Throwable $exception) {
-            Log::warning('Failed to delete report file from disk.', [
-                'report_file_id' => $fileId,
-                'path' => $path,
-                'error' => $exception->getMessage(),
-            ]);
-        }
     }
 };
 ?>

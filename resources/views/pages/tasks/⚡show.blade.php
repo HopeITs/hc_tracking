@@ -1,5 +1,7 @@
 <?php
 
+use App\Actions\Tasks\DeleteTaskAttachment;
+use App\Actions\Tasks\SaveTaskAttachment;
 use App\Enums\FileType;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
@@ -8,15 +10,12 @@ use App\Models\Milestone;
 use App\Models\Task;
 use App\Models\TaskAttachment;
 use App\Rules\SecureUpload;
-use App\Support\UploadName;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
@@ -367,39 +366,12 @@ new #[Title('titles.task')] class extends Component
             'fileDate.required' => __('tasks.set_the_file_date'),
         ]);
 
-        $file = $isCreate
-            ? new TaskAttachment(['task_id' => $this->taskId])
-            : $this->taskAttachment($this->editingFileId);
-
-        $replacedFile = null;
-
-        if ($this->newFile !== null) {
-            if (! $isCreate && $file->original_name !== null) {
-                $replacedFile = ['disk' => $file->disk, 'path' => $file->path];
-            }
-
-            $file->fill([
-                'disk' => 'local',
-                'path' => $this->newFile->store('task-attachments/'.$this->taskId, 'local'),
-                'type' => FileType::from(Str::lower($this->newFile->getClientOriginalExtension())),
-                'mime_type' => $this->newFile->getMimeType(),
-                'size' => $this->newFile->getSize(),
-                'uploaded_by' => auth()->id(),
-            ]);
-        }
-
-        $displayName = UploadName::clean((string) ($validated['fileDisplayName'] ?? ''), '');
-
-        $file->fill([
-            'original_name' => $displayName !== ''
-                ? $this->displayNameWithExtension($displayName, $file->type)
-                : UploadName::clean($this->newFile->getClientOriginalName()),
-            'date' => $validated['fileDate'],
-        ])->save();
-
-        if ($replacedFile !== null) {
-            $this->removeFromDisk($file->id, $replacedFile['disk'], $replacedFile['path']);
-        }
+        app(SaveTaskAttachment::class)->handle(
+            $this->task,
+            $isCreate ? null : $this->taskAttachment($this->editingFileId),
+            $this->newFile,
+            $validated,
+        );
 
         $this->closeFileModal();
         unset($this->attachments);
@@ -443,13 +415,7 @@ new #[Title('titles.task')] class extends Component
             return;
         }
 
-        $file = $this->taskAttachment($this->deletingFileId);
-
-        if ($file->original_name !== null) {
-            $this->removeFromDisk($file->id, $file->disk, $file->path);
-        }
-
-        $file->delete();
+        app(DeleteTaskAttachment::class)->handle($this->task, $this->taskAttachment($this->deletingFileId));
 
         $this->closeDeleteFileModal();
         unset($this->attachments);
@@ -505,36 +471,6 @@ new #[Title('titles.task')] class extends Component
     private function taskAttachment(int $fileId): TaskAttachment
     {
         return TaskAttachment::query()->where('task_id', $this->taskId)->findOrFail($fileId);
-    }
-
-    /**
-     * A user-typed display name, guaranteed to carry the file's real
-     * extension, since it becomes the downloaded filename.
-     */
-    private function displayNameWithExtension(string $displayName, FileType $type): string
-    {
-        if (Str::lower(pathinfo($displayName, PATHINFO_EXTENSION)) === $type->value) {
-            return $displayName;
-        }
-
-        return $displayName.'.'.$type->value;
-    }
-
-    /**
-     * Remove a stored file, logging rather than surfacing a storage failure
-     * so a disk hiccup never leaves a record stuck in the UI.
-     */
-    private function removeFromDisk(int $fileId, string $disk, string $path): void
-    {
-        try {
-            Storage::disk($disk)->delete($path);
-        } catch (\Throwable $exception) {
-            Log::warning('Failed to delete task attachment from disk.', [
-                'task_attachment_id' => $fileId,
-                'path' => $path,
-                'error' => $exception->getMessage(),
-            ]);
-        }
     }
 };
 ?>

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
+use App\Actions\FundingAgreements\DeleteFundingAgreement;
+use App\Actions\FundingAgreements\SaveFundingAgreement;
 use App\Enums\Currency;
 use App\Models\Donor;
 use App\Models\DonorProposal;
@@ -218,15 +220,7 @@ trait ManagesAgreementForm
             'agreementCurrency.required' => __('funding_agreements.select_the_currency_this_budget_is_stated_in'),
         ]);
 
-        $agreement = $existing ?? new DonorProposal;
-
-        $agreement->fill([
-            'donor_id' => (int) $validated['agreementDonorId'],
-            'proposal_id' => (int) $validated['agreementProposalId'],
-            'budget' => $validated['budget'],
-            'currency' => $validated['agreementCurrency'],
-            'project_num' => $validated['projectNum'] === '' ? null : $validated['projectNum'],
-        ])->save();
+        $agreement = app(SaveFundingAgreement::class)->handle($existing, $validated);
 
         $isCreate = $agreement->wasRecentlyCreated;
 
@@ -276,7 +270,11 @@ trait ManagesAgreementForm
             return;
         }
 
-        $agreement->delete();
+        if (! app(DeleteFundingAgreement::class)->handle($agreement)) {
+            $this->confirmingAgreementDelete = false;
+
+            return;
+        }
 
         $this->showAgreementModal = false;
         $this->resetAgreementForm();

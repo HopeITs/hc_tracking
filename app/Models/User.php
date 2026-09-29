@@ -465,7 +465,7 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
         $ids = HrUser::idsOrderedByName();
 
         if ($ids !== []) {
-            $query->orderByRaw('FIELD('.$query->qualifyColumn('hr_user_id').', '.implode(', ', $ids).')');
+            $query->orderByRaw('FIELD('.$query->qualifyColumn('hr_user_id').', '.implode(', ', array_map('intval', $ids)).')');
         }
 
         $query->orderBy($query->qualifyColumn('id'));
