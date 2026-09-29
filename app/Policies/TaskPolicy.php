@@ -38,14 +38,19 @@ class TaskPolicy
     }
 
     /**
-     * Determine whether the user can edit every field of the task: holders of
-     * tasks.update, and the task's own creator. Which tasks a department-
-     * scoped user can reach at all is decided by TaskVisibilityScope when the
-     * task is loaded.
+     * Determine whether the user can edit every field of the task: the task's
+     * own creator, and holders of tasks.update. A department-scoped holder
+     * only edits their own and their department's work (user decision
+     * 2026-09-29); holders of a bypass role edit every task.
      */
     public function update(User $user, Task $task): bool
     {
-        return $user->can('tasks.update') || $this->isCreator($user, $task);
+        if ($this->isCreator($user, $task)) {
+            return true;
+        }
+
+        return $user->can('tasks.update')
+            && (! $user->isTaskDepartmentScoped() || $this->isOwnOrDepartmentWork($user, $task));
     }
 
     /**
@@ -88,6 +93,33 @@ class TaskPolicy
     private function isCreator(User $user, Task $task): bool
     {
         return $task->created_by === $user->id;
+    }
+
+    /**
+     * Whether the task is assigned to the user, or was raised or is assigned
+     * within their HR department — the department half of
+     * TaskVisibilityScope. A task a scoped user only sees because they answer
+     * for its project or program stays view-only for them.
+     */
+    private function isOwnOrDepartmentWork(User $user, Task $task): bool
+    {
+        if ($this->isAssignee($user, $task)) {
+            return true;
+        }
+
+        $departmentEmployeeIds = $user->departmentEmployeeIds();
+
+        if ($departmentEmployeeIds === []) {
+            return false;
+        }
+
+        $assigneeEmployeeIds = ($task->relationLoaded('taskAssignees') ? $task->taskAssignees : $task->taskAssignees()->get())
+            ->pluck('employee_id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
+
+        return array_intersect($assigneeEmployeeIds, $departmentEmployeeIds) !== []
+            || in_array((int) $task->created_by, $user->departmentUserIds(), true);
     }
 
     /**

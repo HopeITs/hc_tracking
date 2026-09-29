@@ -8,13 +8,14 @@ declare(strict_types=1);
 |--------------------------------------------------------------------------
 |
 | One entry per module. Each permission is seeded as "{module}.{action}".
-| Add a module here and re-run the RolesAndPermissionsSeeder to add new
-| permissions without touching any other file. The catalog is built before
+| Add a module here and run `php artisan permissions:sync` to add the new
+| permissions without touching any other file (the RolesAndPermissionsSeeder
+| resets every role, so it is for a fresh database only). The catalog is built before
 | the returned array so the role baselines below can be derived from it.
 */
 $groups = [
     'access-management' => ['manage-users', 'manage-roles', 'manage-permissions'],
-    'programs' => ['view', 'create', 'update', 'delete'],
+    'programs' => ['view', 'update'],
     'projects' => ['view', 'create', 'update', 'delete'],
     'milestones' => ['view', 'create', 'update', 'delete'],
     'indicators' => ['view', 'create', 'update', 'delete'],
@@ -32,8 +33,9 @@ $groups = [
     'calendar' => ['view'],
     'executive-summary' => ['view'],
     'accounts' => ['view', 'create', 'update', 'delete'],
-    'cities' => ['view', 'create', 'update', 'delete'],
+    'cities' => ['view'],
     'activity-log' => ['view'],
+    'notification-settings' => ['manage'],
 ];
 
 $allPermissions = [];
@@ -45,8 +47,11 @@ foreach ($groups as $module => $actions) {
 }
 
 // Every role views every module (user decision 2026-09-25) — except the
-// activity log, which only Super Admin and General Manager hold by default.
-$restrictedViews = ['activity-log.view'];
+// activity log (Super Admin and General Manager) and the money pages (user
+// decision 2026-09-29), which only the finance-facing roles below add back.
+$financeViews = ['transfers.view', 'funding-agreements.view', 'accounts.view', 'executive-summary.view'];
+$fundraisingViews = ['donors.view', 'proposals.view'];
+$restrictedViews = ['activity-log.view', ...$financeViews, ...$fundraisingViews];
 $viewEverything = array_values(array_filter(
     $allPermissions,
     fn (string $permission): bool => str_ends_with($permission, '.view') && ! in_array($permission, $restrictedViews, true),
@@ -122,17 +127,21 @@ return [
     | Role baselines
     |--------------------------------------------------------------------------
     |
-    | Granted when a role is created (App\Models\Role::booted()) and re-synced
-    | by RolesAndPermissionsSeeder. Every role views every module; each list
-    | adds what that role may change. "Super Admin" is handled in code. Every
-    | one of these stays editable from the Admin > Users roles tab.
+    | Granted when a role is created (App\Models\Role::booted()). A permission
+    | added to a list later reaches that role through `permissions:sync`,
+    | which never takes one away. Every role views every module except the
+    | activity log and the money pages; each list adds the money views that
+    | role needs and what it may change. "Super Admin" is handled in code.
+    | These nine names are the built-in roles: they cannot be renamed or
+    | deleted (App\Policies\UserPolicy), but their permissions stay editable
+    | from the Admin > Users roles tab.
     */
     'role_baselines' => [
         'Team Member' => $viewEverything,
         'Media Team' => [...$viewEverything, ...$taskWriter, ...$reportWriter],
         'Public Relations' => [...$viewEverything, ...$taskWriter, ...$reportWriter],
         'Public Relations Manager' => [
-            ...$viewEverything, ...$taskWriter, ...$reportWriter, 'reports.delete',
+            ...$viewEverything, ...$fundraisingViews, ...$taskWriter, ...$reportWriter,
             'donors.create', 'donors.update',
             'proposals.create', 'proposals.update',
         ],
@@ -143,7 +152,7 @@ return [
             'targets.create', 'targets.update', 'targets.delete',
         ],
         'Financial' => [
-            ...$viewEverything, ...$taskWriter,
+            ...$viewEverything, ...$financeViews, ...$fundraisingViews, ...$taskWriter,
             'donors.create', 'donors.update', 'donors.delete',
             'proposals.create', 'proposals.update', 'proposals.delete',
             'funding-agreements.create', 'funding-agreements.update', 'funding-agreements.delete',
@@ -153,7 +162,7 @@ return [
         'Managers' => [
             ...$viewEverything, ...$taskWriter, 'tasks.delete', ...$reportWriter,
             'strategies.create', 'strategies.update', 'strategies.delete',
-            'programs.create', 'programs.update',
+            'programs.update',
             'annual-plans.create', 'annual-plans.update', 'annual-plans.delete',
             'projects.create', 'projects.update', 'projects.delete',
             'milestones.create', 'milestones.update', 'milestones.delete',
@@ -166,6 +175,7 @@ return [
             'access-management.manage-roles',
             'access-management.manage-permissions',
             'reports.mark-seen',
+            'notification-settings.manage',
         ])),
     ],
 ];

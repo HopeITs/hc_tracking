@@ -379,7 +379,7 @@ test('the money reading names every currency after the one its figure leads with
 });
 
 test('a user without proposal permissions sees no edit controls and cannot change anything', function () {
-    $viewer = User::factory()->role('Team Member')->create();
+    $viewer = User::factory()->role('Team Member')->create()->givePermissionTo('proposals.view');
     $agreement = usdAgreement($this->proposal);
     $media = Media::factory()->create(['mediable_type' => 'proposal', 'mediable_id' => $this->proposal->id]);
     $page = Livewire::actingAs($viewer)->test('pages::proposals.show', ['proposal' => $this->proposal]);

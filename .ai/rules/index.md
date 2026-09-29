@@ -19,6 +19,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Concerns/HasTree.php | .ai/rules/concerns.md |
 | config/session.php | .ai/rules/config-2.md |
 | {config/database.php,.env.example} | .ai/rules/config.md |
+| {database/seeders/**,app/Console/Commands/**} | .ai/rules/console-commands.md |
 | resources/css/app.css | .ai/rules/css.md |
 | database/migrations/** | .ai/rules/database-migrations.md |
 | database/seeders/** | .ai/rules/database-seeders.md |
@@ -46,6 +47,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Observers/**, app/Observers/{MilestoneObserver,ResultObserver}.php | .ai/rules/observers.md |
 | {database/migrations/**,app/Models/DonorReport.php,resources/views/pages/funding-agreements/**} | .ai/rules/pages-funding-agreements.md |
 | resources/views/pages/** | .ai/rules/pages.md |
+| {config/access-control.php,app/Policies/UserPolicy.php} | .ai/rules/policies.md |
 | resources/views/pages/proposals/** | .ai/rules/proposals.md |
 | app/Providers/** | .ai/rules/providers.md |
 | app/Notifications/Recipients/** | .ai/rules/recipients.md |

@@ -327,6 +327,8 @@ new #[Title('titles.calendar')] class extends Component {
         // column of their own — the only real ownership signal in the schema is
         // Project::user_id, so anything funding/funded-by one of my projects
         // counts as "mine" here, the same proxy every one of these queries uses.
+        // Each of them is money-adjacent, so each is skipped outright unless the
+        // viewer holds the matching view permission (see canSeeType()).
         $ownedProjectIds = $employeeIds === []
             ? []
             : Project::query()->whereIn('user_id', $employeeIds)->pluck('id')->all();
@@ -353,7 +355,7 @@ new #[Title('titles.calendar')] class extends Component {
                 ->get()
                 ->groupBy(fn (Project $project): string => $project->end_date->toDateString());
 
-        $proposalsByDay = $ownedProjectIds === [] || ! $this->showProposals
+        $proposalsByDay = $ownedProjectIds === [] || ! $this->isTypeShown('proposal')
             ? new Collection
             : Proposal::query()
                 ->select(['id', 'slug', 'name', 'planned_date_end', 'actual_date_end'])
@@ -363,7 +365,7 @@ new #[Title('titles.calendar')] class extends Component {
                 ->get()
                 ->groupBy(fn (Proposal $proposal): string => $proposal->planned_date_end->toDateString());
 
-        $transfersByDay = $ownedProjectIds === [] || ! $this->showTransfers
+        $transfersByDay = $ownedProjectIds === [] || ! $this->isTypeShown('transfer')
             ? new Collection
             : TransfersTracking::query()
                 ->select(['id', 'donor_proposal_id', 'scheduled_date', 'payment_amount', 'amount_transfered_currency', 'ar_status'])
@@ -375,7 +377,7 @@ new #[Title('titles.calendar')] class extends Component {
                 ->get()
                 ->groupBy(fn (TransfersTracking $transfer): string => $transfer->scheduled_date->toDateString());
 
-        $donorFollowUpsByDay = $ownedProjectIds === [] || ! $this->showDonors
+        $donorFollowUpsByDay = $ownedProjectIds === [] || ! $this->showDonors || ! $this->canViewDonors()
             ? new Collection
             : Donor::query()
                 ->select(['id', 'slug', 'name', 'next_step', 'next_step_due_on'])
@@ -386,7 +388,7 @@ new #[Title('titles.calendar')] class extends Component {
                 ->get()
                 ->groupBy(fn (Donor $donor): string => $donor->next_step_due_on->toDateString());
 
-        $donorReportsByDay = $ownedProjectIds === [] || ! $this->showDonors
+        $donorReportsByDay = $ownedProjectIds === [] || ! $this->showDonors || ! $this->canViewAgreements()
             ? new Collection
             : DonorReport::query()
                 ->select(['id', 'donor_proposal_id', 'title', 'due_on', 'submitted_on'])
@@ -978,6 +980,10 @@ new #[Title('titles.calendar')] class extends Component {
      */
     public function toggleType(string $type): void
     {
+        if (! $this->canSeeType($type)) {
+            return;
+        }
+
         $property = $this->typeProperty($type);
         $this->$property = ! $this->$property;
 
@@ -995,6 +1001,10 @@ new #[Title('titles.calendar')] class extends Component {
      */
     public function focusOnlyType(string $type): void
     {
+        if (! $this->canSeeType($type)) {
+            return;
+        }
+
         $this->showMilestones = $type === 'milestone';
         $this->showTasks = $type === 'task';
         $this->showReports = $type === 'report';
@@ -1080,7 +1090,7 @@ new #[Title('titles.calendar')] class extends Component {
                 'type' => 'transfer',
                 'kind' => 'link',
                 'id' => $transfer->id,
-                'url' => route('funding-agreements.show', $transfer->donorProposal),
+                'url' => $this->canViewAgreements() ? route('funding-agreements.show', $transfer->donorProposal) : null,
                 'title' => $transfer->donorProposal?->donor?->name.' · '.number_format((float) $transfer->payment_amount, 2).' '.$transfer->amount_transfered_currency->value,
                 'subLabel' => null,
             ]);
@@ -1103,6 +1113,63 @@ new #[Title('titles.calendar')] class extends Component {
         }
 
         return $rows;
+    }
+
+    /**
+     * Whether the viewer may see proposal deadlines and the proposals behind them.
+     */
+    protected function canViewProposals(): bool
+    {
+        return auth()->user()?->can('proposals.view') ?? false;
+    }
+
+    /**
+     * Whether the viewer may see transfer dates and the amounts on them.
+     */
+    protected function canViewTransfers(): bool
+    {
+        return auth()->user()?->can('transfers.view') ?? false;
+    }
+
+    /**
+     * Whether the viewer may see donors and their follow-up dates.
+     */
+    protected function canViewDonors(): bool
+    {
+        return auth()->user()?->can('donors.view') ?? false;
+    }
+
+    /**
+     * Whether the viewer may see funding agreements, and so donor reports and
+     * the agreement page a transfer or donor report links to.
+     */
+    protected function canViewAgreements(): bool
+    {
+        return auth()->user()?->can('funding-agreements.view') ?? false;
+    }
+
+    /**
+     * Whether the viewer may see any occurrence of $type. The 'donor' type
+     * covers follow-ups (donors.view) and donor reports (funding-agreements.view),
+     * so it is open when either half is; each half is still gated on its own.
+     */
+    protected function canSeeType(string $type): bool
+    {
+        return match ($type) {
+            'proposal' => $this->canViewProposals(),
+            'transfer' => $this->canViewTransfers(),
+            'donor' => $this->canViewDonors() || $this->canViewAgreements(),
+            default => true,
+        };
+    }
+
+    /**
+     * Whether $type is switched on AND permitted. The show* toggles are public
+     * Livewire state a browser can set, so they never decide visibility alone.
+     */
+    protected function isTypeShown(string $type): bool
+    {
+        return $this->canSeeType($type) && $this->{$this->typeProperty($type)};
     }
 
     protected function typeProperty(string $type): string
@@ -1128,13 +1195,13 @@ new #[Title('titles.calendar')] class extends Component {
     protected function focusedType(): ?string
     {
         $active = array_filter([
-            'milestone' => $this->showMilestones,
-            'task' => $this->showTasks,
-            'report' => $this->showReports,
-            'proposal' => $this->showProposals,
-            'transfer' => $this->showTransfers,
-            'donor' => $this->showDonors,
-            'project' => $this->showProjects,
+            'milestone' => $this->isTypeShown('milestone'),
+            'task' => $this->isTypeShown('task'),
+            'report' => $this->isTypeShown('report'),
+            'proposal' => $this->isTypeShown('proposal'),
+            'transfer' => $this->isTypeShown('transfer'),
+            'donor' => $this->isTypeShown('donor'),
+            'project' => $this->isTypeShown('project'),
         ]);
 
         return count($active) === 1 ? array_key_first($active) : null;
@@ -1182,20 +1249,20 @@ new #[Title('titles.calendar')] class extends Component {
                 Report::query()->whereIn('user_id', User::query()->whereIn('employee_id', $employeeIds)->pluck('id')),
                 'planned_date'
             ),
-            'proposal' => $this->nearestOrLatestDate(
+            'proposal' => ! $this->canViewProposals() ? null : $this->nearestOrLatestDate(
                 Proposal::query()->whereHas('projects', fn (Builder $query) => $query->whereIn('projects.user_id', $employeeIds)),
                 'planned_date_end'
             ),
-            'transfer' => $this->nearestOrLatestDate(
+            'transfer' => ! $this->canViewTransfers() ? null : $this->nearestOrLatestDate(
                 TransfersTracking::query()->whereNotNull('scheduled_date')->whereHas('donorProposal.proposal.projects', fn (Builder $query) => $query->whereIn('projects.user_id', $employeeIds)),
                 'scheduled_date'
             ),
             'donor' => $this->pickCloserDate(
-                $this->nearestOrLatestDate(
+                ! $this->canViewDonors() ? null : $this->nearestOrLatestDate(
                     Donor::query()->whereNotNull('next_step_due_on')->whereHas('proposals.projects', fn (Builder $query) => $query->whereIn('projects.user_id', $employeeIds)),
                     'next_step_due_on'
                 ),
-                $this->nearestOrLatestDate(
+                ! $this->canViewAgreements() ? null : $this->nearestOrLatestDate(
                     DonorReport::query()->whereHas('donorProposal.proposal.projects', fn (Builder $query) => $query->whereIn('projects.user_id', $employeeIds)),
                     'due_on'
                 ),
@@ -1337,10 +1404,10 @@ new #[Title('titles.calendar')] class extends Component {
                 'subLabel' => null,
                 'date' => $report->planned_date,
             ]),
-            'proposal' => $this->upcomingOrRecent(
+            'proposal' => ($this->canViewProposals() ? $this->upcomingOrRecent(
                 Proposal::query()->whereHas('projects', fn (Builder $query) => $query->whereIn('projects.user_id', $employeeIds)),
                 'planned_date_end'
-            )->map(fn (Proposal $proposal): array => [
+            ) : new Collection)->map(fn (Proposal $proposal): array => [
                 'kind' => 'link',
                 'id' => $proposal->id,
                 'url' => route('proposals.show', $proposal),
@@ -1348,24 +1415,24 @@ new #[Title('titles.calendar')] class extends Component {
                 'subLabel' => null,
                 'date' => $proposal->planned_date_end,
             ]),
-            'transfer' => $this->upcomingOrRecent(
+            'transfer' => ($this->canViewTransfers() ? $this->upcomingOrRecent(
                 TransfersTracking::query()
                     ->whereNotNull('scheduled_date')
                     ->whereHas('donorProposal.proposal.projects', fn (Builder $query) => $query->whereIn('projects.user_id', $employeeIds))
                     ->with('donorProposal:id,slug,donor_id', 'donorProposal.donor:id,name'),
                 'scheduled_date'
-            )->map(fn (TransfersTracking $transfer): array => [
+            ) : new Collection)->map(fn (TransfersTracking $transfer): array => [
                 'kind' => 'link',
                 'id' => $transfer->id,
-                'url' => route('funding-agreements.show', $transfer->donorProposal),
+                'url' => $this->canViewAgreements() ? route('funding-agreements.show', $transfer->donorProposal) : null,
                 'title' => $transfer->donorProposal?->donor?->name.' · '.number_format((float) $transfer->payment_amount, 2).' '.$transfer->amount_transfered_currency->value,
                 'subLabel' => null,
                 'date' => $transfer->scheduled_date,
             ]),
-            'donor' => $this->upcomingOrRecent(
+            'donor' => ($this->canViewDonors() ? $this->upcomingOrRecent(
                 Donor::query()->whereNotNull('next_step_due_on')->whereHas('proposals.projects', fn (Builder $query) => $query->whereIn('projects.user_id', $employeeIds)),
                 'next_step_due_on'
-            )->map(fn (Donor $donor): array => [
+            ) : new Collection)->map(fn (Donor $donor): array => [
                 'kind' => 'link',
                 'id' => $donor->id,
                 'url' => route('donors.show', $donor),
@@ -1373,12 +1440,12 @@ new #[Title('titles.calendar')] class extends Component {
                 'subLabel' => __('calendar.donor_follow_up'),
                 'date' => $donor->next_step_due_on,
             ])->concat(
-                $this->upcomingOrRecent(
+                ($this->canViewAgreements() ? $this->upcomingOrRecent(
                     DonorReport::query()
                         ->whereHas('donorProposal.proposal.projects', fn (Builder $query) => $query->whereIn('projects.user_id', $employeeIds))
                         ->with('donorProposal:id,slug'),
                     'due_on'
-                )->map(fn (DonorReport $report): array => [
+                ) : new Collection)->map(fn (DonorReport $report): array => [
                     'kind' => 'link',
                     'id' => $report->id,
                     'url' => route('funding-agreements.show', $report->donorProposal),
@@ -1642,6 +1709,7 @@ new #[Title('titles.calendar')] class extends Component {
                             ['donor', 'showDonors', 'calendar.donor_follow_up', 'calendar-filter-donors'],
                             ['project', 'showProjects', 'calendar.project_timeline', 'calendar-filter-projects'],
                         ] as [$typeKey, $showProp, $labelKey, $testHook])
+                            @continue(! $this->canSeeType($typeKey))
                             <div class="group flex items-center gap-1 rounded-md hover:bg-secondary-soft dark:hover:bg-secondary-medium" role="option" aria-selected="{{ $$showProp ? 'true' : 'false' }}">
                                 <button type="button" data-flux-menu-item wire:click="toggleType('{{ $typeKey }}')" class="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 py-1.5 text-start text-sm" data-test="{{ $testHook }}">
                                     <span class="size-1.5 shrink-0 rounded-full {{ $typeDotClasses[$typeKey] }}"></span>
@@ -1733,9 +1801,15 @@ new #[Title('titles.calendar')] class extends Component {
                 <span class="flex items-center gap-1.5"><span class="size-2 shrink-0 rounded-full {{ $typeDotClasses['milestone'] }}"></span>{{ __('tasks.milestone') }}</span>
                 <span class="flex items-center gap-1.5"><span class="size-2 shrink-0 rounded-full {{ $typeDotClasses['task'] }}"></span>{{ __('tasks.task') }}</span>
                 <span class="flex items-center gap-1.5"><span class="size-2 shrink-0 rounded-full {{ $typeDotClasses['report'] }}"></span>{{ __('calendar.report_deadline') }}</span>
-                <span class="flex items-center gap-1.5"><span class="size-2 shrink-0 rounded-full {{ $typeDotClasses['proposal'] }}"></span>{{ __('calendar.proposal_deadline') }}</span>
-                <span class="flex items-center gap-1.5"><span class="size-2 shrink-0 rounded-full {{ $typeDotClasses['transfer'] }}"></span>{{ __('calendar.transfer') }}</span>
-                <span class="flex items-center gap-1.5"><span class="size-2 shrink-0 rounded-full {{ $typeDotClasses['donor'] }}"></span>{{ __('calendar.donor_follow_up') }}</span>
+                @if ($this->canSeeType('proposal'))
+                    <span class="flex items-center gap-1.5"><span class="size-2 shrink-0 rounded-full {{ $typeDotClasses['proposal'] }}"></span>{{ __('calendar.proposal_deadline') }}</span>
+                @endif
+                @if ($this->canSeeType('transfer'))
+                    <span class="flex items-center gap-1.5"><span class="size-2 shrink-0 rounded-full {{ $typeDotClasses['transfer'] }}"></span>{{ __('calendar.transfer') }}</span>
+                @endif
+                @if ($this->canSeeType('donor'))
+                    <span class="flex items-center gap-1.5"><span class="size-2 shrink-0 rounded-full {{ $typeDotClasses['donor'] }}"></span>{{ __('calendar.donor_follow_up') }}</span>
+                @endif
                 <span class="flex items-center gap-1.5"><span class="size-2 shrink-0 rounded-full {{ $typeDotClasses['project'] }}"></span>{{ __('calendar.project_timeline') }}</span>
             </div>
         @endif
@@ -1944,6 +2018,10 @@ new #[Title('titles.calendar')] class extends Component {
                                     <button type="button" wire:click="openEditTaskModal({{ $item['id'] }})" class="block w-full min-w-0 truncate text-start text-xs font-semibold hover:text-primary hover:underline dark:hover:text-status-critical" data-test="calendar-focused-item-{{ $item['id'] }}">
                                         {{ $item['title'] }}
                                     </button>
+                                @elseif ($item['url'] === null)
+                                    <span class="block min-w-0 truncate text-xs font-semibold" data-test="calendar-focused-item-{{ $item['id'] }}">
+                                        {{ $item['title'] }}
+                                    </span>
                                 @else
                                     <a href="{{ $item['url'] }}" wire:navigate class="block min-w-0 truncate text-xs font-semibold hover:text-primary hover:underline dark:hover:text-status-critical" data-test="calendar-focused-item-{{ $item['id'] }}">
                                         {{ $item['title'] }}
@@ -2170,6 +2248,10 @@ new #[Title('titles.calendar')] class extends Component {
                             <button type="button" wire:click="closeDayDetail(); openEditTaskModal({{ $item['id'] }})" class="block w-full min-w-0 truncate text-start text-xs font-semibold hover:text-primary hover:underline dark:hover:text-status-critical" data-test="calendar-daydetail-item-{{ $item['id'] }}">
                                 {{ $item['title'] }}
                             </button>
+                        @elseif ($item['url'] === null)
+                            <span class="block min-w-0 truncate text-xs font-semibold" data-test="calendar-daydetail-item-{{ $item['id'] }}">
+                                {{ $item['title'] }}
+                            </span>
                         @else
                             <a href="{{ $item['url'] }}" wire:navigate class="block min-w-0 truncate text-xs font-semibold hover:text-primary hover:underline dark:hover:text-status-critical" data-test="calendar-daydetail-item-{{ $item['id'] }}">
                                 {{ $item['title'] }}

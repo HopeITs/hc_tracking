@@ -178,7 +178,7 @@ Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () 
         ->name('reports.files.preview');
 
     Route::livewire('admin/notification-settings', 'pages::admin.notification-settings')
-        ->can('manage-notification-settings')
+        ->can('notification-settings.manage')
         ->name('admin.notification-settings.edit');
 
     Route::livewire('activity', 'pages::activity.index')

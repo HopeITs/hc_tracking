@@ -42,7 +42,7 @@ test('guests are redirected from the executive summary', function () {
     $this->get(route('executive-summary.index'))->assertRedirect(route('login'));
 });
 
-test('all authenticated roles can access the executive summary', function (string $roleName) {
+test('only the money-facing roles can access the executive summary', function (string $roleName) {
     $user = User::factory()->role($roleName)->create();
 
     $this->actingAs($user)
@@ -50,10 +50,24 @@ test('all authenticated roles can access the executive summary', function (strin
         ->assertOk()
         ->assertSeeText('Executive Summary');
 })->with([
+    'financial' => 'Financial',
+    'general manager' => 'General Manager',
+    'admin' => 'Super Admin',
+]);
+
+test('every other role is refused the executive summary', function (string $roleName) {
+    $user = User::factory()->role($roleName)->create();
+
+    $this->actingAs($user)
+        ->get(route('executive-summary.index'))
+        ->assertForbidden();
+})->with([
     'team member' => 'Team Member',
+    'media team' => 'Media Team',
+    'public relations' => 'Public Relations',
+    'public relations manager' => 'Public Relations Manager',
     'manager' => 'Managers',
     'meal' => 'MEAL',
-    'admin' => 'Super Admin',
 ]);
 
 test('the fiscal year picker shows the year the page is actually summarising', function () {

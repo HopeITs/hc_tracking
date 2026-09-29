@@ -49,7 +49,25 @@ new #[Title('titles.dashboard')] class extends Component {
      */
     private function visible(Builder $query, string $module): Builder
     {
-        return auth()->user()?->can("{$module}.view") === true ? $query : $query->whereRaw('1 = 0');
+        return $this->canView($module) ? $query : $query->whereRaw('1 = 0');
+    }
+
+    /**
+     * Whether the viewer may open a module, so its sections, tiles and links
+     * render (and its queries run) only for someone who can follow them.
+     */
+    protected function canView(string $module): bool
+    {
+        return auth()->user()?->can("{$module}.view") === true;
+    }
+
+    /**
+     * Whether the funding position may be shown: it sets what agreements
+     * committed against what transfers received, so it needs both modules.
+     */
+    protected function canViewFundingPosition(): bool
+    {
+        return $this->canView('funding-agreements') && $this->canView('transfers');
     }
 
     /**
@@ -105,7 +123,7 @@ new #[Title('titles.dashboard')] class extends Component {
                 href: route('milestones.index', ['project' => $milestone->project_id, 'status' => MilestoneStatus::Planned->value]),
             ));
 
-        $transfers = $this->visible(TransfersTracking::query(), 'transfers')
+        $transfers = ! $this->canView('transfers') ? new Collection : TransfersTracking::query()
             ->select(['id', 'donor_proposal_id', 'payment_amount', 'amount_transfered_currency', 'scheduled_date', 'ar_status'])
             ->with(['donorProposal:id,donor_id,proposal_id', 'donorProposal.donor:id,name', 'donorProposal.proposal:id,name,status'])
             ->where('ar_status', ArStatus::Pending)
@@ -124,7 +142,7 @@ new #[Title('titles.dashboard')] class extends Component {
                 ]),
                 context: $transfer->donorProposal?->proposal?->name ?? '—',
                 daysLate: (int) $transfer->scheduled_date->diffInDays($today),
-                href: route('funding-agreements.show', $transfer->donorProposal),
+                href: $this->transferHref($transfer),
             ));
 
         $risks = $this->visible(Risk::query(), 'risks')
@@ -191,7 +209,9 @@ new #[Title('titles.dashboard')] class extends Component {
         // Organisation-wide: a count on the dashboard is the same for everyone.
         $delivery = $this->visible(Task::query(), 'tasks')->withoutGlobalScope(TaskVisibilityScope::class)->where('status', '!=', TaskStatus::Done)->whereDate('due_date', '<', $today)->count()
             + $this->visible(Milestone::query(), 'milestones')->where('status', MilestoneStatus::Planned)->whereDate('planned_end_date', '<', $today)->count();
-        $funding = $this->visible(TransfersTracking::query(), 'transfers')->where('ar_status', ArStatus::Pending)->whereDate('scheduled_date', '<', $today)->count();
+        $funding = $this->canView('transfers')
+            ? TransfersTracking::query()->where('ar_status', ArStatus::Pending)->whereDate('scheduled_date', '<', $today)->count()
+            : 0;
         $risks = $this->visible(Risk::query(), 'risks')->where('happened', true)->count();
 
         return [
@@ -213,18 +233,22 @@ new #[Title('titles.dashboard')] class extends Component {
     #[Computed]
     public function fundingPosition(): Collection
     {
-        $committed = $this->visible(DonorProposal::query(), 'funding-agreements')
+        if (! $this->canViewFundingPosition()) {
+            return new Collection;
+        }
+
+        $committed = DonorProposal::query()
             ->selectRaw('currency, sum(budget) as total')
             ->groupBy('currency')
             ->pluck('total', 'currency');
 
-        $received = $this->visible(TransfersTracking::query(), 'transfers')
+        $received = TransfersTracking::query()
             ->where('ar_status', ArStatus::Received)
             ->selectRaw('amount_received_currency as currency, sum(net_amount_received) as total')
             ->groupBy('amount_received_currency')
             ->pluck('total', 'currency');
 
-        $pending = $this->visible(TransfersTracking::query(), 'transfers')
+        $pending = TransfersTracking::query()
             ->where('ar_status', ArStatus::Pending)
             ->selectRaw('amount_transfered_currency as currency, sum(payment_amount) as total, count(*) as transfers')
             ->groupBy('amount_transfered_currency')
@@ -267,7 +291,7 @@ new #[Title('titles.dashboard')] class extends Component {
         // figure matches the list it links to.
         $awaitingReview = $this->visible(Report::query(), 'reports')->where('is_seen_by_meal', false)->count();
 
-        return [
+        return array_values(array_filter([
             [
                 'key' => 'active-projects',
                 'label' => __('dashboard.active_projects'),
@@ -276,10 +300,10 @@ new #[Title('titles.dashboard')] class extends Component {
                 'tone' => 'neutral',
                 'href' => route('projects.index', ['status' => ProjectStatus::Active->value]),
             ],
-            [
+            ! $this->canView('proposals') ? null : [
                 'key' => 'open-proposals',
                 'label' => __('dashboard.proposals_in_pipeline'),
-                'value' => $this->visible(Proposal::query(), 'proposals')->whereNotIn('status', [ProposalStatus::Completed, ProposalStatus::Rejected])->count(),
+                'value' => Proposal::query()->whereNotIn('status', [ProposalStatus::Completed, ProposalStatus::Rejected])->count(),
                 'denominator' => null,
                 'tone' => 'funding',
                 'href' => route('proposals.index'),
@@ -300,7 +324,7 @@ new #[Title('titles.dashboard')] class extends Component {
                 'tone' => $awaitingReview > 0 ? 'warn' : 'neutral',
                 'href' => route('reports.index', ['seenByMeal' => 'unseen']),
             ],
-        ];
+        ]));
     }
 
     /**
@@ -362,7 +386,11 @@ new #[Title('titles.dashboard')] class extends Component {
     #[Computed]
     public function pipelineChart(): array
     {
-        $byStatus = $this->visible(Proposal::query(), 'proposals')->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
+        if (! $this->canView('proposals')) {
+            return ['series' => [], 'categories' => []];
+        }
+
+        $byStatus = Proposal::query()->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
 
         // Only open proposals, matching the "Proposals in pipeline" figure: a
         // rejected or completed proposal is no longer in the pipeline, which also
@@ -388,10 +416,14 @@ new #[Title('titles.dashboard')] class extends Component {
     #[Computed]
     public function receiptsChart(): array
     {
+        if (! $this->canView('transfers')) {
+            return ['categories' => [], 'currencies' => []];
+        }
+
         $start = CarbonImmutable::today()->startOfMonth()->subMonths(11);
         $months = collect(range(0, 11))->map(fn (int $offset): CarbonImmutable => $start->addMonths($offset));
 
-        $rows = $this->visible(TransfersTracking::query(), 'transfers')
+        $rows = TransfersTracking::query()
             ->select(['receive_date', 'amount_received_currency', 'net_amount_received'])
             ->where('ar_status', ArStatus::Received)
             ->whereBetween('receive_date', [$start->toDateString(), CarbonImmutable::today()->toDateString()])
@@ -444,7 +476,7 @@ new #[Title('titles.dashboard')] class extends Component {
                 'href' => route('milestones.index', ['project' => $milestone->project_id]),
             ]);
 
-        $transfers = $this->visible(TransfersTracking::query(), 'transfers')
+        $transfers = ! $this->canView('transfers') ? new Collection : TransfersTracking::query()
             ->select(['id', 'donor_proposal_id', 'payment_amount', 'amount_transfered_currency', 'scheduled_date'])
             ->with(['donorProposal:id,donor_id', 'donorProposal.donor:id,name'])
             ->where('ar_status', ArStatus::Pending)
@@ -463,7 +495,7 @@ new #[Title('titles.dashboard')] class extends Component {
                     'donor' => $transfer->donorProposal?->donor?->name ?? '—',
                 ]),
                 'context' => __('dashboard.scheduled_transfer'),
-                'href' => route('funding-agreements.show', $transfer->donorProposal),
+                'href' => $this->transferHref($transfer),
             ]);
 
         $tasks = $this->visible(Task::query(), 'tasks')
@@ -519,7 +551,7 @@ new #[Title('titles.dashboard')] class extends Component {
     #[Computed]
     public function activity(): Collection
     {
-        $notes = $this->visible(ProposalStatusNote::query(), 'proposals')
+        $notes = ! $this->canView('proposals') ? new Collection : ProposalStatusNote::query()
             ->select(['id', 'proposal_id', 'status', 'date'])
             ->with('proposal:id,name')
             ->latest('date')
@@ -555,6 +587,17 @@ new #[Title('titles.dashboard')] class extends Component {
             ->sortByDesc(fn (array $item): int => $item['at']->getTimestamp())
             ->take(7)
             ->values();
+    }
+
+    /**
+     * Where a transfer row leads: its funding agreement for someone who may open
+     * agreements, otherwise the transfers list they are allowed to see.
+     */
+    private function transferHref(TransfersTracking $transfer): string
+    {
+        return $this->canView('funding-agreements')
+            ? route('funding-agreements.show', $transfer->donorProposal)
+            : route('transfers.index');
     }
 
     /**
@@ -632,12 +675,23 @@ new #[Title('titles.dashboard')] class extends Component {
         'funding' => 'text-funding dark:text-white',
         default => 'text-secondary-dark dark:text-white',
     };
+    $canViewProposals = $this->canView('proposals');
+    $canViewTransfers = $this->canView('transfers');
+    $canViewFundingPosition = $this->canViewFundingPosition();
     $focusTabs = [
         'all' => __('dashboard.all'),
         'delivery' => __('dashboard.delivery'),
-        'funding' => __('dashboard.funding'),
+        ...($canViewTransfers ? ['funding' => __('dashboard.funding')] : []),
         'risks' => __('dashboard.risks'),
     ];
+    // The chart row shares twelve columns between the panels this viewer may see.
+    $chartPanels = 1 + (int) $canViewProposals + (int) $canViewTransfers;
+    $chartSpan = match ($chartPanels) {
+        3 => '@5xl/dashboard:col-span-4',
+        2 => '@5xl/dashboard:col-span-6',
+        default => '@5xl/dashboard:col-span-12',
+    };
+    $receiptsSpan = $chartPanels === 3 ? '@3xl/dashboard:col-span-2 @5xl/dashboard:col-span-4' : $chartSpan;
     $hiddenCounts = collect($focusTabs)->map(fn (string $label, string $key): int => max(0, $counts[$key] - $shown[$key]))->all();
     $receipts = $this->receiptsChart;
 @endphp
@@ -696,7 +750,11 @@ new #[Title('titles.dashboard')] class extends Component {
     <div class="grid grid-cols-1 gap-4 @3xl/dashboard:grid-cols-6 @5xl/dashboard:grid-cols-12">
         {{-- Needs attention: every row renders once, the filter only hides rows in the browser --}}
         <section
-            class="{{ $cardClasses }} flex min-w-0 flex-col @3xl/dashboard:col-span-6 @5xl/dashboard:col-span-7 @5xl/dashboard:row-span-2"
+            @class([
+                $cardClasses,
+                'flex min-w-0 flex-col @3xl/dashboard:col-span-6 @5xl/dashboard:col-span-7',
+                '@5xl/dashboard:row-span-2' => $canViewFundingPosition,
+            ])
             aria-labelledby="attention-heading"
             x-data="{ focus: 'all' }"
             data-attention
@@ -790,7 +848,8 @@ new #[Title('titles.dashboard')] class extends Component {
             @endforeach
         </section>
 
-        {{-- Funding position --}}
+        {{-- Funding position: agreements against transfers, only for someone who may open both --}}
+        @if ($canViewFundingPosition)
         <section class="{{ $cardClasses }} flex min-w-0 flex-col @3xl/dashboard:col-span-3 @5xl/dashboard:col-span-5" aria-labelledby="funding-heading" data-funding-position>
             <div class="flex items-start justify-between gap-3 px-5 pt-4 pb-2">
                 <div class="min-w-0">
@@ -844,22 +903,34 @@ new #[Title('titles.dashboard')] class extends Component {
                 </ul>
             @endif
         </section>
+        @endif
 
         {{-- Portfolio pulse --}}
-        <section class="{{ $cardClasses }} grid min-w-0 grid-cols-2 @3xl/dashboard:col-span-3 @5xl/dashboard:col-span-5" aria-label="{{ __('dashboard.portfolio_pulse') }}" data-pulse>
+        <section @class([
+            $cardClasses,
+            'grid min-w-0 grid-cols-2 @5xl/dashboard:col-span-5',
+            '@3xl/dashboard:col-span-3' => $canViewFundingPosition,
+            '@3xl/dashboard:col-span-6' => ! $canViewFundingPosition,
+        ]) aria-label="{{ __('dashboard.portfolio_pulse') }}" data-pulse>
             @foreach ($this->pulse as $figure)
+                @php
+                    // With an odd number of tiles the last one spans the full row.
+                    $spansRow = $loop->last && $loop->count % 2 === 1;
+                    $lastRowStart = $loop->count - ($loop->count % 2 === 0 ? 2 : 1);
+                @endphp
                 <a
                     href="{{ $figure['href'] }}"
                     wire:navigate
                     wire:key="pulse-{{ $figure['key'] }}"
                     @class([
                         'group flex flex-col justify-between gap-3 p-4 transition-colors duration-150 hover:bg-board-head focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary @5xl/dashboard:p-5',
-                        'border-e border-secondary-soft dark:border-secondary-medium' => $loop->odd,
-                        'border-b border-secondary-soft dark:border-secondary-medium' => $loop->index < 2,
+                        'col-span-2' => $spansRow,
+                        'border-e border-secondary-soft dark:border-secondary-medium' => $loop->odd && ! $spansRow,
+                        'border-b border-secondary-soft dark:border-secondary-medium' => $loop->index < $lastRowStart,
                         'rounded-ss-xl' => $loop->index === 0,
                         'rounded-se-xl' => $loop->index === 1,
-                        'rounded-es-xl' => $loop->index === 2,
-                        'rounded-ee-xl' => $loop->index === 3,
+                        'rounded-es-xl' => $loop->index === $lastRowStart,
+                        'rounded-ee-xl' => $loop->last,
                     ])
                 >
                     <span class="text-xs font-medium leading-snug text-secondary-medium dark:text-secondary-soft">{{ $figure['label'] }}</span>
@@ -877,7 +948,7 @@ new #[Title('titles.dashboard')] class extends Component {
 
     {{-- Charts --}}
     <div class="grid grid-cols-1 gap-4 @3xl/dashboard:grid-cols-2 @5xl/dashboard:grid-cols-12">
-        <x-ui.panel :title="__('dashboard.projects_by_status')" :subtitle="__('dashboard.projects_by_status_hint')" class="min-w-0 @5xl/dashboard:col-span-4">
+        <x-ui.panel :title="__('dashboard.projects_by_status')" :subtitle="__('dashboard.projects_by_status_hint')" class="min-w-0 {{ $chartSpan }}">
             @php $projectChart = $this->projectStatusChart; @endphp
             <div class="px-4 pt-4 pb-3">
                 <x-ui.chart
@@ -912,7 +983,8 @@ new #[Title('titles.dashboard')] class extends Component {
             </div>
         </x-ui.panel>
 
-        <x-ui.panel :title="__('dashboard.proposal_pipeline')" :subtitle="__('dashboard.proposal_pipeline_hint')" class="min-w-0 @5xl/dashboard:col-span-4">
+        @if ($canViewProposals)
+        <x-ui.panel :title="__('dashboard.proposal_pipeline')" :subtitle="__('dashboard.proposal_pipeline_hint')" class="min-w-0 {{ $chartSpan }}">
             <x-slot:toolbar>
                 <a href="{{ route('proposals.index') }}" wire:navigate class="rounded-md text-xs font-semibold text-secondary-medium underline-offset-4 hover:text-secondary-dark hover:underline focus-visible:outline-2 focus-visible:outline-primary dark:text-secondary-soft dark:hover:text-white">{{ __('dashboard.view_proposals') }}</a>
             </x-slot:toolbar>
@@ -931,8 +1003,10 @@ new #[Title('titles.dashboard')] class extends Component {
                 />
             </div>
         </x-ui.panel>
+        @endif
 
-        <x-ui.panel :title="__('dashboard.received_per_month')" :subtitle="__('dashboard.received_per_month_hint')" class="min-w-0 @3xl/dashboard:col-span-2 @5xl/dashboard:col-span-4">
+        @if ($canViewTransfers)
+        <x-ui.panel :title="__('dashboard.received_per_month')" :subtitle="__('dashboard.received_per_month_hint')" class="min-w-0 {{ $receiptsSpan }}">
             <div class="px-2 pt-3 pb-2" x-data="{ currency: @js($receipts['currencies'][0]['currency'] ?? null) }">
                 @if (count($receipts['currencies']) === 0)
                     <x-ui.chart type="bar" :label="__('dashboard.received_per_month')" :series="[]" :categories="$receipts['categories']" :height="268" :empty="__('dashboard.no_receipts_yet')" />
@@ -973,6 +1047,7 @@ new #[Title('titles.dashboard')] class extends Component {
                 @endif
             </div>
         </x-ui.panel>
+        @endif
     </div>
 
     {{-- Next 30 days and recent activity --}}

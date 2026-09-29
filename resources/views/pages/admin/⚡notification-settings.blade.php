@@ -62,7 +62,7 @@ new #[Title('titles.notification_rules')] class extends Component {
 
     public function save(NotificationSettings $settings): void
     {
-        Gate::authorize('manage-notification-settings');
+        Gate::authorize('notification-settings.manage');
 
         $validated = $this->validate([
             'workingDays' => ['required', 'array', 'min:1', function (string $attribute, mixed $value, Closure $fail): void {

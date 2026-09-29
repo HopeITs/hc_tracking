@@ -15,6 +15,16 @@ test('only administrators open notification settings', function (string $role, i
     ['Managers', 403],
 ]);
 
+test('a general manager who is given the permission directly opens notification settings', function () {
+    $generalManager = userWithRole('General Manager');
+
+    $this->actingAs($generalManager)->get(route('admin.notification-settings.edit'))->assertForbidden();
+
+    $generalManager->givePermissionTo('notification-settings.manage');
+
+    $this->actingAs($generalManager->fresh())->get(route('admin.notification-settings.edit'))->assertOk();
+});
+
 test('an administrator changes thresholds and working days and they take effect', function () {
     Livewire::actingAs(userWithRole('Super Admin'))->test('pages::admin.notification-settings')
         ->assertSet('workingDays', [1, 2, 3, 4, 5])

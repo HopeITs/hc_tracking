@@ -88,9 +88,55 @@ new #[Title('titles.project')] class extends Component {
         $this->projectId = $project->id;
     }
 
+    /**
+     * Whether the viewer may see funding agreements and the budgets on them.
+     */
+    protected function canViewAgreements(): bool
+    {
+        return auth()->user()?->can('funding-agreements.view') ?? false;
+    }
+
+    /**
+     * Whether the viewer may see the money on this page: committed and
+     * received figures need both the agreements (budgets) and the transfers
+     * (amounts received).
+     */
+    protected function canViewMoney(): bool
+    {
+        return $this->canViewAgreements() && (auth()->user()?->can('transfers.view') ?? false);
+    }
+
+    /**
+     * Whether the viewer may open a proposal's page, so its name links there.
+     */
+    protected function canViewProposals(): bool
+    {
+        return auth()->user()?->can('proposals.view') ?? false;
+    }
+
+    /**
+     * The file collections this viewer may not see: signed agreements and
+     * MOUs are agreement data, so they need funding-agreements.view.
+     *
+     * @return list<string>
+     */
+    protected function hiddenCollections(): array
+    {
+        if ($this->canViewAgreements()) {
+            return [];
+        }
+
+        return array_values(array_map(
+            fn (MediaCollection $collection): string => $collection->value,
+            array_filter(MediaCollection::cases(), fn (MediaCollection $collection): bool => $collection->isFundingPaper()),
+        ));
+    }
+
     #[Computed]
     public function project(): Project
     {
+        $hiddenCollections = $this->hiddenCollections();
+
         return Project::query()
             ->select([
                 'id',
@@ -117,6 +163,7 @@ new #[Title('titles.project')] class extends Component {
                 'user:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
                 'media' => fn ($query) => $query
                     ->select(['id', 'mediable_type', 'mediable_id', 'collection', 'original_name', 'type', 'size', 'uploaded_at', 'uploaded_by'])
+                    ->whereNotIn('collection', $hiddenCollections)
                     ->with('uploader:id,hr_user_id')
                     ->orderByDesc('uploaded_at')
                     ->orderByDesc('id'),
@@ -126,7 +173,7 @@ new #[Title('titles.project')] class extends Component {
                 'milestones',
                 'planIndicators',
                 'proposals',
-                'media',
+                'media' => fn ($query) => $query->whereNotIn('collection', $hiddenCollections),
                 'milestones as reached_milestones_count' => fn ($query) => $query->where('status', MilestoneStatus::Reached->value),
             ])
             ->withSum(['milestones as milestones_reached_weight' => fn ($query) => $query->where('status', MilestoneStatus::Reached->value)], 'weight_percentage')
@@ -354,10 +401,14 @@ new #[Title('titles.project')] class extends Component {
      */
     private function projectFile(int $mediaId): Media
     {
-        return Media::query()
+        $media = Media::query()
             ->where('mediable_type', 'project')
             ->where('mediable_id', $this->projectId)
             ->findOrFail($mediaId);
+
+        abort_if(in_array($media->collection->value, $this->hiddenCollections(), true), 403);
+
+        return $media;
     }
 
     /**
@@ -429,6 +480,8 @@ new #[Title('titles.project')] class extends Component {
                 'fileCategory.required' => __('projects.select_a_file_category'),
             ]);
 
+            abort_if(in_array($validated['fileCategory'], $this->hiddenCollections(), true), 403);
+
             $path = $this->newFile->store('media/projects/'.$this->projectId, 'local');
             $type = FileType::from(strtolower($this->newFile->getClientOriginalExtension()));
             $displayName = trim((string) ($validated['fileDisplayName'] ?? ''));
@@ -459,6 +512,8 @@ new #[Title('titles.project')] class extends Component {
             ], [
                 'fileCategory.required' => __('projects.select_a_file_category'),
             ]);
+
+            abort_if(in_array($validated['fileCategory'], $this->hiddenCollections(), true), 403);
 
             $media->update([
                 'collection' => $validated['fileCategory'],
@@ -528,12 +583,18 @@ new #[Title('titles.project')] class extends Component {
     /**
      * Committed vs. received money for this project, grouped by currency,
      * across every donor proposal signed against every linked proposal.
+     * Empty unless the viewer holds both funding-agreements.view and
+     * transfers.view.
      *
      * @return \Illuminate\Support\Collection<string, array{currency: \App\Enums\Currency, committed: float, received: float}>
      */
     #[Computed]
     public function fundingByCurrency(): \Illuminate\Support\Collection
     {
+        if (! $this->canViewMoney()) {
+            return collect();
+        }
+
         return DonorProposal::query()
             ->select(['id', 'proposal_id', 'currency', 'budget'])
             ->whereHas('proposal.projects', fn ($query) => $query->whereKey($this->projectId))
@@ -632,24 +693,25 @@ new #[Title('titles.project')] class extends Component {
     }
 
     /**
-     * Every proposal funding this project, with the donor agreements behind
-     * each one eager loaded so the connections view (donors, committed and
-     * received amounts) costs no extra queries per card.
+     * Every proposal funding this project. Donor names always come along; the
+     * agreements and transfers behind them (budgets, amounts received) are
+     * eager loaded only for a viewer holding both funding-agreements.view and
+     * transfers.view, so the connections view costs no extra queries per card.
      *
      * @return Collection<int, Proposal>
      */
     #[Computed]
     public function attachedProposals(): Collection
     {
+        $canViewMoney = $this->canViewMoney();
+
         return $this->project->proposals()
             ->select(['proposals.id', 'proposals.name', 'proposals.status', 'proposals.planned_date_begin', 'proposals.planned_date_end'])
-            ->with(['donorProposals' => fn ($query) => $query
+            ->with('donorNames:id,name')
+            ->when($canViewMoney, fn ($query) => $query->with(['donorProposals' => fn ($query) => $query
                 ->select(['id', 'proposal_id', 'donor_id', 'currency', 'budget'])
-                ->with([
-                    'donor:id,name',
-                    'transfers:id,donor_proposal_id,net_amount_received',
-                ]),
-            ])
+                ->with('transfers:id,donor_proposal_id,net_amount_received'),
+            ]))
             ->orderBy('proposals.name')
             ->orderBy('proposals.id')
             ->get();
@@ -664,6 +726,10 @@ new #[Title('titles.project')] class extends Component {
      */
     protected function proposalFunding(Proposal $proposal): \Illuminate\Support\Collection
     {
+        if (! $this->canViewMoney()) {
+            return collect();
+        }
+
         return $proposal->donorProposals
             ->groupBy(fn (DonorProposal $donorProposal) => $donorProposal->currency->value)
             ->map(fn (Collection $group) => [
@@ -679,12 +745,15 @@ new #[Title('titles.project')] class extends Component {
      * and how many proposals are currently in implementation or monitoring —
      * the headline numbers a fundraising manager scans first.
      *
+     * The donor and agreement counts are funding stats and stay zero unless
+     * the viewer holds both funding-agreements.view and transfers.view.
+     *
      * @return array{donors: int, agreements: int, underway: int}
      */
     #[Computed]
     public function proposalsSummary(): array
     {
-        $agreements = $this->attachedProposals->flatMap->donorProposals;
+        $agreements = $this->canViewMoney() ? $this->attachedProposals->flatMap->donorProposals : collect();
 
         return [
             'donors' => $agreements->pluck('donor_id')->unique()->count(),
@@ -821,7 +890,7 @@ new #[Title('titles.project')] class extends Component {
         <x-ui.stat-tile :label="__('projects.demographic_total')" :value="$this->project->targetDemographicTotal() === null ? '—' : number_format($this->project->targetDemographicTotal())" />
     </div>
 
-    <div class="grid gap-4 @5xl/detail:grid-cols-3">
+    <div @class(['grid gap-4', '@5xl/detail:grid-cols-3' => $this->canViewMoney(), '@5xl/detail:grid-cols-2' => ! $this->canViewMoney()])>
         <x-ui.panel :title="__('common.description')">
             @if ($this->project->description === null)
                 <p class="p-3.5 text-sm italic text-secondary-medium dark:text-secondary-soft">{{ __('projects.no_description_recorded') }}</p>
@@ -851,17 +920,19 @@ new #[Title('titles.project')] class extends Component {
             </div>
         </x-ui.panel>
 
-        <x-ui.panel :title="__('projects.funding_envelope')">
-            @if ($this->fundingByCurrency->isEmpty())
-                <x-ui.empty-state icon="banknotes" :heading="__('projects.not_funded_yet')" :body="__('projects.link_a_proposal_to_record_which_funding_covers_this_project')" />
-            @else
-                <div class="flex flex-col gap-4 p-3.5">
-                    @foreach ($this->fundingByCurrency as $row)
-                        <x-ui.capacity-bar :committed="$row['committed']" :used="$row['received']" :currency="$row['currency']" wire:key="funding-{{ $row['currency']->value }}" />
-                    @endforeach
-                </div>
-            @endif
-        </x-ui.panel>
+        @if ($this->canViewMoney())
+            <x-ui.panel :title="__('projects.funding_envelope')">
+                @if ($this->fundingByCurrency->isEmpty())
+                    <x-ui.empty-state icon="banknotes" :heading="__('projects.not_funded_yet')" :body="__('projects.link_a_proposal_to_record_which_funding_covers_this_project')" />
+                @else
+                    <div class="flex flex-col gap-4 p-3.5">
+                        @foreach ($this->fundingByCurrency as $row)
+                            <x-ui.capacity-bar :committed="$row['committed']" :used="$row['received']" :currency="$row['currency']" wire:key="funding-{{ $row['currency']->value }}" />
+                        @endforeach
+                    </div>
+                @endif
+            </x-ui.panel>
+        @endif
     </div>
 
     <x-ui.relation-tabs :tabs="$this->tabs" :active="$tab" wire-target="tab" />
@@ -1087,9 +1158,11 @@ new #[Title('titles.project')] class extends Component {
                 <x-ui.empty-state icon="document-text" :heading="__('projects.no_proposals_linked')" :body="__('projects.link_a_proposal_to_record_which_funding_covers_this_project')" />
             @else
                 @php $summary = $this->proposalsSummary; @endphp
-                <div class="grid gap-3 border-b border-secondary-soft p-3.5 @lg/detail:grid-cols-3 dark:border-secondary-medium">
-                    <x-ui.stat-tile :label="__('projects.stat_donors_funding')" :value="$summary['donors']" icon="building-library" />
-                    <x-ui.stat-tile :label="__('projects.stat_funding_agreements')" :value="$summary['agreements']" icon="document-check" />
+                <div @class(['grid gap-3 border-b border-secondary-soft p-3.5 dark:border-secondary-medium', '@lg/detail:grid-cols-3' => $this->canViewMoney()])>
+                    @if ($this->canViewMoney())
+                        <x-ui.stat-tile :label="__('projects.stat_donors_funding')" :value="$summary['donors']" icon="building-library" />
+                        <x-ui.stat-tile :label="__('projects.stat_funding_agreements')" :value="$summary['agreements']" icon="document-check" />
+                    @endif
                     <x-ui.stat-tile :label="__('projects.stat_proposals_underway')" :value="$summary['underway']" icon="signal" :tone="$summary['underway'] > 0 ? 'good' : null" />
                 </div>
 
@@ -1101,7 +1174,11 @@ new #[Title('titles.project')] class extends Component {
                         >
                             <div class="flex items-start justify-between gap-3">
                                 <div class="min-w-0">
-                                    <a href="{{ route('proposals.show', $proposal) }}" wire:navigate class="truncate text-base font-bold text-secondary-dark hover:underline dark:text-white">{{ $proposal->name }}</a>
+                                    @if ($this->canViewProposals())
+                                        <a href="{{ route('proposals.show', $proposal) }}" wire:navigate class="truncate text-base font-bold text-secondary-dark hover:underline dark:text-white">{{ $proposal->name }}</a>
+                                    @else
+                                        <p class="truncate text-base font-bold text-secondary-dark dark:text-white">{{ $proposal->name }}</p>
+                                    @endif
                                     <p class="mt-1 flex items-center gap-1.5 text-xs text-secondary-medium dark:text-secondary-soft">
                                         <flux:icon name="calendar-days" variant="micro" class="size-3.5 shrink-0" />
                                         <span class="tabular-nums">{{ $proposal->planned_date_begin?->translatedFormat(__('formats.date')) }} – {{ $proposal->planned_date_end?->translatedFormat(__('formats.date')) }}</span>
@@ -1126,17 +1203,17 @@ new #[Title('titles.project')] class extends Component {
                                 </span>
                             </div>
 
-                            @if ($proposal->donorProposals->isEmpty())
+                            @if ($proposal->donorNames->isEmpty())
                                 <p class="type-meta border-t border-secondary-soft pt-3 italic text-secondary-medium dark:border-secondary-medium dark:text-secondary-soft">
                                     {{ __('projects.no_funding_agreement_recorded_yet') }}
                                 </p>
                             @else
                                 <div class="flex flex-col gap-3 border-t border-secondary-soft pt-3 dark:border-secondary-medium">
                                     <div class="flex flex-wrap items-center gap-1.5">
-                                        @foreach ($proposal->donorProposals->unique('donor_id') as $agreement)
-                                            <span class="inline-flex items-center gap-1 rounded-full border border-secondary-light bg-board px-2 py-0.5 text-[11px] font-semibold text-secondary-dark dark:border-secondary-medium dark:text-white" wire:key="proposal-{{ $proposal->id }}-donor-{{ $agreement->donor_id }}">
+                                        @foreach ($proposal->donorNames->unique('id') as $donor)
+                                            <span class="inline-flex items-center gap-1 rounded-full border border-secondary-light bg-board px-2 py-0.5 text-[11px] font-semibold text-secondary-dark dark:border-secondary-medium dark:text-white" wire:key="proposal-{{ $proposal->id }}-donor-{{ $donor->id }}">
                                                 <flux:icon name="building-library" variant="micro" class="size-3 shrink-0 text-secondary-medium dark:text-secondary-soft" />
-                                                {{ $agreement->donor->name }}
+                                                {{ $donor->name }}
                                             </span>
                                         @endforeach
                                     </div>
@@ -1172,6 +1249,7 @@ new #[Title('titles.project')] class extends Component {
                 <div class="grid grid-cols-2 gap-x-4 gap-y-4">
                     <x-ui.form-select wire:model="fileCategory" :label="__('projects.file_category')" :placeholder="__('common.select')" required>
                         @foreach (\App\Enums\MediaCollection::cases() as $collectionOption)
+                            @continue(in_array($collectionOption->value, $this->hiddenCollections(), true))
                             <flux:select.option :value="$collectionOption->value">{{ $collectionOption->label() }}</flux:select.option>
                         @endforeach
                     </x-ui.form-select>

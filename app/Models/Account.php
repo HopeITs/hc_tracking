@@ -117,6 +117,18 @@ class Account extends Model implements TracksActivity
     }
 
     /**
+     * The account number with everything but its last four characters hidden,
+     * for people who may see the account but not change it. A number of four
+     * characters or fewer is hidden completely.
+     */
+    public function maskedAccountNumber(): string
+    {
+        $number = (string) $this->account_number;
+
+        return Str::length($number) > 4 ? '•••• '.Str::substr($number, -4) : '••••';
+    }
+
+    /**
      * Whether this account can still receive a transfer.
      */
     public function isUsable(): bool

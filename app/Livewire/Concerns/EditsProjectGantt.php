@@ -15,6 +15,7 @@ use Flux\Flux;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
+use Livewire\Attributes\Locked;
 
 /**
  * The write side of the project Gantt: every edit the chart makes lands here —
@@ -40,6 +41,7 @@ use Illuminate\Support\Facades\Validator;
  */
 trait EditsProjectGantt
 {
+    #[Locked]
     public ?int $ganttBaselineId = null;
 
     /**

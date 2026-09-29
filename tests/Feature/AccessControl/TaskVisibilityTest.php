@@ -5,12 +5,13 @@ use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Task;
 use App\Models\TaskAttachment;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Livewire;
 
 use function Livewire\invade;
 
 beforeEach(function () {
-    $media = insertHrDepartment('Media');
+    $this->mediaDepartment = $media = insertHrDepartment('Media');
     $finance = insertHrDepartment('Finance');
     $this->mediaEmployee = insertHrEmployee(firstNameEn: 'Media', lastNameEn: 'Person');
     insertHrContract($this->mediaEmployee, insertHrPosition($media));
@@ -98,7 +99,7 @@ test('proposal progress counts every task, including hidden ones', function () {
     $proposal = Proposal::factory()->create();
     $this->financeTask->update(['source_type' => 'proposal', 'source_id' => $proposal->id]);
 
-    $row = Livewire::actingAs($this->member)->test('pages::proposals.index')->instance()->proposals->firstWhere('id', $proposal->id);
+    $row = Livewire::actingAs(userWithRole('Public Relations Manager', $this->mediaEmployee))->test('pages::proposals.index')->instance()->proposals->firstWhere('id', $proposal->id);
 
     expect($row->tasks_count)->toBe(1);
 });
@@ -107,4 +108,24 @@ test('a milestone whose only task is hidden still cannot be deleted', function (
     $page = invade(Livewire::actingAs($this->member)->test('pages::milestones.index')->instance());
 
     expect($page->canDelete($this->milestone->id))->toBeFalse();
+});
+
+test('a department-limited editor edits own and department tasks, and only views owned-project tasks', function () {
+    $editor = userWithRole('Media Team', $this->mediaEmployee);
+    $this->project->update(['user_id' => $this->mediaEmployee]);
+    $colleague = insertHrEmployee(firstNameEn: 'Media', lastNameEn: 'Colleague');
+    insertHrContract($colleague, insertHrPosition($this->mediaDepartment));
+    $departmentTask = Task::factory()->create(['title' => 'Media department task']);
+    $departmentTask->taskAssignees()->delete();
+    $departmentTask->taskAssignees()->create(['employee_id' => $colleague]);
+    $gate = Gate::forUser($editor->fresh());
+
+    expect($gate->allows('update', $departmentTask))->toBeTrue()
+        ->and($gate->allows('view', $this->financeTask))->toBeTrue()
+        ->and($gate->allows('update', $this->financeTask))->toBeFalse()
+        ->and($gate->allows('updateStatus', $this->financeTask))->toBeFalse();
+});
+
+test('Managers edit tasks in every department', function () {
+    expect(Gate::forUser(userWithRole('Managers'))->allows('update', $this->financeTask))->toBeTrue();
 });

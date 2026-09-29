@@ -34,7 +34,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
@@ -128,7 +127,6 @@ class AppServiceProvider extends ServiceProvider
         $this->configureDefaults();
         $this->configureHttps();
         $this->configureMorphMap();
-        $this->configureGates();
         $this->configureLivewire();
         $this->configureRateLimiting();
     }
@@ -170,14 +168,6 @@ class AppServiceProvider extends ServiceProvider
     protected function configureFortifyActions(): void
     {
         $this->app->bind(DisableTwoFactorAuthentication::class, DisableTwoFactorAuthenticationUnlessRequired::class);
-    }
-
-    /**
-     * Abilities that are role-based rather than permission-based.
-     */
-    protected function configureGates(): void
-    {
-        Gate::define('manage-notification-settings', fn (User $user): bool => $user->hasAnyRole(config('access-control.administrator_roles')));
     }
 
     /**

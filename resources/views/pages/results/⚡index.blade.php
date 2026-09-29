@@ -131,7 +131,7 @@ new #[Title('titles.results_framework')] class extends Component {
                         // can resolve to null; the view renders that explicitly.
                         'planIndicators.source' => fn (MorphTo $morphTo) => $morphTo->morphWith([
                             AnnualPlan::class => [],
-                            Proposal::class => ['donors'],
+                            Proposal::class => ['donorNames:id,name'],
                         ]),
                     ])
                     ->orderBy('name')
@@ -197,7 +197,7 @@ new #[Title('titles.results_framework')] class extends Component {
                 default => null,
             },
             'donors' => $source instanceof Proposal
-                ? $source->donors->pluck('name')->values()->all()
+                ? $source->donorNames->pluck('name')->values()->all()
                 : [],
             'project' => $target->project?->name,
             'reports' => $target->reports->count(),

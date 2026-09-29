@@ -13,6 +13,7 @@
     $dayDonorReports = $calendar['donorReportsByDay']->get($dateKey, new \Illuminate\Support\Collection);
     $dayProjectStarts = $calendar['projectStartsByDay']->get($dateKey, new \Illuminate\Support\Collection);
     $dayProjectEnds = $calendar['projectEndsByDay']->get($dateKey, new \Illuminate\Support\Collection);
+    $canOpenAgreement = auth()->user()->can('funding-agreements.view');
 @endphp
 
 @foreach ($dayMilestones as $milestone)
@@ -81,8 +82,7 @@
 
 @foreach ($dayTransfers as $transfer)
     <a
-        href="{{ route('funding-agreements.show', $transfer->donorProposal) }}"
-        wire:navigate
+        @if ($canOpenAgreement) href="{{ route('funding-agreements.show', $transfer->donorProposal) }}" wire:navigate @endif
         wire:key="calendar-transfer-{{ $transfer->id }}"
         x-on:click.stop
         class="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] {{ $transferTone($transfer->ar_status) }}"

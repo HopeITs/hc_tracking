@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\MediaCollection;
 use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\RagStatus;
@@ -320,6 +321,34 @@ new #[Title('titles.projects')] class extends Component {
         };
     }
 
+    /**
+     * Whether the viewer may see committed budgets and currencies. They are
+     * agreement data, so they need funding-agreements.view; donor and proposal
+     * names stay visible either way.
+     */
+    protected function canViewMoney(): bool
+    {
+        return auth()->user()?->can('funding-agreements.view') ?? false;
+    }
+
+    /**
+     * The file collections this viewer may not count: signed agreements and
+     * MOUs are agreement data, so they need funding-agreements.view.
+     *
+     * @return list<string>
+     */
+    protected function hiddenCollections(): array
+    {
+        if (auth()->user()?->can('funding-agreements.view') ?? false) {
+            return [];
+        }
+
+        return array_values(array_map(
+            fn (MediaCollection $collection): string => $collection->value,
+            array_filter(MediaCollection::cases(), fn (MediaCollection $collection): bool => $collection->isFundingPaper()),
+        ));
+    }
+
     /** @return LengthAwarePaginator<int, Project> */
     #[Computed]
     public function projects(): LengthAwarePaginator
@@ -361,7 +390,7 @@ new #[Title('titles.projects')] class extends Component {
                 'planIndicators',
                 'proposals',
                 'indicators',
-                'media',
+                'media' => fn ($query) => $query->whereNotIn('collection', $this->hiddenCollections()),
                 'risks as materialised_risks_count' => fn ($query) => $query->where('happened', true),
                 'milestones as reached_milestones_count' => fn ($query) => $query->where('status', MilestoneStatus::Reached->value),
             ])
@@ -459,6 +488,10 @@ new #[Title('titles.projects')] class extends Component {
     #[Computed]
     public function committedFunding(): array
     {
+        if (! $this->canViewMoney()) {
+            return [];
+        }
+
         $projectIds = $this->applyFilters(Project::query())->toBase()->select('projects.id');
 
         return DB::table('donor_proposal')
@@ -500,6 +533,8 @@ new #[Title('titles.projects')] class extends Component {
             return [];
         }
 
+        $canViewMoney = $this->canViewMoney();
+
         $rows = DB::table('project_proposal')
             ->join('donor_proposal', 'donor_proposal.proposal_id', '=', 'project_proposal.proposal_id')
             ->join('donors', 'donors.id', '=', 'donor_proposal.donor_id')
@@ -508,11 +543,13 @@ new #[Title('titles.projects')] class extends Component {
             ->select([
                 'project_proposal.project_id',
                 'project_proposal.proposal_id',
-                'donor_proposal.currency',
-                'donor_proposal.budget',
                 'donors.name as donor_name',
                 'proposals.name as proposal_name',
             ])
+            ->when($canViewMoney, fn ($query) => $query->addSelect([
+                'donor_proposal.currency',
+                'donor_proposal.budget',
+            ]))
             ->selectSub(
                 DB::table('project_proposal as shares')
                     ->selectRaw('count(*)')
@@ -527,7 +564,11 @@ new #[Title('titles.projects')] class extends Component {
             $projectId = (int) $row->project_id;
 
             $funding[$projectId] ??= ['currencies' => [], 'donors' => [], 'proposals' => [], 'shared' => 0];
-            $funding[$projectId]['currencies'][$row->currency] = ($funding[$projectId]['currencies'][$row->currency] ?? 0.0) + (float) $row->budget;
+
+            if ($canViewMoney) {
+                $funding[$projectId]['currencies'][$row->currency] = ($funding[$projectId]['currencies'][$row->currency] ?? 0.0) + (float) $row->budget;
+            }
+
             $funding[$projectId]['shared'] = max($funding[$projectId]['shared'], (int) $row->share_count - 1);
 
             if (! in_array($row->donor_name, $funding[$projectId]['donors'], true)) {
@@ -873,6 +914,7 @@ new #[Title('titles.projects')] class extends Component {
     $statusCounts = $this->statusCounts;
     $triageCounts = $this->triageCounts;
     $fundingByProject = $this->fundingByProject;
+    $canViewMoney = $this->canViewMoney();
     $projects = $this->projects;
 
     $loadingTargets = 'search, city, program, owner, status, lens, sort, view, toggleStatus, toggleLens, clearFilters, gotoPage, nextPage, previousPage';
@@ -1076,7 +1118,12 @@ new #[Title('titles.projects')] class extends Component {
         <section aria-labelledby="portfolio-figures-heading">
             <h2 id="portfolio-figures-heading" class="type-label mb-2 text-secondary-medium dark:text-secondary-soft">{{ __('projects.group_portfolio') }}</h2>
 
-            <div class="grid min-h-[calc(100%-1.75rem)] grid-cols-2 gap-px overflow-hidden rounded-xl border border-secondary-soft bg-secondary-soft dark:border-secondary-medium dark:bg-secondary-medium">
+            <div @class([
+                'grid min-h-[calc(100%-1.75rem)] gap-px overflow-hidden rounded-xl border border-secondary-soft bg-secondary-soft dark:border-secondary-medium dark:bg-secondary-medium',
+                'grid-cols-2' => $canViewMoney,
+                'grid-cols-1' => ! $canViewMoney,
+            ])>
+                @if ($canViewMoney)
                 <div class="flex flex-col justify-between gap-2 bg-white p-4 dark:bg-secondary-dark">
                     <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.tile_committed_funding') }}</p>
                     <div>
@@ -1090,6 +1137,7 @@ new #[Title('titles.projects')] class extends Component {
                     </div>
                     <p class="type-meta text-secondary-medium dark:text-secondary-soft">{{ __('projects.tile_committed_funding_hint') }}</p>
                 </div>
+                @endif
 
                 <div class="flex flex-col justify-between gap-2 bg-white p-4 dark:bg-secondary-dark">
                     <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.tile_beneficiaries') }}</p>

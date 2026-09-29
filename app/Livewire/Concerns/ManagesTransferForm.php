@@ -93,10 +93,26 @@ trait ManagesTransferForm
         return null;
     }
 
+    /**
+     * Whether the viewer may schedule or edit a tranche. The agreement and
+     * account pick-lists carry budgets and bank account names, and the modal
+     * flag is client-settable, so they are only ever built for these viewers.
+     */
+    protected function canUseTransferForm(): bool
+    {
+        $user = auth()->user();
+
+        return $user !== null && ($user->can('transfers.create') || $user->can('transfers.update'));
+    }
+
     /** @return Collection<int, Account> */
     #[Computed]
     public function accountOptions(): Collection
     {
+        if (! $this->canUseTransferForm()) {
+            return new Collection;
+        }
+
         return Account::query()->select(['id', 'account_name', 'is_active'])->orderBy('account_name')->orderBy('id')->get();
     }
 
@@ -104,6 +120,10 @@ trait ManagesTransferForm
     #[Computed]
     public function agreementOptions(): Collection
     {
+        if (! $this->canUseTransferForm()) {
+            return new Collection;
+        }
+
         return $this->scopedAgreements()
             ->select(['id', 'donor_id', 'proposal_id', 'project_num', 'currency', 'budget'])
             ->with(['donor:id,name', 'proposal:id,name'])

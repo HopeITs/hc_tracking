@@ -100,6 +100,8 @@ new #[Title('titles.indicators')] class extends Component {
     public string $progressSourceOfVerification = '';
 
     public bool $showInspectModal = false;
+
+    #[Locked]
     public ?int $inspectingIndicatorId = null;
 
     /**
@@ -226,7 +228,7 @@ new #[Title('titles.indicators')] class extends Component {
                 // resolve to null; the view renders that explicitly.
                 'planIndicators.source' => fn (MorphTo $morphTo) => $morphTo->morphWith([
                     AnnualPlan::class => [],
-                    Proposal::class => ['donors', 'projects:id'],
+                    Proposal::class => ['donorNames:id,name', 'projects:id'],
                 ]),
             ])
             ->orderBy('name')
@@ -264,7 +266,7 @@ new #[Title('titles.indicators')] class extends Component {
                 default => null,
             },
             'donors' => $source instanceof Proposal
-                ? $source->donors->pluck('name')->values()->all()
+                ? $source->donorNames->pluck('name')->values()->all()
                 : [],
             'project' => $target->project?->name,
             'reports' => $reports->count(),

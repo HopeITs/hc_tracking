@@ -27,6 +27,11 @@ class ProposalFileDownloadController extends Controller
             404
         );
 
+        abort_if(
+            $media->collection->isFundingPaper() && ! auth()->user()->can('funding-agreements.view'),
+            403
+        );
+
         abort_unless(Storage::disk($media->disk)->exists($media->path), 404);
 
         return Storage::disk($media->disk)->download($media->path, $media->original_name, [

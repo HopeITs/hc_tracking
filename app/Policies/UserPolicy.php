@@ -78,13 +78,29 @@ class UserPolicy
     }
 
     /**
-     * Whether the user may rename or delete one role. Administrator roles are
-     * never renamed or deleted; a non-administrator may not touch a role they
+     * Whether the user may rename or delete one role. Built-in roles
+     * (isBuiltIn()) are never renamed or deleted; a non-administrator may not touch a role they
      * hold themselves or one carrying user-management rights.
      */
     public function manageRole(User $user, Role $role): bool
     {
-        return $user->can('access-management.manage-roles') && $this->mayReshapeRole($user, $role);
+        return $user->can('access-management.manage-roles')
+            && ! self::isBuiltIn($role)
+            && $this->mayReshapeRole($user, $role);
+    }
+
+    /**
+     * Whether a role is one of the built-in roles named in
+     * config/access-control.php. Rules find these by name (task department
+     * scoping, the starting role, alert routing), so renaming or deleting one
+     * would silently break them; their permissions stay editable.
+     */
+    public static function isBuiltIn(Role $role): bool
+    {
+        return in_array($role->name, [
+            ...array_keys(config('access-control.role_baselines', [])),
+            ...config('access-control.administrator_roles', []),
+        ], true);
     }
 
     /**

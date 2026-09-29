@@ -83,6 +83,17 @@ new #[Title('titles.accounts')] class extends Component {
         $this->resetPage();
     }
 
+    /**
+     * Only people who may change accounts see full account numbers and can
+     * find an account by its number; everyone else sees the last four
+     * characters, so a search cannot confirm a guessed number either.
+     */
+    #[Computed]
+    public function showsFullAccountNumbers(): bool
+    {
+        return auth()->user()->can('accounts.update');
+    }
+
     /** @return LengthAwarePaginator<int, Account> */
     #[Computed]
     public function accounts(): LengthAwarePaginator
@@ -98,7 +109,7 @@ new #[Title('titles.accounts')] class extends Component {
                 fn ($query) => $query->where(fn ($query) => $query
                     ->where('account_name', 'like', '%'.$search.'%')
                     ->orWhere('bank_name', 'like', '%'.$search.'%')
-                    ->orWhereIn('id', Account::idsMatchingAccountNumber($search))),
+                    ->when($this->showsFullAccountNumbers, fn ($query) => $query->orWhereIn('id', Account::idsMatchingAccountNumber($search)))),
             )
             ->when($this->state === 'active', fn ($query) => $query->where('is_active', true))
             ->when($this->state === 'closed', fn ($query) => $query->where('is_active', false))
@@ -482,7 +493,7 @@ new #[Title('titles.accounts')] class extends Component {
                             </div>
                             <div class="min-w-0">
                                 <p class="truncate text-base font-bold text-secondary-dark dark:text-white">{{ $account->account_name }}</p>
-                                <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $account->bank_name }} · {{ $account->currency->value }} · {{ $account->account_number }}</p>
+                                <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $account->bank_name }} · {{ $account->currency->value }} · <span dir="ltr" data-test="account-number">{{ $this->showsFullAccountNumbers ? $account->account_number : $account->maskedAccountNumber() }}</span></p>
                                 <p class="truncate text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">
                                     @if ($account->opened_at !== null)
                                         {{ __('accounts.opened_date', ['date' => $account->opened_at->translatedFormat(__('formats.date'))]) }}

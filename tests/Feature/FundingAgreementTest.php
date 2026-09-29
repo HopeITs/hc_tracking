@@ -408,7 +408,7 @@ test('agreement detail renders an agreement with no tranches', function () {
 });
 
 test('a user without funding agreement permissions cannot record one', function () {
-    $viewer = User::factory()->role('Managers')->create();
+    $viewer = User::factory()->role('Managers')->create()->givePermissionTo('funding-agreements.view');
 
     $fresh = fn () => Livewire::actingAs($viewer)->test('pages::funding-agreements.index');
 
@@ -728,7 +728,7 @@ test('a donor report cannot be submitted in the future or reached from another a
 });
 
 test('a user who cannot update agreements cannot manage donor reports', function () {
-    $viewer = User::factory()->role('Managers')->create();
+    $viewer = User::factory()->role('Managers')->create()->givePermissionTo('funding-agreements.view');
     $agreement = DonorProposal::factory()->create();
     $report = DonorReport::factory()->create(['donor_proposal_id' => $agreement->id]);
 

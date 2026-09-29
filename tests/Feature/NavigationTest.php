@@ -12,8 +12,8 @@ test('the sidebar groups navigation in the application workflow order', function
         ->assertSeeTextInOrder(['Overview', 'Strategy', 'Delivery', 'Administration']);
 });
 
-test('the sidebar carries a funding group once its routes exist', function () {
-    $user = User::factory()->role('Team Member')->create();
+test('the sidebar carries a funding group for Financial, who holds every funding permission', function () {
+    $user = User::factory()->role('Financial')->create();
 
     $this->actingAs($user)
         ->get(route('dashboard'))
@@ -24,6 +24,33 @@ test('the sidebar carries a funding group once its routes exist', function () {
         ->assertSeeText('Funding Agreements')
         ->assertSeeText('Transfers')
         ->assertSeeText('Accounts');
+});
+
+test('the sidebar shows Public Relations Manager proposals and donors but not agreements or transfers', function () {
+    $user = User::factory()->role('Public Relations Manager')->create();
+
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertSeeText('Funding')
+        ->assertSeeText('Proposals')
+        ->assertSeeText('Donors')
+        ->assertDontSeeText('Funding Agreements')
+        ->assertDontSeeText('Transfers');
+});
+
+test('the sidebar hides the funding group from a Team Member', function () {
+    $user = User::factory()->role('Team Member')->create();
+
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertDontSeeText('Funding')
+        ->assertDontSeeText('Donors')
+        ->assertDontSeeText('Funding Agreements')
+        ->assertDontSeeText('Transfers')
+        ->assertDontSee('href="'.route('proposals.index').'"', false)
+        ->assertDontSee('href="'.route('funding-agreements.index').'"', false);
 });
 
 test('the sidebar carries a results and learning group once its routes exist', function () {
@@ -141,4 +168,72 @@ test('the sidebar header matches the desktop top header height so their bottom b
     // The negative margins cancel the sidebar's p-3 so the border reaches both edges.
     expect($sidebarHeaderClasses)->toContain('h-16', '-mx-3', '-mt-3', 'border-b')
         ->and($headerClasses)->toContain('min-h-16', 'border-b');
+});
+
+test('both top headers link to the bug report form in a new tab', function () {
+    $user = User::factory()->role('Team Member')->create();
+
+    $response = $this->actingAs($user)->get(route('dashboard'))->assertOk();
+
+    $document = new DOMDocument;
+    $document->loadHTML($response->getContent(), LIBXML_NOERROR | LIBXML_NOWARNING);
+    $links = (new DOMXPath($document))->query('//a[@data-report-bug]');
+
+    expect($links)->toHaveCount(2);
+
+    foreach ($links as $link) {
+        expect($link->getAttribute('href'))->toBe('https://forms.gle/5QfGGarkeejAe3HS6')
+            ->and($link->getAttribute('target'))->toBe('_blank')
+            ->and($link->getAttribute('rel'))->toContain('noopener')
+            ->and($link->getAttribute('aria-label'))->toBe('Report a problem or bug')
+            ->and($link->hasAttribute('data-top-bar-action'))->toBeTrue();
+    }
+});
+
+test('the sidebar arms its collapse animation only from a toggle, so a restored state renders without motion', function () {
+    $user = User::factory()->role('Team Member')->create();
+
+    $response = $this->actingAs($user)->get(route('dashboard'))->assertOk();
+
+    $document = new DOMDocument;
+    $document->loadHTML($response->getContent(), LIBXML_NOERROR | LIBXML_NOWARNING);
+    $sidebar = (new DOMXPath($document))->query('//*[@data-navigation-sidebar]')->item(0);
+
+    // app.css only transitions the rail while data-sidebar-animating is set.
+    expect($sidebar->hasAttribute('data-sidebar-animating'))->toBeFalse()
+        ->and($sidebar->getAttribute('x-on:flux-sidebar-toggle.document'))->toContain("setAttribute('data-sidebar-animating'", "removeAttribute('data-sidebar-animating')");
+});
+
+test('the sidebar brand link keeps a single accessible name while the wordmark and mark crossfade', function () {
+    $user = User::factory()->role('Team Member')->create();
+
+    $response = $this->actingAs($user)->get(route('dashboard'))->assertOk();
+
+    $document = new DOMDocument;
+    $document->loadHTML($response->getContent(), LIBXML_NOERROR | LIBXML_NOWARNING);
+    $xpath = new DOMXPath($document);
+
+    $wordmarkAlts = collect($xpath->query('//*[@data-navigation-sidebar]//*[@data-sidebar-logo-wordmark]//img'))->map->getAttribute('alt')->all();
+    $markAlts = collect($xpath->query('//*[@data-navigation-sidebar]//*[@data-sidebar-logo-mark]//img'))->map->getAttribute('alt')->all();
+
+    // Both stay in the DOM on desktop; only the wordmark (light and dark) names the link.
+    expect($wordmarkAlts)->toBe([config('app.name'), config('app.name')])
+        ->and($markAlts)->toBe(['']);
+});
+
+test('the mobile drawer puts its theme and language toggles in their own row so the logo has room', function () {
+    $user = User::factory()->role('Team Member')->create();
+
+    $response = $this->actingAs($user)->get(route('dashboard'))->assertOk();
+
+    $document = new DOMDocument;
+    $document->loadHTML($response->getContent(), LIBXML_NOERROR | LIBXML_NOWARNING);
+    $xpath = new DOMXPath($document);
+
+    $headerPreferences = $xpath->query('//*[@data-navigation-sidebar]//*[@data-flux-sidebar-header]//*[@data-sidebar-preferences]');
+    $drawerPreferences = $xpath->query('//*[@data-navigation-sidebar]/*[@data-sidebar-preferences]');
+
+    expect($headerPreferences)->toHaveCount(0)
+        ->and($drawerPreferences)->toHaveCount(1)
+        ->and($xpath->query('.//*[@data-theme-toggle]', $drawerPreferences->item(0)))->toHaveCount(1);
 });

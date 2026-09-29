@@ -69,7 +69,7 @@ test('only mark-seen holders acknowledge for MEAL', function () {
 test('reports.delete removes another author\'s draft; a colleague without it cannot', function () {
     ($this->index)(userWithRole('Media Team'))->call('confirmDeleteReport', $this->draft->id)->assertForbidden();
 
-    ($this->index)(userWithRole('Public Relations Manager'))->call('confirmDeleteReport', $this->draft->id)->call('deleteReport')->assertOk();
+    ($this->index)(userWithRole('General Manager'))->call('confirmDeleteReport', $this->draft->id)->call('deleteReport')->assertOk();
 
     expect(Report::query()->find($this->draft->id))->toBeNull();
 });

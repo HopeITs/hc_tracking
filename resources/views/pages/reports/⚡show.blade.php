@@ -500,7 +500,7 @@ new #[Title('titles.report')] class extends Component {
     $sourceHref = match (true) {
         $planIndicator->source === null => null,
         $planIndicator->source_type === 'annual_plan' && Route::has('annual-plans.show') => route('annual-plans.show', $planIndicator->source),
-        $planIndicator->source_type !== 'annual_plan' && Route::has('proposals.show') => route('proposals.show', $planIndicator->source),
+        $planIndicator->source_type !== 'annual_plan' && Route::has('proposals.show') && auth()->user()->can('proposals.view') => route('proposals.show', $planIndicator->source),
         default => null,
     };
 
@@ -562,11 +562,14 @@ new #[Title('titles.report')] class extends Component {
                     @else
                         {{ __('reports.committed_in_an_annual_plan') }}
                     @endif
-                @elseif ($sourceHref !== null)
-                    {{ __('reports.committed_in_a_proposal_2') }}
-                    <a href="{{ $sourceHref }}" wire:navigate class="hover:underline">{{ $planIndicator->source->name }}</a>
                 @else
-                    {{ __('reports.committed_in_a_proposal') }}
+                    {{ __('reports.committed_in_a_proposal_2') }}
+                    {{-- The proposal's name stays for everyone; only its page is gated. --}}
+                    @if ($sourceHref !== null)
+                        <a href="{{ $sourceHref }}" wire:navigate class="hover:underline">{{ $planIndicator->source->name }}</a>
+                    @else
+                        {{ $planIndicator->source->name }}
+                    @endif
                 @endif
             </span>
         </x-slot:meta>

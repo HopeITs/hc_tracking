@@ -17,6 +17,7 @@
         aria-haspopup="dialog"
         aria-label="{{ __('notifications.app.tooltip') }}"
         class="inline-flex size-9 cursor-pointer touch-manipulation items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark max-lg:size-11 dark:text-secondary-soft dark:hover:bg-white/10 dark:hover:text-white"
+        data-top-bar-action
         data-test="header-install-app-button"
     >
         <flux:icon.arrow-down-tray variant="mini" />

@@ -60,6 +60,9 @@ trait BuildsPortfolioGantt
      * The portfolio with its money: fundraising on top, delivery in the
      * middle, donor obligations at the bottom, and the relations between them.
      *
+     * Proposal rows need proposals.view, and the obligations hang off those
+     * proposals, so a viewer without it gets the plain portfolio.
+     *
      * @return array<string, mixed>
      */
     protected function connectedGanttPayload(?int $programId = null, ?string $status = null, string $groupBy = 'program'): array
@@ -68,10 +71,10 @@ trait BuildsPortfolioGantt
         $milestones = $this->timelineMilestones($projects);
         $projectIds = $projects->modelKeys();
 
-        $proposals = Proposal::query()
+        $proposals = ! $this->ganttViewerCan('proposals.view') ? new EloquentCollection : Proposal::query()
             ->select(['id', 'name', 'status', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end'])
             ->whereHas('projects', fn ($query) => $query->whereIn('projects.id', $projectIds))
-            ->with(['donors:id,name', 'projects:id'])
+            ->with([$this->proposalDonorRelation(), 'projects:id'])
             ->orderBy('planned_date_begin')
             ->orderBy('id')
             ->get();
@@ -105,11 +108,15 @@ trait BuildsPortfolioGantt
      */
     protected function pipelineGanttPayload(?string $phase = null): array
     {
+        if (! $this->ganttViewerCan('proposals.view')) {
+            return $this->readOnlyPayload(collect(), []);
+        }
+
         $proposals = Proposal::query()
             ->select(['id', 'name', 'status', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end'])
             ->when($phase !== null && ProposalPhase::tryFrom($phase) !== null, fn ($query) => $query->whereIn('status', ProposalPhase::from($phase)->statuses()))
             ->with([
-                'donors:id,name',
+                $this->proposalDonorRelation(),
                 'projects:id,name,status,start_date,end_date',
             ])
             ->orderBy('planned_date_begin')
@@ -189,7 +196,7 @@ trait BuildsPortfolioGantt
                 status: $proposal->status->value,
                 statusLabel: $proposal->status->label(),
                 tone: 'funding',
-                url: route('proposals.show', $proposal),
+                url: $this->ganttViewerCan('proposals.view') ? route('proposals.show', $proposal) : null,
             ));
             $this->rollUp($rows, 0);
 
@@ -364,12 +371,15 @@ trait BuildsPortfolioGantt
     }
 
     /**
-     * A proposal bar: its lifecycle span, donors and the money signed on it.
+     * A proposal bar: its lifecycle span, donors and, for a viewer holding
+     * funding-agreements.view, the money signed on it.
      *
      * @return array<string, mixed>
      */
     private function proposalRow(Proposal $proposal, string $parent, int $depth, string $wbs): array
     {
+        $donors = $proposal->relationLoaded('donors') ? $proposal->donors : $proposal->donorNames;
+
         return $this->ganttRow(
             id: 'proposal-'.$proposal->id,
             parent: $parent,
@@ -385,10 +395,22 @@ trait BuildsPortfolioGantt
             status: $proposal->status->value,
             statusLabel: $proposal->status->label(),
             tone: $this->proposalTone($proposal),
-            owner: $proposal->donors->pluck('name')->unique()->implode(', ') ?: null,
+            owner: $donors->pluck('name')->unique()->implode(', ') ?: null,
             url: route('proposals.show', $proposal),
-            money: $this->ganttMoney($proposal->donors->map(fn ($donor): array => [$donor->pivot->budget, $donor->pivot->currency])),
+            money: $this->ganttViewerCan('funding-agreements.view')
+                ? $this->ganttMoney($donors->map(fn ($donor): array => [$donor->pivot->budget, $donor->pivot->currency]))
+                : null,
         );
+    }
+
+    /**
+     * The donor relation to eager-load on a proposal bar. Only a viewer of
+     * funding-agreements gets the one that carries the budget pivot; everyone
+     * else gets names alone, so a budget is never loaded for them.
+     */
+    private function proposalDonorRelation(): string
+    {
+        return $this->ganttViewerCan('funding-agreements.view') ? 'donors:id,name' : 'donorNames:id,name';
     }
 
     /**

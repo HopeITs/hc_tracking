@@ -137,6 +137,8 @@ return [
     'total_tasks' => 'Total tasks',
     'unscheduled' => 'Unscheduled',
     'unscheduled_tasks_have_no_due_date_drag_one_onto_a_day_to_sch' => 'Unscheduled tasks have no due date. Drag one onto a day to schedule it.',
+    'update_task_status' => 'Update status',
+    'update_task_status_hint' => 'You are assigned to this task, so you can move its status. Everything else is read-only.',
     'upload_file' => 'Upload file',
     'uploading' => 'Uploading…',
     'view' => 'View',

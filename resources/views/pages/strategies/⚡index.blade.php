@@ -60,12 +60,30 @@ new #[Title('titles.strategies')] class extends Component {
     }
 
     /**
-     * Whether the current user may create, edit or delete strategies.
+     * Whether the current user may create strategies (strategies.create).
      */
     #[Computed]
-    public function canManage(): bool
+    public function canCreateStrategies(): bool
     {
-        return Gate::allows('create', Strategy::class);
+        return auth()->user()->can('strategies.create');
+    }
+
+    /**
+     * Whether the current user may edit strategies (strategies.update).
+     */
+    #[Computed]
+    public function canEditStrategies(): bool
+    {
+        return auth()->user()->can('strategies.update');
+    }
+
+    /**
+     * Whether the current user may delete strategies (strategies.delete).
+     */
+    #[Computed]
+    public function canDeleteStrategies(): bool
+    {
+        return auth()->user()->can('strategies.delete');
     }
 
     /**
@@ -344,7 +362,7 @@ new #[Title('titles.strategies')] class extends Component {
             </x-ui.header-filter-select>
         </x-slot:filters>
 
-        @if ($this->canManage)
+        @if ($this->canCreateStrategies)
             <x-slot:actions>
                 <x-ui.button tone="primary" icon="plus" class="min-h-11 touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-strategy-button">
                     {{ __('strategies.add_strategy') }}
@@ -424,11 +442,13 @@ new #[Title('titles.strategies')] class extends Component {
                             <div class="flex items-center justify-end gap-1 @3xl:justify-start">
                                 <x-ui.button tone="ghost" size="sm" icon="eye" class="size-9!" :href="route('strategies.show', tap(new Strategy, fn ($s) => $s->id = $strategy['id']))" wire:navigate :aria-label="__('common.view_name', ['name' => $strategy['name']])" />
 
-                                @if ($this->canManage)
-                                    <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $strategy['id'] }})" :aria-label="__('common.edit_name', ['name' => $strategy['name']])" />
+                                @if ($this->canEditStrategies)
+                                    <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $strategy['id'] }})" :aria-label="__('common.edit_name', ['name' => $strategy['name']])" data-test="edit-strategy-button" />
+                                @endif
 
+                                @if ($this->canDeleteStrategies)
                                     @if ($strategy['programs_count'] === 0)
-                                        <x-ui.button tone="ghost" size="sm" icon="trash" class="size-9!" wire:click="confirmDelete({{ $strategy['id'] }})" :aria-label="__('common.delete_name', ['name' => $strategy['name']])" />
+                                        <x-ui.button tone="ghost" size="sm" icon="trash" class="size-9!" wire:click="confirmDelete({{ $strategy['id'] }})" :aria-label="__('common.delete_name', ['name' => $strategy['name']])" data-test="delete-strategy-button" />
                                     @else
                                         <flux:tooltip :content="__('strategies.strategies_with_linked_programs_cannot_be_deleted')">
                                             <span class="inline-flex size-9 cursor-not-allowed items-center justify-center text-secondary-light" aria-disabled="true">
@@ -447,7 +467,7 @@ new #[Title('titles.strategies')] class extends Component {
         </div>
     @endif
 
-    @if ($this->canManage)
+    @if ($this->canCreateStrategies || $this->canEditStrategies)
         <x-ui.modal
             wire:model="showStrategyModal"
             size="md"
@@ -468,7 +488,9 @@ new #[Title('titles.strategies')] class extends Component {
                 </x-ui.button>
             </x-slot:actions>
         </x-ui.modal>
+    @endif
 
+    @if ($this->canDeleteStrategies)
         <x-ui.confirm-modal
             wire:model="showDeleteModal"
             :title="__('strategies.delete_this_strategy')"

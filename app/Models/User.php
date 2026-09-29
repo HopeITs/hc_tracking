@@ -518,6 +518,19 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
     }
 
     /**
+     * Tracking user ids of everyone in this user's current HR department.
+     * Memoized per user instance, since task edit checks read it per task.
+     *
+     * @return list<int>
+     */
+    public function departmentUserIds(): array
+    {
+        return once(fn (): array => $this->departmentEmployeeIds() === []
+            ? []
+            : array_values(static::query()->whereIn('employee_id', $this->departmentEmployeeIds())->pluck('id')->map(fn (mixed $id): int => (int) $id)->all()));
+    }
+
+    /**
      * Programs this user manages (programs.manager_id is their HR employee).
      * Memoized per user instance.
      *

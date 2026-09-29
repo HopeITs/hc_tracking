@@ -301,7 +301,7 @@ test('each proposal row shows its task progress and overdue work', function () {
 });
 
 test('a user without proposal permissions sees no edit controls and cannot create, move or delete', function () {
-    $viewer = User::factory()->role('Team Member')->create();
+    $viewer = User::factory()->role('Team Member')->create()->givePermissionTo('proposals.view');
     $proposal = Proposal::factory()->create();
 
     $fresh = fn () => Livewire::actingAs($viewer)->test('pages::proposals.index');

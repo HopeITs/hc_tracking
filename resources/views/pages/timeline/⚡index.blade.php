@@ -20,6 +20,10 @@ use Livewire\Component;
  *   them, so selecting any bar traces its whole route;
  * - pipeline: every proposal through its lifecycle with the projects it funds.
  *
+ * The connected lens shows proposals and the pipeline lens is built from them,
+ * so both need proposals.view: a viewer without it is limited to the portfolio
+ * lens, the pipeline option is hidden and its URL value is ignored.
+ *
  * Read-only by design — schedules are edited on each project's Plan tab,
  * where links, baselines and undo live.
  */
@@ -51,6 +55,27 @@ new #[Title('titles.timeline')] class extends Component {
     }
 
     /**
+     * The lens actually drawn: the requested one, unless the viewer may not
+     * open it.
+     */
+    protected function activeView(): string
+    {
+        if ($this->view === 'pipeline' && ! $this->canViewProposals()) {
+            return 'portfolio';
+        }
+
+        return $this->view;
+    }
+
+    /**
+     * Whether the viewer may see proposals, which the pipeline lens is made of.
+     */
+    protected function canViewProposals(): bool
+    {
+        return auth()->user()?->can('proposals.view') ?? false;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     #[Computed]
@@ -59,7 +84,7 @@ new #[Title('titles.timeline')] class extends Component {
         $programId = ctype_digit($this->program) ? (int) $this->program : null;
         $status = ProjectStatus::tryFrom($this->status)?->value;
 
-        return match ($this->view) {
+        return match ($this->activeView()) {
             'pipeline' => $this->pipelineGanttPayload(ProposalPhase::tryFrom($this->phase)?->value),
             'connected' => $this->connectedGanttPayload($programId, $status, $this->group),
             default => $this->portfolioGanttPayload($programId, $status, $this->group),
@@ -81,7 +106,7 @@ new #[Title('titles.timeline')] class extends Component {
     #[Computed]
     public function recordCount(): int
     {
-        $kind = $this->view === 'pipeline' ? 'proposal' : 'project';
+        $kind = $this->activeView() === 'pipeline' ? 'proposal' : 'project';
 
         return collect($this->payload['rows'])->where('kind', $kind)->count();
     }
@@ -95,7 +120,7 @@ new #[Title('titles.timeline')] class extends Component {
     #[Computed]
     public function groupOptions(): array
     {
-        if ($this->view === 'pipeline') {
+        if ($this->activeView() === 'pipeline') {
             return [];
         }
 
@@ -108,7 +133,7 @@ new #[Title('titles.timeline')] class extends Component {
 
     public function updatedView(): void
     {
-        if (! in_array($this->view, self::VIEWS, true)) {
+        if (! in_array($this->view, self::VIEWS, true) || $this->activeView() !== $this->view) {
             $this->view = 'portfolio';
         }
     }
@@ -123,11 +148,16 @@ new #[Title('titles.timeline')] class extends Component {
 ?>
 
 @php
+    $activeView = $this->activeView();
     $views = [
         'portfolio' => ['key' => 'portfolio', 'label' => __('gantt.portfolio'), 'icon' => 'briefcase', 'subtitle' => __('gantt.portfolio_subtitle')],
         'connected' => ['key' => 'connected', 'label' => __('gantt.connected'), 'icon' => 'arrows-right-left', 'subtitle' => __('gantt.connected_subtitle')],
         'pipeline' => ['key' => 'pipeline', 'label' => __('gantt.pipeline'), 'icon' => 'funnel', 'subtitle' => __('gantt.pipeline_subtitle')],
     ];
+
+    if (! $this->canViewProposals()) {
+        unset($views['pipeline']);
+    }
 @endphp
 
 <section class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="timeline-heading">
@@ -137,7 +167,7 @@ new #[Title('titles.timeline')] class extends Component {
         :count="$this->recordCount"
     >
         <x-slot:filters>
-            @if ($view === 'pipeline')
+            @if ($activeView === 'pipeline')
                 <x-ui.header-filter-select :label="__('gantt.phase')" wire:model.live="phase" :value="$phase">
                     <flux:select.option value="">{{ __('gantt.all_statuses') }}</flux:select.option>
                     @foreach (ProposalPhase::cases() as $phaseOption)
@@ -165,14 +195,14 @@ new #[Title('titles.timeline')] class extends Component {
     <div class="relative rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-secondary-medium dark:bg-secondary-dark dark:shadow-none" data-timeline-board>
         {{-- The three lenses on the same portfolio --}}
         <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-board-line px-4 py-3">
-            <x-ui.view-toggle wire-model="view" :active="$view" :options="array_values($views)" :label="__('gantt.view')" class="max-w-full overflow-x-auto [&>button]:shrink-0 [&>button]:whitespace-nowrap" />
-            <p class="type-meta text-secondary-medium dark:text-secondary-soft">{{ $views[$view]['subtitle'] }}</p>
+            <x-ui.view-toggle wire-model="view" :active="$activeView" :options="array_values($views)" :label="__('gantt.view')" class="max-w-full overflow-x-auto [&>button]:shrink-0 [&>button]:whitespace-nowrap" />
+            <p class="type-meta text-secondary-medium dark:text-secondary-soft">{{ $views[$activeView]['subtitle'] }}</p>
         </div>
 
         <div wire:loading.delay class="pointer-events-none absolute inset-x-4 top-0 h-0.5 animate-pulse rounded-full bg-status-active" aria-hidden="true"></div>
 
         {{-- Keyed by the view, grouping and filters so the chart starts fresh on every change. --}}
-        <div wire:key="timeline-gantt-{{ $view }}-{{ $group }}-{{ $program }}-{{ $status }}-{{ $phase }}" wire:loading.delay.class="opacity-60" class="transition-opacity">
+        <div wire:key="timeline-gantt-{{ $activeView }}-{{ $group }}-{{ $program }}-{{ $status }}-{{ $phase }}" wire:loading.delay.class="opacity-60" class="transition-opacity">
             @if ($this->payload['rows'] === [])
                 <div class="p-6">
                     <x-ui.empty-state icon="chart-bar" :heading="__('gantt.nothing_to_plan')" :body="__('gantt.nothing_matches')" />
@@ -180,9 +210,9 @@ new #[Title('titles.timeline')] class extends Component {
             @else
                 <x-ui.gantt
                     :payload="$this->payload"
-                    :scope="'timeline-'.$view"
+                    :scope="'timeline-'.$activeView"
                     explorer
-                    :group-by="$view === 'pipeline' ? null : $group"
+                    :group-by="$activeView === 'pipeline' ? null : $group"
                     :group-options="$this->groupOptions"
                     height="h-[min(74vh,52rem)]"
                     wire:ignore

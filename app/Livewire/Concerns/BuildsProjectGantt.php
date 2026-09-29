@@ -176,6 +176,7 @@ trait BuildsProjectGantt
             return;
         }
 
+        $canOpenProposals = $this->ganttViewerCan('proposals.view');
         $groupIndex = count($rows->where('depth', 0)) + 1;
         $groupAt = $rows->count();
         $rows->push($this->ganttGroupRow('fundraising', (string) $groupIndex, __('gantt.fundraising')));
@@ -197,7 +198,7 @@ trait BuildsProjectGantt
                 status: $proposal->status->value,
                 statusLabel: $proposal->status->label(),
                 tone: 'funding',
-                url: route('proposals.show', $proposal),
+                url: $canOpenProposals ? route('proposals.show', $proposal) : null,
             ));
         }
 
@@ -345,25 +346,36 @@ trait BuildsProjectGantt
      * ('pays' for a transfer, 'reports' for a donor report) so the timeline
      * can trace the money back to the work it funds.
      *
+     * Transfers need transfers.view and donor reports need
+     * funding-agreements.view: a viewer holding neither gets no obligations
+     * group and no query runs, since both carry amounts and agreement data.
+     *
      * @param  int|list<int>|Project  $source
      * @param  Collection<int, GanttRow>  $rows
      * @param  Collection<int, array{from: string, to: string, type: string}>|null  $relations
      */
     private function pushObligationRows(Project|int|array $source, Collection $rows, ?Collection $relations = null): void
     {
+        $canSeeTransfers = $this->ganttViewerCan('transfers.view');
+        $canSeeReports = $this->ganttViewerCan('funding-agreements.view');
+
+        if ((! $canSeeTransfers && ! $canSeeReports) || $source === []) {
+            return;
+        }
+
         $scope = match (true) {
             $source instanceof Project => fn ($query) => $query->whereIn('proposal_id', $source->proposals()->pluck('proposals.id')),
             is_array($source) => fn ($query) => $query->whereIn('proposal_id', $source),
             default => fn ($query) => $query->whereKey($source),
         };
 
-        $transfers = TransfersTracking::query()
+        $transfers = ! $canSeeTransfers ? collect() : TransfersTracking::query()
             ->whereHas('donorProposal', $scope)
             ->with('donorProposal.donor:id,name')
             ->get()
             ->filter(fn (TransfersTracking $transfer): bool => ($transfer->scheduled_date ?? $transfer->transfer_date) !== null);
 
-        $reports = DonorReport::query()
+        $reports = ! $canSeeReports ? collect() : DonorReport::query()
             ->whereHas('donorProposal', $scope)
             ->with('donorProposal.donor:id,name')
             ->get();
@@ -554,6 +566,15 @@ trait BuildsProjectGantt
             'editable' => $editable,
             'progressEditable' => $editable && $kind === 'task' && ! $summary,
         ];
+    }
+
+    /**
+     * Whether the signed-in viewer holds a permission, for rows that carry
+     * money or link to a page the viewer may not be allowed to open.
+     */
+    private function ganttViewerCan(string $permission): bool
+    {
+        return auth()->user()?->can($permission) ?? false;
     }
 
     /**

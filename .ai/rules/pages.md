@@ -37,3 +37,6 @@ To look at a rendered page when you have no session (and must not type a passwor
 4. Delete the file from public/ afterwards.
 
 Use C:\php85\php.exe, not XAMPP's PHP. Good for layout, typography, contrast, light/dark and responsive checks; not for interaction.
+
+## Hide money, keep names
+Money data (amounts, budgets, agreements, transfers, donor reports, bank data, Agreement/MOU files) is queried and rendered only for holders of funding-agreements.view / transfers.view / accounts.view — skip the query server-side, Blade @can alone is not enough. Proposal/donor names stay as plain text; links to proposals.show, donors.show, funding-agreements.show or transfers.index render only with that page's view permission (user decision 2026-09-29).

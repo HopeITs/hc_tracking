@@ -44,11 +44,21 @@ new #[Title('titles.donor')] class extends Component {
      * Every agreement this donor holds, with the proposal behind it, the
      * projects that proposal funds and every tranche paid against it.
      *
+     * Empty for a viewer without funding-agreements.view, and every money
+     * reading below is derived from it, so none of them is ever computed.
+     * A viewer without transfers.view gets the agreements with no tranches.
+     *
      * @return Collection<int, DonorProposal>
      */
     #[Computed]
     public function agreements(): Collection
     {
+        if (! auth()->user()?->can('funding-agreements.view')) {
+            return new Collection;
+        }
+
+        $canViewTransfers = (bool) auth()->user()->can('transfers.view');
+
         return DonorProposal::query()
             ->select(['id', 'donor_id', 'proposal_id', 'budget', 'currency', 'project_num'])
             ->where('donor_id', $this->donorId)
@@ -57,6 +67,7 @@ new #[Title('titles.donor')] class extends Component {
                 'proposal.projects:id,name,status',
                 'transfers' => fn ($query) => $query
                     ->select(['id', 'donor_proposal_id', 'account_id', 'payment_amount', 'amount_transfered_currency', 'scheduled_date', 'transfer_date', 'fees', 'fees_currency', 'amount_received', 'exchange_rate', 'net_amount_received', 'amount_received_currency', 'receive_date', 'ar_status'])
+                    ->when(! $canViewTransfers, fn ($query) => $query->whereRaw('1 = 0'))
                     ->orderByRaw('coalesce(receive_date, scheduled_date) is null')
                     ->orderByRaw('coalesce(receive_date, scheduled_date)')
                     ->orderBy('id'),
@@ -419,7 +430,9 @@ new #[Title('titles.donor')] class extends Component {
             @if (filled($donor->country))
                 <span class="inline-flex items-center gap-1"><flux:icon.map-pin variant="micro" class="size-3.5" aria-hidden="true" />{{ $donor->country }}</span>
             @endif
-            <span>{{ trans_choice('common.count_agreement', $donor->donor_proposals_count, ['count' => $donor->donor_proposals_count]) }}</span>
+            @can('funding-agreements.view')
+                <span>{{ trans_choice('common.count_agreement', $donor->donor_proposals_count, ['count' => $donor->donor_proposals_count]) }}</span>
+            @endcan
         </x-slot:meta>
 
         <x-slot:actions>
@@ -472,6 +485,7 @@ new #[Title('titles.donor')] class extends Component {
         </p>
     </div>
 
+    @can('funding-agreements.view')
     @if ($this->agreements->isEmpty())
         <div class="mt-10">
             <x-ui.empty-state icon="banknotes" :heading="__('common.no_agreements_yet')" :body="__('donors.agreements_signed_by_this_donor_will_appear_here')" />
@@ -839,6 +853,7 @@ new #[Title('titles.donor')] class extends Component {
             </div>
         </section>
     @endif
+    @endcan
 
     <x-donors.form-modal :editing="true" :type-options="$this->donorTypeOptions" />
 

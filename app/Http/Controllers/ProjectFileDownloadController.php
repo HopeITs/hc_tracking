@@ -28,6 +28,11 @@ class ProjectFileDownloadController extends Controller
             404
         );
 
+        abort_if(
+            $media->collection->isFundingPaper() && ! auth()->user()->can('funding-agreements.view'),
+            403
+        );
+
         // Media rows created before this feature (seeders, demo data) never had
         // a real file written to disk — a plain download() would 500 on those
         // via a Flysystem UnableToRetrieveMetadata exception. 404 instead.

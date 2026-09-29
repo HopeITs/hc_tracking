@@ -16,6 +16,7 @@ return [
     'switch_language' => 'تغيير اللغة',
     'toggle_sidebar' => 'طي القائمة الجانبية أو توسيعها',
     'toggle_theme' => 'التبديل بين الوضع الفاتح والداكن',
+    'report_a_problem' => 'الإبلاغ عن مشكلة أو خطأ',
     'roles_and_permissions' => 'الأدوار والصلاحيات',
     'user_directory' => 'دليل المستخدمين',
 ];

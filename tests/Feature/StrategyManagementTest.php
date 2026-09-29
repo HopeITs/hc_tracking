@@ -233,3 +233,23 @@ test('every role can open a strategy through the view icon, not the name', funct
     'manager' => 'Managers',
     'admin' => 'Super Admin',
 ]);
+
+test('the strategy buttons follow their own permission, not create alone', function (string $permission, array $shown, array $hidden) {
+    Strategy::factory()->create(['name' => 'Button strategy']);
+    Role::create(['name' => 'Strategy Clerk', 'guard_name' => 'web'])->givePermissionTo($permission);
+    $clerk = User::factory()->role('Strategy Clerk')->create();
+
+    $page = Livewire::actingAs($clerk)->test('pages::strategies.index');
+
+    foreach ($shown as $marker) {
+        $page->assertSeeHtml('data-test="'.$marker.'"');
+    }
+
+    foreach ($hidden as $marker) {
+        $page->assertDontSeeHtml('data-test="'.$marker.'"');
+    }
+})->with([
+    'create only' => ['strategies.create', ['create-strategy-button'], ['edit-strategy-button', 'delete-strategy-button']],
+    'update only' => ['strategies.update', ['edit-strategy-button'], ['create-strategy-button', 'delete-strategy-button']],
+    'delete only' => ['strategies.delete', ['delete-strategy-button'], ['create-strategy-button', 'edit-strategy-button']],
+]);

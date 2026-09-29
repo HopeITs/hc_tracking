@@ -86,6 +86,8 @@ new #[Title('titles.targets')] class extends Component {
     #[Locked]
     public ?int $deletingTargetId = null;
     public bool $showDeleteModal = false;
+
+    #[Locked]
     public ?int $expandedTargetId = null;
 
     public string $targetSourceType = 'annual_plan';
@@ -377,6 +379,23 @@ new #[Title('titles.targets')] class extends Component {
             ->paginate(6, ['result_id']);
     }
 
+    /**
+     * Whether the viewer may see the budgets funders committed to a proposal.
+     */
+    protected function canViewAgreements(): bool
+    {
+        return auth()->user()?->can('funding-agreements.view') ?? false;
+    }
+
+    /**
+     * The proposal relation that lists its donors: with each budget for someone
+     * who may see agreements, otherwise names only so no amount is ever loaded.
+     */
+    protected function donorRelation(): string
+    {
+        return $this->canViewAgreements() ? 'donors' : 'donorNames';
+    }
+
     /** @return Collection<int, PlanIndicator> */
     #[Computed]
     public function targets(): Collection
@@ -396,7 +415,7 @@ new #[Title('titles.targets')] class extends Component {
                 'source' => fn (MorphTo $morphTo) => $morphTo->morphWith([
                     AnnualPlan::class => ['program:id'],
                     // projects: which projects the proposal funds, for chainIssues().
-                    Proposal::class => ['donors:id,name', 'projects:id'],
+                    Proposal::class => [$this->donorRelation().':id,name', 'projects:id'],
                 ]),
                 'indicator:id,name,result_id,project_id,measure,unit,baseline',
                 'indicator.result:id,statement,type,program_id',
@@ -836,6 +855,10 @@ new #[Title('titles.targets')] class extends Component {
         default => null,
     };
     $sourceTypeLabels = ['annual_plan' => __('common.annual_plan'), 'proposal' => __('common.proposal')];
+    $donorRelation = $this->donorRelation();
+    $canViewBudgets = $this->canViewAgreements();
+    $canOpenProposals = auth()->user()->can('proposals.view');
+    $canOpenDonors = auth()->user()->can('donors.view');
     $pulse = $this->pulse;
     $statusMeta = [
         'achieved' => ['label' => __('targets.status_achieved'), 'count' => $pulse['achieved'], 'fill' => 'bg-status-good', 'text' => 'text-status-good', 'dot' => 'bg-status-good'],
@@ -1034,9 +1057,10 @@ new #[Title('titles.targets')] class extends Component {
                                     $source = $target->source;
                                     $sourceLabel = $this->sourceLabel($target);
                                     $isProposal = $target->source_type === 'proposal';
+                                    // Names stay for everyone; a link only for someone who may open its page.
                                     $sourceUrl = match (true) {
                                         $source instanceof AnnualPlan => route('annual-plans.show', $source),
-                                        $source instanceof Proposal => route('proposals.show', $source),
+                                        $source instanceof Proposal && $canOpenProposals => route('proposals.show', $source),
                                         default => null,
                                     };
                                     $targetIndicator = $target->indicator;
@@ -1094,7 +1118,11 @@ new #[Title('titles.targets')] class extends Component {
                                                         {{ __('targets.source_no_longer_available') }}
                                                     </span>
                                                 @else
-                                                    <a href="{{ $sourceUrl }}" wire:navigate class="{{ $linkClass }}">{{ $sourceLabel }}</a>
+                                                    @if ($sourceUrl !== null)
+                                                        <a href="{{ $sourceUrl }}" wire:navigate class="{{ $linkClass }}">{{ $sourceLabel }}</a>
+                                                    @else
+                                                        <span class="font-medium text-secondary-dark dark:text-white">{{ $sourceLabel }}</span>
+                                                    @endif
                                                     @if ($source instanceof AnnualPlan && $source->program !== null)
                                                         <span class="text-secondary-light" aria-hidden="true">/</span>
                                                         <span class="sr-only">{{ __('common.program') }}:</span>
@@ -1104,10 +1132,14 @@ new #[Title('titles.targets')] class extends Component {
                                                         <span class="inline-flex flex-wrap items-center gap-x-1.5">
                                                             <flux:icon.banknotes variant="micro" class="size-3.5 text-funding dark:text-secondary-soft" aria-hidden="true" />
                                                             <span class="sr-only">{{ __('common.donors') }}:</span>
-                                                            @forelse ($source->donors as $donor)
+                                                            @forelse ($source->getRelation($donorRelation) as $donor)
                                                                 <span class="inline-flex items-baseline gap-1.5">
-                                                                    <a href="{{ route('donors.show', $donor) }}" wire:navigate class="{{ $linkClass }}">{{ $donor->name }}</a>
-                                                                    @if ($donor->pivot?->budget !== null)
+                                                                    @if ($canOpenDonors)
+                                                                        <a href="{{ route('donors.show', $donor) }}" wire:navigate class="{{ $linkClass }}">{{ $donor->name }}</a>
+                                                                    @else
+                                                                        <span class="font-medium text-secondary-dark dark:text-white">{{ $donor->name }}</span>
+                                                                    @endif
+                                                                    @if ($canViewBudgets && $donor->pivot?->budget !== null)
                                                                         <x-ui.money :amount="$donor->pivot->budget" :currency="$donor->pivot->currency" class="text-xs text-funding dark:text-secondary-soft" />
                                                                     @endif
                                                                 </span>@if (! $loop->last)<span aria-hidden="true">,</span>@endif

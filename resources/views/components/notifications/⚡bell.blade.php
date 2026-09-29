@@ -125,6 +125,7 @@ new class extends Component {
         aria-label="{{ trans_choice('notifications.bell_label', $total, ['count' => $total]) }}"
         x-bind:class="open && 'bg-secondary-soft text-secondary-dark dark:bg-white/10 dark:text-white'"
         class="relative inline-flex size-9 cursor-pointer touch-manipulation items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark max-lg:size-11 dark:text-secondary-soft dark:hover:bg-white/10 dark:hover:text-white"
+        data-top-bar-action
         data-test="notification-bell-button"
     >
         <span x-bind:class="pulse && 'notification-bell-ring'" class="inline-flex">

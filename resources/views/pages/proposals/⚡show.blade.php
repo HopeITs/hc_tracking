@@ -116,6 +116,7 @@ new #[Title('titles.proposal')] class extends Component
 
     public bool $showPreviewModal = false;
 
+    #[Locked]
     public ?int $previewingFileId = null;
 
     public bool $showAddTaskModal = false;
@@ -139,9 +140,25 @@ new #[Title('titles.proposal')] class extends Component
 
     public function updatedTab(): void
     {
-        if (! in_array($this->tab, self::TABS, true)) {
+        if (! in_array($this->tab, self::TABS, true) || ($this->tab === 'funding' && ! $this->canViewAgreements())) {
             $this->tab = 'status';
         }
+    }
+
+    /**
+     * Whether the viewer may see funding agreements and the budgets on them.
+     */
+    protected function canViewAgreements(): bool
+    {
+        return auth()->user()?->can('funding-agreements.view') ?? false;
+    }
+
+    /**
+     * Whether the viewer may see transfers and the amounts sent and received.
+     */
+    protected function canViewTransfers(): bool
+    {
+        return auth()->user()?->can('transfers.view') ?? false;
     }
 
     /**
@@ -158,7 +175,7 @@ new #[Title('titles.proposal')] class extends Component
         return [
             ['key' => 'status', 'label' => __('proposals.status_history'), 'count' => $this->statusNotes->count()],
             ['key' => 'deadlines', 'label' => __('proposals.deadlines'), 'count' => count($this->deadlines)],
-            ['key' => 'funding', 'label' => __('common.funding'), 'count' => $this->agreements->count()],
+            ...($this->canViewAgreements() ? [['key' => 'funding', 'label' => __('common.funding'), 'count' => $this->agreements->count()]] : []),
             ['key' => 'projects', 'label' => __('common.projects'), 'count' => $this->projects->count()],
             ['key' => 'tasks', 'label' => __('common.tasks'), 'count' => $this->tasks->count()],
             ['key' => 'targets', 'label' => __('common.targets'), 'count' => $this->targets->count()],
@@ -194,15 +211,29 @@ new #[Title('titles.proposal')] class extends Component
      * built by belongsToMany carries no casts, so its currency arrives as a raw
      * string while this relation's arrives as a Currency case.
      *
+     * Empty for a viewer without funding-agreements.view, and every money
+     * reading below is derived from it, so none of them is ever computed.
+     * A viewer without transfers.view gets the agreements with no tranches.
+     *
      * @return Collection<int, DonorProposal>
      */
     #[Computed]
     public function agreements(): Collection
     {
+        if (! $this->canViewAgreements()) {
+            return new Collection;
+        }
+
+        $canViewTransfers = $this->canViewTransfers();
+
         return DonorProposal::query()
             ->select(['id', 'donor_id', 'budget', 'currency', 'project_num', 'proposal_id'])
             ->where('proposal_id', $this->proposalId)
-            ->with(['donor:id,name', 'transfers.account:id,account_name'])
+            ->with([
+                'donor:id,name',
+                'transfers' => fn ($query) => $query->when(! $canViewTransfers, fn ($query) => $query->whereRaw('1 = 0')),
+                'transfers.account:id,account_name',
+            ])
             ->orderBy('id')
             ->get();
     }
@@ -529,6 +560,10 @@ new #[Title('titles.proposal')] class extends Component
     #[Computed]
     public function donorReports(): Collection
     {
+        if ($this->agreements->isEmpty()) {
+            return new Collection;
+        }
+
         return DonorReport::query()
             ->select(['id', 'donor_proposal_id', 'title', 'type', 'due_on', 'submitted_on'])
             ->whereIn('donor_proposal_id', $this->agreements->modelKeys())
@@ -547,6 +582,37 @@ new #[Title('titles.proposal')] class extends Component
     }
 
     /**
+     * The file collections this viewer may not see: signed agreements and
+     * MOUs are agreement data, so they need funding-agreements.view.
+     *
+     * @return list<string>
+     */
+    protected function hiddenCollections(): array
+    {
+        if ($this->canViewAgreements()) {
+            return [];
+        }
+
+        return array_values(array_map(
+            fn (MediaCollection $collection): string => $collection->value,
+            array_filter(MediaCollection::cases(), fn (MediaCollection $collection): bool => $collection->isFundingPaper()),
+        ));
+    }
+
+    /**
+     * The grant paperwork categories this viewer may see on funded projects.
+     *
+     * @return list<MediaCollection>
+     */
+    protected function visibleGrantPaper(): array
+    {
+        return array_values(array_filter(
+            self::GRANT_PAPER,
+            fn (MediaCollection $collection): bool => ! in_array($collection->value, $this->hiddenCollections(), true),
+        ));
+    }
+
+    /**
      * Files filed on the proposal itself.
      *
      * @return Collection<int, Media>
@@ -558,6 +624,7 @@ new #[Title('titles.proposal')] class extends Component
             ->select(['id', 'mediable_type', 'mediable_id', 'collection', 'disk', 'path', 'original_name', 'type', 'size', 'uploaded_at', 'uploaded_by'])
             ->where('mediable_type', 'proposal')
             ->where('mediable_id', $this->proposalId)
+            ->whereNotIn('collection', $this->hiddenCollections())
             ->with('uploader:id,hr_user_id')
             ->orderByDesc('uploaded_at')
             ->orderByDesc('id')
@@ -586,7 +653,7 @@ new #[Title('titles.proposal')] class extends Component
             ->select(['id', 'mediable_type', 'mediable_id', 'collection', 'disk', 'path', 'original_name', 'type', 'size', 'uploaded_at', 'uploaded_by'])
             ->where('mediable_type', 'project')
             ->whereIn('mediable_id', $projectIds)
-            ->whereIn('collection', array_map(fn (MediaCollection $collection): string => $collection->value, self::GRANT_PAPER))
+            ->whereIn('collection', array_map(fn (MediaCollection $collection): string => $collection->value, $this->visibleGrantPaper()))
             ->with('uploader:id,hr_user_id')
             ->orderByDesc('uploaded_at')
             ->orderByDesc('id')
@@ -717,7 +784,7 @@ new #[Title('titles.proposal')] class extends Component
         $grantEnd = $this->proposal->actual_date_end ?? $this->proposal->planned_date_end;
 
         if ($grantEnd !== null && $this->proposal->actual_date_end === null && ! in_array($this->proposal->status, [ProposalStatus::Completed, ProposalStatus::Rejected], true)) {
-            $push('grant-end', 'grant', $grantEnd, __('proposals.grant_term_ends'), $this->proposal->name, null, 'funding');
+            $push('grant-end', 'grant', $grantEnd, __('proposals.grant_term_ends'), $this->proposal->name, null, $this->canViewAgreements() ? 'funding' : 'status');
         }
 
         usort($items, fn (array $a, array $b): int => [$a['date'], $a['key']] <=> [$b['date'], $b['key']]);
@@ -858,7 +925,7 @@ new #[Title('titles.proposal')] class extends Component
             ];
         }
 
-        if ($this->agreements->isEmpty() && in_array($this->proposal->phase, [ProposalPhase::Implementation, ProposalPhase::Monitoring, ProposalPhase::Closure], true)) {
+        if ($this->canViewAgreements() && $this->agreements->isEmpty() && in_array($this->proposal->phase, [ProposalPhase::Implementation, ProposalPhase::Monitoring, ProposalPhase::Closure], true)) {
             $warnings[] = [
                 'key' => 'no-agreement',
                 'text' => __('proposals.warning_no_agreement'),
@@ -885,7 +952,7 @@ new #[Title('titles.proposal')] class extends Component
     public function vitals(): array
     {
         return [
-            $this->moneyVital(),
+            ...($this->canViewAgreements() ? [$this->moneyVital()] : []),
             $this->workVital(),
             $this->timeVital(),
             $this->promisesVital(),
@@ -1514,10 +1581,14 @@ new #[Title('titles.proposal')] class extends Component
      */
     private function proposalFile(int $mediaId): Media
     {
-        return Media::query()
+        $media = Media::query()
             ->where('mediable_type', 'proposal')
             ->where('mediable_id', $this->proposalId)
             ->findOrFail($mediaId);
+
+        abort_if(in_array($media->collection->value, $this->hiddenCollections(), true), 403);
+
+        return $media;
     }
 
     /**
@@ -1585,6 +1656,8 @@ new #[Title('titles.proposal')] class extends Component
             'fileCategory.required' => __('proposals.select_a_file_category'),
             'fileDisplayName.required' => __('proposals.enter_a_file_name'),
         ]);
+
+        abort_if(in_array($validated['fileCategory'], $this->hiddenCollections(), true), 403);
 
         $media = $isCreate
             ? new Media(['mediable_type' => 'proposal', 'mediable_id' => $this->proposalId, 'disk' => 'local'])
@@ -1915,7 +1988,7 @@ new #[Title('titles.proposal')] class extends Component
 
     {{-- The bench: four readings of this grant's condition; each opens the tab holding its evidence. --}}
     <div
-        class="mt-7 grid grid-cols-2 gap-x-6 gap-y-7 @3xl/detail:grid-cols-4"
+        @class(['mt-7 grid grid-cols-2 gap-x-6 gap-y-7', '@3xl/detail:grid-cols-4' => count($this->vitals) === 4, '@3xl/detail:grid-cols-3' => count($this->vitals) !== 4])
         role="group"
         aria-label="{{ __('proposals.the_grant_s_vital_signs') }}"
         data-bench
@@ -2018,6 +2091,7 @@ new #[Title('titles.proposal')] class extends Component
                                 <p class="mt-2 text-xs {{ $mutedText }}" data-foreign-tranches>{{ trans_choice('proposals.count_tranches_in_another_currency', $money['foreignCount'], ['count' => $money['foreignCount'], 'currency' => $currency]) }}</p>
                             @endif
 
+                            @can('transfers.view')
                             @if ($agreement->transfers->isEmpty())
                                 <p class="mt-3 text-sm {{ $mutedText }}">{{ __('proposals.committed_with_no_transfer_yet') }}</p>
                             @else
@@ -2089,6 +2163,7 @@ new #[Title('titles.proposal')] class extends Component
                                     @endforeach
                                 </ol>
                             @endif
+                            @endcan
                         </article>
                     @endforeach
                 </div>
@@ -2907,12 +2982,14 @@ new #[Title('titles.proposal')] class extends Component
         :locked-proposal-name="$this->proposal->name"
     />
 
-    <x-funding.transfer-modal
-        :editing="$editingTransferId !== null"
-        :agreement-options="$showTransferModal ? $this->agreementOptions : []"
-        :account-options="$showTransferModal ? $this->accountOptions : []"
-        :confirming-delete="$confirmingTransferDelete"
-    />
+    @canany(['transfers.create', 'transfers.update'])
+        <x-funding.transfer-modal
+            :editing="$editingTransferId !== null"
+            :agreement-options="$showTransferModal ? $this->agreementOptions : []"
+            :account-options="$showTransferModal ? $this->accountOptions : []"
+            :confirming-delete="$confirmingTransferDelete"
+        />
+    @endcanany
 
     <x-ui.confirm-modal
         wire:model="showUnlinkModal"
@@ -2945,6 +3022,7 @@ new #[Title('titles.proposal')] class extends Component
                 <div class="grid grid-cols-2 gap-x-4 gap-y-4">
                     <x-ui.form-select wire:model="fileCategory" :label="__('proposals.file_category')" :placeholder="__('common.select')" required>
                         @foreach (MediaCollection::cases() as $collectionOption)
+                            @continue(in_array($collectionOption->value, $this->hiddenCollections(), true))
                             <flux:select.option :value="$collectionOption->value">{{ $collectionOption->label() }}</flux:select.option>
                         @endforeach
                     </x-ui.form-select>

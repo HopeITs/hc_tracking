@@ -27,6 +27,17 @@ enum MediaCollection: string
     case Other = 'other';
 
     /**
+     * Whether this collection holds signed funding paperwork.
+     *
+     * An agreement or MOU can state the budget, so it is agreement data:
+     * only someone holding funding-agreements.view may list or open it.
+     */
+    public function isFundingPaper(): bool
+    {
+        return in_array($this, [self::Agreement, self::Mou], true);
+    }
+
+    /**
      * All media collection values, for validation rules and console prompts.
      *
      * @return array<int, string>

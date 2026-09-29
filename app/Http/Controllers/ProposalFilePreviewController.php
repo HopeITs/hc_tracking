@@ -34,6 +34,11 @@ class ProposalFilePreviewController extends Controller
         };
 
         abort_unless($belongsHere, 404);
+
+        abort_if(
+            $media->collection->isFundingPaper() && ! auth()->user()->can('funding-agreements.view'),
+            403
+        );
         abort_unless($media->isPreviewable() && $media->isStored(), 404);
 
         $contentType = match ($media->type) {

@@ -3,6 +3,7 @@
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Models\Project;
+use App\Models\Role;
 use App\Models\Task;
 use App\Models\User;
 use App\Notifications\QuickActions;
@@ -69,14 +70,31 @@ test('adding a task on a project needs tasks.create', function () {
 });
 
 test('an assignee on the task page changes status but not the title', function () {
-    Livewire::actingAs($this->assignee)->test('pages::tasks.show', ['task' => $this->task])
-        ->set('title', 'Renamed by assignee')
-        ->set('taskStatus', TaskStatus::InProgress->value)
+    $this->task->update(['priority' => TaskPriority::Low]);
+
+    $page = Livewire::actingAs($this->assignee)->test('pages::tasks.show', ['task' => $this->task])
+        ->assertSeeHtml('data-test="task-edit-status-done"')
+        ->assertSeeHtml('data-test="task-edit-progress-input"')
+        ->assertSeeHtml('data-test="task-edit-completed-date-input"')
+        ->assertSeeHtml('data-test="update-task-button"')
+        ->assertDontSeeHtml('data-test="task-edit-title-input"')
+        ->assertDontSeeHtml('data-test="task-edit-priority-high"')
+        ->assertDontSeeHtml('data-test="task-edit-assignee-picker"')
+        ->assertSee('Assigned work');
+
+    $page->set('title', 'Renamed by assignee')
+        ->set('taskPriority', TaskPriority::High->value)
+        ->set('taskStatus', TaskStatus::Done->value)
+        ->set('progressPercentage', '100')
+        ->set('completedDate', '2026-09-28')
         ->call('updateTask');
 
     expect($this->task->fresh())
         ->title->toBe('Assigned work')
-        ->status->toBe(TaskStatus::InProgress);
+        ->priority->toBe(TaskPriority::Low)
+        ->status->toBe(TaskStatus::Done)
+        ->progress_percentage->toBe(100)
+        ->completed_date->toDateString()->toBe('2026-09-28');
 });
 
 test('someone who can see a task but has no rights on it cannot change it from the task page', function () {
@@ -87,6 +105,9 @@ test('someone who can see a task but has no rights on it cannot change it from t
     $manager = userWithRole('Managers');
 
     Livewire::actingAs($manager)->test('pages::tasks.show', ['task' => $visible])
+        ->assertSeeHtml('data-test="task-edit-title-input"')
+        ->assertSeeHtml('data-test="task-edit-priority-high"')
+        ->assertSeeHtml('data-test="update-task-button"')
         ->set('title', 'Renamed by manager')
         ->call('updateTask')
         ->assertHasNoErrors();
@@ -94,6 +115,21 @@ test('someone who can see a task but has no rights on it cannot change it from t
     expect($visible->fresh()->title)->toBe('Renamed by manager');
 
     $this->actingAs($colleague)->get(route('tasks.show', $this->task))->assertNotFound();
+
+    Role::create(['name' => 'Task Viewer', 'guard_name' => 'web'])->givePermissionTo('tasks.view');
+    $viewer = User::factory()->role('Task Viewer')->create();
+
+    Livewire::actingAs($viewer)->test('pages::tasks.show', ['task' => $visible])
+        ->assertSee('Renamed by manager')
+        ->assertDontSeeHtml('data-test="task-edit-form"')
+        ->assertDontSeeHtml('data-test="task-edit-title-input"')
+        ->assertDontSeeHtml('data-test="task-edit-status-done"')
+        ->assertDontSeeHtml('data-test="update-task-button"')
+        ->set('title', 'Renamed by viewer')
+        ->call('updateTask')
+        ->assertForbidden();
+
+    expect($visible->fresh()->title)->toBe('Renamed by manager');
 });
 
 test('quick actions are offered only to people who may move the task', function () {

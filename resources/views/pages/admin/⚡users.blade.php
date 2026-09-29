@@ -4,6 +4,7 @@ use App\Models\HrUser;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Policies\UserPolicy;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -399,6 +400,16 @@ new #[Title('titles.user_directory')] class extends Component {
     public function selectedRoleIsProtected(): bool
     {
         return in_array($this->selectedRole?->name, config('access-control.administrator_roles', []), true);
+    }
+
+    /**
+     * Whether the selected role is a built-in role whose name is fixed
+     * (UserPolicy::isBuiltIn()); its permissions stay editable.
+     */
+    #[Computed]
+    public function selectedRoleIsBuiltIn(): bool
+    {
+        return $this->selectedRole !== null && UserPolicy::isBuiltIn($this->selectedRole);
     }
 
     /**
@@ -878,10 +889,13 @@ new #[Title('titles.user_directory')] class extends Component {
                             @elseif (! $this->canEditSelectedRolePermissions && auth()->user()->can('access-management.manage-permissions'))
                                 <p class="mt-1.5 text-xs font-semibold text-primary" data-test="role-admin-only-note">{{ __('roles.admin_only_role_help') }}</p>
                             @endif
+                            @if (! $this->selectedRoleIsProtected && $this->selectedRoleIsBuiltIn)
+                                <p class="mt-1.5 text-xs text-secondary-medium dark:text-secondary-soft" data-test="role-built-in-note">{{ __('roles.built_in_role_help') }}</p>
+                            @endif
                         </div>
 
                         @can('access-management.manage-roles')
-                            @unless ($this->selectedRoleIsProtected)
+                            @unless ($this->selectedRoleIsProtected || $this->selectedRoleIsBuiltIn)
                                 <div class="grid w-full items-end gap-2 sm:w-auto sm:grid-cols-[minmax(13rem,1fr)_auto]">
                                     <x-ui.input id="selected-role-name" wire:model="selectedRoleName" autocomplete="off" spellcheck="false" :label="__('roles.rename_role')" :disabled="! $this->canManageSelectedRole" />
                                     <x-ui.button type="button" wire:click="renameRole" :disabled="! $this->canManageSelectedRole" :title="$this->canManageSelectedRole ? null : __('roles.admin_only_role_help')">{{ __('roles.rename_role') }}</x-ui.button>

@@ -102,8 +102,28 @@ new #[Title('titles.proposals')] class extends Component {
      */
     public function toggleDonor(int $donorId): void
     {
+        if (! $this->canViewAgreements()) {
+            return;
+        }
+
         $this->donor = $this->donor === (string) $donorId ? '' : (string) $donorId;
         $this->resetPage();
+    }
+
+    /**
+     * Whether the viewer may see funding agreements and the budgets on them.
+     */
+    protected function canViewAgreements(): bool
+    {
+        return auth()->user()?->can('funding-agreements.view') ?? false;
+    }
+
+    /**
+     * Whether the viewer may see transfers and the amounts sent and received.
+     */
+    protected function canViewTransfers(): bool
+    {
+        return auth()->user()?->can('transfers.view') ?? false;
     }
 
     /**
@@ -117,7 +137,8 @@ new #[Title('titles.proposals')] class extends Component {
     protected function filteredQuery(bool $withPhase = true): Builder
     {
         $search = trim($this->search);
-        $donorId = (int) $this->donor;
+        // The donor filter narrows by funding agreements, so it only applies to a viewer who may see them.
+        $donorId = $this->canViewAgreements() ? (int) $this->donor : 0;
 
         return Proposal::query()
             ->when($search !== '', function (Builder $query) use ($search): void {
@@ -151,18 +172,28 @@ new #[Title('titles.proposals')] class extends Component {
     public function proposals(): LengthAwarePaginator
     {
         $today = now()->toDateString();
+        $canTransfers = $this->canViewTransfers();
+
+        $relations = [
+            'projects' => fn ($query) => $query->select(['projects.id', 'projects.name', 'projects.status'])->orderBy('projects.name'),
+            'statusNotes' => fn ($query) => $query->select(['id', 'proposal_id', 'status', 'context', 'date'])->orderByDesc('date')->orderByDesc('id')->limit(1),
+        ];
+
+        // Agreements, and the tranches behind them, load only for a viewer who may see them.
+        if ($this->canViewAgreements()) {
+            $relations['donorProposals'] = fn ($query) => $query->select(['id', 'proposal_id', 'donor_id', 'budget', 'currency', 'project_num'])->orderBy('id');
+            $relations['donorProposals.donor'] = fn ($query) => $query->select(['id', 'name']);
+            $relations['donorProposals.transfers'] = fn ($query) => $query
+                ->select(['id', 'donor_proposal_id', 'ar_status', 'payment_amount', 'amount_transfered_currency', 'net_amount_received', 'amount_received_currency', 'scheduled_date', 'transfer_date'])
+                ->when(! $canTransfers, fn ($query) => $query->whereRaw('1 = 0'));
+        }
 
         return $this->filteredQuery()
             ->select(['id', 'name', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end', 'status', 'updated_at'])
-            ->with([
-                'donorProposals' => fn ($query) => $query->select(['id', 'proposal_id', 'donor_id', 'budget', 'currency', 'project_num'])->orderBy('id'),
-                'donorProposals.donor:id,name',
-                'donorProposals.transfers:id,donor_proposal_id,ar_status,payment_amount,amount_transfered_currency,net_amount_received,amount_received_currency,scheduled_date,transfer_date',
-                'projects' => fn ($query) => $query->select(['projects.id', 'projects.name', 'projects.status'])->orderBy('projects.name'),
-                'statusNotes' => fn ($query) => $query->select(['id', 'proposal_id', 'status', 'context', 'date'])->orderByDesc('date')->orderByDesc('id')->limit(1),
-            ])
+            ->with($relations)
             // Task progress is organisation-wide: every viewer sees the same figures.
             ->withCount([
+                'donorProposals',
                 'tasks' => fn ($query) => $query->withoutGlobalScope(TaskVisibilityScope::class),
                 'tasks as done_tasks_count' => fn ($query) => $query->withoutGlobalScope(TaskVisibilityScope::class)->where('status', TaskStatus::Done),
                 'tasks as overdue_tasks_count' => fn ($query) => $query->withoutGlobalScope(TaskVisibilityScope::class)->where('status', '!=', TaskStatus::Done)->whereDate('due_date', '<', $today),
@@ -194,7 +225,12 @@ new #[Title('titles.proposals')] class extends Component {
     #[Computed]
     public function fundingPosition(): Collection
     {
+        if (! $this->canViewAgreements()) {
+            return new Collection;
+        }
+
         $ids = $this->filteredProposalIds;
+        $canTransfers = $this->canViewTransfers();
 
         $committed = DonorProposal::query()
             ->whereIn('proposal_id', $ids)
@@ -205,13 +241,13 @@ new #[Title('titles.proposals')] class extends Component {
         $transfers = fn () => TransfersTracking::query()
             ->whereHas('donorProposal', fn (Builder $query) => $query->whereIn('proposal_id', $ids));
 
-        $received = $transfers()
+        $received = ! $canTransfers ? collect() : $transfers()
             ->where('ar_status', ArStatus::Received)
             ->selectRaw('amount_received_currency as currency, sum(net_amount_received) as total')
             ->groupBy('amount_received_currency')
             ->pluck('total', 'currency');
 
-        $pending = $transfers()
+        $pending = ! $canTransfers ? collect() : $transfers()
             ->where('ar_status', ArStatus::Pending)
             ->selectRaw('amount_transfered_currency as currency, sum(payment_amount) as total, count(*) as transfers')
             ->groupBy('amount_transfered_currency')
@@ -221,7 +257,7 @@ new #[Title('titles.proposals')] class extends Component {
         // What the tranches sent in each agreement's own currency already
         // cover of its budget, whatever became of them: fees, a missing net
         // amount or a failed transfer never turn money back into unscheduled.
-        $scheduled = TransfersTracking::query()
+        $scheduled = ! $canTransfers ? collect() : TransfersTracking::query()
             ->join('donor_proposal', 'donor_proposal.id', '=', 'transfers_tracking.donor_proposal_id')
             ->whereIn('donor_proposal.proposal_id', $ids)
             ->whereColumn('transfers_tracking.amount_transfered_currency', 'donor_proposal.currency')
@@ -262,7 +298,7 @@ new #[Title('titles.proposals')] class extends Component {
     #[Computed]
     public function pipeline(): array
     {
-        $rows = $this->filteredQuery(withPhase: false)
+        $rows = ! $this->canViewAgreements() ? collect() : $this->filteredQuery(withPhase: false)
             ->leftJoin('donor_proposal', 'donor_proposal.proposal_id', '=', 'proposals.id')
             ->selectRaw('proposals.status, donor_proposal.currency, count(distinct proposals.id) as proposals, sum(donor_proposal.budget) as budget')
             ->groupBy('proposals.status', 'donor_proposal.currency')
@@ -305,6 +341,10 @@ new #[Title('titles.proposals')] class extends Component {
     #[Computed]
     public function flow(): array
     {
+        if (! $this->canViewAgreements()) {
+            return ['currencies' => [], 'unfunded' => []];
+        }
+
         $proposals = Proposal::query()
             ->whereIn('id', $this->filteredProposalIds)
             ->select(['id', 'name', 'status', 'planned_date_begin'])
@@ -413,7 +453,7 @@ new #[Title('titles.proposals')] class extends Component {
     #[Computed]
     public function donorFilterName(): ?string
     {
-        $donorId = (int) $this->donor;
+        $donorId = $this->canViewAgreements() ? (int) $this->donor : 0;
 
         return $donorId > 0 ? Donor::query()->whereKey($donorId)->value('name') : null;
     }
@@ -711,6 +751,7 @@ new #[Title('titles.proposals')] class extends Component {
     $amount = fn (float $value): string => Number::format($value, maxPrecision: 0);
     $shortAmount = fn (float $value): string => Number::abbreviate($value, maxPrecision: 1);
     $matchingCount = $this->filteredProposalIds->count();
+    $canAgreements = $this->canViewAgreements();
     // The flow names every matching proposal but the list below shows one page
     // of them: a proposal on this page is scrolled to, any other one opened.
     $pageProposalIds = $this->proposals->getCollection()->modelKeys();
@@ -767,6 +808,7 @@ new #[Title('titles.proposals')] class extends Component {
         <x-ui.empty-state icon="document-text" :heading="__('proposals.no_proposals_yet')" :body="__('proposals.add_the_first_proposal_to_open_the_pipeline')" />
     @else
         {{-- Where the money stands: one line per currency, never summed across them. --}}
+        @if ($canAgreements)
         <section aria-labelledby="money-heading" class="pt-3" data-funding-position>
             <div class="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
                 <h2 id="money-heading" class="text-lg font-bold {{ $inkText }}">{{ __('proposals.where_the_money_stands') }}</h2>
@@ -808,9 +850,10 @@ new #[Title('titles.proposals')] class extends Component {
                 <p class="mt-4 border-t pt-4 text-sm {{ $hairline }} {{ $mutedText }}">{{ __('proposals.no_money_committed_to_these_proposals_yet') }}</p>
             @endforelse
         </section>
+        @endif
 
         {{-- The pipeline rail: five phases on one thread; a stop filters the page. --}}
-        <nav aria-label="{{ __('proposals.pipeline_phases') }}" class="border-t pt-6 {{ $hairline }}" data-pipeline>
+        <nav aria-label="{{ __('proposals.pipeline_phases') }}" @class(['pt-6', 'border-t '.$hairline => $canAgreements]) data-pipeline>
             <ol class="relative grid grid-cols-5 gap-1">
                 <span class="absolute inset-x-[10%] top-[0.4375rem] h-px bg-secondary-soft dark:bg-secondary-medium" aria-hidden="true"></span>
                 @foreach ($this->pipeline as $stop)
@@ -1084,7 +1127,7 @@ new #[Title('titles.proposals')] class extends Component {
                                     <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-10! touch-manipulation" wire:click="openEditModal({{ $proposal->id }})" :aria-label="__('common.edit_name', ['name' => $proposal->name])" />
                                     @endcan
                                     @can('delete', $proposal)
-                                    @if ($proposal->donorProposals->isEmpty())
+                                    @if ($proposal->donor_proposals_count === 0)
                                         <x-ui.button tone="ghost" size="sm" icon="trash" class="size-10! touch-manipulation" wire:click="confirmDelete({{ $proposal->id }})" :aria-label="__('common.delete_name', ['name' => $proposal->name])" />
                                     @else
                                         <flux:tooltip :content="__('proposals.funded_proposals_cannot_be_deleted_remove_the_funding_agreem')">
@@ -1132,8 +1175,9 @@ new #[Title('titles.proposals')] class extends Component {
                             </ol>
 
                             {{-- Connections --}}
-                            <div class="mt-6 grid gap-x-10 gap-y-6 @4xl/directory:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                            <div @class(['mt-6 grid gap-x-10 gap-y-6', '@4xl/directory:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)]' => $canAgreements, '@4xl/directory:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]' => ! $canAgreements])>
                                 {{-- Funding --}}
+                                @if ($canAgreements)
                                 <div class="min-w-0" data-connection="funding">
                                     <p class="type-label {{ $mutedText }}">{{ __('common.funding') }}</p>
                                     @forelse ($proposal->donorProposals as $agreement)
@@ -1168,6 +1212,7 @@ new #[Title('titles.proposals')] class extends Component {
                                         <p class="mt-2 text-sm {{ $mutedText }}">{{ __('proposals.no_funding_agreements') }}</p>
                                     @endforelse
                                 </div>
+                                @endif
 
                                 {{-- Projects --}}
                                 <div class="min-w-0" data-connection="projects">
