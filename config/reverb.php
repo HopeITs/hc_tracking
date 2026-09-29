@@ -1,5 +1,15 @@
 <?php
 
+/*
+| Hostnames allowed to open a WebSocket. Defaults to the host of APP_URL so
+| a page on another site cannot connect; list extra hosts (comma-separated)
+| in REVERB_ALLOWED_ORIGINS. Reverb matches the Origin header's host only.
+*/
+$allowedOrigins = array_values(array_filter(array_map(
+    trim(...),
+    explode(',', (string) (env('REVERB_ALLOWED_ORIGINS') ?: parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST))),
+)));
+
 return [
 
     /*
@@ -82,7 +92,7 @@ return [
                     'scheme' => env('REVERB_SCHEME', 'https'),
                     'useTLS' => env('REVERB_SCHEME', 'https') === 'https',
                 ],
-                'allowed_origins' => ['*'],
+                'allowed_origins' => $allowedOrigins,
                 'ping_interval' => env('REVERB_APP_PING_INTERVAL', 60),
                 'activity_timeout' => env('REVERB_APP_ACTIVITY_TIMEOUT', 30),
                 'max_connections' => env('REVERB_APP_MAX_CONNECTIONS'),
