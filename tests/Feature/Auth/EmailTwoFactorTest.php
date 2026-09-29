@@ -251,3 +251,19 @@ test('when the code email cannot be sent, sign-in stops with a clear message', f
     $this->assertGuest();
     $this->get(route('email-two-factor.login'))->assertRedirect(route('login'));
 });
+
+test('resending the code is capped per hour, however slowly it is asked for', function () {
+    $this->freezeTime();
+    $user = User::factory()->withHrAccount()->create(['email_two_factor_enabled' => true]);
+    passwordStepEmailsCode($user);
+
+    foreach (range(1, 10) as $attempt) {
+        $this->withServerVariables(['REMOTE_ADDR' => "10.0.6.{$attempt}"])->post(route('email-two-factor.resend'))
+            ->assertStatus(302);
+        $this->travel(61)->seconds();
+    }
+
+    $this->withServerVariables(['REMOTE_ADDR' => '10.0.6.99'])
+        ->post(route('email-two-factor.resend'))
+        ->assertStatus(429);
+});

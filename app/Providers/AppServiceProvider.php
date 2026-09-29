@@ -184,7 +184,8 @@ class AppServiceProvider extends ServiceProvider
         // many IPs. Stacked with a per-IP limit so a single IP can't spam
         // resends across many guest sessions either.
         RateLimiter::for('email-two-factor-resend', fn (Request $request) => [
-            Limit::perMinute(2)->by((string) $request->session()->get('login.id')),
+            Limit::perMinute(2)->by('minute:'.$request->session()->get('login.id')),
+            Limit::perHour(10)->by('hour:'.$request->session()->get('login.id')),
             Limit::perMinute(5)->by($request->ip()),
         ]);
     }
