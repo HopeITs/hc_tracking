@@ -1,10 +1,13 @@
 <?php
 
+use App\Actions\Fortify\EmailLoginCodes;
 use App\Models\User;
 use App\Notifications\EmailLoginCode;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Routing\Middleware\ThrottleRequests;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Sleep;
 use Laravel\Fortify\Features;
 use Livewire\Livewire;
 
@@ -250,4 +253,20 @@ test('when the code email cannot be sent, sign-in stops with a clear message', f
 
     $this->assertGuest();
     $this->get(route('email-two-factor.login'))->assertRedirect(route('login'));
+});
+
+test('a code check that cannot get its turn is refused without using up the code', function () {
+    Sleep::fake(syncWithCarbon: true);
+    $user = User::factory()->withHrAccount()->create(['email_two_factor_enabled' => true]);
+
+    $code = passwordStepEmailsCode($user);
+
+    $otherCheck = Cache::lock('email-login-code-lock:'.$user->getKey(), 60);
+    expect($otherCheck->get())->toBeTrue();
+
+    expect(EmailLoginCodes::verify($user, $code))->toBeFalse();
+
+    $otherCheck->release();
+
+    expect(EmailLoginCodes::verify($user, $code))->toBeTrue();
 });

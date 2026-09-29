@@ -3,8 +3,11 @@
 use App\Http\Middleware\EnsureHrAccountIsActive;
 use App\Models\Activity;
 use App\Models\User;
+use Illuminate\Auth\AuthenticationException;
+use Illuminate\Contracts\Cache\Store;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Laravel\Fortify\Features;
@@ -361,6 +364,105 @@ test('an unreachable hr database does not sign anyone out', function () {
     $this->actingAs($user);
     config(['database.connections.hr.database' => '/missing/dir/hr.sqlite']);
     DB::purge('hr');
+
+    $request = Request::create('/');
+    $request->setUserResolver(fn (): User => $user);
+    $request->setLaravelSession(app('session.store'));
+
+    $response = (new EnsureHrAccountIsActive)->handle($request, fn (): Response => new Response('ok'));
+
+    expect($response->getContent())->toBe('ok');
+    $this->assertAuthenticatedAs($user);
+});
+
+/**
+ * Points the default cache store at one that throws on every call, the way an
+ * unreachable Redis would, while the HR database stays up.
+ */
+function breakCacheStore(): void
+{
+    Cache::extend('broken', fn () => Cache::repository(new class implements Store
+    {
+        public function get($key): never
+        {
+            throw new RuntimeException('Cache store is down.');
+        }
+
+        public function many(array $keys): never
+        {
+            throw new RuntimeException('Cache store is down.');
+        }
+
+        public function put($key, $value, $seconds): never
+        {
+            throw new RuntimeException('Cache store is down.');
+        }
+
+        public function putMany(array $values, $seconds): never
+        {
+            throw new RuntimeException('Cache store is down.');
+        }
+
+        public function increment($key, $value = 1): never
+        {
+            throw new RuntimeException('Cache store is down.');
+        }
+
+        public function decrement($key, $value = 1): never
+        {
+            throw new RuntimeException('Cache store is down.');
+        }
+
+        public function forever($key, $value): never
+        {
+            throw new RuntimeException('Cache store is down.');
+        }
+
+        public function forget($key): never
+        {
+            throw new RuntimeException('Cache store is down.');
+        }
+
+        public function touch($key, $seconds): never
+        {
+            throw new RuntimeException('Cache store is down.');
+        }
+
+        public function flush(): never
+        {
+            throw new RuntimeException('Cache store is down.');
+        }
+
+        public function getPrefix(): string
+        {
+            return '';
+        }
+    }));
+
+    config(['cache.stores.broken' => ['driver' => 'broken'], 'cache.default' => 'broken']);
+    Cache::forgetDriver('broken');
+}
+
+test('a broken cache store does not keep a deactivated hr user signed in', function () {
+    $employeeId = insertHrEmployee(isActive: false);
+    insertHrUser($employeeId, 'rana@example.org');
+    $user = User::factory()->create(['email' => 'rana@example.org']);
+    $this->actingAs($user);
+    breakCacheStore();
+
+    $request = Request::create('/');
+    $request->setUserResolver(fn (): User => $user);
+    $request->setLaravelSession(app('session.store'));
+
+    expect(fn () => (new EnsureHrAccountIsActive)->handle($request, fn (): Response => new Response('ok')))
+        ->toThrow(AuthenticationException::class);
+    $this->assertGuest();
+});
+
+test('a broken cache store does not lock out an active hr user', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+    breakCacheStore();
 
     $request = Request::create('/');
     $request->setUserResolver(fn (): User => $user);

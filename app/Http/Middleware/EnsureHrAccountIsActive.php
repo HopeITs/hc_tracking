@@ -123,33 +123,60 @@ class EnsureHrAccountIsActive
      * What HR said about this user's account within the last minute, or null
      * when nothing is cached and HR cannot be reached.
      *
+     * A cache store that fails is reported and never trusted as an answer: HR is
+     * asked directly instead, so a deactivation is still noticed while the cache
+     * is down.
+     *
      * @return array{lost_access: bool, password_fingerprint: string}|null
      */
     private function cachedHrAccount(User $user): ?array
     {
         try {
-            return Cache::remember(self::cacheKey($user), 60, fn (): array => $this->lookUpHrAccount($user));
+            $cached = Cache::get(self::cacheKey($user));
         } catch (Throwable $exception) {
             report($exception);
 
-            return null;
+            return $this->lookUpHrAccountOrNull($user);
         }
+
+        return is_array($cached) ? $cached : $this->freshHrAccount($user);
     }
 
     /**
      * What HR says about this user's account right now (and cache it), or null
      * when HR cannot be reached, leaving the cached answer as it was.
      *
+     * A failure while caching is reported, but HR's answer is still returned.
+     *
      * @return array{lost_access: bool, password_fingerprint: string}|null
      */
     private function freshHrAccount(User $user): ?array
     {
+        $hrAccount = $this->lookUpHrAccountOrNull($user);
+
+        if ($hrAccount === null) {
+            return null;
+        }
+
         try {
-            $hrAccount = $this->lookUpHrAccount($user);
-
             Cache::put(self::cacheKey($user), $hrAccount, 60);
+        } catch (Throwable $exception) {
+            report($exception);
+        }
 
-            return $hrAccount;
+        return $hrAccount;
+    }
+
+    /**
+     * What HR says about this user's account right now, or null (reported)
+     * when HR cannot be reached.
+     *
+     * @return array{lost_access: bool, password_fingerprint: string}|null
+     */
+    private function lookUpHrAccountOrNull(User $user): ?array
+    {
+        try {
+            return $this->lookUpHrAccount($user);
         } catch (Throwable $exception) {
             report($exception);
 
