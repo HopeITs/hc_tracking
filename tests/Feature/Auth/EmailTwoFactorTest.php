@@ -1,10 +1,13 @@
 <?php
 
+use App\Actions\Fortify\EmailLoginCodes;
 use App\Models\User;
 use App\Notifications\EmailLoginCode;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Routing\Middleware\ThrottleRequests;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Sleep;
 use Laravel\Fortify\Features;
 use Livewire\Livewire;
 
@@ -95,6 +98,42 @@ test('the code stops working after too many wrong guesses', function () {
         ->post(route('email-two-factor.login.store'), ['code' => $code])
         ->assertSessionHasErrors('code');
     $this->assertGuest();
+});
+
+test('resending the code is limited per login attempt, whatever the ip', function () {
+    $this->freezeTime();
+    $user = User::factory()->withHrAccount()->create(['email_two_factor_enabled' => true]);
+    passwordStepEmailsCode($user);
+
+    $this->withServerVariables(['REMOTE_ADDR' => '10.0.5.1'])->post(route('email-two-factor.resend'));
+    $this->withServerVariables(['REMOTE_ADDR' => '10.0.5.2'])->post(route('email-two-factor.resend'));
+
+    $this->withServerVariables(['REMOTE_ADDR' => '10.0.5.3'])
+        ->post(route('email-two-factor.resend'))
+        ->assertStatus(429);
+});
+
+test('resending the code is also limited per ip, across different logins', function () {
+    $this->freezeTime();
+    $attemptsFromOneIp = fn (User $user) => $this
+        ->withServerVariables(['REMOTE_ADDR' => '10.0.6.1'])
+        ->post(route('email-two-factor.resend'));
+
+    foreach (range(1, 6) as $attempt) {
+        $user = User::factory()->withHrAccount()->create(['email_two_factor_enabled' => true]);
+        passwordStepEmailsCode($user);
+
+        $response = ($attemptsFromOneIp)($user);
+
+        if ($attempt <= 5) {
+            $response->assertStatus(302);
+        } else {
+            $response->assertStatus(429);
+        }
+
+        auth()->logout();
+        $this->flushSession();
+    }
 });
 
 test('the challenge page needs a password step first', function () {
@@ -214,4 +253,20 @@ test('when the code email cannot be sent, sign-in stops with a clear message', f
 
     $this->assertGuest();
     $this->get(route('email-two-factor.login'))->assertRedirect(route('login'));
+});
+
+test('a code check that cannot get its turn is refused without using up the code', function () {
+    Sleep::fake(syncWithCarbon: true);
+    $user = User::factory()->withHrAccount()->create(['email_two_factor_enabled' => true]);
+
+    $code = passwordStepEmailsCode($user);
+
+    $otherCheck = Cache::lock('email-login-code-lock:'.$user->getKey(), 60);
+    expect($otherCheck->get())->toBeTrue();
+
+    expect(EmailLoginCodes::verify($user, $code))->toBeFalse();
+
+    $otherCheck->release();
+
+    expect(EmailLoginCodes::verify($user, $code))->toBeTrue();
 });

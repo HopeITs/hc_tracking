@@ -18,13 +18,13 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => redirect()->route(Auth::check() ? 'dashboard' : 'login'))->name('home');
 
-Route::post('locale', SwitchLocaleController::class)->name('locale.update');
+Route::post('locale', SwitchLocaleController::class)->middleware('throttle:locale')->name('locale.update');
 
 // Second login step for people who turned on email codes (after the HR password).
 Route::middleware('guest')->controller(EmailTwoFactorController::class)->group(function () {
     Route::get('email-two-factor-challenge', 'create')->name('email-two-factor.login');
     Route::post('email-two-factor-challenge', 'store')->middleware('throttle:two-factor')->name('email-two-factor.login.store');
-    Route::post('email-two-factor-challenge/resend', 'resend')->middleware('throttle:2,1')->name('email-two-factor.resend');
+    Route::post('email-two-factor-challenge/resend', 'resend')->middleware('throttle:email-two-factor-resend')->name('email-two-factor.resend');
 });
 
 Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () {
@@ -72,6 +72,7 @@ Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () 
 
     Route::get('projects/{project}/files/{media}/download', ProjectFileDownloadController::class)
         ->can('projects.view')
+        ->middleware('throttle:files')
         ->name('projects.files.download');
 
     Route::livewire('timeline', 'pages::timeline.index')
@@ -112,10 +113,12 @@ Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () 
 
     Route::get('tasks/{task}/files/{taskAttachment}/download', TaskFileDownloadController::class)
         ->can('tasks.view')
+        ->middleware('throttle:files')
         ->name('tasks.files.download');
 
     Route::get('tasks/{task}/files/{taskAttachment}/preview', TaskFilePreviewController::class)
         ->can('tasks.view')
+        ->middleware('throttle:files')
         ->name('tasks.files.preview');
 
     Route::livewire('proposals', 'pages::proposals.index')
@@ -128,10 +131,12 @@ Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () 
 
     Route::get('proposals/{proposal}/files/{media}/download', ProposalFileDownloadController::class)
         ->can('proposals.view')
+        ->middleware('throttle:files')
         ->name('proposals.files.download');
 
     Route::get('proposals/{proposal}/files/{media}/preview', ProposalFilePreviewController::class)
         ->can('proposals.view')
+        ->middleware('throttle:files')
         ->name('proposals.files.preview');
 
     Route::livewire('donors', 'pages::donors.index')
@@ -164,10 +169,12 @@ Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () 
 
     Route::get('reports/{report}/files/{reportFile}/download', ReportFileDownloadController::class)
         ->can('reports.view')
+        ->middleware('throttle:files')
         ->name('reports.files.download');
 
     Route::get('reports/{report}/files/{reportFile}/preview', ReportFilePreviewController::class)
         ->can('reports.view')
+        ->middleware('throttle:files')
         ->name('reports.files.preview');
 
     Route::livewire('admin/notification-settings', 'pages::admin.notification-settings')

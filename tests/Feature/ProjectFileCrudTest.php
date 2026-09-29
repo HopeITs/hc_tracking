@@ -195,6 +195,34 @@ test('the download route streams a file that belongs to the project in the url',
         ->assertHeader('X-Content-Type-Options', 'nosniff');
 });
 
+test('the download route stops scripted mass downloads but leaves other users unaffected', function () {
+    $this->freezeTime();
+    Storage::fake('local');
+    $user = User::factory()->role('General Manager')->create();
+    $colleague = User::factory()->role('General Manager')->create();
+    $project = Project::factory()->create();
+    $path = 'media/projects/'.$project->id.'/report.pdf';
+    Storage::disk('local')->put($path, 'file contents');
+    $media = Media::factory()->create([
+        'mediable_type' => 'project',
+        'mediable_id' => $project->id,
+        'path' => $path,
+        'original_name' => 'report.pdf',
+    ]);
+
+    foreach (range(1, 60) as $attempt) {
+        $this->actingAs($user)->get(route('projects.files.download', [$project, $media]))->assertOk();
+    }
+
+    $this->actingAs($user)
+        ->get(route('projects.files.download', [$project, $media]))
+        ->assertStatus(429);
+
+    $this->actingAs($colleague)
+        ->get(route('projects.files.download', [$project, $media]))
+        ->assertOk();
+});
+
 test('the download route returns 404 instead of crashing when the media row has no real file on disk', function () {
     Storage::fake('local');
     $user = User::factory()->role('General Manager')->create();
