@@ -3,13 +3,11 @@
 namespace Database\Seeders;
 
 use App\Models\Activity;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
     /**
      * Seed the application's database.
      *
@@ -17,16 +15,17 @@ class DatabaseSeeder extends Seeder
      * programme layer everything else hangs off, then the three layers that
      * read from it.
      *
-     * Runs with activity recording off: seeded data is history, not news, so
-     * it must never produce activity or notifications.
+     * Every seeder runs from here. The domain and real-data seeders run with
+     * model events and activity recording off: seeded data is history, not
+     * news, so it must never produce activity or notifications.
      *
-     * Only demo data belongs here. The organisation's real records are
-     * opt-in via RealDataSeeder, and demo notifications via
-     * NotificationDemoSeeder.
+     * NotificationDemoSeeder comes last and outside that quiet block: it
+     * exists to exercise the activity and notification pipeline, so events
+     * and recording must be on for it.
      */
     public function run(): void
     {
-        Activity::withoutRecording(function (): void {
+        Model::withoutEvents(fn () => Activity::withoutRecording(function (): void {
             $this->call([
                 RolesAndPermissionsSeeder::class,
                 CoreDataSeeder::class,
@@ -34,7 +33,10 @@ class DatabaseSeeder extends Seeder
                 DeliverySeeder::class,
                 MealSeeder::class,
                 FinanceSeeder::class,
+                RealDataSeeder::class,
             ]);
-        });
+        }));
+
+        $this->call(NotificationDemoSeeder::class);
     }
 }
