@@ -2,6 +2,7 @@
 
 use App\Http\DeniedAccessRecorder;
 use App\Http\Middleware\EnsureHrAccountIsActive;
+use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\SyncProgramsFromHr;
 use Illuminate\Foundation\Application;
@@ -19,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(append: [
+            SecurityHeaders::class,
             SetLocale::class,
             SyncProgramsFromHr::class,
             EnsureHrAccountIsActive::class,
