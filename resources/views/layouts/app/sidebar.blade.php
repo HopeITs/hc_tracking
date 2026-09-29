@@ -35,7 +35,9 @@
                 <livewire:notifications.bell />
             @endif
 
-            <flux:dropdown position="top" align="end">
+            <x-tour.button />
+
+            <flux:dropdown position="top" align="end" data-tour="profile">
                 <flux:profile
                     icon-trailing="chevron-down"
                     class="min-h-11 min-w-11 touch-manipulation"
@@ -90,6 +92,8 @@
                     <livewire:notifications.bell />
                 @endif
 
+                <x-tour.button />
+
                 <flux:button
                     x-data
                     x-on:click="$flux.dark = ! $flux.dark"
@@ -107,13 +111,15 @@
 
                 <x-locale-toggle />
 
-                <div class="ms-1 border-s border-secondary-soft ps-2 dark:border-secondary-medium">
+                <div class="ms-1 border-s border-secondary-soft ps-2 dark:border-secondary-medium" data-tour="profile">
                     <x-desktop-user-menu />
                 </div>
             </div>
         </flux:header>
 
         {{ $slot }}
+
+        <x-tour.overlay />
 
         @persist('toast')
             <flux:toast.group position="center">

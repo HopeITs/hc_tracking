@@ -18,7 +18,7 @@
     };
 @endphp
 
-<div {{ $attributes->class('flex flex-col gap-2') }}>
+<div data-status-strip {{ $attributes->class('flex flex-col gap-2') }}>
     <div class="flex h-2.5 w-full overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium" role="img" aria-label="{{ $label }}">
         @if ($total > 0)
             @foreach ($segments as $segment)

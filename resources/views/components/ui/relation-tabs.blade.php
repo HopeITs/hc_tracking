@@ -1,6 +1,6 @@
 @props(['tabs' => [], 'active' => null, 'wireTarget' => 'tab'])
 
-<div role="tablist" {{ $attributes->class('flex flex-wrap items-center gap-1 border-b border-secondary-soft dark:border-secondary-medium') }}>
+<div role="tablist" data-relation-tabs {{ $attributes->class('flex flex-wrap items-center gap-1 border-b border-secondary-soft dark:border-secondary-medium') }}>
     @foreach ($tabs as $tab)
         @php $isActive = $tab['key'] === $active; @endphp
         <button

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\EmailTwoFactorController;
 use App\Http\Controllers\MarkNotificationReadController;
+use App\Http\Controllers\MarkTourSeenController;
 use App\Http\Controllers\OpenNotificationController;
 use App\Http\Controllers\ProjectFileDownloadController;
 use App\Http\Controllers\ProposalFileDownloadController;
@@ -28,6 +29,8 @@ Route::middleware('guest')->controller(EmailTwoFactorController::class)->group(f
 });
 
 Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () {
+    Route::post('tour/seen', MarkTourSeenController::class)->middleware('throttle:locale')->name('tour.seen');
+
     Route::livewire('home', 'pages::dashboard.index')->name('dashboard');
 
     Route::livewire('executive-summary', 'pages::executive-summary.index')

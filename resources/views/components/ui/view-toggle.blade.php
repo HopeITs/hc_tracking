@@ -1,7 +1,7 @@
 @props(['wireModel', 'active' => null, 'options' => [], 'label' => null])
 
 <div
-    {{ $attributes->class('inline-flex items-center gap-0.5 rounded-lg border border-secondary-soft bg-white p-0.5 dark:border-secondary-medium dark:bg-secondary-dark') }}
+    data-view-toggle {{ $attributes->class('inline-flex items-center gap-0.5 rounded-lg border border-secondary-soft bg-white p-0.5 dark:border-secondary-medium dark:bg-secondary-dark') }}
     role="radiogroup"
     @if ($label !== null) aria-label="{{ $label }}" @endif
 >
