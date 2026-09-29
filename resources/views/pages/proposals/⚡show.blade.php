@@ -23,6 +23,8 @@ use App\Models\ProposalStatusNote;
 use App\Models\Report;
 use App\Models\Task;
 use App\Models\TransfersTracking;
+use App\Rules\SecureUpload;
+use App\Support\UploadName;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
@@ -1526,7 +1528,7 @@ new #[Title('titles.proposal')] class extends Component
      */
     private function displayNameWithExtension(string $displayName, FileType $type): string
     {
-        $displayName = trim($displayName);
+        $displayName = UploadName::clean($displayName);
 
         if (Str::lower(pathinfo($displayName, PATHINFO_EXTENSION)) === $type->value) {
             return $displayName;
@@ -1577,7 +1579,7 @@ new #[Title('titles.proposal')] class extends Component
         $allowedTypes = implode(',', FileType::values());
 
         $validated = $this->validate([
-            'newFile' => [$isCreate ? 'required' : 'nullable', 'file', 'max:5120', 'mimes:'.$allowedTypes, 'extensions:'.$allowedTypes],
+            'newFile' => [$isCreate ? 'required' : 'nullable', 'bail', 'file', 'max:5120', 'mimes:'.$allowedTypes, 'extensions:'.$allowedTypes, new SecureUpload],
             'fileCategory' => ['required', Rule::enum(MediaCollection::class)],
             'fileDisplayName' => [$isCreate ? 'nullable' : 'required', 'string', 'max:255'],
         ], [
@@ -1608,13 +1610,13 @@ new #[Title('titles.proposal')] class extends Component
             ]);
         }
 
-        $displayName = trim((string) ($validated['fileDisplayName'] ?? ''));
+        $displayName = UploadName::clean((string) ($validated['fileDisplayName'] ?? ''), '');
 
         $media->fill([
             'collection' => $validated['fileCategory'],
             'original_name' => $displayName !== ''
                 ? $this->displayNameWithExtension($displayName, $media->type)
-                : $this->newFile->getClientOriginalName(),
+                : UploadName::clean($this->newFile->getClientOriginalName()),
         ])->save();
 
         if ($replaced !== null) {

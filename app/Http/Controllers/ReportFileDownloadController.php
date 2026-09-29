@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Report;
 use App\Models\ReportFile;
+use App\Support\UploadName;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -26,7 +27,7 @@ class ReportFileDownloadController extends Controller
         abort_unless($reportFile->report_id === $report->id, 404);
         abort_unless($reportFile->isStored(), 404);
 
-        return Storage::disk($reportFile->disk)->download($reportFile->path, $reportFile->displayName(), [
+        return Storage::disk($reportFile->disk)->download($reportFile->path, UploadName::clean($reportFile->displayName()), [
             'X-Content-Type-Options' => 'nosniff',
         ]);
     }

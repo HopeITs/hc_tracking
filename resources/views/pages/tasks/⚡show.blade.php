@@ -7,6 +7,8 @@ use App\Models\HrEmployee;
 use App\Models\Milestone;
 use App\Models\Task;
 use App\Models\TaskAttachment;
+use App\Rules\SecureUpload;
+use App\Support\UploadName;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
@@ -356,7 +358,7 @@ new #[Title('titles.task')] class extends Component
         $allowedTypes = implode(',', FileType::values());
 
         $validated = $this->validate([
-            'newFile' => [$isCreate ? 'required' : 'nullable', 'file', 'max:5120', 'mimes:'.$allowedTypes, 'extensions:'.$allowedTypes],
+            'newFile' => [$isCreate ? 'required' : 'nullable', 'bail', 'file', 'max:5120', 'mimes:'.$allowedTypes, 'extensions:'.$allowedTypes, new SecureUpload],
             'fileDisplayName' => [$isCreate ? 'nullable' : 'required', 'string', 'max:255'],
             'fileDate' => ['required', 'date'],
         ], [
@@ -386,12 +388,12 @@ new #[Title('titles.task')] class extends Component
             ]);
         }
 
-        $displayName = trim((string) ($validated['fileDisplayName'] ?? ''));
+        $displayName = UploadName::clean((string) ($validated['fileDisplayName'] ?? ''), '');
 
         $file->fill([
             'original_name' => $displayName !== ''
                 ? $this->displayNameWithExtension($displayName, $file->type)
-                : $this->newFile->getClientOriginalName(),
+                : UploadName::clean($this->newFile->getClientOriginalName()),
             'date' => $validated['fileDate'],
         ])->save();
 

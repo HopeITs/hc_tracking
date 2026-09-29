@@ -21,6 +21,8 @@ use App\Models\Proposal;
 use App\Models\Result;
 use App\Models\Risk;
 use App\Models\Task;
+use App\Rules\SecureUpload;
+use App\Support\UploadName;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
@@ -371,7 +373,7 @@ new #[Title('titles.project')] class extends Component {
      */
     private function displayNameWithExtension(string $displayName, FileType $type): string
     {
-        $displayName = trim($displayName);
+        $displayName = UploadName::clean($displayName);
 
         if (Str::lower(pathinfo($displayName, PATHINFO_EXTENSION)) === $type->value) {
             return $displayName;
@@ -421,7 +423,7 @@ new #[Title('titles.project')] class extends Component {
             $allowedTypes = implode(',', FileType::values());
 
             $validated = $this->validate([
-                'newFile' => ['required', 'file', 'max:5120', 'mimes:'.$allowedTypes, 'extensions:'.$allowedTypes],
+                'newFile' => ['required', 'bail', 'file', 'max:5120', 'mimes:'.$allowedTypes, 'extensions:'.$allowedTypes, new SecureUpload],
                 'fileCategory' => ['required', Rule::enum(MediaCollection::class)],
                 'fileDisplayName' => ['nullable', 'string', 'max:255'],
             ], [
@@ -431,7 +433,7 @@ new #[Title('titles.project')] class extends Component {
 
             $path = $this->newFile->store('media/projects/'.$this->projectId, 'local');
             $type = FileType::from(strtolower($this->newFile->getClientOriginalExtension()));
-            $displayName = trim((string) ($validated['fileDisplayName'] ?? ''));
+            $displayName = UploadName::clean((string) ($validated['fileDisplayName'] ?? ''), '');
 
             Media::create([
                 'mediable_type' => 'project',
@@ -441,7 +443,7 @@ new #[Title('titles.project')] class extends Component {
                 'path' => $path,
                 'original_name' => $displayName !== ''
                     ? $this->displayNameWithExtension($displayName, $type)
-                    : $this->newFile->getClientOriginalName(),
+                    : UploadName::clean($this->newFile->getClientOriginalName()),
                 'mime_type' => $this->newFile->getMimeType(),
                 'size' => $this->newFile->getSize(),
                 'type' => $type,

@@ -187,7 +187,7 @@ test('a file uploads to the proposal and downloads only through its own proposal
 
     proposalPage()
         ->call('openCreateFileModal')
-        ->set('newFile', UploadedFile::fake()->create('signed.pdf', 100, 'application/pdf'))
+        ->set('newFile', validUpload('signed.pdf', 100))
         ->set('fileCategory', MediaCollection::Agreement->value)
         ->set('fileDisplayName', 'ECHO agreement')
         ->call('saveFile')
@@ -291,7 +291,7 @@ test('replacing a file stores the new one and removes the old one from disk', fu
 
     $page = proposalPage()
         ->call('openCreateFileModal')
-        ->set('newFile', UploadedFile::fake()->create('draft.docx', 50))
+        ->set('newFile', validUpload('draft.docx', 50))
         ->set('fileCategory', MediaCollection::Proposal->value)
         ->call('saveFile');
 
@@ -299,7 +299,7 @@ test('replacing a file stores the new one and removes the old one from disk', fu
     $oldPath = $media->path;
 
     $page->call('openEditFileModal', $media->id)
-        ->set('newFile', UploadedFile::fake()->create('final.pdf', 80, 'application/pdf'))
+        ->set('newFile', validUpload('final.pdf', 80))
         ->set('fileDisplayName', 'Final proposal')
         ->call('saveFile')
         ->assertHasNoErrors();

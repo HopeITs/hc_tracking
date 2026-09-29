@@ -13,7 +13,7 @@ test('uploading a valid file creates a media row and writes the file to disk', f
     Storage::fake('local');
     $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
-    $file = UploadedFile::fake()->create('signed-agreement.pdf', 100, 'application/pdf');
+    $file = validUpload('signed-agreement.pdf', 100);
 
     Livewire::actingAs($user)
         ->test('pages::projects.show', ['project' => $project])
@@ -40,7 +40,7 @@ test('a display name typed without an extension keeps the uploaded files real ex
     Storage::fake('local');
     $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
-    $file = UploadedFile::fake()->create('photo.jpg', 100, 'image/jpeg');
+    $file = validUpload('photo.jpg', 100);
 
     Livewire::actingAs($user)
         ->test('pages::projects.show', ['project' => $project])

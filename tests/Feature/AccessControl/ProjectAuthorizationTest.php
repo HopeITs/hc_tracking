@@ -6,7 +6,6 @@ use App\Models\Milestone;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\User;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
@@ -29,7 +28,7 @@ test('the owner edits their project and uploads a file, but cannot archive it', 
 
     ($this->show)($this->owner)
         ->call('openCreateFileModal')
-        ->set('newFile', UploadedFile::fake()->create('plan.pdf', 50, 'application/pdf'))
+        ->set('newFile', validUpload('plan.pdf', 50))
         ->set('fileCategory', MediaCollection::Agreement->value)
         ->set('fileDisplayName', 'Work plan')
         ->call('saveFile')
