@@ -5,6 +5,7 @@ use App\Http\Middleware\AddSecurityHeaders;
 use App\Http\Middleware\EnsureHrAccountIsActive;
 use App\Http\Middleware\EnsureRequestCameThroughTrustedProxy;
 use App\Http\Middleware\EnsureTwoFactorIsEnabled;
+use App\Http\Middleware\RedirectToHttps;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\SyncProgramsFromHr;
 use Illuminate\Foundation\Application;
@@ -29,6 +30,10 @@ return Application::configure(basePath: dirname(__DIR__))
             AddSecurityHeaders::class,
             EnsureRequestCameThroughTrustedProxy::class,
         ]);
+
+        // Appended, not prepended: it must run after TrustProxies so that
+        // isSecure() believes a trusted proxy's X-Forwarded-Proto.
+        $middleware->append(RedirectToHttps::class);
 
         $middleware->web(append: [
             SetLocale::class,

@@ -38,6 +38,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Fortify\Actions\DisableTwoFactorAuthentication;
@@ -86,6 +87,30 @@ class AppServiceProvider extends ServiceProvider
     }
 
     /**
+     * Production is served over HTTPS only (see RedirectToHttps), so every
+     * URL it generates is https: pages, assets, the Livewire endpoints and the
+     * links in emails sent from queued jobs, even when APP_URL was copied from
+     * a local http:// .env. That misconfiguration is logged once a day, like
+     * APP_DEBUG above; a cache failure falls back to logging.
+     */
+    protected function configureHttps(): void
+    {
+        if (! $this->app->isProduction()) {
+            return;
+        }
+
+        URL::forceHttps();
+
+        if (str_starts_with((string) config('app.url'), 'https://')) {
+            return;
+        }
+
+        if (rescue(fn (): bool => Cache::add('security.app-url-not-https', true, now()->addDay()), true, report: false)) {
+            Log::critical('APP_URL does not start with https:// in production; generated links were forced to https. Set APP_URL=https://... in the live .env.');
+        }
+    }
+
+    /**
      * `php artisan dev` also runs the scheduler, so notification alerts,
      * digests and snooze wake-ups fire locally exactly as they will in
      * production (where cron runs schedule:run every minute).
@@ -101,6 +126,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+        $this->configureHttps();
         $this->configureMorphMap();
         $this->configureGates();
         $this->configureLivewire();

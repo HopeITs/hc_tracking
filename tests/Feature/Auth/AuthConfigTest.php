@@ -64,6 +64,16 @@ test('the session cookie is not secure by default when the app is served over ht
     expect($session['secure'])->toBeFalse();
 });
 
+test('the session cookie is always secure by default in production, even with an http app url', function () {
+    $session = configFileWithEnv('session.php', [
+        'APP_ENV' => 'production',
+        'APP_URL' => 'http://127.0.0.1:8000/',
+        'SESSION_SECURE_COOKIE' => null,
+    ]);
+
+    expect($session['secure'])->toBeTrue();
+});
+
 test('SESSION_SECURE_COOKIE overrides the scheme of the app url', function (string $appUrl, string $secureCookie, bool $expected) {
     $session = configFileWithEnv('session.php', [
         'APP_URL' => $appUrl,
