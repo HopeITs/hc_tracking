@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\Like;
 use App\Enums\ArStatus;
 use App\Enums\DonorType;
 use App\Livewire\Concerns\ManagesDonorForm;
@@ -98,10 +99,10 @@ new #[Title('titles.donors')] class extends Component {
         return Donor::query()
             ->when($search !== '', function (Builder $query) use ($search): void {
                 $query->where(function (Builder $query) use ($search): void {
-                    $query->where('name', 'like', '%'.$search.'%')
-                        ->orWhere('country', 'like', '%'.$search.'%')
-                        ->orWhere('contact_person', 'like', '%'.$search.'%')
-                        ->orWhere('email', 'like', '%'.$search.'%');
+                    $query->where('name', 'like', Like::contains($search))
+                        ->orWhere('country', 'like', Like::contains($search))
+                        ->orWhere('contact_person', 'like', Like::contains($search))
+                        ->orWhere('email', 'like', Like::contains($search));
                 });
             })
             ->when($this->relationship === 'funding', fn (Builder $query) => $query->has('donorProposals'))

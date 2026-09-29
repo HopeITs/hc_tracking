@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\Like;
 use App\Enums\ArStatus;
 use App\Enums\Currency;
 use App\Livewire\Concerns\ManagesAgreementForm;
@@ -90,9 +91,9 @@ new #[Title('titles.funding_agreements')] class extends Component {
             ->when($search !== '', function (Builder $query) use ($search): void {
                 $query->where(function (Builder $query) use ($search): void {
                     $query
-                        ->where('project_num', 'like', '%'.$search.'%')
-                        ->orWhereHas('donor', fn (Builder $query) => $query->where('name', 'like', '%'.$search.'%'))
-                        ->orWhereHas('proposal', fn (Builder $query) => $query->where('name', 'like', '%'.$search.'%'));
+                        ->where('project_num', 'like', Like::contains($search))
+                        ->orWhereHas('donor', fn (Builder $query) => $query->where('name', 'like', Like::contains($search)))
+                        ->orWhereHas('proposal', fn (Builder $query) => $query->where('name', 'like', Like::contains($search)));
                 });
             })
             ->when($this->donor !== '', fn (Builder $query) => $query->where('donor_id', (int) $this->donor))

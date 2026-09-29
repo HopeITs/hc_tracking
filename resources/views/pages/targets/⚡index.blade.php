@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\Like;
 use App\Enums\IndicatorMeasure;
 use App\Enums\Period;
 use App\Models\AnnualPlan;
@@ -210,7 +211,7 @@ new #[Title('titles.targets')] class extends Component {
         return PlanIndicator::query()
             // The indicator, the result it measures, or the proposal it was committed in.
             ->when($search !== '', function ($query) use ($search): void {
-                $like = '%'.$search.'%';
+                $like = Like::contains($search);
 
                 $query->where(fn ($query) => $query
                     ->whereHas('indicator', fn ($query) => $query

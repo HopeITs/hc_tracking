@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Models\Concerns\RemembersHrLookup;
+use App\Support\Like;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -65,7 +66,7 @@ class HrUser extends HrModel
 
         return static::query()
             ->where(fn (Builder $query) => $query
-                ->where('email', 'like', '%'.trim($search).'%')
+                ->where('email', 'like', Like::contains($search))
                 ->orWhereIn('employee_id', $employeeIds))
             ->pluck('id')
             ->all();

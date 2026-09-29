@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\Like;
 use App\Enums\ArStatus;
 use App\Enums\ProposalPhase;
 use App\Enums\ProposalStatus;
@@ -122,7 +123,7 @@ new #[Title('titles.proposals')] class extends Component {
         return Proposal::query()
             ->when($search !== '', function (Builder $query) use ($search): void {
                 $query->where(function (Builder $query) use ($search): void {
-                    $query->where('name', 'like', '%'.$search.'%')->orWhere('notes', 'like', '%'.$search.'%');
+                    $query->where('name', 'like', Like::contains($search))->orWhere('notes', 'like', Like::contains($search));
                 });
             })
             ->when(ProposalStatus::tryFrom($this->status), fn (Builder $query, ProposalStatus $status) => $query->where('status', $status))

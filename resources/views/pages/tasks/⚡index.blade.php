@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\Like;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Livewire\Concerns\ManagesTaskVisibility;
@@ -404,8 +405,8 @@ new #[Title('titles.tasks')] class extends Component
             ])
             ->when($search !== '', function (Builder $query) use ($search): void {
                 $query->where(function (Builder $query) use ($search): void {
-                    $query->where('title', 'like', '%'.$search.'%')
-                        ->orWhere('description', 'like', '%'.$search.'%')
+                    $query->where('title', 'like', Like::contains($search))
+                        ->orWhere('description', 'like', Like::contains($search))
                         ->orWhereHas('taskAssignees', fn (Builder $query) => $query->whereIn('employee_id', HrEmployee::idsMatchingName($search)));
                 });
             })

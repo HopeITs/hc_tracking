@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\Locale;
+use App\Support\Like;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -75,10 +76,10 @@ class HrEmployee extends HrModel
 
         foreach ($words as $word) {
             $query->where(fn ($query) => $query
-                ->where('first_name_en', 'like', '%'.$word.'%')
-                ->orWhere('last_name_en', 'like', '%'.$word.'%')
-                ->orWhere('first_name_ar', 'like', '%'.$word.'%')
-                ->orWhere('last_name_ar', 'like', '%'.$word.'%'));
+                ->where('first_name_en', 'like', Like::contains($word))
+                ->orWhere('last_name_en', 'like', Like::contains($word))
+                ->orWhere('first_name_ar', 'like', Like::contains($word))
+                ->orWhere('last_name_ar', 'like', Like::contains($word)));
         }
 
         return $query->pluck('id')->all();

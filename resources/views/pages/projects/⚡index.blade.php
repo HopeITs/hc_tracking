@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\Like;
 use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\RagStatus;
@@ -235,8 +236,8 @@ new #[Title('titles.projects')] class extends Component {
 
         return [
             'cities' => HrCity::query()
-                ->where('name_en', 'like', '%'.$search.'%')
-                ->orWhere('name_ar', 'like', '%'.$search.'%')
+                ->where('name_en', 'like', Like::contains($search))
+                ->orWhere('name_ar', 'like', Like::contains($search))
                 ->pluck('id')
                 ->all(),
             'owners' => HrEmployee::idsMatchingName($search),
@@ -262,7 +263,7 @@ new #[Title('titles.projects')] class extends Component {
             ->when($search !== '', function (Builder $query) use ($search, $matches): void {
                 $query->where(function (Builder $query) use ($search, $matches): void {
                     $query
-                        ->where('name', 'like', '%'.$search.'%')
+                        ->where('name', 'like', Like::contains($search))
                         ->orWhereIn('city_id', $matches['cities'])
                         ->orWhereIn('program_id', HrProgram::idsMatchingName($search))
                         ->orWhereIn('user_id', $matches['owners']);

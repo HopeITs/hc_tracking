@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\Like;
 use App\Models\Project;
 use App\Models\Risk;
 use Flux\Flux;
@@ -94,9 +95,9 @@ new #[Title('titles.risks')] class extends Component {
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($query) use ($search): void {
                     $query
-                        ->where('name', 'like', '%'.$search.'%')
-                        ->orWhere('impact', 'like', '%'.$search.'%')
-                        ->orWhereHas('project', fn ($query) => $query->where('name', 'like', '%'.$search.'%'));
+                        ->where('name', 'like', Like::contains($search))
+                        ->orWhere('impact', 'like', Like::contains($search))
+                        ->orWhereHas('project', fn ($query) => $query->where('name', 'like', Like::contains($search)));
                 });
             })
             ->when($includeProject && $this->project !== '', fn ($query) => $query->where('project_id', (int) $this->project))

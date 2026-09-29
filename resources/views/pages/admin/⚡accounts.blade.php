@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\Like;
 use App\Enums\ArStatus;
 use App\Enums\Currency;
 use App\Models\Account;
@@ -96,9 +97,9 @@ new #[Title('titles.accounts')] class extends Component {
             ->when(
                 $search !== '',
                 fn ($query) => $query->where(fn ($query) => $query
-                    ->where('account_name', 'like', '%'.$search.'%')
-                    ->orWhere('bank_name', 'like', '%'.$search.'%')
-                    ->orWhere('account_number', 'like', '%'.$search.'%')),
+                    ->where('account_name', 'like', Like::contains($search))
+                    ->orWhere('bank_name', 'like', Like::contains($search))
+                    ->orWhere('account_number', 'like', Like::contains($search))),
             )
             ->when($this->state === 'active', fn ($query) => $query->where('is_active', true))
             ->when($this->state === 'closed', fn ($query) => $query->where('is_active', false))

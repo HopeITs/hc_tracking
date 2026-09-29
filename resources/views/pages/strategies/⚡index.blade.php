@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\Like;
 use App\Models\Strategy;
 use Flux\Flux;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -213,7 +214,7 @@ new #[Title('titles.strategies')] class extends Component {
         $searchFiltered = Strategy::query()
             ->select(['id', 'name', 'start_year', 'end_year'])
             ->withCount('programs')
-            ->when($search !== '', fn ($query) => $query->where('name', 'like', '%'.$search.'%'))
+            ->when($search !== '', fn ($query) => $query->where('name', 'like', Like::contains($search)))
             ->orderBy('name')
             ->orderBy('id')
             ->get()

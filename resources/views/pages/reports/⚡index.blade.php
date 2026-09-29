@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\Like;
 use App\Enums\ReportStatus;
 use App\Livewire\Concerns\ManagesReportForm;
 use App\Models\AnnualPlan;
@@ -146,7 +147,7 @@ new #[Title('titles.reports')] class extends Component {
 
         return Report::query()
             ->when($search !== '', function ($query) use ($search): void {
-                $like = '%'.$search.'%';
+                $like = Like::contains($search);
 
                 $query->where(function ($query) use ($like): void {
                     $query
