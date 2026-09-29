@@ -2,6 +2,7 @@
 
 use App\Http\DeniedAccessRecorder;
 use App\Http\Middleware\EnsureHrAccountIsActive;
+use App\Http\Middleware\EnsureRequestCameThroughTrustedProxy;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\SyncProgramsFromHr;
 use Illuminate\Foundation\Application;
@@ -18,6 +19,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->prepend(EnsureRequestCameThroughTrustedProxy::class);
+
         $middleware->web(append: [
             SetLocale::class,
             SyncProgramsFromHr::class,

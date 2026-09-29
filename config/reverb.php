@@ -1,5 +1,27 @@
 <?php
 
+/*
+|--------------------------------------------------------------------------
+| Allowed websocket origins
+|--------------------------------------------------------------------------
+|
+| The browser origins that may open a websocket to Reverb, as a
+| comma-separated list of hosts in REVERB_ALLOWED_ORIGINS (wildcards such
+| as *.example.org work; Reverb matches the Origin header's host with
+| Str::is). Unset or empty allows only the host of APP_URL, so another
+| website cannot open a socket in a signed-in user's browser. With neither
+| set no browser origin is allowed and the frontend falls back to polling.
+| An explicit * still allows every origin.
+*/
+
+$reverbAllowedOrigins = array_values(array_filter(array_map(trim(...), explode(',', (string) env('REVERB_ALLOWED_ORIGINS', '')))));
+
+if ($reverbAllowedOrigins === []) {
+    $appHost = parse_url((string) env('APP_URL', ''), PHP_URL_HOST);
+
+    $reverbAllowedOrigins = is_string($appHost) && $appHost !== '' ? [$appHost] : [];
+}
+
 return [
 
     /*
@@ -82,7 +104,7 @@ return [
                     'scheme' => env('REVERB_SCHEME', 'https'),
                     'useTLS' => env('REVERB_SCHEME', 'https') === 'https',
                 ],
-                'allowed_origins' => ['*'],
+                'allowed_origins' => $reverbAllowedOrigins,
                 'ping_interval' => env('REVERB_APP_PING_INTERVAL', 60),
                 'activity_timeout' => env('REVERB_APP_ACTIVITY_TIMEOUT', 30),
                 'max_connections' => env('REVERB_APP_MAX_CONNECTIONS'),

@@ -4,9 +4,12 @@ use App\Models\User;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Log;
 use Laravel\Fortify\Events\RecoveryCodeReplaced;
 use Laravel\Fortify\Events\TwoFactorAuthenticationDisabled;
+use Monolog\Formatter\SyslogFormatter;
+use Monolog\Handler\SocketHandler;
 use Monolog\Handler\TestHandler;
 use Monolog\LogRecord;
 
@@ -43,6 +46,36 @@ test('the auth channel writes a daily auth.log kept for 90 days at info level un
             'level' => 'info',
             'max_files' => 90,
         ]);
+});
+
+test('the optional auth_remote channel sends syslog lines over TLS to LOG_AUTH_REMOTE_URL with short timeouts', function () {
+    config(['logging.channels.auth_remote.handler_with.connectionString' => 'tls://logs.example.org:6514']);
+
+    $handler = Log::channel('auth_remote')->getLogger()->getHandlers()[0];
+
+    expect($handler)->toBeInstanceOf(SocketHandler::class)
+        ->and($handler->getConnectionString())->toBe('tls://logs.example.org:6514')
+        ->and($handler->getFormatter())->toBeInstanceOf(SyslogFormatter::class)
+        ->and($handler->getConnectionTimeout())->toBeGreaterThan(0.0)->toBeLessThanOrEqual(5.0)
+        ->and($handler->getTimeout())->toBeGreaterThan(0.0)->toBeLessThanOrEqual(5.0)
+        ->and($handler->getWritingTimeout())->toBeGreaterThan(0.0)->toBeLessThanOrEqual(5.0);
+});
+
+test('an unreachable remote collector does not block a sign-in or the local auth line', function () {
+    Exceptions::fake();
+    config([
+        'logging.channels.auth_local' => ['driver' => 'monolog', 'handler' => TestHandler::class],
+        'logging.channels.auth' => ['driver' => 'stack', 'channels' => ['auth_local', 'auth_remote'], 'ignore_exceptions' => false],
+        'logging.channels.auth_remote.handler_with.connectionString' => 'tls://127.0.0.1:9',
+    ]);
+    $user = User::factory()->withHrAccount()->create();
+
+    $this->post(route('login.store'), ['email' => $user->email, 'password' => 'password'])
+        ->assertSessionHasNoErrors();
+
+    $this->assertAuthenticatedAs($user);
+    expect(authLogEntry('login')?->context)->toMatchArray(['user_id' => $user->id]);
+    Exceptions::assertReported(UnexpectedValueException::class);
 });
 
 test('a sign-in is logged with the user, ip, user agent and guard', function () {
