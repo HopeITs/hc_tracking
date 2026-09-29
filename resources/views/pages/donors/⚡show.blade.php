@@ -803,30 +803,30 @@ new #[Title('titles.donor')] class extends Component {
                                     <flux:icon.chevron-right variant="micro" class="size-4 transition-transform group-open:rotate-90 rtl:-scale-x-100" aria-hidden="true" />
                                     {{ trans_choice('donors.every_tranche_in_detail', $agreement->transfers->count(), ['count' => $agreement->transfers->count()]) }}
                                 </summary>
-                                <div class="mt-3 overflow-x-auto">
-                                    <table class="w-full min-w-[46rem] text-start text-xs tabular-nums">
-                                        <thead>
+                                <div class="@container mt-3">
+                                    <table class="w-full text-start text-xs tabular-nums @max-3xl:block">
+                                        <thead class="@max-3xl:hidden">
                                             <tr class="border-b {{ $hairline }}">
                                                 @foreach ([__('common.status'), __('transfers.scheduled'), __('transfers.sent_on'), __('transfers.payment_amount'), __('transfers.fees'), __('transfers.exchange_rate'), __('transfers.amount_received'), __('transfers.received_on'), __('transfers.account')] as $heading)
                                                     <th scope="col" class="type-label py-2 pe-4 text-start font-semibold {{ $mutedText }}">{{ $heading }}</th>
                                                 @endforeach
                                             </tr>
                                         </thead>
-                                        <tbody>
+                                        <tbody class="[&>tr>td]:@max-3xl:block [&>tr>td]:@max-3xl:whitespace-normal [&>tr>td]:@max-3xl:before:block [&>tr>td]:@max-3xl:before:text-[11px] [&>tr>td]:@max-3xl:before:font-semibold [&>tr>td]:@max-3xl:before:content-[attr(data-label)] [&>tr>td]:@max-3xl:before:text-secondary-medium dark:[&>tr>td]:@max-3xl:before:text-secondary-soft [&>tr>td]:@max-3xl:p-0 [&>tr]:@max-3xl:grid [&>tr]:@max-3xl:grid-cols-2 [&>tr]:@max-3xl:gap-x-4 [&>tr]:@max-3xl:gap-y-2 [&>tr]:@max-3xl:py-3 @max-3xl:block">
                                             @foreach ($agreement->transfers as $transfer)
                                                 @php
                                                     $state = $this->transferState($transfer);
                                                 @endphp
                                                 <tr class="border-b last:border-b-0 {{ $hairline }}" wire:key="tranche-row-{{ $transfer->id }}" data-tranche-row="{{ $state }}">
-                                                    <td @class(['py-2 pe-4 font-semibold whitespace-nowrap', 'text-funding' => $state === 'received', 'text-status-warn' => in_array($state, ['due', 'transit'], true), 'text-status-critical' => in_array($state, ['overdue', 'failed'], true), $mutedText => $state === 'undated'])>{{ $stateLabels[$state] }}</td>
-                                                    <td class="py-2 pe-4 whitespace-nowrap">{{ $formatDate($transfer->scheduled_date) }}</td>
-                                                    <td class="py-2 pe-4 whitespace-nowrap">{{ $formatDate($transfer->transfer_date) }}</td>
-                                                    <td class="py-2 pe-4 font-semibold whitespace-nowrap {{ $inkText }}">{{ $amount((float) $transfer->payment_amount) }} <span class="font-normal {{ $mutedText }}">{{ $transfer->amount_transfered_currency?->value }}</span></td>
-                                                    <td class="py-2 pe-4 whitespace-nowrap">{{ (float) $transfer->fees > 0 ? $amount((float) $transfer->fees).' '.$transfer->fees_currency?->value : '—' }}</td>
-                                                    <td class="py-2 pe-4 whitespace-nowrap">{{ (float) $transfer->exchange_rate !== 1.0 ? rtrim(rtrim(number_format((float) $transfer->exchange_rate, 6), '0'), '.') : '—' }}</td>
-                                                    <td class="py-2 pe-4 whitespace-nowrap">{{ $transfer->net_amount_received !== null ? $amount((float) $transfer->net_amount_received).' '.$transfer->amount_received_currency?->value : '—' }}</td>
-                                                    <td class="py-2 pe-4 whitespace-nowrap">{{ $formatDate($transfer->receive_date) }}</td>
-                                                    <td class="py-2 pe-4 whitespace-nowrap">{{ $transfer->account?->account_name ?? __('transfers.not_yet_assigned') }}</td>
+                                                    <td data-label="{{ __('common.status') }}" @class(['py-2 pe-4 font-semibold whitespace-nowrap', 'text-funding' => $state === 'received', 'text-status-warn' => in_array($state, ['due', 'transit'], true), 'text-status-critical' => in_array($state, ['overdue', 'failed'], true), $mutedText => $state === 'undated'])>{{ $stateLabels[$state] }}</td>
+                                                    <td data-label="{{ __('transfers.scheduled') }}" class="py-2 pe-4 whitespace-nowrap">{{ $formatDate($transfer->scheduled_date) }}</td>
+                                                    <td data-label="{{ __('transfers.sent_on') }}" class="py-2 pe-4 whitespace-nowrap">{{ $formatDate($transfer->transfer_date) }}</td>
+                                                    <td data-label="{{ __('transfers.payment_amount') }}" class="py-2 pe-4 font-semibold whitespace-nowrap {{ $inkText }}">{{ $amount((float) $transfer->payment_amount) }} <span class="font-normal {{ $mutedText }}">{{ $transfer->amount_transfered_currency?->value }}</span></td>
+                                                    <td data-label="{{ __('transfers.fees') }}" class="py-2 pe-4 whitespace-nowrap">{{ (float) $transfer->fees > 0 ? $amount((float) $transfer->fees).' '.$transfer->fees_currency?->value : '—' }}</td>
+                                                    <td data-label="{{ __('transfers.exchange_rate') }}" class="py-2 pe-4 whitespace-nowrap">{{ (float) $transfer->exchange_rate !== 1.0 ? rtrim(rtrim(number_format((float) $transfer->exchange_rate, 6), '0'), '.') : '—' }}</td>
+                                                    <td data-label="{{ __('transfers.amount_received') }}" class="py-2 pe-4 whitespace-nowrap">{{ $transfer->net_amount_received !== null ? $amount((float) $transfer->net_amount_received).' '.$transfer->amount_received_currency?->value : '—' }}</td>
+                                                    <td data-label="{{ __('transfers.received_on') }}" class="py-2 pe-4 whitespace-nowrap">{{ $formatDate($transfer->receive_date) }}</td>
+                                                    <td data-label="{{ __('transfers.account') }}" class="py-2 pe-4 whitespace-nowrap">{{ $transfer->account?->account_name ?? __('transfers.not_yet_assigned') }}</td>
                                                 </tr>
                                             @endforeach
                                         </tbody>
