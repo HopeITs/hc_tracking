@@ -3,6 +3,7 @@
 use App\Http\DeniedAccessRecorder;
 use App\Http\Middleware\EnsureHrAccountIsActive;
 use App\Http\Middleware\EnsureRequestCameThroughTrustedProxy;
+use App\Http\Middleware\EnsureTwoFactorIsEnabled;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\SyncProgramsFromHr;
 use Illuminate\Foundation\Application;
@@ -15,9 +16,13 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         commands: __DIR__.'/../routes/console.php',
-        channels: __DIR__.'/../routes/channels.php',
         health: '/up',
     )
+    // POST /broadcasting/auth gets the same gate as every app page (signed
+    // in, two-factor enrolled where required) plus its own rate limit.
+    ->withBroadcasting(__DIR__.'/../routes/channels.php', [
+        'middleware' => ['web', 'auth', 'throttle:broadcasting', EnsureTwoFactorIsEnabled::class],
+    ])
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->prepend(EnsureRequestCameThroughTrustedProxy::class);
 

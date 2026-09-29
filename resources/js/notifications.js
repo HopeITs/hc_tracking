@@ -9,6 +9,12 @@
  * is not connected the inbox is polled every 60s; returning to the tab always
  * re-syncs.
  *
+ * Live updates never outlive the session. After the session lifetime passes
+ * with no input in this tab, the socket and polling pause until the user is
+ * back. On ".session.ended" (a sign-out somewhere for this user) the socket
+ * reconnects, which re-authorizes the channel: a tab whose session is gone is
+ * refused (401/403/419) and stays disconnected.
+ *
  * Desktop popups go through the service worker (public/sw.js) so they carry
  * the app's name and banner artwork, and a click opens the record. The same file
  * makes the site installable as the "HC Tracking" app; the install prompt is
@@ -20,8 +26,14 @@ const MAX_TOASTS = 4;
 const APP_ICON = '/app-icons/icon-192.png';
 const APP_BADGE = '/app-icons/badge-96.png';
 
+const AUTH_REFUSED_STATUSES = [401, 403, 419];
+
 let subscribed = false;
 let pollTimer = null;
+
+/** null while live; 'idle' (resumes on input) or 'signed-out' (stays off). */
+let pausedReason = null;
+let lastActivityAt = Date.now();
 
 /** Translated strings rendered by <x-notifications.toasts>. */
 function labels() {
@@ -272,7 +284,7 @@ function maybeShowDesktopPopup(payload) {
 /* ------------------------------------------------------------------ */
 
 function startPolling() {
-    if (pollTimer === null) {
+    if (pollTimer === null && pausedReason === null) {
         pollTimer = window.setInterval(refreshInbox, POLL_INTERVAL_MS);
     }
 }
@@ -284,6 +296,61 @@ function stopPolling() {
     }
 }
 
+function pusherClient() {
+    return window.Echo?.connector?.pusher ?? null;
+}
+
+/** Stop the socket and polling: nothing live reaches this tab until resumed. */
+function pauseLiveUpdates(reason) {
+    pausedReason = reason;
+    stopPolling();
+    pusherClient()?.disconnect();
+}
+
+/**
+ * Back from an idle pause. Reconnecting the same Pusher client re-authorizes
+ * the channel, so an expired session ends up paused as signed-out instead.
+ */
+function resumeLiveUpdates() {
+    if (pausedReason !== 'idle') {
+        return;
+    }
+
+    pausedReason = null;
+
+    const pusher = pusherClient();
+
+    if (pusher) {
+        pusher.connect();
+    } else {
+        startPolling();
+        refreshInbox();
+    }
+}
+
+/** A sign-out happened for this user somewhere: re-check this tab's session. */
+function recheckSession() {
+    const pusher = pusherClient();
+
+    if (pausedReason !== null || !pusher) {
+        return;
+    }
+
+    pusher.disconnect();
+    pusher.connect();
+}
+
+function sessionLifetimeMs() {
+    const minutes = Number(document.body.dataset.sessionLifetime);
+
+    return Number.isFinite(minutes) && minutes > 0 ? minutes * 60_000 : null;
+}
+
+function noteActivity() {
+    lastActivityAt = Date.now();
+    resumeLiveUpdates();
+}
+
 function subscribe() {
     const userId = document.body.dataset.userId;
 
@@ -293,21 +360,48 @@ function subscribe() {
 
     subscribed = true;
 
+    ['pointerdown', 'keydown', 'wheel', 'touchstart'].forEach((type) => {
+        window.addEventListener(type, noteActivity, { capture: true, passive: true });
+    });
+
+    const lifetimeMs = sessionLifetimeMs();
+
+    if (lifetimeMs !== null) {
+        window.setInterval(() => {
+            if (pausedReason === null && Date.now() - lastActivityAt >= lifetimeMs) {
+                pauseLiveUpdates('idle');
+            }
+        }, 60_000);
+    }
+
     if (!window.Echo) {
         startPolling();
 
         return;
     }
 
-    window.Echo.private(`App.Models.User.${userId}`).listen('.notification.pushed', (payload) => {
-        refreshInbox();
-        window.dispatchEvent(new CustomEvent('hc-notification', { detail: payload }));
-        maybeShowDesktopPopup(payload);
-    });
+    window.Echo.private(`App.Models.User.${userId}`)
+        .listen('.notification.pushed', (payload) => {
+            refreshInbox();
+            window.dispatchEvent(new CustomEvent('hc-notification', { detail: payload }));
+            maybeShowDesktopPopup(payload);
+        })
+        .listen('.session.ended', recheckSession)
+        .error((error) => {
+            if (AUTH_REFUSED_STATUSES.includes(error?.status)) {
+                pauseLiveUpdates('signed-out');
+            } else {
+                startPolling();
+            }
+        });
 
-    const connection = window.Echo.connector?.pusher?.connection;
+    const connection = pusherClient()?.connection;
 
     connection?.bind('state_change', ({ current }) => {
+        if (pausedReason !== null) {
+            return;
+        }
+
         if (current === 'connected') {
             stopPolling();
             refreshInbox();
@@ -326,6 +420,7 @@ document.addEventListener('livewire:navigated', subscribe);
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
         refreshInbox();
+        noteActivity();
     }
 });
 

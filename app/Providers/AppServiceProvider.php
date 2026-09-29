@@ -179,6 +179,13 @@ class AppServiceProvider extends ServiceProvider
             (string) ($request->user()?->id ?? $request->ip()),
         ));
 
+        // POST /broadcasting/auth: a page authorizes its one private channel
+        // once per load (and on a reconnect), so 30 a minute is far above
+        // real use while stopping a script from hammering it.
+        RateLimiter::for('broadcasting', fn (Request $request) => Limit::perMinute(30)->by(
+            (string) ($request->user()?->id ?? $request->ip()),
+        ));
+
         // The resend endpoint used a flat, IP-only throttle: a distributed
         // caller could spam resends for one still-authenticating login from
         // many IPs. Stacked with a per-IP limit so a single IP can't spam

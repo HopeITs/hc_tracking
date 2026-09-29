@@ -7,6 +7,7 @@ use App\Livewire\Concerns\RequiresConfirmedPassword;
 use App\Models\TrustedDevice;
 use App\Models\User;
 use Flux\Flux;
+use Illuminate\Auth\Events\OtherDeviceLogout;
 use Illuminate\Auth\SessionGuard;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Auth;
@@ -291,7 +292,9 @@ new #[Title('titles.security_settings')] class extends Component {
     /**
      * Sign this account out everywhere but here: the other session rows go,
      * and a new remember token stops remember-me cookies from signing those
-     * devices straight back in.
+     * devices straight back in. OtherDeviceLogout writes the auth log line
+     * and tells those devices' open tabs to drop their live websocket
+     * (BroadcastSessionEnded).
      */
     public function signOutOtherDevices(): void
     {
@@ -304,6 +307,8 @@ new #[Title('titles.security_settings')] class extends Component {
         $this->rotateRememberToken(auth()->user());
 
         TrustedDevices::forgetOthers(request(), auth()->user());
+
+        event(new OtherDeviceLogout('web', auth()->user()));
 
         unset($this->signedInDevices, $this->trustedDevices);
 
