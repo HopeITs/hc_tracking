@@ -118,3 +118,19 @@ test('the account directory renders with no accounts', function () {
 
     Livewire::actingAs($user)->test('pages::admin.accounts')->assertSee('No accounts yet');
 });
+
+test('accounts can be searched by part of their encrypted account number', function () {
+    $user = User::factory()->role('Financial')->create();
+
+    Account::factory()->create(['account_name' => 'Operations USD', 'bank_name' => 'Fransbank', 'account_number' => 'NRA201000409112768']);
+    Account::factory()->create(['account_name' => 'Legacy EUR', 'bank_name' => 'Bank Audi', 'account_number' => '4040Z06926201']);
+
+    Livewire::actingAs($user)
+        ->test('pages::admin.accounts')
+        ->set('search', 'nra2010004')
+        ->assertSee('Operations USD')
+        ->assertDontSee('Legacy EUR')
+        ->set('search', 'Audi')
+        ->assertSee('Legacy EUR')
+        ->assertDontSee('Operations USD');
+});

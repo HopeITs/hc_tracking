@@ -1,8 +1,11 @@
 <?php
 
 use App\Models\Account;
+use App\Models\Activity;
 use App\Models\TransfersTracking;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 
 test('an account has the transfers that landed in it', function () {
     $account = Account::factory()->create();
@@ -70,4 +73,67 @@ test('a closed account keeps the transfers that already passed through it', func
     $account->close();
 
     expect($account->fresh()->transfers)->toHaveCount(1);
+});
+
+test('the account number and IBAN are stored encrypted and read back in plaintext', function () {
+    $account = Account::factory()->create([
+        'account_number' => '030/02/353/2531267/1/3',
+        'iban' => 'LB03001400003002353253126713',
+    ]);
+
+    $stored = DB::table('accounts')->find($account->id);
+
+    expect($stored->account_number)->not->toContain('2531267')
+        ->and(Crypt::decryptString($stored->account_number))->toBe('030/02/353/2531267/1/3')
+        ->and(Crypt::decryptString($stored->iban))->toBe('LB03001400003002353253126713')
+        ->and($account->fresh()->account_number)->toBe('030/02/353/2531267/1/3')
+        ->and($account->fresh()->iban)->toBe('LB03001400003002353253126713');
+});
+
+test('an account with no IBAN stores null, not an encrypted empty value', function () {
+    $account = Account::factory()->create(['iban' => null]);
+
+    expect(DB::table('accounts')->find($account->id)->iban)->toBeNull()
+        ->and($account->fresh()->iban)->toBeNull();
+});
+
+test('account numbers and IBANs are kept out of the activity log', function () {
+    $account = Activity::withoutRecording(fn () => Account::factory()->create([
+        'account_number' => '4040Z06926201',
+        'iban' => 'LB00000000000000000000000001',
+    ]));
+
+    $account->update([
+        'account_number' => '4040Z06926299',
+        'iban' => 'LB00000000000000000000000099',
+        'bank_name' => 'Bank Audi',
+    ]);
+
+    $activity = Activity::query()->where('subject_type', 'account')->sole();
+    $storedLog = json_encode(DB::table('activities')->find($activity->id));
+
+    expect($activity->changes)->toHaveKey('bank_name')
+        ->not->toHaveKey('account_number')
+        ->not->toHaveKey('iban')
+        ->and($storedLog)->not->toContain('4040Z069262')
+        ->not->toContain('LB000000000000000000000000');
+});
+
+test('the account number and IBAN are still serialized', function () {
+    $account = Account::factory()->create(['account_number' => '21.13.0000803.11', 'iban' => 'LB03001400003002353253126713']);
+
+    expect($account->fresh()->toArray())->toMatchArray([
+        'account_number' => '21.13.0000803.11',
+        'iban' => 'LB03001400003002353253126713',
+    ]);
+});
+
+test('accounts are found by part of their account number, ignoring case', function () {
+    $matching = Account::factory()->create(['account_number' => 'NRA201000409112768']);
+    $alsoMatching = Account::factory()->create(['account_number' => 'nra201000340603445']);
+    Account::factory()->create(['account_number' => '4040Z06926201']);
+
+    expect(Account::idsMatchingAccountNumber(' nra2010 '))->toEqualCanonicalizing([$matching->id, $alsoMatching->id])
+        ->and(Account::idsMatchingAccountNumber('no-such-number'))->toBe([])
+        ->and(Account::idsMatchingAccountNumber(''))->toBe([]);
 });

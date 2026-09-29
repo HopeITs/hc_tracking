@@ -17,19 +17,25 @@ use Illuminate\Database\Seeder;
  *
  * or with every other real seeder, in dependency order, via RealDataSeeder.
  *
- * `firstOrCreate` on `account_number` makes re-running it a no-op for
- * accounts already inserted, so it is safe to run again after adding a new
- * row here.
+ * An account whose account number is already stored is skipped, so re-running
+ * it is a no-op for accounts already inserted and it is safe to run again after
+ * adding a new row here. account_number is encrypted, so the existing numbers
+ * are decrypted and compared in PHP rather than matched by the database.
  */
 class RealAccountsSeeder extends Seeder
 {
     public function run(): void
     {
+        $existingAccountNumbers = Account::query()->pluck('account_number')->flip();
+
         foreach ($this->accounts() as $account) {
-            Account::query()->firstOrCreate(
-                ['account_number' => $account['account_number']],
-                $account,
-            );
+            if ($existingAccountNumbers->has($account['account_number'])) {
+                continue;
+            }
+
+            Account::query()->create($account);
+
+            $existingAccountNumbers->put($account['account_number'], true);
         }
     }
 

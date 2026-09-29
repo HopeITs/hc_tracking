@@ -176,7 +176,7 @@ class AuthenticateWithHrAccount
      *
      * @throws ValidationException
      */
-    public static function confirmsPassword(User $user, ?string $password): bool
+    public static function confirmsPassword(User $user, #[\SensitiveParameter] ?string $password): bool
     {
         $request = request();
         $limits = [
@@ -263,7 +263,7 @@ class AuthenticateWithHrAccount
     /**
      * The HR account with this email, when the password matches it.
      */
-    private static function hrAccountFor(string $email, string $password): ?HrUser
+    private static function hrAccountFor(string $email, #[\SensitiveParameter] string $password): ?HrUser
     {
         if ($email === '' || $password === '') {
             return null;

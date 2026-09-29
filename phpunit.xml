@@ -30,6 +30,7 @@
         <env name="HR_DB_DRIVER" value="sqlite"/>
         <env name="HR_DB_DATABASE" value=":memory:"/>
         <env name="LOG_AUTH_STACK" value="null"/>
+        <env name="LOG_CHANNEL" value="null"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

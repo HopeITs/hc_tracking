@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 /**
  * An organisational bank account that donor funds pass through.
@@ -29,6 +30,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * across every account held at that branch); `company_address` is the
  * account holder company's own registered address, when it differs from the
  * organisation's own — kept separate rather than folded together.
+ *
+ * `account_number` and `iban` are encrypted at rest with the APP_KEY and never
+ * written to the activity log. The database cannot search them; match them in
+ * PHP (see idsMatchingAccountNumber()).
  *
  * @property int $id
  * @property string $account_name
@@ -88,6 +93,30 @@ class Account extends Model implements TracksActivity
     }
 
     /**
+     * Ids of the accounts whose account number contains this text, ignoring
+     * case. The column is encrypted, so the database cannot match it: every
+     * account number is decrypted and compared here instead (a small table).
+     *
+     * @return list<int>
+     */
+    public static function idsMatchingAccountNumber(string $search): array
+    {
+        $search = trim($search);
+
+        if ($search === '') {
+            return [];
+        }
+
+        return static::query()
+            ->select(['id', 'account_number'])
+            ->get()
+            ->filter(fn (Account $account): bool => Str::contains($account->account_number, $search, ignoreCase: true))
+            ->pluck('id')
+            ->values()
+            ->all();
+    }
+
+    /**
      * Whether this account can still receive a transfer.
      */
     public function isUsable(): bool
@@ -130,6 +159,8 @@ class Account extends Model implements TracksActivity
     {
         return [
             'currency' => Currency::class,
+            'account_number' => 'encrypted',
+            'iban' => 'encrypted',
             'opened_at' => 'date',
             'closed_at' => 'date',
             'is_active' => 'boolean',
@@ -157,6 +188,17 @@ class Account extends Model implements TracksActivity
     public function activityEvents(): array
     {
         return ['is_active' => 'closed', 'account_name' => 'updated'];
+    }
+
+    /**
+     * Bank details stay out of the log: it is readable by more people than
+     * the accounts page, and it is not encrypted.
+     *
+     * @return list<string>
+     */
+    protected function activityExcludedFields(): array
+    {
+        return ['account_number', 'iban'];
     }
 
     /**

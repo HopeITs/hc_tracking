@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Account;
 use App\Models\Activity;
 use Database\Seeders\NotificationDemoSeeder;
 use Database\Seeders\RealAccountsSeeder;
@@ -72,4 +73,15 @@ test('the database seeder loads no real records and no demo notifications', func
     $this->seed();
 
     expect($runs->getArrayCopy())->toBe([]);
+});
+
+test('the real accounts seeder stores each account once when run again', function () {
+    $this->seed(RealAccountsSeeder::class);
+    $firstRun = Account::query()->pluck('account_number')->sort()->values()->all();
+
+    $this->seed(RealAccountsSeeder::class);
+
+    expect($firstRun)->not->toBeEmpty()
+        ->and(Account::query()->pluck('account_number')->sort()->values()->all())->toBe($firstRun)
+        ->and($firstRun)->toBe(array_values(array_unique($firstRun)));
 });

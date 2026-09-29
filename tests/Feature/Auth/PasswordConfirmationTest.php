@@ -1,8 +1,11 @@
 <?php
 
+use App\Actions\Fortify\AuthenticateWithHrAccount;
 use App\Models\User;
 use Illuminate\Auth\Events\Failed;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Schema;
 
 test('confirm password screen can be rendered', function () {
     $user = User::factory()->create();
@@ -131,4 +134,29 @@ test('a failed login confirms nothing', function () {
 
     expect(session('auth.password_confirmed_at'))->toBeNull()
         ->and(session('auth.hr_password_checked'))->toBeNull();
+});
+
+test('a failing password check keeps the password out of the stack trace', function () {
+    $previousIgnoreArgs = ini_set('zend.exception_ignore_args', '0');
+    $previousMaxLength = ini_set('zend.exception_string_param_max_len', '100');
+    $user = User::factory()->withHrAccount('hr-secret')->create();
+    Schema::connection('hr')->drop('users');
+
+    try {
+        AuthenticateWithHrAccount::confirmsPassword($user, 'typed-hr-secret');
+        $this->fail('The HR lookup should have thrown.');
+    } catch (QueryException $exception) {
+        $stringArguments = collect($exception->getTrace())
+            ->flatMap(fn (array $frame): array => $frame['args'] ?? [])
+            ->filter(fn (mixed $argument): bool => is_string($argument));
+
+        expect($exception->getTraceAsString())
+            ->toContain('confirmsPassword')
+            ->toContain($user->email)
+            ->not->toContain('typed-hr-secret')
+            ->and($stringArguments)->not->toContain('typed-hr-secret');
+    } finally {
+        ini_set('zend.exception_ignore_args', (string) $previousIgnoreArgs);
+        ini_set('zend.exception_string_param_max_len', (string) $previousMaxLength);
+    }
 });
