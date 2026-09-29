@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\DeniedAccessRecorder;
+use App\Http\Middleware\AddSecurityHeaders;
 use App\Http\Middleware\EnsureHrAccountIsActive;
 use App\Http\Middleware\EnsureRequestCameThroughTrustedProxy;
 use App\Http\Middleware\EnsureTwoFactorIsEnabled;
@@ -24,7 +25,10 @@ return Application::configure(basePath: dirname(__DIR__))
         'middleware' => ['web', 'auth', 'throttle:broadcasting', EnsureTwoFactorIsEnabled::class],
     ])
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->prepend(EnsureRequestCameThroughTrustedProxy::class);
+        $middleware->prepend([
+            AddSecurityHeaders::class,
+            EnsureRequestCameThroughTrustedProxy::class,
+        ]);
 
         $middleware->web(append: [
             SetLocale::class,
