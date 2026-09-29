@@ -15,6 +15,8 @@ return [
     'unrecognised_device' => 'جهاز غير معروف',
     'login_code_subject' => 'رمز الدخول إلى :app',
     'login_code_intro' => 'استخدم هذا الرمز لإكمال تسجيل الدخول:',
+    'login_code_heading' => 'رمز تسجيل الدخول',
+    'login_code_preheader' => 'أدخله في صفحة تسجيل الدخول خلال :minutes دقائق.',
     'login_code_expires' => 'يعمل الرمز مرة واحدة وتنتهي صلاحيته خلال :minutes دقائق.',
     'login_code_if_it_was_not_you' => 'إذا لم تحاول تسجيل الدخول، فقد يعرف أحدهم كلمة مرورك: غيّر كلمة مرور الموارد البشرية الآن وأبلغ قسم تقنية المعلومات.',
     'second_step_failed_subject' => 'أدخل أحدهم كلمة مرورك في :app',

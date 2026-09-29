@@ -241,6 +241,22 @@ new #[Title('titles.security_settings')] class extends Component {
     /* @end-chisel-2fa */
 
     /**
+     * What a new sign-in asks for after the password: the authenticator app
+     * takes priority over the emailed code (see RedirectIfTwoFactorRequired).
+     *
+     * @return 'app'|'email'|'password'
+     */
+    #[Computed]
+    public function signInCheck(): string
+    {
+        return match (true) {
+            $this->canManageTwoFactor && $this->twoFactorEnabled => 'app',
+            $this->emailTwoFactorEnabled => 'email',
+            default => 'password',
+        };
+    }
+
+    /**
      * The browsers signed in to this account, newest first. Rows past the
      * session lifetime are left out, as they can no longer be used; session
      * ids and payloads never leave the server.
@@ -371,130 +387,181 @@ new #[Title('titles.security_settings')] class extends Component {
     }
 }; ?>
 
-<section class="w-full">
-    @include('partials.settings-heading')
+<section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="security-heading">
+    @php
+        $signInCheck = $this->signInCheck;
+        $appStepAvailable = $canManageTwoFactor ?? false;
+        [$protectionHeading, $protectionDetail] = match ($signInCheck) {
+            'app' => [__('settings.protection_app'), __('settings.protection_app_detail')],
+            'email' => [__('settings.protection_email'), __('settings.protection_email_detail')],
+            default => [__('settings.protection_password'), __('settings.protection_password_detail')],
+        };
+    @endphp
 
-    <flux:heading level="2" class="sr-only">{{ __('settings.security_settings') }}</flux:heading>
+    <x-ui.page-header heading-id="security-heading" :title="__('common.security')" />
 
-    <x-pages::settings.layout :heading="__('common.password')" :subheading="__('settings.you_sign_in_with_your_hr_system_account')">
-        <flux:text class="mt-6" data-test="hr-password-notice">
-            {{ __('settings.your_password_is_managed_in_the_hr_system_change_it_there_th') }}
-        </flux:text>
-
-        <section class="mt-12" data-test="email-two-factor">
-            <flux:heading>{{ __('settings.email_2fa_heading') }}</flux:heading>
-            <flux:subheading>{{ __('settings.email_2fa_description') }}</flux:subheading>
-
-            <div class="mt-4 space-y-4 text-sm">
-                <flux:text>{{ __($emailTwoFactorEnabled ? 'settings.email_2fa_is_on' : 'settings.email_2fa_is_off') }}</flux:text>
-
-                @if ($emailTwoFactorEnabled && ($canManageTwoFactor ?? false) && $twoFactorEnabled)
-                    <flux:text variant="subtle">{{ __('settings.email_2fa_app_takes_priority') }}</flux:text>
-                @endif
-
-                @if ($emailTwoFactorRequired)
-                    <flux:text variant="subtle" data-test="email-2fa-required">{{ __('settings.email_2fa_required') }}</flux:text>
-                @elseif ($emailTwoFactorEnabled)
-                    <flux:button variant="outline" wire:click="setEmailTwoFactor(false)" data-test="email-2fa-disable">
-                        {{ __('settings.email_2fa_disable') }}
-                    </flux:button>
-                @else
-                    <flux:button variant="primary" wire:click="setEmailTwoFactor(true)" data-test="email-2fa-enable">
-                        {{ __('settings.email_2fa_enable') }}
-                    </flux:button>
-                @endif
+    <div class="grid max-w-2xl gap-12">
+        {{-- Sign-in protection: what a new sign-in asks for, then each step as a dot on one thread. --}}
+        <section aria-labelledby="sign-in-protection-heading" class="grid gap-8">
+            <div class="grid gap-2" data-test="sign-in-protection" data-sign-in-check="{{ $signInCheck }}">
+                <h2 id="sign-in-protection-heading" class="type-label uppercase text-secondary-light dark:text-secondary-soft">
+                    {{ __('settings.sign_in_protection') }}
+                </h2>
+                <p class="flex items-center gap-3 text-3xl font-bold leading-tight tracking-tight @3xl/directory:text-4xl">
+                    <span
+                        aria-hidden="true"
+                        @class([
+                            'size-3 shrink-0 rounded-full',
+                            'bg-status-good' => $signInCheck !== 'password',
+                            'bg-status-warn' => $signInCheck === 'password',
+                        ])
+                    ></span>
+                    {{ $protectionHeading }}
+                </p>
+                <p class="max-w-xl text-secondary-medium dark:text-secondary-soft">{{ $protectionDetail }}</p>
             </div>
-        </section>
 
-        {{-- @chisel-2fa --}}
-        @if ($canManageTwoFactor)
-            <section class="mt-12">
-                <flux:heading>{{ __('settings.app_2fa_heading') }}</flux:heading>
-                <flux:subheading>{{ __('settings.manage_your_two_factor_authentication_settings') }}</flux:subheading>
+            @if ($appStepAvailable && $twoFactorRequired && ! $twoFactorEnabled)
+                <flux:callout variant="warning" icon="shield-exclamation" data-test="two-factor-required-notice">
+                    <flux:callout.heading>{{ __('settings.two_factor_required_heading') }}</flux:callout.heading>
+                    <flux:callout.text>{{ __('settings.two_factor_required_explanation') }}</flux:callout.text>
+                </flux:callout>
+            @endif
 
-                @if ($twoFactorRequired && ! $twoFactorEnabled)
-                    <flux:callout variant="warning" icon="shield-exclamation" class="mt-6" data-test="two-factor-required-notice">
-                        <flux:callout.heading>{{ __('settings.two_factor_required_heading') }}</flux:callout.heading>
-                        <flux:callout.text>{{ __('settings.two_factor_required_explanation') }}</flux:callout.text>
-                    </flux:callout>
-                @endif
+            <ol class="grid" aria-label="{{ __('settings.sign_in_steps') }}" wire:cloak>
+                <x-security.step
+                    :title="__('common.password')"
+                    :state="__('settings.state_always_on')"
+                    :on="true"
+                    data-test="hr-password-notice"
+                >
+                    <x-slot:description>{{ __('settings.your_password_is_managed_in_the_hr_system_change_it_there_th') }}</x-slot:description>
+                </x-security.step>
 
-                <div class="flex flex-col w-full mx-auto space-y-6 text-sm" wire:cloak>
-                    @if ($twoFactorEnabled)
-                        <div class="space-y-4">
-                            <flux:text>
-                                {{ __('settings.you_will_be_prompted_for_a_secure_random_pin_during_login_wh') }}
-                            </flux:text>
+                <x-security.step
+                    :title="__('settings.email_2fa_heading')"
+                    :state="__($emailTwoFactorRequired ? 'settings.state_required' : ($emailTwoFactorEnabled ? 'settings.state_on' : 'settings.state_off'))"
+                    :on="$emailTwoFactorEnabled"
+                    :last="! $appStepAvailable"
+                    data-test="email-two-factor"
+                >
+                    <x-slot:description>{{ __('settings.email_2fa_description') }}</x-slot:description>
 
-                            @if ($twoFactorRequired)
-                                <flux:text variant="subtle" data-test="two-factor-required-cannot-disable">
-                                    {{ __('settings.two_factor_required_cannot_disable') }}
-                                </flux:text>
+                    @unless ($emailTwoFactorRequired)
+                        <x-slot:actions>
+                            @if ($emailTwoFactorEnabled)
+                                <x-ui.button size="sm" wire:click="setEmailTwoFactor(false)" data-test="email-2fa-disable" class="border">
+                                    {{ __('settings.email_2fa_disable') }}
+                                </x-ui.button>
                             @else
-                                <div class="flex justify-start">
-                                    <flux:button
-                                        variant="danger"
-                                        wire:click="disable"
-                                    >
+                                <x-ui.button :tone="$signInCheck === 'password' ? 'primary' : 'secondary'" size="sm" wire:click="setEmailTwoFactor(true)" data-test="email-2fa-enable" class="border">
+                                    {{ __('settings.email_2fa_enable') }}
+                                </x-ui.button>
+                            @endif
+                        </x-slot:actions>
+                    @endunless
+
+                    @if ($emailTwoFactorRequired)
+                        <p class="text-secondary-medium dark:text-secondary-soft" data-test="email-2fa-required">{{ __('settings.email_2fa_required') }}</p>
+                    @endif
+
+                    @if ($emailTwoFactorEnabled && $signInCheck === 'app')
+                        <p class="text-secondary-medium dark:text-secondary-soft">{{ __('settings.email_2fa_app_takes_priority') }}</p>
+                    @endif
+                </x-security.step>
+
+                {{-- @chisel-2fa --}}
+                @if ($appStepAvailable)
+                    <x-security.step
+                        :title="__('settings.app_2fa_heading')"
+                        :state="__($twoFactorEnabled ? 'settings.state_on' : ($twoFactorRequired ? 'settings.state_required' : 'settings.state_off'))"
+                        :on="$twoFactorEnabled"
+                        :last="true"
+                        data-test="app-two-factor"
+                    >
+                        <x-slot:description>
+                            {{ $twoFactorEnabled
+                                ? __('settings.you_will_be_prompted_for_a_secure_random_pin_during_login_wh')
+                                : __('settings.when_you_enable_two_factor_authentication_you_will_be_prompt') }}
+                        </x-slot:description>
+
+                        @if (! $twoFactorEnabled || ! $twoFactorRequired)
+                            <x-slot:actions>
+                                @if ($twoFactorEnabled)
+                                    <x-ui.button size="sm" wire:click="disable" class="border">
                                         {{ __('settings.disable_2fa') }}
-                                    </flux:button>
-                                </div>
+                                    </x-ui.button>
+                                @else
+                                    <flux:modal.trigger name="two-factor-setup-modal">
+                                        <x-ui.button
+                                            :tone="$twoFactorRequired ? 'primary' : 'secondary'"
+                                            size="sm"
+                                            wire:click="$dispatch('start-two-factor-setup')"
+                                            class="border"
+                                        >
+                                            {{ __('settings.enable_2fa') }}
+                                        </x-ui.button>
+                                    </flux:modal.trigger>
+                                @endif
+                            </x-slot:actions>
+                        @endif
+
+                        @if ($twoFactorEnabled)
+                            @if ($twoFactorRequired)
+                                <p class="text-secondary-medium dark:text-secondary-soft" data-test="two-factor-required-cannot-disable">
+                                    {{ __('settings.two_factor_required_cannot_disable') }}
+                                </p>
                             @endif
 
                             <livewire:pages::settings.two-factor.recovery-codes :$requiresConfirmation />
-                        </div>
-                    @else
-                        <div class="space-y-4">
-                            <flux:text variant="subtle">
-                                {{ __('settings.when_you_enable_two_factor_authentication_you_will_be_prompt') }}
-                            </flux:text>
+                        @endif
+                    </x-security.step>
+                @endif
+                {{-- @end-chisel-2fa --}}
+            </ol>
 
-                            <flux:modal.trigger name="two-factor-setup-modal">
-                                <flux:button
-                                    variant="primary"
-                                    wire:click="$dispatch('start-two-factor-setup')"
-                                >
-                                    {{ __('settings.enable_2fa') }}
-                                </flux:button>
-                            </flux:modal.trigger>
-
-                            <livewire:pages::settings.two-factor-setup-modal :requires-confirmation="$requiresConfirmation" />
-                        </div>
-                    @endif
-                </div>
-            </section>
-        @endif
-        {{-- @end-chisel-2fa --}}
+            {{-- @chisel-2fa --}}
+            @if ($appStepAvailable && ! $twoFactorEnabled)
+                <livewire:pages::settings.two-factor-setup-modal :requires-confirmation="$requiresConfirmation" />
+            @endif
+            {{-- @end-chisel-2fa --}}
+        </section>
 
         {{-- @chisel-passkeys --}}
         @if ($canManagePasskeys)
-            <section class="mt-12">
-                <flux:heading>{{ __('settings.passkeys') }}</flux:heading>
-                <flux:subheading>{{ __('settings.manage_your_passkeys_for_passwordless_sign_in') }}</flux:subheading>
+            <section aria-labelledby="passkeys-heading" class="grid gap-5 border-t border-secondary-soft pt-10 dark:border-secondary-medium" data-test="passkeys">
+                <div>
+                    <h2 id="passkeys-heading" class="text-xl font-bold">{{ __('settings.passkeys') }}</h2>
+                    <p class="mt-1 text-sm text-secondary-medium dark:text-secondary-soft">{{ __('settings.manage_your_passkeys_for_passwordless_sign_in') }}</p>
+                </div>
 
-                <div class="mt-6 flex flex-col w-full mx-auto space-y-6 text-sm" wire:cloak>
-                    <div class="border rounded-lg border-zinc-200 dark:border-zinc-700 overflow-hidden">
-                        @forelse ($passkeys as $passkey)
-                            <div class="flex items-center justify-between p-4 {{ ! $loop->last ? 'border-b border-zinc-200 dark:border-zinc-700' : '' }}">
-                                <div class="flex items-center gap-4">
-                                    <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-zinc-100 dark:bg-zinc-800">
-                                        <flux:icon.key class="size-5 text-zinc-500 dark:text-zinc-400" />
+                @if ($passkeys === [])
+                    <div class="flex items-start gap-3 text-sm" wire:cloak>
+                        <flux:icon.finger-print variant="outline" class="size-5 shrink-0 text-secondary-light dark:text-secondary-soft" />
+                        <div>
+                            <p class="font-semibold">{{ __('settings.no_passkeys_yet') }}</p>
+                            <p class="text-secondary-medium dark:text-secondary-soft">{{ __('settings.add_a_passkey_to_sign_in_without_a_password') }}</p>
+                        </div>
+                    </div>
+                @else
+                    <ul class="divide-y divide-secondary-soft border-y border-secondary-soft text-sm dark:divide-secondary-medium dark:border-secondary-medium" wire:cloak>
+                        @foreach ($passkeys as $passkey)
+                            <li class="flex items-center gap-4 py-3" wire:key="passkey-{{ $passkey['id'] }}">
+                                <flux:icon.key variant="outline" class="size-5 shrink-0 text-secondary-light dark:text-secondary-soft" />
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <p class="truncate font-semibold">{{ $passkey['name'] }}</p>
+                                        @if ($passkey['authenticator'])
+                                            <span class="type-meta rounded-full bg-secondary-soft/60 px-2 py-0.5 text-secondary-medium dark:bg-white/10 dark:text-secondary-soft">{{ $passkey['authenticator'] }}</span>
+                                        @endif
                                     </div>
-                                    <div class="space-y-1">
-                                        <div class="flex items-center gap-2.5">
-                                            <p class="font-medium tracking-tight">{{ $passkey['name'] }}</p>
-                                            @if ($passkey['authenticator'])
-                                                <flux:badge size="sm">{{ $passkey['authenticator'] }}</flux:badge>
-                                            @endif
-                                        </div>
-                                        <p class="text-zinc-500 dark:text-zinc-400 text-xs">
-                                            {{ __('settings.added_time', ['time' => $passkey['created_at_diff']]) }}
-                                            @if ($passkey['last_used_at_diff'])
-                                                <span class="opacity-50 mx-1">/</span>
-                                                {{ __('settings.last_used_time', ['time' => $passkey['last_used_at_diff']]) }}
-                                            @endif
-                                        </p>
-                                    </div>
+                                    <p class="type-meta mt-0.5 text-secondary-medium dark:text-secondary-soft">
+                                        {{ __('settings.added_time', ['time' => $passkey['created_at_diff']]) }}
+                                        @if ($passkey['last_used_at_diff'])
+                                            <span aria-hidden="true" class="mx-1">·</span>
+                                            {{ __('settings.last_used_time', ['time' => $passkey['last_used_at_diff']]) }}
+                                        @endif
+                                    </p>
                                 </div>
 
                                 <flux:button
@@ -503,110 +570,120 @@ new #[Title('titles.security_settings')] class extends Component {
                                     icon="trash"
                                     icon:variant="outline"
                                     wire:click="confirmDelete({{ $passkey['id'] }})"
-                                    class="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/50"
+                                    :aria-label="__('settings.remove_passkey')"
+                                    class="text-primary hover:bg-primary/10 dark:text-white dark:hover:bg-white/10"
                                 />
-                            </div>
-                        @empty
-                            <div class="p-8 text-center">
-                                <div class="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-zinc-100 dark:bg-zinc-800">
-                                    <flux:icon.key class="size-7 text-zinc-400 dark:text-zinc-500" />
-                                </div>
-                                <p class="font-medium">{{ __('settings.no_passkeys_yet') }}</p>
-                                <flux:text class="mt-1">{{ __('settings.add_a_passkey_to_sign_in_without_a_password') }}</flux:text>
-                            </div>
-                        @endforelse
-                    </div>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
 
-                    <x-passkey-registration />
-                </div>
+                <x-passkey-registration />
             </section>
         @endif
         {{-- @end-chisel-passkeys --}}
 
-        @if ($canManageSignedInDevices)
+        {{-- Devices: where this account is signed in, and which browsers skip the sign-in code. --}}
+        <section aria-labelledby="devices-heading" class="grid gap-10 border-t border-secondary-soft pt-10 dark:border-secondary-medium">
+            <h2 id="devices-heading" class="text-xl font-bold">{{ __('settings.your_devices') }}</h2>
+
+            @if ($canManageSignedInDevices)
+                @php
+                    $signedInDevices = $this->signedInDevices;
+                @endphp
+
+                <div class="grid gap-4" data-test="signed-in-devices">
+                    <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+                        <div class="min-w-0 flex-1 basis-64">
+                            <h3 class="type-heading">{{ __('settings.signed_in_devices') }}</h3>
+                            <p class="mt-1 text-sm text-secondary-medium dark:text-secondary-soft">{{ __('settings.signed_in_devices_description') }}</p>
+                        </div>
+
+                        @if (collect($signedInDevices)->contains('current', false))
+                            <x-ui.button size="sm" icon="arrow-right-start-on-rectangle" wire:click="signOutOtherDevices" class="border">
+                                {{ __('settings.sign_out_other_devices') }}
+                            </x-ui.button>
+                        @endif
+                    </div>
+
+                    <ul class="divide-y divide-secondary-soft border-y border-secondary-soft text-sm dark:divide-secondary-medium dark:border-secondary-medium" wire:cloak>
+                        @foreach ($signedInDevices as $device)
+                            <li class="flex items-center gap-4 py-3" wire:key="signed-in-device-{{ $loop->index }}">
+                                <flux:icon
+                                    :name="$device['mobile'] ? 'device-phone-mobile' : 'computer-desktop'"
+                                    variant="outline"
+                                    class="size-5 shrink-0 text-secondary-light dark:text-secondary-soft"
+                                />
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <p class="font-semibold">{{ $device['label'] }}</p>
+                                        @if ($device['current'])
+                                            <span class="type-meta rounded-full bg-status-good-soft px-2 py-0.5 text-status-good">{{ __('settings.this_device') }}</span>
+                                        @endif
+                                    </div>
+                                    <p class="type-meta mt-0.5 text-secondary-medium dark:text-secondary-soft">
+                                        @if ($device['ip_address'])
+                                            <span dir="ltr">{{ $device['ip_address'] }}</span>
+                                            <span aria-hidden="true" class="mx-1">·</span>
+                                        @endif
+                                        {{ $device['current'] ? __('settings.active_now') : __('settings.last_active_time', ['time' => $device['last_active']]) }}
+                                    </p>
+                                </div>
+                            </li>
+                        @endforeach
+                    </ul>
+
+                    @unless (collect($signedInDevices)->contains('current', false))
+                        <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('settings.no_other_devices_are_signed_in') }}</p>
+                    @endunless
+                </div>
+            @endif
+
             @php
-                $signedInDevices = $this->signedInDevices;
+                $trustedDevices = $this->trustedDevices;
             @endphp
 
-            <section class="mt-12" data-test="signed-in-devices">
-                <flux:heading>{{ __('settings.signed_in_devices') }}</flux:heading>
-                <flux:subheading>{{ __('settings.signed_in_devices_description') }}</flux:subheading>
+            <div class="grid gap-4" data-test="trusted-devices">
+                <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+                    <div class="min-w-0 flex-1 basis-64">
+                        <h3 class="type-heading">{{ __('settings.trusted_devices') }}</h3>
+                        <p class="mt-1 text-sm text-secondary-medium dark:text-secondary-soft">{{ __('settings.trusted_devices_description') }}</p>
+                    </div>
 
-                <ul class="mt-6 divide-y divide-zinc-200 text-sm dark:divide-zinc-700" wire:cloak>
-                    @foreach ($signedInDevices as $device)
-                        <li class="flex items-center gap-4 py-3" wire:key="signed-in-device-{{ $loop->index }}">
-                            <flux:icon
-                                :name="$device['mobile'] ? 'device-phone-mobile' : 'computer-desktop'"
-                                variant="outline"
-                                class="size-5 shrink-0 text-zinc-400 dark:text-zinc-500"
-                            />
-                            <div class="min-w-0 space-y-1">
-                                <div class="flex items-center gap-2.5">
-                                    <p class="font-medium tracking-tight">{{ $device['label'] }}</p>
-                                    @if ($device['current'])
-                                        <flux:badge size="sm" color="green">{{ __('settings.this_device') }}</flux:badge>
-                                    @endif
-                                </div>
-                                <p class="text-zinc-500 dark:text-zinc-400 text-xs">
-                                    @if ($device['ip_address'])
-                                        <span dir="ltr">{{ $device['ip_address'] }}</span>
-                                        <span class="opacity-50 mx-1">/</span>
-                                    @endif
-                                    {{ $device['current'] ? __('settings.active_now') : __('settings.last_active_time', ['time' => $device['last_active']]) }}
-                                </p>
-                            </div>
-                        </li>
-                    @endforeach
-                </ul>
+                    @if ($trustedDevices !== [])
+                        <x-ui.button size="sm" icon="shield-exclamation" wire:click="forgetTrustedDevices" data-test="forget-trusted-devices" class="border">
+                            {{ __('settings.forget_trusted_devices') }}
+                        </x-ui.button>
+                    @endif
+                </div>
 
-                @if (collect($signedInDevices)->contains('current', false))
-                    <flux:button variant="outline" size="sm" class="mt-4" wire:click="signOutOtherDevices">
-                        {{ __('settings.sign_out_other_devices') }}
-                    </flux:button>
+                @if ($trustedDevices === [])
+                    <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('settings.no_trusted_devices') }}</p>
                 @else
-                    <flux:text class="mt-4">{{ __('settings.no_other_devices_are_signed_in') }}</flux:text>
-                @endif
-            </section>
-        @endif
-
-        @php
-            $trustedDevices = $this->trustedDevices;
-        @endphp
-
-        <section class="mt-12" data-test="trusted-devices">
-            <flux:heading>{{ __('settings.trusted_devices') }}</flux:heading>
-            <flux:subheading>{{ __('settings.trusted_devices_description') }}</flux:subheading>
-
-            @if ($trustedDevices === [])
-                <flux:text class="mt-4">{{ __('settings.no_trusted_devices') }}</flux:text>
-            @else
-                <ul class="mt-6 divide-y divide-zinc-200 text-sm dark:divide-zinc-700" wire:cloak>
-                    @foreach ($trustedDevices as $device)
-                        <li class="flex items-center gap-4 py-3" wire:key="trusted-device-{{ $loop->index }}">
-                            <flux:icon name="shield-check" variant="outline" class="size-5 shrink-0 text-zinc-400 dark:text-zinc-500" />
-                            <div class="min-w-0 space-y-1">
-                                <div class="flex items-center gap-2.5">
-                                    <p class="font-medium tracking-tight">{{ $device['label'] }}</p>
-                                    @if ($device['current'])
-                                        <flux:badge size="sm" color="green">{{ __('settings.this_device') }}</flux:badge>
-                                    @endif
+                    <ul class="divide-y divide-secondary-soft border-y border-secondary-soft text-sm dark:divide-secondary-medium dark:border-secondary-medium" wire:cloak>
+                        @foreach ($trustedDevices as $device)
+                            <li class="flex items-center gap-4 py-3" wire:key="trusted-device-{{ $loop->index }}">
+                                <flux:icon name="shield-check" variant="outline" class="size-5 shrink-0 text-secondary-light dark:text-secondary-soft" />
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <p class="font-semibold">{{ $device['label'] }}</p>
+                                        @if ($device['current'])
+                                            <span class="type-meta rounded-full bg-status-good-soft px-2 py-0.5 text-status-good">{{ __('settings.this_device') }}</span>
+                                        @endif
+                                    </div>
+                                    <p class="type-meta mt-0.5 text-secondary-medium dark:text-secondary-soft">
+                                        {{ __('settings.last_active_time', ['time' => $device['last_used']]) }}
+                                        <span aria-hidden="true" class="mx-1">·</span>
+                                        {{ __('settings.trusted_until', ['date' => $device['expires']]) }}
+                                    </p>
                                 </div>
-                                <p class="text-zinc-500 dark:text-zinc-400 text-xs">
-                                    {{ __('settings.last_active_time', ['time' => $device['last_used']]) }}
-                                    <span class="opacity-50 mx-1">/</span>
-                                    {{ __('settings.trusted_until', ['date' => $device['expires']]) }}
-                                </p>
-                            </div>
-                        </li>
-                    @endforeach
-                </ul>
-
-                <flux:button variant="outline" size="sm" class="mt-4" wire:click="forgetTrustedDevices" data-test="forget-trusted-devices">
-                    {{ __('settings.forget_trusted_devices') }}
-                </flux:button>
-            @endif
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
+            </div>
         </section>
-    </x-pages::settings.layout>
+    </div>
 
     {{-- @chisel-passkeys --}}
     <flux:modal
@@ -623,17 +700,11 @@ new #[Title('titles.security_settings')] class extends Component {
                 </flux:text>
             </div>
 
-            <div class="flex gap-3 justify-end">
-                <flux:button
-                    variant="outline"
-                    wire:click="closeDeleteModal"
-                >
+            <div class="flex justify-end gap-3">
+                <x-ui.button wire:click="closeDeleteModal" class="border">
                     {{ __('common.cancel') }}
-                </flux:button>
-                <flux:button
-                    variant="danger"
-                    wire:click="deletePasskey"
-                >
+                </x-ui.button>
+                <flux:button variant="danger" wire:click="deletePasskey">
                     {{ __('settings.remove_passkey') }}
                 </flux:button>
             </div>

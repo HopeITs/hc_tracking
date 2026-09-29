@@ -14,6 +14,8 @@ return [
     'unrecognised_browser_on_platform' => 'an unrecognised browser on :platform',
     'unrecognised_device' => 'an unrecognised device',
     'login_code_subject' => 'Your :app sign-in code',
+    'login_code_heading' => 'Your sign-in code',
+    'login_code_preheader' => 'Enter it on the sign-in page within :minutes minutes.',
     'login_code_intro' => 'Use this code to finish signing in:',
     'login_code_expires' => 'The code works once and expires in :minutes minutes.',
     'login_code_if_it_was_not_you' => 'If you didn\'t try to sign in, someone may know your password: change your HR password now and tell IT.',
