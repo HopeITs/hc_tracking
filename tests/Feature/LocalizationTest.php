@@ -120,6 +120,28 @@ test('a guest can switch language for their session', function () {
     $this->get(route('login'))->assertSee('dir="rtl"', false);
 });
 
+test('switching language is limited per user, not shared with a colleague on the same ip', function () {
+    $this->freezeTime();
+    $user = User::factory()->create();
+    $colleague = User::factory()->create();
+
+    foreach (range(1, 10) as $attempt) {
+        $this->actingAs($user)
+            ->withServerVariables(['REMOTE_ADDR' => '10.0.7.1'])
+            ->post(route('locale.update'), ['locale' => 'ar']);
+    }
+
+    $this->actingAs($user)
+        ->withServerVariables(['REMOTE_ADDR' => '10.0.7.1'])
+        ->post(route('locale.update'), ['locale' => 'en'])
+        ->assertStatus(429);
+
+    $this->actingAs($colleague)
+        ->withServerVariables(['REMOTE_ADDR' => '10.0.7.1'])
+        ->post(route('locale.update'), ['locale' => 'ar'])
+        ->assertSessionHas('locale', 'ar');
+});
+
 test('only supported languages are accepted', function () {
     $user = User::factory()->create();
 
