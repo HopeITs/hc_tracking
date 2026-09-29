@@ -182,7 +182,7 @@ Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () 
         ->name('admin.notification-settings.edit');
 
     Route::livewire('activity', 'pages::activity.index')
-        ->can('view-activity-log')
+        ->can('activity-log.view')
         ->name('activity.index');
 
     Route::livewire('notifications-settings', 'pages::notifications.settings')

@@ -20,7 +20,8 @@ use Illuminate\Support\Str;
  * per user; only its SHA-256 hash is stored (TrustedDevice), so a stolen
  * password alone never skips the code on another computer. "Sign out other
  * devices" and "Forget trusted devices" on the security page delete the rows,
- * which ends the trust at once.
+ * which ends the trust at once. Trust also ends for every browser when the
+ * authenticator app is switched off or new recovery codes are made.
  */
 final class TrustedDevices
 {

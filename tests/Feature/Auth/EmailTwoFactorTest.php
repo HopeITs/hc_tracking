@@ -181,7 +181,7 @@ test('changing email codes needs a fresh password confirmation', function () {
 });
 
 test('roles that must use two factor always get an email code, even with their setting off', function (string $role) {
-    config(['access-control.two_factor.enforced' => true]);
+    config(['access-control.two_factor' => ['enforced' => true, 'required_roles' => ['Super Admin', 'General Manager', 'Managers', 'Financial']]]);
     $this->seed(RolesAndPermissionsSeeder::class);
 
     $user = User::factory()->role($role)->withHrAccount()->create();
@@ -195,7 +195,7 @@ test('roles that must use two factor always get an email code, even with their s
 })->with(['Super Admin', 'General Manager', 'Managers', 'Financial']);
 
 test('other roles are not asked for an email code while enforcement is on', function () {
-    config(['access-control.two_factor.enforced' => true]);
+    config(['access-control.two_factor' => ['enforced' => true, 'required_roles' => ['Super Admin', 'General Manager', 'Managers', 'Financial']]]);
     $this->seed(RolesAndPermissionsSeeder::class);
 
     $user = User::factory()->role('Team Member')->withHrAccount()->create();
@@ -207,7 +207,7 @@ test('other roles are not asked for an email code while enforcement is on', func
 });
 
 test('a role that requires two factor cannot turn email codes off', function () {
-    config(['access-control.two_factor.enforced' => true]);
+    config(['access-control.two_factor' => ['enforced' => true, 'required_roles' => ['Super Admin', 'General Manager', 'Managers', 'Financial']]]);
     $this->seed(RolesAndPermissionsSeeder::class);
 
     $superAdmin = User::factory()->role('Super Admin')->create(['email_two_factor_enabled' => true]);
@@ -226,7 +226,7 @@ test('a role that requires two factor cannot turn email codes off', function () 
 
 test('a role that requires two factor can use the authenticator app instead of email codes', function () {
     $this->skipUnlessFortifyHas(Features::twoFactorAuthentication());
-    config(['access-control.two_factor.enforced' => true]);
+    config(['access-control.two_factor' => ['enforced' => true, 'required_roles' => ['Super Admin', 'General Manager', 'Managers', 'Financial']]]);
     $this->seed(RolesAndPermissionsSeeder::class);
 
     $superAdmin = User::factory()->role('Super Admin')->withTwoFactor()->withHrAccount()->create();

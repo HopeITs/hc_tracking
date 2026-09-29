@@ -19,6 +19,7 @@ use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 
@@ -396,7 +397,8 @@ test('a user without proposal permissions sees no edit controls and cannot chang
 
     $fresh()->call('openStatusModal')->assertForbidden();
     $fresh()->set('newStatus', ProposalStatus::Completed->value)->set('statusContext', 'Done')->set('statusDate', '2026-06-15')->call('changeStatus')->assertForbidden();
-    $fresh()->set('deletingFileId', $media->id)->call('deleteFile')->assertForbidden();
+    $fresh()->call('confirmDeleteFile', $media->id)->assertForbidden();
+    expect(fn () => $fresh()->set('deletingFileId', $media->id))->toThrow(CannotUpdateLockedPropertyException::class);
     $fresh()->call('openAgreementEdit', $agreement->id)->assertForbidden();
     $fresh()->call('openTransferCreate', $agreement->id)->assertForbidden();
 

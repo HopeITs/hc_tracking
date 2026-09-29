@@ -5,7 +5,8 @@ use App\Models\Role;
 
 /**
  * Every module's view permission. Every role holds all of them (user
- * decision 2026-09-25: everyone may view every module page).
+ * decision 2026-09-25: everyone may view every module page) — except the
+ * activity log, which stays with Super Admin and General Manager.
  *
  * @return list<string>
  */
@@ -15,9 +16,16 @@ function everyViewPermission(): array
         ->filter(fn (array $actions): bool => in_array('view', $actions, true))
         ->keys()
         ->map(fn (string $module): string => "{$module}.view")
+        ->reject(fn (string $permission): bool => $permission === 'activity-log.view')
         ->values()
         ->all();
 }
+
+test('only Super Admin and General Manager may open the activity log by default', function () {
+    $holders = Role::query()->whereHas('permissions', fn ($query) => $query->where('name', 'activity-log.view'))->pluck('name')->all();
+
+    expect($holders)->toEqualCanonicalizing(['Super Admin', 'General Manager']);
+});
 
 test('each role holds every view permission plus exactly its approved write permissions', function (string $roleName, array $writes) {
     $granted = Role::findByName($roleName, 'web')->permissions->pluck('name')->all();

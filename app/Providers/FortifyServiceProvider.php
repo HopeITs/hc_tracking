@@ -81,11 +81,26 @@ class FortifyServiceProvider extends ServiceProvider
 
     /**
      * Configure rate limiting.
+     *
+     * The `two-factor` limiter guards both second steps: Fortify's POST
+     * /two-factor-challenge (authenticator or recovery code) and the app's
+     * POST email-two-factor-challenge. Whoever reaches either already knows
+     * the account's HR password, so a per-minute limit alone still allowed
+     * about 7,200 guesses a day; the hourly and daily caps bring that down
+     * to 30. Each limit needs its own `by` key: ThrottleRequests keys a
+     * limit by limiter name plus `by` value, not by its decay, so limits
+     * sharing a key would share one counter.
      */
     private function configureRateLimiting(): void
     {
         RateLimiter::for('two-factor', function (Request $request) {
-            return Limit::perMinute(5)->by($request->session()->get('login.id'));
+            $loginId = $request->session()->get('login.id');
+
+            return [
+                Limit::perMinute(5)->by('minute:'.$loginId),
+                Limit::perHour(15)->by('hour:'.$loginId),
+                Limit::perDay(30)->by('day:'.$loginId),
+            ];
         });
 
         RateLimiter::for('login', function (Request $request) {

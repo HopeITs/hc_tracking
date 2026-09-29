@@ -7,6 +7,7 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Concerns\RecordsActivity;
 use App\Http\Middleware\EnsureTwoFactorIsEnabled;
+use App\Notifications\ActivityRecorder;
 use App\Notifications\TracksActivity;
 use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
@@ -654,5 +655,43 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
         }
 
         $this->recordActivity('user.role_changed', ['roles' => [$before, $after]], ['role' => $after === [] ? '—' : implode(', ', $after)]);
+    }
+
+    /**
+     * Record a change of direct permissions (permission pivots fire no model
+     * events either).
+     *
+     * @param  list<string>  $before
+     * @param  list<string>  $after
+     */
+    public function recordPermissionChange(array $before, array $after): void
+    {
+        $added = array_values(array_diff($after, $before));
+        $removed = array_values(array_diff($before, $after));
+
+        if ($added === [] && $removed === []) {
+            return;
+        }
+
+        sort($added);
+        sort($removed);
+
+        $this->recordActivity('user.permissions_changed', properties: [
+            'added' => $added === [] ? '—' : implode(', ', $added),
+            'removed' => $removed === [] ? '—' : implode(', ', $removed),
+            'added_permissions' => $added,
+            'removed_permissions' => $removed,
+        ]);
+    }
+
+    /**
+     * Record that this user was refused an action (a 403). Logged for the
+     * audit trail only: it notifies nobody.
+     *
+     * @param  array{action: string, ip: string|null}  $attempt
+     */
+    public function recordAccessDenied(array $attempt): void
+    {
+        app(ActivityRecorder::class)->record($this, 'user.access_denied', properties: $attempt, notify: false);
     }
 }

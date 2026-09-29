@@ -1,0 +1,39 @@
+# Forwards every branch and tag pushed to GitHub (including pushes made by
+# Claude Code cloud sessions) to the GitLab repository, which stays the
+# team's primary remote. Needs a GITLAB_TOKEN repository secret: a GitLab
+# project or personal access token with the write_repository scope.
+# Pushes are never forced, so a branch that diverged on GitLab fails here
+# instead of overwriting GitLab history.
+
+name: Mirror to GitLab
+
+on:
+  push:
+    branches: ['**']
+    tags: ['**']
+
+concurrency:
+  group: mirror-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Push ref to GitLab
+        env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+        run: |
+          if [ -z "$GITLAB_TOKEN" ]; then
+            echo "::error::GITLAB_TOKEN secret is not set"
+            exit 1
+          fi
+          git push "https://oauth2:${GITLAB_TOKEN}@gitlab.com/hcsyria/hc-tracking.git" "${GITHUB_SHA}:${GITHUB_REF}"

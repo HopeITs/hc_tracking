@@ -45,6 +45,7 @@ new #[Title('titles.funding_agreement')] class extends Component {
 
     public bool $showReportModal = false;
 
+    #[Locked]
     public ?int $editingReportId = null;
 
     public string $reportTitle = '';
@@ -57,6 +58,7 @@ new #[Title('titles.funding_agreement')] class extends Component {
 
     public bool $showReportDeleteModal = false;
 
+    #[Locked]
     public ?int $deletingReportId = null;
 
     public function mount(DonorProposal $donorProposal): void

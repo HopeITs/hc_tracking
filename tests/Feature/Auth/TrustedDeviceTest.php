@@ -154,3 +154,48 @@ test('the user menu links to the security page', function () {
         ->assertSee('data-test="security-menu-item"', false)
         ->assertSee(route('security.edit'));
 });
+
+test('switching off the authenticator app forgets every trusted browser of that user', function () {
+    $this->skipUnlessFortifyHas(Features::twoFactorAuthentication());
+    Features::twoFactorAuthentication(['confirm' => true, 'confirmPassword' => true]);
+
+    $user = User::factory()->withTwoFactor()->create();
+    TrustedDevice::factory()->for($user)->count(2)->create();
+    $otherDevice = TrustedDevice::factory()->create();
+
+    $this->actingAs($user)->withSession(['auth.password_confirmed_at' => time()]);
+
+    Livewire::test('pages::settings.security')->call('disable');
+
+    expect($user->fresh()->two_factor_secret)->toBeNull()
+        ->and($user->trustedDevices()->exists())->toBeFalse()
+        ->and(TrustedDevice::query()->pluck('id')->all())->toBe([$otherDevice->id]);
+});
+
+test('clearing an unfinished app set-up keeps the trusted browsers', function () {
+    $this->skipUnlessFortifyHas(Features::twoFactorAuthentication());
+    Features::twoFactorAuthentication(['confirm' => true, 'confirmPassword' => true]);
+
+    $user = User::factory()->withTwoFactor()->create(['two_factor_confirmed_at' => null, 'email_two_factor_enabled' => true]);
+    TrustedDevice::factory()->for($user)->create();
+
+    $this->actingAs($user)->withSession(['auth.password_confirmed_at' => time()]);
+
+    Livewire::test('pages::settings.security');
+
+    expect($user->fresh()->two_factor_secret)->toBeNull()
+        ->and($user->trustedDevices()->count())->toBe(1);
+});
+
+test('making new recovery codes forgets every trusted browser', function () {
+    $this->skipUnlessFortifyHas(Features::twoFactorAuthentication());
+
+    $user = User::factory()->withTwoFactor()->create();
+    TrustedDevice::factory()->for($user)->count(2)->create();
+
+    $this->actingAs($user)->withSession(['auth.password_confirmed_at' => time()]);
+
+    Livewire::test('pages::settings.two-factor.recovery-codes')->call('regenerateRecoveryCodes');
+
+    expect($user->trustedDevices()->exists())->toBeFalse();
+});

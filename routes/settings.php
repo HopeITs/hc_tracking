@@ -3,12 +3,11 @@
 use App\Http\Middleware\EnsureTwoFactorIsEnabled;
 use Illuminate\Support\Facades\Route;
 
+/*
+| Security is the only settings page, so /settings opens it.
+*/
 Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () {
-    Route::redirect('settings', 'settings/profile');
-
-    Route::livewire('settings/profile', 'pages::settings.profile')->name('profile.edit');
-
-    Route::livewire('settings/appearance', 'pages::settings.appearance')->name('appearance.edit');
+    Route::redirect('settings', 'settings/security');
 });
 
 /*

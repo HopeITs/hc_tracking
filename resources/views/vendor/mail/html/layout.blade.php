@@ -1,8 +1,15 @@
 {{--
-    Laravel's mail layout, published only to follow the language direction:
-    Arabic mail (e.g. NewDeviceSignIn) renders right to left. The theme inlines
-    text-align: left on paragraphs and headings, so the right-to-left rule
-    needs !important to win over those inline styles.
+    Laravel's mail layout, published for two reasons:
+
+    - The brand card: the header (logo) sits inside the white card with the
+      body, under a red rule, and the footer sits below the card.
+    - The language direction: Arabic mail (e.g. NewDeviceSignIn) renders right
+      to left. The theme inlines text-align: left on paragraphs and headings,
+      so the right-to-left rule needs !important to win over those styles.
+
+    The optional $preheader is the inbox preview line. It is followed by
+    invisible padding so clients don't pull body text (such as a sign-in code)
+    into the preview shown on lock screens.
 --}}
 @php
     $direction = \App\Enums\Locale::current()->direction();
@@ -24,6 +31,17 @@ width: 100% !important;
 .footer {
 width: 100% !important;
 }
+
+.content-cell,
+.header {
+padding-left: 24px !important;
+padding-right: 24px !important;
+}
+
+.code-value {
+font-size: 30px !important;
+letter-spacing: 6px !important;
+}
 }
 
 @media only screen and (max-width: 500px) {
@@ -33,6 +51,7 @@ width: 100% !important;
 }
 @if ($direction === 'rtl')
 
+.header,
 .content-cell p,
 .content-cell h1,
 .content-cell h2,
@@ -42,22 +61,35 @@ width: 100% !important;
 .content-cell blockquote {
 text-align: right !important;
 }
+
+.content-cell .code-content p,
+.footer .content-cell p {
+text-align: center !important;
+}
+
+.panel {
+border-left: 0 !important;
+border-right: 3px solid #be1f24 !important;
+}
 @endif
 </style>
 {!! $head ?? '' !!}
 </head>
 <body dir="{{ $direction }}">
+@if (filled($preheader ?? null))
+<div class="preheader" style="display: none; max-height: 0; overflow: hidden; mso-hide: all;">{{ $preheader }}{!! str_repeat('&#847;&zwnj;&nbsp;', 90) !!}</div>
+@endif
 
 <table class="wrapper" width="100%" cellpadding="0" cellspacing="0" role="presentation">
 <tr>
 <td align="center">
 <table class="content" width="100%" cellpadding="0" cellspacing="0" role="presentation">
-{!! $header ?? '' !!}
-
-<!-- Email Body -->
+<!-- Email Card -->
 <tr>
 <td class="body" width="100%" cellpadding="0" cellspacing="0" style="border: hidden !important;">
 <table class="inner-body" align="center" width="570" cellpadding="0" cellspacing="0" role="presentation">
+{!! $header ?? '' !!}
+
 <!-- Body content -->
 <tr>
 <td class="content-cell">

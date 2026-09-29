@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
@@ -215,7 +216,7 @@ test('the browser cannot mark two factor as enabled on the security page', funct
 });
 
 test('a role that requires two factor cannot switch the app off when it has no email for codes', function () {
-    config(['access-control.two_factor.enforced' => true]);
+    config(['access-control.two_factor' => ['enforced' => true, 'required_roles' => ['Super Admin', 'General Manager', 'Managers', 'Financial']]]);
 
     $superAdmin = User::factory()->role('Super Admin')->withTwoFactor()->create(['email' => '']);
 
@@ -231,7 +232,7 @@ test('a role that requires two factor cannot switch the app off when it has no e
 });
 
 test('a team member can still switch two factor off while other roles require it', function () {
-    config(['access-control.two_factor.enforced' => true]);
+    config(['access-control.two_factor' => ['enforced' => true, 'required_roles' => ['Super Admin', 'General Manager', 'Managers', 'Financial']]]);
 
     $teamMember = User::factory()->role('Team Member')->withTwoFactor()->create();
 
@@ -342,3 +343,31 @@ test('other devices are not signed out once the password confirmation has lapsed
     expect(DB::table('sessions')->where('id', 'laptop-session')->exists())->toBeTrue()
         ->and($user->fresh()->remember_token)->toBe('old-remember-token');
 });
+
+test('security is the only settings page and settings opens it', function () {
+    $this->actingAs(User::factory()->create());
+
+    $this->get('/settings')->assertRedirect('/settings/security');
+    $this->get('/settings/profile')->assertNotFound();
+    $this->get('/settings/appearance')->assertNotFound();
+
+    expect(Route::has('profile.edit'))->toBeFalse()
+        ->and(Route::has('appearance.edit'))->toBeFalse();
+});
+
+test('the headline says what a new sign-in asks for after the password', function (string $state, string $check, string $headline) {
+    config(['access-control.two_factor' => ['enforced' => false, 'required_roles' => []]]);
+
+    $user = $state === 'app and email' ? User::factory()->withTwoFactor()->create() : User::factory()->create();
+    $user->forceFill(['email_two_factor_enabled' => $state !== 'nothing'])->save();
+
+    $this->actingAs($user)->withSession(['auth.password_confirmed_at' => time()]);
+
+    Livewire::test('pages::settings.security')
+        ->assertSeeHtml('data-sign-in-check="'.$check.'"')
+        ->assertSee(__($headline));
+})->with([
+    'the app wins over email' => ['app and email', 'app', 'settings.protection_app'],
+    'email code only' => ['email', 'email', 'settings.protection_email'],
+    'password only' => ['nothing', 'password', 'settings.protection_password'],
+]);

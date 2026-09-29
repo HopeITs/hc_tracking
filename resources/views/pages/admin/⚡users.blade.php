@@ -233,7 +233,9 @@ new #[Title('titles.user_directory')] class extends Component {
         $user->roles()->sync($validated['userRoleIds']);
         $user->recordRoleChange($rolesBefore, $user->roles()->pluck('name')->all());
         $user->setActiveRole($validated['userActiveRoleId']);
+        $permissionsBefore = $user->permissions()->pluck('name')->all();
         $user->syncPermissions(Permission::query()->whereIn('id', $validated['userPermissionIds'])->get());
+        $user->recordPermissionChange($permissionsBefore, $user->permissions()->pluck('name')->all());
 
         Flux::toast(variant: 'success', text: __('users.user_updated'));
 
@@ -400,6 +402,47 @@ new #[Title('titles.user_directory')] class extends Component {
     }
 
     /**
+     * Whether the viewer may rename or delete the selected role
+     * (UserPolicy::manageRole).
+     */
+    #[Computed]
+    public function canManageSelectedRole(): bool
+    {
+        $role = $this->selectedRole?->loadMissing('permissions');
+
+        return $role !== null && Gate::allows('manageRole', [User::class, $role]);
+    }
+
+    /**
+     * Whether the viewer may change the selected role's permissions
+     * (UserPolicy::editRolePermissions).
+     */
+    #[Computed]
+    public function canEditSelectedRolePermissions(): bool
+    {
+        $role = $this->selectedRole?->loadMissing('permissions');
+
+        return $role !== null && Gate::allows('editRolePermissions', [User::class, $role]);
+    }
+
+    /**
+     * Ids of the permissions the viewer may give or take away
+     * (UserPolicy::grantPermission).
+     *
+     * @return list<int>
+     */
+    #[Computed]
+    public function grantablePermissionIds(): array
+    {
+        return Permission::query()->get()
+            ->filter(fn (Permission $permission): bool => Gate::allows('grantPermission', [User::class, $permission]))
+            ->pluck('id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->values()
+            ->all();
+    }
+
+    /**
      * @return EloquentCollection<int, User>
      */
     #[Computed]
@@ -442,6 +485,7 @@ new #[Title('titles.user_directory')] class extends Component {
         ]);
 
         $role = Role::query()->create(['name' => $validated['newRoleName'], 'guard_name' => 'web']);
+        $role->recordActivity('role.created');
 
         $this->newRoleName = '';
         $this->selectRole($role->id);
@@ -451,29 +495,31 @@ new #[Title('titles.user_directory')] class extends Component {
 
     public function renameRole(): void
     {
-        Gate::authorize('access-management.manage-roles');
+        $role = Role::query()->with('permissions')->findOrFail($this->selectedRoleId);
 
-        $role = Role::query()->findOrFail($this->selectedRoleId);
-
-        abort_if(in_array($role->name, config('access-control.administrator_roles', []), true), 403);
+        Gate::authorize('manageRole', [User::class, $role]);
 
         $validated = $this->validate([
             'selectedRoleName' => ['required', 'string', 'max:255', Rule::unique('roles', 'name')->ignore($role->id)],
         ]);
 
+        $oldName = $role->name;
         $role->update(['name' => $validated['selectedRoleName']]);
+
+        if ($oldName !== $role->name) {
+            $role->recordActivity('role.renamed', ['name' => [$oldName, $role->name]], ['field' => 'name']);
+        }
 
         Flux::toast(variant: 'success', text: __('roles.role_renamed'));
     }
 
     public function deleteRole(): void
     {
-        Gate::authorize('access-management.manage-roles');
+        $role = Role::query()->with('permissions')->findOrFail($this->selectedRoleId);
 
-        $role = Role::query()->findOrFail($this->selectedRoleId);
+        Gate::authorize('manageRole', [User::class, $role]);
 
-        abort_if(in_array($role->name, config('access-control.administrator_roles', []), true), 403);
-
+        $role->recordActivity('role.deleted');
         $role->delete();
 
         $this->selectedRoleId = Role::query()->orderBy('name')->value('id');
@@ -482,36 +528,97 @@ new #[Title('titles.user_directory')] class extends Component {
         Flux::toast(variant: 'success', text: __('roles.role_deleted'));
     }
 
+    /**
+     * Tick every permission the actor may hand out. Permissions the actor may
+     * not grant (access-management.* for a non-administrator) keep the state
+     * they already had.
+     */
     public function selectAllRolePermissions(): void
     {
-        Gate::authorize('access-management.manage-permissions');
+        Gate::authorize('editRolePermissions', [User::class, $this->roleForPermissionEdit()]);
 
-        $this->rolePermissionIds = Permission::query()->pluck('id')->all();
+        $current = array_map('intval', $this->rolePermissionIds);
+
+        $this->rolePermissionIds = Permission::query()->get()
+            ->filter(fn (Permission $permission): bool => Gate::allows('grantPermission', [User::class, $permission])
+                || in_array($permission->id, $current, true))
+            ->pluck('id')
+            ->all();
     }
 
+    /**
+     * Untick every permission the actor may take away.
+     */
     public function clearRolePermissions(): void
     {
-        Gate::authorize('access-management.manage-permissions');
+        Gate::authorize('editRolePermissions', [User::class, $this->roleForPermissionEdit()]);
 
-        if (! $this->selectedRoleIsProtected) {
-            $this->rolePermissionIds = [];
-        }
+        $this->rolePermissionIds = Permission::query()
+            ->whereKey($this->rolePermissionIds)
+            ->get()
+            ->reject(fn (Permission $permission): bool => Gate::allows('grantPermission', [User::class, $permission]))
+            ->pluck('id')
+            ->all();
     }
 
     public function saveRolePermissions(): void
     {
-        Gate::authorize('access-management.manage-permissions');
+        $role = $this->roleForPermissionEdit();
 
-        $role = Role::query()->findOrFail($this->selectedRoleId);
+        Gate::authorize('editRolePermissions', [User::class, $role]);
 
-        abort_if(in_array($role->name, config('access-control.administrator_roles', []), true), 403);
+        $validated = $this->validate([
+            'rolePermissionIds' => ['array'],
+            'rolePermissionIds.*' => ['integer', 'distinct', Rule::exists('permissions', 'id')],
+        ]);
 
-        $role->syncPermissions(
-            Permission::query()->whereIn('id', $this->rolePermissionIds)->get()
-        );
+        $before = $role->permissions->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
+        $after = array_map('intval', $validated['rolePermissionIds']);
+
+        $changed = Permission::query()
+            ->whereKey(array_merge(array_diff($after, $before), array_diff($before, $after)))
+            ->get();
+
+        $changed->each(fn (Permission $permission) => Gate::authorize('grantPermission', [User::class, $permission]));
+
+        $role->syncPermissions(Permission::query()->whereKey($after)->get());
+
+        if ($changed->isNotEmpty()) {
+            $role->recordActivity('role.permissions_changed', properties: $this->permissionChangeProperties($changed, $after));
+        }
 
         Flux::toast(variant: 'success', text: __('roles.save_permissions'));
         $this->loadSelectedRole();
+    }
+
+    /**
+     * The selected role with the permissions UserPolicy::isPrivileged() reads.
+     */
+    protected function roleForPermissionEdit(): Role
+    {
+        return Role::query()->with('permissions')->findOrFail($this->selectedRoleId);
+    }
+
+    /**
+     * Sentence properties for a permission change: what was added and removed.
+     *
+     * @param  EloquentCollection<int, Permission>  $changed
+     * @param  list<int>  $after
+     * @return array{added: string, removed: string, added_permissions: list<string>, removed_permissions: list<string>}
+     */
+    protected function permissionChangeProperties(EloquentCollection $changed, array $after): array
+    {
+        [$added, $removed] = $changed->partition(fn (Permission $permission): bool => in_array($permission->id, $after, true));
+
+        $addedNames = $added->pluck('name')->sort()->values()->all();
+        $removedNames = $removed->pluck('name')->sort()->values()->all();
+
+        return [
+            'added' => $addedNames === [] ? '—' : implode(', ', $addedNames),
+            'removed' => $removedNames === [] ? '—' : implode(', ', $removedNames),
+            'added_permissions' => $addedNames,
+            'removed_permissions' => $removedNames,
+        ];
     }
 
     protected function resetCreateUserForm(): void
@@ -768,14 +875,16 @@ new #[Title('titles.user_directory')] class extends Component {
                             </button>
                             @if ($this->selectedRoleIsProtected)
                                 <p class="mt-1.5 text-xs font-semibold text-primary">{{ __('roles.protected_role_help') }}</p>
+                            @elseif (! $this->canEditSelectedRolePermissions && auth()->user()->can('access-management.manage-permissions'))
+                                <p class="mt-1.5 text-xs font-semibold text-primary" data-test="role-admin-only-note">{{ __('roles.admin_only_role_help') }}</p>
                             @endif
                         </div>
 
                         @can('access-management.manage-roles')
                             @unless ($this->selectedRoleIsProtected)
                                 <div class="grid w-full items-end gap-2 sm:w-auto sm:grid-cols-[minmax(13rem,1fr)_auto]">
-                                    <x-ui.input id="selected-role-name" wire:model="selectedRoleName" autocomplete="off" spellcheck="false" :label="__('roles.rename_role')" />
-                                    <x-ui.button type="button" wire:click="renameRole">{{ __('roles.rename_role') }}</x-ui.button>
+                                    <x-ui.input id="selected-role-name" wire:model="selectedRoleName" autocomplete="off" spellcheck="false" :label="__('roles.rename_role')" :disabled="! $this->canManageSelectedRole" />
+                                    <x-ui.button type="button" wire:click="renameRole" :disabled="! $this->canManageSelectedRole" :title="$this->canManageSelectedRole ? null : __('roles.admin_only_role_help')">{{ __('roles.rename_role') }}</x-ui.button>
                                 </div>
                             @endunless
                         @endcan
@@ -787,8 +896,8 @@ new #[Title('titles.user_directory')] class extends Component {
                             <h3 class="text-sm font-bold text-secondary-dark dark:text-white">{{ __('roles.permissions') }}</h3>
                             @can('access-management.manage-permissions')
                                 <div class="flex flex-wrap gap-2">
-                                    <x-ui.button type="button" tone="ghost" wire:click="selectAllRolePermissions">{{ __('roles.select_all') }}</x-ui.button>
-                                    <x-ui.button type="button" tone="ghost" wire:click="clearRolePermissions" :disabled="$this->selectedRoleIsProtected">{{ __('roles.clear_all') }}</x-ui.button>
+                                    <x-ui.button type="button" tone="ghost" wire:click="selectAllRolePermissions" :disabled="! $this->canEditSelectedRolePermissions">{{ __('roles.select_all') }}</x-ui.button>
+                                    <x-ui.button type="button" tone="ghost" wire:click="clearRolePermissions" :disabled="! $this->canEditSelectedRolePermissions">{{ __('roles.clear_all') }}</x-ui.button>
                                 </div>
                             @endcan
                         </div>
@@ -806,7 +915,8 @@ new #[Title('titles.user_directory')] class extends Component {
                                             <flux:checkbox
                                                 value="{{ $permission->id }}"
                                                 :label="(string) str($permission->name)->afterLast('.')->replace('-', ' ')"
-                                                :disabled="$this->selectedRoleIsProtected"
+                                                :disabled="! $this->canEditSelectedRolePermissions || ! in_array($permission->id, $this->grantablePermissionIds, true)"
+                                                :title="in_array($permission->id, $this->grantablePermissionIds, true) ? null : __('roles.admin_only_permission_help')"
                                                 wire:key="role-permission-{{ $permission->id }}"
                                             />
                                         @endforeach
@@ -817,7 +927,7 @@ new #[Title('titles.user_directory')] class extends Component {
 
                         @can('access-management.manage-permissions')
                             <div class="sticky bottom-0 flex justify-end border-t border-secondary-soft bg-white/95 px-6 py-3 backdrop-blur-sm dark:border-secondary-medium dark:bg-secondary-dark/95">
-                                <x-ui.button type="submit" tone="primary" data-test="save-role-permissions">{{ __('roles.save_permissions') }}</x-ui.button>
+                                <x-ui.button type="submit" tone="primary" data-test="save-role-permissions" :disabled="! $this->canEditSelectedRolePermissions">{{ __('roles.save_permissions') }}</x-ui.button>
                             </div>
                         @endcan
                     </form>

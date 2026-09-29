@@ -35,9 +35,9 @@ final class EmailLoginCode extends Notification
     {
         return (new MailMessage)
             ->subject(__('security.login_code_subject', ['app' => config('app.name')]))
-            ->line(__('security.login_code_intro'))
-            ->line('**'.$this->code.'**')
-            ->line(__('security.login_code_expires', ['minutes' => $this->minutesValid]))
-            ->line(__('security.login_code_if_it_was_not_you'));
+            ->markdown('mail.login-code', [
+                'code' => $this->code,
+                'minutesValid' => $this->minutesValid,
+            ]);
     }
 }

@@ -67,7 +67,7 @@ beforeEach(function () {
         'confirmPassword' => true,
     ]);
 
-    config(['access-control.two_factor.enforced' => true]);
+    config(['access-control.two_factor' => ['enforced' => true, 'required_roles' => ['Super Admin', 'General Manager', 'Managers', 'Financial']]]);
 });
 
 test('every role that must use two factor goes straight through, covered by emailed codes', function (string $role) {
@@ -98,6 +98,15 @@ test('two factor that was set up but never confirmed does not count', function (
     $superAdmin = User::factory()->role('Super Admin')->withTwoFactor()->create(['email' => '', 'two_factor_confirmed_at' => null]);
 
     $this->actingAs($superAdmin)->get(route('dashboard'))->assertRedirect(route('security.edit'));
+});
+
+test('as shipped, two factor is optional for every role, even a super admin with no email', function () {
+    config(['access-control.two_factor.required_roles' => (require config_path('access-control.php'))['two_factor']['required_roles']]);
+
+    expect(config('access-control.two_factor.enforced'))->toBeTrue()
+        ->and(config('access-control.two_factor.required_roles'))->toBe([]);
+
+    $this->actingAs(requiredRoleWithoutEmail())->get(route('dashboard'))->assertOk();
 });
 
 test('a team member without two factor goes through', function () {

@@ -394,7 +394,15 @@ return [
         'user' => [
             'created' => ':actor created the account of :subject',
             'role_changed' => ':actor changed the roles of :subject to :role',
+            'permissions_changed' => ':actor changed the direct permissions of :subject (added: :added; removed: :removed)',
+            'access_denied' => ':subject was refused access to :action (IP :ip)',
             'deleted' => ':actor removed the account of :subject',
+        ],
+        'role' => [
+            'created' => ':actor created the role “:subject”',
+            'renamed' => ':actor renamed the role “:from” to “:to”',
+            'permissions_changed' => ':actor changed the permissions of the role “:subject” (added: :added; removed: :removed)',
+            'deleted' => ':actor deleted the role “:subject”',
         ],
     ],
 ];
