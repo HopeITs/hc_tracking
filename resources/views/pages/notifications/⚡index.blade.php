@@ -7,6 +7,7 @@ use App\Models\UserNotification;
 use App\Notifications\Inbox;
 use App\Notifications\NotificationPresenter;
 use App\Notifications\UnreadCounts;
+use App\Support\Like;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
@@ -70,7 +71,7 @@ new #[Title('titles.notifications')] class extends Component {
             ->when(in_array($this->priority, NotificationPriority::values(), true), fn (Builder $query) => $query->where('priority', $this->priority))
             ->when($this->state === 'unread', fn (Builder $query) => $query->whereNull('read_at'))
             ->when($this->state === 'read', fn (Builder $query) => $query->whereNotNull('read_at'))
-            ->when($term !== '', fn (Builder $query) => $query->where('search_text', 'like', '%'.addcslashes($term, '%_\\').'%'));
+            ->when($term !== '', fn (Builder $query) => $query->where('search_text', 'like', Like::contains($term)));
     }
 
     /**

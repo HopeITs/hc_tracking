@@ -140,7 +140,10 @@ return [
             'extensions:'.implode(',', FileType::values()),
         ],
         'directory' => null,                                  // Example: 'tmp'                     | Default: 'livewire-tmp'
-        'middleware' => null,                                 // Example: 'throttle:5,1'            | Default: 'throttle:60,1'
+        // 20 uploads a minute per user (several files picked together are
+        // one upload). The default of 60 let one account write 300 MB a
+        // minute into livewire-tmp.
+        'middleware' => 'throttle:20,1',
         // Only the image types an upload may be. SVG is excluded: served from
         // the app's own origin, an SVG can run script.
         'preview_mimes' => ['png', 'jpg', 'jpeg'],

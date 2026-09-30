@@ -7,6 +7,7 @@ namespace App\Actions\Fortify;
 use App\Models\HrUser;
 use App\Models\User;
 use App\Support\BackoffThrottle;
+use App\Support\Turnstile;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Auth\Events\Login;
@@ -14,7 +15,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Fortify;
 use Laravel\Fortify\LoginRateLimiter;
@@ -31,6 +31,9 @@ use Laravel\Fortify\LoginRateLimiter;
  * failed logins are limited per IP across all emails (password spraying) and
  * per email across all IPs (distributed guessing). Only failures count, so a
  * whole office signing in from one IP is never blocked by its own logins.
+ * A browser that signed in to the email before is held to a limit of its own
+ * instead of the per-email one (see RecognisedBrowsers), so that limit cannot
+ * be used to lock a colleague out.
  */
 class AuthenticateWithHrAccount
 {
@@ -112,14 +115,27 @@ class AuthenticateWithHrAccount
             return null;
         }
 
+        // A browser that signed in to this email before counts its failures
+        // on its own key, so a lockout strangers caused on the email (the
+        // limit across all IPs) does not keep the account's owner out.
+        $backoffKey = RecognisedBrowsers::failedLoginsKey($request, $email) ?? self::failedLoginsByEmailKey($email);
+
         $limits = [
             self::failedLoginsByIpKey($request) => [self::MaxFailedLoginsPerIp, self::FailedLoginDecaySeconds],
-            self::failedLoginsByEmailKey($email) => [self::MaxFailedLoginsPerEmail, self::FailedLoginDecaySeconds],
+            $backoffKey => [self::MaxFailedLoginsPerEmail, self::FailedLoginDecaySeconds],
         ];
 
-        $backoffKey = self::failedLoginsByEmailKey($email);
-
         self::ensureIsNotThrottled($request, $limits, Fortify::username(), 'auth.throttle', $backoffKey);
+
+        // A failed human check counts against the IP only, never the email,
+        // so a script cannot lock someone else's address out with it.
+        if (! Turnstile::passes($request)) {
+            RateLimiter::hit(self::failedLoginsByIpKey($request), self::FailedLoginDecaySeconds);
+
+            throw ValidationException::withMessages([
+                Turnstile::ResponseField => [trans('authentication.human_check_failed')],
+            ]);
+        }
 
         $hrUser = self::findHrUserByEmail($email);
 
@@ -287,7 +303,7 @@ class AuthenticateWithHrAccount
      */
     private static function failedLoginsByEmailKey(string $email): string
     {
-        return 'login-failures-email:'.sha1(Str::transliterate(Str::lower(trim($email))));
+        return 'login-failures-email:'.RecognisedBrowsers::emailFingerprint($email);
     }
 
     /**

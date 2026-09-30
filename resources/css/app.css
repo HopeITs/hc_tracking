@@ -774,6 +774,32 @@ button:not(:disabled),
 }
 
 /*
+ * Sidebar group headings read as labels, not as one more link: small, bold,
+ * uppercase and quieter than the rows under them. Unlayered on purpose: Flux
+ * styles the heading with its own utilities, and the collapsed rail below
+ * still has to win the colour. Arabic has no capitals and must not be
+ * letter-spaced, so it keeps its size and drops the tracking.
+ */
+[data-navigation-sidebar] [data-flux-sidebar-group] > div:first-child {
+    padding-block: 0.625rem 0.375rem;
+    color: var(--color-secondary-light);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    line-height: 1rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+[data-navigation-sidebar] [data-flux-sidebar-group] > div:first-child:lang(ar) {
+    font-size: 0.75rem;
+    letter-spacing: 0;
+}
+
+:where(.dark) [data-navigation-sidebar] [data-flux-sidebar-group] > div:first-child {
+    color: var(--color-ink-faint);
+}
+
+/*
  * Desktop sidebar collapse and expand.
  *
  * Flux swaps labels, section headings and the logo with display:none, so the

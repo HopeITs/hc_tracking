@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Support\Turnstile;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Vite;
@@ -17,7 +18,8 @@ use Symfony\Component\HttpFoundation\Response;
  * 'unsafe-inline' and 'unsafe-eval' for scripts because Livewire, Alpine and
  * the inline toast/preloader scripts need them; everything else is locked to
  * this origin, which still blocks framing, plugins, base-tag and form
- * hijacking, and any request to a third-party host.
+ * hijacking, and any request to a third-party host. The one exception is
+ * the login page while Turnstile is on, which may load Cloudflare's widget.
  *
  * HSTS is not sent here: AddSecurityHeaders owns it (production over HTTPS,
  * max-age from config('app.hsts_max_age')).
@@ -61,15 +63,16 @@ class SecurityHeaders
     {
         $devServer = $this->viteDevServer();
         $sockets = $this->socketSources();
+        $humanCheck = $this->humanCheckSource($request);
 
         $directives = [
             'default-src' => ["'self'"],
-            'script-src' => array_filter(["'self'", "'unsafe-inline'", "'unsafe-eval'", $devServer]),
+            'script-src' => array_filter(["'self'", "'unsafe-inline'", "'unsafe-eval'", $devServer, $humanCheck]),
             'style-src' => array_filter(["'self'", "'unsafe-inline'", $devServer]),
             'img-src' => ["'self'", 'data:', 'blob:'],
             'font-src' => array_filter(["'self'", 'data:', $devServer]),
             'connect-src' => array_filter(["'self'", $devServer, $this->webSocketOrigin($devServer), ...$sockets]),
-            'frame-src' => ["'self'"],
+            'frame-src' => array_filter(["'self'", $humanCheck]),
             'worker-src' => ["'self'"],
             'manifest-src' => ["'self'"],
             'object-src' => ["'none'"],
@@ -83,6 +86,15 @@ class SecurityHeaders
             ->implode('; ');
 
         return $request->isSecure() ? $policy.'; upgrade-insecure-requests' : $policy;
+    }
+
+    /**
+     * Cloudflare's origin for the Turnstile widget, on the login page only
+     * and only while the human check is switched on, else null.
+     */
+    private function humanCheckSource(Request $request): ?string
+    {
+        return Turnstile::isEnabled() && $request->routeIs('login') ? Turnstile::Origin : null;
     }
 
     /**

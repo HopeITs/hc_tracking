@@ -129,6 +129,34 @@ test('no proxy is trusted unless TRUSTED_PROXIES lists one', function (?string $
     'list' => [' 10.0.0.1 , 192.168.0.0/16 ', ['10.0.0.1', '192.168.0.0/16']],
 ]);
 
+test('the word cloudflare in TRUSTED_PROXIES stands for every cloudflare range', function (string $value, int $expectedCount) {
+    $proxies = configFileWithEnv('trustedproxy.php', ['TRUSTED_PROXIES' => $value])['proxies'];
+
+    expect($proxies)
+        ->toHaveCount($expectedCount)
+        ->toContain('173.245.48.0/20', '172.64.0.0/13', '2400:cb00::/32', '2c0f:f248::/32')
+        ->not->toContain('cloudflare', 'Cloudflare');
+})->with([
+    'alone' => ['cloudflare', 22],
+    'any letter case, beside another proxy' => [' Cloudflare , 10.0.0.1 ', 23],
+    'written twice' => ['cloudflare,cloudflare', 22],
+]);
+
+test('with the cloudflare ranges, a visitor is known by the address cloudflare forwards and nobody else is let in', function () {
+    Route::get('/test-client-ip', fn () => request()->ip());
+
+    config([
+        'trustedproxy.required' => true,
+        'trustedproxy.proxies' => configFileWithEnv('trustedproxy.php', ['TRUSTED_PROXIES' => 'cloudflare'])['proxies'],
+    ]);
+
+    $this->withServerVariables(['REMOTE_ADDR' => '172.64.10.20', 'HTTP_X_FORWARDED_FOR' => '203.0.113.9'])
+        ->get('/test-client-ip')->assertOk()->assertSee('203.0.113.9');
+
+    $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.9', 'HTTP_X_FORWARDED_FOR' => '172.64.10.20'])
+        ->get('/test-client-ip')->assertForbidden();
+});
+
 test('a forwarded ip is only believed from a trusted proxy', function () {
     Route::get('/test-client-ip', fn () => request()->ip());
 

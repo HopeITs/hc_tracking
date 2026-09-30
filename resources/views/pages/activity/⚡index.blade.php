@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Notifications\ActivityPresenter;
 use App\Notifications\NotificationPresenter;
 use App\Notifications\SubjectLinks;
+use App\Support\Like;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -78,8 +79,8 @@ new #[Title('titles.activity_log')] class extends Component {
             ->when($this->module !== '', fn (Builder $query) => $query->where('module', $this->module))
             ->when(ctype_digit($this->actor), fn (Builder $query) => $query->where('actor_id', (int) $this->actor))
             ->when($term !== '', fn (Builder $query) => $query->where(fn (Builder $query) => $query
-                ->where('event', 'like', '%'.addcslashes($term, '%_\\').'%')
-                ->orWhere('properties', 'like', '%'.addcslashes($term, '%_\\').'%')))
+                ->where('event', 'like', Like::contains($term))
+                ->orWhere('properties', 'like', Like::contains($term))))
             ->when($this->validDate($this->from), fn (Builder $query) => $query->where('created_at', '>=', CarbonImmutable::parse($this->from)->startOfDay()))
             ->when($this->validDate($this->to), fn (Builder $query) => $query->where('created_at', '<=', CarbonImmutable::parse($this->to)->endOfDay()))
             ->when($sortingByModule, fn (Builder $query) => $query->orderBy('module', $this->sortDirection))

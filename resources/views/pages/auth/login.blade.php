@@ -63,6 +63,23 @@
                 style="--color-accent: var(--color-primary); --color-accent-foreground: var(--color-white);"
             />
 
+            @if (\App\Support\Turnstile::isEnabled())
+                <!-- Human check (Cloudflare Turnstile) -->
+                <div>
+                    <div
+                        class="cf-turnstile"
+                        data-sitekey="{{ config('services.turnstile.site_key') }}"
+                        data-language="{{ app()->getLocale() }}"
+                        data-size="flexible"
+                        data-theme="auto"
+                        data-test="login-human-check"
+                    ></div>
+                    <flux:error :name="\App\Support\Turnstile::ResponseField" class="text-primary! dark:text-brand-text!" />
+                </div>
+
+                <script src="{{ \App\Support\Turnstile::Origin }}/turnstile/v0/api.js" async defer></script>
+            @endif
+
             <x-ui.button type="submit" tone="primary" class="min-h-11 w-full cursor-pointer!" data-test="login-button">
                 {{ __('authentication.sign_in') }}
             </x-ui.button>

@@ -66,7 +66,7 @@ class HrEmployee extends HrModel
      */
     public static function idsMatchingName(string $search): array
     {
-        $words = preg_split('/\s+/u', trim($search), -1, PREG_SPLIT_NO_EMPTY);
+        $words = preg_split('/\s+/u', Like::term($search), -1, PREG_SPLIT_NO_EMPTY);
 
         if ($words === false || $words === []) {
             return [];

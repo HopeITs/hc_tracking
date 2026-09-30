@@ -29,17 +29,24 @@
 
             <flux:spacer />
 
-            <x-notifications.install-button />
+            {{-- The icon actions share one track, the same one the language toggle sits on. --}}
+            <div class="me-1 inline-flex items-center gap-1 rounded-full bg-secondary-soft/40 p-1 dark:bg-surface-2" data-top-bar-action-group>
+                <x-notifications.install-button />
 
-            @if ($showsInbox)
-                <livewire:notifications.bell />
-            @endif
+                @if ($showsInbox)
+                    <livewire:notifications.bell />
+                @endif
 
-            <x-report-bug-button />
+                <x-report-bug-button />
 
+<<<<<<< HEAD
             <x-guideline-button />
 
             <x-tour.button />
+=======
+                <x-tour.button />
+            </div>
+>>>>>>> Security-handeling-youssef
 
             <flux:dropdown position="top" align="end" data-tour="profile">
                 <flux:profile
@@ -89,35 +96,41 @@
         <flux:header sticky class="z-40 hidden min-h-16 border-b border-secondary-soft bg-white px-4 py-2 lg:flex dark:border-line dark:bg-surface-1" data-desktop-navigation-header data-top-bar-actions>
             <flux:spacer />
 
-            <div class="flex items-center gap-1.5">
-                <x-notifications.install-button />
+            <div class="flex items-center gap-3">
+                <x-locale-toggle />
 
-                @if ($showsInbox)
-                    <livewire:notifications.bell />
-                @endif
+                {{-- The icon actions share one track, the same one the language toggle sits on. --}}
+                <div class="inline-flex items-center gap-2 rounded-full bg-secondary-soft/40 px-2 py-1 dark:bg-surface-2" data-top-bar-action-group>
+                    <x-notifications.install-button />
 
-                <x-report-bug-button />
+                    @if ($showsInbox)
+                        <livewire:notifications.bell />
+                    @endif
 
-                <x-tour.button />
+                    <x-report-bug-button />
 
-                {{-- Light / Dark / System. The choice lives in Flux's $flux.appearance; resources/js/theme-transition.js cross-fades the switch. --}}
-                <flux:dropdown x-data position="bottom" align="end">
+                    <x-tour.button />
+
+                    {{-- One press flips Light / Dark; the icon shows the theme in use. resources/js/theme-transition.js stores the choice in Flux's $flux.appearance and cross-fades the switch. --}}
                     <flux:button
+                        x-data
+                        x-on:click="hcToggleAppearance()"
                         variant="ghost"
                         size="sm"
                         square
-                        class="size-9! touch-manipulation text-secondary-medium! hover:bg-secondary-soft! hover:text-secondary-dark! dark:text-ink-muted! dark:hover:bg-white/10! dark:hover:text-ink!"
+                        class="size-8! touch-manipulation text-secondary-medium! hover:bg-white! hover:text-secondary-dark! hover:shadow-sm dark:text-ink-muted! dark:hover:bg-surface-3! dark:hover:text-ink! dark:hover:shadow-raised"
                         :aria-label="__('common.appearance')"
                         :tooltip="__('common.appearance')"
                         tooltip:position="bottom"
                         data-theme-toggle
                         data-top-bar-action
                     >
-                        <flux:icon.sun x-show="$flux.appearance === 'light'" x-cloak variant="mini" />
-                        <flux:icon.moon x-show="$flux.appearance === 'dark'" x-cloak variant="mini" />
-                        <flux:icon.computer-desktop x-show="$flux.appearance === 'system'" x-cloak variant="mini" />
+                        <flux:icon.sun x-show="! $flux.dark" x-cloak variant="outline" class="size-4.5!" />
+                        <flux:icon.moon x-show="$flux.dark" x-cloak variant="outline" class="size-4.5!" />
                     </flux:button>
+                </div>
 
+<<<<<<< HEAD
                     <flux:menu :aria-label="__('common.appearance')">
                         <flux:menu.radio.group x-bind:value="$flux.appearance">
                             <flux:menu.radio value="light" icon:trailing="sun" class="touch-manipulation" x-on:click="hcSetAppearance('light')" data-appearance-option="light">
@@ -138,6 +151,9 @@
                 <x-locale-toggle />
 
                 <div class="ms-1 border-s border-secondary-soft ps-2 dark:border-line" data-tour="profile">
+=======
+                <div class="border-s border-secondary-soft ps-2 dark:border-line" data-tour="profile">
+>>>>>>> Security-handeling-youssef
                     <x-desktop-user-menu />
                 </div>
             </div>

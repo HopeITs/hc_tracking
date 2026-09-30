@@ -16,6 +16,7 @@ use App\Models\Report;
 use App\Models\Result;
 use App\Models\Risk;
 use App\Models\Task;
+use App\Support\Like;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
@@ -133,7 +134,7 @@ new #[Title('titles.program')] class extends Component {
             ->where('program_id', $this->programId)
             ->when($this->projectSearch !== '', fn ($query) => $query->whereRaw(
                 "name like ? escape '!'",
-                ['%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $this->projectSearch).'%'],
+                ['%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], mb_substr($this->projectSearch, 0, Like::MaxTermLength)).'%'],
             ))
             ->when($status !== null, fn ($query) => $query->where('status', $status->value))
             ->with([
