@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\Like;
 use App\Models\HrCity;
 use App\Models\Project;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -148,8 +149,8 @@ new #[Title('titles.city_directory')] class extends Component {
         $query = HrCity::query()
             ->select(['id', 'name_en', 'name_ar', 'is_active'])
             ->when($search !== '', fn ($query) => $query->where(fn ($query) => $query
-                ->where('name_en', 'like', '%'.$search.'%')
-                ->orWhere('name_ar', 'like', '%'.$search.'%')))
+                ->where('name_en', 'like', Like::contains($search))
+                ->orWhere('name_ar', 'like', Like::contains($search))))
             ->when($this->status !== '', fn ($query) => $query->where('is_active', $this->status === 'active'));
 
         if ($this->sort === 'name') {

@@ -451,6 +451,19 @@
     ::file-selector-button {
         border-color: var(--color-gray-200, currentColor);
     }
+
+    /* Scale the rem grid on QHD/4K so the 90rem page column keeps a sensible share of the screen. */
+    @media (min-width: 2200px) {
+        html {
+            font-size: 112.5%;
+        }
+    }
+
+    @media (min-width: 3200px) {
+        html {
+            font-size: 150%;
+        }
+    }
 }
 
 /*

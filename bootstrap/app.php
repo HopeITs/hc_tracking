@@ -3,9 +3,13 @@
 use App\Http\DeniedAccessRecorder;
 use App\Http\Middleware\AddSecurityHeaders;
 use App\Http\Middleware\EnsureHrAccountIsActive;
+<<<<<<< HEAD
 use App\Http\Middleware\EnsureRequestCameThroughTrustedProxy;
 use App\Http\Middleware\EnsureTwoFactorIsEnabled;
 use App\Http\Middleware\RedirectToHttps;
+=======
+use App\Http\Middleware\SecurityHeaders;
+>>>>>>> gitlab/security-mai
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\SyncProgramsFromHr;
 use Illuminate\Foundation\Application;
@@ -36,6 +40,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(RedirectToHttps::class);
 
         $middleware->web(append: [
+            SecurityHeaders::class,
             SetLocale::class,
             SyncProgramsFromHr::class,
             EnsureHrAccountIsActive::class,

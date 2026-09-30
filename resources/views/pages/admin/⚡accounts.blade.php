@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\Like;
 use App\Enums\ArStatus;
 use App\Enums\Currency;
 use App\Models\Account;
@@ -107,9 +108,15 @@ new #[Title('titles.accounts')] class extends Component {
             ->when(
                 $search !== '',
                 fn ($query) => $query->where(fn ($query) => $query
+<<<<<<< HEAD
                     ->where('account_name', 'like', '%'.$search.'%')
                     ->orWhere('bank_name', 'like', '%'.$search.'%')
                     ->when($this->showsFullAccountNumbers, fn ($query) => $query->orWhereIn('id', Account::idsMatchingAccountNumber($search)))),
+=======
+                    ->where('account_name', 'like', Like::contains($search))
+                    ->orWhere('bank_name', 'like', Like::contains($search))
+                    ->orWhere('account_number_last4', Account::lastFour($search))),
+>>>>>>> gitlab/security-mai
             )
             ->when($this->state === 'active', fn ($query) => $query->where('is_active', true))
             ->when($this->state === 'closed', fn ($query) => $query->where('is_active', false))

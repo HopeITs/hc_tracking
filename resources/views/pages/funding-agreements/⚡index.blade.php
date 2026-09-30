@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\Like;
 use App\Enums\ArStatus;
 use App\Enums\Currency;
 use App\Livewire\Concerns\ManagesAgreementForm;
@@ -90,9 +91,9 @@ new #[Title('titles.funding_agreements')] class extends Component {
             ->when($search !== '', function (Builder $query) use ($search): void {
                 $query->where(function (Builder $query) use ($search): void {
                     $query
-                        ->where('project_num', 'like', '%'.$search.'%')
-                        ->orWhereHas('donor', fn (Builder $query) => $query->where('name', 'like', '%'.$search.'%'))
-                        ->orWhereHas('proposal', fn (Builder $query) => $query->where('name', 'like', '%'.$search.'%'));
+                        ->where('project_num', 'like', Like::contains($search))
+                        ->orWhereHas('donor', fn (Builder $query) => $query->where('name', 'like', Like::contains($search)))
+                        ->orWhereHas('proposal', fn (Builder $query) => $query->where('name', 'like', Like::contains($search)));
                 });
             })
             ->when($this->donor !== '', fn (Builder $query) => $query->where('donor_id', (int) $this->donor))
@@ -1263,10 +1264,10 @@ new #[Title('titles.funding_agreements')] class extends Component {
                                                     @if ($agreement->transfers->isEmpty())
                                                         <p class="text-xs {{ $mutedText }}">{{ __('funding_agreements.no_tranches_scheduled_yet') }}</p>
                                                     @else
-                                                        <div class="overflow-x-auto">
-                                                            <table class="w-full min-w-[36rem] text-xs">
+                                                        <div class="@container">
+                                                            <table class="w-full text-xs @max-xl:block">
                                                                 <caption class="sr-only">{{ __('funding_agreements.tranches_of_name', ['name' => $agreementName]) }}</caption>
-                                                                <thead>
+                                                                <thead class="@max-xl:hidden">
                                                                     <tr class="text-start {{ $mutedText }}">
                                                                         <th scope="col" class="pb-2 text-start font-semibold">{{ __('funding_agreements.due') }}</th>
                                                                         <th scope="col" class="pb-2 text-end font-semibold">{{ __('funding_agreements.amount') }}</th>
@@ -1276,7 +1277,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
                                                                         <th scope="col" class="pb-2 ps-4 text-start font-semibold">{{ __('funding_agreements.account') }}</th>
                                                                     </tr>
                                                                 </thead>
-                                                                <tbody>
+                                                                <tbody class="[&>tr>td]:@max-xl:block [&>tr>td]:@max-xl:whitespace-normal [&>tr>td]:@max-xl:before:block [&>tr>td]:@max-xl:before:text-[11px] [&>tr>td]:@max-xl:before:font-semibold [&>tr>td]:@max-xl:before:content-[attr(data-label)] [&>tr>td]:@max-xl:before:text-secondary-medium dark:[&>tr>td]:@max-xl:before:text-secondary-soft [&>tr>td]:@max-xl:p-0 [&>tr]:@max-xl:grid [&>tr]:@max-xl:grid-cols-2 [&>tr]:@max-xl:gap-x-4 [&>tr]:@max-xl:gap-y-2 [&>tr]:@max-xl:py-3 @max-xl:block">
                                                                     @foreach ($agreement->transfers as $transfer)
                                                                         @php
                                                                             $state = $this->trancheState($transfer);
@@ -1287,15 +1288,15 @@ new #[Title('titles.funding_agreements')] class extends Component {
                                                                             wire:key="ledger-row-{{ $transfer->id }}"
                                                                             data-ledger-row="{{ $state }}"
                                                                         >
-                                                                            <td class="py-2 pe-3 font-semibold whitespace-nowrap tabular-nums {{ $inkText }}">{{ $transfer->scheduled_date?->translatedFormat(__('formats.date')) ?? '—' }}</td>
-                                                                            <td class="py-2 pe-3 text-end font-bold whitespace-nowrap tabular-nums {{ $inkText }}">{{ $amount((float) $transfer->payment_amount) }} <span class="font-semibold {{ $mutedText }}">{{ $transfer->amount_transfered_currency->value }}</span></td>
-                                                                            <td class="py-2 ps-4 pe-3 whitespace-nowrap">
+                                                                            <td data-label="{{ __('funding_agreements.due') }}" class="py-2 pe-3 font-semibold whitespace-nowrap tabular-nums {{ $inkText }}">{{ $transfer->scheduled_date?->translatedFormat(__('formats.date')) ?? '—' }}</td>
+                                                                            <td data-label="{{ __('funding_agreements.amount') }}" class="py-2 pe-3 text-end font-bold whitespace-nowrap tabular-nums {{ $inkText }}">{{ $amount((float) $transfer->payment_amount) }} <span class="font-semibold {{ $mutedText }}">{{ $transfer->amount_transfered_currency->value }}</span></td>
+                                                                            <td data-label="{{ __('common.status') }}" class="py-2 ps-4 pe-3 whitespace-nowrap">
                                                                                 <span class="inline-flex items-center gap-1.5 rounded-full py-0.5 ps-1.5 pe-2 text-[11px] font-bold {{ $tagClass[$state] }}">
                                                                                     <span class="size-2 rounded-full {{ $beadClass[$state] }}" aria-hidden="true"></span>{{ $trancheStateLabels[$state] }}
                                                                                 </span>
                                                                             </td>
-                                                                            <td class="py-2 pe-3 whitespace-nowrap tabular-nums {{ $mutedText }}">{{ $transfer->transfer_date?->translatedFormat(__('formats.date')) ?? '—' }}</td>
-                                                                            <td class="py-2 pe-3 text-end whitespace-nowrap tabular-nums">
+                                                                            <td data-label="{{ __('funding_agreements.sent') }}" class="py-2 pe-3 whitespace-nowrap tabular-nums {{ $mutedText }}">{{ $transfer->transfer_date?->translatedFormat(__('formats.date')) ?? '—' }}</td>
+                                                                            <td data-label="{{ __('funding_agreements.landed') }}" class="py-2 pe-3 text-end whitespace-nowrap tabular-nums">
                                                                                 @if ($state === 'received' && $transfer->net_amount_received !== null)
                                                                                     <span class="font-bold text-funding">{{ $amount((float) $transfer->net_amount_received) }} {{ $transfer->amount_received_currency->value }}</span>
                                                                                     @if ($transfer->amount_received !== null)
@@ -1310,7 +1311,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
                                                                                     <span class="{{ $mutedText }}">—</span>
                                                                                 @endif
                                                                             </td>
-                                                                            <td class="py-2 ps-4 {{ $inkText }}">{{ $transfer->account?->account_name ?? __('funding_agreements.no_account_assigned') }}</td>
+                                                                            <td data-label="{{ __('funding_agreements.account') }}" class="py-2 ps-4 {{ $inkText }}">{{ $transfer->account?->account_name ?? __('funding_agreements.no_account_assigned') }}</td>
                                                                         </tr>
                                                                     @endforeach
                                                                 </tbody>

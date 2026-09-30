@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\Like;
 use App\Models\HrEmployee;
 use App\Models\Program;
 use App\Models\Strategy;
@@ -143,7 +144,7 @@ new #[Title('titles.programs')] class extends Component {
                 $query->where(function (Builder $query) use ($search): void {
                     $query
                         ->whereNameLike($search)
-                        ->orWhereHas('strategy', fn (Builder $query) => $query->where('name', 'like', '%'.$search.'%'))
+                        ->orWhereHas('strategy', fn (Builder $query) => $query->where('name', 'like', Like::contains($search)))
                         ->orWhereIn('manager_id', HrEmployee::idsMatchingName($search));
                 });
             })

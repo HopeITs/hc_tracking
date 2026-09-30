@@ -6,6 +6,7 @@ namespace App\Actions\Fortify;
 
 use App\Models\HrUser;
 use App\Models\User;
+use App\Support\BackoffThrottle;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Auth\Events\Login;
@@ -79,6 +80,20 @@ class AuthenticateWithHrAccount
     public const FailedConfirmationsPerUserDecaySeconds = 900;
 
     /**
+     * Exponential backoff for the per-email and per-user limits: the first
+     * time one trips it locks for this many seconds, then double that, and so
+     * on. The first lockout equals the decay window, so a single burst of
+     * failures behaves as before; repeat bursts are what get longer.
+     */
+    public const BackoffBaseSeconds = 900;
+
+    /**
+     * The longest a lockout can grow to. Kept to hours, not days, because
+     * anyone can fail on purpose against someone else's email to lock it.
+     */
+    public const BackoffCapSeconds = 21600;
+
+    /**
      * Resolve the tracking user for valid HR credentials.
      *
      * An unknown email fails onto the email field (Fortify's default
@@ -102,18 +117,20 @@ class AuthenticateWithHrAccount
             self::failedLoginsByEmailKey($email) => [self::MaxFailedLoginsPerEmail, self::FailedLoginDecaySeconds],
         ];
 
-        self::ensureIsNotThrottled($request, $limits, Fortify::username(), 'auth.throttle');
+        $backoffKey = self::failedLoginsByEmailKey($email);
+
+        self::ensureIsNotThrottled($request, $limits, Fortify::username(), 'auth.throttle', $backoffKey);
 
         $hrUser = self::findHrUserByEmail($email);
 
         if ($hrUser === null || ! $hrUser->isActive()) {
-            self::recordFailures($limits);
+            self::recordFailures($limits, $backoffKey, self::MaxFailedLoginsPerEmail);
 
             return null;
         }
 
         if (! Hash::check($password, $hrUser->password)) {
-            self::recordFailures($limits);
+            self::recordFailures($limits, $backoffKey, self::MaxFailedLoginsPerEmail);
 
             app(LoginRateLimiter::class)->increment($request);
 
@@ -126,7 +143,8 @@ class AuthenticateWithHrAccount
             ]);
         }
 
-        RateLimiter::clear(self::failedLoginsByEmailKey($email));
+        RateLimiter::clear($backoffKey);
+        BackoffThrottle::clear($backoffKey);
 
         $user = User::forHrAccount($hrUser);
 
@@ -184,10 +202,12 @@ class AuthenticateWithHrAccount
             'confirm-password-user:'.$user->id => [self::MaxFailedConfirmationsPerUser, self::FailedConfirmationsPerUserDecaySeconds],
         ];
 
-        self::ensureIsNotThrottled($request, $limits, 'password', 'auth.confirm_throttle');
+        $backoffKey = 'confirm-password-user:'.$user->id;
+
+        self::ensureIsNotThrottled($request, $limits, 'password', 'auth.confirm_throttle', $backoffKey);
 
         if (self::hrAccountFor($user->email, (string) $password) === null) {
-            self::recordFailures($limits);
+            self::recordFailures($limits, $backoffKey, self::MaxFailedConfirmationsPerUser);
 
             event(new Failed('web', $user, [Fortify::username() => $user->email]));
 
@@ -198,6 +218,8 @@ class AuthenticateWithHrAccount
             RateLimiter::clear($key);
         }
 
+        BackoffThrottle::clear($backoffKey);
+
         return true;
     }
 
@@ -205,13 +227,14 @@ class AuthenticateWithHrAccount
      * Refuse the attempt when any of these limits has been reached.
      *
      * @param  array<string, array{int, int}>  $limits  max attempts and decay seconds, by rate limiter key
+     * @param  string|null  $backoffKey  a key whose exponential backoff lockout also refuses the attempt
      *
      * @throws ValidationException
      */
-    private static function ensureIsNotThrottled(Request $request, array $limits, string $field, string $messageKey): void
+    private static function ensureIsNotThrottled(Request $request, array $limits, string $field, string $messageKey, ?string $backoffKey = null): void
     {
-        $isThrottled = false;
-        $seconds = 0;
+        $seconds = $backoffKey === null ? 0 : BackoffThrottle::lockedForSeconds($backoffKey);
+        $isThrottled = $seconds > 0;
 
         foreach ($limits as $key => [$maxAttempts]) {
             if (RateLimiter::tooManyAttempts($key, $maxAttempts)) {
@@ -237,12 +260,19 @@ class AuthenticateWithHrAccount
     /**
      * Count one failed attempt against each of these limits.
      *
+     * When the limit under $backoffKey is reached by it, that key is locked
+     * out for longer than the last time (exponential backoff).
+     *
      * @param  array<string, array{int, int}>  $limits  max attempts and decay seconds, by rate limiter key
      */
-    private static function recordFailures(array $limits): void
+    private static function recordFailures(array $limits, string $backoffKey, int $backoffMaxAttempts): void
     {
         foreach ($limits as $key => [, $decaySeconds]) {
             RateLimiter::hit($key, $decaySeconds);
+        }
+
+        if (RateLimiter::tooManyAttempts($backoffKey, $backoffMaxAttempts)) {
+            BackoffThrottle::escalate($backoffKey, self::BackoffBaseSeconds, self::BackoffCapSeconds);
         }
     }
 

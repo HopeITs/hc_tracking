@@ -17,15 +17,22 @@ use Illuminate\Database\Seeder;
  *
  * or with every other real seeder, in dependency order, via RealDataSeeder.
  *
+<<<<<<< HEAD
  * An account whose account number is already stored is skipped, so re-running
  * it is a no-op for accounts already inserted and it is safe to run again after
  * adding a new row here. account_number is encrypted, so the existing numbers
  * are decrypted and compared in PHP rather than matched by the database.
+=======
+ * Account numbers are encrypted, so they cannot be matched in SQL. Existing
+ * numbers are read once and compared in PHP, which keeps re-running it a
+ * no-op for accounts already inserted and safe after adding a new row here.
+>>>>>>> gitlab/security-mai
  */
 class RealAccountsSeeder extends Seeder
 {
     public function run(): void
     {
+<<<<<<< HEAD
         $existingAccountNumbers = Account::query()->pluck('account_number')->flip();
 
         foreach ($this->accounts() as $account) {
@@ -36,6 +43,14 @@ class RealAccountsSeeder extends Seeder
             Account::query()->create($account);
 
             $existingAccountNumbers->put($account['account_number'], true);
+=======
+        $existing = Account::query()->pluck('account_number')->all();
+
+        foreach ($this->accounts() as $account) {
+            if (! in_array($account['account_number'], $existing, true)) {
+                Account::query()->create($account);
+            }
+>>>>>>> gitlab/security-mai
         }
     }
 
