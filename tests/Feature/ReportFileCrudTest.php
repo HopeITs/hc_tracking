@@ -32,7 +32,7 @@ test('uploading a file stores it on the private disk with its metadata', functio
     $report = Report::factory()->create(['status' => ReportStatus::Draft]);
     $user = reportAuthor($report);
 
-    $file = uploadReportFile($report, $user, UploadedFile::fake()->create('attendance.pdf', 120, 'application/pdf'), 'Attendance sheet');
+    $file = uploadReportFile($report, $user, validUpload('attendance.pdf', 120), 'Attendance sheet');
 
     expect($file->type)->toBe(FileType::Pdf)
         ->and($file->original_name)->toBe('Attendance sheet.pdf')
@@ -78,7 +78,7 @@ test('editing updates the name and date without touching the stored file', funct
     Storage::fake('local');
     $report = Report::factory()->create(['status' => ReportStatus::Draft]);
     $user = reportAuthor($report);
-    $file = uploadReportFile($report, $user, UploadedFile::fake()->create('list.xlsx', 50));
+    $file = uploadReportFile($report, $user, validUpload('list.xlsx', 50));
     $originalPath = $file->path;
 
     Livewire::actingAs($user)
@@ -103,13 +103,13 @@ test('editing with a replacement file swaps the stored file and removes the old 
     Storage::fake('local');
     $report = Report::factory()->create(['status' => ReportStatus::Draft]);
     $user = reportAuthor($report);
-    $file = uploadReportFile($report, $user, UploadedFile::fake()->create('draft.docx', 50), 'Narrative');
+    $file = uploadReportFile($report, $user, validUpload('draft.docx', 50), 'Narrative');
     $oldPath = $file->path;
 
     Livewire::actingAs($user)
         ->test('pages::reports.show', ['report' => $report])
         ->call('openEditFileModal', $file->id)
-        ->set('newFile', UploadedFile::fake()->create('final.pdf', 80, 'application/pdf'))
+        ->set('newFile', validUpload('final.pdf', 80))
         ->set('fileDisplayName', 'Narrative')
         ->call('saveFile')
         ->assertHasNoErrors();
@@ -129,7 +129,7 @@ test('deleting a file removes its row and its stored file', function () {
     Storage::fake('local');
     $report = Report::factory()->create(['status' => ReportStatus::Draft]);
     $user = reportAuthor($report);
-    $file = uploadReportFile($report, $user, UploadedFile::fake()->create('evidence.pdf', 10, 'application/pdf'));
+    $file = uploadReportFile($report, $user, validUpload('evidence.pdf', 10));
 
     Livewire::actingAs($user)
         ->test('pages::reports.show', ['report' => $report])
@@ -158,7 +158,7 @@ test('the download route streams a stored file under its display name', function
     Storage::fake('local');
     $report = Report::factory()->create(['status' => ReportStatus::Draft]);
     $user = reportAuthor($report);
-    $file = uploadReportFile($report, $user, UploadedFile::fake()->createWithContent('sheet.pdf', 'PDF-CONTENT'), 'Signed sheet');
+    $file = uploadReportFile($report, $user, validUpload('sheet.pdf'), 'Signed sheet');
 
     $this->actingAs($user)
         ->get(route('reports.files.download', [$report, $file]))
@@ -176,7 +176,7 @@ test('the download route rejects guests, reference-only rows and files from anot
     $report = Report::factory()->create(['status' => ReportStatus::Draft]);
     $user = reportAuthor($report);
     $otherReport = Report::factory()->create();
-    $stored = uploadReportFile($report, $user, UploadedFile::fake()->create('a.pdf', 10, 'application/pdf'));
+    $stored = uploadReportFile($report, $user, validUpload('a.pdf', 10));
     $referenceOnly = ReportFile::factory()->create(['report_id' => $report->id]);
 
     auth()->forgetGuards();
@@ -203,7 +203,7 @@ test('stored files stay downloadable once the report is locked', function () {
     Storage::fake('local');
     $report = Report::factory()->create(['status' => ReportStatus::Draft]);
     $user = reportAuthor($report);
-    $file = uploadReportFile($report, $user, UploadedFile::fake()->create('a.pdf', 10, 'application/pdf'));
+    $file = uploadReportFile($report, $user, validUpload('a.pdf', 10));
     $report->update(['status' => ReportStatus::Approved]);
 
     $this->actingAs($user)
@@ -218,7 +218,7 @@ test('the preview route serves pdfs and images inline with a safe content type',
     Storage::fake('local');
     $report = Report::factory()->create(['status' => ReportStatus::Draft]);
     $user = reportAuthor($report);
-    $file = uploadReportFile($report, $user, UploadedFile::fake()->create($name, 10, $contentType));
+    $file = uploadReportFile($report, $user, validUpload($name, 10));
 
     $response = $this->actingAs($user)->get(route('reports.files.preview', [$report, $file]))->assertOk();
 
@@ -235,8 +235,8 @@ test('the preview route refuses office files, reference-only rows and files from
     Storage::fake('local');
     $report = Report::factory()->create(['status' => ReportStatus::Draft]);
     $user = reportAuthor($report);
-    $docx = uploadReportFile($report, $user, UploadedFile::fake()->create('a.docx', 10));
-    $pdf = uploadReportFile($report, $user, UploadedFile::fake()->create('a.pdf', 10, 'application/pdf'));
+    $docx = uploadReportFile($report, $user, validUpload('a.docx', 10));
+    $pdf = uploadReportFile($report, $user, validUpload('a.pdf', 10));
     $referenceOnly = ReportFile::factory()->create(['report_id' => $report->id, 'type' => FileType::Pdf]);
 
     $this->actingAs($user)->get(route('reports.files.preview', [$report, $docx]))->assertNotFound();
@@ -248,8 +248,8 @@ test('the preview modal renders the right viewer and steps between files, even o
     Storage::fake('local');
     $report = Report::factory()->create(['status' => ReportStatus::Draft]);
     $user = reportAuthor($report);
-    $pdf = uploadReportFile($report, $user, UploadedFile::fake()->create('a.pdf', 10, 'application/pdf'));
-    $docx = uploadReportFile($report, $user, UploadedFile::fake()->create('b.docx', 10));
+    $pdf = uploadReportFile($report, $user, validUpload('a.pdf', 10));
+    $docx = uploadReportFile($report, $user, validUpload('b.docx', 10));
     $report->update(['status' => ReportStatus::Approved]);
 
     $component = Livewire::actingAs($user)

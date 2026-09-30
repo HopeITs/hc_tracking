@@ -1,5 +1,8 @@
 <?php
 
+use App\Actions\Proposals\ChangeProposalStatus;
+use App\Actions\Proposals\DeleteProposalFile;
+use App\Actions\Proposals\SaveProposalFile;
 use App\Enums\ArStatus;
 use App\Enums\FileType;
 use App\Enums\MediaCollection;
@@ -23,6 +26,7 @@ use App\Models\ProposalStatusNote;
 use App\Models\Report;
 use App\Models\Task;
 use App\Models\TransfersTracking;
+use App\Rules\SecureUpload;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
@@ -1436,17 +1440,12 @@ new #[Title('titles.proposal')] class extends Component
             'statusDate.required' => __('proposals.set_the_date_this_change_took_effect'),
         ]);
 
-        DB::transaction(function () use ($validated): void {
-            $proposal = Proposal::query()->findOrFail($this->proposalId);
-            $proposal->fill(['status' => $validated['newStatus']])->save();
-
-            ProposalStatusNote::query()->create([
-                'proposal_id' => $this->proposalId,
-                'status' => $validated['newStatus'],
-                'context' => $validated['statusContext'],
-                'date' => $validated['statusDate'],
-            ]);
-        });
+        app(ChangeProposalStatus::class)->handle(
+            Proposal::query()->findOrFail($this->proposalId),
+            $validated['newStatus'],
+            $validated['statusContext'],
+            $validated['statusDate'],
+        );
 
         $this->showStatusModal = false;
         $this->statusContext = '';
@@ -1591,21 +1590,6 @@ new #[Title('titles.proposal')] class extends Component
         return $media;
     }
 
-    /**
-     * A typed display name, guaranteed to carry the file's real extension so
-     * the downloaded copy still opens.
-     */
-    private function displayNameWithExtension(string $displayName, FileType $type): string
-    {
-        $displayName = trim($displayName);
-
-        if (Str::lower(pathinfo($displayName, PATHINFO_EXTENSION)) === $type->value) {
-            return $displayName;
-        }
-
-        return $displayName.'.'.$type->value;
-    }
-
     public function openCreateFileModal(): void
     {
         Gate::authorize('update', $this->proposal);
@@ -1648,7 +1632,7 @@ new #[Title('titles.proposal')] class extends Component
         $allowedTypes = implode(',', FileType::values());
 
         $validated = $this->validate([
-            'newFile' => [$isCreate ? 'required' : 'nullable', 'file', 'max:5120', 'mimes:'.$allowedTypes, 'extensions:'.$allowedTypes],
+            'newFile' => [$isCreate ? 'required' : 'nullable', 'bail', 'file', 'max:5120', 'mimes:'.$allowedTypes, 'extensions:'.$allowedTypes, new SecureUpload],
             'fileCategory' => ['required', Rule::enum(MediaCollection::class)],
             'fileDisplayName' => [$isCreate ? 'nullable' : 'required', 'string', 'max:255'],
         ], [
@@ -1657,6 +1641,7 @@ new #[Title('titles.proposal')] class extends Component
             'fileDisplayName.required' => __('proposals.enter_a_file_name'),
         ]);
 
+<<<<<<< HEAD
         abort_if(in_array($validated['fileCategory'], $this->hiddenCollections(), true), 403);
 
         $media = $isCreate
@@ -1693,6 +1678,14 @@ new #[Title('titles.proposal')] class extends Component
         if ($replaced !== null) {
             $this->removeFromDisk($media->id, $replaced['disk'], $replaced['path']);
         }
+=======
+        app(SaveProposalFile::class)->handle(
+            $this->proposal,
+            $isCreate ? null : $this->proposalFile($this->editingFileId),
+            $this->newFile,
+            $validated,
+        );
+>>>>>>> gitlab/security-mai
 
         $this->closeFileModal();
         unset($this->proposalFiles, $this->documents, $this->tabs);
@@ -1722,32 +1715,13 @@ new #[Title('titles.proposal')] class extends Component
             return;
         }
 
-        $media = $this->proposalFile($this->deletingFileId);
-        $media->delete();
-        $this->removeFromDisk($media->id, $media->disk, $media->path);
+        app(DeleteProposalFile::class)->handle($this->proposal, $this->proposalFile($this->deletingFileId));
 
         $this->confirmingFileDelete = false;
         $this->deletingFileId = null;
         unset($this->proposalFiles, $this->documents, $this->tabs);
 
         Flux::toast(variant: 'success', text: __('proposals.file_deleted'));
-    }
-
-    /**
-     * Remove a stored document, logging rather than surfacing a storage
-     * failure so a disk hiccup never leaves a row stuck in the UI.
-     */
-    private function removeFromDisk(int $mediaId, string $disk, string $path): void
-    {
-        try {
-            Storage::disk($disk)->delete($path);
-        } catch (\Throwable $exception) {
-            Log::warning('Failed to delete proposal file from disk.', [
-                'media_id' => $mediaId,
-                'path' => $path,
-                'exception' => $exception->getMessage(),
-            ]);
-        }
     }
 
     /**

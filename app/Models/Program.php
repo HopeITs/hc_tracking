@@ -152,7 +152,7 @@ class Program extends Model implements TracksActivity
         $ids = HrProgram::idsOrderedByName();
 
         if ($ids !== []) {
-            $query->orderByRaw('FIELD('.$query->qualifyColumn('id').', '.implode(', ', $ids).') '.($direction === 'desc' ? 'desc' : 'asc'));
+            $query->orderByRaw('FIELD('.$query->qualifyColumn('id').', '.implode(', ', array_map('intval', $ids)).') '.($direction === 'desc' ? 'desc' : 'asc'));
         }
 
         $query->orderBy($query->qualifyColumn('id'), $direction === 'desc' ? 'desc' : 'asc');

@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Donors\DeleteDonor;
 use App\Support\Like;
 use App\Enums\ArStatus;
 use App\Enums\DonorType;
@@ -481,9 +482,7 @@ new #[Title('titles.donors')] class extends Component {
             return;
         }
 
-        Gate::authorize('donors.delete');
-
-        Donor::query()->findOrFail($this->deletingDonorId)->delete();
+        app(DeleteDonor::class)->handle(Donor::query()->findOrFail($this->deletingDonorId));
 
         $this->cancelDelete();
         $this->resetPage();

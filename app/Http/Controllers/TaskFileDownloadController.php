@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Task;
 use App\Models\TaskAttachment;
+use App\Support\UploadName;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -26,7 +27,7 @@ class TaskFileDownloadController extends Controller
         abort_unless($taskAttachment->task_id === $task->id, 404);
         abort_unless($taskAttachment->isStored(), 404);
 
-        return Storage::disk($taskAttachment->disk)->download($taskAttachment->path, $taskAttachment->displayName(), [
+        return Storage::disk($taskAttachment->disk)->download($taskAttachment->path, UploadName::clean($taskAttachment->displayName()), [
             'X-Content-Type-Options' => 'nosniff',
         ]);
     }

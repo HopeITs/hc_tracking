@@ -35,9 +35,15 @@
                 <livewire:notifications.bell />
             @endif
 
+<<<<<<< HEAD
             <x-report-bug-button />
 
             <flux:dropdown position="top" align="end">
+=======
+            <x-tour.button />
+
+            <flux:dropdown position="top" align="end" data-tour="profile">
+>>>>>>> gitlab/security-mai
                 <flux:profile
                     icon-trailing="chevron-down"
                     class="min-h-11 min-w-11 touch-manipulation"
@@ -92,6 +98,7 @@
                     <livewire:notifications.bell />
                 @endif
 
+<<<<<<< HEAD
                 <x-report-bug-button />
 
                 {{-- Light / Dark / System. The choice lives in Flux's $flux.appearance; resources/js/theme-transition.js cross-fades the switch. --}}
@@ -130,12 +137,36 @@
                 <x-locale-toggle />
 
                 <div class="ms-1 border-s border-secondary-soft ps-2 dark:border-line">
+=======
+                <x-tour.button />
+
+                <flux:button
+                    x-data
+                    x-on:click="$flux.dark = ! $flux.dark"
+                    variant="ghost"
+                    size="sm"
+                    square
+                    class="size-9! touch-manipulation text-secondary-medium! hover:bg-secondary-soft! hover:text-secondary-dark! dark:text-secondary-soft! dark:hover:bg-white/10! dark:hover:text-white!"
+                    :aria-label="__('navigation.toggle_theme')"
+                    :tooltip="__('navigation.toggle_theme')"
+                    data-theme-toggle
+                >
+                    <flux:icon.moon x-show="! $flux.dark" variant="mini" />
+                    <flux:icon.sun x-show="$flux.dark" x-cloak variant="mini" />
+                </flux:button>
+
+                <x-locale-toggle />
+
+                <div class="ms-1 border-s border-secondary-soft ps-2 dark:border-secondary-medium" data-tour="profile">
+>>>>>>> gitlab/security-mai
                     <x-desktop-user-menu />
                 </div>
             </div>
         </flux:header>
 
         {{ $slot }}
+
+        <x-tour.overlay />
 
         @persist('toast')
             <flux:toast.group position="center">

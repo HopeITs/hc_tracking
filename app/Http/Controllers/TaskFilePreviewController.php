@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Enums\FileType;
 use App\Models\Task;
 use App\Models\TaskAttachment;
+use App\Support\UploadName;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -38,6 +39,7 @@ class TaskFilePreviewController extends Controller
         $headers = [
             'Content-Type' => $contentType,
             'X-Content-Type-Options' => 'nosniff',
+            'Cross-Origin-Resource-Policy' => 'same-origin',
             'Cache-Control' => 'private, max-age=300',
         ];
 
@@ -48,6 +50,6 @@ class TaskFilePreviewController extends Controller
             $headers['Content-Security-Policy'] = 'sandbox';
         }
 
-        return Storage::disk($taskAttachment->disk)->response($taskAttachment->path, $taskAttachment->displayName(), $headers, 'inline');
+        return Storage::disk($taskAttachment->disk)->response($taskAttachment->path, UploadName::clean($taskAttachment->displayName()), $headers, 'inline');
     }
 }

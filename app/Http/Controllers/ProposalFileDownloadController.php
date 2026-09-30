@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Media;
 use App\Models\Proposal;
+use App\Support\UploadName;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -34,7 +35,7 @@ class ProposalFileDownloadController extends Controller
 
         abort_unless(Storage::disk($media->disk)->exists($media->path), 404);
 
-        return Storage::disk($media->disk)->download($media->path, $media->original_name, [
+        return Storage::disk($media->disk)->download($media->path, UploadName::clean($media->original_name), [
             'X-Content-Type-Options' => 'nosniff',
         ]);
     }

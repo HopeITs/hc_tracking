@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Enums\FileType;
 use App\Models\Report;
 use App\Models\ReportFile;
+use App\Support\UploadName;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -37,6 +38,7 @@ class ReportFilePreviewController extends Controller
         $headers = [
             'Content-Type' => $contentType,
             'X-Content-Type-Options' => 'nosniff',
+            'Cross-Origin-Resource-Policy' => 'same-origin',
             'Cache-Control' => 'private, max-age=300',
         ];
 
@@ -47,6 +49,6 @@ class ReportFilePreviewController extends Controller
             $headers['Content-Security-Policy'] = 'sandbox';
         }
 
-        return Storage::disk($reportFile->disk)->response($reportFile->path, $reportFile->displayName(), $headers, 'inline');
+        return Storage::disk($reportFile->disk)->response($reportFile->path, UploadName::clean($reportFile->displayName()), $headers, 'inline');
     }
 }

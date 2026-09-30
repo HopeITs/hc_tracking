@@ -15,7 +15,11 @@ import './scroll-lock';
 import './section-rail';
 import './task-board';
 import './theme-color';
+<<<<<<< HEAD
 import './theme-transition';
+=======
+import './tour';
+>>>>>>> gitlab/security-mai
 
 /**
  * Echo exposes an expressive API for subscribing to channels and listening

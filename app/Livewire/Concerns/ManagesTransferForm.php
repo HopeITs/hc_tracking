@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
+use App\Actions\Transfers\DeleteTransfer;
+use App\Actions\Transfers\SaveTransfer;
 use App\Enums\ArStatus;
 use App\Enums\Currency;
 use App\Models\Account;
@@ -294,26 +296,7 @@ trait ManagesTransferForm
             'receiveDate.required_if' => __('transfers.enter_the_date_the_money_landed'),
         ]);
 
-        $transfer = $existing ?? new TransfersTracking;
-
-        $transfer->fill([
-            'donor_proposal_id' => (int) $validated['transferAgreementId'],
-            'account_id' => $validated['transferAccountId'] === '' || $validated['transferAccountId'] === null
-                ? null
-                : (int) $validated['transferAccountId'],
-            'payment_amount' => $validated['paymentAmount'],
-            'amount_transfered_currency' => $validated['transferredCurrency'],
-            'scheduled_date' => $validated['scheduledDate'] === '' ? null : $validated['scheduledDate'],
-            'transfer_date' => $validated['transferDate'] === '' ? null : $validated['transferDate'],
-            'fees' => $validated['fees'],
-            'fees_currency' => $validated['feesCurrency'],
-            'amount_received' => $validated['amountReceived'] === '' ? null : $validated['amountReceived'],
-            'exchange_rate' => $validated['exchangeRate'],
-            'net_amount_received' => $validated['netAmountReceived'] === '' ? null : $validated['netAmountReceived'],
-            'amount_received_currency' => $validated['receivedCurrency'],
-            'receive_date' => $validated['receiveDate'] === '' ? null : $validated['receiveDate'],
-            'ar_status' => $validated['transferArStatus'],
-        ])->save();
+        $transfer = app(SaveTransfer::class)->handle($existing, $validated);
 
         $isCreate = $transfer->wasRecentlyCreated;
 
@@ -354,7 +337,7 @@ trait ManagesTransferForm
         }
 
         $transfer = $this->scopedTransfer($this->editingTransferId);
-        $transfer->delete();
+        app(DeleteTransfer::class)->handle($transfer);
 
         $this->showTransferModal = false;
         $this->resetTransferForm();

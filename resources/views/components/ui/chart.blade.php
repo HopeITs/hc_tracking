@@ -29,7 +29,7 @@
     ];
 @endphp
 
-<figure {{ $attributes->class('flex flex-col') }} role="group" aria-labelledby="{{ $chartId }}-caption">
+<figure data-chart {{ $attributes->class('flex flex-col') }} role="group" aria-labelledby="{{ $chartId }}-caption">
     <figcaption id="{{ $chartId }}-caption" class="sr-only">{{ $label }}</figcaption>
 
     @if ($isEmpty)

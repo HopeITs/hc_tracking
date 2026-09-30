@@ -27,6 +27,7 @@ use App\Notifications\NotificationPresenter;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
@@ -549,4 +550,42 @@ function sentencesFor(User $user): array
     return UserNotification::query()->forUser($user)->orderBy('created_at')->get()
         ->map(fn (UserNotification $notification): string => $presenter->sentence($notification->data, 'en'))
         ->all();
+}
+
+/**
+ * A genuine, harmless upload of the given type, padded to roughly $kilobytes.
+ *
+ * The SecureUpload rule inspects real content, so a zero-filled
+ * UploadedFile::fake()->create() no longer passes for a PDF, image or Office file.
+ */
+function validUpload(string $name, int $kilobytes = 10): UploadedFile
+{
+    $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+    $padding = str_repeat('0', max(0, $kilobytes * 1024));
+
+    $head = match ($extension) {
+        'pdf' => "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n%",
+        'png' => base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='),
+        'jpg', 'jpeg' => base64_decode('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA='),
+        default => null,
+    };
+
+    $content = match ($extension) {
+        'pdf', 'png', 'jpg', 'jpeg' => $head.str_repeat('0', max(0, $kilobytes * 1024 - strlen($head))),
+        default => (function () use ($extension, $padding): string {
+            $path = tempnam(sys_get_temp_dir(), 'zip');
+            $zip = new ZipArchive;
+            $zip->open($path, ZipArchive::OVERWRITE);
+            $zip->addFromString('[Content_Types].xml', '<Types/>');
+            $zip->addFromString($extension === 'docx' ? 'word/document.xml' : 'xl/workbook.xml', '<x/>');
+            $zip->addFromString('padding.txt', $padding);
+            $zip->close();
+            $bytes = (string) file_get_contents($path);
+            unlink($path);
+
+            return $bytes;
+        })(),
+    };
+
+    return UploadedFile::fake()->createWithContent($name, $content);
 }

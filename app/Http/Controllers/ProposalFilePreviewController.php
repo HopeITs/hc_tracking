@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Enums\FileType;
 use App\Models\Media;
 use App\Models\Proposal;
+use App\Support\UploadName;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -50,6 +51,7 @@ class ProposalFilePreviewController extends Controller
         $headers = [
             'Content-Type' => $contentType,
             'X-Content-Type-Options' => 'nosniff',
+            'Cross-Origin-Resource-Policy' => 'same-origin',
             'Cache-Control' => 'private, max-age=300',
         ];
 
@@ -60,6 +62,6 @@ class ProposalFilePreviewController extends Controller
             $headers['Content-Security-Policy'] = 'sandbox';
         }
 
-        return Storage::disk($media->disk)->response($media->path, $media->original_name, $headers, 'inline');
+        return Storage::disk($media->disk)->response($media->path, UploadName::clean($media->original_name), $headers, 'inline');
     }
 }

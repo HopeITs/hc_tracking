@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
+use App\Actions\Reports\DeleteReport;
 use App\Enums\IndicatorMeasure;
 use App\Models\AnnualPlan;
 use App\Models\PlanIndicator;
@@ -12,9 +13,7 @@ use App\Models\Report;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
@@ -404,7 +403,7 @@ trait ManagesReportForm
      * report_files rows cascade in the database, but their files on disk do
      * not, so those are removed here after the rows are gone.
      */
-    public function deleteReport(): void
+    public function deleteReport(DeleteReport $delete): void
     {
         if ($this->deletingReportId === null) {
             return;
@@ -412,22 +411,12 @@ trait ManagesReportForm
 
         $report = Report::query()->with('files:id,report_id,disk,path,original_name')->findOrFail($this->deletingReportId);
 
-        if (! $report->isEditable()) {
+        if (! $delete->handle($report)) {
             $this->cancelDeleteReport();
 
             Flux::toast(variant: 'danger', text: __('reports.only_draft_reports_can_be_deleted'));
 
             return;
-        }
-
-        Gate::authorize('delete', $report);
-
-        $stored = $report->files->filter(fn ($file): bool => $file->original_name !== null);
-
-        DB::transaction(fn () => $report->delete());
-
-        foreach ($stored as $file) {
-            rescue(fn () => Storage::disk($file->disk)->delete($file->path), report: true);
         }
 
         $this->cancelDeleteReport();
