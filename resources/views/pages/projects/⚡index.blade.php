@@ -1,10 +1,7 @@
 <?php
 
-<<<<<<< HEAD
 use App\Enums\MediaCollection;
-=======
 use App\Support\Like;
->>>>>>> gitlab/security-mai
 use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\RagStatus;

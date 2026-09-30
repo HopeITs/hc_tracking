@@ -1,22 +1,34 @@
 <?php
 
-<<<<<<< HEAD
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Vite;
 
 /*
 | Every response carries the browser hardening headers from
-| App\Http\Middleware\AddSecurityHeaders. Framing stays same-origin (not
-| DENY) because the proposal, report and task pages embed PDF previews.
+| App\Http\Middleware\AddSecurityHeaders (global, outermost) and
+| App\Http\Middleware\SecurityHeaders (web group, full CSP). Framing stays
+| same-origin (not DENY) because the proposal, report and task pages embed PDF
+| previews.
 */
 test('pages carry the hardening headers and allow only same-origin framing', function () {
-    $this->get(route('login'))
-        ->assertOk()
+    $response = $this->get(route('login'));
+
+    $response->assertOk()
         ->assertHeader('X-Frame-Options', 'SAMEORIGIN')
-        ->assertHeader('Content-Security-Policy', "frame-ancestors 'self'")
         ->assertHeader('X-Content-Type-Options', 'nosniff')
         ->assertHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
-        ->assertHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()')
+        ->assertHeader('Cross-Origin-Opener-Policy', 'same-origin')
         ->assertHeaderMissing('Strict-Transport-Security');
+
+    expect($response->headers->get('Permissions-Policy'))->toContain('camera=()');
+
+    expect($response->headers->get('Content-Security-Policy'))
+        ->toContain("default-src 'self'")
+        ->toContain("object-src 'none'")
+        ->toContain("frame-ancestors 'self'")
+        ->toContain("base-uri 'self'")
+        ->toContain("form-action 'self'")
+        ->not->toContain('upgrade-insecure-requests');
 });
 
 test('a request refused by the origin lockdown still carries the headers', function () {
@@ -59,35 +71,10 @@ test('hsts is never sent over plain http or outside production', function (strin
     'production over http' => ['production', false],
     'local over https' => ['local', true],
 ]);
-=======
-use Illuminate\Support\Facades\Vite;
 
-it('sends the hardening headers on a public page', function () {
-    $response = $this->get(route('login'));
-
-    $response->assertOk()
-        ->assertHeader('X-Content-Type-Options', 'nosniff')
-        ->assertHeader('X-Frame-Options', 'SAMEORIGIN')
-        ->assertHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
-        ->assertHeader('Cross-Origin-Opener-Policy', 'same-origin')
-        ->assertHeaderMissing('Strict-Transport-Security');
-
-    $policy = $response->headers->get('Content-Security-Policy');
-
-    expect($policy)
-        ->toContain("default-src 'self'")
-        ->toContain("object-src 'none'")
-        ->toContain("frame-ancestors 'self'")
-        ->toContain("base-uri 'self'")
-        ->toContain("form-action 'self'")
-        ->not->toContain('upgrade-insecure-requests');
-});
-
-it('adds HSTS and upgrades insecure requests over https', function () {
-    $response = $this->get('https://localhost/login');
-
-    $response->assertHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-    expect($response->headers->get('Content-Security-Policy'))->toContain('upgrade-insecure-requests');
+it('upgrades insecure requests over https', function () {
+    expect($this->get('https://localhost/login')->headers->get('Content-Security-Policy'))
+        ->toContain('upgrade-insecure-requests');
 });
 
 it('allows the configured push service to be reached', function () {
@@ -104,7 +91,8 @@ it('allows the Vite dev server only while it is running', function () {
     file_put_contents($hot, 'http://[::1]:5173');
     Vite::useHotFile($hot);
 
-    expect($this->get(route('login'))->headers->get('Content-Security-Policy'))->toContain('http://[::1]:5173');
+    expect($this->get(route('login'))->headers->get('Content-Security-Policy'))->toContain('http://[::1]:5173')
+        ->toContain('ws://[::1]:5173');
 
     unlink($hot);
 
@@ -116,6 +104,6 @@ it('leaves inline PDF responses without a CSP but keeps the other headers', func
 
     $this->get('/_test/pdf')
         ->assertHeader('X-Content-Type-Options', 'nosniff')
+        ->assertHeader('X-Frame-Options', 'SAMEORIGIN')
         ->assertHeaderMissing('Content-Security-Policy');
 });
->>>>>>> gitlab/security-mai

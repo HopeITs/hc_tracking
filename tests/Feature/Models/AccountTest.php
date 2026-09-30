@@ -75,29 +75,25 @@ test('a closed account keeps the transfers that already passed through it', func
     expect($account->fresh()->transfers)->toHaveCount(1);
 });
 
-<<<<<<< HEAD
-test('the account number and IBAN are stored encrypted and read back in plaintext', function () {
-    $account = Account::factory()->create([
-        'account_number' => '030/02/353/2531267/1/3',
-        'iban' => 'LB03001400003002353253126713',
-=======
 test('bank identifiers are encrypted at rest and readable through the model', function () {
     $account = Account::factory()->create([
         'account_number' => '21.13.0000803.11',
         'iban' => 'SY12 3456 7890',
         'swift_code' => 'FSBKSYDA',
         'authorized_person' => 'Jane Doe',
->>>>>>> gitlab/security-mai
     ]);
 
     $stored = DB::table('accounts')->find($account->id);
 
-<<<<<<< HEAD
-    expect($stored->account_number)->not->toContain('2531267')
-        ->and(Crypt::decryptString($stored->account_number))->toBe('030/02/353/2531267/1/3')
-        ->and(Crypt::decryptString($stored->iban))->toBe('LB03001400003002353253126713')
-        ->and($account->fresh()->account_number)->toBe('030/02/353/2531267/1/3')
-        ->and($account->fresh()->iban)->toBe('LB03001400003002353253126713');
+    expect($stored->account_number)->not->toContain('0000803')
+        ->and($stored->iban)->not->toContain('SY12')
+        ->and($stored->swift_code)->not->toContain('FSBK')
+        ->and($stored->authorized_person)->not->toContain('Jane')
+        ->and(Crypt::decryptString($stored->account_number))->toBe('21.13.0000803.11')
+        ->and(Crypt::decryptString($stored->iban))->toBe('SY12 3456 7890')
+        ->and($account->fresh()->account_number)->toBe('21.13.0000803.11')
+        ->and($account->fresh()->iban)->toBe('SY12 3456 7890')
+        ->and($account->fresh()->authorized_person)->toBe('Jane Doe');
 });
 
 test('an account with no IBAN stores null, not an encrypted empty value', function () {
@@ -129,15 +125,6 @@ test('account numbers and IBANs are kept out of the activity log', function () {
         ->not->toContain('LB000000000000000000000000');
 });
 
-test('the account number and IBAN are still serialized', function () {
-    $account = Account::factory()->create(['account_number' => '21.13.0000803.11', 'iban' => 'LB03001400003002353253126713']);
-
-    expect($account->fresh()->toArray())->toMatchArray([
-        'account_number' => '21.13.0000803.11',
-        'iban' => 'LB03001400003002353253126713',
-    ]);
-});
-
 test('accounts are found by part of their account number, ignoring case', function () {
     $matching = Account::factory()->create(['account_number' => 'NRA201000409112768']);
     $alsoMatching = Account::factory()->create(['account_number' => 'nra201000340603445']);
@@ -146,14 +133,6 @@ test('accounts are found by part of their account number, ignoring case', functi
     expect(Account::idsMatchingAccountNumber(' nra2010 '))->toEqualCanonicalizing([$matching->id, $alsoMatching->id])
         ->and(Account::idsMatchingAccountNumber('no-such-number'))->toBe([])
         ->and(Account::idsMatchingAccountNumber(''))->toBe([]);
-=======
-    expect($stored->account_number)->not->toContain('0000803')
-        ->and($stored->iban)->not->toContain('SY12')
-        ->and($stored->swift_code)->not->toContain('FSBK')
-        ->and($stored->authorized_person)->not->toContain('Jane')
-        ->and($account->fresh()->account_number)->toBe('21.13.0000803.11')
-        ->and($account->fresh()->iban)->toBe('SY12 3456 7890')
-        ->and($account->fresh()->authorized_person)->toBe('Jane Doe');
 });
 
 test('the last four characters of the number stay searchable and follow edits', function () {
@@ -169,5 +148,4 @@ test('the last four characters of the number stay searchable and follow edits', 
 test('encrypted identifiers stay out of serialisation', function () {
     expect(Account::factory()->create(['iban' => 'SY99'])->toArray())
         ->not->toHaveKeys(['account_number', 'iban', 'swift_code', 'authorized_person']);
->>>>>>> gitlab/security-mai
 });

@@ -203,11 +203,8 @@ class Account extends Model implements TracksActivity
             'currency' => Currency::class,
             'account_number' => 'encrypted',
             'iban' => 'encrypted',
-<<<<<<< HEAD
-=======
             'swift_code' => 'encrypted',
             'authorized_person' => 'encrypted',
->>>>>>> gitlab/security-mai
             'opened_at' => 'date',
             'closed_at' => 'date',
             'is_active' => 'boolean',

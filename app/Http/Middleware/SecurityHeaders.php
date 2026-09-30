@@ -18,6 +18,9 @@ use Symfony\Component\HttpFoundation\Response;
  * the inline toast/preloader scripts need them; everything else is locked to
  * this origin, which still blocks framing, plugins, base-tag and form
  * hijacking, and any request to a third-party host.
+ *
+ * HSTS is not sent here: AddSecurityHeaders owns it (production over HTTPS,
+ * max-age from config('app.hsts_max_age')).
  */
 class SecurityHeaders
 {
@@ -45,10 +48,6 @@ class SecurityHeaders
             $headers['Content-Security-Policy'] = $this->contentSecurityPolicy($request);
         }
 
-        if ($request->isSecure()) {
-            $headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains';
-        }
-
         foreach ($headers as $name => $value) {
             if (! $response->headers->has($name)) {
                 $response->headers->set($name, $value);
@@ -69,7 +68,7 @@ class SecurityHeaders
             'style-src' => array_filter(["'self'", "'unsafe-inline'", $devServer]),
             'img-src' => ["'self'", 'data:', 'blob:'],
             'font-src' => array_filter(["'self'", 'data:', $devServer]),
-            'connect-src' => array_filter(["'self'", $devServer, ...$sockets]),
+            'connect-src' => array_filter(["'self'", $devServer, $this->webSocketOrigin($devServer), ...$sockets]),
             'frame-src' => ["'self'"],
             'worker-src' => ["'self'"],
             'manifest-src' => ["'self'"],
@@ -98,6 +97,14 @@ class SecurityHeaders
         $origin = trim((string) @file_get_contents(Vite::hotFile()));
 
         return $origin === '' ? null : $origin;
+    }
+
+    /**
+     * The ws:// twin of the Vite dev server origin, for its hot-reload socket.
+     */
+    private function webSocketOrigin(?string $devServer): ?string
+    {
+        return $devServer === null ? null : preg_replace('/^http/', 'ws', $devServer);
     }
 
     /**

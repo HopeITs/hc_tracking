@@ -255,7 +255,6 @@ test('when the code email cannot be sent, sign-in stops with a clear message', f
     $this->get(route('email-two-factor.login'))->assertRedirect(route('login'));
 });
 
-<<<<<<< HEAD
 test('a code check that cannot get its turn is refused without using up the code', function () {
     Sleep::fake(syncWithCarbon: true);
     $user = User::factory()->withHrAccount()->create(['email_two_factor_enabled' => true]);
@@ -270,7 +269,8 @@ test('a code check that cannot get its turn is refused without using up the code
     $otherCheck->release();
 
     expect(EmailLoginCodes::verify($user, $code))->toBeTrue();
-=======
+});
+
 test('resending the code is capped per hour, however slowly it is asked for', function () {
     $this->freezeTime();
     $user = User::factory()->withHrAccount()->create(['email_two_factor_enabled' => true]);
@@ -285,5 +285,4 @@ test('resending the code is capped per hour, however slowly it is asked for', fu
     $this->withServerVariables(['REMOTE_ADDR' => '10.0.6.99'])
         ->post(route('email-two-factor.resend'))
         ->assertStatus(429);
->>>>>>> gitlab/security-mai
 });

@@ -46,7 +46,15 @@ class AddSecurityHeaders
     {
         $response = $next($request);
 
+        $isPdf = str_starts_with((string) $response->headers->get('Content-Type'), 'application/pdf');
+
         foreach (self::Headers as $name => $value) {
+            // The built-in PDF viewer does not render under a CSP, so inline
+            // PDFs get no fallback policy; X-Frame-Options still guards them.
+            if ($name === 'Content-Security-Policy' && $isPdf) {
+                continue;
+            }
+
             if (! $response->headers->has($name)) {
                 $response->headers->set($name, $value);
             }

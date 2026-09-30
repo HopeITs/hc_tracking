@@ -119,7 +119,6 @@ test('the account directory renders with no accounts', function () {
     Livewire::actingAs($user)->test('pages::admin.accounts')->assertSee('No accounts yet');
 });
 
-<<<<<<< HEAD
 test('accounts can be searched by part of their encrypted account number', function () {
     $user = User::factory()->role('Financial')->create();
 
@@ -134,7 +133,8 @@ test('accounts can be searched by part of their encrypted account number', funct
         ->set('search', 'Audi')
         ->assertSee('Legacy EUR')
         ->assertDontSee('Operations USD');
-=======
+});
+
 test('the directory finds an account by the last four characters of its number', function () {
     $user = User::factory()->role('Financial')->create();
 
@@ -149,5 +149,4 @@ test('the directory finds an account by the last four characters of its number',
         ->set('search', '21.13.0000803.11')
         ->assertSee('Ends Eleven')
         ->assertDontSee('Ends Other');
->>>>>>> gitlab/security-mai
 });
