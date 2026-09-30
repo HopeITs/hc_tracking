@@ -113,7 +113,7 @@ new class extends Component {
     x-on:keydown.escape.window="close(true)"
     x-on:click.outside="close(false)"
     x-on:inbox-undoable.window="showUndo($event.detail)"
-    class="relative"
+    class="relative flex"
     data-notification-bell
 >
     <button
@@ -123,13 +123,13 @@ new class extends Component {
         x-bind:aria-expanded="open.toString()"
         aria-haspopup="dialog"
         aria-label="{{ trans_choice('notifications.bell_label', $total, ['count' => $total]) }}"
-        x-bind:class="open && 'bg-secondary-soft text-secondary-dark dark:bg-white/10 dark:text-ink'"
-        class="relative inline-flex size-9 cursor-pointer touch-manipulation items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark max-lg:size-11 dark:text-ink-muted dark:hover:bg-white/10 dark:hover:text-ink"
+        x-bind:class="open && 'bg-white text-secondary-dark shadow-sm dark:bg-surface-3 dark:text-ink dark:shadow-raised'"
+        class="relative inline-flex size-8 cursor-pointer touch-manipulation items-center justify-center rounded-full text-secondary-medium transition-colors hover:bg-white hover:text-secondary-dark hover:shadow-sm max-lg:size-11 dark:text-ink-muted dark:hover:bg-surface-3 dark:hover:text-ink dark:hover:shadow-raised"
         data-top-bar-action
         data-test="notification-bell-button"
     >
         <span x-bind:class="pulse && 'notification-bell-ring'" class="inline-flex">
-            <flux:icon.bell variant="mini" />
+            <flux:icon.bell variant="outline" class="size-4.5!" />
         </span>
 
         @if ($total > 0)

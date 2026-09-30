@@ -7,6 +7,7 @@ namespace App\Actions\Fortify;
 use App\Models\HrUser;
 use App\Models\User;
 use App\Support\BackoffThrottle;
+use App\Support\Turnstile;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Auth\Events\Login;
@@ -120,6 +121,16 @@ class AuthenticateWithHrAccount
         $backoffKey = self::failedLoginsByEmailKey($email);
 
         self::ensureIsNotThrottled($request, $limits, Fortify::username(), 'auth.throttle', $backoffKey);
+
+        // A failed human check counts against the IP only, never the email,
+        // so a script cannot lock someone else's address out with it.
+        if (! Turnstile::passes($request)) {
+            RateLimiter::hit(self::failedLoginsByIpKey($request), self::FailedLoginDecaySeconds);
+
+            throw ValidationException::withMessages([
+                Turnstile::ResponseField => [trans('authentication.human_check_failed')],
+            ]);
+        }
 
         $hrUser = self::findHrUserByEmail($email);
 

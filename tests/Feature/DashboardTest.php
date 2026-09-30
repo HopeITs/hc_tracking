@@ -34,7 +34,7 @@ test('authenticated users see the application navigation on the dashboard', func
         ->assertSee('data-navigation-sidebar', false)
         ->assertSee('data-mobile-navigation-close', false)
         ->assertSee('data-mobile-navigation-toggle', false)
-        ->assertSeeText('Overview')
+        ->assertSeeText('My Workspace')
         ->assertSeeText('Dashboard')
         ->assertDontSeeText('Repository')
         ->assertDontSeeText('Documentation');

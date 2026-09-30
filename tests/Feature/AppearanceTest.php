@@ -40,7 +40,7 @@ test('error pages leave light or dark to the stored or system appearance', funct
     expect(openingHtmlTag($html))->toBe('<html lang="en" dir="ltr">');
 });
 
-test('the desktop top header offers a light, dark and system appearance menu', function () {
+test('the desktop top header switches light and dark from one button, with no menu to choose from', function () {
     $this->actingAs(User::factory()->role('Team Member')->create());
 
     $response = $this->get(route('dashboard'))->assertOk();
@@ -50,26 +50,20 @@ test('the desktop top header offers a light, dark and system appearance menu', f
     $xpath = new DOMXPath($document);
 
     $header = $xpath->query('//*[@data-desktop-navigation-header]')->item(0);
-    $triggers = $xpath->query('.//*[@data-theme-toggle]', $header);
-    $options = collect($xpath->query('.//*[@data-appearance-option]', $header));
+    $toggles = $xpath->query('.//*[@data-theme-toggle]', $header);
 
-    expect($triggers)->toHaveCount(1)
-        ->and($triggers->item(0)->getAttribute('aria-label'))->toBe('Appearance')
-        ->and($triggers->item(0)->hasAttribute('data-top-bar-action'))->toBeTrue()
-        ->and($options->map->getAttribute('data-appearance-option')->all())->toBe(['light', 'dark', 'system'])
-        ->and($options->map->getAttribute('value')->all())->toBe(['light', 'dark', 'system'])
-        ->and($options->map(fn (DOMElement $option): string => trim($option->textContent))->all())->toBe(['Light', 'Dark', 'System']);
+    expect($toggles)->toHaveCount(1)
+        ->and($toggles->item(0)->nodeName)->toBe('button')
+        ->and($toggles->item(0)->getAttribute('aria-label'))->toBe('Appearance')
+        ->and($toggles->item(0)->getAttribute('x-on:click'))->toBe('hcToggleAppearance()')
+        ->and($toggles->item(0)->hasAttribute('data-top-bar-action'))->toBeTrue()
+        ->and($xpath->query('ancestor::ui-dropdown', $toggles->item(0)))->toHaveCount(0);
 });
 
-test('the appearance menu is translated in arabic', function () {
+test('the theme button is labelled in arabic', function () {
     $this->actingAs(User::factory()->role('Team Member')->create(['locale' => 'ar']));
 
     $this->get(route('dashboard'))
         ->assertOk()
-        ->assertSee('aria-label="المظهر"', false)
-        ->assertSeeInOrder([
-            'data-appearance-option="light"', 'فاتح',
-            'data-appearance-option="dark"', 'داكن',
-            'data-appearance-option="system"', 'النظام',
-        ], false);
+        ->assertSee('aria-label="المظهر"', false);
 });

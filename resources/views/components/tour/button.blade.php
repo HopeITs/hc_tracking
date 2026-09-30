@@ -8,10 +8,10 @@
         x-on:hc-tour-seen.window="fresh = false"
         aria-haspopup="dialog"
         aria-label="{{ __('tour.start') }}"
-        class="relative inline-flex size-9 cursor-pointer touch-manipulation items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark max-lg:size-11 dark:text-secondary-soft dark:hover:bg-white/10 dark:hover:text-white"
+        class="relative inline-flex size-8 cursor-pointer touch-manipulation items-center justify-center rounded-full text-secondary-medium transition-colors hover:bg-white hover:text-secondary-dark hover:shadow-sm max-lg:size-11 dark:text-ink-muted dark:hover:bg-surface-3 dark:hover:text-ink dark:hover:shadow-raised"
         data-test="tour-start-button"
     >
-        <flux:icon.sparkles variant="mini" />
+        <flux:icon.sparkles variant="outline" class="size-4.5!" />
 
         <span x-show="fresh" x-cloak class="absolute end-1.5 top-1.5 flex size-2">
             <span class="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-60 motion-reduce:animate-none"></span>

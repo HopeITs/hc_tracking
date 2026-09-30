@@ -1,40 +1,37 @@
 /**
- * Switches between Light, Dark and System appearance with a short cross-fade.
+ * Flips between Light and Dark appearance with a short cross-fade.
  *
- * The appearance menus (desktop top header and mobile drawer) call
- * window.hcSetAppearance(mode). Flux still owns the choice: $flux.appearance
- * is its store, it keeps the choice in localStorage ('flux.appearance') and it
- * toggles .dark on <html>. Flux does that from an Alpine effect, which runs in
- * a later microtask rather than when the store is written, so the class is
- * also set here, synchronously and by the same rule Flux uses. The page is
- * then already in its new state when document.startViewTransition()'s callback
- * returns, and Flux's effect finds the class in place and only stores the
- * choice.
+ * The theme buttons (desktop top header and mobile drawer) call
+ * window.hcToggleAppearance(), which switches to the opposite of what the
+ * page currently shows. Someone who has never pressed the button stays on
+ * Flux's default, 'system', and follows their device until the first press.
+ *
+ * Flux still owns the choice: $flux.appearance is its store, it keeps the
+ * choice in localStorage ('flux.appearance') and it toggles .dark on <html>.
+ * Flux does that from an Alpine effect, which runs in a later microtask rather
+ * than when the store is written, so the class is also set here,
+ * synchronously. The page is then already in its new state when
+ * document.startViewTransition()'s callback returns, and Flux's effect finds
+ * the class in place and only stores the choice.
  *
  * The cross-fade itself is the ::view-transition-old/new(root) block in
  * app.css. Browsers without view transitions and anyone who prefers reduced
- * motion switch instantly, as does a choice that keeps the current colours
- * (System while the OS already matches).
+ * motion switch instantly.
  */
-const APPEARANCES = ['light', 'dark', 'system'];
-
-const resolvesToDark = (appearance) =>
-    appearance === 'dark' || (appearance === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-
 const applyAppearance = (appearance) => {
     window.Flux.appearance = appearance;
-    document.documentElement.classList.toggle('dark', resolvesToDark(appearance));
+    document.documentElement.classList.toggle('dark', appearance === 'dark');
 };
 
-const setAppearance = (appearance) => {
-    if (!APPEARANCES.includes(appearance) || !window.Flux) {
+const toggleAppearance = () => {
+    if (!window.Flux) {
         return;
     }
 
-    const changesColours = resolvesToDark(appearance) !== document.documentElement.classList.contains('dark');
+    const appearance = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    if (!changesColours || reducedMotion || typeof document.startViewTransition !== 'function') {
+    if (reducedMotion || typeof document.startViewTransition !== 'function') {
         applyAppearance(appearance);
 
         return;
@@ -43,4 +40,4 @@ const setAppearance = (appearance) => {
     document.startViewTransition(() => applyAppearance(appearance));
 };
 
-window.hcSetAppearance = setAppearance;
+window.hcToggleAppearance = toggleAppearance;

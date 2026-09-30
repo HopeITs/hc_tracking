@@ -2,7 +2,10 @@
     $moduleCounts = auth()->check() && ! \App\Http\Middleware\EnsureTwoFactorIsEnabled::mustEnrol(auth()->user())
         ? app(\App\Notifications\UnreadCounts::class)->for(auth()->user())['modules']
         : [];
-    $navigationGroupClasses = '[&>div:first-child>div]:text-[11px]! [&>div:first-child>div]:font-semibold! [&>div:first-child>div]:tracking-[0.12em] [&>div:first-child>div]:text-secondary-light! [&>div:first-child>div]:uppercase dark:[&>div:first-child>div]:text-ink-muted! in-data-flux-sidebar-collapsed-desktop:flex!';
+    $showsAdministration = auth()->user()?->canAny(['cities.view', 'activity-log.view', 'notification-settings.manage'])
+        || auth()->user()?->can('viewAny', \App\Models\User::class);
+    /* The heading's look lives in app.css ("Sidebar group headings"): Flux renders it as the group's first div, which utilities passed here cannot reach reliably. */
+    $navigationGroupClasses = 'in-data-flux-sidebar-collapsed-desktop:flex!';
     $navigationItemClasses = 'touch-manipulation rounded-lg! in-data-flux-sidebar-collapsed-desktop:rounded-2xl! text-secondary-dark! hover:bg-secondary-soft/70! max-lg:h-11! data-current:border-primary! data-current:bg-primary! data-current:font-semibold! data-current:text-white! data-current:shadow-sm! dark:text-ink-muted! dark:hover:bg-white/[0.06]! dark:hover:text-ink! dark:data-current:border-transparent! dark:data-current:bg-surface-2! dark:data-current:text-ink! dark:data-current:shadow-none! dark:data-current:before:absolute dark:data-current:before:inset-y-1.5 dark:data-current:before:start-0 dark:data-current:before:w-0.5 dark:data-current:before:rounded-full dark:data-current:before:bg-brand in-data-flux-sidebar-collapsed-desktop:dark:data-current:before:hidden';
 @endphp
 
@@ -47,36 +50,21 @@
 
     {{-- Mobile drawer only: the header row has no room beside the full logo, and a bottom row can sit under the browser's own toolbar. --}}
     <div class="-mx-3 -mt-3 flex shrink-0 items-center justify-between gap-2 border-b border-secondary-soft px-3 py-1.5 lg:hidden dark:border-line" data-sidebar-preferences>
-        {{-- Same Light / Dark / System menu as the desktop top header (layouts/app/sidebar.blade.php). --}}
-        <flux:dropdown x-data position="bottom" align="start">
-            <flux:button
-                variant="ghost"
-                size="sm"
-                square
-                class="size-9! touch-manipulation text-secondary-medium! hover:bg-secondary-soft/70! hover:text-secondary-dark! max-lg:size-11! dark:text-ink-muted! dark:hover:bg-white/10! dark:hover:text-ink!"
-                :aria-label="__('common.appearance')"
-                :tooltip="__('common.appearance')"
-                data-theme-toggle
-            >
-                <flux:icon.sun x-show="$flux.appearance === 'light'" x-cloak variant="mini" />
-                <flux:icon.moon x-show="$flux.appearance === 'dark'" x-cloak variant="mini" />
-                <flux:icon.computer-desktop x-show="$flux.appearance === 'system'" x-cloak variant="mini" />
-            </flux:button>
-
-            <flux:menu :aria-label="__('common.appearance')">
-                <flux:menu.radio.group x-bind:value="$flux.appearance">
-                    <flux:menu.radio value="light" icon:trailing="sun" class="min-h-11 touch-manipulation" x-on:click="hcSetAppearance('light')" data-appearance-option="light">
-                        {{ __('navigation.appearance_light') }}
-                    </flux:menu.radio>
-                    <flux:menu.radio value="dark" icon:trailing="moon" class="min-h-11 touch-manipulation" x-on:click="hcSetAppearance('dark')" data-appearance-option="dark">
-                        {{ __('navigation.appearance_dark') }}
-                    </flux:menu.radio>
-                    <flux:menu.radio value="system" icon:trailing="computer-desktop" class="min-h-11 touch-manipulation" x-on:click="hcSetAppearance('system')" data-appearance-option="system">
-                        {{ __('navigation.appearance_system') }}
-                    </flux:menu.radio>
-                </flux:menu.radio.group>
-            </flux:menu>
-        </flux:dropdown>
+        {{-- Same Light / Dark button as the desktop top header (layouts/app/sidebar.blade.php). --}}
+        <flux:button
+            x-data
+            x-on:click="hcToggleAppearance()"
+            variant="ghost"
+            size="sm"
+            square
+            class="size-9! touch-manipulation text-secondary-medium! hover:bg-secondary-soft/70! hover:text-secondary-dark! max-lg:size-11! dark:text-ink-muted! dark:hover:bg-white/10! dark:hover:text-ink!"
+            :aria-label="__('common.appearance')"
+            :tooltip="__('common.appearance')"
+            data-theme-toggle
+        >
+            <flux:icon.sun x-show="! $flux.dark" x-cloak variant="outline" class="size-4.5!" />
+            <flux:icon.moon x-show="$flux.dark" x-cloak variant="outline" class="size-4.5!" />
+        </flux:button>
 
         <x-locale-toggle />
     </div>
@@ -88,7 +76,7 @@
         x-on:resize.window.debounce.150ms="$el.closest('[data-navigation-sidebar]').style.setProperty('--sidebar-scrollbar', ($el.offsetWidth - $el.clientWidth) + 'px')"
     >
         <flux:sidebar.group
-            :heading="__('navigation.overview')"
+            :heading="__('navigation.group_workspace')"
             :class="$navigationGroupClasses"
         >
             <flux:sidebar.item
@@ -101,15 +89,19 @@
                 {{ __('common.dashboard') }}
             </flux:sidebar.item>
 
-            @can('executive-summary.view')
+            {{-- Daily work first: tasks sit here, not under Delivery, because every role opens them most. --}}
+            @can('tasks.view')
                 <flux:sidebar.item
-                    icon="chart-pie"
-                    :href="route('executive-summary.index')"
-                    :current="request()->routeIs('executive-summary.*')"
+                    icon="clipboard-document-check"
+                    :href="route('tasks.index')"
+                    :current="request()->routeIs('tasks.*')"
                     :class="$navigationItemClasses"
                     wire:navigate
                 >
-                    {{ __('common.executive_summary') }}
+                    {{ __('common.tasks') }}
+                    <x-slot:icon-trailing>
+                        <x-notifications.module-badge module="tasks" :count="$moduleCounts['tasks'] ?? 0" />
+                    </x-slot:icon-trailing>
                 </flux:sidebar.item>
             @endcan
 
@@ -124,11 +116,23 @@
                     {{ __('common.my_calendar') }}
                 </flux:sidebar.item>
             @endcan
+
+            @can('executive-summary.view')
+                <flux:sidebar.item
+                    icon="chart-pie"
+                    :href="route('executive-summary.index')"
+                    :current="request()->routeIs('executive-summary.*')"
+                    :class="$navigationItemClasses"
+                    wire:navigate
+                >
+                    {{ __('common.executive_summary') }}
+                </flux:sidebar.item>
+            @endcan
         </flux:sidebar.group>
 
         @canany(['strategies.view', 'programs.view', 'annual-plans.view'])
             <flux:sidebar.group
-                :heading="__('common.strategy')"
+                :heading="__('navigation.group_strategy_planning')"
                 :class="$navigationGroupClasses"
             >
                 @can('strategies.view')
@@ -178,9 +182,9 @@
             </flux:sidebar.group>
         @endcanany
 
-        @canany(['projects.view', 'milestones.view', 'tasks.view', 'risks.view'])
+        @canany(['projects.view', 'milestones.view', 'risks.view'])
             <flux:sidebar.group
-                :heading="__('common.delivery')"
+                :heading="__('navigation.group_projects_delivery')"
                 :class="$navigationGroupClasses"
             >
                 @can('projects.view')
@@ -195,18 +199,6 @@
                         <x-slot:icon-trailing>
                             <x-notifications.module-badge module="projects" :count="$moduleCounts['projects'] ?? 0" />
                         </x-slot:icon-trailing>
-                    </flux:sidebar.item>
-                @endcan
-
-                @can('projects.view')
-                    <flux:sidebar.item
-                        icon="chart-bar-square"
-                        :href="route('timeline.index')"
-                        :current="request()->routeIs('timeline.*')"
-                        :class="$navigationItemClasses"
-                        wire:navigate
-                    >
-                        {{ __('titles.timeline') }}
                     </flux:sidebar.item>
                 @endcan
 
@@ -225,18 +217,15 @@
                     </flux:sidebar.item>
                 @endcan
 
-                @can('tasks.view')
+                @can('projects.view')
                     <flux:sidebar.item
-                        icon="clipboard-document-check"
-                        :href="route('tasks.index')"
-                        :current="request()->routeIs('tasks.*')"
+                        icon="bars-3-bottom-left"
+                        :href="route('timeline.index')"
+                        :current="request()->routeIs('timeline.*')"
                         :class="$navigationItemClasses"
                         wire:navigate
                     >
-                        {{ __('common.tasks') }}
-                        <x-slot:icon-trailing>
-                            <x-notifications.module-badge module="tasks" :count="$moduleCounts['tasks'] ?? 0" />
-                        </x-slot:icon-trailing>
+                        {{ __('titles.timeline') }}
                     </flux:sidebar.item>
                 @endcan
 
@@ -259,7 +248,7 @@
 
         @canany(['results.view', 'indicators.view', 'targets.view', 'reports.view'])
             <flux:sidebar.group
-                :heading="__('navigation.results_learning')"
+                :heading="__('navigation.group_monitoring_evaluation')"
                 :class="$navigationGroupClasses"
             >
                 @can('results.view')
@@ -294,7 +283,7 @@
 
                 @can('targets.view')
                     <flux:sidebar.item
-                        icon="flag"
+                        icon="viewfinder-circle"
                         :href="route('targets.index')"
                         :current="request()->routeIs('targets.*')"
                         :class="$navigationItemClasses"
@@ -324,26 +313,12 @@
             </flux:sidebar.group>
         @endcanany
 
-        @canany(['proposals.view', 'donors.view', 'funding-agreements.view', 'transfers.view'])
+        {{-- In the order money arrives: donor, proposal, agreement, transfer, then the account it lands in. --}}
+        @canany(['donors.view', 'proposals.view', 'funding-agreements.view', 'transfers.view', 'accounts.view'])
             <flux:sidebar.group
-                :heading="__('common.funding')"
+                :heading="__('navigation.group_funding_finance')"
                 :class="$navigationGroupClasses"
             >
-                @can('proposals.view')
-                    <flux:sidebar.item
-                        icon="document-text"
-                        :href="route('proposals.index')"
-                        :current="request()->routeIs('proposals.*')"
-                        :class="$navigationItemClasses"
-                        wire:navigate
-                    >
-                        {{ __('common.proposals') }}
-                        <x-slot:icon-trailing>
-                            <x-notifications.module-badge module="proposals" :count="$moduleCounts['proposals'] ?? 0" />
-                        </x-slot:icon-trailing>
-                    </flux:sidebar.item>
-                @endcan
-
                 @can('donors.view')
                     <flux:sidebar.item
                         icon="building-library"
@@ -355,6 +330,21 @@
                         {{ __('common.donors') }}
                         <x-slot:icon-trailing>
                             <x-notifications.module-badge module="donors" :count="$moduleCounts['donors'] ?? 0" />
+                        </x-slot:icon-trailing>
+                    </flux:sidebar.item>
+                @endcan
+
+                @can('proposals.view')
+                    <flux:sidebar.item
+                        icon="document-text"
+                        :href="route('proposals.index')"
+                        :current="request()->routeIs('proposals.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate
+                    >
+                        {{ __('common.proposals') }}
+                        <x-slot:icon-trailing>
+                            <x-notifications.module-badge module="proposals" :count="$moduleCounts['proposals'] ?? 0" />
                         </x-slot:icon-trailing>
                     </flux:sidebar.item>
                 @endcan
@@ -388,78 +378,80 @@
                         </x-slot:icon-trailing>
                     </flux:sidebar.item>
                 @endcan
+
+                @can('accounts.view')
+                    <flux:sidebar.item
+                        icon="credit-card"
+                        :href="route('admin.accounts.index')"
+                        :current="request()->routeIs('admin.accounts.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate
+                    >
+                        {{ __('common.accounts') }}
+                        <x-slot:icon-trailing>
+                            <x-notifications.module-badge module="accounts" :count="$moduleCounts['accounts'] ?? 0" />
+                        </x-slot:icon-trailing>
+                    </flux:sidebar.item>
+                @endcan
             </flux:sidebar.group>
         @endcanany
 
-        <flux:sidebar.group
-            :heading="__('navigation.administration')"
-            :class="$navigationGroupClasses"
-        >
-            @can('accounts.view')
-                <flux:sidebar.item
-                    icon="credit-card"
-                    :href="route('admin.accounts.index')"
-                    :current="request()->routeIs('admin.accounts.*')"
-                    :class="$navigationItemClasses"
-                    wire:navigate
-                >
-                    {{ __('common.accounts') }}
-                    <x-slot:icon-trailing>
-                        <x-notifications.module-badge module="accounts" :count="$moduleCounts['accounts'] ?? 0" />
-                    </x-slot:icon-trailing>
-                </flux:sidebar.item>
-            @endcan
+        @if ($showsAdministration)
+            <flux:sidebar.group
+                :heading="__('navigation.administration')"
+                :class="$navigationGroupClasses"
+            >
+                @can('viewAny', App\Models\User::class)
+                    <flux:sidebar.item
+                        icon="users"
+                        :href="route('admin.users.index')"
+                        :current="request()->routeIs('admin.users.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate
+                    >
+                        {{ __('navigation.user_directory') }}
+                        <x-slot:icon-trailing>
+                            <x-notifications.module-badge module="access-management" :count="$moduleCounts['access-management'] ?? 0" />
+                        </x-slot:icon-trailing>
+                    </flux:sidebar.item>
+                @endcan
 
-            @can('cities.view')
-                <flux:sidebar.item
-                    icon="map-pin"
-                    :href="route('admin.cities.index')"
-                    :current="request()->routeIs('admin.cities.*')"
-                    :class="$navigationItemClasses"
-                    wire:navigate
-                >
-                    {{ __('common.cities') }}
-                </flux:sidebar.item>
-            @endcan
+                @can('notification-settings.manage')
+                    <flux:sidebar.item
+                        icon="adjustments-horizontal"
+                        :href="route('admin.notification-settings.edit')"
+                        :current="request()->routeIs('admin.notification-settings.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate
+                    >
+                        {{ __('navigation.notification_settings') }}
+                    </flux:sidebar.item>
+                @endcan
 
-            @can('activity-log.view')
-                <flux:sidebar.item
-                    icon="clock"
-                    :href="route('activity.index')"
-                    :current="request()->routeIs('activity.*')"
-                    :class="$navigationItemClasses"
-                    wire:navigate
-                >
-                    {{ __('navigation.activity_log') }}
-                </flux:sidebar.item>
-            @endcan
+                @can('activity-log.view')
+                    <flux:sidebar.item
+                        icon="clock"
+                        :href="route('activity.index')"
+                        :current="request()->routeIs('activity.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate
+                    >
+                        {{ __('navigation.activity_log') }}
+                    </flux:sidebar.item>
+                @endcan
 
-            @can('notification-settings.manage')
-                <flux:sidebar.item
-                    icon="adjustments-horizontal"
-                    :href="route('admin.notification-settings.edit')"
-                    :current="request()->routeIs('admin.notification-settings.*')"
-                    :class="$navigationItemClasses"
-                    wire:navigate
-                >
-                    {{ __('navigation.notification_settings') }}
-                </flux:sidebar.item>
-            @endcan
-
-            @can('viewAny', App\Models\User::class)
-                <flux:sidebar.item
-                    icon="users"
-                    :href="route('admin.users.index')"
-                    :current="request()->routeIs('admin.users.*')"
-                    :class="$navigationItemClasses"
-                    wire:navigate
-                >
-                    {{ __('navigation.user_directory') }}
-                    <x-slot:icon-trailing>
-                        <x-notifications.module-badge module="access-management" :count="$moduleCounts['access-management'] ?? 0" />
-                    </x-slot:icon-trailing>
-                </flux:sidebar.item>
-            @endcan
-        </flux:sidebar.group>
+                @can('cities.view')
+                    <flux:sidebar.item
+                        icon="map-pin"
+                        :href="route('admin.cities.index')"
+                        :current="request()->routeIs('admin.cities.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate
+                    >
+                        {{ __('common.cities') }}
+                    </flux:sidebar.item>
+                @endcan
+            </flux:sidebar.group>
+        @endif
     </flux:sidebar.nav>
 </flux:sidebar>
