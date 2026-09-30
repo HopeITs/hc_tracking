@@ -184,6 +184,15 @@ class AppServiceProvider extends ServiceProvider
             (string) ($request->user()?->id ?? $request->ip()),
         ));
 
+        // On the whole `web` group (see bootstrap/app.php): the login page
+        // and the other pages a signed-out visitor can reach had no limit,
+        // so one machine could request them without end. Signed-in people
+        // are not counted here; an office behind one IP stays far below 300
+        // signed-out requests a minute.
+        RateLimiter::for('guest', fn (Request $request) => $request->user() === null
+            ? Limit::perMinute(300)->by('guest:'.$request->ip())
+            : Limit::none());
+
         // File download/preview routes had no limiter at all: a signed-in
         // user (or a hijacked session) could otherwise script sequential
         // requests to exfiltrate every attachment in the system.

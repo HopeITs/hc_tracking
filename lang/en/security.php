@@ -23,4 +23,9 @@ return [
     'second_step_failed_intro' => 'Your correct password was just entered, but the security code that followed was wrong several times.',
     'second_step_failed_if_it_was_you' => 'If this was you mistyping the code, there is nothing more to do.',
     'second_step_failed_if_it_was_not_you' => "If it wasn't you, someone knows your password: change your HR password now and tell IT.",
+    'lockout_surge_subject' => 'Many blocked sign-in attempts on :app',
+    'lockout_surge_intro' => ':attempts sign-in attempts were blocked in the last :minutes minutes because too many passwords had already been wrong.',
+    'lockout_surge_latest_ip' => 'Latest IP address: :ip',
+    'lockout_surge_what_it_means' => 'A few of these are normal when someone forgets a password. This many usually means a program is guessing passwords. The accounts are protected: the attempts are being refused.',
+    'lockout_surge_what_to_do' => 'Tell IT. The sign-in log on the server (storage/logs/auth) lists every attempt with its address, so the addresses can be blocked.',
 ];

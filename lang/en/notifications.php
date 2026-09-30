@@ -121,6 +121,7 @@ return [
         'test_sent' => 'Test notification sent to :name.',
     ],
     'test_message' => 'This is a test notification. Desktop popups are working.',
+    'lockout_surge' => ':attempts sign-in attempts were blocked in the last :minutes minutes. Someone may be guessing passwords: tell IT.',
     'more_updates' => '{0} |{1} and 1 more update|[2,*] and :count more updates',
 
     'modules' => [

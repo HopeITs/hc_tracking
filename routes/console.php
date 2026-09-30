@@ -18,3 +18,4 @@ Schedule::command('notifications:scan daily')->dailyAt('06:00')->withoutOverlapp
 Schedule::command('notifications:digests')->everyMinute()->withoutOverlapping();
 Schedule::command('model:prune', ['--model' => [Activity::class, TrustedDevice::class, UserNotification::class]])->daily();
 Schedule::command('files:prune')->dailyAt('03:00')->withoutOverlapping();
+Schedule::command('cache:prune-expired')->hourly()->withoutOverlapping();

@@ -11,6 +11,11 @@ test('Like escapes wildcard characters and the escape character', function () {
         ->and(Like::contains('  UNI  '))->toBe('%UNI%');
 });
 
+test('Like only searches for the first 100 characters typed', function () {
+    expect(Like::contains(str_repeat('ب', 150)))->toBe('%'.str_repeat('ب', 100).'%')
+        ->and(Like::term('  '.str_repeat('a', 99).' b c  '))->toBe(str_repeat('a', 99).' ');
+});
+
 test('a bare wildcard typed in a search box is matched literally', function () {
     $this->seed(RolesAndPermissionsSeeder::class);
     $user = User::factory()->role('Financial')->create();

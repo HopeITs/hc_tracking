@@ -9,6 +9,7 @@ use App\Http\Middleware\RedirectToHttps;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\SyncProgramsFromHr;
+use App\Http\Middleware\ThrottleRequestsWithoutSession;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -36,7 +37,15 @@ return Application::configure(basePath: dirname(__DIR__))
         // isSecure() believes a trusted proxy's X-Forwarded-Proto.
         $middleware->append(RedirectToHttps::class);
 
+        // Global, not in the `web` group: there it would be sorted behind the
+        // session on routes that list a throttle first (Livewire's update
+        // route), and must see the cookies before they are decrypted. After
+        // TrustProxies, so $request->ip() is the visitor behind a proxy.
+        $middleware->append(ThrottleRequestsWithoutSession::class);
+
+        // `throttle:guest` limits signed-out requests that do carry a session.
         $middleware->web(append: [
+            'throttle:guest',
             SecurityHeaders::class,
             SetLocale::class,
             SyncProgramsFromHr::class,
