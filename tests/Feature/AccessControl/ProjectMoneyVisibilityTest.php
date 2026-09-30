@@ -9,7 +9,6 @@ use App\Models\Media;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\TransfersTracking;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -338,7 +337,7 @@ test('a Managers user cannot edit, delete, or file a document into the funding p
     $fresh()->call('confirmDeleteFile', $agreement->id)->assertForbidden();
 
     $fresh()->call('openCreateFileModal')
-        ->set('newFile', UploadedFile::fake()->create('sneaky.pdf', 100, 'application/pdf'))
+        ->set('newFile', validUpload('sneaky.pdf', 100))
         ->set('fileCategory', MediaCollection::Mou->value)
         ->call('saveFile')
         ->assertForbidden();
@@ -353,7 +352,7 @@ test('a Managers user cannot edit, delete, or file a document into the funding p
         ->and($agreement->fresh())->not->toBeNull();
 
     $fresh()->call('openCreateFileModal')
-        ->set('newFile', UploadedFile::fake()->create('allowed.pdf', 100, 'application/pdf'))
+        ->set('newFile', validUpload('allowed.pdf', 100))
         ->set('fileCategory', MediaCollection::Photo->value)
         ->call('saveFile')
         ->assertHasNoErrors();

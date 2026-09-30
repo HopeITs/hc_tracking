@@ -1,10 +1,6 @@
 @props(['breadcrumbs' => [], 'title', 'subtitle' => null, 'titleClass' => null, 'unread' => false])
 
-<<<<<<< HEAD
-<header {{ $attributes->class('flex flex-col gap-3 border-b border-secondary-soft pb-4 dark:border-line') }}>
-=======
-<header data-detail-header {{ $attributes->class('flex flex-col gap-3 border-b border-secondary-soft pb-4 dark:border-secondary-medium') }}>
->>>>>>> gitlab/security-mai
+<header data-detail-header {{ $attributes->class('flex flex-col gap-3 border-b border-secondary-soft pb-4 dark:border-line') }}>
     @if ($breadcrumbs !== [])
         <nav aria-label="{{ __('ui.breadcrumb') }}" class="flex flex-wrap items-center gap-1.5 text-xs text-secondary-medium dark:text-ink-muted">
             @foreach ($breadcrumbs as $index => $crumb)

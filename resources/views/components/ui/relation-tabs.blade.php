@@ -1,10 +1,6 @@
 @props(['tabs' => [], 'active' => null, 'wireTarget' => 'tab'])
 
-<<<<<<< HEAD
-<div role="tablist" {{ $attributes->class('flex flex-wrap items-center gap-1 border-b border-secondary-soft dark:border-line') }}>
-=======
-<div role="tablist" data-relation-tabs {{ $attributes->class('flex flex-wrap items-center gap-1 border-b border-secondary-soft dark:border-secondary-medium') }}>
->>>>>>> gitlab/security-mai
+<div role="tablist" data-relation-tabs {{ $attributes->class('flex flex-wrap items-center gap-1 border-b border-secondary-soft dark:border-line') }}>
     @foreach ($tabs as $tab)
         @php $isActive = $tab['key'] === $active; @endphp
         <button

@@ -1,10 +1,6 @@
 @props(['title', 'count' => null, 'description' => null, 'headingId' => null])
 
-<<<<<<< HEAD
-<header {{ $attributes->class('grid gap-8 border-b border-secondary-soft pb-7 @6xl:grid-cols-[minmax(16rem,.7fr)_minmax(0,1.3fr)] @6xl:items-center dark:border-line') }}>
-=======
-<header data-page-header {{ $attributes->class('grid gap-8 border-b border-secondary-soft pb-7 @6xl:grid-cols-[minmax(16rem,.7fr)_minmax(0,1.3fr)] @6xl:items-center dark:border-secondary-medium') }}>
->>>>>>> gitlab/security-mai
+<header data-page-header {{ $attributes->class('grid gap-8 border-b border-secondary-soft pb-7 @6xl:grid-cols-[minmax(16rem,.7fr)_minmax(0,1.3fr)] @6xl:items-center dark:border-line') }}>
     <div class="min-w-0">
         <div class="flex items-center gap-2.5">
             <flux:heading :id="$headingId" size="xl" class="text-3xl! font-bold! leading-none!">{{ $title }}</flux:heading>

@@ -8,7 +8,6 @@ use App\Models\Media;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\TransfersTracking;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
@@ -259,7 +258,7 @@ test('Public Relations Manager cannot upload, edit or delete agreement or MOU fi
     foreach ([MediaCollection::Agreement, MediaCollection::Mou] as $collection) {
         $fresh()
             ->call('openCreateFileModal')
-            ->set('newFile', UploadedFile::fake()->create('sneaky.pdf', 100, 'application/pdf'))
+            ->set('newFile', validUpload('sneaky.pdf', 100))
             ->set('fileCategory', $collection->value)
             ->call('saveFile')
             ->assertForbidden();
@@ -270,7 +269,7 @@ test('Public Relations Manager cannot upload, edit or delete agreement or MOU fi
 
     $fresh()
         ->call('openCreateFileModal')
-        ->set('newFile', UploadedFile::fake()->create('notes.pdf', 100, 'application/pdf'))
+        ->set('newFile', validUpload('notes.pdf', 100))
         ->set('fileCategory', MediaCollection::Proposal->value)
         ->call('saveFile')
         ->assertHasNoErrors();

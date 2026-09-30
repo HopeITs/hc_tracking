@@ -1641,51 +1641,14 @@ new #[Title('titles.proposal')] class extends Component
             'fileDisplayName.required' => __('proposals.enter_a_file_name'),
         ]);
 
-<<<<<<< HEAD
         abort_if(in_array($validated['fileCategory'], $this->hiddenCollections(), true), 403);
 
-        $media = $isCreate
-            ? new Media(['mediable_type' => 'proposal', 'mediable_id' => $this->proposalId, 'disk' => 'local'])
-            : $this->proposalFile($this->editingFileId);
-
-        $replaced = null;
-
-        if ($this->newFile !== null) {
-            if (! $isCreate) {
-                $replaced = ['disk' => $media->disk, 'path' => $media->path];
-            }
-
-            $media->fill([
-                'disk' => 'local',
-                'path' => $this->newFile->store('media/proposals/'.$this->proposalId, 'local'),
-                'type' => FileType::from(Str::lower($this->newFile->getClientOriginalExtension())),
-                'mime_type' => $this->newFile->getMimeType(),
-                'size' => $this->newFile->getSize(),
-                'uploaded_at' => now(),
-                'uploaded_by' => auth()->id(),
-            ]);
-        }
-
-        $displayName = trim((string) ($validated['fileDisplayName'] ?? ''));
-
-        $media->fill([
-            'collection' => $validated['fileCategory'],
-            'original_name' => $displayName !== ''
-                ? $this->displayNameWithExtension($displayName, $media->type)
-                : $this->newFile->getClientOriginalName(),
-        ])->save();
-
-        if ($replaced !== null) {
-            $this->removeFromDisk($media->id, $replaced['disk'], $replaced['path']);
-        }
-=======
         app(SaveProposalFile::class)->handle(
             $this->proposal,
             $isCreate ? null : $this->proposalFile($this->editingFileId),
             $this->newFile,
             $validated,
         );
->>>>>>> gitlab/security-mai
 
         $this->closeFileModal();
         unset($this->proposalFiles, $this->documents, $this->tabs);

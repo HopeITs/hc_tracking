@@ -460,31 +460,9 @@ new #[Title('titles.project')] class extends Component {
                 'fileCategory.required' => __('projects.select_a_file_category'),
             ]);
 
-<<<<<<< HEAD
             abort_if(in_array($validated['fileCategory'], $this->hiddenCollections(), true), 403);
 
-            $path = $this->newFile->store('media/projects/'.$this->projectId, 'local');
-            $type = FileType::from(strtolower($this->newFile->getClientOriginalExtension()));
-            $displayName = trim((string) ($validated['fileDisplayName'] ?? ''));
-
-            Media::create([
-                'mediable_type' => 'project',
-                'mediable_id' => $this->projectId,
-                'collection' => $validated['fileCategory'],
-                'disk' => 'local',
-                'path' => $path,
-                'original_name' => $displayName !== ''
-                    ? $this->displayNameWithExtension($displayName, $type)
-                    : $this->newFile->getClientOriginalName(),
-                'mime_type' => $this->newFile->getMimeType(),
-                'size' => $this->newFile->getSize(),
-                'type' => $type,
-                'uploaded_at' => now(),
-                'uploaded_by' => auth()->id(),
-            ]);
-=======
             app(SaveProjectFile::class)->handle(Project::query()->findOrFail($this->projectId), null, $this->newFile, $validated);
->>>>>>> gitlab/security-mai
 
             $toast = __('projects.file_uploaded');
         } else {
@@ -497,16 +475,9 @@ new #[Title('titles.project')] class extends Component {
                 'fileCategory.required' => __('projects.select_a_file_category'),
             ]);
 
-<<<<<<< HEAD
             abort_if(in_array($validated['fileCategory'], $this->hiddenCollections(), true), 403);
 
-            $media->update([
-                'collection' => $validated['fileCategory'],
-                'original_name' => $this->displayNameWithExtension($validated['fileDisplayName'], $media->type),
-            ]);
-=======
             app(SaveProjectFile::class)->handle(Project::query()->findOrFail($this->projectId), $media, null, $validated);
->>>>>>> gitlab/security-mai
 
             $toast = __('projects.file_updated');
         }

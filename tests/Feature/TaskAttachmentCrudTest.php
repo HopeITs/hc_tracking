@@ -215,7 +215,7 @@ test('edit and delete refuse an attachment that belongs to another task', functi
         ->assertNotFound();
 })->with(['openEditFileModal', 'confirmDeleteFile']);
 
-test('the preview route serves pdfs and images inline with a safe content type', function (string $name, string $contentType, string $policy) {
+test('the preview route serves pdfs and images inline with a safe content type', function (string $name, string $contentType, ?string $policy) {
     Storage::fake('local');
     $user = User::factory()->role('Super Admin')->create();
     $task = Task::factory()->create();
@@ -228,7 +228,7 @@ test('the preview route serves pdfs and images inline with a safe content type',
         ->and($response->headers->get('X-Content-Type-Options'))->toBe('nosniff')
         ->and($response->headers->get('Content-Security-Policy'))->toBe($policy);
 })->with([
-    'pdf' => ['a.pdf', 'application/pdf', "frame-ancestors 'self'"],
+    'pdf' => ['a.pdf', 'application/pdf', null],
     'png' => ['a.png', 'image/png', 'sandbox'],
 ]);
 

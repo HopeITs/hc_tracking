@@ -2,11 +2,7 @@
     'caption' => null,
 ])
 
-<<<<<<< HEAD
-<div {{ $attributes->class('@container overflow-x-auto rounded-xl border border-board-line bg-board shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:shadow-raised dark:border-transparent') }}>
-=======
-<div data-data-table {{ $attributes->class('@container overflow-x-auto rounded-xl border border-board-line bg-board shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:shadow-none') }}>
->>>>>>> gitlab/security-mai
+<div data-data-table {{ $attributes->class('@container overflow-x-auto rounded-xl border border-board-line bg-board shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:shadow-raised dark:border-transparent') }}>
     <table class="w-full border-collapse text-start text-sm">
         @if ($caption)
             <caption class="sr-only">{{ $caption }}</caption>

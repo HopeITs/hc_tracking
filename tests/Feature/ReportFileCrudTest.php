@@ -214,7 +214,7 @@ test('stored files stay downloadable once the report is locked', function () {
     $this->actingAs($user)->get(route('reports.files.download', [$report, $file]))->assertOk();
 });
 
-test('the preview route serves pdfs and images inline with a safe content type', function (string $name, string $contentType, string $policy) {
+test('the preview route serves pdfs and images inline with a safe content type', function (string $name, string $contentType, ?string $policy) {
     Storage::fake('local');
     $report = Report::factory()->create(['status' => ReportStatus::Draft]);
     $user = reportAuthor($report);
@@ -227,7 +227,7 @@ test('the preview route serves pdfs and images inline with a safe content type',
         ->and($response->headers->get('X-Content-Type-Options'))->toBe('nosniff')
         ->and($response->headers->get('Content-Security-Policy'))->toBe($policy);
 })->with([
-    'pdf' => ['a.pdf', 'application/pdf', "frame-ancestors 'self'"],
+    'pdf' => ['a.pdf', 'application/pdf', null],
     'png' => ['a.png', 'image/png', 'sandbox'],
 ]);
 

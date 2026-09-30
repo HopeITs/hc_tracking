@@ -329,7 +329,7 @@ test('the preview serves a proposal pdf and a funded project file inline, and no
         ->assertOk()
         ->assertHeader('Content-Type', 'application/pdf')
         ->assertHeader('X-Content-Type-Options', 'nosniff')
-        ->assertHeader('Content-Security-Policy', "frame-ancestors 'self'");
+        ->assertHeaderMissing('Content-Security-Policy');
     $this->actingAs($this->user)->get(route('proposals.files.preview', [$this->proposal, $projectFile]))
         ->assertOk()
         ->assertHeader('Content-Security-Policy', 'sandbox');
