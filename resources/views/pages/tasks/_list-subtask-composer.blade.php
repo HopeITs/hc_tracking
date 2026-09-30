@@ -1,6 +1,7 @@
 @php
     use App\Enums\TaskPriority;
     use App\Enums\TaskStatus;
+    use Illuminate\Support\Js;
 
     /**
      * The "add subtask" row directly under a parent's own row (and its
@@ -16,7 +17,10 @@
     $subtaskDraft = $this->subtaskDraft($task);
     $draftPriority = TaskPriority::from($subtaskDraft['priority']);
     $draftStatus = TaskStatus::from($subtaskDraft['status']);
-    $draftAssignees = collect($this->userOptions)->whereIn('id', collect($subtaskDraft['assignees'])->map(fn ($id) => (int) $id));
+    $draftAssigneeIds = collect($subtaskDraft['assignees'])->map(fn ($id) => (int) $id)->values()->all();
+    $draftAssignees = collect($this->userOptions)->whereIn('id', $draftAssigneeIds);
+    // Opens the one shared _assignee-popover instead of rendering every employee here.
+    $draftPicker = "\$store.assigneePicker.openFor('list-subtask-{$task->id}', ".Js::from($draftAssigneeIds).", \$el.getBoundingClientRect(), 'toggleSubtaskDraftAssignee', [{$task->id}])";
 @endphp
 
 <tr x-show="subtasksOpen[{{ $task->id }}]" x-cloak wire:key="task-subtask-composer-{{ $task->id }}" class="bg-secondary-soft/20 dark:bg-white/[0.03]" data-test="task-subtask-add-row-{{ $task->id }}">
@@ -34,12 +38,18 @@
         />
     </td>
     <td class="px-2">
-        <x-ui.multi-select-popover
-            :label="__('tasks.assignees')"
+        <div
+            x-data
+            role="button"
+            tabindex="0"
+            x-on:click="{{ $draftPicker }}"
+            x-on:keydown.enter="{{ $draftPicker }}"
+            x-on:keydown.space.prevent="{{ $draftPicker }}"
+            aria-haspopup="listbox"
+            aria-label="{{ __('tasks.assignees') }}"
             class="inline-flex cursor-pointer items-center -space-x-2 rtl:space-x-reverse"
             data-test="task-subtask-assignee-trigger-{{ $task->id }}"
         >
-            <x-slot:trigger>
                 @if ($draftAssignees->isEmpty())
                     <span class="inline-flex size-7 items-center justify-center rounded-full border border-dashed border-secondary-light text-secondary-light">
                         <flux:icon.user-plus variant="micro" class="size-3.5" />
@@ -56,27 +66,7 @@
                         </span>
                     @endif
                 @endif
-            </x-slot:trigger>
-
-            @foreach ($this->userOptions as $userOption)
-                @php $isDraftAssigned = in_array((string) $userOption['id'], $subtaskDraft['assignees'], true); @endphp
-                <button
-                    type="button"
-                    role="option"
-                    aria-selected="{{ $isDraftAssigned ? 'true' : 'false' }}"
-                    wire:click="toggleSubtaskDraftAssignee({{ $task->id }}, {{ $userOption['id'] }})"
-                    wire:key="task-{{ $task->id }}-subtask-draft-assignee-{{ $userOption['id'] }}"
-                    x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
-                    class="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm hover:bg-secondary-soft dark:hover:bg-white/[0.06]"
-                    data-test="task-subtask-assignee-option-{{ $task->id }}-{{ $userOption['id'] }}"
-                >
-                    <span class="min-w-0 flex-1 truncate">{{ $userOption['name'] }} · {{ $userOption['secondary_name'] }}</span>
-                    @if ($isDraftAssigned)
-                        <flux:icon.check class="size-4 shrink-0 text-primary dark:text-brand-text" />
-                    @endif
-                </button>
-            @endforeach
-        </x-ui.multi-select-popover>
+        </div>
     </td>
     <td class="px-2">
         <input

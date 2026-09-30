@@ -14,18 +14,25 @@
  * _assignee-popover.blade.php) reads those back via $store.assigneePicker.
  * Toggling updates assignedIds optimistically (instant checkmark feedback)
  * before the $wire call round-trips to persist it.
+ *
+ * The board cards and every "add task" / "add subtask" draft row open this
+ * same popover too, passing the Livewire method to call and its leading
+ * arguments (the employee id is appended). Only toggleAssignee() on a saved
+ * task keeps at least one assignee; a draft may be emptied.
  */
 
 document.addEventListener('alpine:init', () => {
     window.Alpine.store('assigneePicker', {
         open: false,
         taskId: null,
+        method: 'toggleAssignee',
+        args: [],
         assignedIds: [],
         optionSearch: '',
         top: 0,
         left: 0,
 
-        openFor(taskId, assignedIds, rect) {
+        openFor(taskId, assignedIds, rect, method = 'toggleAssignee', args = [taskId]) {
             if (this.open && this.taskId === taskId) {
                 this.close();
 
@@ -33,6 +40,8 @@ document.addEventListener('alpine:init', () => {
             }
 
             this.taskId = taskId;
+            this.method = method;
+            this.args = [...args];
             this.assignedIds = [...assignedIds];
             this.optionSearch = '';
             this.top = rect.bottom + 4;
@@ -63,7 +72,7 @@ document.addEventListener('alpine:init', () => {
 
             if (index === -1) {
                 this.assignedIds.push(employeeId);
-            } else if (this.assignedIds.length > 1) {
+            } else if (this.method !== 'toggleAssignee' || this.assignedIds.length > 1) {
                 this.assignedIds.splice(index, 1);
             } else {
                 // Mirrors toggleAssignee()'s own "keep at least one
@@ -72,7 +81,7 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
-            $wire.toggleAssignee(this.taskId, employeeId);
+            $wire[this.method](...this.args, employeeId);
         },
     });
 });

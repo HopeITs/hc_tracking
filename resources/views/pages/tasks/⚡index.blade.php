@@ -1495,42 +1495,42 @@ new #[Title('titles.tasks')] class extends Component
         <x-slot:filters>
             <x-ui.input type="search" icon="magnifying-glass" :label="__('tasks.search_tasks')" :placeholder="__('tasks.title_description_or_assignee')" wire:model.live.debounce.300ms="search" clearable />
             <x-ui.header-filter-select :label="__('common.status')" wire:model.live="status" :value="$status">
-                <flux:select.option value="">{{ __('common.all_statuses') }}</flux:select.option>
+                <option value="">{{ __('common.all_statuses') }}</option>
                 @foreach (TaskStatus::cases() as $statusCase)
-                    <flux:select.option :value="$statusCase->value" :wire:key="'task-status-filter-'.$statusCase->value">{{ $statusCase->label() }}</flux:select.option>
+                    <option value="{{ $statusCase->value }}">{{ $statusCase->label() }}</option>
                 @endforeach
             </x-ui.header-filter-select>
             <x-ui.header-filter-select :label="__('tasks.priority')" wire:model.live="priority" :value="$priority">
-                <flux:select.option value="">{{ __('tasks.all_priorities') }}</flux:select.option>
+                <option value="">{{ __('tasks.all_priorities') }}</option>
                 @foreach (TaskPriority::cases() as $priorityCase)
-                    <flux:select.option :value="$priorityCase->value" :wire:key="'task-priority-filter-'.$priorityCase->value">{{ $priorityCase->label() }}</flux:select.option>
+                    <option value="{{ $priorityCase->value }}">{{ $priorityCase->label() }}</option>
                 @endforeach
             </x-ui.header-filter-select>
             <x-ui.header-filter-select :label="__('tasks.assignee')" wire:model.live="assignee" :value="$assignee">
-                <flux:select.option value="">{{ __('common.anyone') }}</flux:select.option>
+                <option value="">{{ __('common.anyone') }}</option>
                 @foreach ($this->userOptions as $userOption)
-                    <flux:select.option :value="$userOption['id']" :wire:key="'task-assignee-filter-'.$userOption['id']">{{ $userOption['name'] }} · {{ $userOption['secondary_name'] }}</flux:select.option>
+                    <option value="{{ $userOption['id'] }}">{{ $userOption['name'] }} · {{ $userOption['secondary_name'] }}</option>
                 @endforeach
             </x-ui.header-filter-select>
             @if ($canPickDepartment)
                 <x-ui.header-filter-select :label="__('tasks.department')" wire:model.live="departmentId" :value="$departmentId" data-test="task-department-filter">
-                    <flux:select.option value="">{{ __('tasks.every_department') }}</flux:select.option>
+                    <option value="">{{ __('tasks.every_department') }}</option>
                     @foreach ($this->departmentOptions as $departmentOption)
-                        <flux:select.option :value="$departmentOption['id']" :wire:key="'task-department-filter-'.$departmentOption['id']">{{ $departmentOption['name'] }}</flux:select.option>
+                        <option value="{{ $departmentOption['id'] }}">{{ $departmentOption['name'] }}</option>
                     @endforeach
                 </x-ui.header-filter-select>
             @endif
             <x-ui.header-filter-select :label="__('tasks.source_type')" wire:model.live="sourceType" :value="$sourceType">
-                <flux:select.option value="">{{ __('common.select') }}</flux:select.option>
+                <option value="">{{ __('common.select') }}</option>
                 @foreach ($this->sourceTypeOptions as $sourceTypeOption)
-                    <flux:select.option :value="$sourceTypeOption['value']" :wire:key="'task-source-type-filter-'.$sourceTypeOption['value']">{{ $sourceTypeOption['label'] }}</flux:select.option>
+                    <option value="{{ $sourceTypeOption['value'] }}">{{ $sourceTypeOption['label'] }}</option>
                 @endforeach
             </x-ui.header-filter-select>
             @if ($sourceType !== '')
                 <x-ui.header-filter-select :label="__('tasks.source')" wire:model.live="sourceId" :value="$sourceId">
-                    <flux:select.option value="">{{ __('common.select') }}</flux:select.option>
+                    <option value="">{{ __('common.select') }}</option>
                     @foreach ($this->filterSourceOptions as $sourceOption)
-                        <flux:select.option :value="$sourceOption['id']" :wire:key="'task-source-filter-'.$sourceOption['id']">{{ $sourceOption['name'] }}</flux:select.option>
+                        <option value="{{ $sourceOption['id'] }}">{{ $sourceOption['name'] }}</option>
                     @endforeach
                 </x-ui.header-filter-select>
             @endif
@@ -1663,19 +1663,19 @@ new #[Title('titles.tasks')] class extends Component
         <div class="flex shrink-0 flex-wrap items-center gap-2">
             @if ($view === 'list')
                 <x-ui.header-filter-select :label="__('tasks.group_by')" wire:model.live="group" :value="$group" class="w-40!">
-                    <flux:select.option value="none">{{ __('tasks.no_grouping') }}</flux:select.option>
-                    <flux:select.option value="status">{{ __('common.status') }}</flux:select.option>
-                    <flux:select.option value="priority">{{ __('tasks.priority') }}</flux:select.option>
-                    <flux:select.option value="assignee">{{ __('tasks.assignee') }}</flux:select.option>
-                    <flux:select.option value="milestone">{{ __('tasks.milestone') }}</flux:select.option>
+                    <option value="none">{{ __('tasks.no_grouping') }}</option>
+                    <option value="status">{{ __('common.status') }}</option>
+                    <option value="priority">{{ __('tasks.priority') }}</option>
+                    <option value="assignee">{{ __('tasks.assignee') }}</option>
+                    <option value="milestone">{{ __('tasks.milestone') }}</option>
                 </x-ui.header-filter-select>
                 <x-ui.header-filter-select :label="__('tasks.sort_by')" wire:model.live="sortField" :value="$sortField" class="w-40!">
-                    <flux:select.option value="due">{{ __('tasks.due_date_2') }}</flux:select.option>
-                    <flux:select.option value="title">{{ __('common.name') }}</flux:select.option>
-                    <flux:select.option value="status">{{ __('common.status') }}</flux:select.option>
-                    <flux:select.option value="priority">{{ __('tasks.priority') }}</flux:select.option>
-                    <flux:select.option value="assignee">{{ __('tasks.assignee') }}</flux:select.option>
-                    <flux:select.option value="created">{{ __('tasks.created_date') }}</flux:select.option>
+                    <option value="due">{{ __('tasks.due_date_2') }}</option>
+                    <option value="title">{{ __('common.name') }}</option>
+                    <option value="status">{{ __('common.status') }}</option>
+                    <option value="priority">{{ __('tasks.priority') }}</option>
+                    <option value="assignee">{{ __('tasks.assignee') }}</option>
+                    <option value="created">{{ __('tasks.created_date') }}</option>
                 </x-ui.header-filter-select>
                 <x-ui.button
                     size="sm"
@@ -1733,6 +1733,8 @@ new #[Title('titles.tasks')] class extends Component
             @default
                 @include('pages.tasks._list')
         @endswitch
+
+        @include('pages.tasks._assignee-popover')
     @endif
 
     @php
@@ -1765,13 +1767,13 @@ new #[Title('titles.tasks')] class extends Component
             <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
                 <x-ui.form-select wire:model.live="taskSourceType" :label="__('tasks.source_type')" :placeholder="__('common.select')" required>
                     @foreach ($this->sourceTypeOptions as $sourceTypeOption)
-                        <flux:select.option :value="$sourceTypeOption['value']">{{ $sourceTypeOption['label'] }}</flux:select.option>
+                        <option value="{{ $sourceTypeOption['value'] }}">{{ $sourceTypeOption['label'] }}</option>
                     @endforeach
                 </x-ui.form-select>
 
                 <x-ui.form-select wire:model="taskSourceId" :label="__('tasks.source')" :placeholder="__('common.select')" required>
                     @foreach ($this->sourceOptions as $sourceOption)
-                        <flux:select.option :value="$sourceOption['id']">{{ $sourceOption['name'] }}</flux:select.option>
+                        <option value="{{ $sourceOption['id'] }}">{{ $sourceOption['name'] }}</option>
                     @endforeach
                 </x-ui.form-select>
             </div>
@@ -1809,7 +1811,7 @@ new #[Title('titles.tasks')] class extends Component
 
                 <x-ui.form-multiselect wire:model="assignedTo" :label="__('tasks.assignees')" :placeholder="__('common.select')" class="col-span-2" data-test="task-assignee-picker">
                     @foreach ($this->userOptions as $userOption)
-                        <flux:select.option :value="$userOption['id']">{{ $userOption['name'] }} · {{ $userOption['secondary_name'] }}</flux:select.option>
+                        <option value="{{ $userOption['id'] }}">{{ $userOption['name'] }} · {{ $userOption['secondary_name'] }}</option>
                     @endforeach
                 </x-ui.form-multiselect>
             </div>

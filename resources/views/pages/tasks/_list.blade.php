@@ -102,6 +102,4 @@
             </div>
         </div>
     </div>
-
-    @include('pages.tasks._assignee-popover')
 </div>

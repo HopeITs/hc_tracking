@@ -13,9 +13,12 @@
  * SHOW_DELAY_MS, and once visible it stays at least MIN_VISIBLE_MS, so fast
  * switches never flicker.
  */
-const SHOW_DELAY_MS = 200;
-const MIN_VISIBLE_MS = 500;
-const LEAVE_MS = 400;
+// Kept short on purpose: every millisecond the loader stays up after the new
+// page has arrived is time the page is ready but hidden. LEAVE_MS matches the
+// .hc-preloader[data-state='leaving'] transition in app.css.
+const SHOW_DELAY_MS = 300;
+const MIN_VISIBLE_MS = 200;
+const LEAVE_MS = 200;
 const FAILSAFE_MS = 10000;
 const INTRO_ANIMATIONS = ['hc-preloader-rise', 'hc-preloader-write'];
 

@@ -41,7 +41,7 @@
                      assertDontSee() against the directory list if always rendered. --}}
                 <x-ui.form-select wire:model="agreementDonorId" :label="__('funding_agreements.donor')" :placeholder="__('funding_agreements.select_a_donor')" required autofocus>
                     @foreach ($donorOptions as $donorOption)
-                        <flux:select.option :value="$donorOption->id">{{ $donorOption->name }}</flux:select.option>
+                        <option value="{{ $donorOption->id }}">{{ $donorOption->name }}</option>
                     @endforeach
                 </x-ui.form-select>
             @endif
@@ -56,7 +56,7 @@
             @else
                 <x-ui.form-select wire:model.live="agreementProposalId" :label="__('common.proposal')" :placeholder="__('common.select_a_proposal')" required>
                     @foreach ($proposalOptions as $proposalOption)
-                        <flux:select.option :value="$proposalOption->id">{{ $proposalOption->name }}</flux:select.option>
+                        <option value="{{ $proposalOption->id }}">{{ $proposalOption->name }}</option>
                     @endforeach
                 </x-ui.form-select>
             @endif

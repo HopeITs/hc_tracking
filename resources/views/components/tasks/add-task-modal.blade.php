@@ -47,7 +47,7 @@
 
         <x-ui.form-multiselect wire:model="newTaskAssignedTo" :label="__('tasks.assignees')" :placeholder="__('common.select')" class="col-span-2" :data-test="$testPrefix.'-assignee-picker'">
             @foreach ($userOptions as $userOption)
-                <flux:select.option :value="$userOption->id">{{ $userOption->name }} · {{ $userOption->secondary_name }}</flux:select.option>
+                <option value="{{ $userOption->id }}">{{ $userOption->name }} · {{ $userOption->secondary_name }}</option>
             @endforeach
         </x-ui.form-multiselect>
     </div>

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Concerns;
 
+use App\Support\RouteSlugs;
 use Illuminate\Support\Str;
 
 /**
@@ -46,7 +47,9 @@ trait HasSlug
      * slug column; requiring every one of them to list it would be a huge,
      * easy-to-miss surface. Resolving it lazily here instead means only a
      * model actually used to build a link ever pays for it, and every
-     * existing narrow select keeps working unchanged.
+     * existing narrow select keeps working unchanged. RouteSlugs reads all of
+     * a model's slugs at once, so a page of links costs one query, not one
+     * per link.
      */
     public function getRouteKey(): mixed
     {
@@ -54,7 +57,7 @@ trait HasSlug
             return $this->attributes['slug'];
         }
 
-        return static::query()->whereKey($this->getKey())->value('slug');
+        return app(RouteSlugs::class)->for($this);
     }
 
     /**

@@ -76,6 +76,10 @@
         $helpText !== null ? $id.'-help' : null,
         $error !== '' ? $id.'-error' : null,
     ])->filter()->implode(' ');
+
+    /* flux:menu.item's own default-variant classes (vendor/livewire/flux/stubs/resources/views/flux/menu/item.blade.php). */
+    $menuItemClasses = 'flex items-center px-2 py-1.5 w-full focus:outline-hidden select-none rounded-md text-start text-sm font-medium [&[disabled]]:opacity-50 text-zinc-800 data-active:bg-zinc-50 dark:text-white dark:data-active:bg-zinc-600 **:data-flux-menu-item-icon:text-zinc-400 dark:**:data-flux-menu-item-icon:text-white/60 [&[data-active]_[data-flux-menu-item-icon]]:text-current';
+    $checkClasses = 'shrink-0 [:where(&)]:size-6 ms-auto size-4 shrink-0 '.($multiple ? 'text-primary dark:text-brand-text' : 'text-secondary-medium');
 @endphp
 
 <x-ui.form-field
@@ -143,24 +147,27 @@
                     </div>
                 @endif
 
+                {{-- The markup flux:menu.item and flux:icon.check render, written
+                     out: a person field lists 270+ employees, and two component
+                     renders each cost ~195 ms per form. --}}
                 @foreach ($options as $option)
-                    <flux:menu.item
-                        :data-option-value="$option['value']"
-                        :data-option-label="$option['label']"
-                        :disabled="$option['disabled']"
+                    <button
+                        type="button"
+                        class="{{ $menuItemClasses }}"
+                        data-flux-menu-item
+                        data-option-value="{{ $option['value'] }}"
+                        data-option-label="{{ $option['label'] }}"
+                        @disabled($option['disabled'])
                         x-show="matches($el)"
                         x-bind:disabled="{{ $option['disabled'] ? 'true' : '! matches($el)' }}"
                         x-on:click="choose({{ Illuminate\Support\Js::from($option['value']) }})"
-                        :wire:key="$id.'-'.md5($option['value'])"
+                        wire:key="{{ $id.'-'.md5($option['value']) }}"
                     >
+                        <div class="w-7 hidden [[data-flux-menu]:has(>[data-flux-menu-item-has-icon])_&]:block"></div>
                         <span class="min-w-0 truncate">{{ $option['label'] }}</span>
 
-                        <flux:icon.check
-                            class="ms-auto size-4 shrink-0 {{ $multiple ? 'text-primary dark:text-brand-text' : 'text-secondary-medium' }}"
-                            x-show="isSelected({{ Illuminate\Support\Js::from($option['value']) }})"
-                            :style="in_array($option['value'], $currentValues, true) ? null : 'display: none'"
-                        />
-                    </flux:menu.item>
+                        <svg class="{{ $checkClasses }}" @unless (in_array($option['value'], $currentValues, true)) style="display: none" @endunless x-show="isSelected({{ Illuminate\Support\Js::from($option['value']) }})" data-flux-icon xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" data-slot="icon"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                    </button>
                 @endforeach
             </flux:menu>
         </flux:dropdown>

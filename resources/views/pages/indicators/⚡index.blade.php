@@ -1244,24 +1244,24 @@ new #[Title('titles.indicators')] class extends Component {
             <x-ui.input type="search" icon="magnifying-glass" :label="__('indicators.search_indicators')" :placeholder="__('indicators.indicator_or_result_statement')" wire:model.live.debounce.300ms="search" clearable />
 
             <x-ui.header-filter-select :label="__('common.program')" wire:model.live="program" :value="$program">
-                <flux:select.option value="">{{ __('common.all_programs') }}</flux:select.option>
-                <flux:select.option value="none">{{ __('common.unassigned') }}</flux:select.option>
+                <option value="">{{ __('common.all_programs') }}</option>
+                <option value="none">{{ __('common.unassigned') }}</option>
                 @foreach ($this->programOptions as $programOption)
-                    <flux:select.option :value="$programOption->id" :wire:key="'ind-program-'.$programOption->id">{{ $programOption->name }}</flux:select.option>
+                    <option value="{{ $programOption->id }}">{{ $programOption->name }}</option>
                 @endforeach
             </x-ui.header-filter-select>
 
             <x-ui.header-filter-select :label="__('indicators.result')" wire:model.live="result" :value="$result">
-                <flux:select.option value="">{{ __('indicators.all_results') }}</flux:select.option>
+                <option value="">{{ __('indicators.all_results') }}</option>
                 @foreach ($this->resultOptions as $resultOption)
-                    <flux:select.option :value="$resultOption->id" :wire:key="'ind-result-'.$resultOption->id">{{ Str::limit($resultOption->statement, 50) }}</flux:select.option>
+                    <option value="{{ $resultOption->id }}">{{ Str::limit($resultOption->statement, 50) }}</option>
                 @endforeach
             </x-ui.header-filter-select>
 
             <x-ui.header-filter-select :label="__('indicators.measure')" wire:model.live="measure" :value="$measure">
-                <flux:select.option value="">{{ __('indicators.all_measures') }}</flux:select.option>
+                <option value="">{{ __('indicators.all_measures') }}</option>
                 @foreach (IndicatorMeasure::cases() as $measureCase)
-                    <flux:select.option :value="$measureCase->value" :wire:key="'ind-measure-'.$measureCase->value">{{ $measureCase->label() }}</flux:select.option>
+                    <option value="{{ $measureCase->value }}">{{ $measureCase->label() }}</option>
                 @endforeach
             </x-ui.header-filter-select>
         </x-slot:filters>
@@ -2123,7 +2123,7 @@ new #[Title('titles.indicators')] class extends Component {
 
                     <x-ui.form-select wire:model.live="indicatorResultId" :label="__('indicators.result')" :placeholder="__('indicators.select_a_result')" required>
                         @foreach ($this->resultOptions as $resultOption)
-                            <flux:select.option :value="$resultOption->id">{{ $resultOption->type->label() }} · {{ Str::limit($resultOption->statement, 60) }}</flux:select.option>
+                            <option value="{{ $resultOption->id }}">{{ $resultOption->type->label() }} · {{ Str::limit($resultOption->statement, 60) }}</option>
                         @endforeach
                     </x-ui.form-select>
 
@@ -2132,9 +2132,9 @@ new #[Title('titles.indicators')] class extends Component {
                         :label="__('common.project')"
                         :help="$indicatorResultId !== '' ? __('indicators.only_projects_delivering_the_result_program_are_offered') : null"
                     >
-                        <flux:select.option value="">{{ __('common.organisation_wide') }}</flux:select.option>
+                        <option value="">{{ __('common.organisation_wide') }}</option>
                         @foreach ($this->projectOptions as $projectOption)
-                            <flux:select.option :value="$projectOption->id">{{ $projectOption->name }}</flux:select.option>
+                            <option value="{{ $projectOption->id }}">{{ $projectOption->name }}</option>
                         @endforeach
                     </x-ui.form-select>
                 </div>

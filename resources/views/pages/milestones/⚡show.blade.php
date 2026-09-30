@@ -590,15 +590,15 @@ new #[Title('titles.milestone')] class extends Component {
         <x-ui.form-section :title="__('common.section_placement')" :fields="['relatedParentMilestoneId', 'relatedResponsibleUserId']">
             <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
                 <x-ui.form-select wire:model="relatedParentMilestoneId" :label="__('milestones.nest_under')" :search-label="__('milestones.search_milestones')">
-                    <flux:select.option value="">{{ __('common.top_level') }}</flux:select.option>
+                    <option value="">{{ __('common.top_level') }}</option>
                     @foreach ($this->relatedParentOptions as $relatedParentOption)
-                        <flux:select.option :value="$relatedParentOption->id">{{ $relatedParentOption->name }}</flux:select.option>
+                        <option value="{{ $relatedParentOption->id }}">{{ $relatedParentOption->name }}</option>
                     @endforeach
                 </x-ui.form-select>
 
                 <x-ui.form-select wire:model="relatedResponsibleUserId" :label="__('milestones.responsible')" :placeholder="__('common.select')" :search-label="__('milestones.search_responsible')">
                     @foreach ($this->userOptions as $userOption)
-                        <flux:select.option :value="$userOption->id">{{ $userOption->name }} · {{ $userOption->secondary_name }}</flux:select.option>
+                        <option value="{{ $userOption->id }}">{{ $userOption->name }} · {{ $userOption->secondary_name }}</option>
                     @endforeach
                 </x-ui.form-select>
             </div>
@@ -611,7 +611,7 @@ new #[Title('titles.milestone')] class extends Component {
 
                 <x-ui.form-select wire:model="relatedStatus" :label="__('common.status')" required>
                     @foreach (MilestoneStatus::cases() as $statusCase)
-                        <flux:select.option :value="$statusCase->value">{{ $statusCase->label() }}</flux:select.option>
+                        <option value="{{ $statusCase->value }}">{{ $statusCase->label() }}</option>
                     @endforeach
                 </x-ui.form-select>
 

@@ -47,7 +47,8 @@
                     data-test="assignee-popover-option-{{ $userOption['id'] }}"
                 >
                     <span class="min-w-0 flex-1 truncate">{{ $userOption['name'] }} · {{ $userOption['secondary_name'] }}</span>
-                    <flux:icon.check x-show="$store.assigneePicker.isAssigned({{ $userOption['id'] }})" class="size-4 shrink-0 text-primary dark:text-brand-text" />
+                    {{-- flux:icon.check's markup, written out: one component render per employee cost ~20 ms. --}}
+                    <svg x-show="$store.assigneePicker.isAssigned({{ $userOption['id'] }})" class="shrink-0 [:where(&)]:size-6 size-4 text-primary dark:text-brand-text" data-flux-icon xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" data-slot="icon"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
                 </button>
             @endforeach
         </div>

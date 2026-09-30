@@ -21,9 +21,9 @@
             <x-ui.form-input wire:model="name" :label="__('donors.donor_name')" maxlength="255" required autofocus class="@2xl/modal:col-span-2" />
 
             <x-ui.form-select wire:model="donorType" :label="__('common.type')">
-                <flux:select.option value="">{{ __('donors.not_classified') }}</flux:select.option>
+                <option value="">{{ __('donors.not_classified') }}</option>
                 @foreach ($typeOptions as $typeOption)
-                    <flux:select.option :value="$typeOption->value">{{ $typeOption->label() }}</flux:select.option>
+                    <option value="{{ $typeOption->value }}">{{ $typeOption->label() }}</option>
                 @endforeach
             </x-ui.form-select>
 

@@ -28,12 +28,19 @@
         />
     </label>
     <div class="flex flex-wrap items-center gap-2 ps-6">
-        <x-ui.multi-select-popover
-            :label="__('tasks.assignees')"
+        {{-- Trigger only: the option list lives once in _assignee-popover.blade.php. --}}
+        <div
+            x-data
+            role="button"
+            tabindex="0"
+            x-on:click="$store.assigneePicker.openFor($el.dataset.test, {{ \Illuminate\Support\Js::from(collect($taskDraft['assignees'])->map(fn ($id) => (int) $id)->values()->all()) }}, $el.getBoundingClientRect(), 'toggleTaskDraftAssignee', [{{ Illuminate\Support\Js::from($rowKey) }}])"
+            x-on:keydown.enter="$store.assigneePicker.openFor($el.dataset.test, {{ \Illuminate\Support\Js::from(collect($taskDraft['assignees'])->map(fn ($id) => (int) $id)->values()->all()) }}, $el.getBoundingClientRect(), 'toggleTaskDraftAssignee', [{{ Illuminate\Support\Js::from($rowKey) }}])"
+            x-on:keydown.space.prevent="$store.assigneePicker.openFor($el.dataset.test, {{ \Illuminate\Support\Js::from(collect($taskDraft['assignees'])->map(fn ($id) => (int) $id)->values()->all()) }}, $el.getBoundingClientRect(), 'toggleTaskDraftAssignee', [{{ Illuminate\Support\Js::from($rowKey) }}])"
+            aria-haspopup="listbox"
+            aria-label="{{ __('tasks.assignees') }}"
             class="inline-flex shrink-0 cursor-pointer items-center -space-x-2 rtl:space-x-reverse"
             data-test="task-add-assignee-trigger-mobile-{{ $group }}-{{ $groupKeyString }}"
         >
-            <x-slot:trigger>
                 @if ($draftAssignees->isEmpty())
                     <span class="inline-flex size-7 items-center justify-center rounded-full border border-dashed border-secondary-light text-secondary-light">
                         <flux:icon.user-plus variant="micro" class="size-3.5" />
@@ -50,27 +57,7 @@
                         </span>
                     @endif
                 @endif
-            </x-slot:trigger>
-
-            @foreach ($this->userOptions as $userOption)
-                @php $isDraftAssigned = in_array((string) $userOption['id'], $taskDraft['assignees'], true); @endphp
-                <button
-                    type="button"
-                    role="option"
-                    aria-selected="{{ $isDraftAssigned ? 'true' : 'false' }}"
-                    wire:click="toggleTaskDraftAssignee({{ Illuminate\Support\Js::from($rowKey) }}, {{ $userOption['id'] }})"
-                    wire:key="task-add-mobile-{{ $group }}-{{ $groupKeyString }}-assignee-{{ $userOption['id'] }}"
-                    x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
-                    class="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm hover:bg-secondary-soft dark:hover:bg-white/[0.06]"
-                    data-test="task-add-assignee-option-mobile-{{ $group }}-{{ $groupKeyString }}-{{ $userOption['id'] }}"
-                >
-                    <span class="min-w-0 flex-1 truncate">{{ $userOption['name'] }} · {{ $userOption['secondary_name'] }}</span>
-                    @if ($isDraftAssigned)
-                        <flux:icon.check class="size-4 shrink-0 text-primary dark:text-brand-text" />
-                    @endif
-                </button>
-            @endforeach
-        </x-ui.multi-select-popover>
+        </div>
 
         <input
             type="date"

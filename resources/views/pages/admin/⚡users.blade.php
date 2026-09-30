@@ -693,16 +693,16 @@ new #[Title('titles.user_directory')] class extends Component {
             <x-ui.input id="access-user-search" type="search" icon="magnifying-glass" :label="__('users.search_users')" :placeholder="__('users.search_users')" wire:model.live.debounce.350ms="search" clearable />
 
             <x-ui.header-filter-select id="access-role-filter" :label="__('users.all_roles')" wire:model.live="role" :value="$role">
-                <flux:select.option value="">{{ __('users.all_roles') }}</flux:select.option>
+                <option value="">{{ __('users.all_roles') }}</option>
                 @foreach ($this->roleOptions as $roleOption)
-                    <flux:select.option :value="$roleOption->name" :wire:key="'role-filter-'.$roleOption->id">{{ $roleOption->name }}</flux:select.option>
+                    <option value="{{ $roleOption->name }}">{{ $roleOption->name }}</option>
                 @endforeach
             </x-ui.header-filter-select>
 
             <x-ui.header-filter-select id="access-status-filter" :label="__('common.status')" wire:model.live="status" :value="$status">
-                <flux:select.option value="">{{ __('users.all_statuses') }}</flux:select.option>
-                <flux:select.option value="active">{{ __('common.active') }}</flux:select.option>
-                <flux:select.option value="inactive">{{ __('cities.inactive') }}</flux:select.option>
+                <option value="">{{ __('users.all_statuses') }}</option>
+                <option value="active">{{ __('common.active') }}</option>
+                <option value="inactive">{{ __('cities.inactive') }}</option>
             </x-ui.header-filter-select>
         </div>
 
@@ -984,15 +984,15 @@ new #[Title('titles.user_directory')] class extends Component {
         <div class="grid gap-y-4">
             <x-ui.form-select wire:model="hrUserId" :label="__('users.hr_account')" :placeholder="__('users.select_an_hr_account')" required autofocus>
                 @foreach ($this->hrAccountOptions as $hrAccountOption)
-                    <flux:select.option :value="$hrAccountOption->id">{{ $hrAccountOption->email }}@if ($hrAccountOption->employee) · {{ $hrAccountOption->employee->name }} · {{ $hrAccountOption->employee->secondary_name }}@endif</flux:select.option>
+                    <option value="{{ $hrAccountOption->id }}">{{ $hrAccountOption->email }}@if ($hrAccountOption->employee) · {{ $hrAccountOption->employee->name }} · {{ $hrAccountOption->employee->secondary_name }}@endif</option>
                 @endforeach
             </x-ui.form-select>
 
             <x-ui.form-select wire:model="initialRoleId" :label="__('users.role')">
-                <flux:select.option value="">{{ __('users.default_role_option', ['role' => config('access-control.default_role')]) }}</flux:select.option>
+                <option value="">{{ __('users.default_role_option', ['role' => config('access-control.default_role')]) }}</option>
                 @foreach ($this->roleOptions as $roleOption)
                     @can('assignRole', [App\Models\User::class, $roleOption])
-                        <flux:select.option :value="$roleOption->id">{{ $roleOption->name }}</flux:select.option>
+                        <option value="{{ $roleOption->id }}">{{ $roleOption->name }}</option>
                     @endcan
                 @endforeach
             </x-ui.form-select>

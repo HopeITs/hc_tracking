@@ -2866,7 +2866,7 @@ new #[Title('titles.proposal')] class extends Component
         <div class="grid grid-cols-2 gap-x-4 gap-y-4">
             <x-ui.form-select wire:model="newStatus" :label="__('proposals.new_status')" required autofocus>
                 @foreach (ProposalStatus::cases() as $statusCase)
-                    <flux:select.option :value="$statusCase->value">{{ $statusCase->label() }} — {{ $statusCase->phase()->label() }}</flux:select.option>
+                    <option value="{{ $statusCase->value }}">{{ $statusCase->label() }} — {{ $statusCase->phase()->label() }}</option>
                 @endforeach
             </x-ui.form-select>
 
@@ -2960,7 +2960,7 @@ new #[Title('titles.proposal')] class extends Component
                     <x-ui.form-select wire:model="fileCategory" :label="__('proposals.file_category')" :placeholder="__('common.select')" required>
                         @foreach (MediaCollection::cases() as $collectionOption)
                             @continue(in_array($collectionOption->value, $this->hiddenCollections(), true))
-                            <flux:select.option :value="$collectionOption->value">{{ $collectionOption->label() }}</flux:select.option>
+                            <option value="{{ $collectionOption->value }}">{{ $collectionOption->label() }}</option>
                         @endforeach
                     </x-ui.form-select>
 

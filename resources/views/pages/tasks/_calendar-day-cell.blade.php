@@ -61,12 +61,19 @@
         data-test="task-calendar-quick-add-{{ $day->toDateString() }}"
     />
     <div class="flex items-center gap-1">
-        <x-ui.multi-select-popover
-            :label="__('tasks.assignees')"
+        {{-- Trigger only: the option list lives once in _assignee-popover.blade.php. --}}
+        <div
+            x-data
+            role="button"
+            tabindex="0"
+            x-on:click="$store.assigneePicker.openFor($el.dataset.test, {{ \Illuminate\Support\Js::from(collect($dayTaskDraft['assignees'])->map(fn ($id) => (int) $id)->values()->all()) }}, $el.getBoundingClientRect(), 'toggleTaskDraftAssignee', [{{ Js::from($dayRowKey) }}])"
+            x-on:keydown.enter="$store.assigneePicker.openFor($el.dataset.test, {{ \Illuminate\Support\Js::from(collect($dayTaskDraft['assignees'])->map(fn ($id) => (int) $id)->values()->all()) }}, $el.getBoundingClientRect(), 'toggleTaskDraftAssignee', [{{ Js::from($dayRowKey) }}])"
+            x-on:keydown.space.prevent="$store.assigneePicker.openFor($el.dataset.test, {{ \Illuminate\Support\Js::from(collect($dayTaskDraft['assignees'])->map(fn ($id) => (int) $id)->values()->all()) }}, $el.getBoundingClientRect(), 'toggleTaskDraftAssignee', [{{ Js::from($dayRowKey) }}])"
+            aria-haspopup="listbox"
+            aria-label="{{ __('tasks.assignees') }}"
             class="inline-flex shrink-0 cursor-pointer items-center -space-x-1.5 rtl:space-x-reverse"
             data-test="task-calendar-add-assignee-trigger-{{ $day->toDateString() }}"
         >
-            <x-slot:trigger>
                 @if ($dayDraftAssignees->isEmpty())
                     <span class="inline-flex size-5 items-center justify-center rounded-full border border-dashed border-secondary-light text-secondary-light">
                         <flux:icon.user-plus variant="micro" class="size-2.5" />
@@ -83,27 +90,7 @@
                         </span>
                     @endif
                 @endif
-            </x-slot:trigger>
-
-            @foreach ($this->userOptions as $userOption)
-                @php $isDayDraftAssigned = in_array((string) $userOption['id'], $dayTaskDraft['assignees'], true); @endphp
-                <button
-                    type="button"
-                    role="option"
-                    aria-selected="{{ $isDayDraftAssigned ? 'true' : 'false' }}"
-                    wire:click="toggleTaskDraftAssignee({{ Js::from($dayRowKey) }}, {{ $userOption['id'] }})"
-                    wire:key="task-calendar-add-{{ $day->toDateString() }}-assignee-{{ $userOption['id'] }}"
-                    x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
-                    class="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm hover:bg-secondary-soft dark:hover:bg-white/[0.06]"
-                    data-test="task-calendar-add-assignee-option-{{ $day->toDateString() }}-{{ $userOption['id'] }}"
-                >
-                    <span class="min-w-0 flex-1 truncate">{{ $userOption['name'] }} · {{ $userOption['secondary_name'] }}</span>
-                    @if ($isDayDraftAssigned)
-                        <flux:icon.check class="size-4 shrink-0 text-primary dark:text-brand-text" />
-                    @endif
-                </button>
-            @endforeach
-        </x-ui.multi-select-popover>
+        </div>
 
         <flux:dropdown position="bottom" align="start">
             <button type="button" aria-label="{{ __('tasks.priority') }}: {{ $dayDraftPriority->label() }}" class="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded hover:bg-secondary-soft dark:hover:bg-surface-2" data-test="task-calendar-add-priority-trigger-{{ $day->toDateString() }}">

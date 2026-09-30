@@ -356,9 +356,9 @@ new #[Title('titles.strategies')] class extends Component {
             />
 
             <x-ui.header-filter-select id="strategy-status" :label="__('strategies.filter_by_status')" wire:model.live="status" :value="$status">
-                <flux:select.option value="">{{ __('common.all_statuses') }}</flux:select.option>
+                <option value="">{{ __('common.all_statuses') }}</option>
                 @foreach ($statusOptions as $statusValue => $statusOptionLabel)
-                    <flux:select.option :value="$statusValue" :wire:key="'status-filter-'.$statusValue">{{ $statusOptionLabel }}</flux:select.option>
+                    <option value="{{ $statusValue }}">{{ $statusOptionLabel }}</option>
                 @endforeach
             </x-ui.header-filter-select>
         </x-slot:filters>

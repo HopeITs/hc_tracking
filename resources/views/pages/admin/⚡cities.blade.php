@@ -370,7 +370,7 @@ new #[Title('titles.city_directory')] class extends Component {
 
             <x-ui.header-filter-select :label="__('cities.sort_by')" wire:model.live="sort" :value="$sort">
                 @foreach ($sortOptions as $optionValue => $optionLabel)
-                    <flux:select.option :value="$optionValue">{{ $optionLabel }}</flux:select.option>
+                    <option value="{{ $optionValue }}">{{ $optionLabel }}</option>
                 @endforeach
             </x-ui.header-filter-select>
         </x-slot:filters>

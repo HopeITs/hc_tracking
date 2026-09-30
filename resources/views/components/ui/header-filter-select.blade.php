@@ -39,6 +39,9 @@
     $id ??= 'header-filter-'.substr(md5($model.'|'.$label), 0, 12);
     $searchable ??= count($options) > 7;
     $searchLabel ??= $label;
+
+    /* flux:menu.item's own default-variant classes (vendor/livewire/flux/stubs/resources/views/flux/menu/item.blade.php). */
+    $menuItemClasses = 'flex items-center px-2 py-1.5 w-full focus:outline-hidden select-none rounded-md text-start text-sm font-medium [&[disabled]]:opacity-50 text-zinc-800 data-active:bg-zinc-50 dark:text-white dark:data-active:bg-zinc-600 **:data-flux-menu-item-icon:text-zinc-400 dark:**:data-flux-menu-item-icon:text-white/60 [&[data-active]_[data-flux-menu-item-icon]]:text-current';
 @endphp
 
 <div class="min-w-0" data-header-filter-select>
@@ -72,20 +75,27 @@
                 </div>
             @endif
 
+            {{-- The markup flux:menu.item renders, written out: a person filter
+                 lists 270+ employees, and one component render each cost
+                 ~140 ms per page. --}}
             @foreach ($options as $option)
-                <flux:menu.item
+                <button
+                    type="button"
+                    class="{{ $menuItemClasses }}"
+                    data-flux-menu-item
                     wire:click="$set('{{ $model }}', {{ Illuminate\Support\Js::from($option['value']) }})"
                     x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
-                    :disabled="$option['disabled']"
-                    :data-selected="$selectedValue === $option['value'] ? 'true' : null"
-                    :wire:key="$id.'-'.md5($option['value'])"
+                    @disabled($option['disabled'])
+                    @if ($selectedValue === $option['value']) data-selected="true" @endif
+                    wire:key="{{ $id.'-'.md5($option['value']) }}"
                 >
+                    <div class="w-7 hidden [[data-flux-menu]:has(>[data-flux-menu-item-has-icon])_&]:block"></div>
                     <span class="min-w-0 truncate">{{ $option['label'] }}</span>
 
                     @if ($selectedValue === $option['value'])
                         <flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" />
                     @endif
-                </flux:menu.item>
+                </button>
             @endforeach
         </flux:menu>
     </flux:dropdown>

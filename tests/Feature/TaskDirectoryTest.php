@@ -380,6 +380,28 @@ test('the list row assignee trigger opens a shared multi select popover of every
         ->assertSee('$store.assigneePicker.openFor('.$task->id.',', false);
 });
 
+test('every tasks view renders the employee option list only once', function (string $view) {
+    $user = User::factory()->role('General Manager')->create();
+    $alice = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
+    $tasks = Task::factory()->count(3)->create(['due_date' => today()]);
+
+    foreach ($tasks as $task) {
+        $task->taskAssignees()->delete();
+        $task->taskAssignees()->create(['employee_id' => $alice]);
+    }
+
+    // Each board card, "add task" row and "add subtask" row used to loop
+    // every employee into its own hidden popover: 45 board cards put 32 MB
+    // of HTML on /tasks. They now all open the one shared popover.
+    $html = Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->set('view', $view)
+        ->html();
+
+    expect(substr_count($html, 'assignee-option-'))->toBe(0)
+        ->and(substr_count($html, 'data-test="assignee-popover-option-'.$alice.'"'))->toBe(1);
+})->with(['list', 'board', 'calendar']);
+
 test('a task can be deleted and takes only its own attachments with it', function () {
     $user = User::factory()->role('General Manager')->create();
     $task = Task::factory()->create();

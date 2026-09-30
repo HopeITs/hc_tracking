@@ -28,14 +28,14 @@
         <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
             <x-ui.form-select wire:model.live="transferAgreementId" :label="__('transfers.funding_agreement')" :placeholder="__('transfers.select_an_agreement')" required autofocus class="@2xl/modal:col-span-2">
                 @foreach ($agreementOptions as $agreementOption)
-                    <flux:select.option :value="$agreementOption->id">{{ $agreementOption->donor->name }} · {{ $agreementOption->proposal->name }}@if (filled($agreementOption->project_num)) · {{ $agreementOption->project_num }}@endif · {{ number_format((float) $agreementOption->budget, 0) }} {{ $agreementOption->currency->value }}</flux:select.option>
+                    <option value="{{ $agreementOption->id }}">{{ $agreementOption->donor->name }} · {{ $agreementOption->proposal->name }}@if (filled($agreementOption->project_num)) · {{ $agreementOption->project_num }}@endif · {{ number_format((float) $agreementOption->budget, 0) }} {{ $agreementOption->currency->value }}</option>
                 @endforeach
             </x-ui.form-select>
 
             <x-ui.form-select wire:model="transferAccountId" :label="__('transfers.account')">
-                <flux:select.option value="">{{ __('transfers.not_yet_assigned') }}</flux:select.option>
+                <option value="">{{ __('transfers.not_yet_assigned') }}</option>
                 @foreach ($accountOptions as $accountOption)
-                    <flux:select.option :value="$accountOption->id">{{ $accountOption->account_name }}@unless ($accountOption->is_active) · {{ __('common.closed') }}@endunless</flux:select.option>
+                    <option value="{{ $accountOption->id }}">{{ $accountOption->account_name }}@unless ($accountOption->is_active) · {{ __('common.closed') }}@endunless</option>
                 @endforeach
             </x-ui.form-select>
 

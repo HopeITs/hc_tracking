@@ -25,6 +25,7 @@ use App\Models\Task;
 use App\Models\TransfersTracking;
 use App\Models\User;
 use App\Notifications\Alerts\NotificationSettings;
+use App\Support\RouteSlugs;
 use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
@@ -55,6 +56,7 @@ class AppServiceProvider extends ServiceProvider
 
         // One instance per request or job, so queue workers never hold stale values.
         $this->app->scoped(NotificationSettings::class);
+        $this->app->scoped(RouteSlugs::class);
 
         $this->registerDevCommands();
 

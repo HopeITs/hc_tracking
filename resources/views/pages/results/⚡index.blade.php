@@ -1006,17 +1006,17 @@ new #[Title('titles.results_framework')] class extends Component {
             />
 
             <x-ui.header-filter-select :label="__('common.program')" wire:model.live="program" :value="$program">
-                <flux:select.option value="">{{ __('common.all_programs') }}</flux:select.option>
-                <flux:select.option value="none">{{ __('common.unassigned') }}</flux:select.option>
+                <option value="">{{ __('common.all_programs') }}</option>
+                <option value="none">{{ __('common.unassigned') }}</option>
                 @foreach ($this->programOptions as $programOption)
-                    <flux:select.option :value="$programOption->id" :wire:key="'result-program-'.$programOption->id">{{ $programOption->name }}</flux:select.option>
+                    <option value="{{ $programOption->id }}">{{ $programOption->name }}</option>
                 @endforeach
             </x-ui.header-filter-select>
 
             <x-ui.header-filter-select :label="__('common.type')" wire:model.live="type" :value="$type">
-                <flux:select.option value="">{{ __('results_framework.all_types') }}</flux:select.option>
+                <option value="">{{ __('results_framework.all_types') }}</option>
                 @foreach (ResultType::cases() as $typeCase)
-                    <flux:select.option :value="$typeCase->value" :wire:key="'result-type-'.$typeCase->value">{{ $typeCase->label() }}</flux:select.option>
+                    <option value="{{ $typeCase->value }}">{{ $typeCase->label() }}</option>
                 @endforeach
             </x-ui.header-filter-select>
         </x-slot:filters>
@@ -1447,9 +1447,9 @@ new #[Title('titles.results_framework')] class extends Component {
                         :locked-reason="__('results_framework.an_impact_sits_at_the_top_of_the_chain')"
                         :help="__('results_framework.only_the_level_directly_above_is_offered')"
                     >
-                        <flux:select.option value="">{{ __('common.top_level') }}</flux:select.option>
+                        <option value="">{{ __('common.top_level') }}</option>
                         @foreach ($this->parentOptions as $parentOption)
-                            <flux:select.option :value="$parentOption->id">{{ Str::limit($parentOption->statement, 60) }} · {{ $parentOption->program?->name ?? __('common.unassigned') }}</flux:select.option>
+                            <option value="{{ $parentOption->id }}">{{ Str::limit($parentOption->statement, 60) }} · {{ $parentOption->program?->name ?? __('common.unassigned') }}</option>
                         @endforeach
                     </x-ui.form-select>
 
@@ -1460,9 +1460,9 @@ new #[Title('titles.results_framework')] class extends Component {
                         :locked-reason="__('results_framework.follows_the_program_of_the_result_it_contributes_to')"
                         :help="$editingResultId !== null ? __('results_framework.nested_results_move_with_it') : null"
                     >
-                        <flux:select.option value="">{{ __('common.unassigned') }}</flux:select.option>
+                        <option value="">{{ __('common.unassigned') }}</option>
                         @foreach ($this->programOptions as $programOption)
-                            <flux:select.option :value="$programOption->id">{{ $programOption->name }}</flux:select.option>
+                            <option value="{{ $programOption->id }}">{{ $programOption->name }}</option>
                         @endforeach
                     </x-ui.form-select>
                 </div>

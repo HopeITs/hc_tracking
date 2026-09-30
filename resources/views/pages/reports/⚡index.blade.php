@@ -470,17 +470,17 @@ new #[Title('titles.reports')] class extends Component {
             <x-ui.input type="search" icon="magnifying-glass" :label="__('reports.search_reports')" :placeholder="__('reports.indicator_or_narrative')" wire:model.live.debounce.300ms="search" clearable />
 
             <x-ui.header-filter-select :label="__('reports.reported_by')" wire:model.live="author" :value="$author">
-                <flux:select.option value="">{{ __('common.anyone') }}</flux:select.option>
+                <option value="">{{ __('common.anyone') }}</option>
                 @foreach ($this->authorOptions as $authorOption)
-                    <flux:select.option :value="$authorOption->id" :wire:key="'rpt-author-'.$authorOption->id">{{ $authorOption->name }}</flux:select.option>
+                    <option value="{{ $authorOption->id }}">{{ $authorOption->name }}</option>
                 @endforeach
             </x-ui.header-filter-select>
 
             <x-ui.header-filter-select :label="__('common.project')" wire:model.live="project" :value="$project">
-                <flux:select.option value="">{{ __('targets.any_project') }}</flux:select.option>
-                <flux:select.option value="none">{{ __('common.organisation_wide') }}</flux:select.option>
+                <option value="">{{ __('targets.any_project') }}</option>
+                <option value="none">{{ __('common.organisation_wide') }}</option>
                 @foreach ($this->projectOptions as $projectOption)
-                    <flux:select.option :value="$projectOption->id" :wire:key="'rpt-project-'.$projectOption->id">{{ $projectOption->name }}</flux:select.option>
+                    <option value="{{ $projectOption->id }}">{{ $projectOption->name }}</option>
                 @endforeach
             </x-ui.header-filter-select>
         </x-slot:filters>

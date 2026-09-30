@@ -185,13 +185,22 @@
                             <div @class(['h-full rounded-full transition-[width]', 'bg-status-good' => $task->status === TaskStatus::Done, 'bg-primary dark:bg-ink-muted' => $task->status !== TaskStatus::Done]) style="width: {{ $task->progress_percentage }}%"></div>
                         </div>
 
-                        <x-ui.multi-select-popover
-                            :label="__('tasks.assignees')"
-                            :trigger-label="__('tasks.assignees').': '.($boardAssignees->isEmpty() ? __('common.not_assigned') : $boardAssignees->map->name->implode(', '))"
+                        {{-- Trigger only: the option list lives once in _assignee-popover.blade.php. --}}
+                        <div
+                            x-data
+                            role="button"
+                            @if ($canUpdate)
+                            tabindex="0"
+                            x-on:click="$store.assigneePicker.openFor({{ $task->id }}, {{ Js::from($assignedIds) }}, $el.getBoundingClientRect())"
+                            x-on:keydown.enter="$store.assigneePicker.openFor({{ $task->id }}, {{ Js::from($assignedIds) }}, $el.getBoundingClientRect())"
+                            x-on:keydown.space.prevent="$store.assigneePicker.openFor({{ $task->id }}, {{ Js::from($assignedIds) }}, $el.getBoundingClientRect())"
+                            @endif
+                            aria-haspopup="listbox"
+                            x-bind:aria-expanded="$store.assigneePicker.open && $store.assigneePicker.taskId === {{ $task->id }} ? 'true' : 'false'"
+                            aria-label="{{ __('tasks.assignees') }}: {{ $boardAssignees->isEmpty() ? __('common.not_assigned') : $boardAssignees->map->name->implode(', ') }}"
                             class="inline-flex cursor-pointer items-center -space-x-2 rtl:space-x-reverse"
                             data-test="task-board-assignee-trigger-{{ $task->id }}"
                         >
-                            <x-slot:trigger>
                                 @if ($boardAssignees->isEmpty())
                                     <span class="inline-flex size-7 items-center justify-center rounded-full border border-dashed border-secondary-light text-secondary-light">
                                         <flux:icon.user-plus variant="micro" class="size-3.5" />
@@ -221,28 +230,7 @@
                                         </span>
                                     @endif
                                 @endif
-                            </x-slot:trigger>
-
-                            @foreach ($this->userOptions as $userOption)
-                                @php $isAssigned = in_array($userOption['id'], $assignedIds, true); @endphp
-                                <button
-                                    type="button"
-                                    role="option"
-                                    aria-selected="{{ $isAssigned ? 'true' : 'false' }}"
-                                    wire:click="toggleAssignee({{ $task->id }}, {{ $userOption['id'] }})"
-                                    @disabled(! $canUpdate)
-                                    wire:key="task-board-{{ $task->id }}-assignee-option-{{ $userOption['id'] }}"
-                                    x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
-                                    class="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm hover:bg-secondary-soft dark:hover:bg-white/[0.06]"
-                                    data-test="task-board-assignee-option-{{ $task->id }}-{{ $userOption['id'] }}"
-                                >
-                                    <span class="min-w-0 flex-1 truncate">{{ $userOption['name'] }} · {{ $userOption['secondary_name'] }}</span>
-                                    @if ($isAssigned)
-                                        <flux:icon.check class="size-4 shrink-0 text-primary dark:text-brand-text" />
-                                    @endif
-                                </button>
-                            @endforeach
-                        </x-ui.multi-select-popover>
+                        </div>
 
                         {{-- Non-pointer alternative to the drag-and-drop status change above,
                              matching the milestone board's established fallback pattern. --}}
@@ -326,13 +314,23 @@
                                     />
                                 </label>
                                 <div class="flex flex-wrap items-center gap-1.5 ps-5">
-                                    <x-ui.multi-select-popover
-                                        :label="__('tasks.assignees')"
+                                    @php
+                                        $boardDraftIds = collect($boardSubtaskDraft['assignees'])->map(fn ($id) => (int) $id)->values()->all();
+                                        $boardDraftAssignees = collect($this->userOptions)->whereIn('id', $boardDraftIds);
+                                        $boardDraftPicker = "\$store.assigneePicker.openFor('board-subtask-{$task->id}', ".Js::from($boardDraftIds).", \$el.getBoundingClientRect(), 'toggleSubtaskDraftAssignee', [{$task->id}])";
+                                    @endphp
+                                    <div
+                                        x-data
+                                        role="button"
+                                        tabindex="0"
+                                        x-on:click="{{ $boardDraftPicker }}"
+                                        x-on:keydown.enter="{{ $boardDraftPicker }}"
+                                        x-on:keydown.space.prevent="{{ $boardDraftPicker }}"
+                                        aria-haspopup="listbox"
+                                        aria-label="{{ __('tasks.assignees') }}"
                                         class="inline-flex shrink-0 cursor-pointer items-center -space-x-2 rtl:space-x-reverse"
                                         data-test="task-board-subtask-assignee-trigger-{{ $task->id }}"
                                     >
-                                        <x-slot:trigger>
-                                            @php $boardDraftAssignees = collect($this->userOptions)->whereIn('id', collect($boardSubtaskDraft['assignees'])->map(fn ($id) => (int) $id)); @endphp
                                             @if ($boardDraftAssignees->isEmpty())
                                                 <span class="inline-flex size-6 items-center justify-center rounded-full border border-dashed border-secondary-light text-secondary-light">
                                                     <flux:icon.user-plus variant="micro" class="size-3" />
@@ -349,27 +347,7 @@
                                                     </span>
                                                 @endif
                                             @endif
-                                        </x-slot:trigger>
-
-                                        @foreach ($this->userOptions as $userOption)
-                                            @php $isBoardDraftAssigned = in_array((string) $userOption['id'], $boardSubtaskDraft['assignees'], true); @endphp
-                                            <button
-                                                type="button"
-                                                role="option"
-                                                aria-selected="{{ $isBoardDraftAssigned ? 'true' : 'false' }}"
-                                                wire:click="toggleSubtaskDraftAssignee({{ $task->id }}, {{ $userOption['id'] }})"
-                                                wire:key="task-board-{{ $task->id }}-subtask-draft-assignee-{{ $userOption['id'] }}"
-                                                x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
-                                                class="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm hover:bg-secondary-soft dark:hover:bg-white/[0.06]"
-                                                data-test="task-board-subtask-assignee-option-{{ $task->id }}-{{ $userOption['id'] }}"
-                                            >
-                                                <span class="min-w-0 flex-1 truncate">{{ $userOption['name'] }} · {{ $userOption['secondary_name'] }}</span>
-                                                @if ($isBoardDraftAssigned)
-                                                    <flux:icon.check class="size-4 shrink-0 text-primary dark:text-brand-text" />
-                                                @endif
-                                            </button>
-                                        @endforeach
-                                    </x-ui.multi-select-popover>
+                                    </div>
 
                                     <input
                                         type="date"
@@ -420,12 +398,21 @@
                     />
                 </label>
                 <div class="flex flex-wrap items-center gap-1.5 ps-6">
-                    <x-ui.multi-select-popover
-                        :label="__('tasks.assignees')"
+                    @php
+                        $boardTaskDraftPicker = "\$store.assigneePicker.openFor(".Js::from('board-add-'.$case->value).', '.Js::from(collect($boardTaskDraft['assignees'])->map(fn ($id) => (int) $id)->values()->all()).", \$el.getBoundingClientRect(), 'toggleTaskDraftAssignee', [".Js::from($boardRowKey).'])';
+                    @endphp
+                    <div
+                        x-data
+                        role="button"
+                        tabindex="0"
+                        x-on:click="{{ $boardTaskDraftPicker }}"
+                        x-on:keydown.enter="{{ $boardTaskDraftPicker }}"
+                        x-on:keydown.space.prevent="{{ $boardTaskDraftPicker }}"
+                        aria-haspopup="listbox"
+                        aria-label="{{ __('tasks.assignees') }}"
                         class="inline-flex shrink-0 cursor-pointer items-center -space-x-2 rtl:space-x-reverse"
                         data-test="task-board-add-assignee-trigger-{{ $case->value }}"
                     >
-                        <x-slot:trigger>
                             @if ($boardTaskDraftAssignees->isEmpty())
                                 <span class="inline-flex size-6 items-center justify-center rounded-full border border-dashed border-secondary-light text-secondary-light">
                                     <flux:icon.user-plus variant="micro" class="size-3" />
@@ -442,27 +429,7 @@
                                     </span>
                                 @endif
                             @endif
-                        </x-slot:trigger>
-
-                        @foreach ($this->userOptions as $userOption)
-                            @php $isBoardTaskDraftAssigned = in_array((string) $userOption['id'], $boardTaskDraft['assignees'], true); @endphp
-                            <button
-                                type="button"
-                                role="option"
-                                aria-selected="{{ $isBoardTaskDraftAssigned ? 'true' : 'false' }}"
-                                wire:click="toggleTaskDraftAssignee({{ Js::from($boardRowKey) }}, {{ $userOption['id'] }})"
-                                wire:key="task-board-add-{{ $case->value }}-assignee-{{ $userOption['id'] }}"
-                                x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
-                                class="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm hover:bg-secondary-soft dark:hover:bg-white/[0.06]"
-                                data-test="task-board-add-assignee-option-{{ $case->value }}-{{ $userOption['id'] }}"
-                            >
-                                <span class="min-w-0 flex-1 truncate">{{ $userOption['name'] }} · {{ $userOption['secondary_name'] }}</span>
-                                @if ($isBoardTaskDraftAssigned)
-                                    <flux:icon.check class="size-4 shrink-0 text-primary dark:text-brand-text" />
-                                @endif
-                            </button>
-                        @endforeach
-                    </x-ui.multi-select-popover>
+                    </div>
 
                     <input
                         type="date"

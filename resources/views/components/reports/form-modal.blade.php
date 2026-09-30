@@ -33,7 +33,7 @@
             <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
                 <x-ui.form-select wire:model.live="reportTargetId" :label="__('reports.target')" :placeholder="__('reports.select_a_target')" :help="$targetHelp" required autofocus class="@2xl/modal:col-span-2">
                     @foreach ($targetOptions as $targetOption)
-                        <flux:select.option :value="$targetOption['id']">{{ $targetOption['label'] }}</flux:select.option>
+                        <option value="{{ $targetOption['id'] }}">{{ $targetOption['label'] }}</option>
                     @endforeach
                 </x-ui.form-select>
 

@@ -390,15 +390,15 @@ new #[Title('titles.accounts')] class extends Component {
             <x-ui.input type="search" icon="magnifying-glass" :label="__('accounts.search_accounts')" :placeholder="__('accounts.account_name')" wire:model.live.debounce.300ms="search" clearable />
 
             <x-ui.header-filter-select :label="__('common.state')" wire:model.live="state" :value="$state">
-                <flux:select.option value="">{{ __('common.all_accounts') }}</flux:select.option>
-                <flux:select.option value="active">{{ __('accounts.open') }}</flux:select.option>
-                <flux:select.option value="closed">{{ __('accounts.closed') }}</flux:select.option>
+                <option value="">{{ __('common.all_accounts') }}</option>
+                <option value="active">{{ __('accounts.open') }}</option>
+                <option value="closed">{{ __('accounts.closed') }}</option>
             </x-ui.header-filter-select>
 
             <x-ui.header-filter-select :label="__('common.currency')" wire:model.live="currencyFilter" :value="$currencyFilter">
-                <flux:select.option value="">{{ __('accounts.all_currencies') }}</flux:select.option>
+                <option value="">{{ __('accounts.all_currencies') }}</option>
                 @foreach (Currency::cases() as $currencyCase)
-                    <flux:select.option :value="$currencyCase->value" :wire:key="'account-currency-filter-'.$currencyCase->value">{{ $currencyCase->value }}</flux:select.option>
+                    <option value="{{ $currencyCase->value }}">{{ $currencyCase->value }}</option>
                 @endforeach
             </x-ui.header-filter-select>
         </x-slot:filters>

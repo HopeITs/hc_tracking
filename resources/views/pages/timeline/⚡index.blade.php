@@ -169,23 +169,23 @@ new #[Title('titles.timeline')] class extends Component {
         <x-slot:filters>
             @if ($activeView === 'pipeline')
                 <x-ui.header-filter-select :label="__('gantt.phase')" wire:model.live="phase" :value="$phase">
-                    <flux:select.option value="">{{ __('gantt.all_statuses') }}</flux:select.option>
+                    <option value="">{{ __('gantt.all_statuses') }}</option>
                     @foreach (ProposalPhase::cases() as $phaseOption)
-                        <flux:select.option :value="$phaseOption->value" :wire:key="'timeline-phase-'.$phaseOption->value">{{ $phaseOption->label() }}</flux:select.option>
+                        <option value="{{ $phaseOption->value }}">{{ $phaseOption->label() }}</option>
                     @endforeach
                 </x-ui.header-filter-select>
             @else
                 <x-ui.header-filter-select :label="__('common.program')" wire:model.live="program" :value="$program">
-                    <flux:select.option value="">{{ __('gantt.all_programs') }}</flux:select.option>
+                    <option value="">{{ __('gantt.all_programs') }}</option>
                     @foreach ($this->programOptions as $programOption)
-                        <flux:select.option :value="$programOption->id" :wire:key="'timeline-program-'.$programOption->id">{{ $programOption->name }}</flux:select.option>
+                        <option value="{{ $programOption->id }}">{{ $programOption->name }}</option>
                     @endforeach
                 </x-ui.header-filter-select>
 
                 <x-ui.header-filter-select :label="__('common.status')" wire:model.live="status" :value="$status">
-                    <flux:select.option value="">{{ __('gantt.all_statuses') }}</flux:select.option>
+                    <option value="">{{ __('gantt.all_statuses') }}</option>
                     @foreach (ProjectStatus::cases() as $statusOption)
-                        <flux:select.option :value="$statusOption->value" :wire:key="'timeline-status-'.$statusOption->value">{{ $statusOption->label() }}</flux:select.option>
+                        <option value="{{ $statusOption->value }}">{{ $statusOption->label() }}</option>
                     @endforeach
                 </x-ui.header-filter-select>
             @endif

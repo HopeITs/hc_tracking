@@ -251,20 +251,20 @@ new #[Title('titles.programs')] class extends Component {
                 <x-ui.input id="program-search" type="search" icon="magnifying-glass" :aria-label="__('programs.search_programs')" :placeholder="__('programs.program_strategy_or_manager')" wire:model.live.debounce.300ms="search" />
             </div>
             <x-ui.header-filter-select id="program-strategy" :label="__('common.strategy')" :search-label="__('programs.search_strategies')" wire:model.live="strategy" :value="$strategy">
-                <flux:select.option value="">{{ __('programs.all_strategies') }}</flux:select.option>
+                <option value="">{{ __('programs.all_strategies') }}</option>
                 @foreach ($this->strategyOptions as $strategyOption)
-                    <flux:select.option :value="$strategyOption->id" :wire:key="'strategy-filter-'.$strategyOption->id">
+                    <option value="{{ $strategyOption->id }}">
                         {{ $strategyOption->name }} · {{ $strategyOption->start_year }}–{{ $strategyOption->end_year }}
-                    </flux:select.option>
+                    </option>
                 @endforeach
             </x-ui.header-filter-select>
 
             <x-ui.header-filter-select id="program-manager" :label="__('programs.manager')" :search-label="__('programs.search_managers')" wire:model.live="manager" :value="$manager">
-                <flux:select.option value="">{{ __('common.all_managers') }}</flux:select.option>
+                <option value="">{{ __('common.all_managers') }}</option>
                 @foreach ($this->managerOptions as $managerOption)
-                    <flux:select.option :value="$managerOption->id" :wire:key="'manager-filter-'.$managerOption->id">
+                    <option value="{{ $managerOption->id }}">
                         {{ $managerOption->name }}
-                    </flux:select.option>
+                    </option>
                 @endforeach
             </x-ui.header-filter-select>
         </x-slot:filters>
@@ -306,16 +306,16 @@ new #[Title('titles.programs')] class extends Component {
     >
         <div class="grid gap-y-4">
             <x-ui.form-select wire:model="strategyId" :label="__('programs.linked_strategy')" autofocus>
-                <flux:select.option value="">{{ __('common.not_assigned') }}</flux:select.option>
+                <option value="">{{ __('common.not_assigned') }}</option>
                 @foreach ($this->strategyOptions as $strategyOption)
-                    <flux:select.option :value="$strategyOption->id">{{ $strategyOption->name }} ({{ $strategyOption->start_year }}–{{ $strategyOption->end_year }})</flux:select.option>
+                    <option value="{{ $strategyOption->id }}">{{ $strategyOption->name }} ({{ $strategyOption->start_year }}–{{ $strategyOption->end_year }})</option>
                 @endforeach
             </x-ui.form-select>
 
             <x-ui.form-select wire:model="managerId" :label="__('programs.direct_manager')" :help="__('programs.the_assigned_manager_is_the_hr_employee_directly_accountable')">
-                <flux:select.option value="">{{ __('common.not_assigned') }}</flux:select.option>
+                <option value="">{{ __('common.not_assigned') }}</option>
                 @foreach ($this->managerOptions as $managerOption)
-                    <flux:select.option :value="$managerOption->id">{{ $managerOption->name }} · {{ $managerOption->secondary_name }}</flux:select.option>
+                    <option value="{{ $managerOption->id }}">{{ $managerOption->name }} · {{ $managerOption->secondary_name }}</option>
                 @endforeach
             </x-ui.form-select>
         </div>

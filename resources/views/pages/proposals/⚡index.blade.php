@@ -769,16 +769,16 @@ new #[Title('titles.proposals')] class extends Component {
             <x-ui.input type="search" icon="magnifying-glass" :label="__('proposals.search_proposals')" :placeholder="__('proposals.name_or_notes')" wire:model.live.debounce.300ms="search" clearable />
 
             <x-ui.header-filter-select :label="__('common.status')" wire:model.live="status" :value="$status">
-                <flux:select.option value="">{{ __('common.all_statuses') }}</flux:select.option>
+                <option value="">{{ __('common.all_statuses') }}</option>
                 @foreach (ProposalStatus::cases() as $statusCase)
-                    <flux:select.option :value="$statusCase->value" :wire:key="'proposal-status-'.$statusCase->value">{{ $statusCase->label() }}</flux:select.option>
+                    <option value="{{ $statusCase->value }}">{{ $statusCase->label() }}</option>
                 @endforeach
             </x-ui.header-filter-select>
 
             <x-ui.header-filter-select :label="__('proposals.phase')" wire:model.live="phase" :value="$phase">
-                <flux:select.option value="">{{ __('proposals.all_phases') }}</flux:select.option>
+                <option value="">{{ __('proposals.all_phases') }}</option>
                 @foreach (ProposalPhase::cases() as $phaseCase)
-                    <flux:select.option :value="$phaseCase->value" :wire:key="'proposal-phase-'.$phaseCase->value">{{ $phaseCase->label() }}</flux:select.option>
+                    <option value="{{ $phaseCase->value }}">{{ $phaseCase->label() }}</option>
                 @endforeach
             </x-ui.header-filter-select>
         </x-slot:filters>
@@ -1307,7 +1307,7 @@ new #[Title('titles.proposals')] class extends Component {
                 @if ($editingProposalId === null)
                     <x-ui.form-select wire:model="proposalStatus" :label="__('proposals.starting_status')" required>
                         @foreach (ProposalStatus::cases() as $statusCase)
-                            <flux:select.option :value="$statusCase->value">{{ $statusCase->label() }} — {{ $statusCase->phase()->label() }}</flux:select.option>
+                            <option value="{{ $statusCase->value }}">{{ $statusCase->label() }} — {{ $statusCase->phase()->label() }}</option>
                         @endforeach
                     </x-ui.form-select>
                 @endif
@@ -1344,7 +1344,7 @@ new #[Title('titles.proposals')] class extends Component {
         <div class="grid grid-cols-2 gap-x-4 gap-y-4">
             <x-ui.form-select wire:model="newStatus" :label="__('proposals.new_status')" required autofocus>
                 @foreach (ProposalStatus::cases() as $statusCase)
-                    <flux:select.option :value="$statusCase->value">{{ $statusCase->label() }} — {{ $statusCase->phase()->label() }}</flux:select.option>
+                    <option value="{{ $statusCase->value }}">{{ $statusCase->label() }} — {{ $statusCase->phase()->label() }}</option>
                 @endforeach
             </x-ui.form-select>
 

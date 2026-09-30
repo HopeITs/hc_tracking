@@ -602,16 +602,16 @@ new #[Title('titles.funding_agreements')] class extends Component {
             <x-ui.input type="search" icon="magnifying-glass" :label="__('funding_agreements.search_agreements')" :placeholder="__('common.reference_donor_or_proposal')" wire:model.live.debounce.300ms="search" clearable />
 
             <x-ui.header-filter-select :label="__('funding_agreements.donor')" wire:model.live="donor" :value="$donor">
-                <flux:select.option value="">{{ __('funding_agreements.all_donors') }}</flux:select.option>
+                <option value="">{{ __('funding_agreements.all_donors') }}</option>
                 @foreach ($this->donorOptions as $donorOption)
-                    <flux:select.option :value="$donorOption->id" :wire:key="'agr-donor-'.$donorOption->id">{{ $donorOption->name }}</flux:select.option>
+                    <option value="{{ $donorOption->id }}">{{ $donorOption->name }}</option>
                 @endforeach
             </x-ui.header-filter-select>
 
             <x-ui.header-filter-select :label="__('common.currency')" wire:model.live="currency" :value="$currency">
-                <flux:select.option value="">{{ __('funding_agreements.all_currencies') }}</flux:select.option>
+                <option value="">{{ __('funding_agreements.all_currencies') }}</option>
                 @foreach (Currency::cases() as $currencyCase)
-                    <flux:select.option :value="$currencyCase->value" :wire:key="'agr-currency-'.$currencyCase->value">{{ $currencyCase->value }}</flux:select.option>
+                    <option value="{{ $currencyCase->value }}">{{ $currencyCase->value }}</option>
                 @endforeach
             </x-ui.header-filter-select>
         </x-slot:filters>

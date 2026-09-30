@@ -225,16 +225,16 @@ new #[Title('titles.activity_log')] class extends Component {
             <x-ui.input type="search" icon="magnifying-glass" :label="__('activity.filters.search')" wire:model.live.debounce.300ms="search" clearable />
 
             <x-ui.header-filter-select :label="__('activity.filters.module')" wire:model.live="module" :value="$module">
-                <flux:select.option value="">{{ __('activity.filters.all_modules') }}</flux:select.option>
+                <option value="">{{ __('activity.filters.all_modules') }}</option>
                 @foreach (array_keys(config('notifications.modules')) as $option)
-                    <flux:select.option :value="$option">{{ $notificationPresenter->moduleLabel($option) }}</flux:select.option>
+                    <option value="{{ $option }}">{{ $notificationPresenter->moduleLabel($option) }}</option>
                 @endforeach
             </x-ui.header-filter-select>
 
             <x-ui.header-filter-select :label="__('activity.filters.actor')" wire:model.live="actor" :value="$actor" searchable>
-                <flux:select.option value="">{{ __('activity.filters.all_actors') }}</flux:select.option>
+                <option value="">{{ __('activity.filters.all_actors') }}</option>
                 @foreach ($this->actorOptions as $person)
-                    <flux:select.option :value="(string) $person->id" :wire:key="'activity-actor-'.$person->id">{{ $person->name }}</flux:select.option>
+                    <option value="{{ (string) $person->id }}">{{ $person->name }}</option>
                 @endforeach
             </x-ui.header-filter-select>
 

@@ -832,16 +832,16 @@ new #[Title('titles.annual_plans')] class extends Component {
                 clear="clearYears"
             >
                 @foreach ($this->yearOptions as $yearOption)
-                    <flux:select.option :value="$yearOption" :wire:key="'year-option-'.$yearOption">{{ $yearOption }}</flux:select.option>
+                    <option value="{{ $yearOption }}">{{ $yearOption }}</option>
                 @endforeach
             </x-ui.header-filter-multiselect>
 
             <x-ui.header-filter-select id="annual-plan-manager" :label="__('annual_plans.assigned_manager')" wire:model.live="manager" :value="$manager">
-                <flux:select.option value="">{{ __('common.all_managers') }}</flux:select.option>
+                <option value="">{{ __('common.all_managers') }}</option>
                 @foreach ($this->managerOptions as $managerOption)
-                    <flux:select.option :value="$managerOption->id" :wire:key="'manager-filter-'.$managerOption->id">
+                    <option value="{{ $managerOption->id }}">
                         {{ $managerOption->name }} · {{ $managerOption->secondary_name }}
-                    </flux:select.option>
+                    </option>
                 @endforeach
             </x-ui.header-filter-select>
         </x-slot:filters>
@@ -1474,19 +1474,19 @@ new #[Title('titles.annual_plans')] class extends Component {
             <div class="grid grid-cols-2 gap-x-4 gap-y-4">
                 <x-ui.form-select wire:model="planProgramId" :label="__('common.program')" :placeholder="__('annual_plans.select_a_program')" required class="col-span-2">
                     @foreach ($this->programOptions as $programOption)
-                        <flux:select.option :value="$programOption->id">{{ $programOption->name }}</flux:select.option>
+                        <option value="{{ $programOption->id }}">{{ $programOption->name }}</option>
                     @endforeach
                 </x-ui.form-select>
 
                 <x-ui.form-select wire:model="planYear" :label="__('annual_plans.fiscal_year')" :placeholder="__('annual_plans.select_a_fiscal_year')" required>
                     @foreach ($this->yearFormOptions as $yearFormOption)
-                        <flux:select.option :value="$yearFormOption">{{ $yearFormOption }}</flux:select.option>
+                        <option value="{{ $yearFormOption }}">{{ $yearFormOption }}</option>
                     @endforeach
                 </x-ui.form-select>
 
                 <x-ui.form-select wire:model="planManagerId" :label="__('annual_plans.assigned_manager')" :placeholder="__('annual_plans.select_a_manager')" required>
                     @foreach ($this->employeeOptions as $employeeOption)
-                        <flux:select.option :value="$employeeOption->id">{{ $employeeOption->name }} · {{ $employeeOption->secondary_name }}</flux:select.option>
+                        <option value="{{ $employeeOption->id }}">{{ $employeeOption->name }} · {{ $employeeOption->secondary_name }}</option>
                     @endforeach
                 </x-ui.form-select>
             </div>

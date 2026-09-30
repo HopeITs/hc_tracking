@@ -725,13 +725,13 @@ new #[Title('titles.annual_plan')] class extends Component {
             <div class="grid grid-cols-2 gap-x-4 gap-y-4">
                 <x-ui.form-select wire:model="planYear" :label="__('annual_plans.fiscal_year')" :placeholder="__('annual_plans.select_a_fiscal_year')" required autofocus>
                     @foreach ($this->yearFormOptions as $yearFormOption)
-                        <flux:select.option :value="$yearFormOption">{{ $yearFormOption }}</flux:select.option>
+                        <option value="{{ $yearFormOption }}">{{ $yearFormOption }}</option>
                     @endforeach
                 </x-ui.form-select>
 
                 <x-ui.form-select wire:model="planManagerId" :label="__('annual_plans.assigned_manager')" :placeholder="__('annual_plans.select_a_manager')" required>
                     @foreach ($this->employeeOptions as $employeeOption)
-                        <flux:select.option :value="$employeeOption->id">{{ $employeeOption->name }} · {{ $employeeOption->secondary_name }}</flux:select.option>
+                        <option value="{{ $employeeOption->id }}">{{ $employeeOption->name }} · {{ $employeeOption->secondary_name }}</option>
                     @endforeach
                 </x-ui.form-select>
             </div>

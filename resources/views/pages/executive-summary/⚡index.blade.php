@@ -995,7 +995,7 @@ new #[Title('titles.executive_summary')] class extends Component {
                 :value="(string) $this->fiscalYear"
             >
                 @foreach ($this->yearOptions as $yearOption)
-                    <flux:select.option :value="$yearOption" :wire:key="'summary-year-'.$yearOption">{{ $yearOption }}</flux:select.option>
+                    <option value="{{ $yearOption }}">{{ $yearOption }}</option>
                 @endforeach
             </x-ui.header-filter-select>
         </x-slot:filters>

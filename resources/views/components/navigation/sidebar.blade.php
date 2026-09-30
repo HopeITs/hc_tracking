@@ -39,7 +39,7 @@
             :sidebar="true"
             :href="route('dashboard')"
             class="touch-manipulation text-secondary-dark max-lg:min-h-11 dark:text-ink in-data-flux-sidebar-collapsed-desktop:in-data-flux-sidebar-active:static! in-data-flux-sidebar-collapsed-desktop:in-data-flux-sidebar-active:opacity-100!"
-            wire:navigate
+            wire:navigate.hover
         />
 
         <flux:sidebar.collapse
@@ -84,7 +84,7 @@
                 :href="route('dashboard')"
                 :current="request()->routeIs('dashboard')"
                 :class="$navigationItemClasses"
-                wire:navigate
+                wire:navigate.hover
             >
                 {{ __('common.dashboard') }}
             </flux:sidebar.item>
@@ -96,7 +96,7 @@
                     :href="route('tasks.index')"
                     :current="request()->routeIs('tasks.*')"
                     :class="$navigationItemClasses"
-                    wire:navigate
+                    wire:navigate.hover
                 >
                     {{ __('common.tasks') }}
                     <x-slot:icon-trailing>
@@ -111,7 +111,7 @@
                     :href="route('calendar.index')"
                     :current="request()->routeIs('calendar.*')"
                     :class="$navigationItemClasses"
-                    wire:navigate
+                    wire:navigate.hover
                 >
                     {{ __('common.my_calendar') }}
                 </flux:sidebar.item>
@@ -123,7 +123,7 @@
                     :href="route('executive-summary.index')"
                     :current="request()->routeIs('executive-summary.*')"
                     :class="$navigationItemClasses"
-                    wire:navigate
+                    wire:navigate.hover
                 >
                     {{ __('common.executive_summary') }}
                 </flux:sidebar.item>
@@ -141,7 +141,7 @@
                         :href="route('strategies.index')"
                         :current="request()->routeIs('strategies.*')"
                         :class="$navigationItemClasses"
-                        wire:navigate
+                        wire:navigate.hover
                     >
                         {{ __('common.strategies') }}
                         <x-slot:icon-trailing>
@@ -156,7 +156,7 @@
                         :href="route('programs.index')"
                         :current="request()->routeIs('programs.*')"
                         :class="$navigationItemClasses"
-                        wire:navigate
+                        wire:navigate.hover
                     >
                         {{ __('common.programs') }}
                         <x-slot:icon-trailing>
@@ -171,7 +171,7 @@
                         :href="route('annual-plans.index')"
                         :current="request()->routeIs('annual-plans.*')"
                         :class="$navigationItemClasses"
-                        wire:navigate
+                        wire:navigate.hover
                     >
                         {{ __('common.annual_plans') }}
                         <x-slot:icon-trailing>
@@ -193,7 +193,7 @@
                         :href="route('projects.index')"
                         :current="request()->routeIs('projects.*')"
                         :class="$navigationItemClasses"
-                        wire:navigate
+                        wire:navigate.hover
                     >
                         {{ __('common.projects') }}
                         <x-slot:icon-trailing>
@@ -208,7 +208,7 @@
                         :href="route('milestones.index')"
                         :current="request()->routeIs('milestones.*')"
                         :class="$navigationItemClasses"
-                        wire:navigate
+                        wire:navigate.hover
                     >
                         {{ __('common.milestones') }}
                         <x-slot:icon-trailing>
@@ -223,7 +223,7 @@
                         :href="route('timeline.index')"
                         :current="request()->routeIs('timeline.*')"
                         :class="$navigationItemClasses"
-                        wire:navigate
+                        wire:navigate.hover
                     >
                         {{ __('titles.timeline') }}
                     </flux:sidebar.item>
@@ -235,7 +235,7 @@
                         :href="route('risks.index')"
                         :current="request()->routeIs('risks.*')"
                         :class="$navigationItemClasses"
-                        wire:navigate
+                        wire:navigate.hover
                     >
                         {{ __('common.risks') }}
                         <x-slot:icon-trailing>
@@ -257,7 +257,7 @@
                         :href="route('results.index')"
                         :current="request()->routeIs('results.*')"
                         :class="$navigationItemClasses"
-                        wire:navigate
+                        wire:navigate.hover
                     >
                         {{ __('common.results_framework') }}
                         <x-slot:icon-trailing>
@@ -272,7 +272,7 @@
                         :href="route('indicators.index')"
                         :current="request()->routeIs('indicators.*')"
                         :class="$navigationItemClasses"
-                        wire:navigate
+                        wire:navigate.hover
                     >
                         {{ __('common.indicators') }}
                         <x-slot:icon-trailing>
@@ -287,7 +287,7 @@
                         :href="route('targets.index')"
                         :current="request()->routeIs('targets.*')"
                         :class="$navigationItemClasses"
-                        wire:navigate
+                        wire:navigate.hover
                     >
                         {{ __('common.targets') }}
                         <x-slot:icon-trailing>
@@ -302,7 +302,7 @@
                         :href="route('reports.index')"
                         :current="request()->routeIs('reports.*')"
                         :class="$navigationItemClasses"
-                        wire:navigate
+                        wire:navigate.hover
                     >
                         {{ __('common.reports') }}
                         <x-slot:icon-trailing>
@@ -325,7 +325,7 @@
                         :href="route('donors.index')"
                         :current="request()->routeIs('donors.*')"
                         :class="$navigationItemClasses"
-                        wire:navigate
+                        wire:navigate.hover
                     >
                         {{ __('common.donors') }}
                         <x-slot:icon-trailing>
@@ -340,7 +340,7 @@
                         :href="route('proposals.index')"
                         :current="request()->routeIs('proposals.*')"
                         :class="$navigationItemClasses"
-                        wire:navigate
+                        wire:navigate.hover
                     >
                         {{ __('common.proposals') }}
                         <x-slot:icon-trailing>
@@ -355,7 +355,7 @@
                         :href="route('funding-agreements.index')"
                         :current="request()->routeIs('funding-agreements.*')"
                         :class="$navigationItemClasses"
-                        wire:navigate
+                        wire:navigate.hover
                     >
                         {{ __('common.funding_agreements') }}
                         <x-slot:icon-trailing>
@@ -370,7 +370,7 @@
                         :href="route('transfers.index')"
                         :current="request()->routeIs('transfers.*')"
                         :class="$navigationItemClasses.' rtl:[&_svg]:-scale-x-100'"
-                        wire:navigate
+                        wire:navigate.hover
                     >
                         {{ __('common.transfers') }}
                         <x-slot:icon-trailing>
@@ -385,7 +385,7 @@
                         :href="route('admin.accounts.index')"
                         :current="request()->routeIs('admin.accounts.*')"
                         :class="$navigationItemClasses"
-                        wire:navigate
+                        wire:navigate.hover
                     >
                         {{ __('common.accounts') }}
                         <x-slot:icon-trailing>
@@ -407,7 +407,7 @@
                         :href="route('admin.users.index')"
                         :current="request()->routeIs('admin.users.*')"
                         :class="$navigationItemClasses"
-                        wire:navigate
+                        wire:navigate.hover
                     >
                         {{ __('navigation.user_directory') }}
                         <x-slot:icon-trailing>
@@ -422,7 +422,7 @@
                         :href="route('admin.notification-settings.edit')"
                         :current="request()->routeIs('admin.notification-settings.*')"
                         :class="$navigationItemClasses"
-                        wire:navigate
+                        wire:navigate.hover
                     >
                         {{ __('navigation.notification_settings') }}
                     </flux:sidebar.item>
@@ -434,7 +434,7 @@
                         :href="route('activity.index')"
                         :current="request()->routeIs('activity.*')"
                         :class="$navigationItemClasses"
-                        wire:navigate
+                        wire:navigate.hover
                     >
                         {{ __('navigation.activity_log') }}
                     </flux:sidebar.item>
@@ -446,7 +446,7 @@
                         :href="route('admin.cities.index')"
                         :current="request()->routeIs('admin.cities.*')"
                         :class="$navigationItemClasses"
-                        wire:navigate
+                        wire:navigate.hover
                     >
                         {{ __('common.cities') }}
                     </flux:sidebar.item>

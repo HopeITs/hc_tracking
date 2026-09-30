@@ -2088,20 +2088,20 @@ new #[Title('titles.calendar')] class extends Component {
                     required
                 >
                     @foreach ($this->projectOptions as $projectOption)
-                        <flux:select.option :value="$projectOption->id">{{ $projectOption->name }}</flux:select.option>
+                        <option value="{{ $projectOption->id }}">{{ $projectOption->name }}</option>
                     @endforeach
                 </x-ui.form-select>
 
                 <x-ui.form-select wire:model="parentMilestoneId" :label="__('milestones.nest_under')" :search-label="__('milestones.search_milestones')">
-                    <flux:select.option value="">{{ __('common.top_level') }}</flux:select.option>
+                    <option value="">{{ __('common.top_level') }}</option>
                     @foreach ($this->parentOptions as $parentOption)
-                        <flux:select.option :value="$parentOption->id">{{ $parentOption->name }}</flux:select.option>
+                        <option value="{{ $parentOption->id }}">{{ $parentOption->name }}</option>
                     @endforeach
                 </x-ui.form-select>
 
                 <x-ui.form-select wire:model="responsibleUserId" :label="__('milestones.responsible')" :placeholder="__('common.select')" :search-label="__('milestones.search_responsible')">
                     @foreach ($this->userOptions as $userOption)
-                        <flux:select.option :value="$userOption->id">{{ $userOption->name }} · {{ $userOption->secondary_name }}</flux:select.option>
+                        <option value="{{ $userOption->id }}">{{ $userOption->name }} · {{ $userOption->secondary_name }}</option>
                     @endforeach
                 </x-ui.form-select>
             </div>
@@ -2114,7 +2114,7 @@ new #[Title('titles.calendar')] class extends Component {
 
                 <x-ui.form-select wire:model="milestoneStatus" :label="__('common.status')" required class="col-span-2 @4xl/modal:col-span-1">
                     @foreach (MilestoneStatus::cases() as $statusCase)
-                        <flux:select.option :value="$statusCase->value">{{ $statusCase->label() }}</flux:select.option>
+                        <option value="{{ $statusCase->value }}">{{ $statusCase->label() }}</option>
                     @endforeach
                 </x-ui.form-select>
 
@@ -2157,13 +2157,13 @@ new #[Title('titles.calendar')] class extends Component {
             <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
                 <x-ui.form-select wire:model.live="taskSourceType" :label="__('tasks.source_type')" :placeholder="__('common.select')" required>
                     @foreach ($this->sourceTypeOptions as $sourceTypeKey => $sourceTypeLabel)
-                        <flux:select.option :value="$sourceTypeKey">{{ $sourceTypeLabel }}</flux:select.option>
+                        <option value="{{ $sourceTypeKey }}">{{ $sourceTypeLabel }}</option>
                     @endforeach
                 </x-ui.form-select>
 
                 <x-ui.form-select wire:model="taskSourceId" :label="__('tasks.source')" :placeholder="__('common.select')" required>
                     @foreach ($this->sourceOptions as $sourceOption)
-                        <flux:select.option :value="$sourceOption->id">{{ $sourceOption->name }}{{ $taskSourceType === 'milestone' ? ' · '.$sourceOption->project->name : '' }}</flux:select.option>
+                        <option value="{{ $sourceOption->id }}">{{ $sourceOption->name }}{{ $taskSourceType === 'milestone' ? ' · '.$sourceOption->project->name : '' }}</option>
                     @endforeach
                 </x-ui.form-select>
             </div>
@@ -2199,7 +2199,7 @@ new #[Title('titles.calendar')] class extends Component {
 
                 <x-ui.form-multiselect wire:model="assignedTo" :label="__('tasks.assignees')" :placeholder="__('common.select')" class="col-span-2" data-test="task-assignee-picker">
                     @foreach ($this->userOptions as $userOption)
-                        <flux:select.option :value="$userOption->id">{{ $userOption->name }} · {{ $userOption->secondary_name }}</flux:select.option>
+                        <option value="{{ $userOption->id }}">{{ $userOption->name }} · {{ $userOption->secondary_name }}</option>
                     @endforeach
                 </x-ui.form-multiselect>
             </div>

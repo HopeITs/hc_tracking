@@ -370,9 +370,9 @@ new #[Title('titles.risks')] class extends Component {
             <x-ui.input type="search" icon="magnifying-glass" :label="__('risks.search_risks')" :placeholder="__('risks.risk_impact_or_project')" wire:model.live.debounce.300ms="search" clearable />
 
             <x-ui.header-filter-select :label="__('common.project')" wire:model.live="project" :value="$project">
-                <flux:select.option value="">{{ __('common.all_projects') }}</flux:select.option>
+                <option value="">{{ __('common.all_projects') }}</option>
                 @foreach ($this->projectOptions as $projectOption)
-                    <flux:select.option :value="$projectOption->id" :wire:key="'risk-project-filter-'.$projectOption->id">{{ $projectOption->name }}</flux:select.option>
+                    <option value="{{ $projectOption->id }}">{{ $projectOption->name }}</option>
                 @endforeach
             </x-ui.header-filter-select>
         </x-slot:filters>
@@ -594,7 +594,7 @@ new #[Title('titles.risks')] class extends Component {
 
                 <x-ui.form-select wire:model="riskProjectId" :label="__('common.project')" :placeholder="__('common.select_a_project')" required>
                     @foreach ($this->projectOptions as $projectOption)
-                        <flux:select.option :value="$projectOption->id">{{ $projectOption->name }}</flux:select.option>
+                        <option value="{{ $projectOption->id }}">{{ $projectOption->name }}</option>
                     @endforeach
                 </x-ui.form-select>
 

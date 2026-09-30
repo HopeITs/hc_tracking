@@ -1199,7 +1199,7 @@ new #[Title('titles.project')] class extends Component {
                     <x-ui.form-select wire:model="fileCategory" :label="__('projects.file_category')" :placeholder="__('common.select')" required>
                         @foreach (\App\Enums\MediaCollection::cases() as $collectionOption)
                             @continue(in_array($collectionOption->value, $this->hiddenCollections(), true))
-                            <flux:select.option :value="$collectionOption->value">{{ $collectionOption->label() }}</flux:select.option>
+                            <option value="{{ $collectionOption->value }}">{{ $collectionOption->label() }}</option>
                         @endforeach
                     </x-ui.form-select>
 

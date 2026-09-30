@@ -1,6 +1,7 @@
 @php
     use App\Enums\MilestoneStatus;
     use Carbon\CarbonImmutable;
+    use Illuminate\Support\Js;
 
     /** @var \Illuminate\Database\Eloquent\Collection<int, \App\Models\Project> $projects */
 
@@ -18,6 +19,12 @@
     // row below it so a whole family reads as one small tree, not a jumble.
     $topPad = 26;
     $rowStep = 46;
+
+    // The week/day zoom ticks are built in the browser only once someone
+    // zooms in (up to 660 per project, each a translatedFormat() call, cost
+    // ~400 ms per page on the server). These let them match formats.date_short.
+    $shortMonthNames = collect(range(1, 12))->map(fn (int $month): string => CarbonImmutable::create(2000, $month, 1)->translatedFormat('M'))->all();
+    $dayBeforeMonth = str_starts_with(__('formats.date_short'), 'j');
 @endphp
 
 <x-ui.panel>
@@ -67,38 +74,6 @@
             while ($cursor->lte($windowEnd) && $guard < ($byYear ? 40 : 160)) {
                 $ticks->push(['label' => $byYear ? $cursor->format('Y') : $cursor->translatedFormat(__('formats.month_short')), 'at' => $position($cursor)]);
                 $cursor = $byYear ? $cursor->addYear() : $cursor->addMonthNoOverflow();
-                $guard++;
-            }
-        }
-
-        // Finer ticks for the "weeks"/"days" zoom tiers, both capped so a long
-        // project never dumps hundreds of labels into the page at once.
-        $weekTicks = collect();
-        if ($hasWindow) {
-            $cursor = $windowStart->copy()->startOfWeek(CarbonImmutable::SUNDAY);
-            $guard = 0;
-            while ($cursor->lte($windowEnd) && $guard < 260) {
-                if ($cursor->gte($windowStart)) {
-                    $weekTicks->push(['label' => $cursor->translatedFormat(__('formats.date_short')), 'at' => $position($cursor)]);
-                }
-                $cursor = $cursor->addWeek();
-                $guard++;
-            }
-        }
-
-        $dayTicks = collect();
-        if ($hasWindow) {
-            $dayInterval = max(1, (int) ceil($span / 150));
-            $cursor = $windowStart->copy();
-            $lastMonth = null;
-            $guard = 0;
-            while ($cursor->lte($windowEnd) && $guard < 400) {
-                $dayTicks->push([
-                    'label' => $cursor->month === $lastMonth ? $cursor->format('j') : $cursor->translatedFormat(__('formats.date_short')),
-                    'at' => $position($cursor),
-                ]);
-                $lastMonth = $cursor->month;
-                $cursor = $cursor->addDays($dayInterval);
                 $guard++;
             }
         }
@@ -169,6 +144,41 @@
                     zoomBy(delta) {
                         this.zoomLevel = Math.min(48, Math.max(0, this.zoomLevel + delta));
                     },
+                    tickLabel(time) {
+                        const d = new Date(time);
+                        const month = {{ Js::from($shortMonthNames) }}[d.getUTCMonth()];
+
+                        return {{ $dayBeforeMonth ? 'true' : 'false' }} ? d.getUTCDate() + ' ' + month : month + ' ' + d.getUTCDate();
+                    },
+                    tickAt(time) {
+                        return Math.max(0, Math.min(100, (time - this.windowStartUtc) / 86400000 / this.span * 100));
+                    },
+                    {{-- Finer ticks for the weeks/days zoom tiers, both capped so a long project never dumps hundreds of labels at once. --}}
+                    get weekTicks() {
+                        const ticks = [];
+                        const end = this.windowStartUtc + this.span * 86400000;
+                        let cursor = this.windowStartUtc - new Date(this.windowStartUtc).getUTCDay() * 86400000;
+                        for (let guard = 0; cursor <= end && guard < 260; guard++, cursor += 7 * 86400000) {
+                            if (cursor >= this.windowStartUtc) {
+                                ticks.push({ label: this.tickLabel(cursor), at: this.tickAt(cursor) });
+                            }
+                        }
+
+                        return ticks;
+                    },
+                    get dayTicks() {
+                        const ticks = [];
+                        const end = this.windowStartUtc + this.span * 86400000;
+                        const interval = Math.max(1, Math.ceil(this.span / 150)) * 86400000;
+                        let lastMonth = null;
+                        for (let cursor = this.windowStartUtc, guard = 0; cursor <= end && guard < 400; guard++, cursor += interval) {
+                            const d = new Date(cursor);
+                            ticks.push({ label: d.getUTCMonth() === lastMonth ? String(d.getUTCDate()) : this.tickLabel(cursor), at: this.tickAt(cursor) });
+                            lastMonth = d.getUTCMonth();
+                        }
+
+                        return ticks;
+                    },
                     pointerInfo(event) {
                         const rect = event.currentTarget.getBoundingClientRect();
                         const rtl = document.documentElement.dir === 'rtl';
@@ -228,14 +238,22 @@
                             @endforeach
                         </div>
                         <div class="relative h-4" aria-hidden="true" x-show="tickMode === 'weeks'" x-cloak>
-                            @foreach ($weekTicks as $tick)
-                                <span class="absolute top-0 whitespace-nowrap text-xs tabular-nums text-secondary-light dark:text-ink-faint" style="inset-inline-start: {{ $tick['at'] }}%">{{ $tick['label'] }}</span>
-                            @endforeach
+                            <template x-if="tickMode === 'weeks'">
+                                <div>
+                                    <template x-for="tick in weekTicks" :key="tick.at">
+                                        <span class="absolute top-0 whitespace-nowrap text-xs tabular-nums text-secondary-light dark:text-ink-faint" :style="'inset-inline-start: ' + tick.at + '%'" x-text="tick.label"></span>
+                                    </template>
+                                </div>
+                            </template>
                         </div>
                         <div class="relative h-4" aria-hidden="true" x-show="tickMode === 'days'" x-cloak>
-                            @foreach ($dayTicks as $tick)
-                                <span class="absolute top-0 whitespace-nowrap text-xs tabular-nums text-secondary-light dark:text-ink-faint" style="inset-inline-start: {{ $tick['at'] }}%">{{ $tick['label'] }}</span>
-                            @endforeach
+                            <template x-if="tickMode === 'days'">
+                                <div>
+                                    <template x-for="tick in dayTicks" :key="tick.at">
+                                        <span class="absolute top-0 whitespace-nowrap text-xs tabular-nums text-secondary-light dark:text-ink-faint" :style="'inset-inline-start: ' + tick.at + '%'" x-text="tick.label"></span>
+                                    </template>
+                                </div>
+                            </template>
                         </div>
 
                         <div

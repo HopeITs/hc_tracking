@@ -886,45 +886,45 @@ new #[Title('titles.targets')] class extends Component {
             <x-ui.input type="search" icon="magnifying-glass" :label="__('targets.search_targets')" :placeholder="__('common.indicator_name')" wire:model.live.debounce.300ms="search" clearable />
 
             <x-ui.header-filter-select :label="__('targets.committed_in')" wire:model.live="sourceType" :value="$sourceType">
-                <flux:select.option value="">{{ __('targets.any_source') }}</flux:select.option>
+                <option value="">{{ __('targets.any_source') }}</option>
                 @foreach ($sourceTypeLabels as $sourceKey => $sourceLabel)
-                    <flux:select.option :value="$sourceKey" :wire:key="'tgt-source-'.$sourceKey">{{ $sourceLabel }}</flux:select.option>
+                    <option value="{{ $sourceKey }}">{{ $sourceLabel }}</option>
                 @endforeach
             </x-ui.header-filter-select>
 
             <x-ui.header-filter-select :label="__('common.project')" wire:model.live="project" :value="$project">
-                <flux:select.option value="">{{ __('targets.any_project') }}</flux:select.option>
-                <flux:select.option value="none">{{ __('common.organisation_wide') }}</flux:select.option>
+                <option value="">{{ __('targets.any_project') }}</option>
+                <option value="none">{{ __('common.organisation_wide') }}</option>
                 @foreach ($this->projectOptions as $projectOption)
-                    <flux:select.option :value="$projectOption->id" :wire:key="'tgt-project-'.$projectOption->id">{{ $projectOption->name }}</flux:select.option>
+                    <option value="{{ $projectOption->id }}">{{ $projectOption->name }}</option>
                 @endforeach
             </x-ui.header-filter-select>
 
             <x-ui.header-filter-select :label="__('common.period')" wire:model.live="period" :value="$period">
-                <flux:select.option value="">{{ __('targets.all_periods') }}</flux:select.option>
+                <option value="">{{ __('targets.all_periods') }}</option>
                 @foreach (Period::cases() as $periodCase)
-                    <flux:select.option :value="$periodCase->value" :wire:key="'tgt-period-'.$periodCase->value">{{ $periodCase->label() }}</flux:select.option>
+                    <option value="{{ $periodCase->value }}">{{ $periodCase->label() }}</option>
                 @endforeach
             </x-ui.header-filter-select>
 
             <x-ui.header-filter-select :label="__('common.program')" wire:model.live="program" :value="$program">
-                <flux:select.option value="">{{ __('targets.any_program') }}</flux:select.option>
+                <option value="">{{ __('targets.any_program') }}</option>
                 @foreach ($this->programOptions as $programOption)
-                    <flux:select.option :value="$programOption->id" :wire:key="'tgt-program-'.$programOption->id">{{ $programOption->name }}</flux:select.option>
+                    <option value="{{ $programOption->id }}">{{ $programOption->name }}</option>
                 @endforeach
             </x-ui.header-filter-select>
 
             <x-ui.header-filter-select :label="__('targets.donor')" wire:model.live="donor" :value="$donor">
-                <flux:select.option value="">{{ __('targets.any_donor') }}</flux:select.option>
+                <option value="">{{ __('targets.any_donor') }}</option>
                 @foreach ($this->donorOptions as $donorOption)
-                    <flux:select.option :value="$donorOption->id" :wire:key="'tgt-donor-'.$donorOption->id">{{ $donorOption->name }}</flux:select.option>
+                    <option value="{{ $donorOption->id }}">{{ $donorOption->name }}</option>
                 @endforeach
             </x-ui.header-filter-select>
 
             <x-ui.header-filter-select :label="__('targets.year')" wire:model.live="year" :value="$year">
-                <flux:select.option value="">{{ __('targets.all_years') }}</flux:select.option>
+                <option value="">{{ __('targets.all_years') }}</option>
                 @foreach ($this->yearOptions as $yearOption)
-                    <flux:select.option :value="$yearOption" :wire:key="'tgt-year-'.$yearOption">{{ $yearOption }}</flux:select.option>
+                    <option value="{{ $yearOption }}">{{ $yearOption }}</option>
                 @endforeach
             </x-ui.header-filter-select>
         </x-slot:filters>
@@ -1308,7 +1308,7 @@ new #[Title('titles.targets')] class extends Component {
                 <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
                     <x-ui.form-select wire:model.live="targetIndicatorId" :label="__('targets.indicator')" :placeholder="__('targets.select_an_indicator')" :help="$indicatorHelp" required autofocus class="@2xl/modal:col-span-2">
                         @foreach ($this->indicatorOptions as $indicatorOption)
-                            <flux:select.option :value="$indicatorOption->id">{{ $indicatorOption->name }} — {{ Str::limit($indicatorOption->result?->statement, 50) }}</flux:select.option>
+                            <option value="{{ $indicatorOption->id }}">{{ $indicatorOption->name }} — {{ Str::limit($indicatorOption->result?->statement, 50) }}</option>
                         @endforeach
                     </x-ui.form-select>
 
@@ -1327,7 +1327,7 @@ new #[Title('titles.targets')] class extends Component {
                         required
                     >
                         @foreach ($this->sourceOptions as $sourceOption)
-                            <flux:select.option :value="$sourceOption['id']">{{ $sourceOption['label'] }}</flux:select.option>
+                            <option value="{{ $sourceOption['id'] }}">{{ $sourceOption['label'] }}</option>
                         @endforeach
                     </x-ui.form-select>
                 </div>
@@ -1353,10 +1353,10 @@ new #[Title('titles.targets')] class extends Component {
                         class="@2xl/modal:col-span-2"
                     >
                         @if ($formIndicator?->project_id === null)
-                            <flux:select.option value="">{{ __('common.organisation_wide') }}</flux:select.option>
+                            <option value="">{{ __('common.organisation_wide') }}</option>
                         @endif
                         @foreach ($this->formProjectOptions as $projectOption)
-                            <flux:select.option :value="$projectOption->id">{{ $projectOption->name }}</flux:select.option>
+                            <option value="{{ $projectOption->id }}">{{ $projectOption->name }}</option>
                         @endforeach
                     </x-ui.form-select>
                 </div>

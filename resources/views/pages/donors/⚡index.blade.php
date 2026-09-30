@@ -521,25 +521,25 @@ new #[Title('titles.donors')] class extends Component {
             <x-ui.input type="search" icon="magnifying-glass" :label="__('donors.search_donors')" :placeholder="__('donors.name_country_or_contact')" wire:model.live.debounce.300ms="search" clearable />
 
             <x-ui.header-filter-select :label="__('donors.relationship')" wire:model.live="relationship" :value="$relationship">
-                <flux:select.option value="">{{ __('donors.all_donors') }}</flux:select.option>
-                <flux:select.option value="funding">{{ __('donors.funding_now') }}</flux:select.option>
-                <flux:select.option value="prospect">{{ __('donors.prospects') }}</flux:select.option>
+                <option value="">{{ __('donors.all_donors') }}</option>
+                <option value="funding">{{ __('donors.funding_now') }}</option>
+                <option value="prospect">{{ __('donors.prospects') }}</option>
             </x-ui.header-filter-select>
 
             <x-ui.header-filter-select :label="__('common.type')" wire:model.live="type" :value="$type">
-                <flux:select.option value="">{{ __('donors.all_types') }}</flux:select.option>
+                <option value="">{{ __('donors.all_types') }}</option>
                 @foreach ($this->typeRail as $typeStop)
-                    <flux:select.option :value="$typeStop['value']">{{ $typeStop['label'] }}</flux:select.option>
+                    <option value="{{ $typeStop['value'] }}">{{ $typeStop['label'] }}</option>
                 @endforeach
             </x-ui.header-filter-select>
 
             <x-ui.header-filter-select :label="__('donors.sort_by')" wire:model.live="sort" :value="$sort">
-                <flux:select.option value="name">{{ __('donors.sort_name') }}</flux:select.option>
-                <flux:select.option value="agreements">{{ __('donors.sort_agreements') }}</flux:select.option>
+                <option value="name">{{ __('donors.sort_name') }}</option>
+                <option value="agreements">{{ __('donors.sort_agreements') }}</option>
                 @if ($canTransfers)
-                    <flux:select.option value="next_due">{{ __('donors.sort_next_due') }}</flux:select.option>
+                    <option value="next_due">{{ __('donors.sort_next_due') }}</option>
                 @endif
-                <flux:select.option value="follow_up">{{ __('donors.sort_follow_up') }}</flux:select.option>
+                <option value="follow_up">{{ __('donors.sort_follow_up') }}</option>
             </x-ui.header-filter-select>
         </x-slot:filters>
 
