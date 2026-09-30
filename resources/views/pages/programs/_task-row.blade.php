@@ -24,10 +24,10 @@
     {{-- The marker is a pie of the task's own progress; a finished task is filled solid. --}}
     <span
         @class([
-            'size-3.5 rounded-full border-2 text-secondary-dark dark:text-white',
-            'border-secondary-dark bg-secondary-dark dark:border-white dark:bg-white' => $isDone,
+            'size-3.5 rounded-full border-2 text-secondary-dark dark:text-ink',
+            'border-secondary-dark bg-secondary-dark dark:border-ink-muted dark:bg-ink-muted' => $isDone,
             'border-primary text-status-critical!' => $isOverdue,
-            'border-secondary-dark dark:border-white' => ! $isDone && ! $isOverdue && $progress > 0,
+            'border-secondary-dark dark:border-ink-muted' => ! $isDone && ! $isOverdue && $progress > 0,
             'border-secondary-light' => ! $isDone && ! $isOverdue && $progress === 0,
         ])
         @unless ($isDone) style="background: conic-gradient(currentColor {{ $progress }}%, transparent 0)" @endunless
@@ -63,7 +63,7 @@
             @else
                 <span class="flex shrink-0 -space-x-1.5 rtl:space-x-reverse" aria-hidden="true">
                     @foreach ($assignees->take(2) as $employee)
-                        <span class="inline-flex size-6 items-center justify-center rounded-full bg-secondary-soft text-[10px] font-bold text-secondary-dark ring-2 ring-white dark:bg-secondary-medium dark:text-white dark:ring-secondary-dark">
+                        <span class="inline-flex size-6 items-center justify-center rounded-full bg-secondary-soft text-[10px] font-bold text-secondary-dark ring-2 ring-white dark:bg-surface-3 dark:text-ink dark:ring-surface-1">
                             {{ mb_strtoupper(collect(preg_split('/\s+/u', trim($employee->name)))->filter()->take(2)->map(fn (string $part): string => mb_substr($part, 0, 1))->implode('')) }}
                         </span>
                     @endforeach
@@ -102,8 +102,8 @@
         </span>
 
         <span class="flex items-center gap-2" role="img" aria-label="{{ __('tasks.progress') }} {{ $progress }}%">
-            <span class="h-1 w-14 overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium @3xl/detail:flex-1" aria-hidden="true">
-                <span class="block h-full rounded-full bg-secondary-dark dark:bg-white" style="width: {{ $progress }}%"></span>
+            <span class="h-1 w-14 overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2 @3xl/detail:flex-1" aria-hidden="true">
+                <span class="block h-full rounded-full bg-secondary-dark dark:bg-ink-muted" style="width: {{ $progress }}%"></span>
             </span>
             <span class="w-9 text-end font-semibold tabular-nums {{ $progress >= 100 ? $inkText : $mutedText }}">{{ $progress }}%</span>
         </span>

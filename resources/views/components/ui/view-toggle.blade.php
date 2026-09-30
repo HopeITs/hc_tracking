@@ -1,7 +1,7 @@
 @props(['wireModel', 'active' => null, 'options' => [], 'label' => null])
 
 <div
-    {{ $attributes->class('inline-flex items-center gap-0.5 rounded-lg border border-secondary-soft bg-white p-0.5 dark:border-secondary-medium dark:bg-secondary-dark') }}
+    {{ $attributes->class('inline-flex items-center gap-0.5 rounded-lg border border-secondary-soft bg-white p-0.5 dark:border-line dark:bg-surface-1') }}
     role="radiogroup"
     @if ($label !== null) aria-label="{{ $label }}" @endif
 >
@@ -14,8 +14,8 @@
             wire:click="$set('{{ $wireModel }}', '{{ $option['key'] }}')"
             @class([
                 'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 type-meta font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-primary',
-                'bg-primary text-white' => $isActive,
-                'text-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => ! $isActive,
+                'bg-primary dark:bg-ink dark:text-surface-0 text-white' => $isActive,
+                'text-secondary-medium hover:text-secondary-dark dark:text-ink-muted dark:hover:text-ink' => ! $isActive,
             ])
         >
             @if (! empty($option['icon']))

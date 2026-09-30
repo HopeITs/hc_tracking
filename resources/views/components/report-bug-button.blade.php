@@ -6,7 +6,7 @@
     variant="ghost"
     size="sm"
     square
-    class="size-9! touch-manipulation text-secondary-medium! hover:bg-secondary-soft! hover:text-secondary-dark! max-lg:size-11! dark:text-secondary-soft! dark:hover:bg-white/10! dark:hover:text-white!"
+    class="size-9! touch-manipulation text-secondary-medium! hover:bg-secondary-soft! hover:text-secondary-dark! max-lg:size-11! dark:text-ink-muted! dark:hover:bg-white/10! dark:hover:text-ink!"
     :aria-label="__('navigation.report_a_problem')"
     :tooltip="__('navigation.report_a_problem')"
     tooltip:position="bottom"

@@ -60,16 +60,16 @@ new class extends Component {
 }; ?>
 
 <div
-    class="space-y-3 border-s-2 border-secondary-soft ps-4 dark:border-secondary-medium"
+    class="space-y-3 border-s-2 border-secondary-soft ps-4 dark:border-line"
     wire:cloak
     x-data="{ showRecoveryCodes: false }"
 >
     <div>
         <h4 class="flex items-center gap-2 font-semibold">
-            <flux:icon.lock-closed variant="micro" class="size-4 text-secondary-light dark:text-secondary-soft" />
+            <flux:icon.lock-closed variant="micro" class="size-4 text-secondary-light dark:text-ink-muted" />
             {{ __('settings.2fa_recovery_codes') }}
         </h4>
-        <p class="mt-1 text-secondary-medium dark:text-secondary-soft">
+        <p class="mt-1 text-secondary-medium dark:text-ink-muted">
             {{ __('settings.recovery_codes_let_you_regain_access_if_you_lose_your_2fa_de') }}
         </p>
     </div>
@@ -139,7 +139,7 @@ new class extends Component {
                         <div role="listitem" class="select-text" wire:loading.class="opacity-50 animate-pulse">{{ $code }}</div>
                     @endforeach
                 </div>
-                <p class="type-meta text-secondary-medium dark:text-secondary-soft">
+                <p class="type-meta text-secondary-medium dark:text-ink-muted">
                     {{ __('settings.each_recovery_code_can_be_used_once_to_access_your_account_a') }}
                 </p>
             @endif

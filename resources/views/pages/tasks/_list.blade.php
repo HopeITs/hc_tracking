@@ -31,7 +31,7 @@
 
         if ($group === 'priority') {
             return match (TaskPriority::tryFrom($key)) {
-                TaskPriority::High => 'bg-primary',
+                TaskPriority::High => 'bg-primary dark:bg-status-critical',
                 TaskPriority::Medium => 'bg-status-warn',
                 TaskPriority::Low => 'bg-secondary-light',
                 default => 'bg-secondary-light',
@@ -42,7 +42,7 @@
     };
 
     $priorityIconClasses = fn (TaskPriority $case): string => match ($case) {
-        TaskPriority::High => 'text-primary',
+        TaskPriority::High => 'text-primary dark:text-brand-text',
         TaskPriority::Medium => 'text-status-warn',
         TaskPriority::Low => 'text-secondary-light',
     };
@@ -58,24 +58,24 @@
 
 <div class="relative">
     {{-- Skeleton, shown only while a filter/sort/group change is in flight. --}}
-    <div wire:loading wire:target="search,status,priority,assignee,sourceType,sourceId,sort,group" class="overflow-hidden rounded-xl border border-secondary-soft bg-white dark:border-secondary-medium dark:bg-secondary-dark">
-        <div class="animate-pulse divide-y divide-secondary-soft p-3.5 motion-reduce:animate-none dark:divide-secondary-medium">
+    <div wire:loading wire:target="search,status,priority,assignee,sourceType,sourceId,sort,group" class="overflow-hidden rounded-xl border border-secondary-soft bg-white dark:border-line dark:bg-surface-1">
+        <div class="animate-pulse divide-y divide-secondary-soft p-3.5 motion-reduce:animate-none dark:divide-line">
             @for ($i = 0; $i < 6; $i++)
                 <div class="flex items-center gap-3 py-2.5">
-                    <div class="size-5 shrink-0 rounded-full bg-secondary-soft dark:bg-secondary-medium"></div>
-                    <div class="h-3 flex-1 rounded bg-secondary-soft dark:bg-secondary-medium"></div>
-                    <div class="h-3 w-16 shrink-0 rounded bg-secondary-soft dark:bg-secondary-medium"></div>
-                    <div class="h-3 w-12 shrink-0 rounded bg-secondary-soft dark:bg-secondary-medium"></div>
-                    <div class="h-6 w-24 shrink-0 rounded-full bg-secondary-soft dark:bg-secondary-medium"></div>
+                    <div class="size-5 shrink-0 rounded-full bg-secondary-soft dark:bg-surface-2"></div>
+                    <div class="h-3 flex-1 rounded bg-secondary-soft dark:bg-surface-2"></div>
+                    <div class="h-3 w-16 shrink-0 rounded bg-secondary-soft dark:bg-surface-2"></div>
+                    <div class="h-3 w-12 shrink-0 rounded bg-secondary-soft dark:bg-surface-2"></div>
+                    <div class="h-6 w-24 shrink-0 rounded-full bg-secondary-soft dark:bg-surface-2"></div>
                 </div>
             @endfor
         </div>
     </div>
 
     <div wire:loading.remove wire:target="search,status,priority,assignee,sourceType,sourceId,sort,group" class="flex flex-col gap-4">
-        <div class="overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-secondary-medium dark:bg-secondary-dark dark:shadow-none">
-            <div class="border-b border-secondary-soft px-4 py-2.5 dark:border-secondary-medium">
-                <p class="text-xs text-secondary-medium dark:text-secondary-soft">{{ trans_choice('tasks.count_matching_task', $paginator->total(), ['count' => $paginator->total()]) }}</p>
+        <div class="overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-transparent dark:bg-surface-1 dark:shadow-raised">
+            <div class="border-b border-secondary-soft px-4 py-2.5 dark:border-line">
+                <p class="text-xs text-secondary-medium dark:text-ink-muted">{{ trans_choice('tasks.count_matching_task', $paginator->total(), ['count' => $paginator->total()]) }}</p>
             </div>
 
             @foreach ($groups as $groupKey => $groupTasks)
@@ -97,8 +97,8 @@
                 @endif
             @endforeach
 
-            <div class="border-t border-secondary-soft px-4 py-3 dark:border-secondary-medium">
-                <flux:pagination :paginator="$paginator" class="text-secondary-medium! dark:text-secondary-soft!" scroll-to="#task-directory-heading" />
+            <div class="border-t border-secondary-soft px-4 py-3 dark:border-line">
+                <flux:pagination :paginator="$paginator" class="text-secondary-medium! dark:text-ink-muted!" scroll-to="#task-directory-heading" />
             </div>
         </div>
     </div>

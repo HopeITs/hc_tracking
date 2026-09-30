@@ -15,6 +15,7 @@ import './scroll-lock';
 import './section-rail';
 import './task-board';
 import './theme-color';
+import './theme-transition';
 
 /**
  * Echo exposes an expressive API for subscribing to channels and listening

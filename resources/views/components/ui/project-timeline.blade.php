@@ -26,9 +26,9 @@
 
     $markerTone = fn ($milestone): string => match (true) {
         $milestone->status === MilestoneStatus::Reached => 'border-status-good bg-status-good',
-        $milestone->isMissed() || $milestone->isOverdue() => 'border-primary bg-primary',
+        $milestone->isMissed() || $milestone->isOverdue() => 'border-primary bg-primary dark:bg-status-critical dark:border-status-critical',
         $milestone->status === MilestoneStatus::Ongoing => 'border-status-warn bg-status-warn',
-        default => 'border-secondary-dark bg-board dark:border-white',
+        default => 'border-secondary-dark bg-board dark:border-ink-muted',
     };
 @endphp
 
@@ -37,7 +37,7 @@
         <div class="flex flex-col gap-4 @4xl/detail:flex-row @4xl/detail:items-end @4xl/detail:justify-between">
             <div class="max-w-xl">
                 <h2 id="program-projects-heading" class="text-xl font-bold text-balance">{{ __('common.projects') }}</h2>
-                <p class="mt-1 text-sm text-secondary-medium dark:text-secondary-soft">{{ __('programs.timeline_description') }}</p>
+                <p class="mt-1 text-sm text-secondary-medium dark:text-ink-muted">{{ __('programs.timeline_description') }}</p>
             </div>
 
             <label class="block @4xl/detail:w-80">
@@ -52,7 +52,7 @@
         <div class="flex flex-wrap gap-2" role="group" aria-label="{{ __('programs.timeline_filter_status') }}">
             <button type="button" wire:click="filterProjectsByStatus('')" aria-pressed="{{ $status === '' ? 'true' : 'false' }}" @class([
                 'inline-flex cursor-pointer items-center gap-2 rounded-full border py-1 ps-3 pe-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
-                'border-secondary-dark bg-secondary-dark text-white dark:border-white dark:bg-white dark:text-secondary-dark' => $status === '',
+                'border-secondary-dark bg-secondary-dark text-white dark:border-ink dark:bg-ink dark:text-surface-0' => $status === '',
                 'border-board-line bg-board hover:border-secondary-light' => $status !== '',
             ])>
                 {{ __('programs.timeline_all') }}
@@ -64,7 +64,7 @@
                 @continue($segment['count'] === 0 && $status !== $case->value)
                 <button type="button" wire:click="filterProjectsByStatus('{{ $case->value }}')" aria-pressed="{{ $status === $case->value ? 'true' : 'false' }}" @class([
                     'inline-flex cursor-pointer items-center gap-2 rounded-full border py-1 ps-2.5 pe-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
-                    'border-secondary-dark bg-secondary-dark text-white dark:border-white dark:bg-white dark:text-secondary-dark' => $status === $case->value,
+                    'border-secondary-dark bg-secondary-dark text-white dark:border-ink dark:bg-ink dark:text-surface-0' => $status === $case->value,
                     'border-board-line bg-board hover:border-secondary-light' => $status !== $case->value,
                 ])>
                     <span aria-hidden="true" class="size-2 rounded-full {{ $segment['tone'] }}"></span>
@@ -92,14 +92,14 @@
     @else
         <div class="bg-ground" wire:loading.class="opacity-60" wire:target="projectSearch, filterProjectsByStatus, gotoPage, previousPage, nextPage">
             {{-- Legend --}}
-            <div class="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-board-line px-5 py-3 type-meta text-secondary-medium dark:text-secondary-soft" aria-hidden="true">
+            <div class="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-board-line px-5 py-3 type-meta text-secondary-medium dark:text-ink-muted" aria-hidden="true">
                 <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-status-good bg-status-good"></span>{{ MilestoneStatus::Reached->label() }}</span>
-                <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-secondary-dark bg-board dark:border-white"></span>{{ MilestoneStatus::Planned->label() }}</span>
+                <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-secondary-dark bg-board dark:border-ink-muted"></span>{{ MilestoneStatus::Planned->label() }}</span>
                 <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-status-warn bg-status-warn"></span>{{ MilestoneStatus::Ongoing->label() }}</span>
-                <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-primary bg-primary"></span>{{ __('milestones.missed') }} / {{ __('milestones.overdue') }}</span>
+                <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-primary bg-primary dark:bg-status-critical dark:border-status-critical"></span>{{ __('milestones.missed') }} / {{ __('milestones.overdue') }}</span>
                 <span class="inline-flex items-center gap-1.5"><span class="w-4 border-t-2 border-dashed border-status-warn"></span>{{ __('programs.timeline_outside_legend') }}</span>
-                <span class="inline-flex items-center gap-1.5"><span class="relative flex h-3.5 w-7 rounded-sm border border-primary/40 bg-primary/10"><span class="h-full w-3 rounded-s-sm bg-primary"></span><span class="absolute -inset-y-1 start-4 w-0.5 bg-primary"></span></span>{{ __('programs.timeline_legend_progress') }}</span>
-                <span class="inline-flex items-center gap-1.5"><span class="h-3.5 w-0.5 bg-primary"></span>{{ __('programs.timeline_today') }}</span>
+                <span class="inline-flex items-center gap-1.5"><span class="relative flex h-3.5 w-7 rounded-sm border border-primary/40 bg-primary/10 dark:bg-white/10 dark:border-line-strong"><span class="h-full w-3 rounded-s-sm bg-primary dark:bg-ink-muted"></span><span class="absolute -inset-y-1 start-4 w-0.5 bg-primary dark:bg-ink-muted"></span></span>{{ __('programs.timeline_legend_progress') }}</span>
+                <span class="inline-flex items-center gap-1.5"><span class="h-3.5 w-0.5 bg-primary dark:bg-ink"></span>{{ __('programs.timeline_today') }}</span>
             </div>
 
             {{-- Time axis (wide layout only) --}}
@@ -109,9 +109,9 @@
                     <div class="relative h-9">
                         @foreach ($ticks as $tick)
                             @continue($tick['nearToday'])
-                            <span class="absolute bottom-2 -translate-x-1/2 type-meta whitespace-nowrap text-secondary-medium tabular-nums rtl:translate-x-1/2 dark:text-secondary-soft" style="inset-inline-start: {{ $tick['at'] }}%">{{ $tick['label'] }}</span>
+                            <span class="absolute bottom-2 -translate-x-1/2 type-meta whitespace-nowrap text-secondary-medium tabular-nums rtl:translate-x-1/2 dark:text-ink-muted" style="inset-inline-start: {{ $tick['at'] }}%">{{ $tick['label'] }}</span>
                         @endforeach
-                        <span class="absolute bottom-1.5 -translate-x-1/2 rounded-full bg-primary px-2 py-0.5 text-[0.6875rem] font-bold whitespace-nowrap text-white rtl:translate-x-1/2" style="inset-inline-start: {{ $todayAt }}%">{{ __('programs.timeline_today') }}</span>
+                        <span class="absolute bottom-1.5 -translate-x-1/2 rounded-full bg-primary dark:bg-ink dark:text-surface-0 px-2 py-0.5 text-[0.6875rem] font-bold whitespace-nowrap text-white rtl:translate-x-1/2" style="inset-inline-start: {{ $todayAt }}%">{{ __('programs.timeline_today') }}</span>
                     </div>
                     <span></span>
                 </div>
@@ -140,8 +140,8 @@
                             $elapsed = min(100, max(0, ($today->getTimestamp() - $project->start_date->getTimestamp()) / $span * 100));
                         }
 
-                        $neutralTone = 'border-board-line bg-board text-secondary-medium dark:text-secondary-soft';
-                        $criticalTone = 'border-primary/30 bg-status-critical-soft text-primary';
+                        $neutralTone = 'border-board-line bg-board text-secondary-medium dark:text-ink-muted';
+                        $criticalTone = 'border-primary/30 bg-status-critical-soft text-primary dark:text-brand-text';
                         $schedule = match (true) {
                             $isFinished => ['label' => $progress === null ? $project->status->label() : __('programs.timeline_closed_at', ['percent' => $progress]), 'tone' => $neutralTone, 'icon' => 'archive-box'],
                             $hasDates && $today->gt($project->end_date) && ($progress ?? 0) < 100 => ['label' => __('programs.timeline_past_end'), 'tone' => $criticalTone, 'icon' => 'calendar'],
@@ -160,14 +160,14 @@
                         $showExpected = $hasWindow && $isLive && $progress !== null && $progress < 100 && $elapsed !== null && $elapsed > 0;
                         $expectedLabel = $showExpected ? __('programs.timeline_expected', ['percent' => (int) round($elapsed)]) : null;
                         $fillTone = match (true) {
-                            $isLive => 'bg-primary',
+                            $isLive => 'bg-primary dark:bg-ink-muted',
                             $isPreparing => 'bg-status-warn',
                             default => 'bg-secondary-light',
                         };
                         $trackTone = match (true) {
                             $isLive => 'border-primary/40 bg-primary/10',
                             $isPreparing => 'border-dashed border-status-warn/60 bg-status-warn-soft',
-                            default => 'border-board-line bg-secondary-soft/60 dark:bg-secondary-medium/40',
+                            default => 'border-board-line bg-secondary-soft/60 dark:bg-white/10',
                         };
                         $outside = $hasDates
                             ? $project->milestones->filter(fn ($milestone): bool => $milestone->planned_start_date->lt($project->start_date) || $milestone->planned_start_date->gt($project->end_date))
@@ -179,21 +179,21 @@
                         <div class="grid gap-4 px-5 py-4 @4xl/detail:grid-cols-[minmax(15rem,20rem)_1fr_10rem] @4xl/detail:items-center @4xl/detail:gap-8">
                             {{-- Identity --}}
                             <div class="min-w-0">
-                                <a href="{{ route('projects.show', $project) }}" wire:navigate class="inline-flex max-w-full items-start gap-1.5 font-semibold text-pretty group-hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary after:absolute after:inset-0 after:content-['']">
+                                <a href="{{ route('projects.show', $project) }}" wire:navigate class="inline-flex max-w-full items-start gap-1.5 font-semibold text-pretty group-hover:text-primary dark:group-hover:text-brand-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary after:absolute after:inset-0 after:content-['']">
                                     <span class="line-clamp-2">{{ $project->name }}</span>
                                     <flux:icon.arrow-up-right variant="micro" class="mt-1 size-3.5 shrink-0 opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100 rtl:-scale-x-100" aria-hidden="true" />
                                 </a>
-                                <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 type-meta text-secondary-medium dark:text-secondary-soft">
+                                <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 type-meta text-secondary-medium dark:text-ink-muted">
                                     <x-ui.enum-badge :case="$project->status" />
                                     <span class="inline-flex items-center gap-1"><flux:icon.map-pin variant="micro" class="size-3.5" aria-hidden="true" />{{ $project->city?->name ?? __('common.unknown_city') }}</span>
                                     <span class="inline-flex min-w-0 items-center gap-1"><flux:icon.user variant="micro" class="size-3.5 shrink-0" aria-hidden="true" /><span class="truncate">{{ $project->user?->name ?? __('common.not_assigned') }}</span></span>
                                 </div>
                                 <div class="mt-2 flex flex-wrap items-center gap-1.5 type-meta">
-                                    <span @class(['inline-flex items-center gap-1 rounded-full border px-2 py-0.5', 'border-board-line text-secondary-medium dark:text-secondary-soft' => $openRisks === 0, 'border-status-warn/30 bg-status-warn-soft font-semibold text-status-warn' => $openRisks > 0])>
+                                    <span @class(['inline-flex items-center gap-1 rounded-full border px-2 py-0.5', 'border-board-line text-secondary-medium dark:text-ink-muted' => $openRisks === 0, 'border-status-warn/30 bg-status-warn-soft font-semibold text-status-warn' => $openRisks > 0])>
                                         <flux:icon.shield-exclamation variant="micro" class="size-3.5" aria-hidden="true" />{{ trans_choice('programs.timeline_open_risks', $openRisks, ['count' => $openRisks]) }}
                                     </span>
                                     @if ($project->materialised_risks_count > 0)
-                                        <span class="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-status-critical-soft px-2 py-0.5 font-semibold text-primary">
+                                        <span class="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-status-critical-soft px-2 py-0.5 font-semibold text-primary dark:text-brand-text">
                                             <flux:icon.bolt variant="micro" class="size-3.5" aria-hidden="true" />{{ trans_choice('programs.timeline_materialised', $project->materialised_risks_count, ['count' => $project->materialised_risks_count]) }}
                                         </span>
                                     @endif
@@ -251,7 +251,7 @@
                                                     x-show="open"
                                                     style="display: none"
                                                     role="tooltip"
-                                                    class="pointer-events-none absolute bottom-full start-1/2 z-30 mb-1.5 w-max max-w-56 -translate-x-1/2 rounded-md bg-secondary-dark px-2.5 py-1.5 text-start text-xs leading-snug text-white shadow-lg rtl:translate-x-1/2 dark:bg-white dark:text-secondary-dark"
+                                                    class="pointer-events-none absolute bottom-full start-1/2 z-30 mb-1.5 w-max max-w-56 -translate-x-1/2 rounded-md bg-secondary-dark px-2.5 py-1.5 text-start text-xs leading-snug text-white shadow-lg rtl:translate-x-1/2 dark:bg-surface-3 dark:shadow-raised dark:text-ink"
                                                 >
                                                     <span class="block font-semibold">{{ $milestone->name }}</span>
                                                     <span class="block opacity-80">{{ $milestone->planned_start_date->translatedFormat(__('formats.date')) }} · {{ $statusLabel }}</span>
@@ -262,10 +262,10 @@
                                             </button>
                                         @endforeach
                                     @else
-                                        <span class="absolute inset-x-0 top-1/2 flex h-7 -translate-y-1/2 items-center justify-center rounded-md border border-dashed border-secondary-light bg-board type-meta text-secondary-medium dark:text-secondary-soft">{{ __('programs.timeline_no_window') }}</span>
+                                        <span class="absolute inset-x-0 top-1/2 flex h-7 -translate-y-1/2 items-center justify-center rounded-md border border-dashed border-secondary-light bg-board type-meta text-secondary-medium dark:text-ink-muted">{{ __('programs.timeline_no_window') }}</span>
                                     @endif
                                 </div>
-                                <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 type-meta text-secondary-medium tabular-nums dark:text-secondary-soft">
+                                <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 type-meta text-secondary-medium tabular-nums dark:text-ink-muted">
                                     <span>{{ $project->start_date?->translatedFormat(__('formats.date')) ?? '—' }} <span aria-hidden="true">–</span> {{ $project->end_date?->translatedFormat(__('formats.date')) ?? '—' }}</span>
                                     @if ($showExpected)
                                         <span>{{ $expectedLabel }}</span>
@@ -283,8 +283,8 @@
                                 </span>
                                 <div class="text-end">
                                     <p class="text-2xl leading-none font-bold tabular-nums">{{ $progress === null ? '—' : $progress.'%' }}</p>
-                                    <p class="mt-1 type-meta font-semibold text-secondary-dark dark:text-white">{{ __('programs.timeline_weighted_complete') }}</p>
-                                    <p class="type-meta text-secondary-medium tabular-nums dark:text-secondary-soft">{{ trans_choice('programs.timeline_milestones_reached', $milestoneCount, ['count' => $milestoneCount, 'reached' => $reachedMilestones]) }}</p>
+                                    <p class="mt-1 type-meta font-semibold text-secondary-dark dark:text-ink">{{ __('programs.timeline_weighted_complete') }}</p>
+                                    <p class="type-meta text-secondary-medium tabular-nums dark:text-ink-muted">{{ trans_choice('programs.timeline_milestones_reached', $milestoneCount, ['count' => $milestoneCount, 'reached' => $reachedMilestones]) }}</p>
                                 </div>
                             </div>
                         </div>

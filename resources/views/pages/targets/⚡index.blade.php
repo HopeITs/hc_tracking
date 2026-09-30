@@ -863,20 +863,20 @@ new #[Title('titles.targets')] class extends Component {
     $pulse = $this->pulse;
     $statusMeta = [
         'achieved' => ['label' => __('targets.status_achieved'), 'count' => $pulse['achieved'], 'fill' => 'bg-status-good', 'text' => 'text-status-good', 'dot' => 'bg-status-good'],
-        'in_progress' => ['label' => __('targets.status_in_progress'), 'count' => $pulse['in_progress'], 'fill' => 'bg-secondary-dark dark:bg-white', 'text' => 'text-secondary-dark dark:text-white', 'dot' => 'bg-secondary-dark dark:bg-white'],
+        'in_progress' => ['label' => __('targets.status_in_progress'), 'count' => $pulse['in_progress'], 'fill' => 'bg-secondary-dark dark:bg-ink-muted', 'text' => 'text-secondary-dark dark:text-ink', 'dot' => 'bg-secondary-dark dark:bg-ink-muted'],
         'not_started' => ['label' => __('targets.status_not_started'), 'count' => $pulse['not_started'], 'fill' => 'bg-secondary-light', 'text' => 'text-secondary-light', 'dot' => 'bg-secondary-light'],
     ];
     $shareOf = fn (int $part): float => $pulse['total'] > 0 ? round($part / $pulse['total'] * 100, 1) : 0;
     $formatValue = fn (float $value): string => fmod($value, 1.0) === 0.0 ? number_format($value) : number_format($value, 2);
     $resultMark = fn ($type): string => match ($type?->value) {
-        'impact' => 'bg-secondary-dark ring-secondary-dark dark:bg-white dark:ring-white',
+        'impact' => 'bg-secondary-dark ring-secondary-dark dark:bg-ink dark:ring-ink',
         'outcome' => 'bg-primary ring-primary',
-        default => 'bg-white ring-secondary-light dark:bg-secondary-dark',
+        default => 'bg-white ring-secondary-light dark:bg-surface-1',
     };
     $groups = $this->targets->groupBy(fn ($target) => $target->indicator->result_id);
 @endphp
 
-<section class="@container/directory admin-directory flex min-h-full w-full flex-1 flex-col gap-8 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="target-directory-heading">
+<section class="@container/directory admin-directory flex min-h-full w-full flex-1 flex-col gap-8 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="target-directory-heading">
     <x-ui.page-header
         heading-id="target-directory-heading"
         :title="__('common.targets')"
@@ -950,7 +950,7 @@ new #[Title('titles.targets')] class extends Component {
                 @endif
             </h2>
 
-            <div class="flex h-2.5 w-full gap-0.5 overflow-hidden rounded-full bg-secondary-soft/60 dark:bg-secondary-medium/50" role="img" aria-label="{{ __('targets.status_breakdown') }}: {{ collect($statusMeta)->map(fn ($meta) => $meta['label'].' '.$meta['count'])->join(', ') }}">
+            <div class="flex h-2.5 w-full gap-0.5 overflow-hidden rounded-full bg-secondary-soft/60 dark:bg-surface-2" role="img" aria-label="{{ __('targets.status_breakdown') }}: {{ collect($statusMeta)->map(fn ($meta) => $meta['label'].' '.$meta['count'])->join(', ') }}">
                 @foreach ($statusMeta as $statusKey => $meta)
                     @if ($meta['count'] > 0)
                         <span @class(['h-full transition-opacity duration-300 ease-out', $meta['fill'], 'opacity-25' => $status !== '' && $status !== $statusKey]) style="width: {{ $shareOf($meta['count']) }}%"></span>
@@ -967,8 +967,8 @@ new #[Title('titles.targets')] class extends Component {
                         data-test="status-filter-{{ $statusKey }}"
                         @class([
                             'inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border px-3.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
-                            'border-secondary-dark bg-secondary-dark text-white dark:border-white dark:bg-white dark:text-secondary-dark' => $status === $statusKey,
-                            'border-secondary-soft hover:border-secondary-light dark:border-secondary-medium dark:hover:border-secondary-light' => $status !== $statusKey,
+                            'border-secondary-dark bg-secondary-dark text-white dark:border-ink dark:bg-ink dark:text-surface-0' => $status === $statusKey,
+                            'border-secondary-soft hover:border-secondary-light dark:border-line dark:hover:border-field-line' => $status !== $statusKey,
                         ])
                     >
                         <span aria-hidden="true" class="size-2 rounded-full {{ $meta['dot'] }}"></span>
@@ -982,19 +982,19 @@ new #[Title('titles.targets')] class extends Component {
 
         <dl class="flex flex-wrap gap-x-10 gap-y-4 @5xl/directory:justify-end">
             <div class="flex flex-col gap-1.5">
-                <dt class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('targets.committed_in_plans') }}</dt>
+                <dt class="type-label text-secondary-medium dark:text-ink-muted">{{ __('targets.committed_in_plans') }}</dt>
                 <dd class="text-3xl font-bold leading-none tabular-nums">{{ number_format($pulse['plans']) }}</dd>
             </div>
             <div class="flex flex-col gap-1.5">
-                <dt class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('targets.committed_in_proposals') }}</dt>
-                <dd class="text-3xl font-bold leading-none tabular-nums text-funding dark:text-white">{{ number_format($pulse['proposals']) }}</dd>
+                <dt class="type-label text-secondary-medium dark:text-ink-muted">{{ __('targets.committed_in_proposals') }}</dt>
+                <dd class="text-3xl font-bold leading-none tabular-nums text-funding dark:text-ink">{{ number_format($pulse['proposals']) }}</dd>
             </div>
             <div class="flex flex-col gap-1.5">
-                <dt class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('targets.reports_awaiting_approval') }}</dt>
+                <dt class="type-label text-secondary-medium dark:text-ink-muted">{{ __('targets.reports_awaiting_approval') }}</dt>
                 <dd class="flex items-baseline gap-2">
                     <span class="text-3xl font-bold leading-none tabular-nums">{{ number_format($pulse['reviewed']) }}</span>
                     @if ($pulse['drafts'] > 0)
-                        <span class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">{{ trans_choice('targets.count_draft', $pulse['drafts'], ['count' => number_format($pulse['drafts'])]) }}</span>
+                        <span class="text-xs tabular-nums text-secondary-medium dark:text-ink-muted">{{ trans_choice('targets.count_draft', $pulse['drafts'], ['count' => number_format($pulse['drafts'])]) }}</span>
                     @endif
                 </dd>
             </div>
@@ -1002,27 +1002,27 @@ new #[Title('titles.targets')] class extends Component {
     </div>
 
     <div class="flex flex-col">
-        <div class="flex min-h-11 flex-wrap items-center justify-between gap-3 border-b border-secondary-soft pb-3 dark:border-secondary-medium">
-            <p class="type-meta text-secondary-medium dark:text-secondary-soft" aria-live="polite">
+        <div class="flex min-h-11 flex-wrap items-center justify-between gap-3 border-b border-secondary-soft pb-3 dark:border-line">
+            <p class="type-meta text-secondary-medium dark:text-ink-muted" aria-live="polite">
                 {{ trans_choice('targets.count_matching_target', $this->matchingCount, ['count' => $this->matchingCount]) }}
                 @if ($this->resultPage->lastPage() > 1)
                     · {{ __('targets.results_page', ['from' => $this->resultPage->firstItem(), 'to' => $this->resultPage->lastItem(), 'total' => $this->resultPage->total()]) }}
                 @endif
             </p>
             @if ($scopeLabel !== null)
-                <button type="button" wire:click="clearIndicatorScope" class="inline-flex max-w-full items-center gap-1.5 rounded-full border border-secondary-dark bg-secondary-dark px-3 py-1 text-xs font-semibold text-white hover:opacity-90 dark:border-white dark:bg-white dark:text-secondary-dark" data-test="indicator-scope-chip">
+                <button type="button" wire:click="clearIndicatorScope" class="inline-flex max-w-full items-center gap-1.5 rounded-full border border-secondary-dark bg-secondary-dark px-3 py-1 text-xs font-semibold text-white hover:opacity-90 dark:border-ink dark:bg-ink dark:text-surface-0" data-test="indicator-scope-chip">
                     <span class="truncate">{{ $scopeLabel }}</span>
                     <flux:icon.x-mark variant="micro" class="size-3.5 shrink-0" aria-hidden="true" />
                     <span class="sr-only">{{ __('common.reset_filters') }}</span>
                 </button>
             @endif
             <div class="flex items-center gap-4">
-                <span class="hidden items-center gap-4 text-xs text-secondary-medium @3xl/directory:inline-flex dark:text-secondary-soft">
-                    <span class="inline-flex items-center gap-1.5"><span aria-hidden="true" class="h-1.5 w-4 rounded-full bg-secondary-dark dark:bg-white"></span>{{ __('targets.legend_approved') }}</span>
+                <span class="hidden items-center gap-4 text-xs text-secondary-medium @3xl/directory:inline-flex dark:text-ink-muted">
+                    <span class="inline-flex items-center gap-1.5"><span aria-hidden="true" class="h-1.5 w-4 rounded-full bg-secondary-dark dark:bg-ink-muted"></span>{{ __('targets.legend_approved') }}</span>
                     <span class="inline-flex items-center gap-1.5"><span aria-hidden="true" class="target-pending h-1.5 w-4 rounded-full"></span>{{ __('targets.legend_pending') }}</span>
                 </span>
                 @if ($filtersAreActive)
-                    <flux:button size="sm" variant="ghost" class="text-secondary-medium! dark:text-secondary-soft!" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
+                    <flux:button size="sm" variant="ghost" class="text-secondary-medium! dark:text-ink-muted!" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
                 @endif
             </div>
         </div>
@@ -1043,7 +1043,7 @@ new #[Title('titles.targets')] class extends Component {
                         <header class="flex items-start gap-3 pb-3">
                             <span aria-hidden="true" class="mt-1 size-3 shrink-0 rounded-full ring-2 ring-inset {{ $resultMark($groupResult->type) }}"></span>
                             <div class="flex min-w-0 flex-col gap-0.5">
-                                <p class="type-label text-secondary-medium dark:text-secondary-soft">
+                                <p class="type-label text-secondary-medium dark:text-ink-muted">
                                     {{ $groupResult->type?->label() }}
                                     <span class="normal-case tracking-normal">· {{ trans_choice('targets.count_target', $groupTargets->count(), ['count' => $groupTargets->count()]) }}</span>
                                 </p>
@@ -1052,7 +1052,7 @@ new #[Title('titles.targets')] class extends Component {
                         </header>
 
                         {{-- The thread: every target hangs off its result. --}}
-                        <ol class="ms-1.5 flex flex-col border-s border-secondary-soft dark:border-secondary-medium">
+                        <ol class="ms-1.5 flex flex-col border-s border-secondary-soft dark:border-line">
                             @foreach ($groupTargets as $target)
                                 @php
                                     $source = $target->source;
@@ -1077,10 +1077,10 @@ new #[Title('titles.targets')] class extends Component {
                                     $pendingWidth = $targetAmount > 0 ? max(0, min(100 - $approvedWidth, $pendingAmount / $targetAmount * 100)) : 0;
                                     $isExpanded = $expandedTargetId === $target->id;
                                     $chainIssues = $sourceLabel === null ? [] : $target->chainIssues();
-                                    $linkClass = 'rounded-sm font-medium text-secondary-dark underline decoration-secondary-soft decoration-1 underline-offset-[3px] transition-colors hover:decoration-current focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-white dark:decoration-secondary-medium';
+                                    $linkClass = 'rounded-sm font-medium text-secondary-dark underline decoration-secondary-soft decoration-1 underline-offset-[3px] transition-colors hover:decoration-current focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink dark:decoration-line-strong';
                                 @endphp
                                 <li class="relative" wire:key="target-{{ $target->id }}">
-                                    <span aria-hidden="true" class="absolute top-[1.4rem] -start-[5.5px] z-10 size-2.5 rounded-full ring-4 ring-white {{ $statusMeta[$rowStatus]['dot'] }} dark:ring-secondary-dark"></span>
+                                    <span aria-hidden="true" class="absolute top-[1.4rem] -start-[5.5px] z-10 size-2.5 rounded-full ring-4 ring-white {{ $statusMeta[$rowStatus]['dot'] }} dark:ring-surface-1"></span>
 
                                     <div @class([
                                         'grid gap-4 rounded-e-lg py-4 ps-6 pe-2 transition-colors duration-150 @4xl/directory:grid-cols-[minmax(0,1fr)_minmax(16rem,20rem)_auto] @4xl/directory:items-center @4xl/directory:gap-10',
@@ -1089,22 +1089,22 @@ new #[Title('titles.targets')] class extends Component {
                                     ])>
                                         <div class="flex min-w-0 flex-col gap-2">
                                             <div class="flex flex-wrap items-center gap-2">
-                                                <a href="{{ route('indicators.index', ['inspect' => $targetIndicator->id]) }}" wire:navigate class="text-[15px] font-semibold leading-snug hover:text-primary hover:underline">{{ $targetIndicator->name }}</a>
+                                                <a href="{{ route('indicators.index', ['inspect' => $targetIndicator->id]) }}" wire:navigate class="text-[15px] font-semibold leading-snug hover:text-primary dark:hover:text-brand-text hover:underline">{{ $targetIndicator->name }}</a>
                                                 <x-ui.enum-badge :case="$target->period" />
                                             </div>
 
                                             {{-- A row saved before the chain rules existed, or changed around them. --}}
                                             @foreach ($chainIssues as $issue)
-                                                <p class="flex items-start gap-1.5 text-xs font-semibold text-primary" data-test="chain-issue-{{ $target->id }}">
+                                                <p class="flex items-start gap-1.5 text-xs font-semibold text-primary dark:text-brand-text" data-test="chain-issue-{{ $target->id }}">
                                                     <flux:icon.link-slash variant="micro" class="mt-px size-3.5 shrink-0" aria-hidden="true" />
                                                     {{ __($issue) }}
                                                 </p>
                                             @endforeach
 
                                             {{-- Lineage: where it was committed, the money or plan behind it, then who delivers it. --}}
-                                            <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-secondary-medium dark:text-secondary-soft">
+                                            <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-secondary-medium dark:text-ink-muted">
                                                 {{-- Rendered from the morph map key, never a class name. --}}
-                                                <span @class(['inline-flex items-center gap-1 font-medium', 'text-funding dark:text-secondary-soft' => $isProposal])>
+                                                <span @class(['inline-flex items-center gap-1 font-medium', 'text-funding dark:text-ink-muted' => $isProposal])>
                                                     @if ($isProposal)
                                                         <flux:icon.document-text variant="micro" class="size-3.5" aria-hidden="true" />
                                                     @else
@@ -1115,14 +1115,14 @@ new #[Title('titles.targets')] class extends Component {
                                                 @if ($sourceLabel === null)
                                                     {{-- source_id has no foreign key: the plan or proposal can be
                                                          removed out from under this row. --}}
-                                                    <span class="rounded-md border border-primary px-2 py-0.5 text-[11px] font-semibold text-primary">
+                                                    <span class="rounded-md border border-primary px-2 py-0.5 text-[11px] font-semibold text-primary dark:text-brand-text">
                                                         {{ __('targets.source_no_longer_available') }}
                                                     </span>
                                                 @else
                                                     @if ($sourceUrl !== null)
                                                         <a href="{{ $sourceUrl }}" wire:navigate class="{{ $linkClass }}">{{ $sourceLabel }}</a>
                                                     @else
-                                                        <span class="font-medium text-secondary-dark dark:text-white">{{ $sourceLabel }}</span>
+                                                        <span class="font-medium text-secondary-dark dark:text-ink">{{ $sourceLabel }}</span>
                                                     @endif
                                                     @if ($source instanceof AnnualPlan && $source->program !== null)
                                                         <span class="text-secondary-light" aria-hidden="true">/</span>
@@ -1131,17 +1131,17 @@ new #[Title('titles.targets')] class extends Component {
                                                     @elseif ($source instanceof Proposal)
                                                         <x-ui.enum-badge :case="$source->status" />
                                                         <span class="inline-flex flex-wrap items-center gap-x-1.5">
-                                                            <flux:icon.banknotes variant="micro" class="size-3.5 text-funding dark:text-secondary-soft" aria-hidden="true" />
+                                                            <flux:icon.banknotes variant="micro" class="size-3.5 text-funding dark:text-ink-muted" aria-hidden="true" />
                                                             <span class="sr-only">{{ __('common.donors') }}:</span>
                                                             @forelse ($source->getRelation($donorRelation) as $donor)
                                                                 <span class="inline-flex items-baseline gap-1.5">
                                                                     @if ($canOpenDonors)
                                                                         <a href="{{ route('donors.show', $donor) }}" wire:navigate class="{{ $linkClass }}">{{ $donor->name }}</a>
                                                                     @else
-                                                                        <span class="font-medium text-secondary-dark dark:text-white">{{ $donor->name }}</span>
+                                                                        <span class="font-medium text-secondary-dark dark:text-ink">{{ $donor->name }}</span>
                                                                     @endif
                                                                     @if ($canViewBudgets && $donor->pivot?->budget !== null)
-                                                                        <x-ui.money :amount="$donor->pivot->budget" :currency="$donor->pivot->currency" class="text-xs text-funding dark:text-secondary-soft" />
+                                                                        <x-ui.money :amount="$donor->pivot->budget" :currency="$donor->pivot->currency" class="text-xs text-funding dark:text-ink-muted" />
                                                                     @endif
                                                                 </span>@if (! $loop->last)<span aria-hidden="true">,</span>@endif
                                                             @empty
@@ -1167,21 +1167,21 @@ new #[Title('titles.targets')] class extends Component {
                                         <div class="flex flex-col gap-2">
                                             <div class="flex items-baseline justify-between gap-3">
                                                 <span class="text-3xl font-bold leading-none tracking-tight tabular-nums {{ $statusMeta[$rowStatus]['text'] }}">{{ number_format($achievedPercent) }}<span class="text-lg font-semibold">%</span></span>
-                                                <span class="min-w-0 text-end text-[13px] tabular-nums text-secondary-medium dark:text-secondary-soft">
-                                                    <span class="font-semibold text-secondary-dark dark:text-white">{{ $formatValue($actualAmount) }}{{ $unitSuffix }}</span>
+                                                <span class="min-w-0 text-end text-[13px] tabular-nums text-secondary-medium dark:text-ink-muted">
+                                                    <span class="font-semibold text-secondary-dark dark:text-ink">{{ $formatValue($actualAmount) }}{{ $unitSuffix }}</span>
                                                     {{ __('targets.of_target', ['target' => $formatValue($targetAmount).$unitSuffix]) }}
                                                     @if ($unitWord !== null)
                                                         <span class="break-words">{{ $unitWord }}</span>
                                                     @endif
                                                 </span>
                                             </div>
-                                            <div class="flex h-2 w-full overflow-hidden rounded-full bg-secondary-soft/60 dark:bg-secondary-medium/50" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ (int) round($approvedWidth) }}" aria-label="{{ __('targets.achievement_of', ['indicator' => $targetIndicator->name]) }}">
+                                            <div class="flex h-2 w-full overflow-hidden rounded-full bg-secondary-soft/60 dark:bg-surface-2" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ (int) round($approvedWidth) }}" aria-label="{{ __('targets.achievement_of', ['indicator' => $targetIndicator->name]) }}">
                                                 <span class="target-bar h-full rounded-full {{ $statusMeta[$rowStatus]['fill'] }}" style="width: {{ $approvedWidth }}%"></span>
                                                 @if ($pendingWidth > 0)
                                                     <span class="target-pending h-full" style="width: {{ $pendingWidth }}%"></span>
                                                 @endif
                                             </div>
-                                            <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-secondary-medium dark:text-secondary-soft">
+                                            <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-secondary-medium dark:text-ink-muted">
                                                 @if ($target->reports_count > 0)
                                                     <button
                                                         type="button"
@@ -1189,7 +1189,7 @@ new #[Title('titles.targets')] class extends Component {
                                                         aria-expanded="{{ $isExpanded ? 'true' : 'false' }}"
                                                         aria-controls="target-reports-{{ $target->id }}"
                                                         data-test="toggle-reports-{{ $target->id }}"
-                                                        class="-mx-1 inline-flex min-h-7 cursor-pointer items-center gap-1 rounded-md px-1 font-medium tabular-nums text-secondary-dark transition-colors hover:bg-secondary-soft/60 focus-visible:outline-2 focus-visible:outline-primary dark:text-white dark:hover:bg-white/10"
+                                                        class="-mx-1 inline-flex min-h-7 cursor-pointer items-center gap-1 rounded-md px-1 font-medium tabular-nums text-secondary-dark transition-colors hover:bg-secondary-soft/60 focus-visible:outline-2 focus-visible:outline-primary dark:text-ink dark:hover:bg-white/10"
                                                     >
                                                         {{ trans_choice('targets.count_report', $target->reports_count, ['count' => $target->reports_count]) }}
                                                         <flux:icon.chevron-down variant="micro" @class(['size-3.5 transition-transform duration-200', 'rotate-180' => $isExpanded]) aria-hidden="true" />
@@ -1238,7 +1238,7 @@ new #[Title('titles.targets')] class extends Component {
                                     @if ($isExpanded)
                                         {{-- The report trail: every measurement behind the figure, newest first. --}}
                                         <div id="target-reports-{{ $target->id }}" class="target-trail ms-6 me-2 mb-3 mt-1">
-                                            <ol class="flex flex-col divide-y divide-secondary-soft dark:divide-secondary-medium">
+                                            <ol class="flex flex-col divide-y divide-secondary-soft dark:divide-line">
                                                 @foreach ($this->expandedReports as $report)
                                                     <li wire:key="target-report-{{ $report->id }}">
                                                         <a href="{{ route('reports.show', $report) }}" wire:navigate class="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 rounded-md px-3 py-2.5 transition-colors hover:bg-ground focus-visible:outline-2 focus-visible:outline-primary @2xl/directory:grid-cols-[minmax(0,1fr)_auto_auto_auto] dark:hover:bg-white/[0.04]">
@@ -1249,9 +1249,9 @@ new #[Title('titles.targets')] class extends Component {
                                                                 @else
                                                                     {{ $report->planned_date?->translatedFormat(__('formats.date')) }}
                                                                 @endif
-                                                                <span class="font-normal text-secondary-medium dark:text-secondary-soft">· {{ $report->user?->name }}</span>
+                                                                <span class="font-normal text-secondary-medium dark:text-ink-muted">· {{ $report->user?->name }}</span>
                                                                 </span>
-                                                                <span class="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs font-normal text-secondary-medium dark:text-secondary-soft">
+                                                                <span class="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs font-normal text-secondary-medium dark:text-ink-muted">
                                                                     <span class="inline-flex items-center gap-1">
                                                                         <flux:icon.paper-clip variant="micro" class="size-3.5" aria-hidden="true" />
                                                                         {{ trans_choice('targets.count_evidence_file', $report->files_count, ['count' => $report->files_count]) }}
@@ -1284,7 +1284,7 @@ new #[Title('titles.targets')] class extends Component {
             </div>
         @endif
 
-        <flux:pagination :paginator="$this->resultPage" class="pt-4 text-secondary-medium! dark:text-secondary-soft!" scroll-to="#target-directory-heading" />
+        <flux:pagination :paginator="$this->resultPage" class="pt-4 text-secondary-medium! dark:text-ink-muted!" scroll-to="#target-directory-heading" />
     </div>
 
     <x-ui.modal

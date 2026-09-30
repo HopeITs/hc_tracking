@@ -16,7 +16,7 @@
             return 'bg-status-critical-soft text-primary dark:text-status-critical';
         }
 
-        return 'bg-white text-secondary-dark ring-1 ring-secondary-soft hover:ring-secondary-light dark:bg-secondary-dark dark:text-white dark:ring-secondary-medium';
+        return 'bg-white text-secondary-dark ring-1 ring-secondary-soft hover:ring-secondary-light dark:bg-surface-1 dark:text-ink dark:ring-line';
     };
 
     $markerDot = function (\App\Models\Task $task): string {
@@ -25,11 +25,11 @@
         }
 
         if ($task->isOverdue() || $task->isMissed()) {
-            return 'bg-primary';
+            return 'bg-primary dark:bg-status-critical';
         }
 
         return match ($task->priority) {
-            TaskPriority::High => 'bg-primary',
+            TaskPriority::High => 'bg-primary dark:bg-status-critical',
             TaskPriority::Medium => 'bg-status-warn',
             TaskPriority::Low => 'bg-secondary-light',
         };
@@ -48,7 +48,7 @@
     };
 
     $priorityIconClasses = fn (TaskPriority $case): string => match ($case) {
-        TaskPriority::High => 'text-primary',
+        TaskPriority::High => 'text-primary dark:text-brand-text',
         TaskPriority::Medium => 'text-status-warn',
         TaskPriority::Low => 'text-secondary-light',
     };
@@ -62,19 +62,19 @@
 
 <div class="grid gap-4 @6xl/directory:grid-cols-[minmax(0,1fr)_16rem]">
     <div class="flex flex-col gap-3">
-        <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-secondary-soft bg-secondary-soft/20 px-3 py-2.5 dark:border-secondary-medium dark:bg-secondary-medium/10">
+        <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-secondary-soft bg-secondary-soft/20 px-3 py-2.5 dark:border-line dark:bg-white/[0.03]">
             <div class="flex flex-wrap items-center gap-3">
                 <x-ui.button size="sm" wire:click="goToToday" data-test="task-calendar-today-button">{{ __('common.today') }}</x-ui.button>
 
                 <flux:dropdown position="bottom-start" class="filter-picker">
                     <x-ui.button size="sm" icon:trailing="chevron-down" data-test="task-calendar-view-mode-button">{{ __('calendar.'.$viewMode) }}</x-ui.button>
                     <flux:menu class="filter-menu">
-                        <div class="px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-secondary-soft">{{ __('calendar.time_period') }}</div>
+                        <div class="px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-ink-muted">{{ __('calendar.time_period') }}</div>
                         @foreach ([['day', 'D'], ['four_days', '4'], ['week', 'W'], ['month', 'M']] as [$periodKey, $shortcut])
                             <flux:menu.item wire:click="setViewMode('{{ $periodKey }}')" data-test="task-calendar-view-mode-{{ $periodKey }}">
                                 <span class="min-w-0 flex-1 truncate">{{ __('calendar.'.$periodKey) }}</span>
-                                <kbd class="me-1 rounded border border-secondary-soft px-1.5 py-0.5 text-[10px] font-semibold dark:border-secondary-medium">{{ $shortcut }}</kbd>
-                                @if ($viewMode === $periodKey)<flux:icon.check class="size-4 shrink-0 text-primary" />@endif
+                                <kbd class="me-1 rounded border border-secondary-soft px-1.5 py-0.5 text-[10px] font-semibold dark:border-line">{{ $shortcut }}</kbd>
+                                @if ($viewMode === $periodKey)<flux:icon.check class="size-4 shrink-0 text-primary dark:text-brand-text" />@endif
                             </flux:menu.item>
                         @endforeach
                     </flux:menu>
@@ -93,8 +93,8 @@
         </div>
 
         @if ($viewMode === 'month')
-            <div class="overflow-hidden rounded-2xl border border-secondary-soft shadow-[0_1px_2px_rgba(16,24,40,0.04)] dark:border-secondary-medium">
-                <div class="grid grid-cols-7 border-b border-secondary-soft bg-secondary-soft/40 text-center text-[11px] font-bold tracking-wider text-secondary-medium uppercase dark:border-secondary-medium dark:bg-secondary-medium/40 dark:text-secondary-soft">
+            <div class="overflow-hidden rounded-2xl border border-secondary-soft shadow-[0_1px_2px_rgba(16,24,40,0.04)] dark:border-line">
+                <div class="grid grid-cols-7 border-b border-secondary-soft bg-secondary-soft/40 text-center text-[11px] font-bold tracking-wider text-secondary-medium uppercase dark:border-line dark:bg-surface-2 dark:text-ink-muted">
                     @foreach ($calendar['weeks'][0] as $weekdayHeader)
                         <div class="py-2.5">{{ $weekdayHeader->translatedFormat('D') }}</div>
                     @endforeach
@@ -110,7 +110,7 @@
                             <div
                                 wire:key="task-calendar-day-{{ $day->toDateString() }}"
                                 @class([
-                                    'group/day flex min-h-28 flex-col gap-1 border-b border-e border-secondary-soft p-1.5 text-start transition-colors last:border-e-0 [&:nth-child(7n)]:border-e-0 hover:bg-secondary-soft/20 dark:border-secondary-medium dark:hover:bg-secondary-medium/10',
+                                    'group/day flex min-h-28 flex-col gap-1 border-b border-e border-secondary-soft p-1.5 text-start transition-colors last:border-e-0 [&:nth-child(7n)]:border-e-0 hover:bg-secondary-soft/20 dark:border-line dark:hover:bg-surface-2',
                                     'opacity-40' => ! $isCurrentMonth,
                                     'bg-status-active-soft/40 dark:bg-status-active-soft/10' => $isToday,
                                 ])
@@ -118,8 +118,8 @@
                             >
                                 <span @class([
                                     'inline-flex size-6 items-center justify-center rounded-full text-xs font-bold tabular-nums',
-                                    'bg-primary text-white' => $isToday,
-                                    'text-secondary-dark dark:text-white' => ! $isToday,
+                                    'bg-primary dark:bg-ink dark:text-surface-0 text-white' => $isToday,
+                                    'text-secondary-dark dark:text-ink' => ! $isToday,
                                 ])>
                                     {{ $day->day }}
                                 </span>
@@ -140,25 +140,25 @@
                 $gridColumns = 'grid-template-columns: 4.5rem repeat('.count($periodDays).', minmax(0, 1fr)); min-width: '.$gridMinWidth.'rem;';
             @endphp
 
-            <div class="overflow-hidden rounded-2xl border border-secondary-soft shadow-[0_1px_2px_rgba(16,24,40,0.04)] dark:border-secondary-medium">
+            <div class="overflow-hidden rounded-2xl border border-secondary-soft shadow-[0_1px_2px_rgba(16,24,40,0.04)] dark:border-line">
                 <div class="overflow-x-auto" x-data="{ addOpen: {} }">
                     <div class="grid" style="{{ $gridColumns }}">
-                        <div class="border-b border-e border-secondary-soft dark:border-secondary-medium"></div>
+                        <div class="border-b border-e border-secondary-soft dark:border-line"></div>
                         @foreach ($periodDays as $day)
                             @php $isToday = $day->isSameDay($today); @endphp
-                            <div class="border-b border-e border-secondary-soft p-2 text-center last:border-e-0 dark:border-secondary-medium">
-                                <div @class(['text-sm font-semibold', 'text-primary' => $isToday, 'text-secondary-dark dark:text-white' => ! $isToday])>{{ $day->translatedFormat('l') }}</div>
-                                <div @class(['text-xs', 'text-primary' => $isToday, 'text-secondary-medium dark:text-secondary-soft' => ! $isToday])>{{ $day->translatedFormat('j M') }}</div>
+                            <div class="border-b border-e border-secondary-soft p-2 text-center last:border-e-0 dark:border-line">
+                                <div @class(['text-sm font-semibold', 'text-primary dark:text-brand-text' => $isToday, 'text-secondary-dark dark:text-ink' => ! $isToday])>{{ $day->translatedFormat('l') }}</div>
+                                <div @class(['text-xs', 'text-primary dark:text-brand-text' => $isToday, 'text-secondary-medium dark:text-ink-muted' => ! $isToday])>{{ $day->translatedFormat('j M') }}</div>
                             </div>
                         @endforeach
 
-                        <div class="flex items-center justify-end border-e border-secondary-soft px-2 py-1.5 text-[11px] font-semibold text-secondary-medium dark:border-secondary-medium dark:text-secondary-soft">{{ __('calendar.all_day') }}</div>
+                        <div class="flex items-center justify-end border-e border-secondary-soft px-2 py-1.5 text-[11px] font-semibold text-secondary-medium dark:border-line dark:text-ink-muted">{{ __('calendar.all_day') }}</div>
                         @foreach ($periodDays as $day)
                             @php $isToday = $day->isSameDay($today); @endphp
                             <div
                                 wire:key="task-calendar-allday-{{ $day->toDateString() }}"
                                 @class([
-                                    'group/day flex min-h-24 flex-col gap-1 border-e border-secondary-soft p-1.5 text-start transition-colors last:border-e-0 hover:bg-secondary-soft/20 dark:border-secondary-medium dark:hover:bg-secondary-medium/10',
+                                    'group/day flex min-h-24 flex-col gap-1 border-e border-secondary-soft p-1.5 text-start transition-colors last:border-e-0 hover:bg-secondary-soft/20 dark:border-line dark:hover:bg-surface-2',
                                     'bg-status-active-soft/40 dark:bg-status-active-soft/10' => $isToday,
                                 ])
                                 data-test="task-calendar-allday-{{ $day->toDateString() }}"
@@ -168,16 +168,16 @@
                         @endforeach
                     </div>
 
-                    <div class="max-h-96 overflow-y-auto border-t border-secondary-soft dark:border-secondary-medium" x-init="$el.scrollTop = Math.max(0, {{ $currentHour }} * 48 - 160)">
+                    <div class="max-h-96 overflow-y-auto border-t border-secondary-soft dark:border-line" x-init="$el.scrollTop = Math.max(0, {{ $currentHour }} * 48 - 160)">
                         <div class="grid" style="{{ $gridColumns }}">
                             @for ($hour = 0; $hour < 24; $hour++)
-                                <div class="h-12 border-b border-e border-secondary-soft px-2 py-1 text-end text-[11px] text-secondary-medium dark:border-secondary-medium dark:text-secondary-soft">
+                                <div class="h-12 border-b border-e border-secondary-soft px-2 py-1 text-end text-[11px] text-secondary-medium dark:border-line dark:text-ink-muted">
                                     {{ $hour === 0 ? '' : \Carbon\CarbonImmutable::today()->addHours($hour)->translatedFormat('ga') }}
                                 </div>
                                 @foreach ($periodDays as $day)
-                                    <div class="relative h-12 border-b border-e border-secondary-soft last:border-e-0 dark:border-secondary-medium">
+                                    <div class="relative h-12 border-b border-e border-secondary-soft last:border-e-0 dark:border-line">
                                         @if ($day->isSameDay($today) && $hour === $currentHour)
-                                            <div class="pointer-events-none absolute inset-x-0 h-px bg-primary" style="top: {{ $currentMinuteFraction * 100 }}%;"></div>
+                                            <div class="pointer-events-none absolute inset-x-0 h-px bg-primary dark:bg-ink" style="top: {{ $currentMinuteFraction * 100 }}%;"></div>
                                         @endif
                                     </div>
                                 @endforeach
@@ -193,7 +193,7 @@
         <div class="flex min-h-24 flex-col gap-2 p-2" x-data="taskDropList('task-calendar', (wire, id) => wire.rescheduleTask(id, ''))" data-test="task-calendar-unscheduled">
             @forelse ($calendar['unscheduled'] as $task)
                 <div
-                    class="flex cursor-grab flex-col gap-1.5 rounded-xl border border-secondary-soft bg-white p-2.5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md active:cursor-grabbing dark:border-secondary-medium dark:bg-secondary-dark"
+                    class="flex cursor-grab flex-col gap-1.5 rounded-xl border border-secondary-soft bg-white p-2.5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md active:cursor-grabbing dark:border-line dark:bg-surface-1"
                     data-task-id="{{ $task->id }}"
                     wire:key="task-unscheduled-{{ $task->id }}"
                 >

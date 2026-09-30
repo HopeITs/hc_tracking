@@ -97,6 +97,24 @@
     --color-board-line: #dcddde;
     --color-board-head: #f8f8f9;
 
+    /* Graphite dark-mode semantic layer — only referenced behind dark: or inside .dark; light values are equivalents so the utilities exist. */
+    --color-surface-0: #ffffff;
+    --color-surface-1: #ffffff;
+    --color-surface-2: #f8f8f9;
+    --color-surface-3: #ffffff;
+    --color-ink: #58595b;
+    --color-ink-muted: #6d6e71;
+    --color-ink-faint: #939598;
+    --color-line: #dcddde;
+    --color-line-strong: #939598;
+    --color-field-line: #939598;
+    --color-brand: #be1f24;
+    --color-brand-hover: #a81b20;
+    --color-brand-text: #be1f24;
+
+    /* Dark elevation: a 1px top-edge highlight on raised surfaces instead of a drop shadow (dark:shadow-raised). */
+    --shadow-raised: inset 0 1px 0 rgb(255 255 255 / 0.04);
+
     --spacing-ui-2xs: 0.25rem;
     --spacing-ui-xs: 0.5rem;
     --spacing-ui-sm: 0.75rem;
@@ -116,24 +134,40 @@
 
 @layer theme {
     .dark {
-        --color-accent: var(--color-white);
-        --color-accent-content: var(--color-white);
-        --color-accent-foreground: var(--color-neutral-800);
+        /* Graphite: cool charcoal from the brand grey hue, one lightness step per layer. */
+        --color-surface-0: #151618;
+        --color-surface-1: #1c1d20;
+        --color-surface-2: #242528;
+        --color-surface-3: #2d2e32;
+        --color-ink: #ececee;
+        --color-ink-muted: #a8aaae;
+        --color-ink-faint: #8a8c93;
+        --color-line: #34353a;
+        --color-line-strong: #4a4b51;
+        --color-field-line: #6b6d74;
+        --color-brand: #d4343a;
+        --color-brand-hover: #e04046;
+        --color-brand-text: #ff7b7f;
 
-        --color-status-good: #4fbf8a;
-        --color-status-good-soft: #16281f;
-        --color-status-warn: #e0a743;
-        --color-status-warn-soft: #2b2212;
-        --color-status-critical: #f2756f;
-        --color-status-critical-soft: #3a1a1b;
-        --color-status-active: #6ba3e0;
-        --color-status-active-soft: #182636;
-        --color-funding: #6fb0bd;
-        --color-funding-soft: #142326;
-        --color-ground: #232425;
-        --color-board: #2e2f31;
-        --color-board-line: #454649;
-        --color-board-head: #343538;
+        /* Flux's neutral accent (primary Flux buttons, checked controls): ink on the page ground. */
+        --color-accent: var(--color-ink);
+        --color-accent-content: var(--color-ink);
+        --color-accent-foreground: var(--color-surface-0);
+
+        --color-status-good: #5fd09a;
+        --color-status-good-soft: #14281e;
+        --color-status-warn: #e8b050;
+        --color-status-warn-soft: #2c2313;
+        --color-status-critical: #ff8a86;
+        --color-status-critical-soft: #381a1c;
+        --color-status-active: #7db3ec;
+        --color-status-active-soft: #172637;
+        --color-funding: #7cc3cf;
+        --color-funding-soft: #122629;
+        --color-ground: var(--color-surface-0);
+        --color-board: var(--color-surface-1);
+        --color-board-line: var(--color-line);
+        --color-board-head: var(--color-surface-2);
     }
 }
 
@@ -189,9 +223,14 @@
     }
 
     .dark .gantt-editor {
-        background: var(--color-secondary-dark);
-        color: #fff;
+        border-color: var(--color-field-line);
+        background: var(--color-surface-2);
+        color: var(--color-ink);
         color-scheme: dark;
+    }
+
+    .dark .gantt-editor:focus {
+        outline-color: color-mix(in srgb, var(--color-brand) 60%, transparent);
     }
 
     /* Gantt baseline: a hatched sliver under the planned bar. */
@@ -217,6 +256,11 @@
         touch-action: none;
     }
 
+    .dark .gantt-link-handle {
+        border-color: var(--color-brand);
+        background: var(--color-surface-1);
+    }
+
     [data-gantt] [role='row']:hover .gantt-link-handle {
         opacity: 1;
     }
@@ -229,11 +273,12 @@
         --gantt-surface-selected: color-mix(in oklab, var(--color-white), var(--color-status-active) 11%);
     }
 
+    /* Dark: the grid is a surface-1 panel, hover lifts a step, group rows sit between surface-2 and -3, selection is a brand tint. */
     .dark [data-gantt] {
-        --gantt-surface: var(--color-secondary-dark);
-        --gantt-surface-hover: color-mix(in oklab, var(--color-secondary-dark), var(--color-white) 6%);
-        --gantt-surface-group: color-mix(in oklab, var(--color-secondary-dark), var(--color-white) 9%);
-        --gantt-surface-selected: color-mix(in oklab, var(--color-secondary-dark), var(--color-status-active) 26%);
+        --gantt-surface: var(--color-surface-1);
+        --gantt-surface-hover: var(--color-surface-2);
+        --gantt-surface-group: color-mix(in oklab, var(--color-surface-2), var(--color-surface-3) 50%);
+        --gantt-surface-selected: color-mix(in oklab, var(--color-surface-1), var(--color-brand) 14%);
     }
 
     [data-gantt] .gantt-head,
@@ -317,7 +362,7 @@
     }
 
     .dark [data-gantt] .gantt-scroller {
-        scrollbar-color: color-mix(in oklab, var(--color-white) 22%, transparent) transparent;
+        scrollbar-color: var(--color-line-strong) transparent;
     }
 
     /* Draggable Gantt bars show a grab cursor; the drag itself is JS. */
@@ -384,7 +429,7 @@
     }
 
     .dark .notification-sentence [data-param='subject'] {
-        color: #fff;
+        color: var(--color-ink);
     }
 
     .notification-sentence :is([data-param='from'], [data-param='to'], [data-param='status']) {
@@ -397,7 +442,7 @@
     }
 
     .dark .notification-sentence [data-more-updates] {
-        color: var(--color-secondary-soft);
+        color: var(--color-ink-muted);
     }
 
     /* The thread: a hairline joining one glyph to the next, broken just
@@ -414,7 +459,7 @@
     }
 
     .dark .notification-thread > .notification-row:not(:last-child)::before {
-        background: var(--color-secondary-medium);
+        background: var(--color-line-strong);
     }
 
     @media (prefers-reduced-motion: no-preference) {
@@ -467,6 +512,27 @@
 }
 
 /*
+ * Dark mode (Graphite) browser surfaces. In the base layer so any utility still
+ * wins: native controls, autofill and the search-cancel glyph follow the dark
+ * scheme; scrollbars (inherited) and selection take the Graphite tokens; photos
+ * are dimmed slightly unless they opt out with data-no-dim (logos, previews, charts).
+ */
+@layer base {
+    .dark {
+        color-scheme: dark;
+        scrollbar-color: var(--color-line-strong) transparent;
+    }
+
+    .dark ::selection {
+        background-color: color-mix(in srgb, var(--color-brand) 35%, transparent);
+    }
+
+    .dark img:not([data-no-dim]) {
+        filter: brightness(0.9);
+    }
+}
+
+/*
  * Logo preloader (x-preloader, resources/js/preloader.js). data-state drives it:
  *   boot     server-rendered. Quick mode fades in after 200ms; intro mode
  *            (html[data-preloader='intro']) is visible at once and plays the
@@ -490,8 +556,8 @@
 }
 
 .dark .hc-preloader {
-    background-color: var(--color-secondary-dark);
-    color: var(--color-white);
+    background-color: var(--color-surface-0);
+    color: var(--color-ink);
 }
 
 .hc-preloader:is([data-state='boot'], [data-state='waiting'], [data-state='shown']) {
@@ -542,7 +608,7 @@ html[data-preloader='intro'] .hc-preloader[data-state='boot'] {
 }
 
 .dark .hc-preloader__script {
-    fill: var(--color-white);
+    fill: var(--color-ink);
 }
 
 .hc-preloader__letter,
@@ -572,6 +638,10 @@ html[data-preloader='intro'] .hc-preloader[data-state='boot'] {
     stroke-dasharray: 40 96;
     transform-box: view-box;
     transform-origin: 81.08px 27.09px;
+}
+
+.dark .hc-preloader__ring circle {
+    stroke: var(--color-brand);
 }
 
 /* The spinning O: quick boot and waiting. */
@@ -731,7 +801,7 @@ button:not(:disabled),
     }
 
     .dark [data-navigation-sidebar] [data-flux-sidebar-nav] {
-        scrollbar-color: var(--color-secondary-medium) transparent;
+        scrollbar-color: var(--color-line-strong) transparent;
     }
 
     /*
@@ -794,7 +864,7 @@ button:not(:disabled),
     }
 
     .dark [data-navigation-sidebar] [data-flux-sidebar-group] > div:first-child::after {
-        background: var(--color-secondary-medium);
+        background: var(--color-line);
     }
 
     [data-navigation-sidebar][data-flux-sidebar-collapsed-desktop] [data-flux-sidebar-group] > div:first-child {
@@ -916,14 +986,19 @@ select:focus[data-flux-control] {
     box-shadow: none;
 }
 
+.dark :is(input, textarea, select):focus[data-flux-control] {
+    outline-color: var(--color-ink-muted);
+}
+
 input[type='search']::-webkit-search-cancel-button {
     cursor: pointer;
     filter: grayscale(1) saturate(0) brightness(0.72);
     opacity: 0.85;
 }
 
+/* color-scheme: dark already draws the native glyph light; only keep it neutral. */
 .dark input[type='search']::-webkit-search-cancel-button {
-    filter: grayscale(1) saturate(0) brightness(1.7);
+    filter: grayscale(1) saturate(0);
 }
 
 /* Keep administrative directories inside their approved brand palette. */
@@ -939,7 +1014,8 @@ input[type='search']::-webkit-search-cancel-button {
 .dark .admin-directory [data-flux-table] thead,
 .dark .admin-directory [data-flux-table] tbody,
 .dark .admin-directory [data-flux-table] tr {
-    color: var(--color-white) !important;
+    color: var(--color-ink) !important;
+    outline-color: var(--color-line) !important;
 }
 
 .admin-directory [data-flux-control] {
@@ -951,8 +1027,10 @@ input[type='search']::-webkit-search-cancel-button {
 }
 
 .dark .admin-directory [data-flux-control] {
-    background-color: var(--color-secondary-medium) !important;
-    color: var(--color-white) !important;
+    border-color: var(--color-field-line) !important;
+    background-color: var(--color-surface-2) !important;
+    color: var(--color-ink) !important;
+    outline-color: var(--color-field-line) !important;
 }
 
 .admin-directory [data-flux-control]::placeholder,
@@ -968,6 +1046,19 @@ input[type='search']::-webkit-search-cancel-button {
     box-shadow: none !important;
     outline: 2px solid var(--color-secondary-medium) !important;
     outline-offset: 2px !important;
+}
+
+.dark .admin-directory [data-flux-control]::placeholder,
+.dark .admin-directory [data-flux-input]>div,
+.dark .admin-directory [data-flux-clear-button],
+.dark .admin-directory [data-flux-clear-button] [data-flux-icon] {
+    color: var(--color-ink-faint) !important;
+}
+
+.dark .admin-directory [data-flux-control]:focus,
+.dark .admin-directory [data-flux-control]:focus-visible,
+.dark .admin-directory [data-flux-button]:focus-visible {
+    outline-color: var(--color-ink-muted) !important;
 }
 
 /* The tinted-fill filter row treatment: shared by every directory-style index page's toolbar, not just Programs. */
@@ -1020,16 +1111,42 @@ input[type='search']::-webkit-search-cancel-button {
     box-shadow: none !important;
 }
 
+/*
+ * Dark filters: every control, the search input included, is a surface-2 field
+ * with ink text (the search input used to keep the light tint under white text).
+ * Fields stay on surface-2 when hovered or focused — only the border lifts — so
+ * ink-faint placeholders never sit on surface-3 (4.0 : 1).
+ */
 .dark :is(.program-directory-filters, .directory-filters) [data-flux-control] {
-    background-color: color-mix(in srgb, var(--color-secondary-medium) 70%, var(--color-secondary-dark)) !important;
+    border-color: var(--color-field-line) !important;
+    background-color: var(--color-surface-2) !important;
+    color: var(--color-ink) !important;
 }
 
 .dark :is(.program-directory-filters, .directory-filters) [data-flux-label] {
-    color: var(--color-secondary-soft) !important;
+    color: var(--color-ink-muted) !important;
 }
 
 .dark :is(.program-directory-filters, .directory-filters) [data-flux-control]:hover {
-    background-color: var(--color-secondary-medium) !important;
+    border-color: var(--color-ink-faint) !important;
+    background-color: var(--color-surface-2) !important;
+}
+
+.dark :is(.program-directory-filters, .directory-filters) [data-flux-control]:focus,
+.dark :is(.program-directory-filters, .directory-filters) [data-flux-control]:focus-visible {
+    border-color: var(--color-ink-muted) !important;
+}
+
+/* As in light, the directory search keeps its resting border while focused. */
+.dark :is(#program-search, #strategy-search):is(:focus, :focus-visible) {
+    border-color: var(--color-field-line) !important;
+}
+
+/* Chrome paints autofill with a UA !important background; an inset shadow is the only way to keep the field dark. */
+.dark :is(.program-directory-filters, .directory-filters) [data-flux-control]:autofill {
+    box-shadow: inset 0 0 0 100vmax var(--color-surface-2) !important;
+    -webkit-text-fill-color: var(--color-ink);
+    caret-color: var(--color-ink);
 }
 
 :is(.program-filter-picker, .filter-picker) [data-flux-button] {
@@ -1079,32 +1196,42 @@ input[type='search']::-webkit-search-cancel-button {
 }
 
 .dark :is(.program-filter-picker, .filter-picker) [data-flux-button] {
-    border-color: var(--color-secondary-medium) !important;
-    background-color: color-mix(in srgb, var(--color-secondary-medium) 70%, var(--color-secondary-dark)) !important;
-    color: var(--color-white) !important;
+    border-color: var(--color-field-line) !important;
+    background-color: var(--color-surface-2) !important;
+    color: var(--color-ink) !important;
 }
 
-.dark :is(.program-filter-picker, .filter-picker) [data-flux-button]:hover,
+.dark :is(.program-filter-picker, .filter-picker) [data-flux-button]:hover {
+    border-color: var(--color-ink-faint) !important;
+    background-color: var(--color-surface-2) !important;
+}
+
 .dark :is(.program-filter-picker, .filter-picker) [data-flux-menu-item][data-active] {
-    background-color: var(--color-secondary-medium) !important;
+    background-color: rgb(255 255 255 / 0.06) !important;
 }
 
 .dark :is(.program-filter-picker, .filter-picker) [data-flux-menu] {
-    border-color: var(--color-secondary-medium) !important;
-    background-color: var(--color-secondary-dark) !important;
+    border-color: var(--color-line) !important;
+    background-color: var(--color-surface-3) !important;
+    box-shadow: var(--shadow-raised) !important;
 }
 
 .dark :is(.program-filter-menu, .filter-menu) [data-flux-control] {
-    border-color: var(--color-secondary-medium) !important;
-    background-color: var(--color-secondary-medium) !important;
+    border-color: var(--color-field-line) !important;
+    background-color: var(--color-surface-2) !important;
+    color: var(--color-ink) !important;
 }
 
 .dark :is(.program-filter-picker, .filter-picker) [data-flux-menu-item] {
-    color: var(--color-white) !important;
+    color: var(--color-ink) !important;
 }
 
 .admin-directory [data-flux-control][data-invalid] {
     border-color: var(--color-primary) !important;
+}
+
+.dark .admin-directory [data-flux-control][data-invalid] {
+    border-color: var(--color-brand-text) !important;
 }
 
 .admin-directory [data-flux-button] {
@@ -1122,15 +1249,37 @@ input[type='search']::-webkit-search-cancel-button {
     color: var(--color-secondary-dark) !important;
 }
 
+.dark .admin-directory [data-flux-button][aria-label='Toggle password visibility'] {
+    color: var(--color-ink-muted) !important;
+}
+
 .dark .admin-directory [data-flux-button][aria-label='Toggle password visibility']:hover,
 .dark .admin-directory ui-close [data-flux-button]:hover {
-    background-color: var(--color-secondary-medium) !important;
-    color: var(--color-white) !important;
+    background-color: rgb(255 255 255 / 0.06) !important;
+    color: var(--color-ink) !important;
 }
 
 @layer base {
     .admin-directory ui-close [data-flux-button] {
         color: var(--color-secondary-light) !important;
+    }
+
+    /* Same layer as the rule above, so it can out-rank Flux's own `!` classes on the close X. */
+    .dark .admin-directory ui-close [data-flux-button] {
+        color: var(--color-ink-muted) !important;
+    }
+
+    .dark .admin-directory ui-close [data-flux-button]:hover {
+        color: var(--color-ink) !important;
+    }
+
+    /* Flux's own modal X (its absolute top-end wrapper, not a page's modal.close) is text-zinc-500! in dark: 2.9 : 1 on surface-3. */
+    .dark :is([data-flux-modal] > dialog, [data-flux-modal-content]) > .absolute.top-0.end-0 > [data-flux-modal-close] > [data-flux-button] {
+        color: var(--color-ink-muted) !important;
+    }
+
+    .dark :is([data-flux-modal] > dialog, [data-flux-modal-content]) > .absolute.top-0.end-0 > [data-flux-modal-close] > [data-flux-button]:hover {
+        color: var(--color-ink) !important;
     }
 }
 
@@ -1141,6 +1290,10 @@ input[type='search']::-webkit-search-cancel-button {
     backdrop-filter: blur(4px) saturate(75%);
     transition-duration: 180ms;
     transition-timing-function: ease-out;
+}
+
+.dark [data-flux-modal] > dialog::backdrop {
+    background-color: rgb(0 0 0 / 0.6) !important;
 }
 
 [data-flux-modal] > dialog:not([data-flux-flyout]):not([data-flux-modal-overflow]) {
@@ -1157,6 +1310,13 @@ input[type='search']::-webkit-search-cancel-button {
     box-shadow:
         0 2px 8px color-mix(in srgb, var(--color-secondary-dark) 22%, transparent),
         0 24px 64px color-mix(in srgb, var(--color-secondary-dark) 48%, transparent) !important;
+}
+
+/* Dark overlays: no drop shadow, a line border and the top-edge highlight; the backdrop does the separating. */
+.dark [data-flux-modal] > dialog:not(.bg-transparent):not([data-flux-flyout]):not([data-flux-modal-overflow]),
+.dark [data-flux-modal] [data-flux-modal-content]:not(.bg-transparent) {
+    border-color: var(--color-line) !important;
+    box-shadow: var(--shadow-raised) !important;
 }
 
 [data-flux-modal] > dialog:not([data-flux-flyout]):not([data-flux-modal-overflow]),
@@ -1217,7 +1377,7 @@ input[type='search']::-webkit-search-cancel-button {
 }
 
 .dark .form-label {
-    color: var(--color-secondary-soft);
+    color: var(--color-ink-muted);
 }
 
 .form-required {
@@ -1312,28 +1472,43 @@ textarea.form-box-input {
 }
 
 .dark .form-box {
-    border-color: var(--color-secondary-medium);
-    background-color: color-mix(in srgb, var(--color-secondary-medium) 70%, var(--color-secondary-dark));
-    color: var(--color-white);
+    border-color: var(--color-field-line);
+    background-color: var(--color-surface-2);
+    color: var(--color-ink);
 }
 
-.dark .form-box:hover,
+.dark .form-box:hover {
+    border-color: var(--color-ink-faint);
+    background-color: var(--color-surface-2);
+}
+
 .dark .form-box:focus-within {
-    background-color: var(--color-secondary-medium);
+    border-color: var(--color-ink-muted);
+    background-color: var(--color-surface-2);
+    outline-color: var(--color-ink-muted);
 }
 
+/* brand-text, not brand: an invalid border must clear 3 : 1 against a surface-3 dialog too. */
 .dark .form-box[data-invalid] {
-    border-color: var(--color-primary);
+    border-color: var(--color-brand-text);
 }
 
 .dark .form-box-input {
     color-scheme: dark;
 }
 
-.dark .form-box-input::placeholder,
+.dark .form-box-input::placeholder {
+    color: var(--color-ink-faint);
+}
+
 .dark .form-affix,
 .dark .form-help {
-    color: var(--color-secondary-soft);
+    color: var(--color-ink-muted);
+}
+
+.dark .form-required,
+.dark .form-error {
+    color: var(--color-brand-text);
 }
 
 /* Form dropdowns are the header filter picker; these add the form-only states. */
@@ -1343,11 +1518,15 @@ textarea.form-box-input {
 }
 
 .dark .form-select-placeholder {
-    color: var(--color-secondary-soft);
+    color: var(--color-ink-faint);
 }
 
 .filter-picker [data-flux-button][aria-invalid='true'] {
     border-color: var(--color-primary) !important;
+}
+
+.dark .filter-picker [data-flux-button][aria-invalid='true'] {
+    border-color: var(--color-brand-text) !important;
 }
 
 .filter-picker [data-flux-button]:disabled {
@@ -1367,8 +1546,8 @@ textarea.form-box-input {
 }
 
 .dark .form-box[data-locked]:hover {
-    border-color: var(--color-secondary-medium);
-    background-color: color-mix(in srgb, var(--color-secondary-medium) 70%, var(--color-secondary-dark));
+    border-color: var(--color-field-line);
+    background-color: var(--color-surface-2);
 }
 
 /*
@@ -1389,8 +1568,8 @@ textarea.form-box-input {
 }
 
 .dark [data-flux-modal] > dialog.modal-shell:not([data-flux-flyout]):not([data-flux-modal-overflow]) {
-    background-color: var(--color-secondary-dark);
-    color: var(--color-white);
+    background-color: var(--color-surface-3);
+    color: var(--color-ink);
 }
 
 .modal-shell-frame {
@@ -1508,21 +1687,29 @@ textarea.form-box-input {
 
 .dark .modal-shell-header,
 .dark .modal-shell-footer {
-    border-color: var(--color-secondary-medium);
+    border-color: var(--color-line);
 }
 
 .dark .modal-shell-footer {
-    background-color: var(--color-secondary-dark);
+    background-color: var(--color-surface-3);
 }
 
 .dark .modal-shell-description,
 .dark .modal-shell-meta {
-    color: var(--color-secondary-soft);
+    color: var(--color-ink-muted);
+}
+
+.dark .modal-shell-close {
+    color: var(--color-ink-muted);
 }
 
 .dark .modal-shell-close:hover {
-    background-color: var(--color-secondary-medium);
-    color: var(--color-white);
+    background-color: rgb(255 255 255 / 0.06);
+    color: var(--color-ink);
+}
+
+.dark .modal-shell-close:focus-visible {
+    outline-color: var(--color-ink-muted);
 }
 
 @media (width < 40rem) {
@@ -1646,20 +1833,29 @@ textarea.form-box-input {
 }
 
 .dark .form-section-heading::after {
-    background-color: var(--color-secondary-medium);
+    background-color: var(--color-line);
 }
 
+/* The ring is a gap cut into the thread, so it takes the dialog's own surface. */
 .dark .form-section-dot {
-    background-color: var(--color-white);
-    box-shadow: 0 0 0 4px var(--color-secondary-dark);
+    background-color: var(--color-ink-muted);
+    box-shadow: 0 0 0 4px var(--color-surface-3);
+}
+
+.dark .form-section[data-invalid] .form-section-dot {
+    background-color: var(--color-brand);
 }
 
 .dark .form-section-hint {
-    color: var(--color-secondary-soft);
+    color: var(--color-ink-muted);
+}
+
+.dark .form-section[data-invalid] .form-section-hint {
+    color: var(--color-brand-text);
 }
 
 .dark .form-section-figure {
-    color: var(--color-white);
+    color: var(--color-ink);
 }
 
 @container modal (width >= 56rem) {
@@ -1673,7 +1869,7 @@ textarea.form-box-input {
     }
 
     .dark .form-section + .form-section {
-        border-top-color: var(--color-secondary-medium);
+        border-top-color: var(--color-line);
     }
 
     .form-section-heading::after {
@@ -1705,7 +1901,7 @@ textarea.form-box-input {
     }
 
     .dark .form-section-rail::before {
-        background-color: var(--color-secondary-medium);
+        background-color: var(--color-line-strong);
     }
 }
 
@@ -1774,15 +1970,20 @@ textarea.form-box-input {
 }
 
 .dark .install-thread-step:not(:last-child)::before {
-    background-color: var(--color-secondary-medium);
+    background-color: var(--color-line-strong);
 }
 
 .dark .install-thread-dot {
-    background-color: var(--color-secondary-dark);
+    border-color: var(--color-brand);
+    background-color: var(--color-surface-3);
+}
+
+.dark .install-thread-step:first-child .install-thread-dot {
+    background-color: var(--color-brand);
 }
 
 .dark .install-thread-text {
-    color: var(--color-secondary-soft);
+    color: var(--color-ink-muted);
 }
 
 /* One-click segments (x-ui.form-segmented): the same 44px box, split into choices. */
@@ -1834,21 +2035,28 @@ textarea.form-box-input {
 }
 
 .dark .form-segmented {
-    border-color: var(--color-secondary-medium);
-    background-color: color-mix(in srgb, var(--color-secondary-medium) 70%, var(--color-secondary-dark));
+    border-color: var(--color-field-line);
+    background-color: var(--color-surface-2);
 }
 
 .dark .form-segmented[data-invalid] {
-    border-color: var(--color-primary);
+    border-color: var(--color-brand-text);
 }
 
 .dark .form-segment {
-    color: var(--color-secondary-soft);
+    color: var(--color-ink-muted);
 }
 
 .dark .form-segment[aria-checked='true'] {
-    background-color: var(--color-secondary-medium);
-    color: var(--color-white);
+    background-color: var(--color-surface-3);
+    color: var(--color-ink);
+    box-shadow:
+        var(--shadow-raised),
+        0 0 0 1px var(--color-line-strong);
+}
+
+.dark .form-segment:focus-visible {
+    outline-color: var(--color-ink-muted);
 }
 
 /* File field (x-ui.form-file): a dashed drop zone, then the chosen file with its progress. */
@@ -1951,40 +2159,49 @@ textarea.form-box-input {
 }
 
 .dark .form-file-zone {
-    border-color: var(--color-secondary-light);
-    background-color: color-mix(in srgb, var(--color-secondary-medium) 70%, var(--color-secondary-dark));
+    border-color: var(--color-field-line);
+    background-color: var(--color-surface-2);
 }
 
 .dark .form-file-zone:hover,
 .dark .form-file[data-dragging] .form-file-zone {
-    background-color: var(--color-secondary-medium);
+    border-color: var(--color-ink-muted);
+    background-color: var(--color-surface-2);
+}
+
+.dark .form-file-zone:focus-within {
+    outline-color: var(--color-ink-muted);
 }
 
 .dark .form-file[data-invalid] .form-file-zone {
-    border-color: var(--color-primary);
+    border-color: var(--color-brand-text);
 }
 
 .dark .form-file-chosen {
-    border-color: var(--color-secondary-medium);
-    background-color: var(--color-secondary-dark);
+    border-color: var(--color-line);
+    background-color: var(--color-surface-2);
 }
 
 .dark .form-file-icon {
-    background-color: var(--color-secondary-medium);
-    color: var(--color-white);
+    background-color: var(--color-surface-3);
+    color: var(--color-ink-muted);
 }
 
 .dark .form-file-track {
-    background-color: var(--color-secondary-medium);
+    background-color: var(--color-line-strong);
 }
 
 .dark .form-file-bar {
-    background-color: var(--color-white);
+    background-color: var(--color-ink);
+}
+
+.dark .form-file-remove {
+    color: var(--color-ink-muted);
 }
 
 .dark .form-file-remove:hover {
-    background-color: var(--color-secondary-medium);
-    color: var(--color-white);
+    background-color: rgb(255 255 255 / 0.06);
+    color: var(--color-ink);
 }
 
 /* End of the form field kit. */
@@ -1999,10 +2216,14 @@ textarea.form-box-input {
     color: var(--color-secondary-medium) !important;
 }
 
+.dark .admin-directory [data-flux-error] {
+    color: var(--color-brand-text) !important;
+}
+
 .dark .admin-directory [data-flux-pagination],
 .dark .admin-directory [data-flux-pagination]>div {
-    border-color: var(--color-secondary-medium) !important;
-    color: var(--color-secondary-soft) !important;
+    border-color: var(--color-line) !important;
+    color: var(--color-ink-muted) !important;
 }
 
 /* \[:where(&)\]:size-4 {
@@ -2015,7 +2236,7 @@ textarea.form-box-input {
 }
 
 .dark .target-pending {
-    background-image: repeating-linear-gradient(135deg, rgb(255 255 255 / 0.45) 0 2px, transparent 2px 5px);
+    background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--color-ink) 45%, transparent) 0 2px, transparent 2px 5px);
 }
 
 @keyframes target-bar-grow {
@@ -2179,6 +2400,35 @@ ui-toast-group[position='center'] {
     transform-origin: right center;
 }
 
+/* Dark toasts: a surface-3 card on a black/60 dim, Graphite text, no drop shadow. */
+.dark [data-flux-toast-dialog] > div {
+    border-color: var(--color-line);
+    background-color: var(--color-surface-3);
+}
+
+.dark ui-toast-group[position='center'] [data-flux-toast-dialog] > div {
+    box-shadow:
+        var(--shadow-raised),
+        0 0 0 100vmax rgb(0 0 0 / 0.6);
+}
+
+/* Heading, then text: the text is primary on its own and supporting under a heading, as in Flux. */
+.dark [data-flux-toast-dialog] > div > div > div:first-child > div > div {
+    color: var(--color-ink);
+}
+
+.dark [data-flux-toast-dialog] > div > div > div:first-child > div > div:not(:empty) + div {
+    color: var(--color-ink-muted);
+}
+
+.dark [data-flux-toast-dialog] ui-close button {
+    color: var(--color-ink-muted);
+}
+
+.dark [data-flux-toast-dialog] ui-close button:hover {
+    color: var(--color-ink);
+}
+
 @keyframes hc-center-toast-countdown {
     from {
         transform: scaleX(1);
@@ -2244,6 +2494,10 @@ ui-toast-group[position='center'] {
 .cal-scroller {
     scrollbar-width: thin;
     scrollbar-color: var(--color-secondary-light) transparent;
+}
+
+.dark .cal-scroller {
+    scrollbar-color: var(--color-line-strong) transparent;
 }
 
 .cal-ledger {
@@ -2464,7 +2718,7 @@ ui-toast-group[position='center'] {
 }
 
 .dark .chrono-cursor {
-    background: var(--color-white);
+    background: var(--color-ink);
 }
 
 /*
@@ -2521,13 +2775,19 @@ ui-toast-group[position='center'] {
 }
 
 .dark .dossier ::selection {
-    color: var(--color-white);
+    background: color-mix(in srgb, var(--color-brand) 35%, transparent);
+    color: var(--color-ink);
 }
 
 .dossier {
     caret-color: var(--color-primary);
     scrollbar-width: thin;
     scrollbar-color: var(--color-secondary-light) transparent;
+}
+
+.dark .dossier {
+    caret-color: var(--color-brand-text);
+    scrollbar-color: var(--color-line-strong) transparent;
 }
 
 /*
@@ -2656,7 +2916,7 @@ ui-toast-group[position='center'] {
 }
 
 .dark .connection-thread > li:not(:last-child)::before {
-    background: var(--color-secondary-medium);
+    background: var(--color-line-strong);
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -2716,9 +2976,9 @@ ui-toast-group[position='center'] {
     background-color: color-mix(in srgb, var(--color-secondary-soft) 40%, transparent);
 }
 
-:root.dark .measure-track,
+.dark:root .measure-track,
 .dark .measure-track {
-    background-color: color-mix(in srgb, var(--color-secondary-medium) 45%, transparent);
+    background-color: var(--color-line);
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -2757,7 +3017,7 @@ ui-toast-group[position='center'] {
 }
 
 .dark .ledger-spread::before {
-    background: var(--color-secondary-medium);
+    background: var(--color-line);
 }
 
 /*
@@ -2775,7 +3035,7 @@ ui-toast-group[position='center'] {
 }
 
 .dark .ledger-strike::before {
-    background: var(--color-secondary-medium);
+    background: var(--color-line);
 }
 
 /*
@@ -2787,7 +3047,7 @@ ui-toast-group[position='center'] {
 }
 
 .dark .ledger-chip {
-    background: var(--color-secondary-dark);
+    background: var(--color-surface-1);
 }
 
 .exec-ledger [aria-expanded='true'] .ledger-chip,
@@ -2795,9 +3055,10 @@ ui-toast-group[position='center'] {
     background: color-mix(in srgb, var(--color-secondary-soft) 20%, var(--color-white));
 }
 
+/* Must match the open row's dark ground (.ledger-reveal: dark:bg-surface-2). */
 .dark .exec-ledger [aria-expanded='true'] .ledger-chip,
 .dark .ledger-reveal .ledger-chip {
-    background: color-mix(in srgb, var(--color-secondary-medium) 15%, var(--color-secondary-dark));
+    background: var(--color-surface-2);
 }
 
 /*
@@ -2840,12 +3101,16 @@ ui-toast-group[position='center'] {
 }
 
 .dark .exec-ledger .ledger-open:hover {
-    background-color: color-mix(in srgb, var(--color-secondary-medium) 30%, transparent);
+    background-color: var(--color-surface-2);
 }
 
 .exec-ledger .ledger-open:focus-visible {
     outline: 2px solid var(--color-primary);
     outline-offset: 2px;
+}
+
+.dark .exec-ledger .ledger-open:focus-visible {
+    outline-color: var(--color-brand);
 }
 
 /*
@@ -2858,13 +3123,19 @@ ui-toast-group[position='center'] {
 }
 
 .dark .exec-ledger ::selection {
-    color: var(--color-white);
+    background: color-mix(in srgb, var(--color-brand) 35%, transparent);
+    color: var(--color-ink);
 }
 
 .exec-ledger {
     caret-color: var(--color-primary);
     scrollbar-width: thin;
     scrollbar-color: var(--color-secondary-light) transparent;
+}
+
+.dark .exec-ledger {
+    caret-color: var(--color-brand-text);
+    scrollbar-color: var(--color-line-strong) transparent;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -3014,11 +3285,11 @@ ui-toast-group[position='center'] {
     }
 
     .dark .rules-page {
-        --rules-ground: var(--color-secondary-dark);
-        --rules-ink: var(--color-white);
-        --rules-muted: var(--color-secondary-soft);
-        --rules-line: var(--color-secondary-medium);
-        --rules-accent: var(--color-status-critical);
+        --rules-ground: var(--color-surface-2);
+        --rules-ink: var(--color-ink);
+        --rules-muted: var(--color-ink-muted);
+        --rules-line: var(--color-line);
+        --rules-accent: var(--color-brand-text);
     }
 
     .rules-page [x-cloak] {
@@ -3452,6 +3723,34 @@ ui-toast-group[position='center'] {
             animation-duration: 1ms !important;
         }
     }
+
+    /*
+     * Dark: controls take the field border (row dividers keep --rules-line) and
+     * red fills move to the dark brand red. :where(.dark) keeps each rule at the
+     * specificity of the light rule it shadows, so the focus and invalid states
+     * above still out-rank the resting border exactly as they do in light.
+     */
+    :where(.dark) :is(.rules-stepper, .rules-time, .rules-day, .rules-chip-add) {
+        border-color: var(--color-field-line);
+    }
+
+    :where(.dark) .rules-day:hover {
+        border-color: var(--color-ink-faint);
+    }
+
+    :where(.dark) .rules-day:has(:checked) {
+        border-color: var(--color-brand);
+        background: var(--color-brand);
+    }
+
+    :where(.dark) .rules-stepper-button:hover:not(:disabled),
+    :where(.dark) .rules-chip-add button:hover {
+        background: var(--color-brand);
+    }
+
+    :where(.dark) .rules-savebar-pulse {
+        background: var(--color-brand);
+    }
 }
 
 @keyframes rules-shake {
@@ -3521,9 +3820,11 @@ ui-toast-group[position='center'] {
 }
 
 .dark [data-top-bar-actions] [data-flux-tooltip-content] {
-    background: var(--color-white);
-    color: var(--color-secondary-dark);
-    box-shadow: 0 6px 16px rgb(0 0 0 / 0.35);
+    background: var(--color-surface-3);
+    color: var(--color-ink);
+    box-shadow:
+        var(--shadow-raised),
+        0 0 0 1px var(--color-line);
 }
 
 /* Fade + 4px slide in. `translate` (not `transform`) so it never fights Flux's positioning;
@@ -3562,5 +3863,132 @@ ui-toast-group[position='center'] {
     [data-top-bar-action]:hover svg,
     [data-top-bar-action]:active {
         transform: none;
+    }
+}
+
+/*
+ * ApexCharts tooltips (resources/js/charts.js switches them to theme 'dark' in dark
+ * mode). Unlayered on purpose: they must beat the stylesheet ApexCharts injects.
+ */
+.dark .apexcharts-tooltip.apexcharts-theme-dark {
+    background: var(--color-surface-3);
+    color: var(--color-ink);
+    border: 1px solid var(--color-line);
+    box-shadow: var(--shadow-raised);
+}
+
+.dark .apexcharts-tooltip.apexcharts-theme-dark .apexcharts-tooltip-title {
+    background: var(--color-surface-2);
+    border-bottom: 1px solid var(--color-line);
+}
+
+/*
+ * Flux in dark mode: overlays on surface-3, fields on surface-2.
+ *
+ * Flux colours itself with its own dark: utilities (dark:bg-zinc-800 on modals,
+ * dark:bg-zinc-700 on menus and tooltips, dark:bg-white/10 on fields). Those live
+ * in Tailwind's utilities layer, so a rule in @layer components can never
+ * out-rank them, and an unlayered rule would out-rank every utility in the app.
+ * These rules therefore sit in @layer utilities, after Tailwind's generated
+ * ones, at the specificity of the Flux class they replace (0,1,0 — everything
+ * else is inside :where()). A tie goes to the later rule, so they beat Flux's
+ * resting classes, while Flux's own state variants (disabled, data-invalid,
+ * data-active) and any page utility with `!` or a state variant still win.
+ */
+@layer utilities {
+    /* Modals, modal content and flyouts. The resting modal's border and shadow are the unlayered !important rules above. */
+    :where(.dark [data-flux-modal] > dialog, .dark [data-flux-modal] [data-flux-modal-content]):not(.bg-transparent, [data-flux-modal-overflow]) {
+        border-color: var(--color-line);
+        background-color: var(--color-surface-3);
+        --tw-ring-color: var(--color-line);
+    }
+
+    /* Menus (every dropdown panel in the app is a flux:menu). */
+    :where(.dark) [data-flux-menu] {
+        border-color: var(--color-line);
+        background-color: var(--color-surface-3);
+        box-shadow: var(--shadow-raised);
+    }
+
+    :where(.dark) :is([data-flux-menu-item], [data-flux-menu-radio], [data-flux-menu-checkbox]) {
+        color: var(--color-ink);
+    }
+
+    :where(.dark) [data-flux-menu-heading] {
+        color: var(--color-ink-muted);
+    }
+
+    /* Tooltips (the top-bar ones have their own unlayered look above). */
+    :where(.dark) [data-flux-tooltip-content] {
+        border-color: var(--color-line);
+        background-color: var(--color-surface-3);
+        color: var(--color-ink);
+    }
+
+    /* Fields; checkboxes, radios and file inputs keep Flux's own look. */
+    :where(.dark) :where(input, textarea, select):where(:not([type='checkbox'], [type='radio'], [type='file']))[data-flux-control] {
+        border-color: var(--color-field-line);
+        background-color: var(--color-surface-2);
+        color: var(--color-ink);
+    }
+
+    :where(.dark) :where(input, textarea)[data-flux-control]::placeholder {
+        color: var(--color-ink-faint);
+    }
+
+    /* Invalid fields: ties Flux's dark:data-invalid:border-red-500 (0,2,0) and wins by order. */
+    :where(.dark) [data-flux-control][data-invalid] {
+        border-color: var(--color-brand-text);
+    }
+
+    :where(.dark select)[data-flux-control] option {
+        background-color: var(--color-surface-3);
+        color: var(--color-ink);
+    }
+
+    /* Tables: a surface-2 header with ink-faint labels, line row dividers. */
+    :where(.dark) [data-flux-column] {
+        border-color: var(--color-line);
+        background-color: var(--color-surface-2);
+        color: var(--color-ink-faint);
+    }
+
+    :where(.dark) [data-flux-cell] {
+        border-color: var(--color-line);
+    }
+}
+
+/*
+ * Two Flux dark classes cannot be tied without also beating Flux's own states or
+ * `!`: the active menu row (dark:data-active:bg-zinc-600, which danger rows swap
+ * for red) and the menu separator (dark:bg-zinc-600!). Instead the zinc-600
+ * token they read is re-pointed on those elements alone; a custom property set
+ * on the element itself wins in any layer, and neither element has descendants
+ * that read zinc-600.
+ */
+@layer components {
+    :where(.dark) :is([data-flux-menu-item], [data-flux-menu-radio], [data-flux-menu-checkbox]),
+    :where(.dark) [data-flux-sidebar-group-dropdown] [data-flux-sidebar-item] {
+        --color-zinc-600: rgb(255 255 255 / 0.06);
+    }
+
+    :where(.dark) [data-flux-menu-separator] > [data-flux-separator] {
+        --color-zinc-600: var(--color-line);
+    }
+}
+
+/*
+ * Theme switch (resources/js, document.startViewTransition()): a short cross-fade
+ * of the whole page. These pseudo-elements only exist during a transition.
+ */
+::view-transition-old(root),
+::view-transition-new(root) {
+    animation-duration: 200ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+        animation: none;
     }
 }

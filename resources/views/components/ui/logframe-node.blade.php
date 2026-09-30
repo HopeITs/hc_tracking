@@ -8,16 +8,16 @@
     $indicatorCount = (int) $result->indicators_count;
 
     $surface = match ($result->type) {
-        ResultType::Impact => 'border-secondary-dark bg-board text-secondary-dark shadow-[0_18px_40px_-24px_rgb(0_0_0/0.35)] dark:border-secondary-light dark:text-white',
-        ResultType::Outcome => 'border-board-line bg-board text-secondary-dark shadow-[0_10px_28px_-22px_rgb(0_0_0/0.45)] dark:text-white',
-        ResultType::Output => 'border-board-line bg-board-head text-secondary-dark dark:text-white',
+        ResultType::Impact => 'border-secondary-dark bg-board text-secondary-dark shadow-[0_18px_40px_-24px_rgb(0_0_0/0.35)] dark:border-field-line dark:text-ink',
+        ResultType::Outcome => 'border-board-line bg-board text-secondary-dark shadow-[0_10px_28px_-22px_rgb(0_0_0/0.45)] dark:text-ink',
+        ResultType::Output => 'border-board-line bg-board-head text-secondary-dark dark:text-ink',
     };
     $mark = match ($result->type) {
-        ResultType::Impact => 'bg-secondary-dark ring-secondary-dark dark:bg-white dark:ring-white',
+        ResultType::Impact => 'bg-secondary-dark ring-secondary-dark dark:bg-ink dark:ring-ink',
         ResultType::Outcome => 'bg-primary ring-primary',
         ResultType::Output => 'bg-board ring-secondary-light',
     };
-    $muted = 'text-secondary-medium dark:text-secondary-soft';
+    $muted = 'text-secondary-medium dark:text-ink-muted';
     $statementSize = match (true) {
         $isApex => 'text-lg @xl/detail:text-xl @3xl/detail:text-2xl font-bold leading-snug',
         $result->type === ResultType::Output => 'text-sm font-medium leading-relaxed',
@@ -56,7 +56,7 @@
                     x-bind:aria-expanded="open.toString()"
                     aria-controls="logframe-children-{{ $result->id }}"
                     title="{{ __('programs.logframe_toggle_contributing') }}"
-                    class="inline-flex cursor-pointer items-center gap-1 rounded-sm font-semibold text-secondary-dark hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-white"
+                    class="inline-flex cursor-pointer items-center gap-1 rounded-sm font-semibold text-secondary-dark hover:text-primary dark:hover:text-brand-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink"
                 >
                     {{ trans_choice('programs.logframe_count_contributing', $children->count(), ['count' => $children->count()]) }}
                     <flux:icon.chevron-down variant="micro" class="size-3.5 transition-transform duration-200" x-bind:class="open ? '' : '-rotate-90 rtl:rotate-90'" aria-hidden="true" />

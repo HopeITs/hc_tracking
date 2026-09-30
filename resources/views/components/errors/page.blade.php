@@ -10,16 +10,16 @@
         'critical' => 'text-status-critical',
         'warn' => 'text-status-warn',
         'active' => 'text-status-active',
-        default => 'text-secondary-medium dark:text-secondary-light',
+        default => 'text-secondary-medium dark:text-ink-faint',
     };
 @endphp
 
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ \App\Enums\Locale::current()->direction() }}" class="dark">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ \App\Enums\Locale::current()->direction() }}">
     <head>
         @include('partials.head', ['title' => $heading])
     </head>
-    <body class="min-h-screen bg-[#e5e7eb] antialiased dark:bg-secondary-dark">
+    <body class="min-h-screen bg-[#e5e7eb] antialiased dark:bg-surface-0">
         <div class="error-page relative flex min-h-svh flex-col items-center justify-center overflow-hidden p-6 md:p-10">
 
             {{-- The tracking route: a faint path threading from origin to destination, with its waypoints along the way. Purely ambient, never a UI element. --}}
@@ -34,22 +34,22 @@
 
             <div class="relative flex w-full max-w-lg flex-col items-center gap-8 text-center">
                 <a href="{{ route('home') }}" class="flex flex-col items-center">
-                    <img src="{{ asset('logo-tracking.svg') }}" alt="" class="h-11 w-auto dark:hidden" />
-                    <img src="{{ asset('logo-tracking-white.svg') }}" alt="" class="hidden h-11 w-auto dark:block" />
+                    <img src="{{ asset('logo-tracking.svg') }}" alt="" class="h-11 w-auto dark:hidden" data-no-dim />
+                    <img src="{{ asset('logo-tracking-white.svg') }}" alt="" class="hidden h-11 w-auto dark:block" data-no-dim />
                     <span class="sr-only">{{ config('app.name', 'Laravel') }}</span>
                 </a>
 
                 <div>
                     <p @class(['type-label', $toneText]) dir="ltr">{{ __('errors.error_code', ['code' => $code]) }}</p>
-                    <h1 class="mt-3 text-4xl font-extrabold tracking-tight text-balance text-secondary-dark sm:text-5xl dark:text-white">{{ $heading }}</h1>
-                    <p class="mx-auto mt-4 max-w-sm text-base text-pretty text-secondary-medium dark:text-secondary-soft">{{ $body }}</p>
+                    <h1 class="mt-3 text-4xl font-extrabold tracking-tight text-balance text-secondary-dark sm:text-5xl dark:text-ink">{{ $heading }}</h1>
+                    <p class="mx-auto mt-4 max-w-sm text-base text-pretty text-secondary-medium dark:text-ink-muted">{{ $body }}</p>
                 </div>
 
                 <x-ui.button tone="primary" :href="route('dashboard')" class="!px-6 !py-3 !text-base">
                     {{ __('errors.back_to_dashboard') }}
                 </x-ui.button>
 
-                <p class="text-center text-xs text-secondary-medium dark:text-secondary-soft">
+                <p class="text-center text-xs text-secondary-medium dark:text-ink-muted">
                     {{ __('authentication.copyright_notice', ['year' => now()->year]) }}
                 </p>
             </div>

@@ -67,7 +67,7 @@
     x-on:keydown.escape.stop="open = false"
     x-on:click.outside="open = false"
 >
-    <label for="{{ $id }}" class="mb-1.5 block text-[11px] font-semibold uppercase leading-4 tracking-[0.1em] text-secondary-medium dark:text-secondary-soft">
+    <label for="{{ $id }}" class="mb-1.5 block text-[11px] font-semibold uppercase leading-4 tracking-[0.1em] text-secondary-medium dark:text-ink-muted">
         {{ $label }}
     </label>
 
@@ -83,7 +83,7 @@
             class="program-filter-trigger flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border px-3 text-start text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
             <span class="truncate">{{ $triggerLabel }}</span>
-            <flux:icon.chevron-up-down class="size-4 shrink-0 text-secondary-medium dark:text-secondary-soft" aria-hidden="true" />
+            <flux:icon.chevron-up-down class="size-4 shrink-0 text-secondary-medium dark:text-ink-muted" aria-hidden="true" />
         </button>
 
         <div
@@ -97,7 +97,7 @@
             class="absolute z-30 mt-1 w-full! rounded-lg border p-[.3125rem] shadow-xs"
         >
             @if ($searchable)
-                <div class="program-filter-menu border-b border-secondary-soft p-1.5 dark:border-secondary-medium">
+                <div class="program-filter-menu border-b border-secondary-soft p-1.5 dark:border-line">
                     <x-ui.input
                         type="search"
                         size="sm"
@@ -115,7 +115,7 @@
                 role="option"
                 aria-selected="{{ $selectedValues === [] ? 'true' : 'false' }}"
                 wire:click="{{ $clear }}"
-                class="flex w-full cursor-pointer items-center rounded-md px-2 py-1.5 text-start text-sm font-medium hover:bg-secondary-soft dark:hover:bg-secondary-medium"
+                class="flex w-full cursor-pointer items-center rounded-md px-2 py-1.5 text-start text-sm font-medium hover:bg-secondary-soft dark:hover:bg-white/[0.06]"
             >
                 <span class="min-w-0 truncate">{{ $emptyLabel }}</span>
 
@@ -134,12 +134,12 @@
                     wire:click="{{ $toggle }}({{ Illuminate\Support\Js::from($option['value']) }})"
                     x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
                     wire:key="{{ $id.'-'.md5($option['value']) }}"
-                    class="flex w-full cursor-pointer items-center rounded-md px-2 py-1.5 text-start text-sm font-medium hover:bg-secondary-soft dark:hover:bg-secondary-medium"
+                    class="flex w-full cursor-pointer items-center rounded-md px-2 py-1.5 text-start text-sm font-medium hover:bg-secondary-soft dark:hover:bg-white/[0.06]"
                 >
                     <span class="min-w-0 truncate">{{ $option['label'] }}</span>
 
                     @if ($isSelected)
-                        <flux:icon.check class="ms-auto size-4 shrink-0 text-primary" />
+                        <flux:icon.check class="ms-auto size-4 shrink-0 text-primary dark:text-brand-text" />
                     @endif
                 </button>
             @endforeach

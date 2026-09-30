@@ -25,7 +25,7 @@
     data-app-install-modal
 >
     <x-slot:mark>
-        <img src="{{ asset('app-icons/icon-192.png') }}" alt="" width="40" height="40" class="mt-1 size-10 shrink-0 rounded-full" />
+        <img src="{{ asset('app-icons/icon-192.png') }}" alt="" width="40" height="40" class="mt-1 size-10 shrink-0 rounded-full" data-no-dim />
     </x-slot:mark>
 
     <ol class="install-thread">

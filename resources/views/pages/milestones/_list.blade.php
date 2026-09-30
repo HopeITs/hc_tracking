@@ -11,7 +11,7 @@
             </div>
         </x-slot:toolbar>
 
-        <div class="divide-y divide-secondary-soft dark:divide-secondary-medium">
+        <div class="divide-y divide-secondary-soft dark:divide-line">
             @foreach ($projectRow->milestones as $milestone)
                 @include('pages.milestones._tree-node', ['milestone' => $milestone, 'depth' => 0])
             @endforeach

@@ -360,7 +360,7 @@ new #[Title('titles.risks')] class extends Component {
     $filtersAreActive = $search !== '' || $project !== '' || $materialisedOnly || $unmitigated;
 @endphp
 
-<section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="risk-register-heading">
+<section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="risk-register-heading">
     <x-ui.page-header
         heading-id="risk-register-heading"
         :title="__('common.risks')"
@@ -392,8 +392,8 @@ new #[Title('titles.risks')] class extends Component {
                     data-test="materialised-toggle"
                     @class([
                         'inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-primary',
-                        'border-primary bg-primary text-white' => $materialisedOnly,
-                        'border-secondary-light text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium' => ! $materialisedOnly,
+                        'border-primary bg-primary dark:bg-ink dark:text-surface-0 dark:border-ink text-white' => $materialisedOnly,
+                        'border-secondary-light text-secondary-medium hover:bg-secondary-soft dark:text-ink-muted dark:hover:bg-surface-2' => ! $materialisedOnly,
                     ])
                 >
                     <flux:icon.exclamation-triangle variant="micro" class="size-3.5" />
@@ -408,7 +408,7 @@ new #[Title('titles.risks')] class extends Component {
                     @class([
                         'inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-primary',
                         'border-status-warn/30 bg-status-warn-soft text-status-warn' => $unmitigated,
-                        'border-secondary-light text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium' => ! $unmitigated,
+                        'border-secondary-light text-secondary-medium hover:bg-secondary-soft dark:text-ink-muted dark:hover:bg-surface-2' => ! $unmitigated,
                     ])
                 >
                     <flux:icon.shield-exclamation variant="micro" class="size-3.5" />
@@ -420,7 +420,7 @@ new #[Title('titles.risks')] class extends Component {
 
     @php $chart = $this->projectRiskChart; $landscape = $this->riskLandscape; @endphp
     @if (count($chart['categories']) > 0)
-        <div x-data="{ open: true }" class="overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-secondary-medium dark:bg-secondary-dark dark:shadow-none">
+        <div x-data="{ open: true }" class="overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-transparent dark:bg-surface-1 dark:shadow-raised">
             <button
                 type="button"
                 x-on:click="open = !open"
@@ -428,20 +428,20 @@ new #[Title('titles.risks')] class extends Component {
                 class="flex min-h-12 w-full flex-wrap items-center justify-between gap-2 px-4 py-3 text-start"
             >
                 <div class="min-w-0">
-                    <p class="truncate text-base font-bold text-secondary-dark dark:text-white">{{ __('risks.risks_by_project') }}</p>
-                    <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ __('risks.risks_by_project_hint') }}</p>
+                    <p class="truncate text-base font-bold text-secondary-dark dark:text-ink">{{ __('risks.risks_by_project') }}</p>
+                    <p class="truncate text-xs text-secondary-medium dark:text-ink-muted">{{ __('risks.risks_by_project_hint') }}</p>
                 </div>
-                <flux:icon.chevron-down variant="micro" class="size-4 shrink-0 text-secondary-medium transition-transform dark:text-secondary-soft" x-bind:class="open && 'rotate-180'" />
+                <flux:icon.chevron-down variant="micro" class="size-4 shrink-0 text-secondary-medium transition-transform dark:text-ink-muted" x-bind:class="open && 'rotate-180'" />
             </button>
 
-            <div x-show="open" x-collapse class="border-t border-secondary-soft px-2 pt-3 pb-2 dark:border-secondary-medium">
+            <div x-show="open" x-collapse class="border-t border-secondary-soft px-2 pt-3 pb-2 dark:border-line">
                 <div class="flex flex-wrap items-center gap-4 px-2 pb-2" role="group" aria-label="{{ __('risks.risks_by_project') }}">
-                    <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-secondary-dark dark:text-white">
-                        <span class="size-2.5 shrink-0 rounded-full bg-primary" aria-hidden="true"></span>
+                    <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-secondary-dark dark:text-ink">
+                        <span class="size-2.5 shrink-0 rounded-full bg-primary dark:bg-status-critical" aria-hidden="true"></span>
                         {{ __('risks.challenges') }} · <span class="tabular-nums">{{ $landscape['challenges'] }}</span>
                     </span>
-                    <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-secondary-medium dark:text-secondary-soft">
-                        <span class="size-2.5 shrink-0 rounded-full bg-secondary-light dark:bg-secondary-medium" aria-hidden="true"></span>
+                    <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-secondary-medium dark:text-ink-muted">
+                        <span class="size-2.5 shrink-0 rounded-full bg-secondary-light dark:bg-ink-faint" aria-hidden="true"></span>
                         {{ __('risks.potential_risks') }} · <span class="tabular-nums">{{ $landscape['potential'] }}</span>
                     </span>
                 </div>
@@ -462,7 +462,7 @@ new #[Title('titles.risks')] class extends Component {
     <x-ui.panel :subtitle="trans_choice('risks.count_matching_risk', $this->risks->total(), ['count' => $this->risks->total()])">
         <x-slot:toolbar>
             @if ($filtersAreActive)
-                <flux:button size="sm" variant="ghost" class="text-secondary-medium! hover:bg-secondary-soft! dark:text-secondary-soft!" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
+                <flux:button size="sm" variant="ghost" class="text-secondary-medium! hover:bg-secondary-soft! dark:text-ink-muted!" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
             @endif
         </x-slot:toolbar>
 
@@ -483,10 +483,10 @@ new #[Title('titles.risks')] class extends Component {
         @else
             <div class="grid grid-cols-1 gap-3 p-3.5 @4xl:grid-cols-2">
                 @foreach ($this->risks as $risk)
-                    <article class="flex flex-col gap-2 rounded-lg border border-secondary-soft p-3.5 dark:border-secondary-medium" wire:key="risk-{{ $risk->id }}">
+                    <article class="flex flex-col gap-2 rounded-lg border border-secondary-soft p-3.5 dark:border-line" wire:key="risk-{{ $risk->id }}">
                         <div class="flex items-start justify-between gap-3">
                             <div
-                                class="inline-flex shrink-0 overflow-hidden rounded-full border border-secondary-light dark:border-secondary-medium"
+                                class="inline-flex shrink-0 overflow-hidden rounded-full border border-secondary-light dark:border-field-line"
                                 role="radiogroup"
                                 aria-label="{{ __('common.state') }}"
                                 data-test="happened-toggle-{{ $risk->id }}"
@@ -499,14 +499,14 @@ new #[Title('titles.risks')] class extends Component {
                                     @disabled(! auth()->user()->can('update', $risk))
                                     @class([
                                         'inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold transition-colors',
-                                        'bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white' => ! $risk->happened,
-                                        'text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium' => $risk->happened,
+                                        'bg-secondary-soft text-secondary-dark dark:bg-surface-2 dark:text-ink' => ! $risk->happened,
+                                        'text-secondary-medium hover:bg-secondary-soft dark:text-ink-muted dark:hover:bg-surface-2' => $risk->happened,
                                     ])
                                 >
                                     <span @class([
                                         'size-2.5 shrink-0 rounded-full border',
-                                        'border-secondary-dark bg-secondary-dark dark:border-white dark:bg-white' => ! $risk->happened,
-                                        'border-secondary-light dark:border-secondary-soft' => $risk->happened,
+                                        'border-secondary-dark bg-secondary-dark dark:border-ink-muted dark:bg-ink-muted' => ! $risk->happened,
+                                        'border-secondary-light dark:border-ink-faint' => $risk->happened,
                                     ]) aria-hidden="true"></span>
                                     {{ __('risks.potential_risk') }}
                                 </button>
@@ -517,15 +517,15 @@ new #[Title('titles.risks')] class extends Component {
                                     wire:click="setHappened({{ $risk->id }}, true)"
                                     @disabled(! auth()->user()->can('update', $risk))
                                     @class([
-                                        'inline-flex items-center gap-1.5 border-s border-secondary-light px-2.5 py-1 text-xs font-semibold transition-colors dark:border-secondary-medium',
-                                        'bg-primary text-white' => $risk->happened,
-                                        'text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium' => ! $risk->happened,
+                                        'inline-flex items-center gap-1.5 border-s border-secondary-light px-2.5 py-1 text-xs font-semibold transition-colors dark:border-line',
+                                        'bg-primary dark:border-transparent dark:bg-status-critical-soft dark:text-status-critical text-white' => $risk->happened,
+                                        'text-secondary-medium hover:bg-secondary-soft dark:text-ink-muted dark:hover:bg-surface-2' => ! $risk->happened,
                                     ])
                                 >
                                     <span @class([
                                         'size-2.5 shrink-0 rounded-full border',
                                         'border-white bg-white' => $risk->happened,
-                                        'border-secondary-light dark:border-secondary-soft' => ! $risk->happened,
+                                        'border-secondary-light dark:border-ink-faint' => ! $risk->happened,
                                     ]) aria-hidden="true"></span>
                                     {{ __('common.materialised') }}
                                 </button>
@@ -537,15 +537,15 @@ new #[Title('titles.risks')] class extends Component {
                         </div>
 
                         <div class="min-w-0">
-                            <p class="type-heading truncate text-secondary-dark dark:text-white">{{ $risk->name }}</p>
-                            <a href="{{ route('projects.show', $risk->project) }}" wire:navigate class="text-xs text-secondary-medium hover:underline dark:text-secondary-soft">
+                            <p class="type-heading truncate text-secondary-dark dark:text-ink">{{ $risk->name }}</p>
+                            <a href="{{ route('projects.show', $risk->project) }}" wire:navigate class="text-xs text-secondary-medium hover:underline dark:text-ink-muted">
                                 {{ $risk->project->name }} · {{ $risk->project->city?->name ?? __('common.unknown_city') }}
                             </a>
                         </div>
 
                         <div class="flex flex-col gap-1.5">
-                            <p class="text-xs text-secondary-medium dark:text-secondary-soft">
-                                <span class="font-semibold text-secondary-dark dark:text-white">{{ __('common.impact') }}:</span>
+                            <p class="text-xs text-secondary-medium dark:text-ink-muted">
+                                <span class="font-semibold text-secondary-dark dark:text-ink">{{ __('common.impact') }}:</span>
                                 {{ $risk->impact ?? '—' }}
                             </p>
 
@@ -553,8 +553,8 @@ new #[Title('titles.risks')] class extends Component {
                                  potential risk that hasn't occurred yet has nothing to mitigate. --}}
                             @if ($risk->happened)
                                 @if ($risk->solution !== null && $risk->solution !== '')
-                                    <p class="text-xs text-secondary-medium dark:text-secondary-soft">
-                                        <span class="font-semibold text-secondary-dark dark:text-white">{{ __('common.mitigation') }}:</span>
+                                    <p class="text-xs text-secondary-medium dark:text-ink-muted">
+                                        <span class="font-semibold text-secondary-dark dark:text-ink">{{ __('common.mitigation') }}:</span>
                                         {{ $risk->solution }}
                                     </p>
                                 @else
@@ -576,7 +576,7 @@ new #[Title('titles.risks')] class extends Component {
         @endif
 
         <x-slot:footer>
-            <flux:pagination :paginator="$this->risks" class="text-secondary-medium! dark:text-secondary-soft!" scroll-to="#risk-register-heading" />
+            <flux:pagination :paginator="$this->risks" class="text-secondary-medium! dark:text-ink-muted!" scroll-to="#risk-register-heading" />
         </x-slot:footer>
     </x-ui.panel>
 
@@ -603,7 +603,7 @@ new #[Title('titles.risks')] class extends Component {
                     :label="__('common.state')"
                     :options="[
                         ['value' => '0', 'label' => __('risks.potential_risk'), 'dot' => 'border border-secondary-light bg-transparent'],
-                        ['value' => '1', 'label' => __('common.materialised'), 'dot' => 'bg-primary', 'test' => 'form-materialised-option'],
+                        ['value' => '1', 'label' => __('common.materialised'), 'dot' => 'bg-primary dark:bg-status-critical', 'test' => 'form-materialised-option'],
                     ]"
                 />
             </div>

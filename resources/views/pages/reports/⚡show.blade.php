@@ -535,7 +535,7 @@ new #[Title('titles.report')] class extends Component {
     ];
 @endphp
 
-<section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-8 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white">
+<section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-8 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink">
     <x-ui.detail-header
         :breadcrumbs="[
             ['label' => __('common.reports'), 'url' => route('reports.index')],
@@ -575,7 +575,7 @@ new #[Title('titles.report')] class extends Component {
         </x-slot:meta>
 
         <x-slot:actions>
-            <x-ui.user-chip :user="$report->user" class="rounded-lg border border-secondary-soft p-2.5 dark:border-secondary-medium" />
+            <x-ui.user-chip :user="$report->user" class="rounded-lg border border-secondary-soft p-2.5 dark:border-line" />
             @if ($planIndicator->source !== null && auth()->user()->can('create', App\Models\Report::class))
                 <x-ui.button icon="document-plus" wire:click="openCreateModal({{ $planIndicator->id }})" data-test="record-next-report-button">{{ __('reports.record_next_report') }}</x-ui.button>
             @endif
@@ -583,58 +583,58 @@ new #[Title('titles.report')] class extends Component {
     </x-ui.detail-header>
 
     {{-- The hero: this figure, the target it counts toward, and how far that target has come. --}}
-    <div class="flex flex-col gap-8 border-y border-secondary-soft py-8 dark:border-secondary-medium @lg/detail:flex-row @lg/detail:items-center">
+    <div class="flex flex-col gap-8 border-y border-secondary-soft py-8 dark:border-line @lg/detail:flex-row @lg/detail:items-center">
         <div class="flex shrink-0 items-center gap-4">
             <x-ui.progress-ring :value="$this->achievement" size="lg" :tone="$this->achievementTone" :label="__('reports.target_achieved')" />
             <div class="@lg/detail:hidden">
-                <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('reports.target_achieved') }}</p>
-                <p class="mt-1 type-meta text-secondary-medium dark:text-secondary-soft">{{ __('reports.approved_reports_only') }}</p>
+                <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('reports.target_achieved') }}</p>
+                <p class="mt-1 type-meta text-secondary-medium dark:text-ink-muted">{{ __('reports.approved_reports_only') }}</p>
             </div>
         </div>
 
         <div class="flex flex-1 flex-wrap items-stretch gap-y-6">
             <div class="min-w-32 flex-1">
-                <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('reports.this_report') }}</p>
+                <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('reports.this_report') }}</p>
                 <p class="mt-1.5 text-4xl leading-none font-extrabold tabular-nums">{{ $formatFigure((float) $report->value) }}{{ $unit }}</p>
-                <p class="mt-1.5 type-meta text-secondary-medium dark:text-secondary-soft">
+                <p class="mt-1.5 type-meta text-secondary-medium dark:text-ink-muted">
                     {{ $report->status === ReportStatus::Approved ? __('reports.counted_toward_the_target') : __('reports.counts_toward_the_target_once_approved') }}
                 </p>
             </div>
-            <div class="min-w-32 flex-1 border-s border-secondary-soft ps-8 dark:border-secondary-medium">
-                <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('reports.achieved_so_far') }}</p>
+            <div class="min-w-32 flex-1 border-s border-secondary-soft ps-8 dark:border-line">
+                <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('reports.achieved_so_far') }}</p>
                 <p class="mt-1.5 text-4xl leading-none font-extrabold tabular-nums">{{ $formatFigure($planIndicator->achievedValue()) }}{{ $unit }}</p>
-                <p class="mt-1.5 type-meta text-secondary-medium dark:text-secondary-soft">{{ __('reports.approved_reports_only') }}</p>
+                <p class="mt-1.5 type-meta text-secondary-medium dark:text-ink-muted">{{ __('reports.approved_reports_only') }}</p>
             </div>
-            <div class="min-w-32 flex-1 border-s border-secondary-soft ps-8 dark:border-secondary-medium">
-                <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('reports.target') }}</p>
-                <p class="mt-1.5 text-4xl leading-none font-extrabold tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $formatFigure((float) $planIndicator->target) }}{{ $unit }}</p>
-                <p class="mt-1.5 type-meta text-secondary-medium dark:text-secondary-soft">{{ $planIndicator->period->label() }}</p>
+            <div class="min-w-32 flex-1 border-s border-secondary-soft ps-8 dark:border-line">
+                <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('reports.target') }}</p>
+                <p class="mt-1.5 text-4xl leading-none font-extrabold tabular-nums text-secondary-medium dark:text-ink-muted">{{ $formatFigure((float) $planIndicator->target) }}{{ $unit }}</p>
+                <p class="mt-1.5 type-meta text-secondary-medium dark:text-ink-muted">{{ $planIndicator->period->label() }}</p>
             </div>
         </div>
     </div>
 
     {{-- The connection: every node with a real destination is a real link — no dead-end labels dressed up as navigation. --}}
     <div>
-        <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('reports.connection') }}</p>
-        <p class="mt-1 text-sm text-secondary-medium dark:text-secondary-soft">{{ __('reports.how_this_figure_traces_through_the_results_framework') }}</p>
+        <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('reports.connection') }}</p>
+        <p class="mt-1 text-sm text-secondary-medium dark:text-ink-muted">{{ __('reports.how_this_figure_traces_through_the_results_framework') }}</p>
 
         <div class="mt-5 flex flex-wrap items-start gap-x-2 gap-y-5">
             @foreach ($chain as $index => $node)
                 @if ($index > 0)
-                    <div class="mt-2.5 hidden h-px w-6 shrink-0 bg-secondary-soft @lg/detail:block dark:bg-secondary-medium" aria-hidden="true"></div>
+                    <div class="mt-2.5 hidden h-px w-6 shrink-0 bg-secondary-soft @lg/detail:block dark:bg-line-strong" aria-hidden="true"></div>
                 @endif
                 <div class="min-w-36 flex-1" wire:key="chain-node-{{ $index }}">
                     <div class="flex items-center gap-2">
-                        <span class="size-1.5 shrink-0 rounded-full bg-primary" aria-hidden="true"></span>
-                        <span class="type-meta text-secondary-medium dark:text-secondary-soft">{{ $node['label'] }}</span>
+                        <span class="size-1.5 shrink-0 rounded-full bg-primary dark:bg-ink-muted" aria-hidden="true"></span>
+                        <span class="type-meta text-secondary-medium dark:text-ink-muted">{{ $node['label'] }}</span>
                     </div>
                     @if ($node['href'] !== null)
-                        <a href="{{ $node['href'] }}" wire:navigate class="mt-1 flex items-center gap-1 ps-3.5 text-sm font-bold text-secondary-dark hover:text-primary hover:underline dark:text-white dark:hover:text-primary">
+                        <a href="{{ $node['href'] }}" wire:navigate class="mt-1 flex items-center gap-1 ps-3.5 text-sm font-bold text-secondary-dark hover:text-primary hover:underline dark:text-ink dark:hover:text-brand-text">
                             <span class="truncate">{{ $node['value'] }}</span>
                             <flux:icon.arrow-up-right variant="micro" class="size-3 shrink-0 rtl:-scale-x-100" />
                         </a>
                     @else
-                        <p class="mt-1 truncate ps-3.5 text-sm font-bold text-secondary-dark dark:text-white">{{ $node['value'] }}</p>
+                        <p class="mt-1 truncate ps-3.5 text-sm font-bold text-secondary-dark dark:text-ink">{{ $node['value'] }}</p>
                     @endif
                 </div>
             @endforeach
@@ -658,8 +658,8 @@ new #[Title('titles.report')] class extends Component {
                         <div class="flex flex-col items-center gap-1.5">
                             <span @class([
                                 'flex size-8 items-center justify-center rounded-full border-2 text-xs font-bold',
-                                'border-primary bg-primary text-white' => $reached,
-                                'border-secondary-light text-secondary-light dark:border-secondary-medium dark:text-secondary-medium' => ! $reached,
+                                'border-primary bg-primary dark:bg-ink-muted dark:border-ink-muted dark:text-surface-0 text-white' => $reached,
+                                'border-secondary-light text-secondary-light dark:border-ink-faint dark:text-ink-faint' => ! $reached,
                             ])>
                                 @if ($reached && ! $isCurrent)
                                     <flux:icon.check variant="micro" class="size-4" />
@@ -669,26 +669,26 @@ new #[Title('titles.report')] class extends Component {
                             </span>
                             <span @class([
                                 'type-meta whitespace-nowrap',
-                                'font-semibold text-secondary-dark dark:text-white' => $isCurrent,
-                                'text-secondary-medium dark:text-secondary-soft' => ! $isCurrent,
+                                'font-semibold text-secondary-dark dark:text-ink' => $isCurrent,
+                                'text-secondary-medium dark:text-ink-muted' => ! $isCurrent,
                             ])>{{ $step->label() }}</span>
                         </div>
 
                         @unless ($loop->last)
                             <span @class([
                                 'mx-2 h-0.5 flex-1',
-                                'bg-primary' => $index < $currentIndex,
-                                'bg-secondary-soft dark:bg-secondary-medium' => $index >= $currentIndex,
+                                'bg-primary dark:bg-ink-muted' => $index < $currentIndex,
+                                'bg-secondary-soft dark:bg-line-strong' => $index >= $currentIndex,
                             ])></span>
                         @endunless
                     </li>
                 @endforeach
             </ol>
 
-            <div class="flex flex-wrap items-center gap-3 border-t border-secondary-soft pt-3.5 dark:border-secondary-medium">
+            <div class="flex flex-wrap items-center gap-3 border-t border-secondary-soft pt-3.5 dark:border-line">
                 <div class="flex flex-wrap items-center gap-2 me-auto">
                     @if ($report->submit_date !== null)
-                        <span class="rounded-md border border-secondary-light px-2 py-0.5 text-xs font-semibold text-secondary-medium dark:text-secondary-soft">
+                        <span class="rounded-md border border-secondary-light px-2 py-0.5 text-xs font-semibold text-secondary-medium dark:text-ink-muted">
                             {{ __('reports.submitted_date', ['date' => $report->submit_date->translatedFormat(__('formats.date'))]) }}
                         </span>
                     @endif
@@ -700,7 +700,7 @@ new #[Title('titles.report')] class extends Component {
                     @endif
 
                     @unless ($report->isEditable())
-                        <span class="rounded-md border border-primary bg-primary px-2 py-0.5 text-xs font-semibold text-white">{{ __('reports.locked') }}</span>
+                        <span class="rounded-md border border-primary bg-primary dark:bg-white/10 dark:text-ink dark:border-line px-2 py-0.5 text-xs font-semibold text-white">{{ __('reports.locked') }}</span>
                     @endunless
                 </div>
 
@@ -747,20 +747,20 @@ new #[Title('titles.report')] class extends Component {
                 />
             </div>
 
-            <ul class="divide-y divide-secondary-soft dark:divide-secondary-medium">
+            <ul class="divide-y divide-secondary-soft dark:divide-line">
                 @foreach ($this->history as $row)
                     @php $isCurrent = $row->id === $report->id; @endphp
                     <li wire:key="history-{{ $row->id }}">
                         @if ($isCurrent)
                             <div class="flex items-center gap-3 bg-status-critical-soft p-3.5 dark:bg-primary/10">
-                                <span class="rounded-full bg-primary px-2 py-0.5 text-[11px] font-bold text-white">{{ __('reports.this_report') }}</span>
-                                <span class="tabular-nums text-sm text-secondary-dark dark:text-white">{{ $row->planned_date?->translatedFormat(__('formats.date')) }}</span>
+                                <span class="rounded-full bg-primary dark:bg-brand px-2 py-0.5 text-[11px] font-bold text-white">{{ __('reports.this_report') }}</span>
+                                <span class="tabular-nums text-sm text-secondary-dark dark:text-ink">{{ $row->planned_date?->translatedFormat(__('formats.date')) }}</span>
                                 <span class="ms-auto text-sm font-semibold tabular-nums">{{ number_format((float) $row->value, 2) }}</span>
                                 <x-ui.enum-badge :case="$row->status" />
                             </div>
                         @else
                             <a href="{{ route('reports.show', $row) }}" wire:navigate class="flex items-center gap-3 p-3.5 transition-colors hover:bg-board-head">
-                                <span class="tabular-nums text-sm text-secondary-medium dark:text-secondary-soft">{{ $row->planned_date?->translatedFormat(__('formats.date')) }}</span>
+                                <span class="tabular-nums text-sm text-secondary-medium dark:text-ink-muted">{{ $row->planned_date?->translatedFormat(__('formats.date')) }}</span>
                                 <span class="ms-auto text-sm font-semibold tabular-nums">{{ number_format((float) $row->value, 2) }}</span>
                                 <x-ui.enum-badge :case="$row->status" />
                             </a>
@@ -774,17 +774,17 @@ new #[Title('titles.report')] class extends Component {
     <x-ui.panel :title="__('reports.narrative_window')">
         <div class="flex flex-wrap gap-x-8 gap-y-4 p-4">
             <div class="min-w-28">
-                <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('reports.window_start') }}</p>
+                <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('reports.window_start') }}</p>
                 <p class="mt-1 text-lg font-bold tabular-nums">{{ $this->report->period_start?->translatedFormat(__('formats.date')) ?? '—' }}</p>
             </div>
             <div class="min-w-28">
-                <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('reports.window_end') }}</p>
+                <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('reports.window_end') }}</p>
                 <p class="mt-1 text-lg font-bold tabular-nums">{{ $this->report->period_end?->translatedFormat(__('formats.date')) ?? '—' }}</p>
             </div>
         </div>
 
         @if ($this->report->narrative_report_notes !== null)
-            <p class="border-t border-secondary-soft p-4 text-sm text-secondary-medium dark:border-secondary-medium dark:text-secondary-soft">{{ $this->report->narrative_report_notes }}</p>
+            <p class="border-t border-secondary-soft p-4 text-sm text-secondary-medium dark:border-line dark:text-ink-muted">{{ $this->report->narrative_report_notes }}</p>
         @endif
     </x-ui.panel>
 
@@ -801,14 +801,14 @@ new #[Title('titles.report')] class extends Component {
 
     {{-- The narrative reads as one continuous document rather than a wall of matching boxes: a fixed label column beside flowing text. --}}
     @if ($writtenSections->isNotEmpty())
-        <div class="flex flex-col divide-y divide-secondary-soft dark:divide-secondary-medium">
+        <div class="flex flex-col divide-y divide-secondary-soft dark:divide-line">
             @foreach ($writtenSections as $field => $section)
                 <div class="flex flex-col gap-2 py-6 first:pt-0 last:pb-0 @lg/detail:flex-row @lg/detail:gap-8" wire:key="narrative-{{ $field }}">
                     <div class="flex shrink-0 items-center gap-2 @lg/detail:w-48">
-                        <flux:icon :name="$section['icon']" variant="micro" class="size-4 shrink-0 text-secondary-medium dark:text-secondary-soft" />
-                        <p class="text-base font-bold text-secondary-dark dark:text-white">{{ $section['label'] }}</p>
+                        <flux:icon :name="$section['icon']" variant="micro" class="size-4 shrink-0 text-secondary-medium dark:text-ink-muted" />
+                        <p class="text-base font-bold text-secondary-dark dark:text-ink">{{ $section['label'] }}</p>
                     </div>
-                    <p class="max-w-3xl flex-1 text-sm whitespace-pre-line text-secondary-medium dark:text-secondary-soft">{{ $this->report->{$field} }}</p>
+                    <p class="max-w-3xl flex-1 text-sm whitespace-pre-line text-secondary-medium dark:text-ink-muted">{{ $this->report->{$field} }}</p>
                 </div>
             @endforeach
         </div>
@@ -832,7 +832,7 @@ new #[Title('titles.report')] class extends Component {
                 @endcan
             </x-ui.empty-state>
         @else
-            <ul class="divide-y divide-secondary-soft dark:divide-secondary-medium">
+            <ul class="divide-y divide-secondary-soft dark:divide-line">
                 @foreach ($this->files as $file)
                     @php
                         $fileName = $file->displayName();
@@ -845,23 +845,23 @@ new #[Title('titles.report')] class extends Component {
                     @endphp
                     <li class="flex flex-wrap items-center gap-3 p-3.5" wire:key="report-file-{{ $file->id }}">
                         @if ($isStored && in_array($file->type, [FileType::Jpg, FileType::Png], true))
-                            <button type="button" wire:click="openPreview({{ $file->id }})" class="size-10 shrink-0 overflow-hidden rounded-xl border border-secondary-soft dark:border-secondary-medium" aria-label="{{ __('reports.preview_name', ['name' => $fileName]) }}">
-                                <img src="{{ route('reports.files.preview', [$report, $file]) }}" alt="" loading="lazy" class="size-full object-cover" />
+                            <button type="button" wire:click="openPreview({{ $file->id }})" class="size-10 shrink-0 overflow-hidden rounded-xl border border-secondary-soft dark:border-line" aria-label="{{ __('reports.preview_name', ['name' => $fileName]) }}">
+                                <img src="{{ route('reports.files.preview', [$report, $file]) }}" alt="" loading="lazy" class="size-full object-cover" data-no-dim />
                             </button>
                         @else
-                            <span class="inline-flex size-10 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-secondary-soft bg-board-head dark:border-secondary-medium dark:bg-secondary-medium/30">
-                                <flux:icon :name="$fileIcon" variant="micro" class="size-3.5 text-secondary-medium dark:text-secondary-soft" />
-                                <span class="text-[10px] font-bold text-secondary-dark dark:text-white">{{ Str::upper($file->type->value) }}</span>
+                            <span class="inline-flex size-10 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-secondary-soft bg-board-head dark:border-line dark:bg-surface-2">
+                                <flux:icon :name="$fileIcon" variant="micro" class="size-3.5 text-secondary-medium dark:text-ink-muted" />
+                                <span class="text-[10px] font-bold text-secondary-dark dark:text-ink">{{ Str::upper($file->type->value) }}</span>
                             </span>
                         @endif
 
                         <div class="min-w-0 flex-1">
                             @if ($isStored)
-                                <button type="button" wire:click="openPreview({{ $file->id }})" class="block max-w-full truncate text-start text-sm font-medium hover:text-primary hover:underline" title="{{ $fileName }}" data-test="preview-file-name">{{ $fileName }}</button>
+                                <button type="button" wire:click="openPreview({{ $file->id }})" class="block max-w-full truncate text-start text-sm font-medium hover:text-primary dark:hover:text-brand-text hover:underline" title="{{ $fileName }}" data-test="preview-file-name">{{ $fileName }}</button>
                             @else
                                 <p class="truncate text-sm font-medium" title="{{ $fileName }}">{{ $fileName }}</p>
                             @endif
-                            <p class="flex flex-wrap items-center gap-x-1.5 text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">
+                            <p class="flex flex-wrap items-center gap-x-1.5 text-xs tabular-nums text-secondary-medium dark:text-ink-muted">
                                 <time datetime="{{ $file->date?->toDateString() }}">{{ $file->date?->translatedFormat(__('formats.date')) }}</time>
                                 @if ($file->size !== null)
                                     <span aria-hidden="true">&middot;</span>
@@ -882,7 +882,7 @@ new #[Title('titles.report')] class extends Component {
                                 <x-ui.button tone="ghost" size="sm" icon="eye" class="size-8!" wire:click="openPreview({{ $file->id }})" :aria-label="__('reports.preview_name', ['name' => $fileName])" data-test="preview-file-button" />
                                 <a
                                     href="{{ route('reports.files.download', [$report, $file]) }}"
-                                    class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-secondary-soft dark:hover:bg-secondary-medium dark:hover:text-white"
+                                    class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-ink-muted dark:hover:bg-surface-2 dark:hover:text-ink"
                                     aria-label="{{ __('common.download_name', ['name' => $fileName]) }}"
                                     data-test="download-file-link"
                                 >
@@ -892,7 +892,7 @@ new #[Title('titles.report')] class extends Component {
 
                             @can('update', $report)
                                 <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-8!" wire:click="openEditFileModal({{ $file->id }})" :aria-label="__('common.edit_name', ['name' => $fileName])" data-test="edit-file-button" />
-                                <x-ui.button tone="ghost" size="sm" icon="trash" class="size-8! text-primary! hover:bg-status-critical-soft!" wire:click="confirmDeleteFile({{ $file->id }})" :aria-label="__('common.delete_name', ['name' => $fileName])" data-test="delete-file-button" />
+                                <x-ui.button tone="ghost" size="sm" icon="trash" class="size-8! text-primary! dark:text-brand-text! hover:bg-status-critical-soft!" wire:click="confirmDeleteFile({{ $file->id }})" :aria-label="__('common.delete_name', ['name' => $fileName])" data-test="delete-file-button" />
                             @endcan
                         </div>
                     </li>
@@ -981,17 +981,17 @@ new #[Title('titles.report')] class extends Component {
                     <x-ui.button tone="ghost" size="sm" icon="chevron-right" class="size-8! rtl:[&_svg]:-scale-x-100" wire:click="previewAdjacent(1)" :aria-label="__('reports.next_file')" />
                 @endif
                 @if ($previewFile->isPreviewable())
-                    <a href="{{ $previewUrl }}" target="_blank" rel="noopener" class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-secondary-soft dark:hover:bg-secondary-medium dark:hover:text-white" aria-label="{{ __('reports.open_in_new_tab') }}">
+                    <a href="{{ $previewUrl }}" target="_blank" rel="noopener" class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-ink-muted dark:hover:bg-surface-2 dark:hover:text-ink" aria-label="{{ __('reports.open_in_new_tab') }}">
                         <flux:icon name="arrow-top-right-on-square" variant="micro" class="size-4" />
                     </a>
                 @endif
-                <a href="{{ $downloadUrl }}" class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-secondary-soft dark:hover:bg-secondary-medium dark:hover:text-white" aria-label="{{ __('common.download_name', ['name' => $previewName]) }}">
+                <a href="{{ $downloadUrl }}" class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-ink-muted dark:hover:bg-surface-2 dark:hover:text-ink" aria-label="{{ __('common.download_name', ['name' => $previewName]) }}">
                     <flux:icon name="arrow-down-tray" variant="micro" class="size-4" />
                 </a>
             </x-slot:headerActions>
 
             <div
-                class="bg-board-head dark:bg-secondary-medium/20"
+                class="bg-board-head dark:bg-surface-2"
                 wire:key="preview-{{ $previewFile->id }}"
                 x-data
                 x-on:keydown.left.window="$wire.previewAdjacent(document.dir === 'rtl' ? 1 : -1)"
@@ -1003,7 +1003,7 @@ new #[Title('titles.report')] class extends Component {
                     <iframe src="{{ $previewUrl }}#view=FitH" title="{{ $previewName }}" class="h-[75dvh] w-full border-0 bg-white" data-test="pdf-preview"></iframe>
                 @elseif ($previewFile->isPreviewable())
                     <div class="flex min-h-[50dvh] items-center justify-center p-4">
-                        <img src="{{ $previewUrl }}" alt="{{ $previewName }}" class="max-h-[75dvh] max-w-full rounded-lg object-contain shadow-sm" data-test="image-preview" />
+                        <img src="{{ $previewUrl }}" alt="{{ $previewName }}" class="max-h-[75dvh] max-w-full rounded-lg object-contain shadow-sm" data-test="image-preview" data-no-dim />
                     </div>
                 @else
                     {{-- Word/Excel: rendered client-side by resources/js/file-preview.js from the authenticated download route. --}}
@@ -1013,19 +1013,19 @@ new #[Title('titles.report')] class extends Component {
                         class="flex h-[75dvh] flex-col"
                         data-test="office-preview"
                     >
-                        <div x-show="sheets.length > 1" class="flex shrink-0 gap-1 overflow-x-auto border-b border-secondary-soft bg-white px-3 py-2 dark:border-secondary-medium dark:bg-secondary-dark">
+                        <div x-show="sheets.length > 1" class="flex shrink-0 gap-1 overflow-x-auto border-b border-secondary-soft bg-white px-3 py-2 dark:border-line dark:bg-surface-1">
                             <template x-for="(sheetName, index) in sheets" :key="index">
                                 <button
                                     type="button"
                                     x-on:click="showSheet(index)"
                                     x-text="sheetName"
                                     class="shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold whitespace-nowrap"
-                                    :class="index === activeSheet ? 'bg-primary text-white' : 'text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium'"
+                                    :class="index === activeSheet ? 'bg-primary dark:bg-ink dark:text-surface-0 text-white' : 'text-secondary-medium hover:bg-secondary-soft dark:text-ink-muted dark:hover:bg-surface-2'"
                                 ></button>
                             </template>
                         </div>
 
-                        <div x-show="status === 'loading'" class="flex flex-1 items-center justify-center gap-2 text-sm text-secondary-medium dark:text-secondary-soft">
+                        <div x-show="status === 'loading'" class="flex flex-1 items-center justify-center gap-2 text-sm text-secondary-medium dark:text-ink-muted">
                             <flux:icon.loading class="size-5" />
                             {{ __('reports.loading_preview') }}
                         </div>
@@ -1033,7 +1033,7 @@ new #[Title('titles.report')] class extends Component {
                         <div x-show="status === 'error'" x-cloak class="flex-1">
                             <x-ui.empty-state icon="exclamation-triangle" :heading="__('reports.preview_not_available')" :body="__('reports.this_file_could_not_be_previewed')">
                                 <x-slot:action>
-                                    <a href="{{ $downloadUrl }}" class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:opacity-90">
+                                    <a href="{{ $downloadUrl }}" class="inline-flex items-center gap-1.5 rounded-lg bg-primary dark:bg-brand dark:hover:bg-brand-hover px-3 py-2 text-sm font-semibold text-white hover:opacity-90">
                                         <flux:icon name="arrow-down-tray" variant="micro" class="size-4" />
                                         {{ __('common.download_name', ['name' => $previewName]) }}
                                     </a>
@@ -1043,7 +1043,7 @@ new #[Title('titles.report')] class extends Component {
 
                         <div x-show="status === 'ready'" x-cloak x-ref="canvas" class="min-h-0 flex-1 overflow-auto"></div>
 
-                        <p x-show="truncated" x-cloak class="shrink-0 border-t border-secondary-soft bg-white px-3 py-2 text-xs text-secondary-medium dark:border-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft">{{ __('reports.sheet_preview_truncated', ['rows' => 500]) }}</p>
+                        <p x-show="truncated" x-cloak class="shrink-0 border-t border-secondary-soft bg-white px-3 py-2 text-xs text-secondary-medium dark:border-line dark:bg-surface-1 dark:text-ink-muted">{{ __('reports.sheet_preview_truncated', ['rows' => 500]) }}</p>
                     </div>
                 @endif
             </div>

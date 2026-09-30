@@ -836,7 +836,7 @@ new #[Title('titles.project')] class extends Component {
 };
 ?>
 
-<section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white">
+<section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink">
     <x-ui.detail-header
         :breadcrumbs="[
             ['label' => __('common.projects'), 'url' => route('projects.index')],
@@ -855,12 +855,12 @@ new #[Title('titles.project')] class extends Component {
         <x-slot:actions>
             <div class="flex flex-wrap items-center gap-2">
                 <x-ui.enum-badge :case="$this->project->status" />
-                <x-ui.employee-chip :employee="$this->project->user" class="rounded-lg border border-secondary-soft p-2.5 dark:border-secondary-medium" />
+                <x-ui.employee-chip :employee="$this->project->user" class="rounded-lg border border-secondary-soft p-2.5 dark:border-line" />
             </div>
         </x-slot:actions>
 
         <x-slot:summary>
-            <div class="flex flex-wrap items-center gap-4 rounded-xl border border-secondary-soft bg-board px-4 py-3 dark:border-secondary-medium">
+            <div class="flex flex-wrap items-center gap-4 rounded-xl border border-secondary-soft bg-board px-4 py-3 dark:border-line">
                 <x-ui.progress-ring
                     size="lg"
                     :value="$this->milestoneProgressPercent"
@@ -868,8 +868,8 @@ new #[Title('titles.project')] class extends Component {
                     :label="__('projects.milestone_progress')"
                 />
                 <div class="min-w-0">
-                    <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.milestone_progress') }}</p>
-                    <p class="mt-0.5 text-sm font-semibold text-secondary-dark dark:text-white">
+                    <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('projects.milestone_progress') }}</p>
+                    <p class="mt-0.5 text-sm font-semibold text-secondary-dark dark:text-ink">
                         {{ $this->milestoneProgressPercent === null ? __('projects.no_weighted_milestones') : __('projects.milestones_reached', ['reached' => $this->project->reached_milestones_count, 'total' => $this->project->milestones_count]) }}
                     </p>
                     <div class="mt-1.5">
@@ -893,9 +893,9 @@ new #[Title('titles.project')] class extends Component {
     <div @class(['grid gap-4', '@5xl/detail:grid-cols-3' => $this->canViewMoney(), '@5xl/detail:grid-cols-2' => ! $this->canViewMoney()])>
         <x-ui.panel :title="__('common.description')">
             @if ($this->project->description === null)
-                <p class="p-3.5 text-sm italic text-secondary-medium dark:text-secondary-soft">{{ __('projects.no_description_recorded') }}</p>
+                <p class="p-3.5 text-sm italic text-secondary-medium dark:text-ink-muted">{{ __('projects.no_description_recorded') }}</p>
             @else
-                <p class="p-3.5 text-sm leading-6 text-secondary-medium dark:text-secondary-soft">{{ $this->project->description }}</p>
+                <p class="p-3.5 text-sm leading-6 text-secondary-medium dark:text-ink-muted">{{ $this->project->description }}</p>
             @endif
         </x-ui.panel>
 
@@ -905,8 +905,8 @@ new #[Title('titles.project')] class extends Component {
                 @foreach ([__('projects.men') => $this->project->target_men, __('projects.women') => $this->project->target_women, __('projects.boys') => $this->project->target_boys, __('projects.girls') => $this->project->target_girls] as $label => $value)
                     <div wire:key="project-demographic-{{ strtolower($label) }}">
                         <div class="flex items-baseline justify-between gap-2">
-                            <p class="type-meta text-secondary-medium dark:text-secondary-soft">{{ $label }}</p>
-                            <p class="text-sm font-semibold tabular-nums text-secondary-dark dark:text-white">{{ $value === null ? '—' : number_format($value) }}</p>
+                            <p class="type-meta text-secondary-medium dark:text-ink-muted">{{ $label }}</p>
+                            <p class="text-sm font-semibold tabular-nums text-secondary-dark dark:text-ink">{{ $value === null ? '—' : number_format($value) }}</p>
                         </div>
                         <x-ui.progress-bar
                             class="mt-1"
@@ -963,11 +963,11 @@ new #[Title('titles.project')] class extends Component {
                     $taskTotal = $this->tasks->count();
                     $taskOverdue = $this->tasks->filter(fn (Task $task): bool => $task->status !== TaskStatus::Done && $task->due_date !== null && $task->due_date->lt(today()))->count();
                     $taskUnassigned = $this->tasks->filter(fn (Task $task): bool => $task->taskAssignees->isEmpty())->count();
-                    $taskInkText = 'text-secondary-dark dark:text-white';
-                    $taskMutedText = 'text-secondary-medium dark:text-secondary-soft';
+                    $taskInkText = 'text-secondary-dark dark:text-ink';
+                    $taskMutedText = 'text-secondary-medium dark:text-ink-muted';
                 @endphp
 
-                <div class="grid gap-3 border-b border-secondary-soft p-3.5 @lg/detail:grid-cols-3 dark:border-secondary-medium">
+                <div class="grid gap-3 border-b border-secondary-soft p-3.5 @lg/detail:grid-cols-3 dark:border-line">
                     <x-ui.stat-tile :label="__('projects.stat_tasks_done')" :value="$taskDone" :denominator="$taskTotal" />
                     <x-ui.stat-tile :label="__('tasks.overdue')" :value="$taskOverdue" :tone="$taskOverdue > 0 ? 'warn' : null" />
                     <x-ui.stat-tile :label="__('common.unassigned')" :value="$taskUnassigned" />
@@ -980,7 +980,7 @@ new #[Title('titles.project')] class extends Component {
                     @endforeach
                 </div>
 
-                <ul class="divide-y divide-secondary-soft px-3.5 pb-3.5 @6xl/detail:px-5 @6xl/detail:pb-5 dark:divide-secondary-medium">
+                <ul class="divide-y divide-secondary-soft px-3.5 pb-3.5 @6xl/detail:px-5 @6xl/detail:pb-5 dark:divide-line">
                     @foreach ($this->tasks as $task)
                         @include('pages.projects._task-row', ['task' => $task, 'inkText' => $taskInkText, 'mutedText' => $taskMutedText])
                     @endforeach
@@ -998,7 +998,7 @@ new #[Title('titles.project')] class extends Component {
     @elseif ($tab === 'risks')
         <x-ui.panel :title="__('projects.risk_register')" :count="$this->risks->count()" :subtitle="__('projects.risks_that_have_materialised_are_listed_first')">
             <x-slot:toolbar>
-                <a href="{{ route('risks.index', ['project' => $this->projectId]) }}" wire:navigate class="type-meta font-semibold text-secondary-medium hover:text-primary hover:underline dark:text-secondary-soft dark:hover:text-primary">
+                <a href="{{ route('risks.index', ['project' => $this->projectId]) }}" wire:navigate class="type-meta font-semibold text-secondary-medium hover:text-primary hover:underline dark:text-ink-muted dark:hover:text-brand-text">
                     {{ __('projects.manage_risks') }}
                 </a>
             </x-slot:toolbar>
@@ -1018,16 +1018,16 @@ new #[Title('titles.project')] class extends Component {
                             'label' => __('common.materialised'),
                             'icon' => 'exclamation-triangle',
                             'risks' => $materialisedRisks,
-                            'laneClasses' => 'border-primary bg-white dark:bg-secondary-dark',
-                            'headerClasses' => 'bg-primary text-white',
+                            'laneClasses' => 'border-primary bg-white dark:bg-surface-1',
+                            'headerClasses' => 'bg-primary dark:border-transparent dark:bg-status-critical-soft dark:text-status-critical text-white',
                         ],
                         [
                             'key' => 'watching',
                             'label' => __('common.watching'),
                             'icon' => 'eye',
                             'risks' => $watchingRisks,
-                            'laneClasses' => 'border-secondary-soft bg-white dark:border-secondary-medium dark:bg-secondary-dark',
-                            'headerClasses' => 'bg-board-head text-secondary-medium dark:bg-secondary-medium/30 dark:text-secondary-soft',
+                            'laneClasses' => 'border-secondary-soft bg-white dark:border-line dark:bg-surface-1',
+                            'headerClasses' => 'bg-board-head text-secondary-medium dark:bg-surface-2 dark:text-ink-muted',
                         ],
                     ], fn ($lane) => $lane['risks']->isNotEmpty()));
                 @endphp
@@ -1041,18 +1041,18 @@ new #[Title('titles.project')] class extends Component {
                                     <span class="ms-auto text-xs font-semibold tabular-nums">{{ $lane['risks']->count() }}</span>
                                 </div>
 
-                                <div class="flex flex-col divide-y divide-secondary-soft dark:divide-secondary-medium">
+                                <div class="flex flex-col divide-y divide-secondary-soft dark:divide-line">
                                     @foreach ($lane['risks'] as $risk)
                                         <article class="flex flex-col gap-2.5 p-3.5" wire:key="project-risk-{{ $risk->id }}">
-                                            <p class="text-sm font-semibold text-secondary-dark dark:text-white">{{ $risk->name }}</p>
-                                            <p class="type-body text-secondary-medium dark:text-secondary-soft">{{ $risk->impact }}</p>
-                                            <div class="flex items-start gap-1.5 border-t border-secondary-soft pt-2.5 dark:border-secondary-medium">
+                                            <p class="text-sm font-semibold text-secondary-dark dark:text-ink">{{ $risk->name }}</p>
+                                            <p class="type-body text-secondary-medium dark:text-ink-muted">{{ $risk->impact }}</p>
+                                            <div class="flex items-start gap-1.5 border-t border-secondary-soft pt-2.5 dark:border-line">
                                                 @if ($risk->solution !== null)
-                                                    <flux:icon name="check-circle" variant="micro" class="mt-0.5 size-4 shrink-0 text-secondary-medium dark:text-secondary-soft" />
-                                                    <p class="type-body text-secondary-dark dark:text-white">{{ $risk->solution }}</p>
+                                                    <flux:icon name="check-circle" variant="micro" class="mt-0.5 size-4 shrink-0 text-secondary-medium dark:text-ink-muted" />
+                                                    <p class="type-body text-secondary-dark dark:text-ink">{{ $risk->solution }}</p>
                                                 @else
-                                                    <flux:icon name="exclamation-circle" variant="micro" class="mt-0.5 size-4 shrink-0 text-primary" />
-                                                    <p class="type-body italic text-primary">{{ __('risks.no_mitigation_recorded_yet') }}</p>
+                                                    <flux:icon name="exclamation-circle" variant="micro" class="mt-0.5 size-4 shrink-0 text-primary dark:text-brand-text" />
+                                                    <p class="type-body italic text-primary dark:text-brand-text">{{ __('risks.no_mitigation_recorded_yet') }}</p>
                                                 @endif
                                             </div>
                                         </article>
@@ -1074,7 +1074,7 @@ new #[Title('titles.project')] class extends Component {
                     $viaProposal = $this->targets->count() - $viaAnnualPlan;
                     $reportsFiled = $this->targets->sum('reports_count');
                 @endphp
-                <div class="grid gap-3 border-b border-secondary-soft p-3.5 @lg/detail:grid-cols-4 dark:border-secondary-medium">
+                <div class="grid gap-3 border-b border-secondary-soft p-3.5 @lg/detail:grid-cols-4 dark:border-line">
                     <x-ui.stat-tile :label="__('projects.stat_indicators_covered')" :value="$this->targetedIndicatorCount" icon="chart-bar" />
                     <x-ui.stat-tile :label="__('projects.stat_committed_via_annual_plans')" :value="$viaAnnualPlan" icon="calendar-days" />
                     <x-ui.stat-tile :label="__('projects.stat_committed_via_proposals')" :value="$viaProposal" icon="document-text" />
@@ -1100,7 +1100,7 @@ new #[Title('titles.project')] class extends Component {
                 </x-ui.empty-state>
             @else
                 @if (count($this->fileCategoryCounts) > 2)
-                    <div class="flex flex-wrap items-center gap-2 border-b border-secondary-soft p-3.5 dark:border-secondary-medium">
+                    <div class="flex flex-wrap items-center gap-2 border-b border-secondary-soft p-3.5 dark:border-line">
                         @foreach ($this->fileCategoryCounts as $category)
                             @php $isActive = $fileCategoryFilter === $category['value']; @endphp
                             <button
@@ -1110,15 +1110,15 @@ new #[Title('titles.project')] class extends Component {
                                 aria-pressed="{{ $isActive ? 'true' : 'false' }}"
                                 @class([
                                     'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 type-meta font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-primary',
-                                    'border-secondary-dark bg-secondary-dark text-white dark:border-white dark:bg-white dark:text-secondary-dark' => $isActive,
-                                    'border-secondary-soft text-secondary-medium hover:border-secondary-light hover:text-secondary-dark dark:border-secondary-medium dark:text-secondary-soft dark:hover:text-white' => ! $isActive,
+                                    'border-secondary-dark bg-secondary-dark text-white dark:border-ink dark:bg-ink dark:text-surface-0' => $isActive,
+                                    'border-secondary-soft text-secondary-medium hover:border-secondary-light hover:text-secondary-dark dark:border-line dark:text-ink-muted dark:hover:text-ink' => ! $isActive,
                                 ])
                             >
                                 {{ $category['label'] }}
                                 <span @class([
                                     'inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-px text-[10px] tabular-nums',
                                     'bg-white/20' => $isActive,
-                                    'bg-secondary-soft dark:bg-secondary-medium' => ! $isActive,
+                                    'bg-secondary-soft dark:bg-surface-2' => ! $isActive,
                                 ])>{{ $category['count'] }}</span>
                             </button>
                         @endforeach
@@ -1158,7 +1158,7 @@ new #[Title('titles.project')] class extends Component {
                 <x-ui.empty-state icon="document-text" :heading="__('projects.no_proposals_linked')" :body="__('projects.link_a_proposal_to_record_which_funding_covers_this_project')" />
             @else
                 @php $summary = $this->proposalsSummary; @endphp
-                <div @class(['grid gap-3 border-b border-secondary-soft p-3.5 dark:border-secondary-medium', '@lg/detail:grid-cols-3' => $this->canViewMoney()])>
+                <div @class(['grid gap-3 border-b border-secondary-soft p-3.5 dark:border-line', '@lg/detail:grid-cols-3' => $this->canViewMoney()])>
                     @if ($this->canViewMoney())
                         <x-ui.stat-tile :label="__('projects.stat_donors_funding')" :value="$summary['donors']" icon="building-library" />
                         <x-ui.stat-tile :label="__('projects.stat_funding_agreements')" :value="$summary['agreements']" icon="document-check" />
@@ -1169,17 +1169,17 @@ new #[Title('titles.project')] class extends Component {
                 <div class="grid gap-4 p-3.5 @3xl/detail:grid-cols-2 @3xl/detail:p-5">
                     @foreach ($this->attachedProposals as $proposal)
                         <article
-                            class="group flex flex-col gap-3.5 rounded-xl border border-secondary-soft bg-white p-4 transition-all hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgba(16,24,40,0.06),0_4px_8px_rgba(16,24,40,0.08)] dark:border-secondary-medium dark:bg-secondary-dark dark:hover:shadow-none"
+                            class="group flex flex-col gap-3.5 rounded-xl border border-secondary-soft bg-white p-4 transition-all hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgba(16,24,40,0.06),0_4px_8px_rgba(16,24,40,0.08)] dark:border-transparent dark:bg-surface-1 dark:hover:shadow-raised"
                             wire:key="project-proposal-{{ $proposal->id }}"
                         >
                             <div class="flex items-start justify-between gap-3">
                                 <div class="min-w-0">
                                     @if ($this->canViewProposals())
-                                        <a href="{{ route('proposals.show', $proposal) }}" wire:navigate class="truncate text-base font-bold text-secondary-dark hover:underline dark:text-white">{{ $proposal->name }}</a>
+                                        <a href="{{ route('proposals.show', $proposal) }}" wire:navigate class="truncate text-base font-bold text-secondary-dark hover:underline dark:text-ink">{{ $proposal->name }}</a>
                                     @else
-                                        <p class="truncate text-base font-bold text-secondary-dark dark:text-white">{{ $proposal->name }}</p>
+                                        <p class="truncate text-base font-bold text-secondary-dark dark:text-ink">{{ $proposal->name }}</p>
                                     @endif
-                                    <p class="mt-1 flex items-center gap-1.5 text-xs text-secondary-medium dark:text-secondary-soft">
+                                    <p class="mt-1 flex items-center gap-1.5 text-xs text-secondary-medium dark:text-ink-muted">
                                         <flux:icon name="calendar-days" variant="micro" class="size-3.5 shrink-0" />
                                         <span class="tabular-nums">{{ $proposal->planned_date_begin?->translatedFormat(__('formats.date')) }} – {{ $proposal->planned_date_end?->translatedFormat(__('formats.date')) }}</span>
                                     </p>
@@ -1198,21 +1198,21 @@ new #[Title('titles.project')] class extends Component {
 
                             <div class="flex flex-wrap items-center gap-2">
                                 <x-ui.enum-badge :case="$proposal->status" />
-                                <span class="rounded-md border border-secondary-light px-2 py-0.5 text-[11px] font-semibold text-secondary-medium dark:text-secondary-soft">
+                                <span class="rounded-md border border-secondary-light px-2 py-0.5 text-[11px] font-semibold text-secondary-medium dark:text-ink-muted">
                                     {{ $proposal->phase->label() }}
                                 </span>
                             </div>
 
                             @if ($proposal->donorNames->isEmpty())
-                                <p class="type-meta border-t border-secondary-soft pt-3 italic text-secondary-medium dark:border-secondary-medium dark:text-secondary-soft">
+                                <p class="type-meta border-t border-secondary-soft pt-3 italic text-secondary-medium dark:border-line dark:text-ink-muted">
                                     {{ __('projects.no_funding_agreement_recorded_yet') }}
                                 </p>
                             @else
-                                <div class="flex flex-col gap-3 border-t border-secondary-soft pt-3 dark:border-secondary-medium">
+                                <div class="flex flex-col gap-3 border-t border-secondary-soft pt-3 dark:border-line">
                                     <div class="flex flex-wrap items-center gap-1.5">
                                         @foreach ($proposal->donorNames->unique('id') as $donor)
-                                            <span class="inline-flex items-center gap-1 rounded-full border border-secondary-light bg-board px-2 py-0.5 text-[11px] font-semibold text-secondary-dark dark:border-secondary-medium dark:text-white" wire:key="proposal-{{ $proposal->id }}-donor-{{ $donor->id }}">
-                                                <flux:icon name="building-library" variant="micro" class="size-3 shrink-0 text-secondary-medium dark:text-secondary-soft" />
+                                            <span class="inline-flex items-center gap-1 rounded-full border border-secondary-light bg-board px-2 py-0.5 text-[11px] font-semibold text-secondary-dark dark:border-line dark:text-ink" wire:key="proposal-{{ $proposal->id }}-donor-{{ $donor->id }}">
+                                                <flux:icon name="building-library" variant="micro" class="size-3 shrink-0 text-secondary-medium dark:text-ink-muted" />
                                                 {{ $donor->name }}
                                             </span>
                                         @endforeach

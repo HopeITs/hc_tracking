@@ -13,19 +13,19 @@
             <div class="min-w-0 flex-1">
                 <div class="flex flex-wrap items-center gap-2">
                     @if (in_array($milestone->id, $this->unreadIds, true))
-                        <span class="size-2 shrink-0 rounded-full bg-primary" data-unread-dot="milestone-{{ $milestone->id }}" title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
+                        <span class="size-2 shrink-0 rounded-full bg-primary dark:bg-ink" data-unread-dot="milestone-{{ $milestone->id }}" title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
                     @endif
-                    <p class="min-w-0 font-semibold text-secondary-dark dark:text-white">{{ $milestone->name }}</p>
+                    <p class="min-w-0 font-semibold text-secondary-dark dark:text-ink">{{ $milestone->name }}</p>
                     <x-ui.enum-badge :case="$milestone->status" />
                     <x-ui.milestone-flags :milestone="$milestone" />
                 </div>
-                <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-secondary-medium dark:text-secondary-soft">
+                <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-secondary-medium dark:text-ink-muted">
                     <span>{{ __('milestones.planned_date', ['date' => $milestone->planned_start_date->translatedFormat(__('formats.date'))]) }}</span>
                     <span>{{ __('milestones.weight_weight', ['weight' => $milestone->weight_percentage]) }}</span>
                     <x-ui.employee-chip :employee="$milestone->responsibleUser" compact />
                 </div>
                 @if ($milestone->description !== null)
-                    <p class="mt-2 text-sm leading-5 text-secondary-medium dark:text-secondary-soft">{{ $milestone->description }}</p>
+                    <p class="mt-2 text-sm leading-5 text-secondary-medium dark:text-ink-muted">{{ $milestone->description }}</p>
                 @endif
             </div>
         </div>

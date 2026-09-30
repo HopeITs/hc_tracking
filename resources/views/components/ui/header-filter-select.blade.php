@@ -42,7 +42,7 @@
 @endphp
 
 <div class="min-w-0" data-header-filter-select>
-    <label for="{{ $id }}" class="mb-1.5 block text-[11px] font-semibold uppercase leading-4 tracking-[0.1em] text-secondary-medium dark:text-secondary-soft">
+    <label for="{{ $id }}" class="mb-1.5 block text-[11px] font-semibold uppercase leading-4 tracking-[0.1em] text-secondary-medium dark:text-ink-muted">
         {{ $label }}
     </label>
 
@@ -59,7 +59,7 @@
 
         <flux:menu class="program-filter-menu">
             @if ($searchable)
-                <div class="border-b border-secondary-soft p-1.5 dark:border-secondary-medium">
+                <div class="border-b border-secondary-soft p-1.5 dark:border-line">
                     <x-ui.input
                         type="search"
                         size="sm"

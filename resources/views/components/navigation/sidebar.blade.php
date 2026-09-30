@@ -2,8 +2,8 @@
     $moduleCounts = auth()->check() && ! \App\Http\Middleware\EnsureTwoFactorIsEnabled::mustEnrol(auth()->user())
         ? app(\App\Notifications\UnreadCounts::class)->for(auth()->user())['modules']
         : [];
-    $navigationGroupClasses = '[&>div:first-child>div]:text-[11px]! [&>div:first-child>div]:font-semibold! [&>div:first-child>div]:tracking-[0.12em] [&>div:first-child>div]:text-secondary-light! [&>div:first-child>div]:uppercase dark:[&>div:first-child>div]:text-secondary-soft! in-data-flux-sidebar-collapsed-desktop:flex!';
-    $navigationItemClasses = 'touch-manipulation rounded-lg! in-data-flux-sidebar-collapsed-desktop:rounded-2xl! text-secondary-dark! hover:bg-secondary-soft/70! max-lg:h-11! data-current:border-primary! data-current:bg-primary! data-current:font-semibold! data-current:text-white! data-current:shadow-sm! dark:text-secondary-soft! dark:hover:bg-white/10! dark:hover:text-white! dark:data-current:border-primary! dark:data-current:bg-primary! dark:data-current:text-white!';
+    $navigationGroupClasses = '[&>div:first-child>div]:text-[11px]! [&>div:first-child>div]:font-semibold! [&>div:first-child>div]:tracking-[0.12em] [&>div:first-child>div]:text-secondary-light! [&>div:first-child>div]:uppercase dark:[&>div:first-child>div]:text-ink-muted! in-data-flux-sidebar-collapsed-desktop:flex!';
+    $navigationItemClasses = 'touch-manipulation rounded-lg! in-data-flux-sidebar-collapsed-desktop:rounded-2xl! text-secondary-dark! hover:bg-secondary-soft/70! max-lg:h-11! data-current:border-primary! data-current:bg-primary! data-current:font-semibold! data-current:text-white! data-current:shadow-sm! dark:text-ink-muted! dark:hover:bg-white/[0.06]! dark:hover:text-ink! dark:data-current:border-transparent! dark:data-current:bg-surface-2! dark:data-current:text-ink! dark:data-current:shadow-none! dark:data-current:before:absolute dark:data-current:before:inset-y-1.5 dark:data-current:before:start-0 dark:data-current:before:w-0.5 dark:data-current:before:rounded-full dark:data-current:before:bg-brand in-data-flux-sidebar-collapsed-desktop:dark:data-current:before:hidden';
 @endphp
 
 {{-- flux-sidebar-toggle opens the window in which app.css animates the desktop collapse, so restoring a saved state on page load never animates. --}}
@@ -14,12 +14,12 @@
     data-navigation-sidebar
     x-on:keydown.escape.window="if (window.matchMedia('(max-width: 63.999rem)').matches && ! $el.hasAttribute('data-flux-sidebar-collapsed-mobile')) { $dispatch('flux-sidebar-toggle') }"
     x-on:flux-sidebar-toggle.document="$el.setAttribute('data-sidebar-animating', ''); clearTimeout($el.sidebarAnimationTimer); $el.sidebarAnimationTimer = setTimeout(() => $el.removeAttribute('data-sidebar-animating'), 500)"
-    class="relative z-50! gap-3! overflow-visible! border-e border-secondary-soft bg-white p-3! text-secondary-dark shadow-[1px_0_0_0_rgba(0,0,0,0.02)] max-lg:duration-300 max-lg:ease-drawer motion-reduce:duration-0 motion-reduce:transition-none max-lg:w-[min(18rem,calc(100vw_-_2.75rem))]! max-lg:shadow-2xl lg:w-[clamp(16rem,18vw,18rem)]! dark:border-secondary-medium dark:bg-secondary-dark dark:text-white dark:shadow-none data-[flux-sidebar-collapsed-desktop]:lg:w-[calc(4rem+1px+var(--sidebar-scrollbar,0px))]! data-[flux-sidebar-collapsed-desktop]:cursor-default!"
+    class="relative z-50! gap-3! overflow-visible! border-e border-secondary-soft bg-white p-3! text-secondary-dark shadow-[1px_0_0_0_rgba(0,0,0,0.02)] max-lg:duration-300 max-lg:ease-drawer motion-reduce:duration-0 motion-reduce:transition-none max-lg:w-[min(18rem,calc(100vw_-_2.75rem))]! max-lg:shadow-2xl lg:w-[clamp(16rem,18vw,18rem)]! dark:border-line dark:bg-surface-1 dark:text-ink dark:shadow-none data-[flux-sidebar-collapsed-desktop]:lg:w-[calc(4rem+1px+var(--sidebar-scrollbar,0px))]! data-[flux-sidebar-collapsed-desktop]:cursor-default!"
 >
     <div
         x-data
         x-on:click="$dispatch('flux-sidebar-toggle')"
-        class="absolute -end-4 top-[15.5px] z-20 hidden size-8 shrink-0 cursor-pointer touch-manipulation items-center justify-center rounded-full border border-secondary-soft bg-white text-secondary-medium shadow-[0_1px_2px_rgba(16,24,40,0.08)] hover:text-secondary-dark lg:flex dark:border-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft dark:hover:text-white"
+        class="absolute -end-4 top-[15.5px] z-20 hidden size-8 shrink-0 cursor-pointer touch-manipulation items-center justify-center rounded-full border border-secondary-soft bg-white text-secondary-medium shadow-[0_1px_2px_rgba(16,24,40,0.08)] hover:text-secondary-dark lg:flex dark:border-line dark:bg-surface-1 dark:text-ink-muted dark:hover:text-ink"
         role="button"
         tabindex="0"
         x-on:keydown.enter="$dispatch('flux-sidebar-toggle')"
@@ -31,36 +31,52 @@
         <flux:icon.chevron-left class="size-4 in-data-flux-sidebar-collapsed-desktop:rotate-180 rtl:rotate-180 in-data-flux-sidebar-collapsed-desktop:rtl:rotate-0" data-desktop-navigation-collapse-icon />
     </div>
 
-    <flux:sidebar.header class="-mx-3 -mt-3 h-16 shrink-0 border-b border-secondary-soft px-3 dark:border-secondary-medium">
+    <flux:sidebar.header class="-mx-3 -mt-3 h-16 shrink-0 border-b border-secondary-soft px-3 dark:border-line">
         <x-app-logo
             :sidebar="true"
             :href="route('dashboard')"
-            class="touch-manipulation text-secondary-dark max-lg:min-h-11 dark:text-white in-data-flux-sidebar-collapsed-desktop:in-data-flux-sidebar-active:static! in-data-flux-sidebar-collapsed-desktop:in-data-flux-sidebar-active:opacity-100!"
+            class="touch-manipulation text-secondary-dark max-lg:min-h-11 dark:text-ink in-data-flux-sidebar-collapsed-desktop:in-data-flux-sidebar-active:static! in-data-flux-sidebar-collapsed-desktop:in-data-flux-sidebar-active:opacity-100!"
             wire:navigate
         />
 
         <flux:sidebar.collapse
-            class="size-11! touch-manipulation text-secondary-medium lg:hidden dark:text-secondary-soft"
+            class="size-11! touch-manipulation text-secondary-medium lg:hidden dark:text-ink-muted"
             data-mobile-navigation-close
         />
     </flux:sidebar.header>
 
     {{-- Mobile drawer only: the header row has no room beside the full logo, and a bottom row can sit under the browser's own toolbar. --}}
-    <div class="-mx-3 -mt-3 flex shrink-0 items-center justify-between gap-2 border-b border-secondary-soft px-3 py-1.5 lg:hidden dark:border-secondary-medium" data-sidebar-preferences>
-        <flux:button
-            x-data
-            x-on:click="$flux.dark = ! $flux.dark"
-            variant="ghost"
-            size="sm"
-            square
-            class="size-9! touch-manipulation text-secondary-medium! hover:bg-secondary-soft/70! hover:text-secondary-dark! max-lg:size-11! dark:text-secondary-soft! dark:hover:bg-white/10! dark:hover:text-white!"
-            :aria-label="__('navigation.toggle_theme')"
-            :tooltip="__('navigation.toggle_theme')"
-            data-theme-toggle
-        >
-            <flux:icon.moon x-show="! $flux.dark" variant="mini" />
-            <flux:icon.sun x-show="$flux.dark" x-cloak variant="mini" />
-        </flux:button>
+    <div class="-mx-3 -mt-3 flex shrink-0 items-center justify-between gap-2 border-b border-secondary-soft px-3 py-1.5 lg:hidden dark:border-line" data-sidebar-preferences>
+        {{-- Same Light / Dark / System menu as the desktop top header (layouts/app/sidebar.blade.php). --}}
+        <flux:dropdown x-data position="bottom" align="start">
+            <flux:button
+                variant="ghost"
+                size="sm"
+                square
+                class="size-9! touch-manipulation text-secondary-medium! hover:bg-secondary-soft/70! hover:text-secondary-dark! max-lg:size-11! dark:text-ink-muted! dark:hover:bg-white/10! dark:hover:text-ink!"
+                :aria-label="__('common.appearance')"
+                :tooltip="__('common.appearance')"
+                data-theme-toggle
+            >
+                <flux:icon.sun x-show="$flux.appearance === 'light'" x-cloak variant="mini" />
+                <flux:icon.moon x-show="$flux.appearance === 'dark'" x-cloak variant="mini" />
+                <flux:icon.computer-desktop x-show="$flux.appearance === 'system'" x-cloak variant="mini" />
+            </flux:button>
+
+            <flux:menu :aria-label="__('common.appearance')">
+                <flux:menu.radio.group x-bind:value="$flux.appearance">
+                    <flux:menu.radio value="light" icon:trailing="sun" class="min-h-11 touch-manipulation" x-on:click="hcSetAppearance('light')" data-appearance-option="light">
+                        {{ __('navigation.appearance_light') }}
+                    </flux:menu.radio>
+                    <flux:menu.radio value="dark" icon:trailing="moon" class="min-h-11 touch-manipulation" x-on:click="hcSetAppearance('dark')" data-appearance-option="dark">
+                        {{ __('navigation.appearance_dark') }}
+                    </flux:menu.radio>
+                    <flux:menu.radio value="system" icon:trailing="computer-desktop" class="min-h-11 touch-manipulation" x-on:click="hcSetAppearance('system')" data-appearance-option="system">
+                        {{ __('navigation.appearance_system') }}
+                    </flux:menu.radio>
+                </flux:menu.radio.group>
+            </flux:menu>
+        </flux:dropdown>
 
         <x-locale-toggle />
     </div>

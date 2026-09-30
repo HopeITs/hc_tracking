@@ -537,7 +537,7 @@ new #[Title('titles.task')] class extends Component
 };
 ?>
 
-<section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="task-detail-heading">
+<section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="task-detail-heading">
     @php $assignees = $this->task->taskAssignees->pluck('employee')->filter(); @endphp
 
     <x-ui.detail-header
@@ -582,7 +582,7 @@ new #[Title('titles.task')] class extends Component
 
     @if ($this->task->description !== null)
         <x-ui.panel :title="__('common.description')">
-            <p class="whitespace-pre-line p-3.5 text-sm text-secondary-medium dark:text-secondary-soft">{{ $this->task->description }}</p>
+            <p class="whitespace-pre-line p-3.5 text-sm text-secondary-medium dark:text-ink-muted">{{ $this->task->description }}</p>
         </x-ui.panel>
     @endif
 
@@ -609,12 +609,12 @@ new #[Title('titles.task')] class extends Component
                 @if ($canEditTask)
                     <x-ui.input wire:model="title" :label="__('tasks.task_title')" type="text" maxlength="255" required data-test="task-edit-title-input" />
 
-                    <flux:textarea wire:model="description" :label="__('common.description')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!" />
+                    <flux:textarea wire:model="description" :label="__('common.description')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:border-field-line! dark:bg-surface-2! dark:text-ink!" />
                 @endif
 
                 <div @class(['grid gap-5', 'sm:grid-cols-2' => $canEditTask])>
                     <div class="min-w-0">
-                        <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft" id="task-edit-status-label">{{ __('common.status') }}</label>
+                        <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-ink-muted" id="task-edit-status-label">{{ __('common.status') }}</label>
                         <div class="grid grid-cols-2 gap-1.5" role="radiogroup" aria-labelledby="task-edit-status-label">
                             @foreach (TaskStatus::cases() as $statusCase)
                                 @php $isStatusSelected = $taskStatus === $statusCase->value; @endphp
@@ -625,8 +625,8 @@ new #[Title('titles.task')] class extends Component
                                     wire:click="$set('taskStatus', '{{ $statusCase->value }}')"
                                     @class([
                                         'inline-flex min-h-10 cursor-pointer touch-manipulation items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-semibold whitespace-nowrap transition-colors',
-                                        'border-secondary-dark bg-secondary-dark text-white dark:border-white dark:bg-white dark:text-secondary-dark' => $isStatusSelected,
-                                        'border-secondary-light text-secondary-medium hover:border-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => ! $isStatusSelected,
+                                        'border-secondary-dark bg-secondary-dark text-white dark:border-ink dark:bg-ink dark:text-surface-0' => $isStatusSelected,
+                                        'border-secondary-light text-secondary-medium hover:border-secondary-medium hover:text-secondary-dark dark:text-ink-muted dark:hover:text-ink' => ! $isStatusSelected,
                                     ])
                                     data-test="task-edit-status-{{ $statusCase->value }}"
                                 >
@@ -639,7 +639,7 @@ new #[Title('titles.task')] class extends Component
 
                     @if ($canEditTask)
                         <div class="min-w-0">
-                            <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft" id="task-edit-priority-label">{{ __('tasks.priority') }}</label>
+                            <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-ink-muted" id="task-edit-priority-label">{{ __('tasks.priority') }}</label>
                             <div class="grid grid-cols-3 gap-1.5" role="radiogroup" aria-labelledby="task-edit-priority-label">
                                 @foreach (TaskPriority::cases() as $priorityCase)
                                     @php $isPrioritySelected = $taskPriority === $priorityCase->value; @endphp
@@ -650,8 +650,8 @@ new #[Title('titles.task')] class extends Component
                                         wire:click="$set('taskPriority', '{{ $priorityCase->value }}')"
                                         @class([
                                             'inline-flex min-h-10 cursor-pointer touch-manipulation items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-semibold whitespace-nowrap transition-colors',
-                                            'border-secondary-dark bg-secondary-dark text-white dark:border-secondary-medium dark:bg-secondary-medium' => $isPrioritySelected,
-                                            'border-secondary-light text-secondary-medium hover:border-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => ! $isPrioritySelected,
+                                            'border-secondary-dark bg-secondary-dark text-white dark:border-ink dark:bg-ink dark:text-surface-0' => $isPrioritySelected,
+                                            'border-secondary-light text-secondary-medium hover:border-secondary-medium hover:text-secondary-dark dark:text-ink-muted dark:hover:text-ink' => ! $isPrioritySelected,
                                         ])
                                         data-test="task-edit-priority-{{ $priorityCase->value }}"
                                     >
@@ -665,12 +665,12 @@ new #[Title('titles.task')] class extends Component
                 </div>
 
                 <div class="min-w-0">
-                    <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft" for="task-edit-progress-slider">{{ __('tasks.progress_2') }}</label>
+                    <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-ink-muted" for="task-edit-progress-slider">{{ __('tasks.progress_2') }}</label>
                     <div class="flex items-center gap-3">
                         <input id="task-edit-progress-slider" type="range" wire:model="progressPercentage" min="0" max="100" step="1" class="h-1.5 w-full flex-1 cursor-pointer accent-primary" data-test="task-edit-progress-slider" />
                         <div class="relative w-16 shrink-0">
-                            <input type="number" wire:model="progressPercentage" min="0" max="100" required class="w-full rounded-lg border border-secondary-light bg-white py-1.5 ps-2 pe-6 text-end text-sm font-semibold tabular-nums text-secondary-dark focus:ring-1 focus:ring-primary focus:outline-none dark:border-secondary-light dark:bg-secondary-medium dark:text-white" aria-label="{{ __('tasks.progress_2') }}" data-test="task-edit-progress-input" />
-                            <span class="pointer-events-none absolute inset-y-0 end-2 flex items-center text-sm text-secondary-medium dark:text-secondary-soft">%</span>
+                            <input type="number" wire:model="progressPercentage" min="0" max="100" required class="w-full rounded-lg border border-secondary-light bg-white py-1.5 ps-2 pe-6 text-end text-sm font-semibold tabular-nums text-secondary-dark focus:ring-1 focus:ring-primary focus:outline-none dark:border-field-line dark:bg-surface-2 dark:text-ink" aria-label="{{ __('tasks.progress_2') }}" data-test="task-edit-progress-input" />
+                            <span class="pointer-events-none absolute inset-y-0 end-2 flex items-center text-sm text-secondary-medium dark:text-ink-muted">%</span>
                         </div>
                     </div>
                     <flux:error name="progressPercentage" class="mt-1.5" />
@@ -678,23 +678,23 @@ new #[Title('titles.task')] class extends Component
 
                 @if ($canEditTask)
                     <div class="min-w-0">
-                        <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('tasks.assignees') }}</label>
+                        <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-ink-muted">{{ __('tasks.assignees') }}</label>
                         <x-ui.multi-select-popover
                             :label="__('tasks.assignees')"
-                            class="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-secondary-light bg-white px-3 py-2 text-start text-sm dark:border-secondary-light dark:bg-secondary-medium"
+                            class="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-secondary-light bg-white px-3 py-2 text-start text-sm dark:border-field-line dark:bg-surface-2"
                             data-test="task-edit-assignee-picker"
                         >
                             <x-slot:trigger>
                                 <span class="min-w-0 truncate">{{ $assigneeTriggerLabel }}</span>
-                                <flux:icon.chevron-up-down class="size-4 shrink-0 text-secondary-medium dark:text-secondary-soft" aria-hidden="true" />
+                                <flux:icon.chevron-up-down class="size-4 shrink-0 text-secondary-medium dark:text-ink-muted" aria-hidden="true" />
                             </x-slot:trigger>
 
                             @foreach ($this->userOptions as $userOption)
                                 <label
                                     x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
-                                    class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-secondary-soft dark:hover:bg-secondary-medium"
+                                    class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-secondary-soft dark:hover:bg-white/[0.06]"
                                 >
-                                    <input type="checkbox" wire:model.live="assignedTo" value="{{ $userOption->id }}" class="rounded border-secondary-light text-primary focus:ring-primary" data-test="task-edit-assignee-checkbox-{{ $userOption->id }}" />
+                                    <input type="checkbox" wire:model.live="assignedTo" value="{{ $userOption->id }}" class="rounded border-secondary-light text-primary dark:text-brand-text focus:ring-primary" data-test="task-edit-assignee-checkbox-{{ $userOption->id }}" />
                                     <span class="min-w-0 truncate">{{ $userOption->name }} · {{ $userOption->secondary_name }}</span>
                                 </label>
                             @endforeach
@@ -714,7 +714,7 @@ new #[Title('titles.task')] class extends Component
                     <flux:error name="dueDate" class="-mt-3" />
                 @endif
 
-                <div class="flex justify-end gap-2 border-t border-secondary-soft pt-4 dark:border-secondary-medium">
+                <div class="flex justify-end gap-2 border-t border-secondary-soft pt-4 dark:border-line">
                     <x-ui.button type="submit" tone="primary" class="min-h-11 touch-manipulation sm:min-h-10" data-test="update-task-button">{{ __('common.save_changes') }}</x-ui.button>
                 </div>
             </form>
@@ -734,7 +734,7 @@ new #[Title('titles.task')] class extends Component
                     </x-slot:action>
                 </x-ui.empty-state>
             @else
-                <ul class="divide-y divide-secondary-soft dark:divide-secondary-medium">
+                <ul class="divide-y divide-secondary-soft dark:divide-line">
                     @foreach ($this->subtasks as $subtask)
                         @php $subtaskAssignees = $subtask->taskAssignees->pluck('employee')->filter(); @endphp
                         <li class="flex flex-wrap items-center justify-between gap-3 p-3.5" wire:key="subtask-{{ $subtask->id }}">
@@ -742,10 +742,10 @@ new #[Title('titles.task')] class extends Component
                                 {{ $subtask->title }}
                             </a>
                             <div class="flex shrink-0 items-center gap-3">
-                                <span class="w-40 shrink-0 truncate text-xs text-secondary-medium dark:text-secondary-soft">
+                                <span class="w-40 shrink-0 truncate text-xs text-secondary-medium dark:text-ink-muted">
                                     {{ $subtaskAssignees->isEmpty() ? __('common.not_assigned') : $subtaskAssignees->map->name->implode(', ') }}
                                 </span>
-                                <span class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">
+                                <span class="text-xs tabular-nums text-secondary-medium dark:text-ink-muted">
                                     {{ $subtask->due_date?->translatedFormat(__('formats.date')) ?? '—' }}
                                 </span>
                                 <x-ui.enum-badge :case="$subtask->status" />
@@ -777,7 +777,7 @@ new #[Title('titles.task')] class extends Component
                 @endif
             </x-ui.empty-state>
         @else
-            <ul class="divide-y divide-secondary-soft dark:divide-secondary-medium">
+            <ul class="divide-y divide-secondary-soft dark:divide-line">
                 @foreach ($this->attachments as $attachment)
                     @php
                         $attachmentName = $attachment->displayName();
@@ -790,23 +790,23 @@ new #[Title('titles.task')] class extends Component
                     @endphp
                     <li class="flex flex-wrap items-center gap-3 p-3.5" wire:key="task-attachment-{{ $attachment->id }}">
                         @if ($isStored && in_array($attachment->type, [FileType::Jpg, FileType::Png], true))
-                            <button type="button" wire:click="openPreview({{ $attachment->id }})" class="size-10 shrink-0 overflow-hidden rounded-xl border border-secondary-soft dark:border-secondary-medium" aria-label="{{ __('tasks.preview_name', ['name' => $attachmentName]) }}">
-                                <img src="{{ route('tasks.files.preview', [$this->task, $attachment]) }}" alt="" loading="lazy" class="size-full object-cover" />
+                            <button type="button" wire:click="openPreview({{ $attachment->id }})" class="size-10 shrink-0 overflow-hidden rounded-xl border border-secondary-soft dark:border-line" aria-label="{{ __('tasks.preview_name', ['name' => $attachmentName]) }}">
+                                <img src="{{ route('tasks.files.preview', [$this->task, $attachment]) }}" alt="" loading="lazy" class="size-full object-cover" data-no-dim />
                             </button>
                         @else
-                            <span class="inline-flex size-10 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-secondary-soft bg-board-head dark:border-secondary-medium dark:bg-secondary-medium/30">
-                                <flux:icon :name="$fileIcon" variant="micro" class="size-3.5 text-secondary-medium dark:text-secondary-soft" />
-                                <span class="text-[10px] font-bold text-secondary-dark dark:text-white">{{ Str::upper($attachment->type->value) }}</span>
+                            <span class="inline-flex size-10 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-secondary-soft bg-board-head dark:border-line dark:bg-surface-2">
+                                <flux:icon :name="$fileIcon" variant="micro" class="size-3.5 text-secondary-medium dark:text-ink-muted" />
+                                <span class="text-[10px] font-bold text-secondary-dark dark:text-ink">{{ Str::upper($attachment->type->value) }}</span>
                             </span>
                         @endif
 
                         <div class="min-w-0 flex-1">
                             @if ($isStored)
-                                <button type="button" wire:click="openPreview({{ $attachment->id }})" class="block max-w-full truncate text-start text-sm font-medium hover:text-primary hover:underline" title="{{ $attachmentName }}" data-test="preview-file-name">{{ $attachmentName }}</button>
+                                <button type="button" wire:click="openPreview({{ $attachment->id }})" class="block max-w-full truncate text-start text-sm font-medium hover:text-primary dark:hover:text-brand-text hover:underline" title="{{ $attachmentName }}" data-test="preview-file-name">{{ $attachmentName }}</button>
                             @else
                                 <p class="truncate text-sm font-medium" title="{{ $attachmentName }}">{{ $attachmentName }}</p>
                             @endif
-                            <p class="flex flex-wrap items-center gap-x-1.5 text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">
+                            <p class="flex flex-wrap items-center gap-x-1.5 text-xs tabular-nums text-secondary-medium dark:text-ink-muted">
                                 <time datetime="{{ $attachment->date?->toDateString() }}">{{ $attachment->date?->translatedFormat(__('formats.date')) }}</time>
                                 @if ($attachment->size !== null)
                                     <span aria-hidden="true">&middot;</span>
@@ -827,7 +827,7 @@ new #[Title('titles.task')] class extends Component
                                 <x-ui.button tone="ghost" size="sm" icon="eye" class="size-8!" wire:click="openPreview({{ $attachment->id }})" :aria-label="__('tasks.preview_name', ['name' => $attachmentName])" data-test="preview-file-button" />
                                 <a
                                     href="{{ route('tasks.files.download', [$this->task, $attachment]) }}"
-                                    class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-secondary-soft dark:hover:bg-secondary-medium dark:hover:text-white"
+                                    class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-ink-muted dark:hover:bg-surface-2 dark:hover:text-ink"
                                     aria-label="{{ __('common.download_name', ['name' => $attachmentName]) }}"
                                     data-test="download-file-link"
                                 >
@@ -837,7 +837,7 @@ new #[Title('titles.task')] class extends Component
 
                             @if ($canEditAttachments)
                                 <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-8!" wire:click="openEditFileModal({{ $attachment->id }})" :aria-label="__('common.edit_name', ['name' => $attachmentName])" data-test="edit-file-button" />
-                                <x-ui.button tone="ghost" size="sm" icon="trash" class="size-8! text-primary! hover:bg-status-critical-soft!" wire:click="confirmDeleteFile({{ $attachment->id }})" :aria-label="__('common.delete_name', ['name' => $attachmentName])" data-test="delete-file-button" />
+                                <x-ui.button tone="ghost" size="sm" icon="trash" class="size-8! text-primary! dark:text-brand-text! hover:bg-status-critical-soft!" wire:click="confirmDeleteFile({{ $attachment->id }})" :aria-label="__('common.delete_name', ['name' => $attachmentName])" data-test="delete-file-button" />
                             @endif
                         </div>
                     </li>
@@ -967,17 +967,17 @@ new #[Title('titles.task')] class extends Component
                     <x-ui.button tone="ghost" size="sm" icon="chevron-right" class="size-8! rtl:[&_svg]:-scale-x-100" wire:click="previewAdjacent(1)" :aria-label="__('tasks.next_file')" />
                 @endif
                 @if ($previewFile->isPreviewable())
-                    <a href="{{ $previewUrl }}" target="_blank" rel="noopener" class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-secondary-soft dark:hover:bg-secondary-medium dark:hover:text-white" aria-label="{{ __('tasks.open_in_new_tab') }}">
+                    <a href="{{ $previewUrl }}" target="_blank" rel="noopener" class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-ink-muted dark:hover:bg-surface-2 dark:hover:text-ink" aria-label="{{ __('tasks.open_in_new_tab') }}">
                         <flux:icon name="arrow-top-right-on-square" variant="micro" class="size-4" />
                     </a>
                 @endif
-                <a href="{{ $downloadUrl }}" class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-secondary-soft dark:hover:bg-secondary-medium dark:hover:text-white" aria-label="{{ __('common.download_name', ['name' => $previewName]) }}">
+                <a href="{{ $downloadUrl }}" class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-ink-muted dark:hover:bg-surface-2 dark:hover:text-ink" aria-label="{{ __('common.download_name', ['name' => $previewName]) }}">
                     <flux:icon name="arrow-down-tray" variant="micro" class="size-4" />
                 </a>
             </x-slot:headerActions>
 
             <div
-                class="bg-board-head dark:bg-secondary-medium/20"
+                class="bg-board-head dark:bg-surface-2"
                 wire:key="preview-{{ $previewFile->id }}"
                 x-data
                 x-on:keydown.left.window="$wire.previewAdjacent(document.dir === 'rtl' ? 1 : -1)"
@@ -989,7 +989,7 @@ new #[Title('titles.task')] class extends Component
                     <iframe src="{{ $previewUrl }}#view=FitH" title="{{ $previewName }}" class="h-[75dvh] w-full border-0 bg-white" data-test="pdf-preview"></iframe>
                 @elseif ($previewFile->isPreviewable())
                     <div class="flex min-h-[50dvh] items-center justify-center p-4">
-                        <img src="{{ $previewUrl }}" alt="{{ $previewName }}" class="max-h-[75dvh] max-w-full rounded-lg object-contain shadow-sm" data-test="image-preview" />
+                        <img src="{{ $previewUrl }}" alt="{{ $previewName }}" class="max-h-[75dvh] max-w-full rounded-lg object-contain shadow-sm" data-test="image-preview" data-no-dim />
                     </div>
                 @else
                     {{-- Word/Excel: rendered client-side by resources/js/file-preview.js from the authenticated download route. --}}
@@ -999,19 +999,19 @@ new #[Title('titles.task')] class extends Component
                         class="flex h-[75dvh] flex-col"
                         data-test="office-preview"
                     >
-                        <div x-show="sheets.length > 1" class="flex shrink-0 gap-1 overflow-x-auto border-b border-secondary-soft bg-white px-3 py-2 dark:border-secondary-medium dark:bg-secondary-dark">
+                        <div x-show="sheets.length > 1" class="flex shrink-0 gap-1 overflow-x-auto border-b border-secondary-soft bg-white px-3 py-2 dark:border-line dark:bg-surface-1">
                             <template x-for="(sheetName, index) in sheets" :key="index">
                                 <button
                                     type="button"
                                     x-on:click="showSheet(index)"
                                     x-text="sheetName"
                                     class="shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold whitespace-nowrap"
-                                    :class="index === activeSheet ? 'bg-primary text-white' : 'text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium'"
+                                    :class="index === activeSheet ? 'bg-primary dark:bg-ink dark:text-surface-0 text-white' : 'text-secondary-medium hover:bg-secondary-soft dark:text-ink-muted dark:hover:bg-surface-2'"
                                 ></button>
                             </template>
                         </div>
 
-                        <div x-show="status === 'loading'" class="flex flex-1 items-center justify-center gap-2 text-sm text-secondary-medium dark:text-secondary-soft">
+                        <div x-show="status === 'loading'" class="flex flex-1 items-center justify-center gap-2 text-sm text-secondary-medium dark:text-ink-muted">
                             <flux:icon.loading class="size-5" />
                             {{ __('tasks.loading_preview') }}
                         </div>
@@ -1019,7 +1019,7 @@ new #[Title('titles.task')] class extends Component
                         <div x-show="status === 'error'" x-cloak class="flex-1">
                             <x-ui.empty-state icon="exclamation-triangle" :heading="__('tasks.preview_not_available')" :body="__('tasks.this_file_could_not_be_previewed')">
                                 <x-slot:action>
-                                    <a href="{{ $downloadUrl }}" class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:opacity-90">
+                                    <a href="{{ $downloadUrl }}" class="inline-flex items-center gap-1.5 rounded-lg bg-primary dark:bg-brand dark:hover:bg-brand-hover px-3 py-2 text-sm font-semibold text-white hover:opacity-90">
                                         <flux:icon name="arrow-down-tray" variant="micro" class="size-4" />
                                         {{ __('common.download_name', ['name' => $previewName]) }}
                                     </a>
@@ -1029,7 +1029,7 @@ new #[Title('titles.task')] class extends Component
 
                         <div x-show="status === 'ready'" x-cloak x-ref="canvas" class="min-h-0 flex-1 overflow-auto"></div>
 
-                        <p x-show="truncated" x-cloak class="shrink-0 border-t border-secondary-soft bg-white px-3 py-2 text-xs text-secondary-medium dark:border-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft">{{ __('tasks.sheet_preview_truncated', ['rows' => 500]) }}</p>
+                        <p x-show="truncated" x-cloak class="shrink-0 border-t border-secondary-soft bg-white px-3 py-2 text-xs text-secondary-medium dark:border-line dark:bg-surface-1 dark:text-ink-muted">{{ __('tasks.sheet_preview_truncated', ['rows' => 500]) }}</p>
                     </div>
                 @endif
             </div>

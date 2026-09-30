@@ -36,15 +36,15 @@
     $textClasses = match ($tone) {
         'good' => 'text-status-good',
         'warn' => 'text-status-warn',
-        'critical' => 'text-primary',
-        default => 'text-secondary-medium dark:text-secondary-soft',
+        'critical' => 'text-primary dark:text-brand-text',
+        default => 'text-secondary-medium dark:text-ink-muted',
     };
 
     $dotClasses = match ($tone) {
         'good' => 'bg-status-good',
         'warn' => 'bg-status-warn',
-        'critical' => 'bg-primary',
-        default => 'bg-secondary-light dark:bg-secondary-medium',
+        'critical' => 'bg-primary dark:bg-status-critical',
+        default => 'bg-secondary-light dark:bg-ink-faint',
     };
 @endphp
 

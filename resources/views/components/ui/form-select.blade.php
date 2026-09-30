@@ -130,7 +130,7 @@
 
             <flux:menu class="filter-menu" :keep-open="$multiple" x-ref="menu" x-on:focus="focusSearch()">
                 @if ($searchable)
-                    <div class="border-b border-secondary-soft p-1.5 dark:border-secondary-medium">
+                    <div class="border-b border-secondary-soft p-1.5 dark:border-line">
                         <x-ui.input
                             type="search"
                             size="sm"
@@ -156,7 +156,7 @@
                         <span class="min-w-0 truncate">{{ $option['label'] }}</span>
 
                         <flux:icon.check
-                            class="ms-auto size-4 shrink-0 {{ $multiple ? 'text-primary' : 'text-secondary-medium' }}"
+                            class="ms-auto size-4 shrink-0 {{ $multiple ? 'text-primary dark:text-brand-text' : 'text-secondary-medium' }}"
                             x-show="isSelected({{ Illuminate\Support\Js::from($option['value']) }})"
                             :style="in_array($option['value'], $currentValues, true) ? null : 'display: none'"
                         />

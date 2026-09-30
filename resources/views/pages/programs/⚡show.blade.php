@@ -553,42 +553,42 @@ new #[Title('titles.program')] class extends Component {
 };
 ?>
 
-<section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white">
-    <header class="border-b border-secondary-soft @4xl/detail:border-b-0 dark:border-secondary-medium">
-        <nav aria-label="{{ __('ui.breadcrumb') }}" class="flex flex-wrap items-center gap-1.5 text-xs text-secondary-medium dark:text-secondary-soft">
-            <a href="{{ route('programs.index') }}" wire:navigate class="rounded font-medium hover:text-secondary-dark hover:underline dark:hover:text-white">{{ __('common.programs') }}</a>
+<section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink">
+    <header class="border-b border-secondary-soft @4xl/detail:border-b-0 dark:border-line">
+        <nav aria-label="{{ __('ui.breadcrumb') }}" class="flex flex-wrap items-center gap-1.5 text-xs text-secondary-medium dark:text-ink-muted">
+            <a href="{{ route('programs.index') }}" wire:navigate class="rounded font-medium hover:text-secondary-dark hover:underline dark:hover:text-ink">{{ __('common.programs') }}</a>
             <span aria-hidden="true" class="text-secondary-light">/</span>
-            <span aria-current="page" class="font-semibold text-secondary-dark dark:text-white">{{ $this->program->name }}</span>
+            <span aria-current="page" class="font-semibold text-secondary-dark dark:text-ink">{{ $this->program->name }}</span>
         </nav>
 
         <div class="mt-5 flex flex-col gap-7 @4xl/detail:flex-row @4xl/detail:items-stretch @4xl/detail:gap-10">
-            <div class="min-w-0 @4xl/detail:flex-1 @4xl/detail:border-b @4xl/detail:border-secondary-soft dark:border-secondary-medium">
+            <div class="min-w-0 @4xl/detail:flex-1 @4xl/detail:border-b @4xl/detail:border-secondary-soft dark:border-line">
                 <div class="flex items-start gap-3 @4xl/detail:min-h-[8.3125rem]">
-                    <div class="flex size-11 shrink-0 items-center justify-center rounded-md bg-primary text-white"><flux:icon name="briefcase" class="size-5" /></div>
+                    <div class="flex size-11 shrink-0 items-center justify-center rounded-md bg-primary dark:bg-white/10 dark:text-ink text-white"><flux:icon name="briefcase" class="size-5" /></div>
                     <div class="min-w-0">
-                        <p class="text-xs font-semibold tracking-[0.12em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('common.program') }}</p>
+                        <p class="text-xs font-semibold tracking-[0.12em] text-secondary-medium uppercase dark:text-ink-muted">{{ __('common.program') }}</p>
                         <div class="mt-1 flex items-center gap-2">
-                            <h1 class="text-3xl font-bold tracking-tight text-secondary-dark dark:text-white @3xl/detail:text-4xl">{{ $this->program->name }}</h1>
+                            <h1 class="text-3xl font-bold tracking-tight text-secondary-dark dark:text-ink @3xl/detail:text-4xl">{{ $this->program->name }}</h1>
                             @if (app(\App\Notifications\UnreadSubjects::class)->has(auth()->user(), 'program', $this->program->id))
-                                <span class="size-2.5 shrink-0 rounded-full bg-primary" data-unread-dot title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
+                                <span class="size-2.5 shrink-0 rounded-full bg-primary dark:bg-ink" data-unread-dot title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
                             @endif
                         </div>
                     </div>
                 </div>
 
-                <dl class="grid gap-5 border-t border-secondary-soft pt-4 @3xl/detail:grid-cols-3 dark:border-secondary-medium">
+                <dl class="grid gap-5 border-t border-secondary-soft pt-4 @3xl/detail:grid-cols-3 dark:border-line">
                     <div class="min-w-0">
-                        <dt class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('programs.linked_strategy') }}</dt>
+                        <dt class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-ink-muted">{{ __('programs.linked_strategy') }}</dt>
                         <dd class="mt-1.5 truncate text-sm font-semibold">
                             @if ($this->program->strategy)
-                                <a href="{{ route('strategies.show', $this->program->strategy) }}" wire:navigate class="hover:text-primary hover:underline">{{ $this->program->strategy->name }}</a>
+                                <a href="{{ route('strategies.show', $this->program->strategy) }}" wire:navigate class="hover:text-primary dark:hover:text-brand-text hover:underline">{{ $this->program->strategy->name }}</a>
                             @else
-                                <span class="font-normal text-secondary-medium dark:text-secondary-soft">{{ __('common.not_assigned') }}</span>
+                                <span class="font-normal text-secondary-medium dark:text-ink-muted">{{ __('common.not_assigned') }}</span>
                             @endif
                         </dd>
                     </div>
                     <div class="min-w-0">
-                        <dt class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('programs.direct_manager') }}</dt>
+                        <dt class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-ink-muted">{{ __('programs.direct_manager') }}</dt>
                         <dd class="mt-1.5 truncate text-sm font-semibold">
                             {{ $this->program->manager?->name ?? __('common.not_assigned') }}
                             @if ($this->program->manager)
@@ -597,29 +597,29 @@ new #[Title('titles.program')] class extends Component {
                         </dd>
                     </div>
                     <div class="min-w-0">
-                        <dt class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('programs.updated') }}</dt>
+                        <dt class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-ink-muted">{{ __('programs.updated') }}</dt>
                         <dd class="mt-1.5 truncate text-sm font-semibold">{{ $this->program->updated_at?->translatedFormat(__('formats.date')) ?? '—' }}</dd>
                     </div>
                 </dl>
             </div>
 
-            <aside class="overflow-hidden rounded-lg border border-secondary-soft bg-white text-secondary-dark @4xl/detail:w-[22rem] @4xl/detail:shrink-0 dark:border-secondary-medium dark:bg-secondary-dark dark:text-white" aria-label="{{ __('programs.delivery_health') }}">
+            <aside class="overflow-hidden rounded-lg border border-secondary-soft bg-white text-secondary-dark @4xl/detail:w-[22rem] @4xl/detail:shrink-0 dark:border-line dark:bg-surface-1 dark:text-ink" aria-label="{{ __('programs.delivery_health') }}">
                 <div class="min-h-32 p-5">
                     <div class="flex items-start justify-between gap-4">
                         <div class="min-w-0">
-                            <p class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('programs.delivery_health') }}</p>
+                            <p class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-ink-muted">{{ __('programs.delivery_health') }}</p>
                             <p class="mt-1 text-sm font-semibold">{{ __('programs.milestone_progress') }}</p>
                         </div>
-                        <span class="shrink-0 text-3xl font-bold tracking-tight text-primary tabular-nums">{{ $this->milestoneProgress['percentage'] === null ? '—' : number_format($this->milestoneProgress['percentage'], 0).'%' }}</span>
+                        <span class="shrink-0 text-3xl font-bold tracking-tight text-primary dark:text-brand-text tabular-nums">{{ $this->milestoneProgress['percentage'] === null ? '—' : number_format($this->milestoneProgress['percentage'], 0).'%' }}</span>
                     </div>
-                    <p class="mt-3 text-xs text-secondary-medium tabular-nums dark:text-secondary-soft">{{ $this->milestoneProgress['percentage'] === null ? __('programs.no_weighted_milestones') : __('programs.weighted_progress_of_total', ['reached' => number_format($this->milestoneProgress['reached'], 0), 'total' => number_format($this->milestoneProgress['total'], 0)]) }}</p>
-                    <div class="mt-4 h-2 overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium" role="progressbar" aria-valuemin="0" aria-valuemax="100" @if ($this->milestoneProgress['percentage'] !== null) aria-valuenow="{{ $this->milestoneProgress['percentage'] }}" @endif aria-label="{{ __('programs.milestone_progress') }}">
-                        <div class="h-full rounded-full bg-primary motion-reduce:transition-none" style="width: {{ $this->milestoneProgress['percentage'] ?? 0 }}%"></div>
+                    <p class="mt-3 text-xs text-secondary-medium tabular-nums dark:text-ink-muted">{{ $this->milestoneProgress['percentage'] === null ? __('programs.no_weighted_milestones') : __('programs.weighted_progress_of_total', ['reached' => number_format($this->milestoneProgress['reached'], 0), 'total' => number_format($this->milestoneProgress['total'], 0)]) }}</p>
+                    <div class="mt-4 h-2 overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2" role="progressbar" aria-valuemin="0" aria-valuemax="100" @if ($this->milestoneProgress['percentage'] !== null) aria-valuenow="{{ $this->milestoneProgress['percentage'] }}" @endif aria-label="{{ __('programs.milestone_progress') }}">
+                        <div class="h-full rounded-full bg-primary dark:bg-ink-muted motion-reduce:transition-none" style="width: {{ $this->milestoneProgress['percentage'] ?? 0 }}%"></div>
                     </div>
                 </div>
-                <div class="border-t border-secondary-soft px-5 py-4 dark:border-secondary-medium">
-                    <p class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('programs.projects_by_status') }}</p>
-                    <div class="mt-3 flex h-2 overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium" role="img" aria-label="{{ __('programs.projects_by_status') }}">
+                <div class="border-t border-secondary-soft px-5 py-4 dark:border-line">
+                    <p class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-ink-muted">{{ __('programs.projects_by_status') }}</p>
+                    <div class="mt-3 flex h-2 overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2" role="img" aria-label="{{ __('programs.projects_by_status') }}">
                         @foreach ($this->projectStatusSegments as $segment)
                             @if ($segment['count'] > 0)<span class="{{ $segment['tone'] }}" style="flex: {{ $segment['count'] }}" title="{{ $segment['label'] }}: {{ $segment['count'] }}"></span>@endif
                         @endforeach
@@ -627,7 +627,7 @@ new #[Title('titles.program')] class extends Component {
                     <div class="mt-3 flex flex-wrap gap-2">
                         @foreach ($this->projectStatusSegments as $segment)
                             @if ($segment['count'] > 0)
-                                <span class="inline-flex items-center gap-1.5 rounded-md border border-secondary-soft px-2 py-1 text-xs font-medium text-secondary-medium dark:border-secondary-medium dark:text-secondary-soft"><span class="size-1.5 rounded-full {{ $segment['tone'] }}"></span>{{ $segment['label'] }} <span class="font-semibold tabular-nums">{{ $segment['count'] }}</span></span>
+                                <span class="inline-flex items-center gap-1.5 rounded-md border border-secondary-soft px-2 py-1 text-xs font-medium text-secondary-medium dark:border-line dark:text-ink-muted"><span class="size-1.5 rounded-full {{ $segment['tone'] }}"></span>{{ $segment['label'] }} <span class="font-semibold tabular-nums">{{ $segment['count'] }}</span></span>
                             @endif
                         @endforeach
                     </div>
@@ -636,16 +636,16 @@ new #[Title('titles.program')] class extends Component {
         </div>
     </header>
 
-    <div class="flex flex-wrap items-center gap-1 border-b border-secondary-soft dark:border-secondary-medium" role="tablist" aria-label="{{ __('programs.connection_views') }}">
+    <div class="flex flex-wrap items-center gap-1 border-b border-secondary-soft dark:border-line" role="tablist" aria-label="{{ __('programs.connection_views') }}">
         @foreach ($this->tabs as $tabOption)
             @php $isActive = $tab === $tabOption['key']; @endphp
             <button type="button" role="tab" wire:key="program-tab-{{ $tabOption['key'] }}" wire:click="$set('tab', '{{ $tabOption['key'] }}')" aria-selected="{{ $isActive ? 'true' : 'false' }}" @class([
                 'inline-flex min-h-11 items-center gap-1.5 border-b-2 px-3 text-sm font-semibold transition-colors',
-                'border-primary text-secondary-dark dark:text-white' => $isActive,
-                'border-transparent text-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => ! $isActive,
+                'border-primary text-secondary-dark dark:text-ink' => $isActive,
+                'border-transparent text-secondary-medium hover:text-secondary-dark dark:text-ink-muted dark:hover:text-ink' => ! $isActive,
             ])>
                 <span>{{ $tabOption['label'] }}</span>
-                <span class="inline-flex min-w-5 items-center justify-center rounded-md border border-secondary-light px-1 py-0.5 text-[11px] font-semibold tabular-nums text-secondary-medium dark:border-secondary-medium dark:text-secondary-soft">{{ $tabOption['count'] }}</span>
+                <span class="inline-flex min-w-5 items-center justify-center rounded-md border border-secondary-light px-1 py-0.5 text-[11px] font-semibold tabular-nums text-secondary-medium dark:border-line dark:text-ink-muted">{{ $tabOption['count'] }}</span>
             </button>
         @endforeach
     </div>
@@ -676,8 +676,8 @@ new #[Title('titles.program')] class extends Component {
                     $taskTotal = $this->tasks->count();
                     $taskOverdue = $this->tasks->filter(fn (Task $task): bool => $task->status !== TaskStatus::Done && $task->due_date !== null && $task->due_date->lt(today()))->count();
                     $taskUnassigned = $this->tasks->filter(fn (Task $task): bool => $task->taskAssignees->isEmpty())->count();
-                    $taskInkText = 'text-secondary-dark dark:text-white';
-                    $taskMutedText = 'text-secondary-medium dark:text-secondary-soft';
+                    $taskInkText = 'text-secondary-dark dark:text-ink';
+                    $taskMutedText = 'text-secondary-medium dark:text-ink-muted';
 
                     $ordered = $this->tasks->sortBy([
                         fn (Task $a, Task $b): int => ($a->status === TaskStatus::Done) <=> ($b->status === TaskStatus::Done),
@@ -695,7 +695,7 @@ new #[Title('titles.program')] class extends Component {
                     $looseTasks = $ordered->filter(fn (Task $task): bool => $this->taskProjectId($task) === null)->values();
                 @endphp
 
-                <div class="grid gap-3 border-b border-secondary-soft p-3.5 @lg/detail:grid-cols-3 dark:border-secondary-medium">
+                <div class="grid gap-3 border-b border-secondary-soft p-3.5 @lg/detail:grid-cols-3 dark:border-line">
                     <x-ui.stat-tile :label="__('programs.stat_tasks_done')" :value="$taskDone" :denominator="$taskTotal" />
                     <x-ui.stat-tile :label="__('tasks.overdue')" :value="$taskOverdue" :tone="$taskOverdue > 0 ? 'warn' : null" />
                     <x-ui.stat-tile :label="__('common.unassigned')" :value="$taskUnassigned" />
@@ -711,10 +711,10 @@ new #[Title('titles.program')] class extends Component {
                 <div class="flex flex-col gap-8 px-3.5 pb-3.5 @6xl/detail:px-5 @6xl/detail:pb-5">
                     @foreach ($taskGroups as $group)
                         <section class="min-w-0" wire:key="program-task-group-{{ $group['project']->id }}">
-                            <header class="border-b border-secondary-soft pt-4 pb-3 dark:border-secondary-medium">
+                            <header class="border-b border-secondary-soft pt-4 pb-3 dark:border-line">
                                 <a href="{{ route('projects.show', $group['project']) }}" wire:navigate class="min-w-0 truncate text-base font-bold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary {{ $taskInkText }}">{{ $group['project']->name }}</a>
                             </header>
-                            <ul class="divide-y divide-secondary-soft dark:divide-secondary-medium">
+                            <ul class="divide-y divide-secondary-soft dark:divide-line">
                                 @foreach ($group['tasks'] as $task)
                                     @include('pages.programs._task-row', ['task' => $task, 'inkText' => $taskInkText, 'mutedText' => $taskMutedText])
                                 @endforeach
@@ -724,10 +724,10 @@ new #[Title('titles.program')] class extends Component {
 
                     @if ($looseTasks->isNotEmpty())
                         <section class="min-w-0" data-loose-tasks>
-                            <header class="border-b border-secondary-soft pt-4 pb-3 dark:border-secondary-medium">
+                            <header class="border-b border-secondary-soft pt-4 pb-3 dark:border-line">
                                 <p class="text-base font-bold {{ $taskInkText }}">{{ __('programs.work_not_tied_to_a_project') }}</p>
                             </header>
-                            <ul class="divide-y divide-secondary-soft dark:divide-secondary-medium">
+                            <ul class="divide-y divide-secondary-soft dark:divide-line">
                                 @foreach ($looseTasks as $task)
                                     @include('pages.programs._task-row', ['task' => $task, 'inkText' => $taskInkText, 'mutedText' => $taskMutedText])
                                 @endforeach

@@ -659,21 +659,21 @@ new #[Title('titles.dashboard')] class extends Component {
     $counts = $this->attentionCounts;
     $shown = $this->attentionShown;
     $myWork = $this->myWork;
-    $cardClasses = 'rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-secondary-medium dark:bg-secondary-dark dark:shadow-none';
+    $cardClasses = 'rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-transparent dark:bg-surface-1 dark:shadow-raised';
     $iconTone = fn (string $tone): string => match ($tone) {
-        'critical' => 'bg-status-critical-soft text-primary dark:bg-primary dark:text-white',
+        'critical' => 'bg-status-critical-soft text-primary dark:bg-status-critical-soft dark:text-status-critical',
         'warn' => 'bg-status-warn-soft text-status-warn',
         'funding' => 'bg-funding-soft text-funding',
         'good' => 'bg-status-good-soft text-status-good',
-        default => 'bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white',
+        default => 'bg-secondary-soft text-secondary-dark dark:bg-surface-2 dark:text-ink',
     };
     // Figures sit on the card ground: tone tokens only reach contrast there in
     // light mode, so dark mode keeps figures white and lets the icon chip carry tone.
     $figureTone = fn (string $tone): string => match ($tone) {
-        'critical' => 'text-primary dark:text-white',
-        'warn' => 'text-status-warn dark:text-white',
-        'funding' => 'text-funding dark:text-white',
-        default => 'text-secondary-dark dark:text-white',
+        'critical' => 'text-primary dark:text-ink',
+        'warn' => 'text-status-warn dark:text-ink',
+        'funding' => 'text-funding dark:text-ink',
+        default => 'text-secondary-dark dark:text-ink',
     };
     $canViewProposals = $this->canView('proposals');
     $canViewTransfers = $this->canView('transfers');
@@ -698,16 +698,16 @@ new #[Title('titles.dashboard')] class extends Component {
 
 <section class="@container/dashboard flex w-full flex-1 flex-col gap-5 pb-10" aria-labelledby="dashboard-heading" data-dashboard>
     {{-- Greeting and the signed-in person's own work --}}
-    <header class="flex flex-col gap-4 border-b border-secondary-soft pb-7 @4xl/dashboard:flex-row @4xl/dashboard:items-center @4xl/dashboard:justify-between dark:border-secondary-medium">
+    <header class="flex flex-col gap-4 border-b border-secondary-soft pb-7 @4xl/dashboard:flex-row @4xl/dashboard:items-center @4xl/dashboard:justify-between dark:border-line">
         <div class="min-w-0">
-            <h1 id="dashboard-heading" class="text-3xl font-bold leading-none text-balance text-secondary-dark dark:text-white">
+            <h1 id="dashboard-heading" class="text-3xl font-bold leading-none text-balance text-secondary-dark dark:text-ink">
                 {{ $this->greeting() }}
             </h1>
-            <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-secondary-medium dark:text-secondary-soft">
+            <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-secondary-medium dark:text-ink-muted">
                 <span>{{ now()->translatedFormat(__('formats.date_long')) }}</span>
                 <span aria-hidden="true" class="text-secondary-light">·</span>
                 @if ($counts['all'] > 0)
-                    <span class="rounded-full bg-primary px-2 py-0.5 text-xs font-bold text-white">{{ trans_choice('dashboard.items_need_attention', $counts['all'], ['count' => $counts['all']]) }}</span>
+                    <span class="rounded-full bg-primary dark:border-transparent dark:bg-status-critical-soft dark:text-status-critical px-2 py-0.5 text-xs font-bold text-white">{{ trans_choice('dashboard.items_need_attention', $counts['all'], ['count' => $counts['all']]) }}</span>
                 @else
                     <span class="rounded-full bg-status-good-soft px-2 py-0.5 text-xs font-bold text-status-good">{{ __('dashboard.all_clear') }}</span>
                 @endif
@@ -715,7 +715,7 @@ new #[Title('titles.dashboard')] class extends Component {
         </div>
 
         <nav class="flex flex-wrap items-stretch gap-2" aria-label="{{ __('dashboard.my_work') }}" data-my-work>
-            <span class="type-label hidden self-center pe-1 text-secondary-medium @xl/dashboard:inline dark:text-secondary-soft">{{ __('dashboard.my_work') }}</span>
+            <span class="type-label hidden self-center pe-1 text-secondary-medium @xl/dashboard:inline dark:text-ink-muted">{{ __('dashboard.my_work') }}</span>
             @php
                 $myTasksHref = $myWork['employeeId'] ? route('tasks.index', ['assignee' => $myWork['employeeId']]) : null;
                 $myWorkLinks = [
@@ -740,7 +740,7 @@ new #[Title('titles.dashboard')] class extends Component {
                         <flux:icon :name="$link['icon']" variant="micro" class="size-4" />
                     </span>
                     <span class="text-lg font-bold tabular-nums {{ $figureTone($link['tone']) }}">{{ Number::format($link['value']) }}</span>
-                    <span class="type-meta max-w-28 leading-tight text-secondary-medium dark:text-secondary-soft">{{ $link['label'] }}</span>
+                    <span class="type-meta max-w-28 leading-tight text-secondary-medium dark:text-ink-muted">{{ $link['label'] }}</span>
                 </{{ $tag }}>
             @endforeach
         </nav>
@@ -759,21 +759,21 @@ new #[Title('titles.dashboard')] class extends Component {
             x-data="{ focus: 'all' }"
             data-attention
         >
-            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-secondary-soft px-5 pt-4 pb-3 dark:border-secondary-medium">
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-secondary-soft px-5 pt-4 pb-3 dark:border-line">
                 <div class="min-w-0">
                     <div class="flex items-center gap-2">
-                        <h2 id="attention-heading" class="text-base font-bold text-secondary-dark dark:text-white">{{ __('dashboard.needs_attention') }}</h2>
+                        <h2 id="attention-heading" class="text-base font-bold text-secondary-dark dark:text-ink">{{ __('dashboard.needs_attention') }}</h2>
                         <span @class([
                             'inline-flex min-w-6 items-center justify-center rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums',
-                            'bg-primary text-white' => $counts['all'] > 0,
+                            'bg-primary dark:border-transparent dark:bg-status-critical-soft dark:text-status-critical text-white' => $counts['all'] > 0,
                             'bg-status-good-soft text-status-good' => $counts['all'] === 0,
                         ])>{{ $counts['all'] }}</span>
                     </div>
-                    <p class="mt-0.5 text-xs text-secondary-medium dark:text-secondary-soft">{{ __('dashboard.needs_attention_hint') }}</p>
+                    <p class="mt-0.5 text-xs text-secondary-medium dark:text-ink-muted">{{ __('dashboard.needs_attention_hint') }}</p>
                 </div>
 
                 @if ($counts['all'] > 0)
-                    <div class="flex max-w-full gap-0.5 overflow-x-auto rounded-lg bg-board-head p-0.5 ring-1 ring-secondary-soft dark:ring-secondary-medium" role="group" aria-label="{{ __('dashboard.filter_attention') }}">
+                    <div class="flex max-w-full gap-0.5 overflow-x-auto rounded-lg bg-board-head p-0.5 ring-1 ring-secondary-soft dark:ring-line" role="group" aria-label="{{ __('dashboard.filter_attention') }}">
                         @foreach ($focusTabs as $tabKey => $tabLabel)
                             <button
                                 type="button"
@@ -781,7 +781,7 @@ new #[Title('titles.dashboard')] class extends Component {
                                 x-bind:aria-pressed="focus === @js($tabKey) ? 'true' : 'false'"
                                 aria-pressed="{{ $tabKey === 'all' ? 'true' : 'false' }}"
                                 wire:key="focus-{{ $tabKey }}"
-                                class="inline-flex min-h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold whitespace-nowrap text-secondary-medium transition-[color,background-color,box-shadow] duration-150 hover:text-secondary-dark focus-visible:outline-2 focus-visible:outline-primary aria-pressed:bg-white aria-pressed:text-secondary-dark aria-pressed:shadow-[0_1px_2px_rgba(16,24,40,0.08)] dark:text-secondary-soft dark:hover:text-white dark:aria-pressed:bg-secondary-medium dark:aria-pressed:text-white"
+                                class="inline-flex min-h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold whitespace-nowrap text-secondary-medium transition-[color,background-color,box-shadow] duration-150 hover:text-secondary-dark focus-visible:outline-2 focus-visible:outline-primary aria-pressed:bg-white aria-pressed:text-secondary-dark aria-pressed:shadow-[0_1px_2px_rgba(16,24,40,0.08)] dark:text-ink-muted dark:hover:text-ink dark:aria-pressed:bg-surface-2 dark:aria-pressed:text-ink"
                             >
                                 {{ $tabLabel }}
                                 <span class="tabular-nums opacity-70">{{ $counts[$tabKey] }}</span>
@@ -795,7 +795,7 @@ new #[Title('titles.dashboard')] class extends Component {
                 @if ($this->attentionItems->isEmpty())
                     <x-ui.empty-state icon="check-circle" :heading="__('dashboard.nothing_needs_attention')" :body="__('dashboard.nothing_needs_attention_body')" class="min-h-80" />
                 @else
-                    <ul class="divide-y divide-secondary-soft dark:divide-secondary-medium" role="list">
+                    <ul class="divide-y divide-secondary-soft dark:divide-line" role="list">
                         @foreach ($this->attentionItems as $item)
                             @php
                                 $inAll = $item['allRank'] !== null;
@@ -818,12 +818,12 @@ new #[Title('titles.dashboard')] class extends Component {
                                         <flux:icon :name="$item['icon']" variant="mini" class="size-4.5" />
                                     </span>
                                     <span class="min-w-0 flex-1">
-                                        <span class="block truncate text-sm font-semibold text-secondary-dark dark:text-white">{{ $item['title'] }}</span>
-                                        <span class="block truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $item['context'] }}</span>
+                                        <span class="block truncate text-sm font-semibold text-secondary-dark dark:text-ink">{{ $item['title'] }}</span>
+                                        <span class="block truncate text-xs text-secondary-medium dark:text-ink-muted">{{ $item['context'] }}</span>
                                     </span>
                                     <span @class([
                                         'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums whitespace-nowrap',
-                                        'bg-status-critical-soft text-primary dark:bg-primary dark:text-white' => $item['daysLate'] === null || $item['daysLate'] > 14,
+                                        'bg-status-critical-soft text-primary dark:bg-status-critical-soft dark:text-status-critical' => $item['daysLate'] === null || $item['daysLate'] > 14,
                                         'bg-white text-status-warn ring-1 ring-status-warn/40 ring-inset dark:bg-status-warn-soft dark:ring-0' => $item['daysLate'] !== null && $item['daysLate'] <= 14,
                                     ])>{{ $item['badge'] }}</span>
                                     <flux:icon.chevron-right variant="micro" class="size-4 shrink-0 text-secondary-light transition-transform duration-200 group-hover:translate-x-0.5 rtl:-scale-x-100 rtl:group-hover:-translate-x-0.5" />
@@ -837,7 +837,7 @@ new #[Title('titles.dashboard')] class extends Component {
             @foreach ($hiddenCounts as $hiddenFocus => $hiddenCount)
                 @if ($hiddenCount > 0)
                     <p
-                        class="border-t border-secondary-soft px-5 py-2.5 text-xs text-secondary-medium dark:border-secondary-medium dark:text-secondary-soft"
+                        class="border-t border-secondary-soft px-5 py-2.5 text-xs text-secondary-medium dark:border-line dark:text-ink-muted"
                         x-show="focus === @js($hiddenFocus)"
                         @unless ($hiddenFocus === 'all') style="display: none" @endunless
                         wire:key="attention-hidden-{{ $hiddenFocus }}"
@@ -853,10 +853,10 @@ new #[Title('titles.dashboard')] class extends Component {
         <section class="{{ $cardClasses }} flex min-w-0 flex-col @3xl/dashboard:col-span-3 @5xl/dashboard:col-span-5" aria-labelledby="funding-heading" data-funding-position>
             <div class="flex items-start justify-between gap-3 px-5 pt-4 pb-2">
                 <div class="min-w-0">
-                    <h2 id="funding-heading" class="text-base font-bold text-secondary-dark dark:text-white">{{ __('dashboard.funding_position') }}</h2>
-                    <p class="mt-0.5 text-xs text-secondary-medium dark:text-secondary-soft">{{ __('dashboard.funding_position_hint') }}</p>
+                    <h2 id="funding-heading" class="text-base font-bold text-secondary-dark dark:text-ink">{{ __('dashboard.funding_position') }}</h2>
+                    <p class="mt-0.5 text-xs text-secondary-medium dark:text-ink-muted">{{ __('dashboard.funding_position_hint') }}</p>
                 </div>
-                <a href="{{ route('funding-agreements.index') }}" wire:navigate class="shrink-0 rounded-md text-xs font-semibold text-secondary-medium underline-offset-4 hover:text-secondary-dark hover:underline focus-visible:outline-2 focus-visible:outline-primary dark:text-secondary-soft dark:hover:text-white">
+                <a href="{{ route('funding-agreements.index') }}" wire:navigate class="shrink-0 rounded-md text-xs font-semibold text-secondary-medium underline-offset-4 hover:text-secondary-dark hover:underline focus-visible:outline-2 focus-visible:outline-primary dark:text-ink-muted dark:hover:text-ink">
                     {{ __('dashboard.view_agreements') }}
                 </a>
             </div>
@@ -864,22 +864,22 @@ new #[Title('titles.dashboard')] class extends Component {
             @if ($this->fundingPosition->isEmpty())
                 <x-ui.empty-state icon="banknotes" :heading="__('dashboard.no_funding_yet')" :body="__('dashboard.no_funding_yet_body')" class="min-h-48" />
             @else
-                <ul class="flex flex-col divide-y divide-secondary-soft px-5 pb-2 dark:divide-secondary-medium" role="list">
+                <ul class="flex flex-col divide-y divide-secondary-soft px-5 pb-2 dark:divide-line" role="list">
                     @foreach ($this->fundingPosition as $line)
                         <li class="py-3.5" wire:key="funding-{{ $line['currency'] }}">
                             <div class="flex items-baseline justify-between gap-3">
                                 <div class="flex min-w-0 items-baseline gap-2">
                                     <span class="rounded-md bg-funding-soft px-1.5 py-0.5 text-[11px] font-bold tracking-wide text-funding">{{ $line['currency'] }}</span>
-                                    <span class="truncate text-sm text-secondary-medium dark:text-secondary-soft">
-                                        <span class="font-bold text-secondary-dark tabular-nums dark:text-white">{{ Number::format($line['received'], maxPrecision: 0) }}</span>
+                                    <span class="truncate text-sm text-secondary-medium dark:text-ink-muted">
+                                        <span class="font-bold text-secondary-dark tabular-nums dark:text-ink">{{ Number::format($line['received'], maxPrecision: 0) }}</span>
                                         {{ __('dashboard.of_committed', ['amount' => Number::format($line['committed'], maxPrecision: 0)]) }}
                                     </span>
                                 </div>
-                                <span class="text-xl font-bold tabular-nums text-funding dark:text-white">{{ $line['share'] === null ? '—' : $line['share'].'%' }}</span>
+                                <span class="text-xl font-bold tabular-nums text-funding dark:text-ink">{{ $line['share'] === null ? '—' : $line['share'].'%' }}</span>
                             </div>
 
                             <div
-                                class="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium"
+                                class="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2"
                                 role="progressbar"
                                 aria-valuemin="0"
                                 aria-valuemax="100"
@@ -889,9 +889,9 @@ new #[Title('titles.dashboard')] class extends Component {
                                 <div class="h-full rounded-full bg-funding" style="width: {{ min(100, $line['share'] ?? 0) }}%"></div>
                             </div>
 
-                            <p class="mt-2 flex flex-wrap items-center gap-x-1.5 text-xs text-secondary-medium dark:text-secondary-soft">
+                            <p class="mt-2 flex flex-wrap items-center gap-x-1.5 text-xs text-secondary-medium dark:text-ink-muted">
                                 @if ($line['committed'] <= 0)
-                                    <span class="font-semibold text-status-warn dark:text-white">{{ __('dashboard.no_commitment_recorded') }}</span>
+                                    <span class="font-semibold text-status-warn dark:text-ink">{{ __('dashboard.no_commitment_recorded') }}</span>
                                 @elseif ($line['pendingCount'] > 0)
                                     {{ trans_choice('dashboard.pending_transfers', $line['pendingCount'], ['count' => $line['pendingCount'], 'amount' => Number::format($line['pending'], maxPrecision: 0), 'currency' => $line['currency']]) }}
                                 @else
@@ -925,19 +925,19 @@ new #[Title('titles.dashboard')] class extends Component {
                     @class([
                         'group flex flex-col justify-between gap-3 p-4 transition-colors duration-150 hover:bg-board-head focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary @5xl/dashboard:p-5',
                         'col-span-2' => $spansRow,
-                        'border-e border-secondary-soft dark:border-secondary-medium' => $loop->odd && ! $spansRow,
-                        'border-b border-secondary-soft dark:border-secondary-medium' => $loop->index < $lastRowStart,
+                        'border-e border-secondary-soft dark:border-line' => $loop->odd && ! $spansRow,
+                        'border-b border-secondary-soft dark:border-line' => $loop->index < $lastRowStart,
                         'rounded-ss-xl' => $loop->index === 0,
                         'rounded-se-xl' => $loop->index === 1,
                         'rounded-es-xl' => $loop->index === $lastRowStart,
                         'rounded-ee-xl' => $loop->last,
                     ])
                 >
-                    <span class="text-xs font-medium leading-snug text-secondary-medium dark:text-secondary-soft">{{ $figure['label'] }}</span>
+                    <span class="text-xs font-medium leading-snug text-secondary-medium dark:text-ink-muted">{{ $figure['label'] }}</span>
                     <span class="flex items-baseline gap-1.5">
                         <span class="type-figure {{ $figureTone($figure['tone']) }}">{{ Number::format($figure['value']) }}</span>
                         @if ($figure['denominator'] !== null)
-                            <span class="text-sm text-secondary-medium tabular-nums dark:text-secondary-soft">/ {{ Number::format($figure['denominator']) }}</span>
+                            <span class="text-sm text-secondary-medium tabular-nums dark:text-ink-muted">/ {{ Number::format($figure['denominator']) }}</span>
                         @endif
                         <flux:icon.arrow-up-right variant="micro" class="ms-auto size-4 text-secondary-light opacity-0 transition-opacity duration-150 group-hover:opacity-100 rtl:-scale-x-100" />
                     </span>
@@ -968,15 +968,15 @@ new #[Title('titles.dashboard')] class extends Component {
                                 'good' => 'bg-status-good',
                                 'funding' => 'bg-funding',
                                 'warn' => 'bg-status-warn',
-                                'strong' => 'bg-secondary-dark dark:bg-secondary-soft',
-                                'muted' => 'bg-secondary-soft dark:bg-secondary-medium',
+                                'strong' => 'bg-secondary-dark dark:bg-ink-muted',
+                                'muted' => 'bg-secondary-soft dark:bg-line-strong',
                                 default => 'bg-secondary-light',
                             };
                         @endphp
-                        <li class="flex items-center gap-1.5 text-xs text-secondary-medium dark:text-secondary-soft" wire:key="project-legend-{{ $index }}">
+                        <li class="flex items-center gap-1.5 text-xs text-secondary-medium dark:text-ink-muted" wire:key="project-legend-{{ $index }}">
                             <span class="{{ $legendTone }} size-2 shrink-0 rounded-full" aria-hidden="true"></span>
                             <span class="truncate">{{ $category }}</span>
-                            <span class="ms-auto font-semibold tabular-nums text-secondary-dark dark:text-white">{{ $projectChart['series'][$index] }}</span>
+                            <span class="ms-auto font-semibold tabular-nums text-secondary-dark dark:text-ink">{{ $projectChart['series'][$index] }}</span>
                         </li>
                     @endforeach
                 </ul>
@@ -986,7 +986,7 @@ new #[Title('titles.dashboard')] class extends Component {
         @if ($canViewProposals)
         <x-ui.panel :title="__('dashboard.proposal_pipeline')" :subtitle="__('dashboard.proposal_pipeline_hint')" class="min-w-0 {{ $chartSpan }}">
             <x-slot:toolbar>
-                <a href="{{ route('proposals.index') }}" wire:navigate class="rounded-md text-xs font-semibold text-secondary-medium underline-offset-4 hover:text-secondary-dark hover:underline focus-visible:outline-2 focus-visible:outline-primary dark:text-secondary-soft dark:hover:text-white">{{ __('dashboard.view_proposals') }}</a>
+                <a href="{{ route('proposals.index') }}" wire:navigate class="rounded-md text-xs font-semibold text-secondary-medium underline-offset-4 hover:text-secondary-dark hover:underline focus-visible:outline-2 focus-visible:outline-primary dark:text-ink-muted dark:hover:text-ink">{{ __('dashboard.view_proposals') }}</a>
             </x-slot:toolbar>
             @php $pipeline = $this->pipelineChart; @endphp
             <div class="px-2 pt-3 pb-2">
@@ -1018,7 +1018,7 @@ new #[Title('titles.dashboard')] class extends Component {
                                     type="button"
                                     x-on:click="currency = @js($receipt['currency'])"
                                     x-bind:aria-pressed="currency === @js($receipt['currency']) ? 'true' : 'false'"
-                                    x-bind:class="currency === @js($receipt['currency']) ? 'bg-funding-soft text-funding' : 'text-secondary-medium hover:text-secondary-dark dark:text-secondary-soft'"
+                                    x-bind:class="currency === @js($receipt['currency']) ? 'bg-funding-soft text-funding' : 'text-secondary-medium hover:text-secondary-dark dark:text-ink-muted'"
                                     class="min-h-8 cursor-pointer rounded-md px-2.5 text-xs font-bold transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-primary"
                                     wire:key="receipt-tab-{{ $receipt['currency'] }}"
                                 >{{ $receipt['currency'] }}</button>
@@ -1027,9 +1027,9 @@ new #[Title('titles.dashboard')] class extends Component {
                     @endif
                     @foreach ($receipts['currencies'] as $receipt)
                         <div x-show="currency === @js($receipt['currency'])" @unless ($loop->first) style="display: none" @endunless wire:key="receipt-chart-{{ $receipt['currency'] }}">
-                            <p class="px-2 text-xs text-secondary-medium dark:text-secondary-soft">
+                            <p class="px-2 text-xs text-secondary-medium dark:text-ink-muted">
                                 {{ __('dashboard.received_last_12_months') }}
-                                <span class="ms-1 text-base font-bold tabular-nums text-secondary-dark dark:text-white">{{ Number::format($receipt['total'], maxPrecision: 0) }}</span>
+                                <span class="ms-1 text-base font-bold tabular-nums text-secondary-dark dark:text-ink">{{ Number::format($receipt['total'], maxPrecision: 0) }}</span>
                                 <span class="text-[11px] font-semibold">{{ $receipt['currency'] }}</span>
                             </p>
                             <x-ui.chart
@@ -1056,23 +1056,23 @@ new #[Title('titles.dashboard')] class extends Component {
             @if ($this->upcoming->isEmpty())
                 <x-ui.empty-state icon="calendar-days" :heading="__('dashboard.nothing_scheduled')" :body="__('dashboard.nothing_scheduled_body')" class="min-h-56" />
             @else
-                <ul class="divide-y divide-secondary-soft dark:divide-secondary-medium" role="list">
+                <ul class="divide-y divide-secondary-soft dark:divide-line" role="list">
                     @foreach ($this->upcoming as $item)
                         @php $daysAway = (int) CarbonImmutable::today()->diffInDays($item['date']); @endphp
                         <li wire:key="upcoming-{{ $item['key'] }}">
                             <a href="{{ $item['href'] }}" wire:navigate class="group flex items-center gap-4 px-4 py-2.5 transition-colors duration-150 hover:bg-board-head focus-visible:bg-board-head focus-visible:outline-none">
-                                <span class="flex w-11 shrink-0 flex-col items-center rounded-lg border border-secondary-soft py-1 leading-none dark:border-secondary-medium">
-                                    <span class="text-[10px] font-semibold text-secondary-medium uppercase dark:text-secondary-soft">{{ $item['date']->translatedFormat(__('formats.month_short')) }}</span>
-                                    <span class="mt-0.5 text-base font-bold tabular-nums text-secondary-dark dark:text-white">{{ $item['date']->format('j') }}</span>
+                                <span class="flex w-11 shrink-0 flex-col items-center rounded-lg border border-secondary-soft py-1 leading-none dark:border-line">
+                                    <span class="text-[10px] font-semibold text-secondary-medium uppercase dark:text-ink-muted">{{ $item['date']->translatedFormat(__('formats.month_short')) }}</span>
+                                    <span class="mt-0.5 text-base font-bold tabular-nums text-secondary-dark dark:text-ink">{{ $item['date']->format('j') }}</span>
                                 </span>
                                 <span class="{{ $iconTone($item['tone']) }} flex size-7 shrink-0 items-center justify-center rounded-md">
                                     <flux:icon :name="$item['icon']" variant="micro" class="size-3.5" />
                                 </span>
                                 <span class="min-w-0 flex-1">
-                                    <span class="block truncate text-sm font-semibold text-secondary-dark dark:text-white">{{ $item['title'] }}</span>
-                                    <span class="block truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $item['context'] }}</span>
+                                    <span class="block truncate text-sm font-semibold text-secondary-dark dark:text-ink">{{ $item['title'] }}</span>
+                                    <span class="block truncate text-xs text-secondary-medium dark:text-ink-muted">{{ $item['context'] }}</span>
                                 </span>
-                                <span class="shrink-0 text-xs font-semibold tabular-nums text-secondary-medium dark:text-secondary-soft">
+                                <span class="shrink-0 text-xs font-semibold tabular-nums text-secondary-medium dark:text-ink-muted">
                                     {{ $daysAway === 0 ? __('dashboard.today') : trans_choice('dashboard.in_days', $daysAway, ['count' => $daysAway]) }}
                                 </span>
                             </a>
@@ -1090,14 +1090,14 @@ new #[Title('titles.dashboard')] class extends Component {
                     @foreach ($this->activity as $event)
                         <li class="relative flex gap-3 pb-3 last:pb-0" wire:key="activity-{{ $event['key'] }}">
                             @unless ($loop->last)
-                                <span class="absolute start-3.5 top-8 bottom-0 w-px bg-secondary-soft dark:bg-secondary-medium" aria-hidden="true"></span>
+                                <span class="absolute start-3.5 top-8 bottom-0 w-px bg-secondary-soft dark:bg-line-strong" aria-hidden="true"></span>
                             @endunless
-                            <span class="relative flex size-7 shrink-0 items-center justify-center rounded-full bg-board-head text-secondary-medium ring-1 ring-secondary-soft dark:text-secondary-soft dark:ring-secondary-medium">
+                            <span class="relative flex size-7 shrink-0 items-center justify-center rounded-full bg-board-head text-secondary-medium ring-1 ring-secondary-soft dark:text-ink-muted dark:ring-line">
                                 <flux:icon :name="$event['icon']" variant="micro" class="size-3.5" />
                             </span>
                             <a href="{{ $event['href'] }}" wire:navigate class="min-w-0 flex-1 rounded-md pt-0.5 focus-visible:outline-2 focus-visible:outline-primary">
-                                <span class="line-clamp-2 text-sm text-secondary-dark hover:underline hover:underline-offset-4 dark:text-white">{{ $event['sentence'] }}</span>
-                                <time class="text-xs text-secondary-medium dark:text-secondary-soft" datetime="{{ $event['at']->toIso8601String() }}">{{ $event['dateOnly'] ? $event['at']->translatedFormat(__('formats.date_short')) : $event['at']->diffForHumans() }}</time>
+                                <span class="line-clamp-2 text-sm text-secondary-dark hover:underline hover:underline-offset-4 dark:text-ink">{{ $event['sentence'] }}</span>
+                                <time class="text-xs text-secondary-medium dark:text-ink-muted" datetime="{{ $event['at']->toIso8601String() }}">{{ $event['dateOnly'] ? $event['at']->translatedFormat(__('formats.date_short')) : $event['at']->diffForHumans() }}</time>
                             </a>
                         </li>
                     @endforeach

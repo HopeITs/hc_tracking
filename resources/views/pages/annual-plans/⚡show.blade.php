@@ -378,7 +378,7 @@ new #[Title('titles.annual_plan')] class extends Component {
     $reportSegments = [
         ['count' => $summary['reportsApproved'], 'class' => 'bg-status-good', 'label' => \App\Enums\ReportStatus::Approved->label()],
         ['count' => $summary['reportsReviewed'], 'class' => 'bg-status-warn', 'label' => \App\Enums\ReportStatus::Reviewed->label()],
-        ['count' => $summary['reportsDraft'], 'class' => 'bg-secondary-medium dark:bg-secondary-soft', 'label' => \App\Enums\ReportStatus::Draft->label()],
+        ['count' => $summary['reportsDraft'], 'class' => 'bg-secondary-medium dark:bg-ink-faint', 'label' => \App\Enums\ReportStatus::Draft->label()],
     ];
 
     $gaugeRadius = 46;
@@ -386,7 +386,7 @@ new #[Title('titles.annual_plan')] class extends Component {
     $gaugeOffset = $gaugeCircumference * (1 - $summary['reportingShare'] / 100);
 @endphp
 
-<section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-8 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white">
+<section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-8 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink">
     <x-ui.detail-header
         :breadcrumbs="[
             ['label' => __('common.annual_plans'), 'url' => route('annual-plans.index')],
@@ -397,14 +397,14 @@ new #[Title('titles.annual_plan')] class extends Component {
     >
         <x-slot:meta>
             @if (Route::has('programs.show'))
-                <a href="{{ route('programs.show', $plan->program) }}" wire:navigate class="font-medium hover:text-secondary-dark hover:underline dark:hover:text-white">
+                <a href="{{ route('programs.show', $plan->program) }}" wire:navigate class="font-medium hover:text-secondary-dark hover:underline dark:hover:text-ink">
                     {{ $plan->program->name }}
                 </a>
             @else
                 <span class="font-medium">{{ $plan->program->name }}</span>
             @endif
             @if ($plan->program->strategy !== null && Route::has('strategies.show'))
-                <a href="{{ route('strategies.show', $plan->program->strategy) }}" wire:navigate class="hover:text-secondary-dark hover:underline dark:hover:text-white">
+                <a href="{{ route('strategies.show', $plan->program->strategy) }}" wire:navigate class="hover:text-secondary-dark hover:underline dark:hover:text-ink">
                     {{ $plan->program->strategy->name }}
                 </a>
             @endif
@@ -414,7 +414,7 @@ new #[Title('titles.annual_plan')] class extends Component {
 
         <x-slot:actions>
             <div class="flex shrink-0 flex-wrap items-center gap-2">
-                <x-ui.employee-chip :employee="$plan->manager" class="rounded-lg border border-secondary-soft p-2.5 dark:border-secondary-medium" />
+                <x-ui.employee-chip :employee="$plan->manager" class="rounded-lg border border-secondary-soft p-2.5 dark:border-line" />
                 <div class="flex items-center gap-1.5">
                     @can('update', $plan)<x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation @sm/detail:size-10!" wire:click="openEditModal" :aria-label="__('annual_plans.edit_this_annual_plan')" data-test="edit-annual-plan-button" />@endcan
                     @can('delete', $plan)<x-ui.button tone="ghost" size="sm" icon="trash" class="size-11! touch-manipulation @sm/detail:size-10!" wire:click="$set('confirmingDelete', true)" :aria-label="__('annual_plans.delete_this_annual_plan')" data-test="delete-annual-plan-button" />@endcan
@@ -427,7 +427,7 @@ new #[Title('titles.annual_plan')] class extends Component {
     <section class="overflow-hidden rounded-xl border border-board-line bg-board" aria-labelledby="plan-pulse-heading">
         <div class="border-b border-board-line bg-board-head px-5 py-4">
             <h2 id="plan-pulse-heading" class="text-base font-bold">{{ __('annual_plans.plan_pulse') }}</h2>
-            <p class="mt-0.5 type-meta text-secondary-medium dark:text-secondary-soft">{{ __('annual_plans.plan_pulse_hint') }}</p>
+            <p class="mt-0.5 type-meta text-secondary-medium dark:text-ink-muted">{{ __('annual_plans.plan_pulse_hint') }}</p>
         </div>
 
         <div class="grid gap-0 @4xl/detail:grid-cols-[20rem_minmax(0,1fr)]">
@@ -445,14 +445,14 @@ new #[Title('titles.annual_plan')] class extends Component {
                         />
                     </svg>
                     <div class="absolute inset-0 flex items-center justify-center">
-                        <span class="text-xl font-bold tabular-nums text-secondary-dark dark:text-white" aria-hidden="true">{{ $summary['reportingShare'] }}%</span>
+                        <span class="text-xl font-bold tabular-nums text-secondary-dark dark:text-ink" aria-hidden="true">{{ $summary['reportingShare'] }}%</span>
                     </div>
                 </div>
 
                 <div class="min-w-0">
-                    <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('annual_plans.targets_reported_on') }}</p>
-                    <p class="mt-1.5 type-figure font-bold tabular-nums">{{ $summary['reported'] }}<span class="type-body font-normal text-secondary-medium dark:text-secondary-soft"> / {{ $summary['targets'] }}</span></p>
-                    <p class="mt-1.5 type-meta text-secondary-medium dark:text-secondary-soft">
+                    <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('annual_plans.targets_reported_on') }}</p>
+                    <p class="mt-1.5 type-figure font-bold tabular-nums">{{ $summary['reported'] }}<span class="type-body font-normal text-secondary-medium dark:text-ink-muted"> / {{ $summary['targets'] }}</span></p>
+                    <p class="mt-1.5 type-meta text-secondary-medium dark:text-ink-muted">
                         {{ trans_choice('annual_plans.count_target_awaiting_first_report', $summary['unreported'], ['count' => $summary['unreported']]) }}
                     </p>
                 </div>
@@ -460,14 +460,14 @@ new #[Title('titles.annual_plan')] class extends Component {
 
             <div class="flex flex-col justify-center gap-3 px-5 py-5">
                 <div class="flex items-baseline justify-between gap-2">
-                    <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('annual_plans.report_review_mix') }}</p>
-                    <p class="type-meta tabular-nums text-secondary-medium dark:text-secondary-soft">{{ trans_choice('common.count_report', $summary['reportsTotal'], ['count' => $summary['reportsTotal']]) }}</p>
+                    <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('annual_plans.report_review_mix') }}</p>
+                    <p class="type-meta tabular-nums text-secondary-medium dark:text-ink-muted">{{ trans_choice('common.count_report', $summary['reportsTotal'], ['count' => $summary['reportsTotal']]) }}</p>
                 </div>
 
                 @if ($summary['reportsTotal'] === 0)
                     <p class="type-meta text-secondary-light">{{ __('annual_plans.no_reports_submitted_yet') }}</p>
                 @else
-                    <div class="flex h-2.5 w-full overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium" role="img" aria-label="{{ __('annual_plans.approved') }} {{ $summary['reportsApproved'] }}, {{ \App\Enums\ReportStatus::Reviewed->label() }} {{ $summary['reportsReviewed'] }}, {{ \App\Enums\ReportStatus::Draft->label() }} {{ $summary['reportsDraft'] }}">
+                    <div class="flex h-2.5 w-full overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2" role="img" aria-label="{{ __('annual_plans.approved') }} {{ $summary['reportsApproved'] }}, {{ \App\Enums\ReportStatus::Reviewed->label() }} {{ $summary['reportsReviewed'] }}, {{ \App\Enums\ReportStatus::Draft->label() }} {{ $summary['reportsDraft'] }}">
                         @foreach ($reportSegments as $segment)
                             @if ($segment['count'] > 0)
                                 <span class="{{ $segment['class'] }} h-full" style="width: {{ $summary['reportsTotal'] > 0 ? round($segment['count'] / $summary['reportsTotal'] * 100, 2) : 0 }}%"></span>
@@ -475,11 +475,11 @@ new #[Title('titles.annual_plan')] class extends Component {
                         @endforeach
                     </div>
 
-                    <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 type-meta text-secondary-medium dark:text-secondary-soft">
+                    <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 type-meta text-secondary-medium dark:text-ink-muted">
                         @foreach ($reportSegments as $segment)
                             <span class="inline-flex items-center gap-1.5">
                                 <span aria-hidden="true" class="{{ $segment['class'] }} size-2 shrink-0 rounded-full"></span>
-                                {{ $segment['label'] }} <span class="font-semibold tabular-nums text-secondary-dark dark:text-white">{{ $segment['count'] }}</span>
+                                {{ $segment['label'] }} <span class="font-semibold tabular-nums text-secondary-dark dark:text-ink">{{ $segment['count'] }}</span>
                             </span>
                         @endforeach
                     </div>
@@ -495,8 +495,8 @@ new #[Title('titles.annual_plan')] class extends Component {
         </div>
 
         @if ($periodMix !== [])
-            <div class="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-board-line px-5 py-3 type-meta text-secondary-medium dark:text-secondary-soft">
-                <span class="font-semibold text-secondary-dark dark:text-white">{{ __('annual_plans.reporting_rhythm') }}</span>
+            <div class="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-board-line px-5 py-3 type-meta text-secondary-medium dark:text-ink-muted">
+                <span class="font-semibold text-secondary-dark dark:text-ink">{{ __('annual_plans.reporting_rhythm') }}</span>
                 @foreach ($periodMix as $row)
                     <span class="inline-flex items-center gap-1.5">
                         <x-ui.enum-badge :case="$row['period']" />
@@ -510,7 +510,7 @@ new #[Title('titles.annual_plan')] class extends Component {
     {{-- The logframe connection: every result this plan measures, and the targets committed under it, one aligned row per target. --}}
     <x-ui.panel :title="__('annual_plans.results_and_targets')" :count="$summary['targets']" :subtitle="__('annual_plans.how_this_plans_targets_connect_to_the_logframe')">
         <x-slot:toolbar>
-            <a href="{{ route('targets.index', ['sourceType' => 'annual_plan']) }}" wire:navigate class="text-xs font-semibold text-secondary-medium hover:underline dark:text-secondary-soft">
+            <a href="{{ route('targets.index', ['sourceType' => 'annual_plan']) }}" wire:navigate class="text-xs font-semibold text-secondary-medium hover:underline dark:text-ink-muted">
                 {{ __('annual_plans.all_annual_plan_targets') }}
             </a>
         </x-slot:toolbar>
@@ -520,10 +520,10 @@ new #[Title('titles.annual_plan')] class extends Component {
         @else
             {{-- Column headings, shown once for the whole table rather than per result group. --}}
             <div class="hidden border-b border-board-line bg-board-head px-4 py-2 @2xl/detail:grid @2xl/detail:grid-cols-[minmax(0,1fr)_7rem_8rem_6rem]">
-                <span class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('annual_plans.indicator_and_location') }}</span>
-                <span class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('common.period') }}</span>
-                <span class="type-label text-end text-secondary-medium dark:text-secondary-soft">{{ __('annual_plans.committed_value') }}</span>
-                <span class="type-label text-end text-secondary-medium dark:text-secondary-soft">{{ __('common.reports') }}</span>
+                <span class="type-label text-secondary-medium dark:text-ink-muted">{{ __('annual_plans.indicator_and_location') }}</span>
+                <span class="type-label text-secondary-medium dark:text-ink-muted">{{ __('common.period') }}</span>
+                <span class="type-label text-end text-secondary-medium dark:text-ink-muted">{{ __('annual_plans.committed_value') }}</span>
+                <span class="type-label text-end text-secondary-medium dark:text-ink-muted">{{ __('common.reports') }}</span>
             </div>
 
             <div class="divide-y divide-board-line">
@@ -534,7 +534,7 @@ new #[Title('titles.annual_plan')] class extends Component {
                             <x-ui.enum-badge :case="$result->type" />
                             <p class="min-w-0 flex-1 text-sm font-semibold">{{ $result->statement }}</p>
                             @if (Route::has('results.index'))
-                                <a href="{{ route('results.index', ['program' => $plan->program_id]) }}" wire:navigate class="shrink-0 type-meta font-semibold text-secondary-medium hover:underline dark:text-secondary-soft">
+                                <a href="{{ route('results.index', ['program' => $plan->program_id]) }}" wire:navigate class="shrink-0 type-meta font-semibold text-secondary-medium hover:underline dark:text-ink-muted">
                                     {{ __('annual_plans.open_in_logframe') }}
                                 </a>
                             @endif
@@ -550,7 +550,7 @@ new #[Title('titles.annual_plan')] class extends Component {
                                 >
                                     <span class="min-w-0">
                                         <span class="block truncate text-sm font-semibold">{{ $target->indicator->name }}</span>
-                                        <span class="block truncate type-meta text-secondary-medium dark:text-secondary-soft">
+                                        <span class="block truncate type-meta text-secondary-medium dark:text-ink-muted">
                                             @if ($target->project === null)
                                                 {{ __('common.organisation_wide') }}
                                             @else
@@ -568,7 +568,7 @@ new #[Title('titles.annual_plan')] class extends Component {
                                             @class([
                                                 'inline-flex min-w-6 items-center justify-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-semibold tabular-nums',
                                                 'border-status-good text-status-good' => $target->reports_count > 0,
-                                                'border-secondary-light text-secondary-medium dark:text-secondary-soft' => $target->reports_count === 0,
+                                                'border-secondary-light text-secondary-medium dark:text-ink-muted' => $target->reports_count === 0,
                                             ])
                                             title="{{ trans_choice('common.count_report', $target->reports_count, ['count' => $target->reports_count]) }}"
                                         >
@@ -600,11 +600,11 @@ new #[Title('titles.annual_plan')] class extends Component {
         <x-ui.panel x-ref="connectionsCard" :title="__('annual_plans.connections')" :subtitle="__('annual_plans.connections_hint')">
             <ul class="divide-y divide-board-line">
                 <li class="flex items-center gap-3 p-3.5">
-                    <span aria-hidden="true" class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white">
+                    <span aria-hidden="true" class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary-soft text-secondary-dark dark:bg-surface-2 dark:text-ink">
                         <flux:icon.briefcase variant="micro" class="size-4" />
                     </span>
                     <span class="min-w-0 flex-1">
-                        <span class="block type-meta text-secondary-medium dark:text-secondary-soft">{{ __('common.program') }}</span>
+                        <span class="block type-meta text-secondary-medium dark:text-ink-muted">{{ __('common.program') }}</span>
                         @if (Route::has('programs.show'))
                             <a href="{{ route('programs.show', $plan->program) }}" wire:navigate class="block truncate text-sm font-semibold hover:underline">{{ $plan->program->name }}</a>
                         @else
@@ -614,11 +614,11 @@ new #[Title('titles.annual_plan')] class extends Component {
                 </li>
 
                 <li class="flex items-center gap-3 p-3.5">
-                    <span aria-hidden="true" class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white">
+                    <span aria-hidden="true" class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary-soft text-secondary-dark dark:bg-surface-2 dark:text-ink">
                         <flux:icon.map variant="micro" class="size-4" />
                     </span>
                     <span class="min-w-0 flex-1">
-                        <span class="block type-meta text-secondary-medium dark:text-secondary-soft">{{ __('common.strategy') }}</span>
+                        <span class="block type-meta text-secondary-medium dark:text-ink-muted">{{ __('common.strategy') }}</span>
                         @if ($plan->program->strategy === null)
                             <span class="block truncate text-sm font-semibold text-secondary-light">{{ __('common.strategy_not_assigned') }}</span>
                         @elseif (Route::has('strategies.show'))
@@ -630,32 +630,32 @@ new #[Title('titles.annual_plan')] class extends Component {
                 </li>
 
                 <li class="flex items-center gap-3 p-3.5">
-                    <span aria-hidden="true" class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white">
+                    <span aria-hidden="true" class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary-soft text-secondary-dark dark:bg-surface-2 dark:text-ink">
                         <flux:icon.user variant="micro" class="size-4" />
                     </span>
                     <span class="min-w-0 flex-1">
-                        <span class="block type-meta text-secondary-medium dark:text-secondary-soft">{{ __('annual_plans.assigned_manager') }}</span>
+                        <span class="block type-meta text-secondary-medium dark:text-ink-muted">{{ __('annual_plans.assigned_manager') }}</span>
                         <x-ui.employee-chip :employee="$plan->manager" compact />
                     </span>
                 </li>
 
                 @if ($linkedProjects->isEmpty())
                     <li class="p-3.5">
-                        <span class="block type-meta text-secondary-medium dark:text-secondary-soft">{{ __('common.projects') }}</span>
+                        <span class="block type-meta text-secondary-medium dark:text-ink-muted">{{ __('common.projects') }}</span>
                         <p class="mt-1 type-meta text-secondary-light">{{ __('annual_plans.no_projects_attributed_yet') }}</p>
                     </li>
                 @else
                     @foreach ($linkedProjects as $project)
                         <li class="flex items-center gap-3 p-3.5" wire:key="connection-project-{{ $project->id }}">
-                            <span aria-hidden="true" class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white">
+                            <span aria-hidden="true" class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary-soft text-secondary-dark dark:bg-surface-2 dark:text-ink">
                                 <flux:icon.map-pin variant="micro" class="size-4" />
                             </span>
                             <span class="min-w-0 flex-1">
                                 @if ($loop->first)
-                                    <span class="block type-meta text-secondary-medium dark:text-secondary-soft">{{ __('common.projects') }}</span>
+                                    <span class="block type-meta text-secondary-medium dark:text-ink-muted">{{ __('common.projects') }}</span>
                                 @endif
                                 <a href="{{ route('projects.show', $project) }}" wire:navigate class="block truncate text-sm font-semibold hover:underline">{{ $project->name }}</a>
-                                <span class="block truncate type-meta text-secondary-medium dark:text-secondary-soft">{{ $project->city?->name ?? __('common.unknown_city') }}</span>
+                                <span class="block truncate type-meta text-secondary-medium dark:text-ink-muted">{{ $project->city?->name ?? __('common.unknown_city') }}</span>
                             </span>
                         </li>
                     @endforeach
@@ -687,7 +687,7 @@ new #[Title('titles.annual_plan')] class extends Component {
                                         'mt-1.5 size-2 shrink-0 rounded-full',
                                         'bg-status-good' => $report->status === \App\Enums\ReportStatus::Approved,
                                         'bg-status-warn' => $report->status === \App\Enums\ReportStatus::Reviewed,
-                                        'bg-secondary-medium dark:bg-secondary-soft' => $report->status === \App\Enums\ReportStatus::Draft,
+                                        'bg-secondary-medium dark:bg-ink-faint' => $report->status === \App\Enums\ReportStatus::Draft,
                                     ])
                                 ></span>
 
@@ -696,9 +696,9 @@ new #[Title('titles.annual_plan')] class extends Component {
                                         <span class="truncate text-sm font-semibold">{{ $indicator->name }}</span>
                                         <x-ui.enum-badge :case="$report->status" />
                                     </span>
-                                    <span class="mt-0.5 block type-meta text-secondary-medium dark:text-secondary-soft">
+                                    <span class="mt-0.5 block type-meta text-secondary-medium dark:text-ink-muted">
                                         {{ $report->planIndicator->project?->name ?? __('common.organisation_wide') }}
-                                        · <span class="font-semibold tabular-nums text-secondary-dark dark:text-white">{{ number_format((float) $report->value, 2) }}</span>
+                                        · <span class="font-semibold tabular-nums text-secondary-dark dark:text-ink">{{ number_format((float) $report->value, 2) }}</span>
                                     </span>
                                     <span class="mt-0.5 block type-meta text-secondary-light">{{ $report->created_at?->translatedFormat(__('formats.date')) }}</span>
                                 </span>

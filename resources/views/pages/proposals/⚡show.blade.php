@@ -1036,7 +1036,7 @@ new #[Title('titles.proposal')] class extends Component
                 : trans_choice('proposals.tasks_across_count_projects', $projectCount, ['count' => $projectCount]),
             'alarm' => $total > 0 && $done < $total && $this->term['state'] === 'over',
             'segments' => [
-                ['width' => $total > 0 ? round($done / $total * 100, 2) : 0.0, 'class' => 'bg-secondary-dark dark:bg-white'],
+                ['width' => $total > 0 ? round($done / $total * 100, 2) : 0.0, 'class' => 'bg-secondary-dark dark:bg-ink-muted'],
             ],
         ];
     }
@@ -1061,7 +1061,7 @@ new #[Title('titles.proposal')] class extends Component
             'caption' => $caption,
             'alarm' => $term['state'] === 'over' && $this->proposal->status !== ProposalStatus::Completed,
             'segments' => [
-                ['width' => $term['percent'], 'class' => 'bg-secondary-medium dark:bg-secondary-soft'],
+                ['width' => $term['percent'], 'class' => 'bg-secondary-medium dark:bg-ink-muted'],
             ],
         ];
     }
@@ -1863,16 +1863,16 @@ new #[Title('titles.proposal')] class extends Component
 ?>
 
 @php
-    $mutedText = 'text-secondary-medium dark:text-secondary-soft';
-    $inkText = 'text-secondary-dark dark:text-white';
-    $hairline = 'border-secondary-soft dark:border-secondary-medium';
+    $mutedText = 'text-secondary-medium dark:text-ink-muted';
+    $inkText = 'text-secondary-dark dark:text-ink';
+    $hairline = 'border-secondary-soft dark:border-line';
     $amount = fn (float $value): string => number_format($value, 2);
     $term = $this->term;
     $chronology = $this->chronology;
     $arrivals = $this->arrivals;
 @endphp
 
-<section class="dossier @container/detail flex min-h-full w-full flex-1 flex-col bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white">
+<section class="dossier @container/detail flex min-h-full w-full flex-1 flex-col bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink">
     <x-ui.detail-header
         :breadcrumbs="[
             ['label' => __('common.proposals'), 'url' => route('proposals.index')],
@@ -1892,7 +1892,7 @@ new #[Title('titles.proposal')] class extends Component
         <x-slot:actions>
             <div class="flex flex-wrap items-center gap-2 @3xl/detail:shrink-0 @3xl/detail:flex-nowrap">
                 <x-ui.enum-badge :case="$this->proposal->status" />
-                <span class="rounded-md border border-secondary-light px-2 py-0.5 text-[11px] font-semibold text-secondary-medium dark:text-secondary-soft">
+                <span class="rounded-md border border-secondary-light px-2 py-0.5 text-[11px] font-semibold text-secondary-medium dark:text-ink-muted">
                     {{ $this->proposal->phase->label() }}
                 </span>
                 @can('update', $this->proposal)
@@ -1928,17 +1928,17 @@ new #[Title('titles.proposal')] class extends Component
                     @if (! $loop->first)
                         <span @class([
                             'absolute end-1/2 top-[0.3125rem] h-0.5 w-full -translate-y-1/2',
-                            'bg-secondary-dark dark:bg-white' => in_array($stop['state'], ['past', 'current'], true),
-                            'bg-primary' => $stop['state'] === 'rejected',
-                            'bg-secondary-soft dark:bg-secondary-medium' => $stop['state'] === 'ahead',
+                            'bg-secondary-dark dark:bg-ink-muted' => in_array($stop['state'], ['past', 'current'], true),
+                            'bg-primary dark:bg-status-critical' => $stop['state'] === 'rejected',
+                            'bg-secondary-soft dark:bg-line-strong' => $stop['state'] === 'ahead',
                         ]) aria-hidden="true"></span>
                     @endif
 
                     <span @class([
                         'relative z-10 size-2.5 rounded-full',
-                        'bg-primary ring-4 ring-primary/20' => in_array($stop['state'], ['current', 'rejected'], true),
-                        'bg-secondary-dark dark:bg-white' => $stop['state'] === 'past',
-                        'border-2 border-secondary-soft bg-white dark:border-secondary-medium dark:bg-secondary-dark' => $stop['state'] === 'ahead',
+                        'bg-primary dark:bg-brand ring-4 ring-primary/20' => in_array($stop['state'], ['current', 'rejected'], true),
+                        'bg-secondary-dark dark:bg-ink-muted' => $stop['state'] === 'past',
+                        'border-2 border-secondary-soft bg-white dark:border-line-strong dark:bg-surface-1' => $stop['state'] === 'ahead',
                     ]) aria-hidden="true"></span>
 
                     <span @class([
@@ -1970,7 +1970,7 @@ new #[Title('titles.proposal')] class extends Component
                         @if ($loop->index >= 3) x-show="expanded" x-cloak @endif
                     >
                         <button type="button" wire:click="$set('tab', '{{ $warning['tab'] }}')" aria-controls="tab-panel" class="group flex min-h-8 w-full touch-manipulation items-start gap-2.5 text-start text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
-                            <span @class(['mt-1.5 size-2 shrink-0 rounded-full', 'bg-primary' => $warning['critical'], 'border-2 border-status-warn' => ! $warning['critical']]) aria-hidden="true"></span>
+                            <span @class(['mt-1.5 size-2 shrink-0 rounded-full', 'bg-primary dark:bg-status-critical' => $warning['critical'], 'border-2 border-status-warn' => ! $warning['critical']]) aria-hidden="true"></span>
                             <span class="min-w-0 flex-1 underline-offset-4 group-hover:underline {{ $warning['critical'] ? 'font-semibold '.$inkText : $inkText }}">{{ $warning['text'] }}</span>
                             <flux:icon.arrow-right variant="micro" class="mt-0.5 size-4 shrink-0 {{ $mutedText }} rtl:rotate-180" aria-hidden="true" />
                         </button>
@@ -2027,7 +2027,7 @@ new #[Title('titles.proposal')] class extends Component
                     ]) data-test="vital-money-{{ $other['currency'] }}">{{ $other['text'] }}</span>
                 @endforeach
 
-                <span class="mt-3 flex h-[3px] w-full gap-px overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium" aria-hidden="true">
+                <span class="mt-3 flex h-[3px] w-full gap-px overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2" aria-hidden="true">
                     @foreach ($reading['segments'] as $segment)
                         <span class="money-grow h-full first:rounded-s-full {{ $segment['class'] }}" style="width: {{ $segment['width'] }}%"></span>
                     @endforeach
@@ -2082,7 +2082,7 @@ new #[Title('titles.proposal')] class extends Component
                                 </div>
                             </div>
 
-                            <div class="mt-3 flex h-2 w-full gap-0.5 overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium" role="img" aria-label="{{ __('proposals.money_bar_label', ['currency' => $currency, 'received' => $amount($agreementReceived), 'pending' => $amount($agreementPending), 'committed' => $amount($budget)]) }}">
+                            <div class="mt-3 flex h-2 w-full gap-0.5 overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2" role="img" aria-label="{{ __('proposals.money_bar_label', ['currency' => $currency, 'received' => $amount($agreementReceived), 'pending' => $amount($agreementPending), 'committed' => $amount($budget)]) }}">
                                 <span class="money-grow h-full rounded-s-full bg-funding" style="width: {{ $budget > 0 ? min(100, round($agreementReceived / $budget * 100, 2)) : 0 }}%"></span>
                                 <span class="money-grow money-pending h-full" style="width: {{ $budget > 0 ? min(100, round($agreementPending / $budget * 100, 2)) : 0 }}%"></span>
                             </div>
@@ -2111,13 +2111,13 @@ new #[Title('titles.proposal')] class extends Component
                                         <li class="relative flex min-w-0 gap-3 pb-4 last:pb-0" wire:key="transfer-{{ $transfer->id }}" data-transfer="{{ $transfer->id }}">
                                             <span class="relative flex w-3 shrink-0 justify-center" aria-hidden="true">
                                                 @unless ($loop->last)
-                                                    <span class="absolute top-3 bottom-[-1rem] w-px bg-secondary-soft dark:bg-secondary-medium"></span>
+                                                    <span class="absolute top-3 bottom-[-1rem] w-px bg-secondary-soft dark:bg-line-strong"></span>
                                                 @endunless
                                                 <span @class([
                                                     'relative z-10 mt-1.5 size-2.5 rounded-full',
                                                     'bg-funding' => $isReceived,
-                                                    'bg-primary' => ! $isReceived && ($isOverdue || $transfer->ar_status === ArStatus::Failed),
-                                                    'border-2 border-status-warn bg-white dark:bg-secondary-dark' => ! $isReceived && ! $isOverdue && $transfer->ar_status !== ArStatus::Failed,
+                                                    'bg-primary dark:bg-status-critical' => ! $isReceived && ($isOverdue || $transfer->ar_status === ArStatus::Failed),
+                                                    'border-2 border-status-warn bg-white dark:bg-surface-1' => ! $isReceived && ! $isOverdue && $transfer->ar_status !== ArStatus::Failed,
                                                 ])></span>
                                             </span>
 
@@ -2201,8 +2201,8 @@ new #[Title('titles.proposal')] class extends Component
 
                     <div class="relative mt-6 pt-5">
                         @if ($chronology['todayPercent'] !== null)
-                            <span class="pointer-events-none absolute inset-y-0 z-20 w-px bg-primary" style="inset-inline-start: {{ $chronology['todayPercent'] }}%" aria-hidden="true"></span>
-                            <span class="absolute top-0 z-20 -translate-x-1/2 text-[10px] font-bold tracking-wide text-status-critical uppercase rtl:translate-x-1/2" style="inset-inline-start: {{ $chronology['todayPercent'] }}%">{{ __('common.today') }}</span>
+                            <span class="pointer-events-none absolute inset-y-0 z-20 w-px bg-primary dark:bg-ink" style="inset-inline-start: {{ $chronology['todayPercent'] }}%" aria-hidden="true"></span>
+                            <span class="absolute top-0 z-20 -translate-x-1/2 text-[10px] font-bold tracking-wide text-status-critical dark:text-ink uppercase rtl:translate-x-1/2" style="inset-inline-start: {{ $chronology['todayPercent'] }}%">{{ __('common.today') }}</span>
                         @endif
 
                         {{-- The scrubbing cursor, drawn over every lane at once. --}}
@@ -2253,8 +2253,8 @@ new #[Title('titles.proposal')] class extends Component
                                             <span @class([
                                                 'size-2.5 shrink-0 rounded-full',
                                                 'bg-funding' => $event['state'] === 'received',
-                                                'bg-primary' => in_array($event['state'], ['overdue', 'failed'], true),
-                                                'border-2 border-status-warn bg-white dark:bg-secondary-dark' => $event['state'] === 'pending',
+                                                'bg-primary dark:bg-status-critical' => in_array($event['state'], ['overdue', 'failed'], true),
+                                                'border-2 border-status-warn bg-white dark:bg-surface-1' => $event['state'] === 'pending',
                                             ]) aria-hidden="true"></span>
                                         </span>
                                     </li>
@@ -2285,15 +2285,15 @@ new #[Title('titles.proposal')] class extends Component
                             x-on:keydown="scrubKey($event)"
                             x-on:blur="scrubbing = false"
                         >
-                            <div class="relative h-2 w-full rounded-full bg-secondary-soft dark:bg-secondary-medium">
+                            <div class="relative h-2 w-full rounded-full bg-secondary-soft dark:bg-surface-2">
                                 <span
-                                    class="absolute inset-y-0 rounded-full bg-secondary-dark dark:bg-white"
+                                    class="absolute inset-y-0 rounded-full bg-secondary-dark dark:bg-ink-muted"
                                     style="inset-inline-start: {{ $chronology['termStart'] }}%; width: {{ $chronology['termWidth'] }}%"
                                     role="img"
                                     aria-label="{{ __('proposals.grant_term_from_to', ['from' => $term['start']->translatedFormat(__('formats.date')), 'to' => $term['end']->translatedFormat(__('formats.date'))]) }}"
                                 ></span>
                                 <span
-                                    class="chrono-handle absolute top-1/2 size-3.5 rounded-full border-2 border-white bg-secondary-dark opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 dark:border-secondary-dark dark:bg-white"
+                                    class="chrono-handle absolute top-1/2 size-3.5 rounded-full border-2 border-white bg-secondary-dark opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 dark:border-surface-1 dark:bg-ink"
                                     :class="scrubbing && 'opacity-100!'"
                                     :style="`inset-inline-start: ${percent}%`"
                                     aria-hidden="true"
@@ -2308,7 +2308,7 @@ new #[Title('titles.proposal')] class extends Component
                                     <a
                                         href="{{ route('projects.show', tap(new Project, fn ($project) => $project->id = $bar['id'])) }}"
                                         wire:navigate
-                                        class="absolute top-0 flex h-7 min-w-0 items-center rounded-sm bg-funding-soft px-2 text-[11px] font-semibold text-funding transition-colors hover:bg-funding hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-white"
+                                        class="absolute top-0 flex h-7 min-w-0 items-center rounded-sm bg-funding-soft px-2 text-[11px] font-semibold text-funding transition-colors hover:bg-funding hover:text-white dark:hover:text-surface-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink"
                                         style="inset-inline-start: {{ $bar['start'] }}%; width: {{ $bar['width'] }}%"
                                     >
                                         <span class="truncate">{{ $bar['name'] }}</span>
@@ -2329,7 +2329,7 @@ new #[Title('titles.proposal')] class extends Component
                                         '-translate-x-full rtl:translate-x-full' => $move['anchor'] === 'end',
                                     ]) style="inset-inline-start: {{ $move['at'] }}%" wire:key="chrono-move-{{ $loop->index }}" data-lane="{{ $move['lane'] }}">
                                         <span @class(['flex flex-col gap-1', 'items-center' => $move['anchor'] === 'center', 'items-start' => $move['anchor'] === 'start', 'items-end' => $move['anchor'] === 'end'])>
-                                            <span class="size-2 shrink-0 rounded-full bg-secondary-medium dark:bg-secondary-soft" aria-hidden="true"></span>
+                                            <span class="size-2 shrink-0 rounded-full bg-secondary-medium dark:bg-ink-muted" aria-hidden="true"></span>
                                             @if ($move['lane'] > 0)
                                                 <span class="-my-1 w-px bg-secondary-light {{ $move['anchor'] === 'start' ? 'ms-1' : ($move['anchor'] === 'end' ? 'me-1' : '') }}" style="height: {{ $move['lane'] * 1.25 }}rem" aria-hidden="true"></span>
                                             @endif
@@ -2425,11 +2425,11 @@ new #[Title('titles.proposal')] class extends Component
                         @endphp
                         <article class="relative min-w-0 ps-6" wire:key="project-{{ $project->id }}" data-project="{{ $project->id }}">
                             {{-- The thread: one mark per funded project, filled once its milestones are all reached. --}}
-                            <span class="absolute start-[0.1875rem] top-5 bottom-0 w-px bg-secondary-soft dark:bg-secondary-medium" aria-hidden="true"></span>
+                            <span class="absolute start-[0.1875rem] top-5 bottom-0 w-px bg-secondary-soft dark:bg-line-strong" aria-hidden="true"></span>
                             <span @class([
                                 'absolute start-0 top-1.5 size-2.5 rounded-full',
-                                'bg-secondary-dark dark:bg-white' => $project->milestones_count > 0 && $project->reached_milestones_count >= $project->milestones_count,
-                                'border-2 border-secondary-dark bg-white dark:border-white dark:bg-secondary-dark' => $project->milestones_count === 0 || $project->reached_milestones_count < $project->milestones_count,
+                                'bg-secondary-dark dark:bg-ink-muted' => $project->milestones_count > 0 && $project->reached_milestones_count >= $project->milestones_count,
+                                'border-2 border-secondary-dark bg-white dark:border-ink-muted dark:bg-surface-1' => $project->milestones_count === 0 || $project->reached_milestones_count < $project->milestones_count,
                             ]) aria-hidden="true"></span>
 
                             <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -2486,7 +2486,7 @@ new #[Title('titles.proposal')] class extends Component
                                         @endphp
                                         <div class="mt-1.5 flex h-1.5 w-full gap-0.5" aria-hidden="true">
                                             @for ($slot = 0; $slot < $slots; $slot++)
-                                                <span @class(['h-full flex-1 rounded-full', 'bg-status-good' => $slot < $filled, 'bg-secondary-soft dark:bg-secondary-medium' => $slot >= $filled])></span>
+                                                <span @class(['h-full flex-1 rounded-full', 'bg-status-good' => $slot < $filled, 'bg-secondary-soft dark:bg-line-strong' => $slot >= $filled])></span>
                                             @endfor
                                         </div>
                                     </div>
@@ -2534,10 +2534,10 @@ new #[Title('titles.proposal')] class extends Component
                     $unassignedCount = $this->tasks->filter(fn (Task $task): bool => $task->taskAssignees->isEmpty())->count();
                     $undatedCount = $this->tasks->whereNull('due_date')->count();
                     $statusTone = [
-                        TaskStatus::Done->value => 'bg-secondary-dark dark:bg-white',
-                        TaskStatus::UnderReview->value => 'bg-secondary-medium dark:bg-secondary-soft',
+                        TaskStatus::Done->value => 'bg-secondary-dark dark:bg-ink',
+                        TaskStatus::UnderReview->value => 'bg-secondary-medium dark:bg-ink-muted',
                         TaskStatus::InProgress->value => 'bg-secondary-light',
-                        TaskStatus::Todo->value => 'bg-secondary-soft dark:bg-secondary-medium',
+                        TaskStatus::Todo->value => 'bg-secondary-soft dark:bg-line-strong',
                     ];
                 @endphp
 
@@ -2599,8 +2599,8 @@ new #[Title('titles.proposal')] class extends Component
                             <header class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b pt-4 pb-3 {{ $hairline }}">
                                 <a href="{{ route('projects.show', $group['project']) }}" wire:navigate class="min-w-0 truncate text-base font-bold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary {{ $inkText }}">{{ $group['project']->name }}</a>
                                 <span class="flex shrink-0 items-center gap-3 text-xs {{ $mutedText }}">
-                                    <span class="h-1 w-24 overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium" aria-hidden="true">
-                                        <span class="block h-full rounded-full bg-secondary-dark dark:bg-white" style="width: {{ round($groupDone / $groupTotal * 100, 2) }}%"></span>
+                                    <span class="h-1 w-24 overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2" aria-hidden="true">
+                                        <span class="block h-full rounded-full bg-secondary-dark dark:bg-ink-muted" style="width: {{ round($groupDone / $groupTotal * 100, 2) }}%"></span>
                                     </span>
                                     <span class="tabular-nums">{{ __('proposals.done_of_total', ['done' => $groupDone, 'total' => $groupTotal]) }}</span>
                                 </span>
@@ -2667,7 +2667,7 @@ new #[Title('titles.proposal')] class extends Component
                                 </div>
                             </div>
 
-                            <div class="mt-3 flex h-2 w-full gap-0.5 overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium" role="img" aria-label="{{ __('proposals.reported_of_target', ['reported' => number_format($achieved, 2), 'target' => number_format($targetValue, 2)]) }}">
+                            <div class="mt-3 flex h-2 w-full gap-0.5 overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2" role="img" aria-label="{{ __('proposals.reported_of_target', ['reported' => number_format($achieved, 2), 'target' => number_format($targetValue, 2)]) }}">
                                 <span class="money-grow h-full rounded-s-full bg-funding" style="width: {{ $achievedPercent }}%"></span>
                                 <span class="money-grow money-pending h-full" style="width: {{ $pendingPercent }}%"></span>
                             </div>
@@ -2719,13 +2719,13 @@ new #[Title('titles.proposal')] class extends Component
                                     <li class="relative flex min-w-0 gap-3 pb-4 last:pb-0" wire:key="deadline-{{ $item['key'] }}" data-deadline="{{ $item['key'] }}">
                                         <span class="relative flex w-3 shrink-0 justify-center" aria-hidden="true">
                                             @unless ($loop->last)
-                                                <span class="absolute top-3 bottom-[-1rem] w-px bg-secondary-soft dark:bg-secondary-medium"></span>
+                                                <span class="absolute top-3 bottom-[-1rem] w-px bg-secondary-soft dark:bg-line-strong"></span>
                                             @endunless
                                             <span @class([
                                                 'relative z-10 mt-1.5 size-2.5 rounded-full',
-                                                'bg-primary' => $state === 'overdue',
-                                                'border-2 border-status-warn bg-white dark:bg-secondary-dark' => $state === 'soon',
-                                                'border-2 border-secondary-light bg-white dark:bg-secondary-dark' => $state === 'later',
+                                                'bg-primary dark:bg-status-critical' => $state === 'overdue',
+                                                'border-2 border-status-warn bg-white dark:bg-surface-1' => $state === 'soon',
+                                                'border-2 border-secondary-light bg-white dark:bg-surface-1' => $state === 'later',
                                             ])></span>
                                         </span>
                                         <div class="flex min-w-0 flex-1 flex-col gap-1 @xl/detail:flex-row @xl/detail:items-baseline @xl/detail:gap-4">
@@ -2762,7 +2762,7 @@ new #[Title('titles.proposal')] class extends Component
             <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
                 <p class="max-w-prose text-xs {{ $mutedText }}">{{ __('proposals.reports_filed_against_the_targets_this_proposal_commits') }}</p>
                 @if ($this->targets->isNotEmpty())
-                    <a href="{{ route('reports.index', ['create' => 1]) }}" wire:navigate class="inline-flex min-h-10 touch-manipulation items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-white hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" data-test="record-report">
+                    <a href="{{ route('reports.index', ['create' => 1]) }}" wire:navigate class="inline-flex min-h-10 touch-manipulation items-center gap-1.5 rounded-lg bg-primary dark:bg-brand dark:hover:bg-brand-hover px-3 text-sm font-semibold text-white hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" data-test="record-report">
                         <flux:icon.plus variant="micro" class="size-4" aria-hidden="true" />
                         {{ __('proposals.record_a_report') }}
                     </a>
@@ -2880,9 +2880,9 @@ new #[Title('titles.proposal')] class extends Component
                                 <li class="relative flex min-w-0 gap-3 pb-5 last:pb-0" wire:key="status-note-{{ $note->id }}">
                                     <span class="relative flex w-3 shrink-0 justify-center" aria-hidden="true">
                                         @unless ($loop->last)
-                                            <span class="absolute top-3 bottom-[-1.25rem] w-px bg-secondary-soft dark:bg-secondary-medium"></span>
+                                            <span class="absolute top-3 bottom-[-1.25rem] w-px bg-secondary-soft dark:bg-line-strong"></span>
                                         @endunless
-                                        <span @class(['relative z-10 mt-1.5 size-2.5 rounded-full', 'bg-primary' => $loop->first, 'bg-secondary-light' => ! $loop->first])></span>
+                                        <span @class(['relative z-10 mt-1.5 size-2.5 rounded-full', 'bg-primary dark:bg-brand' => $loop->first, 'bg-secondary-light' => ! $loop->first])></span>
                                     </span>
 
                                     <div class="min-w-0 flex-1">
@@ -3075,17 +3075,17 @@ new #[Title('titles.proposal')] class extends Component
                     <x-ui.button tone="ghost" size="sm" icon="chevron-right" class="size-9! touch-manipulation rtl:[&_svg]:-scale-x-100" wire:click="previewAdjacent(1)" :aria-label="__('reports.next_file')" />
                 @endif
                 @if ($previewFile->isPreviewable())
-                    <a href="{{ $previewUrl }}" target="_blank" rel="noopener" class="inline-flex size-9 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-secondary-soft dark:hover:bg-secondary-medium dark:hover:text-white" aria-label="{{ __('reports.open_in_new_tab') }}">
+                    <a href="{{ $previewUrl }}" target="_blank" rel="noopener" class="inline-flex size-9 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-ink-muted dark:hover:bg-surface-2 dark:hover:text-ink" aria-label="{{ __('reports.open_in_new_tab') }}">
                         <flux:icon name="arrow-top-right-on-square" variant="micro" class="size-4" />
                     </a>
                 @endif
-                <a href="{{ $previewDownloadUrl }}" class="inline-flex size-9 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-secondary-soft dark:hover:bg-secondary-medium dark:hover:text-white" aria-label="{{ __('common.download_name', ['name' => $previewName]) }}">
+                <a href="{{ $previewDownloadUrl }}" class="inline-flex size-9 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-ink-muted dark:hover:bg-surface-2 dark:hover:text-ink" aria-label="{{ __('common.download_name', ['name' => $previewName]) }}">
                     <flux:icon name="arrow-down-tray" variant="micro" class="size-4" />
                 </a>
             </x-slot:headerActions>
 
             <div
-                class="bg-board-head dark:bg-secondary-medium/20"
+                class="bg-board-head dark:bg-surface-2"
                 wire:key="preview-{{ $previewFile->id }}"
                 x-data
                 x-on:keydown.left.window="$wire.previewAdjacent(document.dir === 'rtl' ? 1 : -1)"
@@ -3098,7 +3098,7 @@ new #[Title('titles.proposal')] class extends Component
                     <iframe src="{{ $previewUrl }}#view=FitH" title="{{ $previewName }}" class="h-[75dvh] w-full border-0 bg-white" data-test="pdf-preview"></iframe>
                 @elseif ($previewFile->isPreviewable())
                     <div class="flex min-h-[50dvh] items-center justify-center p-4">
-                        <img src="{{ $previewUrl }}" alt="{{ $previewName }}" class="max-h-[75dvh] max-w-full rounded-lg object-contain shadow-sm" data-test="image-preview" />
+                        <img src="{{ $previewUrl }}" alt="{{ $previewName }}" class="max-h-[75dvh] max-w-full rounded-lg object-contain shadow-sm" data-test="image-preview" data-no-dim />
                     </div>
                 @else
                     {{-- Word/Excel: rendered client-side by resources/js/file-preview.js from the authenticated download route. --}}
@@ -3108,19 +3108,19 @@ new #[Title('titles.proposal')] class extends Component
                         class="flex h-[75dvh] flex-col"
                         data-test="office-preview"
                     >
-                        <div x-show="sheets.length > 1" class="flex shrink-0 gap-1 overflow-x-auto border-b border-secondary-soft bg-white px-3 py-2 dark:border-secondary-medium dark:bg-secondary-dark">
+                        <div x-show="sheets.length > 1" class="flex shrink-0 gap-1 overflow-x-auto border-b border-secondary-soft bg-white px-3 py-2 dark:border-line dark:bg-surface-1">
                             <template x-for="(sheetName, index) in sheets" :key="index">
                                 <button
                                     type="button"
                                     x-on:click="showSheet(index)"
                                     x-text="sheetName"
                                     class="shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold whitespace-nowrap"
-                                    :class="index === activeSheet ? 'bg-primary text-white' : 'text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium'"
+                                    :class="index === activeSheet ? 'bg-primary dark:bg-ink dark:text-surface-0 text-white' : 'text-secondary-medium hover:bg-secondary-soft dark:text-ink-muted dark:hover:bg-surface-2'"
                                 ></button>
                             </template>
                         </div>
 
-                        <div x-show="status === 'loading'" class="flex flex-1 items-center justify-center gap-2 text-sm text-secondary-medium dark:text-secondary-soft">
+                        <div x-show="status === 'loading'" class="flex flex-1 items-center justify-center gap-2 text-sm text-secondary-medium dark:text-ink-muted">
                             <flux:icon.loading class="size-5" />
                             {{ __('reports.loading_preview') }}
                         </div>
@@ -3128,7 +3128,7 @@ new #[Title('titles.proposal')] class extends Component
                         <div x-show="status === 'error'" x-cloak class="flex-1">
                             <x-ui.empty-state icon="exclamation-triangle" :heading="__('reports.preview_not_available')" :body="__('reports.this_file_could_not_be_previewed')">
                                 <x-slot:action>
-                                    <a href="{{ $previewDownloadUrl }}" class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:opacity-90">
+                                    <a href="{{ $previewDownloadUrl }}" class="inline-flex items-center gap-1.5 rounded-lg bg-primary dark:bg-brand dark:hover:bg-brand-hover px-3 py-2 text-sm font-semibold text-white hover:opacity-90">
                                         <flux:icon name="arrow-down-tray" variant="micro" class="size-4" />
                                         {{ __('common.download_name', ['name' => $previewName]) }}
                                     </a>
@@ -3138,7 +3138,7 @@ new #[Title('titles.proposal')] class extends Component
 
                         <div x-show="status === 'ready'" x-cloak x-ref="canvas" class="min-h-0 flex-1 overflow-auto"></div>
 
-                        <p x-show="truncated" x-cloak class="shrink-0 border-t border-secondary-soft bg-white px-3 py-2 text-xs text-secondary-medium dark:border-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft">{{ __('reports.sheet_preview_truncated', ['rows' => 500]) }}</p>
+                        <p x-show="truncated" x-cloak class="shrink-0 border-t border-secondary-soft bg-white px-3 py-2 text-xs text-secondary-medium dark:border-line dark:bg-surface-1 dark:text-ink-muted">{{ __('reports.sheet_preview_truncated', ['rows' => 500]) }}</p>
                     </div>
                 @endif
             </div>

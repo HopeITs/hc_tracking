@@ -676,7 +676,7 @@ document.addEventListener('alpine:init', () => {
             const role = this.roleOf(row);
 
             if (role === 'self') {
-                return 'ring-2 ring-status-active ring-offset-2 ring-offset-white dark:ring-offset-secondary-dark';
+                return 'ring-2 ring-status-active ring-offset-2 ring-offset-white dark:ring-offset-surface-1';
             }
 
             if (role === 'up' || role === 'down') {
@@ -688,7 +688,7 @@ document.addEventListener('alpine:init', () => {
             }
 
             if (this.isCriticalShown(row)) {
-                return 'ring-2 ring-status-critical ring-offset-1 ring-offset-white dark:ring-offset-secondary-dark';
+                return 'ring-2 ring-status-critical ring-offset-1 ring-offset-white dark:ring-offset-surface-1';
             }
 
             return `ring-1 ring-inset ${this.tones.edge?.[row.tone] ?? ''}`;
@@ -705,7 +705,7 @@ document.addEventListener('alpine:init', () => {
                 return 'ring-2 ring-funding';
             }
 
-            return this.isCriticalShown(row) ? 'ring-2 ring-status-critical' : 'ring-2 ring-white dark:ring-secondary-dark';
+            return this.isCriticalShown(row) ? 'ring-2 ring-status-critical' : 'ring-2 ring-white dark:ring-surface-1';
         },
 
         /** Which glyph a row's name wears in the grid. */
@@ -1194,7 +1194,7 @@ document.addEventListener('alpine:init', () => {
                     const x = this.x(from.startDay) + this.ppd / 2;
 
                     markup += `<path d="M${x},${y1 + direction * 8} V${y2}" fill="none" stroke-width="1.5" stroke-dasharray="2 3" stroke-linecap="round" class="stroke-funding"></path>`
-                        + `<circle cx="${x}" cy="${y2}" r="3.5" stroke-width="1.5" class="fill-funding stroke-white dark:stroke-secondary-dark"></circle>`;
+                        + `<circle cx="${x}" cy="${y2}" r="3.5" stroke-width="1.5" class="fill-funding stroke-white dark:stroke-surface-1"></circle>`;
                 }
             }
 

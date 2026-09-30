@@ -360,7 +360,7 @@ new #[Title('titles.milestone')] class extends Component {
 ?>
 
 @php
-    $dropdownLabelClasses = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-secondary-soft';
+    $dropdownLabelClasses = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-ink-muted';
     $canEditMilestone = auth()->user()->can('update', $this->milestone);
     $canMoveMilestone = $canEditMilestone || auth()->user()->can('updateProgress', $this->milestone);
     $canAddRelated = auth()->user()->can('create', [App\Models\Milestone::class, $this->milestone->project_id]);
@@ -368,7 +368,7 @@ new #[Title('titles.milestone')] class extends Component {
     $selectedResponsibleOption = $responsibleUserId === '' ? null : $this->userOptions->firstWhere('id', (int) $responsibleUserId);
 @endphp
 
-<section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="milestone-detail-heading">
+<section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="milestone-detail-heading">
     <x-ui.detail-header
         id="milestone-detail-heading"
         :breadcrumbs="[
@@ -405,10 +405,10 @@ new #[Title('titles.milestone')] class extends Component {
         <form wire:submit="updateMilestone" class="flex flex-col gap-5 p-4">
             <x-ui.input wire:model="name" :label="__('milestones.milestone_name')" type="text" maxlength="255" required autofocus :disabled="! $canEditMilestone" />
 
-            <flux:textarea wire:model="description" :label="__('common.description')" rows="3" :disabled="! $canEditMilestone" class="border-secondary-light! bg-white! text-secondary-dark! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!" />
+            <flux:textarea wire:model="description" :label="__('common.description')" rows="3" :disabled="! $canEditMilestone" class="border-secondary-light! bg-white! text-secondary-dark! dark:border-field-line! dark:bg-surface-2! dark:text-ink!" />
 
-            <div class="flex flex-col gap-4 border-t border-secondary-soft pt-5 dark:border-secondary-medium">
-                <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('milestones.schedule_and_status') }}</p>
+            <div class="flex flex-col gap-4 border-t border-secondary-soft pt-5 dark:border-line">
+                <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('milestones.schedule_and_status') }}</p>
 
                 <div class="grid gap-4 sm:grid-cols-2">
                     <x-ui.input wire:model="plannedStartDate" :label="__('milestones.planned_start_date')" type="date" required :disabled="! $canEditMilestone" />
@@ -438,8 +438,8 @@ new #[Title('titles.milestone')] class extends Component {
                 </div>
             </div>
 
-            <div class="flex flex-col gap-4 border-t border-secondary-soft pt-5 dark:border-secondary-medium">
-                <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('milestones.assignment') }}</p>
+            <div class="flex flex-col gap-4 border-t border-secondary-soft pt-5 dark:border-line">
+                <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('milestones.assignment') }}</p>
 
                 <div class="min-w-0">
                     <x-ui.progress-bar :value="(float) $weightPercentage" :max="100" show-value class="mt-2" />
@@ -453,7 +453,7 @@ new #[Title('titles.milestone')] class extends Component {
                         </flux:button>
                         <flux:menu class="filter-menu">
                             @if ($this->userOptions->count() > 6)
-                                <div class="border-b border-secondary-soft p-1.5 dark:border-secondary-medium">
+                                <div class="border-b border-secondary-soft p-1.5 dark:border-line">
                                     <x-ui.input type="search" size="sm" icon="magnifying-glass" x-model="optionSearch" :aria-label="__('milestones.search_responsible')" :placeholder="__('milestones.search_responsible')" />
                                 </div>
                             @endif
@@ -476,7 +476,7 @@ new #[Title('titles.milestone')] class extends Component {
                         </flux:button>
                         <flux:menu class="filter-menu">
                             @if ($this->parentOptions->count() > 6)
-                                <div class="border-b border-secondary-soft p-1.5 dark:border-secondary-medium">
+                                <div class="border-b border-secondary-soft p-1.5 dark:border-line">
                                     <x-ui.input type="search" size="sm" icon="magnifying-glass" x-model="optionSearch" :aria-label="__('milestones.search_milestones')" :placeholder="__('milestones.search_milestones')" />
                                 </div>
                             @endif
@@ -496,7 +496,7 @@ new #[Title('titles.milestone')] class extends Component {
                 </div>
             </div>
 
-            <div class="flex justify-end gap-2 border-t border-secondary-soft pt-4 dark:border-secondary-medium">
+            <div class="flex justify-end gap-2 border-t border-secondary-soft pt-4 dark:border-line">
                 <x-ui.button type="submit" tone="primary" class="min-h-11 touch-manipulation sm:min-h-10" data-test="update-milestone-button">{{ __('common.save_changes') }}</x-ui.button>
             </div>
         </form>
@@ -515,12 +515,12 @@ new #[Title('titles.milestone')] class extends Component {
                 </x-slot:action>
             </x-ui.empty-state>
         @else
-            <ul class="divide-y divide-secondary-soft dark:divide-secondary-medium">
+            <ul class="divide-y divide-secondary-soft dark:divide-line">
                 @foreach ($this->relatedMilestones as $related)
                     <li class="flex items-center justify-between gap-3 p-3.5" wire:key="related-milestone-{{ $related->id }}">
                         <a href="{{ route('milestones.show', $related) }}" wire:navigate class="min-w-0 truncate text-sm font-semibold hover:underline">{{ $related->name }}</a>
                         <div class="flex shrink-0 items-center gap-3">
-                            <span class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $related->planned_start_date->translatedFormat(__('formats.date')) }}</span>
+                            <span class="text-xs tabular-nums text-secondary-medium dark:text-ink-muted">{{ $related->planned_start_date->translatedFormat(__('formats.date')) }}</span>
                             <x-ui.enum-badge :case="$related->status" />
                             <x-ui.milestone-flags :milestone="$related" />
                         </div>
@@ -542,7 +542,7 @@ new #[Title('titles.milestone')] class extends Component {
                 </x-slot:action>
             </x-ui.empty-state>
         @else
-            <ul class="divide-y divide-secondary-soft dark:divide-secondary-medium">
+            <ul class="divide-y divide-secondary-soft dark:divide-line">
                 @foreach ($this->relatedTasks as $relatedTask)
                     @php $relatedTaskAssignees = $relatedTask->taskAssignees->pluck('employee')->filter(); @endphp
                     <li class="flex flex-wrap items-center justify-between gap-3 p-3.5" wire:key="milestone-related-task-{{ $relatedTask->id }}">
@@ -550,10 +550,10 @@ new #[Title('titles.milestone')] class extends Component {
                             {{ $relatedTask->title }}
                         </a>
                         <div class="flex shrink-0 items-center gap-3">
-                            <span class="w-40 shrink-0 truncate text-xs text-secondary-medium dark:text-secondary-soft">
+                            <span class="w-40 shrink-0 truncate text-xs text-secondary-medium dark:text-ink-muted">
                                 {{ $relatedTaskAssignees->isEmpty() ? __('common.not_assigned') : $relatedTaskAssignees->map->name->implode(', ') }}
                             </span>
-                            <span class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">
+                            <span class="text-xs tabular-nums text-secondary-medium dark:text-ink-muted">
                                 {{ $relatedTask->due_date?->translatedFormat(__('formats.date')) ?? '—' }}
                             </span>
                             <x-ui.enum-badge :case="$relatedTask->status" />

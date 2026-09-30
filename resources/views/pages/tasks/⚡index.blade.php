@@ -1513,7 +1513,7 @@ new #[Title('titles.tasks')] class extends Component
     $canPickDepartment = auth()->user()->canViewAllTaskDepartments();
 @endphp
 
-<section class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="task-directory-heading">
+<section class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="task-directory-heading">
     <x-ui.page-header heading-id="task-directory-heading" :title="__('common.tasks')" :count="$this->taskStats['total']">
         <x-slot:filters>
             <x-ui.input type="search" icon="magnifying-glass" :label="__('tasks.search_tasks')" :placeholder="__('tasks.title_description_or_assignee')" wire:model.live.debounce.300ms="search" clearable />
@@ -1583,14 +1583,14 @@ new #[Title('titles.tasks')] class extends Component
         </button>
     </div>
 
-    <div class="flex flex-col gap-3 rounded-2xl border border-secondary-soft bg-secondary-soft/20 p-4 dark:border-secondary-medium dark:bg-secondary-medium/10" data-test="my-tasks-rail">
+    <div class="flex flex-col gap-3 rounded-2xl border border-secondary-soft bg-secondary-soft/20 p-4 dark:border-line dark:bg-white/[0.03]" data-test="my-tasks-rail">
         <div class="flex items-center justify-between gap-3">
             <div class="flex items-center gap-2">
-                <flux:icon name="user-circle" variant="micro" class="size-5 text-primary" aria-hidden="true" />
-                <h2 class="text-sm font-bold text-secondary-dark dark:text-white">{{ __('tasks.my_tasks') }}</h2>
+                <flux:icon name="user-circle" variant="micro" class="size-5 text-primary dark:text-brand-text" aria-hidden="true" />
+                <h2 class="text-sm font-bold text-secondary-dark dark:text-ink">{{ __('tasks.my_tasks') }}</h2>
             </div>
             @if ($this->myTasksPreview->isNotEmpty())
-                <button type="button" wire:click="toggleMyTasksOnly" class="text-xs font-semibold text-primary hover:underline" data-test="my-tasks-view-all">
+                <button type="button" wire:click="toggleMyTasksOnly" class="text-xs font-semibold text-primary dark:text-brand-text hover:underline" data-test="my-tasks-view-all">
                     {{ $myTasksOnly ? __('tasks.showing_my_tasks_only') : __('tasks.view_all') }}
                 </button>
             @endif
@@ -1614,9 +1614,9 @@ new #[Title('titles.tasks')] class extends Component
                         wire:key="my-task-{{ $myTask->id }}"
                         data-test="my-task-card-{{ $myTask->id }}"
                         @class([
-                            'flex w-64 shrink-0 flex-col gap-2 rounded-xl border p-3 text-left shadow-sm transition-shadow hover:shadow-md dark:bg-secondary-dark',
+                            'flex w-64 shrink-0 flex-col gap-2 rounded-xl border p-3 text-left shadow-sm transition-shadow hover:shadow-md dark:bg-surface-1',
                             'border-primary/30 bg-white dark:border-status-critical/30' => $isAssignedToMe,
-                            'border-dashed border-secondary-light bg-secondary-soft/30 dark:border-secondary-medium dark:bg-secondary-medium/10' => ! $isAssignedToMe,
+                            'border-dashed border-secondary-light bg-secondary-soft/30 dark:border-line dark:bg-white/[0.03]' => ! $isAssignedToMe,
                         ])
                     >
                         <div class="flex items-center justify-between gap-2">
@@ -1631,7 +1631,7 @@ new #[Title('titles.tasks')] class extends Component
                         @unless ($isAssignedToMe)
                             @php $assigneeName = $myTask->taskAssignees->first()?->employee?->name; @endphp
                             @if ($assigneeName !== null)
-                                <span class="inline-flex items-start gap-1 text-[10px] font-semibold text-secondary-medium dark:text-secondary-soft" data-test="my-task-role-delegated-{{ $myTask->id }}">
+                                <span class="inline-flex items-start gap-1 text-[10px] font-semibold text-secondary-medium dark:text-ink-muted" data-test="my-task-role-delegated-{{ $myTask->id }}">
                                     <flux:icon.paper-airplane variant="micro" class="mt-0.5 size-3 shrink-0" aria-hidden="true" />
                                     <span class="break-words">{{ __('tasks.assigned_to_name', ['name' => $assigneeName]) }}</span>
                                 </span>
@@ -1642,10 +1642,10 @@ new #[Title('titles.tasks')] class extends Component
                             wire:navigate
                             title="{{ $myTask->title }}"
                             x-on:click.stop
-                            class="truncate text-sm font-semibold text-secondary-dark hover:text-primary hover:underline dark:text-white dark:hover:text-status-critical"
+                            class="truncate text-sm font-semibold text-secondary-dark hover:text-primary hover:underline dark:text-ink dark:hover:text-status-critical"
                             data-test="my-task-title-{{ $myTask->id }}"
                         >{{ $myTask->title }}</a>
-                        <div class="flex items-center justify-between text-xs text-secondary-medium dark:text-secondary-soft">
+                        <div class="flex items-center justify-between text-xs text-secondary-medium dark:text-ink-muted">
                             <span @class(['font-semibold text-status-critical' => $myTask->isOverdue() || $myTask->isMissed()])>
                                 {{ $myTask->due_date?->translatedFormat('M j') ?? __('tasks.no_due_date') }}
                             </span>
@@ -1655,12 +1655,12 @@ new #[Title('titles.tasks')] class extends Component
                 @endforeach
             </div>
         @else
-            <p class="text-sm text-secondary-medium dark:text-secondary-soft" data-test="my-tasks-empty">{{ __('common.no_tasks_yet') }}</p>
+            <p class="text-sm text-secondary-medium dark:text-ink-muted" data-test="my-tasks-empty">{{ __('common.no_tasks_yet') }}</p>
         @endif
     </div>
 
     <div class="flex flex-wrap items-center justify-between gap-3">
-        <div class="inline-flex flex-wrap gap-1 rounded-lg border border-secondary-soft bg-secondary-soft/40 p-1 dark:border-secondary-medium dark:bg-secondary-medium/40" role="group" aria-label="{{ __('tasks.view') }}">
+        <div class="inline-flex flex-wrap gap-1 rounded-lg border border-secondary-soft bg-secondary-soft/40 p-1 dark:border-line dark:bg-surface-2" role="group" aria-label="{{ __('tasks.view') }}">
             @foreach ([
                 'list' => ['icon' => 'queue-list', 'label' => __('tasks.list_view')],
                 'board' => ['icon' => 'view-columns', 'label' => __('tasks.board_view')],
@@ -1673,8 +1673,8 @@ new #[Title('titles.tasks')] class extends Component
                     data-test="task-view-{{ $viewOption }}"
                     @class([
                         'inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-md px-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
-                        'bg-white text-secondary-dark shadow-sm dark:bg-secondary-dark dark:text-white' => $view === $viewOption,
-                        'text-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => $view !== $viewOption,
+                        'bg-white text-secondary-dark shadow-sm dark:bg-surface-3 dark:shadow-raised dark:text-ink' => $view === $viewOption,
+                        'text-secondary-medium hover:text-secondary-dark dark:text-ink-muted dark:hover:text-ink' => $view !== $viewOption,
                     ])
                 >
                     <flux:icon :name="$viewMeta['icon']" variant="micro" class="size-4" aria-hidden="true" />
@@ -1721,8 +1721,8 @@ new #[Title('titles.tasks')] class extends Component
                 data-test="task-filter-my-tasks-only"
                 @class([
                     'inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-primary',
-                    'border-primary bg-primary text-white' => $myTasksOnly,
-                    'border-secondary-light text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium' => ! $myTasksOnly,
+                    'border-primary bg-primary dark:bg-ink dark:text-surface-0 dark:border-ink text-white' => $myTasksOnly,
+                    'border-secondary-light text-secondary-medium hover:bg-secondary-soft dark:text-ink-muted dark:hover:bg-surface-2' => ! $myTasksOnly,
                 ])
             >
                 <flux:icon.user variant="micro" class="size-3.5" />

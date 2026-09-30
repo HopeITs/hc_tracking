@@ -72,7 +72,7 @@ new #[Title('titles.notification_settings')] class extends Component {
     }
 }; ?>
 
-<section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="notification-settings-heading">
+<section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="notification-settings-heading">
     <x-ui.page-header heading-id="notification-settings-heading" :title="__('notifications.settings_link')" />
 
     <div class="grid max-w-2xl gap-10">
@@ -89,10 +89,10 @@ new #[Title('titles.notification_settings')] class extends Component {
             data-desktop-app
         >
             <div class="flex items-start gap-4">
-                <img src="{{ asset('app-icons/icon-192.png') }}" alt="" width="48" height="48" class="size-12 shrink-0 rounded-full" />
+                <img src="{{ asset('app-icons/icon-192.png') }}" alt="" width="48" height="48" class="size-12 shrink-0 rounded-full" data-no-dim />
                 <div class="min-w-0">
                     <h2 id="desktop-app-heading" class="text-base font-bold">{{ __('notifications.app.heading') }}</h2>
-                    <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('notifications.app.help') }}</p>
+                    <p class="text-sm text-secondary-medium dark:text-ink-muted">{{ __('notifications.app.help') }}</p>
                 </div>
             </div>
 
@@ -106,14 +106,14 @@ new #[Title('titles.notification_settings')] class extends Component {
                     {{ __('notifications.app.install') }}
                 </x-ui.button>
 
-                <p x-show="state === 'unavailable'" class="text-sm text-secondary-medium dark:text-secondary-soft" data-app-install-hint>{{ __('notifications.app.manual') }}</p>
+                <p x-show="state === 'unavailable'" class="text-sm text-secondary-medium dark:text-ink-muted" data-app-install-hint>{{ __('notifications.app.manual') }}</p>
             </div>
         </section>
 
         {{-- Desktop popups for important and critical notifications. --}}
         <section
             aria-labelledby="desktop-popups-heading"
-            class="grid gap-2 border-t border-secondary-soft pt-8 dark:border-secondary-medium"
+            class="grid gap-2 border-t border-secondary-soft pt-8 dark:border-line"
             x-data="{
                 permission: 'Notification' in window ? Notification.permission : 'unsupported',
                 testing: false,
@@ -159,28 +159,28 @@ new #[Title('titles.notification_settings')] class extends Component {
                 />
                 <span>
                     <span class="block text-sm font-semibold">{{ __('notifications.popups_label') }}</span>
-                    <span class="block text-sm text-secondary-medium dark:text-secondary-soft">{{ __('notifications.popups_help') }}</span>
+                    <span class="block text-sm text-secondary-medium dark:text-ink-muted">{{ __('notifications.popups_help') }}</span>
                 </span>
             </label>
             <p x-show="permission === 'denied'" x-cloak class="ps-7 text-sm text-status-critical">{{ __('notifications.popups_blocked') }}</p>
-            <p x-show="permission === 'unsupported'" x-cloak class="ps-7 text-sm text-secondary-medium dark:text-secondary-soft">{{ __('notifications.popups_unsupported') }}</p>
+            <p x-show="permission === 'unsupported'" x-cloak class="ps-7 text-sm text-secondary-medium dark:text-ink-muted">{{ __('notifications.popups_unsupported') }}</p>
 
             <div x-show="permission !== 'unsupported' && permission !== 'denied'" class="mt-2 flex flex-wrap items-center gap-3 ps-7">
                 <x-ui.button tone="ghost" size="sm" icon="bell-alert" x-on:click="testPopup()" x-bind:disabled="testing" data-test="notification-popup-test">{{ __('notifications.popup_test') }}</x-ui.button>
-                <span x-show="testing" x-cloak class="text-sm text-secondary-medium dark:text-secondary-soft" role="status">{{ __('notifications.popup_test_waiting') }}</span>
+                <span x-show="testing" x-cloak class="text-sm text-secondary-medium dark:text-ink-muted" role="status">{{ __('notifications.popup_test_waiting') }}</span>
             </div>
         </section>
 
         {{-- Module mutes: team-wide updates only; anything addressed to me always arrives. --}}
-        <section aria-labelledby="module-mutes-heading" class="grid gap-2 border-t border-secondary-soft pt-8 dark:border-secondary-medium" data-module-mutes>
+        <section aria-labelledby="module-mutes-heading" class="grid gap-2 border-t border-secondary-soft pt-8 dark:border-line" data-module-mutes>
             <h2 id="module-mutes-heading" class="text-base font-bold">{{ __('notifications.mutes_label') }}</h2>
-            <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('notifications.mutes_help') }}</p>
+            <p class="text-sm text-secondary-medium dark:text-ink-muted">{{ __('notifications.mutes_help') }}</p>
 
-            <ul class="mt-2 divide-y divide-secondary-soft dark:divide-secondary-medium">
+            <ul class="mt-2 divide-y divide-secondary-soft dark:divide-line">
                 @foreach ($this->mutableModules as $module)
                     <li class="flex items-center justify-between gap-3 py-2.5" wire:key="mute-{{ $module }}">
                         <span @class(['text-sm font-medium', 'text-secondary-light line-through' => in_array($module, $muted, true)])>{{ app(\App\Notifications\NotificationPresenter::class)->moduleLabel($module) }}</span>
-                        <label class="inline-flex cursor-pointer items-center gap-2 text-sm text-secondary-medium dark:text-secondary-soft">
+                        <label class="inline-flex cursor-pointer items-center gap-2 text-sm text-secondary-medium dark:text-ink-muted">
                             <input type="checkbox" wire:click="toggleMute('{{ $module }}')" @checked(in_array($module, $muted, true)) class="size-4 accent-primary" data-mute-toggle="{{ $module }}" />
                             {{ __('notifications.muted') }}
                         </label>

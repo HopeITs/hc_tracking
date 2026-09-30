@@ -66,7 +66,7 @@
     }"
 >
     <template x-if="!supported">
-        <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('ui.passkeys_are_not_supported_in_this_browser') }}</p>
+        <p class="text-sm text-secondary-medium dark:text-ink-muted">{{ __('ui.passkeys_are_not_supported_in_this_browser') }}</p>
     </template>
 
     <template x-if="supported && !showForm">
@@ -94,7 +94,7 @@
             />
             <flux:text class="mt-1!">{{ __('ui.give_this_passkey_a_name_to_help_you_identify_it_later') }}</flux:text>
 
-            <p x-show="error" x-text="error" x-cloak class="text-sm text-primary dark:text-white"></p>
+            <p x-show="error" x-text="error" x-cloak class="text-sm text-primary dark:text-ink"></p>
 
             <div class="flex gap-2">
                 <flux:button

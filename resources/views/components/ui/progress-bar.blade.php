@@ -15,9 +15,9 @@
     $fillClasses = match ($effectiveTone) {
         'good' => 'bg-status-good',
         'warn' => 'bg-status-warn',
-        'critical' => 'bg-primary',
+        'critical' => 'bg-primary dark:bg-status-critical',
         'funding' => 'bg-funding',
-        default => 'bg-secondary-dark dark:bg-white',
+        default => 'bg-secondary-dark dark:bg-ink-muted',
     };
 @endphp
 
@@ -25,10 +25,10 @@
     @if (($label !== null && ! $labelHidden) || $showValue)
         <div class="flex items-center gap-2 {{ $label !== null && ! $labelHidden ? 'justify-between' : 'justify-end' }}">
             @if ($label !== null && ! $labelHidden)
-                <p class="type-meta text-secondary-medium dark:text-secondary-soft">{{ $label }}</p>
+                <p class="type-meta text-secondary-medium dark:text-ink-muted">{{ $label }}</p>
             @endif
             @if ($showValue)
-                <p class="type-meta tabular-nums text-secondary-dark dark:text-white">
+                <p class="type-meta tabular-nums text-secondary-dark dark:text-ink">
                     {{ $value === null ? '—' : ($isOver ? __('ui.over_by', ['percent' => round($value - $max)]) : round($pct).'%') }}
                 </p>
             @endif
@@ -36,7 +36,7 @@
     @endif
 
     <div
-        class="h-1.5 w-full overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium"
+        class="h-1.5 w-full overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2"
         role="progressbar"
         aria-valuemin="0"
         aria-valuemax="{{ $max }}"

@@ -417,9 +417,9 @@ new #[Title('titles.transfers')] class extends Component {
 @php
     $filtersAreActive = $search !== '' || $arStatus !== '' || $account !== '' || $stage !== '' || $agreement !== '';
 
-    $mutedText = 'text-secondary-medium dark:text-secondary-soft';
-    $inkText = 'text-secondary-dark dark:text-white';
-    $hairline = 'border-secondary-soft dark:border-secondary-medium';
+    $mutedText = 'text-secondary-medium dark:text-ink-muted';
+    $inkText = 'text-secondary-dark dark:text-ink';
+    $hairline = 'border-secondary-soft dark:border-line';
 
     $amount = fn (float $value): string => Number::format($value, maxPrecision: 0);
     $exact = fn (float $value): string => number_format($value, 2);
@@ -468,7 +468,7 @@ new #[Title('titles.transfers')] class extends Component {
 @endphp
 
 <section
-    class="@container/ladder flex min-h-full w-full flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white"
+    class="@container/ladder flex min-h-full w-full flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink"
     aria-labelledby="transfer-ladder-heading"
 >
     <x-ui.page-header
@@ -568,7 +568,7 @@ new #[Title('titles.transfers')] class extends Component {
                             'stage' => 'overdue',
                             'value' => $line['overdue'],
                             'label' => __('transfers.stage_overdue'),
-                            'dot' => 'bg-primary',
+                            'dot' => 'bg-primary dark:bg-status-critical',
                             'tone' => 'text-status-critical',
                             'note' => trans_choice('transfers.count_tranches', $line['overdueCount'], ['count' => $line['overdueCount']]),
                             'count' => $line['overdueCount'],
@@ -615,7 +615,7 @@ new #[Title('titles.transfers')] class extends Component {
                         ['key' => 'fees', 'stage' => 'short', 'value' => $line['fees'], 'fill' => 'money-fees', 'label' => __('transfers.fees')],
                         ['key' => 'gap', 'stage' => 'short', 'value' => $line['exchangeGap'], 'fill' => 'money-gap', 'label' => __('transfers.exchange_gap')],
                         ['key' => 'transit', 'stage' => 'transit', 'value' => $line['transit'], 'fill' => 'bg-status-warn', 'label' => __('transfers.stage_in_transit')],
-                        ['key' => 'overdue', 'stage' => 'overdue', 'value' => $line['overdue'], 'fill' => 'bg-primary', 'label' => __('transfers.stage_overdue')],
+                        ['key' => 'overdue', 'stage' => 'overdue', 'value' => $line['overdue'], 'fill' => 'bg-primary dark:bg-status-critical', 'label' => __('transfers.stage_overdue')],
                         ['key' => 'upcoming', 'stage' => 'upcoming', 'value' => $line['upcoming'], 'fill' => 'money-pending', 'label' => __('transfers.stage_upcoming')],
                         ['key' => 'failed', 'stage' => 'failed', 'value' => $line['failed'], 'fill' => 'money-failed', 'label' => __('transfers.stage_failed')],
                     ];
@@ -672,7 +672,7 @@ new #[Title('titles.transfers')] class extends Component {
                                         data-ledger-figure="short"
                                         @class([
                                             'group -m-2 rounded-lg p-2 text-start transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-primary enabled:hover:bg-board-head disabled:cursor-default dark:enabled:hover:bg-white/5',
-                                            'bg-board-head ring-1 ring-secondary-dark dark:bg-white/5 dark:ring-white' => $shortfallIsActive,
+                                            'bg-board-head ring-1 ring-secondary-dark dark:bg-white/5 dark:ring-ink' => $shortfallIsActive,
                                         ])
                                     >
                                         <span class="flex h-5 items-center text-xs font-semibold {{ $mutedText }} group-enabled:group-hover:underline group-aria-pressed:underline">{{ __('transfers.shortfall') }}</span>
@@ -723,7 +723,7 @@ new #[Title('titles.transfers')] class extends Component {
                                                 @disabled($isEmpty && ! $isActive)
                                                 @class([
                                                     'group -m-2 w-full rounded-lg p-2 text-start transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-primary enabled:hover:bg-board-head disabled:cursor-default dark:enabled:hover:bg-white/5',
-                                                    'bg-board-head ring-1 ring-secondary-dark dark:bg-white/5 dark:ring-white' => $isActive,
+                                                    'bg-board-head ring-1 ring-secondary-dark dark:bg-white/5 dark:ring-ink' => $isActive,
                                                 ])
                                                 data-ledger-figure="{{ $figure['stage'] }}"
                                             >
@@ -759,7 +759,7 @@ new #[Title('titles.transfers')] class extends Component {
                                     <button
                                         type="button"
                                         wire:click="toggleStage('{{ $segment['stage'] }}')"
-                                        @class(['ledger-segment h-full min-w-1.5 rounded-[2px] transition-opacity duration-150 hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary', $segment['fill'], 'ring-1 ring-secondary-dark dark:ring-white' => $isActive])
+                                        @class(['ledger-segment h-full min-w-1.5 rounded-[2px] transition-opacity duration-150 hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary', $segment['fill'], 'ring-1 ring-secondary-dark dark:ring-ink' => $isActive])
                                         style="width: {{ round($segment['value'] / $scale * 100, 3) }}%"
                                         title="{{ $segmentTitle }}"
                                         aria-pressed="{{ $isActive ? 'true' : 'false' }}"
@@ -799,8 +799,8 @@ new #[Title('titles.transfers')] class extends Component {
                         aria-pressed="{{ $sort === $sortKey ? 'true' : 'false' }}"
                         @class([
                             'rounded-full px-3 py-1.5 text-xs font-semibold transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
-                            'bg-secondary-dark text-white dark:bg-white dark:text-secondary-dark' => $sort === $sortKey,
-                            'text-secondary-medium hover:bg-board-head dark:text-secondary-soft dark:hover:bg-white/5' => $sort !== $sortKey,
+                            'bg-secondary-dark text-white dark:bg-ink dark:text-surface-0' => $sort === $sortKey,
+                            'text-secondary-medium hover:bg-board-head dark:text-ink-muted dark:hover:bg-white/5' => $sort !== $sortKey,
                         ])
                         data-sort="{{ $sortKey }}"
                     >{{ $sortLabel }}</button>
@@ -812,13 +812,13 @@ new #[Title('titles.transfers')] class extends Component {
                     {{ trans_choice('transfers.count_matching_transfer', $this->transfers->total(), ['count' => $this->transfers->total()]) }}
                 </span>
                 @if ($this->agreementFilter !== null)
-                    <button type="button" wire:click="$set('agreement', '')" class="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-funding-soft ps-3 pe-2 text-xs font-semibold text-funding transition-colors hover:bg-funding hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-white" data-agreement-chip>
+                    <button type="button" wire:click="$set('agreement', '')" class="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-funding-soft ps-3 pe-2 text-xs font-semibold text-funding transition-colors hover:bg-funding hover:text-white dark:hover:text-surface-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink" data-agreement-chip>
                         {{ __('transfers.agreement_filter_chip', ['donor' => $this->agreementFilter->donor->name, 'proposal' => $this->agreementFilter->proposal->name]) }}
                         <flux:icon.x-mark variant="micro" class="size-3.5" />
                     </button>
                 @endif
                 @if ($filtersAreActive)
-                    <flux:button size="sm" variant="ghost" class="text-secondary-medium! dark:text-secondary-soft!" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
+                    <flux:button size="sm" variant="ghost" class="text-secondary-medium! dark:text-ink-muted!" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
                 @endif
             </div>
         </div>
@@ -832,7 +832,7 @@ new #[Title('titles.transfers')] class extends Component {
                 :body="__('common.change_the_search_or_filters_and_try_again')"
             />
         @else
-            <ul class="divide-y divide-secondary-soft dark:divide-secondary-medium">
+            <ul class="divide-y divide-secondary-soft dark:divide-line">
                 @foreach ($this->transfers as $transfer)
                     @php
                         $sentCurrency = $transfer->amount_transfered_currency;
@@ -929,7 +929,7 @@ new #[Title('titles.transfers')] class extends Component {
                                 <div class="flex items-start gap-2">
                                     <span @class(['mt-1.5 size-2 shrink-0 rounded-full', match ($transferState) {
                                         'received' => 'bg-funding',
-                                        'failed', 'late' => 'bg-primary',
+                                        'failed', 'late' => 'bg-primary dark:bg-status-critical',
                                         'transit' => 'bg-status-warn',
                                         default => 'money-pending',
                                     }]) aria-hidden="true"></span>
@@ -939,7 +939,7 @@ new #[Title('titles.transfers')] class extends Component {
                                             wire:navigate
                                             class="block truncate text-sm font-semibold underline-offset-2 hover:underline {{ $inkText }}"
                                         >{{ $transfer->donorProposal->donor->name }}</a>
-                                        <p class="flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs text-secondary-medium dark:text-secondary-soft">
+                                        <p class="flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs text-secondary-medium dark:text-ink-muted">
                                             <a href="{{ route('proposals.show', $transfer->donorProposal->proposal) }}" wire:navigate class="truncate underline-offset-2 hover:underline">{{ $transfer->donorProposal->proposal->name }}</a>
                                             <span aria-hidden="true">·</span>
                                             <a href="{{ route('funding-agreements.show', $transfer->donorProposal) }}" wire:navigate class="shrink-0 underline-offset-2 hover:underline" data-agreement-link>{{ filled($transfer->donorProposal->project_num) ? __('proposals.agreement_number', ['number' => $transfer->donorProposal->project_num]) : __('proposals.view_agreement') }}</a>
@@ -951,12 +951,12 @@ new #[Title('titles.transfers')] class extends Component {
                                 <ol class="mt-3 flex items-center gap-0 ps-4">
                                     @foreach ($thread as $node)
                                         @if (! $loop->first)
-                                            <li aria-hidden="true" @class(['h-px w-4 shrink-0 @xl/ladder:w-7', $node['done'] ? 'bg-secondary-light' : 'bg-secondary-soft dark:bg-secondary-medium'])></li>
+                                            <li aria-hidden="true" @class(['h-px w-4 shrink-0 @xl/ladder:w-7', $node['done'] ? 'bg-secondary-light' : 'bg-secondary-soft dark:bg-line-strong'])></li>
                                         @endif
                                         <li class="flex items-center gap-1.5">
                                             <span @class([
                                                 'size-1.5 shrink-0 rounded-full',
-                                                'bg-secondary-dark dark:bg-white' => $node['done'],
+                                                'bg-secondary-dark dark:bg-ink-muted' => $node['done'],
                                                 'ring-1 ring-secondary-light' => ! $node['done'],
                                             ]) aria-hidden="true"></span>
                                             {{-- secondary-light is 2.69:1 on white. The
@@ -1026,7 +1026,7 @@ new #[Title('titles.transfers')] class extends Component {
                                             aria-expanded="false"
                                             x-bind:aria-expanded="open ? 'true' : 'false'"
                                             aria-controls="transfer-detail-{{ $transfer->id }}"
-                                            class="-me-1 flex size-8 items-center justify-center rounded-md text-secondary-medium transition-colors duration-150 hover:bg-board-head focus-visible:outline-2 focus-visible:outline-primary dark:text-secondary-soft dark:hover:bg-white/5"
+                                            class="-me-1 flex size-8 items-center justify-center rounded-md text-secondary-medium transition-colors duration-150 hover:bg-board-head focus-visible:outline-2 focus-visible:outline-primary dark:text-ink-muted dark:hover:bg-white/5"
                                             aria-label="{{ __('transfers.show_the_arithmetic') }}"
                                         >
                                             <flux:icon name="chevron-down" class="size-4 transition-transform duration-200" x-bind:class="open && 'rotate-180'" />
@@ -1070,7 +1070,7 @@ new #[Title('titles.transfers')] class extends Component {
 
                                     {{-- Where the promise sat, so an overshoot is visible as an overshoot. --}}
                                     @if ($isComparable && $overage > 0)
-                                        <span class="absolute inset-y-0 w-px bg-secondary-dark dark:bg-white" style="inset-inline-start: {{ $promisedTick }}%" aria-hidden="true"></span>
+                                        <span class="absolute inset-y-0 w-px bg-secondary-dark dark:bg-ink" style="inset-inline-start: {{ $promisedTick }}%" aria-hidden="true"></span>
                                     @endif
                                 </div>
 
@@ -1129,7 +1129,7 @@ new #[Title('titles.transfers')] class extends Component {
                 @endforeach
             </ul>
 
-            <flux:pagination :paginator="$this->transfers" class="text-secondary-medium! dark:text-secondary-soft!" scroll-to="#transfer-ladder-heading" />
+            <flux:pagination :paginator="$this->transfers" class="text-secondary-medium! dark:text-ink-muted!" scroll-to="#transfer-ladder-heading" />
         @endif
     @endif
 

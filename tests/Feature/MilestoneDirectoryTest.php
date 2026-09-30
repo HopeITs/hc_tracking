@@ -456,7 +456,7 @@ test('the timeline view counts only root milestones next to the project name, li
     $parent = Milestone::factory()->create(['project_id' => $project->id, 'name' => 'Root gate']);
     Milestone::factory()->childOf($parent)->create(['name' => 'Child gate']);
 
-    $countBadge = fn (int $count) => '<span class="inline-flex min-w-6 items-center justify-center rounded-full bg-secondary-soft px-2 py-0.5 text-[11px] font-semibold tabular-nums text-secondary-dark dark:bg-secondary-medium dark:text-white">'.$count.'</span>';
+    $countBadge = fn (int $count) => '<span class="inline-flex min-w-6 items-center justify-center rounded-full bg-secondary-soft px-2 py-0.5 text-[11px] font-semibold tabular-nums text-secondary-dark dark:bg-surface-2 dark:text-ink">'.$count.'</span>';
 
     Livewire::actingAs($user)
         ->test('pages::milestones.index')

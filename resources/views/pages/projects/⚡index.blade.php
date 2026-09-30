@@ -947,20 +947,20 @@ new #[Title('titles.projects')] class extends Component {
 
     /* The fill mirrors the pill, so a verdict never disagrees with its own bar. */
     $progressFillClasses = fn (string $tone): string => match ($tone) {
-        'critical' => 'bg-primary',
+        'critical' => 'bg-primary dark:bg-status-critical',
         'warn' => 'bg-status-warn',
         'good' => 'bg-status-good',
-        default => 'bg-secondary-dark dark:bg-white',
+        default => 'bg-secondary-dark dark:bg-ink-muted',
     };
 
     /* The board card reads the same verdict at full RAG resolution. Critical
        fills solid so white type carries it in both themes; the softer tones
        already flip their own tokens in dark mode. */
     $tonePillClasses = fn (string $tone): string => match ($tone) {
-        'critical' => 'border-primary bg-primary font-semibold text-white',
+        'critical' => 'border-primary bg-primary dark:border-transparent dark:bg-status-critical-soft dark:text-status-critical font-semibold text-white',
         'warn' => 'border-status-warn/40 bg-status-warn-soft font-semibold text-status-warn',
         'good' => 'border-status-good/40 bg-status-good-soft font-semibold text-status-good',
-        default => 'border-board-line text-secondary-medium dark:text-secondary-soft',
+        default => 'border-board-line text-secondary-medium dark:text-ink-muted',
     };
 
     /* How much of a project's own window has passed, as a percentage. */
@@ -1045,7 +1045,7 @@ new #[Title('titles.projects')] class extends Component {
         ->all();
 @endphp
 
-<section class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="project-directory-heading">
+<section class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="project-directory-heading">
     <x-ui.page-header
         heading-id="project-directory-heading"
         :title="__('common.projects')"
@@ -1091,7 +1091,7 @@ new #[Title('titles.projects')] class extends Component {
 
     {{-- The pipeline, which is also the status filter. Six equal segments on
          one baseline; the selected one is the only large red area here. --}}
-    <div role="group" aria-label="{{ __('projects.lifecycle') }}" class="grid grid-flow-col auto-cols-[minmax(7.5rem,1fr)] snap-x gap-px overflow-x-auto rounded-xl border border-secondary-soft bg-secondary-soft dark:border-secondary-medium dark:bg-secondary-medium">
+    <div role="group" aria-label="{{ __('projects.lifecycle') }}" class="grid grid-flow-col auto-cols-[minmax(7.5rem,1fr)] snap-x gap-px overflow-x-auto rounded-xl border border-secondary-soft bg-secondary-soft dark:border-line dark:bg-line">
         @foreach (ProjectStatus::cases() as $case)
             @php
                 $segmentCount = $statusCounts[$case->value] ?? 0;
@@ -1105,12 +1105,12 @@ new #[Title('titles.projects')] class extends Component {
                 data-test="lifecycle-{{ $case->value }}"
                 @class([
                     'flex min-h-16 snap-start cursor-pointer flex-col justify-center gap-1 px-4 py-3 text-start transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary',
-                    'bg-primary text-white' => $isSelected,
-                    'bg-white text-secondary-dark hover:bg-secondary-soft/50 dark:bg-secondary-dark dark:text-white dark:hover:bg-secondary-medium/40' => ! $isSelected,
+                    'bg-primary text-white dark:bg-brand/10 dark:text-ink' => $isSelected,
+                    'bg-white text-secondary-dark hover:bg-secondary-soft/50 dark:bg-surface-1 dark:text-ink dark:hover:bg-surface-2' => ! $isSelected,
                 ])
             >
                 <span class="sr-only">{{ trans_choice('projects.lifecycle_segment', $segmentCount, ['status' => $case->label(), 'count' => $segmentCount]) }}</span>
-                <span aria-hidden="true" class="type-label truncate {{ $isSelected ? 'text-white/80' : 'text-secondary-medium dark:text-secondary-soft' }}">{{ $case->label() }}</span>
+                <span aria-hidden="true" class="type-label truncate {{ $isSelected ? 'text-white/80' : 'text-secondary-medium dark:text-ink-muted' }}">{{ $case->label() }}</span>
                 <span aria-hidden="true" class="text-2xl leading-none font-bold tabular-nums">{{ $segmentCount }}</span>
             </button>
         @endforeach
@@ -1120,16 +1120,16 @@ new #[Title('titles.projects')] class extends Component {
          waiting on it. Kept apart because they answer different questions. --}}
     <div class="grid gap-4 @4xl/directory:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <section aria-labelledby="portfolio-figures-heading">
-            <h2 id="portfolio-figures-heading" class="type-label mb-2 text-secondary-medium dark:text-secondary-soft">{{ __('projects.group_portfolio') }}</h2>
+            <h2 id="portfolio-figures-heading" class="type-label mb-2 text-secondary-medium dark:text-ink-muted">{{ __('projects.group_portfolio') }}</h2>
 
             <div @class([
-                'grid min-h-[calc(100%-1.75rem)] gap-px overflow-hidden rounded-xl border border-secondary-soft bg-secondary-soft dark:border-secondary-medium dark:bg-secondary-medium',
+                'grid min-h-[calc(100%-1.75rem)] gap-px overflow-hidden rounded-xl border border-secondary-soft bg-secondary-soft dark:border-line dark:bg-line',
                 'grid-cols-2' => $canViewMoney,
                 'grid-cols-1' => ! $canViewMoney,
             ])>
                 @if ($canViewMoney)
-                <div class="flex flex-col justify-between gap-2 bg-white p-4 dark:bg-secondary-dark">
-                    <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.tile_committed_funding') }}</p>
+                <div class="flex flex-col justify-between gap-2 bg-white p-4 dark:bg-surface-1">
+                    <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('projects.tile_committed_funding') }}</p>
                     <div>
                         @forelse ($this->committedFunding as $fundingCurrency => $fundingTotal)
                             <p class="type-figure" wire:key="committed-{{ $fundingCurrency }}">
@@ -1139,22 +1139,22 @@ new #[Title('titles.projects')] class extends Component {
                             <p class="type-figure text-secondary-light">—</p>
                         @endforelse
                     </div>
-                    <p class="type-meta text-secondary-medium dark:text-secondary-soft">{{ __('projects.tile_committed_funding_hint') }}</p>
+                    <p class="type-meta text-secondary-medium dark:text-ink-muted">{{ __('projects.tile_committed_funding_hint') }}</p>
                 </div>
                 @endif
 
-                <div class="flex flex-col justify-between gap-2 bg-white p-4 dark:bg-secondary-dark">
-                    <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.tile_beneficiaries') }}</p>
+                <div class="flex flex-col justify-between gap-2 bg-white p-4 dark:bg-surface-1">
+                    <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('projects.tile_beneficiaries') }}</p>
                     <p class="type-figure">{{ number_format($this->committedBeneficiaries) }}</p>
-                    <p class="type-meta text-secondary-medium dark:text-secondary-soft">{{ __('projects.tile_beneficiaries_hint') }}</p>
+                    <p class="type-meta text-secondary-medium dark:text-ink-muted">{{ __('projects.tile_beneficiaries_hint') }}</p>
                 </div>
             </div>
         </section>
 
         <section aria-labelledby="portfolio-triage-heading">
-            <h2 id="portfolio-triage-heading" class="type-label mb-2 text-secondary-medium dark:text-secondary-soft">{{ __('projects.group_attention') }}</h2>
+            <h2 id="portfolio-triage-heading" class="type-label mb-2 text-secondary-medium dark:text-ink-muted">{{ __('projects.group_attention') }}</h2>
 
-            <div class="grid min-h-[calc(100%-1.75rem)] grid-cols-2 gap-px overflow-hidden rounded-xl border border-secondary-soft bg-secondary-soft @2xl/directory:grid-cols-4 dark:border-secondary-medium dark:bg-secondary-medium">
+            <div class="grid min-h-[calc(100%-1.75rem)] grid-cols-2 gap-px overflow-hidden rounded-xl border border-secondary-soft bg-secondary-soft @2xl/directory:grid-cols-4 dark:border-line dark:bg-line">
                 @foreach ($lensTiles as $lensValue => $lensTile)
                     @php
                         $lensCount = $triageCounts[$lensValue] ?? 0;
@@ -1183,17 +1183,17 @@ new #[Title('titles.projects')] class extends Component {
                         @class([
                             'box-border flex flex-col justify-between gap-2 border-2 p-4 text-start transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary',
                             $lensCornerClasses,
-                            'cursor-pointer border-white bg-white hover:border-secondary-soft/50 hover:bg-secondary-soft/50 dark:border-secondary-dark dark:bg-secondary-dark dark:hover:border-secondary-medium/40 dark:hover:bg-secondary-medium/40' => ! $lensIsQuiet && ! $lensIsActive,
-                            'cursor-pointer border-primary bg-white dark:bg-secondary-dark' => $lensIsActive,
-                            'cursor-default border-white bg-white dark:border-secondary-dark dark:bg-secondary-dark' => $lensIsQuiet,
+                            'cursor-pointer border-white bg-white hover:border-secondary-soft/50 hover:bg-secondary-soft/50 dark:border-surface-1 dark:bg-surface-1 dark:hover:border-surface-2 dark:hover:bg-surface-2' => ! $lensIsQuiet && ! $lensIsActive,
+                            'cursor-pointer border-primary bg-white dark:bg-surface-1' => $lensIsActive,
+                            'cursor-default border-white bg-white dark:border-surface-1 dark:bg-surface-1' => $lensIsQuiet,
                         ])
                     >
-                        <span class="type-label flex items-center gap-1.5 text-secondary-medium dark:text-secondary-soft">
+                        <span class="type-label flex items-center gap-1.5 text-secondary-medium dark:text-ink-muted">
                             <flux:icon :name="$lensTile['icon']" variant="micro" class="size-3.5 shrink-0" aria-hidden="true" />
                             <span class="truncate">{{ $lensTile['label'] }}</span>
                         </span>
-                        <span class="type-figure {{ $lensIsQuiet ? 'text-secondary-light' : 'text-primary' }}">{{ $lensCount }}</span>
-                        <span class="type-meta text-secondary-medium dark:text-secondary-soft">{{ $lensTile['hint'] }}</span>
+                        <span class="type-figure {{ $lensIsQuiet ? 'text-secondary-light' : 'text-primary dark:text-brand-text' }}">{{ $lensCount }}</span>
+                        <span class="type-meta text-secondary-medium dark:text-ink-muted">{{ $lensTile['hint'] }}</span>
                     </button>
                 @endforeach
             </div>
@@ -1202,7 +1202,7 @@ new #[Title('titles.projects')] class extends Component {
 
     {{-- Tabs, exactly as the milestones directory renders them. --}}
     <div class="flex flex-wrap items-center justify-between gap-3">
-        <div class="inline-flex flex-wrap gap-1 rounded-lg border border-secondary-soft bg-secondary-soft/40 p-1 dark:border-secondary-medium dark:bg-secondary-medium/40" role="group" aria-label="{{ __('projects.views') }}">
+        <div class="inline-flex flex-wrap gap-1 rounded-lg border border-secondary-soft bg-secondary-soft/40 p-1 dark:border-line dark:bg-surface-2" role="group" aria-label="{{ __('projects.views') }}">
             @foreach ($viewOptions as $viewValue => $viewMeta)
                 <button
                     type="button"
@@ -1211,8 +1211,8 @@ new #[Title('titles.projects')] class extends Component {
                     data-test="project-view-{{ $viewValue }}"
                     @class([
                         'inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-md px-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
-                        'bg-white text-secondary-dark shadow-sm dark:bg-secondary-dark dark:text-white' => $view === $viewValue,
-                        'text-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => $view !== $viewValue,
+                        'bg-white text-secondary-dark shadow-sm dark:bg-surface-3 dark:shadow-raised dark:text-ink' => $view === $viewValue,
+                        'text-secondary-medium hover:text-secondary-dark dark:text-ink-muted dark:hover:text-ink' => $view !== $viewValue,
                     ])
                 >
                     <flux:icon :name="$viewMeta['icon']" variant="micro" class="size-4" aria-hidden="true" />
@@ -1300,14 +1300,14 @@ new #[Title('titles.projects')] class extends Component {
                                         <div class="min-w-0">
                                             <div class="flex min-w-0 items-center gap-1.5">
                                                 @if (in_array($project->id, $this->unreadIds, true))
-                                                    <span class="size-2 shrink-0 rounded-full bg-primary" data-unread-dot="project-{{ $project->id }}" title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
+                                                    <span class="size-2 shrink-0 rounded-full bg-primary dark:bg-ink" data-unread-dot="project-{{ $project->id }}" title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
                                                 @endif
-                                                <h3 class="line-clamp-2 min-w-0 text-[15px] leading-snug font-semibold text-secondary-dark dark:text-white" title="{{ $project->name }}">{{ $project->name }}</h3>
+                                                <h3 class="line-clamp-2 min-w-0 text-[15px] leading-snug font-semibold text-secondary-dark dark:text-ink" title="{{ $project->name }}">{{ $project->name }}</h3>
                                             </div>
 
                                             {{-- City, program and strategy as one breadcrumb instead of three label rows. --}}
-                                            <p class="type-meta mt-1 truncate text-secondary-medium dark:text-secondary-soft" title="{{ $pathTitle }}">
-                                                {{ $projectPath[0] }} <span class="text-secondary-soft dark:text-secondary-medium">&middot;</span> {{ $projectPath[1] }} <span class="text-secondary-soft dark:text-secondary-medium">&middot;</span> {{ $projectPath[2] }}
+                                            <p class="type-meta mt-1 truncate text-secondary-medium dark:text-ink-muted" title="{{ $pathTitle }}">
+                                                {{ $projectPath[0] }} <span class="text-secondary-soft dark:text-ink-faint">&middot;</span> {{ $projectPath[1] }} <span class="text-secondary-soft dark:text-ink-faint">&middot;</span> {{ $projectPath[2] }}
                                             </p>
                                         </div>
 
@@ -1315,7 +1315,7 @@ new #[Title('titles.projects')] class extends Component {
                                             <a
                                                 href="{{ route('projects.show', $project) }}"
                                                 wire:navigate
-                                                class="grid size-11 place-items-center rounded-md border-0! bg-transparent! text-secondary-dark! transition-colors hover:bg-secondary-soft! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-white! dark:hover:bg-secondary-medium! @3xl/directory:size-8!"
+                                                class="grid size-11 place-items-center rounded-md border-0! bg-transparent! text-secondary-dark! transition-colors hover:bg-secondary-soft! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink! dark:hover:bg-surface-2! @3xl/directory:size-8!"
                                                 aria-label="{{ __('projects.open_project', ['name' => $project->name]) }}"
                                             >
                                                 <flux:icon.eye class="size-4.5" />
@@ -1337,11 +1337,11 @@ new #[Title('titles.projects')] class extends Component {
                                                 <flux:icon :name="$schedule['icon']" variant="micro" class="size-3.5" aria-hidden="true" />{{ $schedule['label'] }}
                                             </span>
 
-                                            <p class="shrink-0 text-xl leading-none font-bold tracking-tight tabular-nums text-secondary-dark dark:text-white">
+                                            <p class="shrink-0 text-xl leading-none font-bold tracking-tight tabular-nums text-secondary-dark dark:text-ink">
                                                 @if ($progress === null)
-                                                    <span class="text-base font-semibold text-secondary-medium dark:text-secondary-soft">&mdash;</span>
+                                                    <span class="text-base font-semibold text-secondary-medium dark:text-ink-muted">&mdash;</span>
                                                 @else
-                                                    {{ round($progress) }}<span class="text-xs font-semibold text-secondary-medium dark:text-secondary-soft">%</span>
+                                                    {{ round($progress) }}<span class="text-xs font-semibold text-secondary-medium dark:text-ink-muted">%</span>
                                                 @endif
                                             </p>
                                         </div>
@@ -1349,10 +1349,10 @@ new #[Title('titles.projects')] class extends Component {
                                         <x-ui.progress-bar class="mt-2.5" :value="$progress" :tone="$progressTone" :label="__('projects.milestone_progress_for', ['name' => $project->name])" label-hidden />
 
                                         <div class="mt-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                                            <p class="type-meta text-secondary-medium dark:text-secondary-soft">
+                                            <p class="type-meta text-secondary-medium dark:text-ink-muted">
                                                 {{ $progress === null ? __('projects.no_weighted_milestones') : __('projects.milestones_reached', ['reached' => $project->reached_milestones_count, 'total' => $project->milestones_count]) }}
                                             </p>
-                                            <p class="type-meta shrink-0 tabular-nums text-secondary-medium dark:text-secondary-soft">
+                                            <p class="type-meta shrink-0 tabular-nums text-secondary-medium dark:text-ink-muted">
                                                 {{ $project->start_date?->translatedFormat(__('formats.date')) ?? '—' }}
                                                 <flux:icon.arrow-long-right variant="micro" class="inline size-3.5 rtl:-scale-x-100" aria-hidden="true" />
                                                 {{ $project->end_date?->translatedFormat(__('formats.date')) ?? '—' }}
@@ -1362,39 +1362,39 @@ new #[Title('titles.projects')] class extends Component {
 
                                     {{-- Money and people: the two commitments, on one shared baseline. --}}
                                     <div class="mt-4 grid grid-cols-2 gap-x-4 gap-y-1 border-t border-board-line pt-3.5">
-                                        <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.funding_envelope') }}</p>
-                                        <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.col_beneficiaries') }}</p>
+                                        <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('projects.funding_envelope') }}</p>
+                                        <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('projects.col_beneficiaries') }}</p>
 
                                         <div class="min-w-0">
                                             @if ($funding === null)
-                                                <p class="text-base font-semibold text-secondary-medium dark:text-secondary-soft">{{ $project->proposals_count === 0 ? __('projects.not_funded_yet') : '—' }}</p>
+                                                <p class="text-base font-semibold text-secondary-medium dark:text-ink-muted">{{ $project->proposals_count === 0 ? __('projects.not_funded_yet') : '—' }}</p>
                                             @else
                                                 @foreach ($funding['currencies'] as $cardCurrency => $cardTotal)
-                                                    <p class="text-base text-secondary-dark dark:text-white" wire:key="funding-{{ $project->id }}-{{ $cardCurrency }}">
+                                                    <p class="text-base text-secondary-dark dark:text-ink" wire:key="funding-{{ $project->id }}-{{ $cardCurrency }}">
                                                         <x-ui.money :amount="$cardTotal" :currency="$cardCurrency" />
                                                     </p>
                                                 @endforeach
-                                                <p class="type-meta mt-0.5 truncate text-secondary-medium dark:text-secondary-soft" title="{{ implode(' · ', $funding['donors']) }}">{{ implode(' · ', $funding['donors']) }}</p>
-                                                <p class="type-meta truncate text-secondary-medium dark:text-secondary-soft" title="{{ implode(' · ', $funding['proposals']) }}">{{ implode(' · ', $funding['proposals']) }}</p>
+                                                <p class="type-meta mt-0.5 truncate text-secondary-medium dark:text-ink-muted" title="{{ implode(' · ', $funding['donors']) }}">{{ implode(' · ', $funding['donors']) }}</p>
+                                                <p class="type-meta truncate text-secondary-medium dark:text-ink-muted" title="{{ implode(' · ', $funding['proposals']) }}">{{ implode(' · ', $funding['proposals']) }}</p>
                                             @endif
                                         </div>
 
                                         <div class="min-w-0">
-                                            <p class="text-base font-semibold tabular-nums text-secondary-dark dark:text-white">{{ $project->target_beneficiaries === null ? '—' : number_format($project->target_beneficiaries) }}</p>
+                                            <p class="text-base font-semibold tabular-nums text-secondary-dark dark:text-ink">{{ $project->target_beneficiaries === null ? '—' : number_format($project->target_beneficiaries) }}</p>
                                             @if ($demographics !== [])
-                                                <p class="type-meta mt-0.5 truncate tabular-nums text-secondary-medium dark:text-secondary-soft" title="{{ $demographicsTitle }}">
+                                                <p class="type-meta mt-0.5 truncate tabular-nums text-secondary-medium dark:text-ink-muted" title="{{ $demographicsTitle }}">
                                                     @foreach ($demographics as $demographicLabel => $demographicValue)
-                                                        {{ $demographicLabel }} {{ number_format($demographicValue) }}@if (! $loop->last) <span class="text-secondary-soft dark:text-secondary-medium">&middot;</span> @endif
+                                                        {{ $demographicLabel }} {{ number_format($demographicValue) }}@if (! $loop->last) <span class="text-secondary-soft dark:text-ink-faint">&middot;</span> @endif
                                                     @endforeach
                                                 </p>
                                             @endif
                                             @if ($breakdown !== null && $breakdown !== $project->target_beneficiaries)
-                                                <p class="type-meta tabular-nums text-secondary-medium dark:text-secondary-soft">{{ __('projects.breakdown_count', ['count' => number_format($breakdown)]) }}</p>
+                                                <p class="type-meta tabular-nums text-secondary-medium dark:text-ink-muted">{{ __('projects.breakdown_count', ['count' => number_format($breakdown)]) }}</p>
                                             @endif
                                         </div>
 
                                         @if ($funding !== null && $funding['shared'] > 0)
-                                            <span class="type-meta col-span-2 mt-1.5 inline-flex w-fit items-center gap-1 rounded-full border border-board-line px-2 py-0.5 text-secondary-medium dark:text-secondary-soft">
+                                            <span class="type-meta col-span-2 mt-1.5 inline-flex w-fit items-center gap-1 rounded-full border border-board-line px-2 py-0.5 text-secondary-medium dark:text-ink-muted">
                                                 <flux:icon.arrows-right-left variant="micro" class="size-3.5 shrink-0" aria-hidden="true" />
                                                 {{ trans_choice('projects.shared_with_other_projects', $funding['shared'], ['count' => $funding['shared']]) }}
                                             </span>
@@ -1410,8 +1410,8 @@ new #[Title('titles.projects')] class extends Component {
                                                         <span
                                                             @class([
                                                                 'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs tabular-nums',
-                                                                'border-primary bg-primary font-semibold text-white' => $connection['alert'],
-                                                                'border-board-line text-secondary-medium dark:text-secondary-soft' => ! $connection['alert'],
+                                                                'border-primary bg-primary dark:border-transparent dark:bg-status-critical-soft dark:text-status-critical font-semibold text-white' => $connection['alert'],
+                                                                'border-board-line text-secondary-medium dark:text-ink-muted' => ! $connection['alert'],
                                                             ])
                                                             title="{{ $connection['label'] }}"
                                                         >
@@ -1422,7 +1422,7 @@ new #[Title('titles.projects')] class extends Component {
                                                     @endforeach
                                                 </div>
                                             @else
-                                                <p class="type-meta text-secondary-medium dark:text-secondary-soft">{{ __('projects.no_connections_yet') }}</p>
+                                                <p class="type-meta text-secondary-medium dark:text-ink-muted">{{ __('projects.no_connections_yet') }}</p>
                                             @endif
 
                                             <x-ui.employee-chip :employee="$project->user" compact class="shrink-0 justify-end" />
@@ -1459,8 +1459,8 @@ new #[Title('titles.projects')] class extends Component {
 
                         <tr wire:key="project-{{ $project->id }}">
                             <x-ui.data-table.cell :label="__('projects.col_scheduled')">
-                                <span class="block text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $project->start_date?->translatedFormat(__('formats.date')) ?? '—' }}</span>
-                                <span class="block text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">
+                                <span class="block text-xs tabular-nums text-secondary-medium dark:text-ink-muted">{{ $project->start_date?->translatedFormat(__('formats.date')) ?? '—' }}</span>
+                                <span class="block text-xs tabular-nums text-secondary-medium dark:text-ink-muted">
                                     <flux:icon.arrow-long-right variant="micro" class="inline size-3.5 rtl:-scale-x-100" aria-hidden="true" />
                                     {{ $project->end_date?->translatedFormat(__('formats.date')) ?? '—' }}
                                 </span>
@@ -1469,23 +1469,23 @@ new #[Title('titles.projects')] class extends Component {
                             <x-ui.data-table.cell>
                                 <span class="flex min-w-0 items-center gap-1.5">
                                     @if (in_array($project->id, $this->unreadIds, true))
-                                        <span class="size-2 shrink-0 rounded-full bg-primary" data-unread-dot="project-{{ $project->id }}" title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
+                                        <span class="size-2 shrink-0 rounded-full bg-primary dark:bg-ink" data-unread-dot="project-{{ $project->id }}" title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
                                     @endif
                                     <span class="line-clamp-2 min-w-0 text-sm font-semibold" title="{{ $project->name }}">{{ $project->name }}</span>
                                 </span>
-                                <span class="block truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $project->city?->name ?? __('common.unknown_city') }} · {{ $project->program->name }}</span>
-                                <span class="block truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $project->program->strategy?->name ?? __('common.strategy_not_assigned') }}</span>
-                                <span class="hidden truncate text-xs tabular-nums text-secondary-medium @max-6xl:block @max-3xl:hidden! dark:text-secondary-soft">
+                                <span class="block truncate text-xs text-secondary-medium dark:text-ink-muted">{{ $project->city?->name ?? __('common.unknown_city') }} · {{ $project->program->name }}</span>
+                                <span class="block truncate text-xs text-secondary-medium dark:text-ink-muted">{{ $project->program->strategy?->name ?? __('common.strategy_not_assigned') }}</span>
+                                <span class="hidden truncate text-xs tabular-nums text-secondary-medium @max-6xl:block @max-3xl:hidden! dark:text-ink-muted">
                                     {{ $project->target_beneficiaries === null ? '—' : number_format($project->target_beneficiaries) }}
                                     @foreach ($connections as $connection)
-                                        <span aria-hidden="true"> · </span><span aria-label="{{ $connection['label'] }}" class="{{ $connection['alert'] ? 'font-semibold text-primary' : '' }}">{{ $connection['count'] }}</span>
+                                        <span aria-hidden="true"> · </span><span aria-label="{{ $connection['label'] }}" class="{{ $connection['alert'] ? 'font-semibold text-primary dark:text-brand-text' : '' }}">{{ $connection['count'] }}</span>
                                     @endforeach
                                 </span>
                             </x-ui.data-table.cell>
 
                             <x-ui.data-table.cell :label="__('projects.col_progress')">
                                 <x-ui.progress-bar :value="$progress" :tone="$schedule['tone']" :label="__('projects.milestone_progress_for', ['name' => $project->name])" label-hidden :show-value="$progress !== null" />
-                                <span class="mt-1 block text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">
+                                <span class="mt-1 block text-xs tabular-nums text-secondary-medium dark:text-ink-muted">
                                     {{ $progress === null ? __('projects.no_weighted_milestones') : __('projects.milestones_reached', ['reached' => $project->reached_milestones_count, 'total' => $project->milestones_count]) }}
                                 </span>
                             </x-ui.data-table.cell>
@@ -1493,7 +1493,7 @@ new #[Title('titles.projects')] class extends Component {
                             <x-ui.data-table.cell :label="__('projects.col_beneficiaries')" numeric class="@max-6xl:hidden @max-3xl:flex!">
                                 <span class="block font-semibold">{{ $project->target_beneficiaries === null ? '—' : number_format($project->target_beneficiaries) }}</span>
                                 @if ($breakdown !== null && $breakdown !== $project->target_beneficiaries)
-                                    <span class="block text-xs text-secondary-medium dark:text-secondary-soft">{{ __('projects.breakdown_count', ['count' => number_format($breakdown)]) }}</span>
+                                    <span class="block text-xs text-secondary-medium dark:text-ink-muted">{{ __('projects.breakdown_count', ['count' => number_format($breakdown)]) }}</span>
                                 @endif
                             </x-ui.data-table.cell>
 
@@ -1506,9 +1506,9 @@ new #[Title('titles.projects')] class extends Component {
                                             <x-ui.money :amount="$rowTotal" :currency="$rowCurrency" />
                                         </span>
                                     @endforeach
-                                    <span class="block truncate text-xs text-secondary-medium dark:text-secondary-soft" title="{{ implode(' · ', $funding['donors']) }}">{{ implode(' · ', $funding['donors']) }}</span>
+                                    <span class="block truncate text-xs text-secondary-medium dark:text-ink-muted" title="{{ implode(' · ', $funding['donors']) }}">{{ implode(' · ', $funding['donors']) }}</span>
                                     @if ($funding['shared'] > 0)
-                                        <span class="block text-xs text-secondary-medium dark:text-secondary-soft">{{ trans_choice('projects.shared_with_other_projects', $funding['shared'], ['count' => $funding['shared']]) }}</span>
+                                        <span class="block text-xs text-secondary-medium dark:text-ink-muted">{{ trans_choice('projects.shared_with_other_projects', $funding['shared'], ['count' => $funding['shared']]) }}</span>
                                     @endif
                                 @endif
                             </x-ui.data-table.cell>
@@ -1519,8 +1519,8 @@ new #[Title('titles.projects')] class extends Component {
                                         <span
                                             @class([
                                                 'inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs tabular-nums',
-                                                'border-primary bg-primary font-semibold text-white' => $connection['alert'],
-                                                'border-board-line text-secondary-medium dark:text-secondary-soft' => ! $connection['alert'],
+                                                'border-primary bg-primary dark:border-transparent dark:bg-status-critical-soft dark:text-status-critical font-semibold text-white' => $connection['alert'],
+                                                'border-board-line text-secondary-medium dark:text-ink-muted' => ! $connection['alert'],
                                             ])
                                             title="{{ $connection['label'] }}"
                                             aria-label="{{ $connection['label'] }}"
@@ -1550,7 +1550,7 @@ new #[Title('titles.projects')] class extends Component {
                                     <a
                                         href="{{ route('projects.show', $project) }}"
                                         wire:navigate
-                                        class="grid size-11 shrink-0 place-items-center rounded-md border-0! bg-transparent! text-secondary-dark! transition-colors hover:bg-secondary-soft! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-white! dark:hover:bg-secondary-medium! @3xl/directory:size-8!"
+                                        class="grid size-11 shrink-0 place-items-center rounded-md border-0! bg-transparent! text-secondary-dark! transition-colors hover:bg-secondary-soft! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink! dark:hover:bg-surface-2! @3xl/directory:size-8!"
                                         aria-label="{{ __('projects.open_project', ['name' => $project->name]) }}"
                                     >
                                         <flux:icon.eye class="size-4.5" />
@@ -1589,29 +1589,29 @@ new #[Title('titles.projects')] class extends Component {
 
                 <x-ui.panel>
                     {{-- Same legend grammar as the milestones timeline. --}}
-                    <div class="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-secondary-soft px-4 py-3 text-xs text-secondary-medium dark:border-secondary-medium dark:text-secondary-soft" aria-hidden="true">
-                        <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-secondary-dark bg-secondary-dark dark:border-white dark:bg-white"></span>{{ MilestoneStatus::Reached->label() }}</span>
-                        <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-secondary-dark bg-white dark:border-white dark:bg-secondary-dark"></span>{{ MilestoneStatus::Planned->label() }}</span>
-                        <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-primary bg-white dark:bg-secondary-dark"></span>{{ __('programs.timeline_overdue') }}</span>
-                        <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-primary bg-primary"></span>{{ __('milestones.missed') }}</span>
-                        <span class="inline-flex items-center gap-1.5"><span class="h-3.5 w-0.5 bg-primary"></span>{{ __('programs.timeline_today') }}</span>
+                    <div class="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-secondary-soft px-4 py-3 text-xs text-secondary-medium dark:border-line dark:text-ink-muted" aria-hidden="true">
+                        <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-secondary-dark bg-secondary-dark dark:border-ink-muted dark:bg-ink-muted"></span>{{ MilestoneStatus::Reached->label() }}</span>
+                        <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-secondary-dark bg-white dark:border-ink-muted dark:bg-surface-1"></span>{{ MilestoneStatus::Planned->label() }}</span>
+                        <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-primary bg-white dark:bg-surface-1"></span>{{ __('programs.timeline_overdue') }}</span>
+                        <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-primary bg-primary dark:bg-status-critical dark:border-status-critical"></span>{{ __('milestones.missed') }}</span>
+                        <span class="inline-flex items-center gap-1.5"><span class="h-3.5 w-0.5 bg-primary dark:bg-ink"></span>{{ __('programs.timeline_today') }}</span>
                     </div>
 
                     @if ($window !== null)
-                        <div class="hidden gap-6 border-b border-secondary-soft px-4 {{ $timelineColumns }} @4xl/directory:grid dark:border-secondary-medium">
+                        <div class="hidden gap-6 border-b border-secondary-soft px-4 {{ $timelineColumns }} @4xl/directory:grid dark:border-line">
                             <span></span>
                             <div class="relative h-9">
                                 @foreach ($ticks as $tick)
                                     @continue($tick['nearToday'])
-                                    <span class="absolute bottom-2 -translate-x-1/2 text-xs whitespace-nowrap tabular-nums text-secondary-light rtl:translate-x-1/2 dark:text-secondary-medium" style="inset-inline-start: {{ $tick['at'] }}%">{{ $tick['label'] }}</span>
+                                    <span class="absolute bottom-2 -translate-x-1/2 text-xs whitespace-nowrap tabular-nums text-secondary-light rtl:translate-x-1/2 dark:text-ink-faint" style="inset-inline-start: {{ $tick['at'] }}%">{{ $tick['label'] }}</span>
                                 @endforeach
-                                <span class="absolute bottom-1.5 -translate-x-1/2 rounded-full bg-primary px-2 py-0.5 text-[0.6875rem] font-bold whitespace-nowrap text-white rtl:translate-x-1/2" style="inset-inline-start: {{ $todayAt }}%">{{ __('programs.timeline_today') }}</span>
+                                <span class="absolute bottom-1.5 -translate-x-1/2 rounded-full bg-primary dark:bg-ink dark:text-surface-0 px-2 py-0.5 text-[0.6875rem] font-bold whitespace-nowrap text-white rtl:translate-x-1/2" style="inset-inline-start: {{ $todayAt }}%">{{ __('programs.timeline_today') }}</span>
                             </div>
                             <span></span>
                         </div>
                     @endif
 
-                    <ol class="divide-y divide-secondary-soft dark:divide-secondary-medium">
+                    <ol class="divide-y divide-secondary-soft dark:divide-line">
                         @foreach ($projects as $project)
                             @php
                                 $progress = $this->progressFor($project);
@@ -1629,7 +1629,7 @@ new #[Title('titles.projects')] class extends Component {
                                     .($elapsed === null ? '' : ' · '.__('programs.timeline_expected', ['percent' => (int) round($elapsed)]));
                             @endphp
 
-                            <li class="bg-white transition-colors hover:bg-secondary-soft/30 dark:bg-secondary-dark dark:hover:bg-secondary-medium/30" wire:key="project-timeline-{{ $project->id }}">
+                            <li class="bg-white transition-colors hover:bg-secondary-soft/30 dark:bg-surface-1 dark:hover:bg-surface-2" wire:key="project-timeline-{{ $project->id }}">
                                 <div class="grid gap-4 px-4 py-4 {{ $timelineColumns }} @4xl/directory:items-center @4xl/directory:gap-6">
                                     <div class="min-w-0">
                                         <div class="flex items-start justify-between gap-2">
@@ -1639,7 +1639,7 @@ new #[Title('titles.projects')] class extends Component {
                                                 <a
                                                 href="{{ route('projects.show', $project) }}"
                                                 wire:navigate
-                                                class="grid size-11 place-items-center rounded-md border-0! bg-transparent! text-secondary-dark! transition-colors hover:bg-secondary-soft! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-white! dark:hover:bg-secondary-medium! @3xl/directory:size-8!"
+                                                class="grid size-11 place-items-center rounded-md border-0! bg-transparent! text-secondary-dark! transition-colors hover:bg-secondary-soft! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink! dark:hover:bg-surface-2! @3xl/directory:size-8!"
                                                 aria-label="{{ __('projects.open_project', ['name' => $project->name]) }}"
                                             >
                                                 <flux:icon.eye class="size-4.5" />
@@ -1653,8 +1653,8 @@ new #[Title('titles.projects')] class extends Component {
                                             </div>
                                         </div>
 
-                                        <p class="mt-1 truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $project->city?->name ?? __('common.unknown_city') }} · {{ $project->program->name }}</p>
-                                        <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $project->program->strategy?->name ?? __('common.strategy_not_assigned') }}</p>
+                                        <p class="mt-1 truncate text-xs text-secondary-medium dark:text-ink-muted">{{ $project->city?->name ?? __('common.unknown_city') }} · {{ $project->program->name }}</p>
+                                        <p class="truncate text-xs text-secondary-medium dark:text-ink-muted">{{ $project->program->strategy?->name ?? __('common.strategy_not_assigned') }}</p>
 
                                         <div class="mt-2 flex flex-wrap items-center gap-1.5">
                                             <x-ui.enum-badge :case="$project->status" />
@@ -1666,9 +1666,9 @@ new #[Title('titles.projects')] class extends Component {
                                                 <span
                                                     @class([
                                                         'inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs tabular-nums',
-                                                        'border-primary/30 bg-primary/10 font-semibold text-primary' => $connection['alert'],
-                                                        'border-secondary-soft text-secondary-medium dark:border-secondary-medium dark:text-secondary-soft' => ! $connection['alert'] && $connection['count'] > 0,
-                                                        'border-secondary-soft text-secondary-light dark:border-secondary-medium' => ! $connection['alert'] && $connection['count'] === 0,
+                                                        'border-primary/30 bg-primary/10 font-semibold text-primary dark:text-brand-text' => $connection['alert'],
+                                                        'border-secondary-soft text-secondary-medium dark:border-line dark:text-ink-muted' => ! $connection['alert'] && $connection['count'] > 0,
+                                                        'border-secondary-soft text-secondary-light dark:border-line' => ! $connection['alert'] && $connection['count'] === 0,
                                                     ])
                                                     aria-label="{{ $connection['label'] }}"
                                                 >
@@ -1682,14 +1682,14 @@ new #[Title('titles.projects')] class extends Component {
                                         <div class="relative h-11">
                                             @if ($window !== null)
                                                 @foreach ($ticks as $tick)
-                                                    <span aria-hidden="true" class="absolute inset-y-0 hidden w-px bg-secondary-soft @4xl/directory:block dark:bg-secondary-medium" style="inset-inline-start: {{ $tick['at'] }}%"></span>
+                                                    <span aria-hidden="true" class="absolute inset-y-0 hidden w-px bg-secondary-soft @4xl/directory:block dark:bg-line" style="inset-inline-start: {{ $tick['at'] }}%"></span>
                                                 @endforeach
-                                                <span aria-hidden="true" class="absolute inset-y-0 z-10 w-0.5 -translate-x-1/2 bg-primary rtl:translate-x-1/2" style="inset-inline-start: {{ $todayAt }}%"></span>
+                                                <span aria-hidden="true" class="absolute inset-y-0 z-10 w-0.5 -translate-x-1/2 bg-primary dark:bg-ink rtl:translate-x-1/2" style="inset-inline-start: {{ $todayAt }}%"></span>
                                             @endif
 
                                             @if ($hasWindow)
                                                 <div
-                                                    class="absolute top-1/2 h-6 -translate-y-1/2 overflow-hidden rounded-full border {{ $isFinished ? 'border-secondary-light bg-secondary-soft/60 dark:bg-secondary-medium/40' : ($isLive ? 'border-secondary-light bg-secondary-soft dark:bg-secondary-medium' : 'border-dashed border-secondary-light bg-white dark:bg-secondary-dark') }}"
+                                                    class="absolute top-1/2 h-6 -translate-y-1/2 overflow-hidden rounded-full border {{ $isFinished ? 'border-secondary-light bg-secondary-soft/60 dark:bg-white/10' : ($isLive ? 'border-secondary-light bg-secondary-soft dark:bg-surface-2' : 'border-dashed border-secondary-light bg-white dark:bg-surface-1') }}"
                                                     style="inset-inline-start: {{ $barStart }}%; width: {{ $barWidth }}%"
                                                     role="img"
                                                     aria-label="{{ $barLabel }}"
@@ -1705,9 +1705,9 @@ new #[Title('titles.projects')] class extends Component {
                                                     @php
                                                         $isMissedMarker = $milestone->isMissed();
                                                         $markerTone = match (true) {
-                                                            $milestone->status === MilestoneStatus::Reached => 'border-secondary-dark bg-secondary-dark dark:border-white dark:bg-white',
-                                                            $isMissedMarker || $milestone->isOverdue() => 'border-primary bg-primary',
-                                                            default => 'border-secondary-dark bg-white dark:border-white dark:bg-secondary-dark',
+                                                            $milestone->status === MilestoneStatus::Reached => 'border-secondary-dark bg-secondary-dark dark:border-ink-muted dark:bg-ink-muted',
+                                                            $isMissedMarker || $milestone->isOverdue() => 'border-primary bg-primary dark:bg-status-critical dark:border-status-critical',
+                                                            default => 'border-secondary-dark bg-white dark:border-ink-muted dark:bg-surface-1',
                                                         };
                                                         $markerLabel = __('programs.timeline_marker', [
                                                             'name' => $milestone->name,
@@ -1717,7 +1717,7 @@ new #[Title('titles.projects')] class extends Component {
                                                     @endphp
 
                                                     <span
-                                                        class="absolute top-1/2 z-20 block size-3 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[2px] border-2 shadow-sm ring-2 ring-white rtl:translate-x-1/2 dark:ring-secondary-dark {{ $markerTone }}"
+                                                        class="absolute top-1/2 z-20 block size-3 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[2px] border-2 shadow-sm ring-2 ring-white rtl:translate-x-1/2 dark:ring-surface-1 {{ $markerTone }}"
                                                         style="inset-inline-start: {{ $position($milestone->planned_start_date) }}%"
                                                         role="img"
                                                         aria-label="{{ $markerLabel }}"
@@ -1725,11 +1725,11 @@ new #[Title('titles.projects')] class extends Component {
                                                     ></span>
                                                 @endforeach
                                             @else
-                                                <span class="absolute inset-x-0 top-1/2 flex h-7 -translate-y-1/2 items-center justify-center rounded-full border border-dashed border-secondary-light bg-white text-xs text-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft">{{ __('projects.unscheduled') }}</span>
+                                                <span class="absolute inset-x-0 top-1/2 flex h-7 -translate-y-1/2 items-center justify-center rounded-full border border-dashed border-secondary-light bg-white text-xs text-secondary-medium dark:bg-surface-1 dark:text-ink-muted">{{ __('projects.unscheduled') }}</span>
                                             @endif
                                         </div>
 
-                                        <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">
+                                        <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs tabular-nums text-secondary-medium dark:text-ink-muted">
                                             <span>
                                                 {{ $project->start_date?->translatedFormat(__('formats.date')) ?? '—' }}
                                                 <flux:icon.arrow-long-right variant="micro" class="inline size-3.5 rtl:-scale-x-100" aria-hidden="true" />
@@ -1752,7 +1752,7 @@ new #[Title('titles.projects')] class extends Component {
                                         </span>
                                         <div class="text-end">
                                             <p class="type-figure">{{ $progress === null ? '—' : $progress.'%' }}</p>
-                                            <p class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">
+                                            <p class="text-xs tabular-nums text-secondary-medium dark:text-ink-muted">
                                                 {{ $progress === null ? __('projects.no_weighted_milestones') : __('projects.milestones_reached', ['reached' => $project->reached_milestones_count, 'total' => $project->milestones_count]) }}
                                             </p>
                                         </div>
@@ -1766,7 +1766,7 @@ new #[Title('titles.projects')] class extends Component {
 
             @if ($projects->hasPages())
                 <x-ui.panel class="px-4 py-3">
-                    <flux:pagination :paginator="$projects" class="text-secondary-medium! dark:text-secondary-soft!" scroll-to="#project-directory-heading" />
+                    <flux:pagination :paginator="$projects" class="text-secondary-medium! dark:text-ink-muted!" scroll-to="#project-directory-heading" />
                 </x-ui.panel>
             @endif
         </div>
@@ -1860,8 +1860,8 @@ new #[Title('titles.projects')] class extends Component {
                     <div class="col-span-2 min-w-0 @4xl/modal:col-span-1">
                         <span class="form-label">{{ __('projects.duration') }}</span>
                         <p class="flex min-h-11 flex-wrap items-center gap-x-2 tabular-nums">
-                            <span class="text-lg font-bold text-secondary-dark dark:text-white" x-text="durationLabel || '—'">—</span>
-                            <span class="text-xs font-medium text-secondary-medium dark:text-secondary-soft" x-text="durationRange"></span>
+                            <span class="text-lg font-bold text-secondary-dark dark:text-ink" x-text="durationLabel || '—'">—</span>
+                            <span class="text-xs font-medium text-secondary-medium dark:text-ink-muted" x-text="durationRange"></span>
                         </p>
                     </div>
 
@@ -1929,10 +1929,10 @@ new #[Title('titles.projects')] class extends Component {
     >
         @if ($this->archivingProject !== null && $this->archivingProject['carries'] !== [])
             <div class="rounded-lg border border-board-line bg-board-head p-3">
-                <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.kept_with_the_project') }}</p>
+                <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('projects.kept_with_the_project') }}</p>
                 <ul class="mt-1.5 flex flex-col gap-0.5">
                     @foreach ($this->archivingProject['carries'] as $carriedLabel => $carriedCount)
-                        <li class="text-sm tabular-nums text-secondary-dark dark:text-white" wire:key="carried-{{ $loop->index }}">{{ $carriedCount }} {{ $carriedLabel }}</li>
+                        <li class="text-sm tabular-nums text-secondary-dark dark:text-ink" wire:key="carried-{{ $loop->index }}">{{ $carriedCount }} {{ $carriedLabel }}</li>
                     @endforeach
                 </ul>
             </div>

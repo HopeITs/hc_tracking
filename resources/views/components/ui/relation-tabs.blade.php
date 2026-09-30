@@ -1,6 +1,6 @@
 @props(['tabs' => [], 'active' => null, 'wireTarget' => 'tab'])
 
-<div role="tablist" {{ $attributes->class('flex flex-wrap items-center gap-1 border-b border-secondary-soft dark:border-secondary-medium') }}>
+<div role="tablist" {{ $attributes->class('flex flex-wrap items-center gap-1 border-b border-secondary-soft dark:border-line') }}>
     @foreach ($tabs as $tab)
         @php $isActive = $tab['key'] === $active; @endphp
         <button
@@ -11,8 +11,8 @@
             aria-selected="{{ $isActive ? 'true' : 'false' }}"
             @class([
                 'inline-flex min-h-11 touch-manipulation items-center gap-1.5 border-b-2 px-3 text-sm font-medium transition-colors sm:min-h-10',
-                'border-primary text-secondary-dark dark:text-white' => $isActive,
-                'border-transparent text-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => ! $isActive,
+                'border-primary text-secondary-dark dark:text-ink' => $isActive,
+                'border-transparent text-secondary-medium hover:text-secondary-dark dark:text-ink-muted dark:hover:text-ink' => ! $isActive,
             ])
         >
             {{ $tab['label'] }}

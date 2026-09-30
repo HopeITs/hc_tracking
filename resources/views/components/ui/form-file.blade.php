@@ -97,7 +97,7 @@
 
                 <div class="mt-1.5 flex items-center gap-2" x-show="uploading" style="display: none">
                     <span class="form-file-track"><span class="form-file-bar" x-bind:style="`width: ${progress}%`"></span></span>
-                    <span class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft" x-text="sizeLabel"></span>
+                    <span class="text-xs tabular-nums text-secondary-medium dark:text-ink-muted" x-text="sizeLabel"></span>
                 </div>
             </div>
 

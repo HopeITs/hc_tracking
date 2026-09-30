@@ -395,9 +395,9 @@ new #[Title('titles.donor')] class extends Component {
 ?>
 
 @php
-    $mutedText = 'text-secondary-medium dark:text-secondary-soft';
-    $inkText = 'text-secondary-dark dark:text-white';
-    $hairline = 'border-secondary-soft dark:border-secondary-medium';
+    $mutedText = 'text-secondary-medium dark:text-ink-muted';
+    $inkText = 'text-secondary-dark dark:text-ink';
+    $hairline = 'border-secondary-soft dark:border-line';
     $amount = fn (float $value): string => number_format($value, 2);
     $formatDate = fn (?\DateTimeInterface $date): string => $date?->translatedFormat(__('formats.date')) ?? '—';
     $percentOf = fn (float $part, float $whole): float => $whole > 0 ? min(100, round($part / $whole * 100, 2)) : 0.0;
@@ -412,7 +412,7 @@ new #[Title('titles.donor')] class extends Component {
     ];
 @endphp
 
-<section class="@container/detail flex min-h-full w-full flex-1 flex-col bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" data-donor-dossier>
+<section class="@container/detail flex min-h-full w-full flex-1 flex-col bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" data-donor-dossier>
     <x-ui.detail-header
         :breadcrumbs="[
             ['label' => __('common.donors'), 'url' => route('donors.index')],
@@ -448,10 +448,10 @@ new #[Title('titles.donor')] class extends Component {
                     @endif
                     <span class="flex flex-wrap items-center gap-x-4 gap-y-1 {{ $mutedText }}">
                         @if (filled($donor->email))
-                            <a href="mailto:{{ $donor->email }}" class="inline-flex items-center gap-1.5 underline-offset-4 hover:underline hover:text-secondary-dark dark:hover:text-white"><flux:icon.envelope variant="micro" class="size-4" aria-hidden="true" />{{ $donor->email }}</a>
+                            <a href="mailto:{{ $donor->email }}" class="inline-flex items-center gap-1.5 underline-offset-4 hover:underline hover:text-secondary-dark dark:hover:text-ink"><flux:icon.envelope variant="micro" class="size-4" aria-hidden="true" />{{ $donor->email }}</a>
                         @endif
                         @if (filled($donor->phone))
-                            <a href="tel:{{ preg_replace('/[^\d+]/', '', $donor->phone) }}" dir="ltr" class="inline-flex items-center gap-1.5 tabular-nums underline-offset-4 hover:underline hover:text-secondary-dark dark:hover:text-white"><flux:icon.phone variant="micro" class="size-4" aria-hidden="true" />{{ $donor->phone }}</a>
+                            <a href="tel:{{ preg_replace('/[^\d+]/', '', $donor->phone) }}" dir="ltr" class="inline-flex items-center gap-1.5 tabular-nums underline-offset-4 hover:underline hover:text-secondary-dark dark:hover:text-ink"><flux:icon.phone variant="micro" class="size-4" aria-hidden="true" />{{ $donor->phone }}</a>
                         @endif
                     </span>
                 @else
@@ -523,9 +523,9 @@ new #[Title('titles.donor')] class extends Component {
                     $parts = [
                         ['key' => 'received', 'label' => __('donors.received'), 'value' => $line['received'], 'bar' => 'bg-funding', 'dot' => 'bg-funding', 'text' => 'text-funding'],
                         ['key' => 'due', 'label' => __('donors.due_ahead'), 'value' => $line['due'], 'bar' => 'money-pending', 'dot' => 'money-pending', 'text' => 'text-status-warn'],
-                        ['key' => 'overdue', 'label' => __('donors.overdue'), 'value' => $line['overdue'], 'bar' => 'bg-primary', 'dot' => 'bg-primary', 'text' => 'text-status-critical'],
+                        ['key' => 'overdue', 'label' => __('donors.overdue'), 'value' => $line['overdue'], 'bar' => 'bg-primary dark:bg-status-critical', 'dot' => 'bg-primary dark:bg-status-critical', 'text' => 'text-status-critical'],
                         ...($line['failed'] > 0 ? [['key' => 'failed', 'label' => ArStatus::Failed->label(), 'value' => $line['failed'], 'bar' => 'money-failed', 'dot' => 'money-failed', 'text' => 'text-status-critical']] : []),
-                        ['key' => 'unscheduled', 'label' => __('donors.not_yet_scheduled'), 'value' => $line['unscheduled'], 'bar' => '', 'dot' => 'bg-secondary-soft dark:bg-secondary-medium', 'text' => $mutedText],
+                        ['key' => 'unscheduled', 'label' => __('donors.not_yet_scheduled'), 'value' => $line['unscheduled'], 'bar' => '', 'dot' => 'bg-secondary-soft dark:bg-line-strong', 'text' => $mutedText],
                     ];
                 @endphp
                 <div class="min-w-0" wire:key="river-{{ $currency }}" data-river="{{ $currency }}">
@@ -544,7 +544,7 @@ new #[Title('titles.donor')] class extends Component {
                     </div>
 
                     <div
-                        class="mt-5 flex h-4 w-full gap-0.5 overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium"
+                        class="mt-5 flex h-4 w-full gap-0.5 overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2"
                         role="img"
                         aria-label="{{ __('donors.river_label', ['currency' => $currency, 'received' => $amount($line['received']), 'due' => $amount($line['due']), 'overdue' => $amount($line['overdue']), 'committed' => $amount($line['committed'])]) }}"
                     >
@@ -616,7 +616,7 @@ new #[Title('titles.donor')] class extends Component {
                 <ul class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs {{ $mutedText }}">
                     <li class="inline-flex items-center gap-1.5"><span class="size-2.5 rounded-full bg-funding" aria-hidden="true"></span>{{ __('donors.received') }}</li>
                     <li class="inline-flex items-center gap-1.5"><span class="size-2.5 rounded-full border-2 border-status-warn" aria-hidden="true"></span>{{ __('donors.due_ahead') }}</li>
-                    <li class="inline-flex items-center gap-1.5"><span class="size-2.5 rounded-full bg-primary" aria-hidden="true"></span>{{ __('donors.overdue') }}</li>
+                    <li class="inline-flex items-center gap-1.5"><span class="size-2.5 rounded-full bg-primary dark:bg-status-critical" aria-hidden="true"></span>{{ __('donors.overdue') }}</li>
                     <li class="inline-flex items-center gap-1.5"><span class="size-2.5 rounded-full border-2 border-dashed border-status-critical" aria-hidden="true"></span>{{ $stateLabels['failed'] }}</li>
                 </ul>
             </div>
@@ -633,7 +633,7 @@ new #[Title('titles.donor')] class extends Component {
                                     <span class="block truncate {{ $mutedText }}">{{ $lane['agreement']->project_num ?? __('common.no_donor_reference') }}</span>
                                 </a>
                                 <div class="relative h-14">
-                                    <span class="absolute inset-x-0 top-1/2 h-px bg-secondary-soft dark:bg-secondary-medium" aria-hidden="true"></span>
+                                    <span class="absolute inset-x-0 top-1/2 h-px bg-secondary-soft dark:bg-line" aria-hidden="true"></span>
                                     <span class="absolute inset-y-0 w-px bg-secondary-dark/70 dark:bg-white/70" style="inset-inline-start: {{ $this->calendar['today'] }}%" aria-hidden="true"></span>
                                     @foreach ($lane['points'] as $point)
                                         <a
@@ -648,11 +648,11 @@ new #[Title('titles.donor')] class extends Component {
                                             <span @class([
                                                 'block rounded-full transition-transform duration-200 ease-out group-hover:scale-125',
                                                 'bg-funding' => $point['state'] === 'received',
-                                                'bg-primary ring-4 ring-primary/15' => $point['state'] === 'overdue',
-                                                'border-2 border-dashed border-status-critical bg-white dark:bg-secondary-dark' => $point['state'] === 'failed',
-                                                'border-[3px] border-status-warn bg-white dark:bg-secondary-dark' => in_array($point['state'], ['due', 'transit', 'undated'], true),
+                                                'bg-primary dark:bg-status-critical ring-4 ring-primary/15' => $point['state'] === 'overdue',
+                                                'border-2 border-dashed border-status-critical bg-white dark:bg-surface-1' => $point['state'] === 'failed',
+                                                'border-[3px] border-status-warn bg-white dark:bg-surface-1' => in_array($point['state'], ['due', 'transit', 'undated'], true),
                                             ]) style="width: {{ $point['size'] }}rem; height: {{ $point['size'] }}rem"></span>
-                                            <span @class(['pointer-events-none absolute hidden', 'top-full mt-2' => $loop->parent->first, 'bottom-full mb-2' => ! $loop->parent->first, 'start-0' => $point['position'] < 20, 'end-0' => $point['position'] > 80, 'start-1/2 -translate-x-1/2 rtl:translate-x-1/2' => $point['position'] >= 20 && $point['position'] <= 80, 'rounded-md bg-secondary-dark px-2.5 py-1.5 text-start text-[11px] whitespace-nowrap text-white shadow-[0_6px_16px_-6px_rgb(0_0_0/0.4)] group-hover:block group-focus-visible:block dark:bg-white dark:text-secondary-dark'])>
+                                            <span @class(['pointer-events-none absolute hidden', 'top-full mt-2' => $loop->parent->first, 'bottom-full mb-2' => ! $loop->parent->first, 'start-0' => $point['position'] < 20, 'end-0' => $point['position'] > 80, 'start-1/2 -translate-x-1/2 rtl:translate-x-1/2' => $point['position'] >= 20 && $point['position'] <= 80, 'rounded-md bg-secondary-dark px-2.5 py-1.5 text-start text-[11px] whitespace-nowrap text-white shadow-[0_6px_16px_-6px_rgb(0_0_0/0.4)] group-hover:block group-focus-visible:block dark:bg-surface-3 dark:shadow-raised dark:text-ink'])>
                                                 <span class="block font-bold tabular-nums">{{ $amount($point['amount']) }} {{ $point['currency'] }}</span>
                                                 <span class="block tabular-nums opacity-80">{{ $stateLabels[$point['state']] }} · {{ $point['date']->translatedFormat(__('formats.date')) }}</span>
                                             </span>
@@ -668,7 +668,7 @@ new #[Title('titles.donor')] class extends Component {
                                 @foreach ($this->calendar['ticks'] as $tick)
                                     <span class="absolute top-2 text-[10px] whitespace-nowrap tabular-nums {{ $mutedText }}" style="inset-inline-start: {{ $tick['position'] }}%">{{ $tick['label'] }}</span>
                                 @endforeach
-                                <span class="absolute top-6 -translate-x-1/2 rounded-sm bg-secondary-dark px-1.5 py-0.5 text-[10px] font-bold text-white rtl:translate-x-1/2 dark:bg-white dark:text-secondary-dark" style="inset-inline-start: {{ $this->calendar['today'] }}%">{{ __('donors.today') }}</span>
+                                <span class="absolute top-6 -translate-x-1/2 rounded-sm bg-secondary-dark px-1.5 py-0.5 text-[10px] font-bold text-white rtl:translate-x-1/2 dark:bg-ink dark:text-surface-0" style="inset-inline-start: {{ $this->calendar['today'] }}%">{{ __('donors.today') }}</span>
                             </div>
                         </div>
                     </div>
@@ -710,7 +710,7 @@ new #[Title('titles.donor')] class extends Component {
                                 <span class="text-sm font-semibold tracking-normal {{ $mutedText }}">{{ $currency }}</span>
                             </p>
 
-                            <div class="mt-3 flex h-2 w-full gap-0.5 overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium" role="img" aria-label="{{ __('donors.river_label', ['currency' => $currency, 'received' => $amount($money['received']), 'due' => $amount($money['due']), 'overdue' => $amount($money['overdue']), 'committed' => $amount($money['committed'])]) }}">
+                            <div class="mt-3 flex h-2 w-full gap-0.5 overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2" role="img" aria-label="{{ __('donors.river_label', ['currency' => $currency, 'received' => $amount($money['received']), 'due' => $amount($money['due']), 'overdue' => $amount($money['overdue']), 'committed' => $amount($money['committed'])]) }}">
                                 @if ($money['received'] > 0)
                                     <span class="money-grow h-full rounded-s-full bg-funding" style="width: {{ $percentOf($money['received'], $money['committed']) }}%"></span>
                                 @endif
@@ -718,7 +718,7 @@ new #[Title('titles.donor')] class extends Component {
                                     <span class="money-grow money-pending h-full first:rounded-s-full" style="width: {{ $percentOf($money['due'], $money['committed']) }}%"></span>
                                 @endif
                                 @if ($money['overdue'] > 0)
-                                    <span class="money-grow h-full bg-primary first:rounded-s-full" style="width: {{ $percentOf($money['overdue'], $money['committed']) }}%"></span>
+                                    <span class="money-grow h-full bg-primary dark:bg-status-critical first:rounded-s-full" style="width: {{ $percentOf($money['overdue'], $money['committed']) }}%"></span>
                                 @endif
                             </div>
 
@@ -746,12 +746,12 @@ new #[Title('titles.donor')] class extends Component {
                                         <li class="relative flex min-w-0 gap-3 pb-3 last:pb-0" wire:key="agreement-{{ $agreement->id }}-project-{{ $project->id }}" data-funded-project="{{ $project->id }}">
                                             <span class="relative flex w-3 shrink-0 justify-center" aria-hidden="true">
                                                 @unless ($loop->last)
-                                                    <span class="absolute top-3 bottom-[-0.75rem] w-px bg-secondary-soft dark:bg-secondary-medium"></span>
+                                                    <span class="absolute top-3 bottom-[-0.75rem] w-px bg-secondary-soft dark:bg-line-strong"></span>
                                                 @endunless
                                                 <span @class([
                                                     'relative z-10 mt-1.5 size-2.5 rounded-full',
-                                                    'bg-secondary-dark dark:bg-white' => $project->status->isOpen(),
-                                                    'border-2 border-secondary-light bg-white dark:bg-secondary-dark' => ! $project->status->isOpen(),
+                                                    'bg-secondary-dark dark:bg-ink-muted' => $project->status->isOpen(),
+                                                    'border-2 border-secondary-light bg-white dark:bg-surface-1' => ! $project->status->isOpen(),
                                                 ])></span>
                                             </span>
                                             <div class="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-3 gap-y-1">

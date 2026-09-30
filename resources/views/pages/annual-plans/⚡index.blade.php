@@ -795,7 +795,7 @@ new #[Title('titles.annual_plans')] class extends Component {
 ?>
 
 @php
-    $secondaryButtonClasses = 'border-secondary-light! bg-white! text-secondary-dark! hover:bg-secondary-soft! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white! dark:hover:bg-secondary-medium!';
+    $secondaryButtonClasses = 'border-secondary-light! bg-white! text-secondary-dark! hover:bg-secondary-soft! dark:border-field-line! dark:bg-surface-1! dark:text-ink! dark:hover:bg-surface-2!';
 
     $yearColumns = $this->yearColumns;
     $yearRange = $this->yearRange;
@@ -808,7 +808,7 @@ new #[Title('titles.annual_plans')] class extends Component {
 @endphp
 
 <section
-    class="admin-directory @container/matrix flex min-h-full w-full flex-1 flex-col gap-8 bg-white px-1 text-secondary-dark dark:bg-secondary-dark dark:text-white"
+    class="admin-directory @container/matrix flex min-h-full w-full flex-1 flex-col gap-8 bg-white px-1 text-secondary-dark dark:bg-surface-0 dark:text-ink"
     aria-labelledby="annual-plan-matrix-heading"
     x-data="{ hoverYear: null, hoverProgram: null, gapsOnly: false }"
 >
@@ -855,7 +855,7 @@ new #[Title('titles.annual_plans')] class extends Component {
     </x-ui.page-header>
 
     <div class="flex justify-end">
-        <span wire:loading.delay.flex wire:target="toggleYear,clearYears,manager,programSearch,clearFilters,focusOnYear" class="hidden items-center gap-1.5 text-xs text-secondary-medium dark:text-secondary-soft">
+        <span wire:loading.delay.flex wire:target="toggleYear,clearYears,manager,programSearch,clearFilters,focusOnYear" class="hidden items-center gap-1.5 text-xs text-secondary-medium dark:text-ink-muted">
             <flux:icon.arrow-path class="size-3.5 animate-spin" /> {{ __('common.updating') }}
         </span>
         @if ($filtersAreActive)
@@ -868,7 +868,7 @@ new #[Title('titles.annual_plans')] class extends Component {
             icon="calendar-days"
             :heading="__('common.no_annual_plans_yet')"
             :body="__('annual_plans.once_a_program_has_an_annual_plan_its_fiscal_years_appear_he')"
-            class="rounded-xl border border-secondary-soft dark:border-secondary-medium"
+            class="rounded-xl border border-secondary-soft dark:border-line"
         >
             <x-slot:action>
                 @can('create', App\Models\AnnualPlan::class)<x-ui.button size="sm" tone="primary" icon="plus" wire:click="openCreateModal">{{ __('annual_plans.new_annual_plan') }}</x-ui.button>@endcan
@@ -952,9 +952,9 @@ new #[Title('titles.annual_plans')] class extends Component {
             <div class="flex flex-wrap items-end justify-between gap-3 border-b border-board-line bg-board-head px-5 py-4">
                 <div class="min-w-0">
                     <h2 id="planning-arc-heading" class="text-base font-bold">{{ __('annual_plans.planning_arc') }}</h2>
-                    <p class="mt-0.5 type-meta text-secondary-medium dark:text-secondary-soft">{{ __('annual_plans.planning_arc_hint') }}</p>
+                    <p class="mt-0.5 type-meta text-secondary-medium dark:text-ink-muted">{{ __('annual_plans.planning_arc_hint') }}</p>
                 </div>
-                <p class="type-meta text-secondary-medium tabular-nums dark:text-secondary-soft">
+                <p class="type-meta text-secondary-medium tabular-nums dark:text-ink-muted">
                     @if ($yearRange !== null)
                         {{-- A gappy selection cannot be described as a span: "2023–2027" would claim columns that are not on screen. --}}
                         @if ($yearRange['contiguous'])
@@ -973,13 +973,13 @@ new #[Title('titles.annual_plans')] class extends Component {
 
             <div class="grid gap-0 @4xl/matrix:grid-cols-[minmax(0,1fr)_22rem]">
                 <div class="px-5 pt-6 pb-5 @4xl/matrix:border-e @4xl/matrix:border-board-line" dir="ltr">
-                    <div class="mb-4 flex flex-wrap items-center gap-4 type-meta text-secondary-medium dark:text-secondary-soft">
+                    <div class="mb-4 flex flex-wrap items-center gap-4 type-meta text-secondary-medium dark:text-ink-muted">
                         <span class="inline-flex items-center gap-2">
-                            <span aria-hidden="true" class="h-0.5 w-5 rounded-full bg-primary"></span>
+                            <span aria-hidden="true" class="h-0.5 w-5 rounded-full bg-primary dark:bg-ink"></span>
                             {{ __('annual_plans.chart_series_plans') }}
                         </span>
                         <span class="inline-flex items-center gap-2">
-                            <span aria-hidden="true" class="h-0 w-5 border-t-2 border-dashed border-secondary-medium dark:border-secondary-soft"></span>
+                            <span aria-hidden="true" class="h-0 w-5 border-t-2 border-dashed border-secondary-medium dark:border-ink-muted"></span>
                             {{ __('annual_plans.chart_series_targets') }}
                         </span>
                     </div>
@@ -987,11 +987,11 @@ new #[Title('titles.annual_plans')] class extends Component {
                     {{-- The arc itself: decorative and aria-hidden, since every data point is restated by a focusable, labelled year button below it. --}}
                     <div class="relative" style="aspect-ratio: {{ $arcViewW }} / {{ $arcViewH }}" aria-hidden="true">
                         <svg class="size-full overflow-visible" viewBox="0 0 {{ $arcViewW }} {{ $arcViewH }}">
-                            <path d="{{ $arcPlanArea }}" class="fill-secondary-soft dark:fill-secondary-medium" />
+                            <path d="{{ $arcPlanArea }}" class="fill-secondary-soft dark:fill-line-strong" />
 
                             <path
                                 d="{{ $arcTargetLine }}"
-                                class="fill-none stroke-secondary-medium dark:stroke-secondary-soft"
+                                class="fill-none stroke-secondary-medium dark:stroke-ink-muted"
                                 stroke-width="2"
                                 stroke-linecap="round"
                                 stroke-dasharray="1 8"
@@ -999,7 +999,7 @@ new #[Title('titles.annual_plans')] class extends Component {
 
                             <path
                                 d="{{ $arcPlanLine }}"
-                                class="arc-line-draw fill-none stroke-primary"
+                                class="arc-line-draw fill-none stroke-primary dark:stroke-ink"
                                 style="--arc-length: 1600"
                                 stroke-width="3"
                                 stroke-linecap="round"
@@ -1007,20 +1007,20 @@ new #[Title('titles.annual_plans')] class extends Component {
                             />
 
                             @foreach ($arcPoints as $point)
-                                <circle cx="{{ $point['x'] }}" cy="{{ $point['targetY'] }}" r="2.5" class="fill-secondary-medium dark:fill-secondary-soft" />
+                                <circle cx="{{ $point['x'] }}" cy="{{ $point['targetY'] }}" r="2.5" class="fill-secondary-medium dark:fill-ink-muted" />
                             @endforeach
 
                             @foreach ($arcPoints as $point)
                                 @if ($point['rail']['isActive'])
-                                    <circle cx="{{ $point['x'] }}" cy="{{ $point['planY'] }}" r="9" class="fill-none stroke-primary" stroke-width="1.5" />
+                                    <circle cx="{{ $point['x'] }}" cy="{{ $point['planY'] }}" r="9" class="fill-none stroke-primary dark:stroke-ink" stroke-width="1.5" />
                                 @endif
                                 <circle
                                     cx="{{ $point['x'] }}" cy="{{ $point['planY'] }}"
                                     r="{{ $point['rail']['isActive'] ? 5.5 : 4 }}"
                                     stroke-width="2"
                                     @class([
-                                        'fill-primary stroke-primary' => $point['rail']['isActive'],
-                                        'fill-board stroke-primary' => ! $point['rail']['isActive'],
+                                        'fill-primary dark:fill-ink stroke-primary dark:stroke-ink' => $point['rail']['isActive'],
+                                        'fill-board stroke-primary dark:stroke-ink' => ! $point['rail']['isActive'],
                                     ])
                                 />
                             @endforeach
@@ -1029,7 +1029,7 @@ new #[Title('titles.annual_plans')] class extends Component {
                         <div class="pointer-events-none absolute inset-0">
                             @foreach ($arcPoints as $point)
                                 <span
-                                    class="absolute -translate-x-1/2 -translate-y-[calc(100%+10px)] text-sm font-bold tabular-nums text-secondary-dark dark:text-white"
+                                    class="absolute -translate-x-1/2 -translate-y-[calc(100%+10px)] text-sm font-bold tabular-nums text-secondary-dark dark:text-ink"
                                     style="left: {{ $point['xPct'] }}%; top: {{ $point['planYPct'] }}%;"
                                 >{{ $point['rail']['plans'] }}</span>
                             @endforeach
@@ -1048,13 +1048,13 @@ new #[Title('titles.annual_plans')] class extends Component {
                                     aria-label="{{ __('annual_plans.focus_year_plans_targets', ['year' => $rail['year'], 'plans' => $rail['plans'], 'targets' => $rail['targets']]) }}"
                                     @class([
                                         'min-h-9 cursor-pointer rounded-md px-2.5 py-1 text-sm font-bold tabular-nums transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
-                                        'bg-primary text-white' => $rail['isActive'],
-                                        'text-secondary-dark hover:bg-secondary-soft dark:text-white dark:hover:bg-secondary-medium' => ! $rail['isActive'],
+                                        'bg-primary dark:bg-ink dark:text-surface-0 text-white' => $rail['isActive'],
+                                        'text-secondary-dark hover:bg-secondary-soft dark:text-ink dark:hover:bg-surface-2' => ! $rail['isActive'],
                                     ])
                                 >{{ $rail['year'] }}</button>
 
                                 <span @class([
-                                    'type-label rounded-full bg-primary px-2 py-0.5 text-white',
+                                    'type-label rounded-full bg-primary dark:bg-brand px-2 py-0.5 text-white',
                                     'invisible' => ! $rail['isCurrent'],
                                 ])>{{ __('annual_plans.now') }}</span>
                             </div>
@@ -1072,7 +1072,7 @@ new #[Title('titles.annual_plans')] class extends Component {
                                     <circle cx="60" cy="60" r="{{ $gaugeRadius }}" class="fill-none stroke-board-line" stroke-width="10" />
                                     <circle
                                         cx="60" cy="60" r="{{ $gaugeRadius }}"
-                                        class="fill-none stroke-primary transition-[stroke-dashoffset] duration-500 ease-out motion-reduce:transition-none"
+                                        class="fill-none stroke-primary dark:stroke-ink transition-[stroke-dashoffset] duration-500 ease-out motion-reduce:transition-none"
                                         stroke-width="10"
                                         stroke-linecap="round"
                                         stroke-dasharray="{{ $gaugeCircumference }}"
@@ -1080,7 +1080,7 @@ new #[Title('titles.annual_plans')] class extends Component {
                                     />
                                 </svg>
                                 <div class="absolute inset-0 flex items-center justify-center">
-                                    <span class="text-xl font-bold tabular-nums text-secondary-dark dark:text-white" aria-hidden="true">{{ $gaugeShare }}%</span>
+                                    <span class="text-xl font-bold tabular-nums text-secondary-dark dark:text-ink" aria-hidden="true">{{ $gaugeShare }}%</span>
                                 </div>
                             </div>
 
@@ -1091,12 +1091,12 @@ new #[Title('titles.annual_plans')] class extends Component {
                                         <span @class([
                                             'type-meta font-semibold tabular-nums',
                                             'text-status-good' => $cockpit['plansDelta'] > 0,
-                                            'text-secondary-medium dark:text-secondary-soft' => $cockpit['plansDelta'] < 0,
+                                            'text-secondary-medium dark:text-ink-muted' => $cockpit['plansDelta'] < 0,
                                         ])>{{ $cockpit['plansDelta'] > 0 ? '+' : '' }}{{ $cockpit['plansDelta'] }} {{ __('annual_plans.vs_previous_year') }}</span>
                                     @endif
                                 </div>
-                                <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('annual_plans.portfolio_covered') }}</p>
-                                <p class="mt-1.5 type-meta text-secondary-medium tabular-nums dark:text-secondary-soft">
+                                <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('annual_plans.portfolio_covered') }}</p>
+                                <p class="mt-1.5 type-meta text-secondary-medium tabular-nums dark:text-ink-muted">
                                     {{ __('annual_plans.coverage_with_gaps', ['percent' => $gaugeShare, 'gaps' => $cockpit['gaps']]) }}
                                 </p>
                             </div>
@@ -1104,15 +1104,15 @@ new #[Title('titles.annual_plans')] class extends Component {
 
                         <dl class="mt-5 grid grid-cols-3 divide-x divide-board-line overflow-hidden rounded-md border border-board-line bg-board rtl:divide-x-reverse">
                             <div class="px-3 py-2.5">
-                                <dt class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('common.targets') }}</dt>
+                                <dt class="type-label text-secondary-medium dark:text-ink-muted">{{ __('common.targets') }}</dt>
                                 <dd class="mt-0.5 text-xl font-bold tabular-nums">{{ $cockpit['targets'] }}</dd>
                             </div>
                             <div class="px-3 py-2.5">
-                                <dt class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('annual_plans.approved') }}</dt>
-                                <dd class="mt-0.5 flex items-baseline gap-1 tabular-nums"><span class="text-xl font-bold">{{ $cockpit['approved'] }}</span><span class="text-sm text-secondary-medium dark:text-secondary-soft">/ {{ $cockpit['reports'] }}</span></dd>
+                                <dt class="type-label text-secondary-medium dark:text-ink-muted">{{ __('annual_plans.approved') }}</dt>
+                                <dd class="mt-0.5 flex items-baseline gap-1 tabular-nums"><span class="text-xl font-bold">{{ $cockpit['approved'] }}</span><span class="text-sm text-secondary-medium dark:text-ink-muted">/ {{ $cockpit['reports'] }}</span></dd>
                             </div>
                             <div class="px-3 py-2.5">
-                                <dt class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('annual_plans.managers') }}</dt>
+                                <dt class="type-label text-secondary-medium dark:text-ink-muted">{{ __('annual_plans.managers') }}</dt>
                                 <dd class="mt-0.5 text-xl font-bold tabular-nums">{{ $cockpit['managers'] }}</dd>
                             </div>
                         </dl>
@@ -1126,7 +1126,7 @@ new #[Title('titles.annual_plans')] class extends Component {
             <div class="flex min-h-12 flex-wrap items-center justify-between gap-3 border-b border-board-line bg-board-head px-5 py-3">
                 <div class="min-w-0">
                     <h2 id="coverage-matrix-heading" class="text-base font-bold">{{ __('annual_plans.coverage_matrix') }}</h2>
-                    <p class="mt-0.5 type-meta text-secondary-medium dark:text-secondary-soft">{{ __('annual_plans.coverage_matrix_hint') }}</p>
+                    <p class="mt-0.5 type-meta text-secondary-medium dark:text-ink-muted">{{ __('annual_plans.coverage_matrix_hint') }}</p>
                 </div>
 
                 @if ($activeYear !== null)
@@ -1135,7 +1135,7 @@ new #[Title('titles.annual_plans')] class extends Component {
                         x-on:click="gapsOnly = ! gapsOnly"
                         x-bind:aria-pressed="gapsOnly ? 'true' : 'false'"
                         class="inline-flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-md border px-2.5 type-meta font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                        x-bind:class="gapsOnly ? 'border-primary bg-primary text-white' : 'border-board-line text-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white'"
+                        x-bind:class="gapsOnly ? 'border-primary bg-primary dark:bg-ink dark:text-surface-0 dark:border-ink text-white' : 'border-board-line text-secondary-medium hover:text-secondary-dark dark:text-ink-muted dark:hover:text-ink'"
                     >
                         <flux:icon.funnel variant="micro" class="size-3.5" aria-hidden="true" />
                         {{ __('annual_plans.gaps_in_year', ['year' => $activeYear]) }}
@@ -1143,7 +1143,7 @@ new #[Title('titles.annual_plans')] class extends Component {
                 @endif
             </div>
             {{-- How to read a cell, stated before the grid rather than after it. --}}
-            <div class="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-board-line bg-board-head px-5 py-2.5 type-meta text-secondary-medium dark:text-secondary-soft">
+            <div class="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-board-line bg-board-head px-5 py-2.5 type-meta text-secondary-medium dark:text-ink-muted">
                 <span class="inline-flex items-center gap-1.5">
                     <span aria-hidden="true" class="size-3 shrink-0 rounded-[3px] border border-secondary-light bg-board"></span>
                     {{ __('annual_plans.legend_plan_on_file') }}
@@ -1154,12 +1154,12 @@ new #[Title('titles.annual_plans')] class extends Component {
                 </span>
                 <span class="inline-flex items-center gap-1.5">
                     <span aria-hidden="true" class="relative flex size-3 shrink-0 items-center justify-center rounded-[3px] border border-secondary-light bg-board">
-                        <span class="absolute end-0 top-0 size-1.5 -translate-y-1/3 translate-x-1/3 rounded-full bg-primary rtl:translate-x-[-33%]"></span>
+                        <span class="absolute end-0 top-0 size-1.5 -translate-y-1/3 translate-x-1/3 rounded-full bg-primary dark:bg-status-critical rtl:translate-x-[-33%]"></span>
                     </span>
                     {{ __('annual_plans.legend_no_targets') }}
                 </span>
                 <span class="inline-flex items-center gap-1.5">
-                    <span aria-hidden="true" class="h-1.5 w-6 shrink-0 overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium"><span class="block h-full w-2/3 rounded-full bg-status-good"></span></span>
+                    <span aria-hidden="true" class="h-1.5 w-6 shrink-0 overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2"><span class="block h-full w-2/3 rounded-full bg-status-good"></span></span>
                     {{ __('annual_plans.legend_reporting') }}
                 </span>
                 <span class="inline-flex items-center gap-1.5">
@@ -1194,18 +1194,18 @@ new #[Title('titles.annual_plans')] class extends Component {
                             x-show="! gapsOnly || {{ $this->planFor($program->id, $activeYear ?? 0) === null ? 'true' : 'false' }}"
                         >
                             <div class="flex min-w-0 items-center gap-3">
-                                <div class="grid size-10 shrink-0 place-items-center rounded-md bg-secondary-soft text-sm font-bold text-secondary-dark dark:bg-secondary-medium dark:text-white" aria-hidden="true">
+                                <div class="grid size-10 shrink-0 place-items-center rounded-md bg-secondary-soft text-sm font-bold text-secondary-dark dark:bg-surface-2 dark:text-ink" aria-hidden="true">
                                     {{ mb_strtoupper(mb_substr($program->name, 0, 1)) }}
                                 </div>
                                 <div class="min-w-0 flex-1">
                                     <h3 class="truncate text-sm font-bold">{{ $program->name }}</h3>
                                     @if ($program->strategy)
-                                        <span class="mt-0.5 inline-block max-w-full truncate rounded-full border border-board-line px-1.5 py-px type-meta text-secondary-medium dark:text-secondary-soft">{{ $program->strategy->name }}</span>
+                                        <span class="mt-0.5 inline-block max-w-full truncate rounded-full border border-board-line px-1.5 py-px type-meta text-secondary-medium dark:text-ink-muted">{{ $program->strategy->name }}</span>
                                     @else
                                         <p class="truncate type-meta text-secondary-light">{{ __('common.strategy_not_assigned') }}</p>
                                     @endif
                                 </div>
-                                <span class="ms-auto shrink-0 type-meta font-semibold tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $rowPlans->count() }}/{{ count($yearColumns) }}</span>
+                                <span class="ms-auto shrink-0 type-meta font-semibold tabular-nums text-secondary-medium dark:text-ink-muted">{{ $rowPlans->count() }}/{{ count($yearColumns) }}</span>
                             </div>
 
                             {{-- One full-width row per fiscal year: each carries its own edit and delete controls, which a two-column grid leaves no room for at phone widths. --}}
@@ -1222,7 +1222,7 @@ new #[Title('titles.annual_plans')] class extends Component {
                                                 aria-label="{{ __('annual_plans.add_a_plan_for_program_in_year', ['program' => $program->name, 'year' => $year]) }}"
                                             >
                                                 <span class="type-meta font-bold tabular-nums text-secondary-light">{{ $year }}</span>
-                                                <span class="inline-flex items-center gap-1 type-meta text-secondary-medium dark:text-secondary-soft">
+                                                <span class="inline-flex items-center gap-1 type-meta text-secondary-medium dark:text-ink-muted">
                                                     <flux:icon.plus class="size-3.5" />
                                                     {{ __('annual_plans.add_plan') }}
                                                 </span>
@@ -1243,12 +1243,12 @@ new #[Title('titles.annual_plans')] class extends Component {
                                                     <span class="type-meta font-bold tabular-nums">{{ $year }}</span>
                                                     <span class="inline-flex items-center gap-1.5">
                                                         @if ($stats['targets'] === 0)
-                                                            <span aria-hidden="true" class="size-1.5 rounded-full bg-primary"></span>
+                                                            <span aria-hidden="true" class="size-1.5 rounded-full bg-primary dark:bg-status-critical"></span>
                                                         @endif
                                                         <span class="text-sm font-bold tabular-nums">{{ $stats['targets'] }}</span>
                                                     </span>
                                                 </span>
-                                                <span class="truncate type-meta text-secondary-medium dark:text-secondary-soft">{{ $plan->manager?->name ?? __('common.not_assigned') }}</span>
+                                                <span class="truncate type-meta text-secondary-medium dark:text-ink-muted">{{ $plan->manager?->name ?? __('common.not_assigned') }}</span>
                                             </a>
 
                                                 @can('update', $plan)<x-ui.button
@@ -1287,7 +1287,7 @@ new #[Title('titles.annual_plans')] class extends Component {
                         {{-- Neither this row nor the Program column below is position:sticky. An `overflow-x-auto` ancestor computes `overflow-y: auto` too (CSS Overflow §3), quietly making it a sticky containing block on both axes — a `start-0` column stuck to that box has floated to the top of the page and over the app's own header before, so the Program column simply scrolls with the rest of the row now. --}}
                         <div role="row" class="grid border-b border-board-line bg-board-head" style="grid-template-columns: minmax(15rem, 26rem) repeat(var(--matrix-columns), minmax(6.25rem, 14rem)) 1fr;">
                             <div role="columnheader" class="flex items-end bg-board-head px-5 py-3">
-                                <span class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('common.program') }}</span>
+                                <span class="type-label text-secondary-medium dark:text-ink-muted">{{ __('common.program') }}</span>
                             </div>
 
                             @foreach ($yearRail as $rail)
@@ -1308,9 +1308,9 @@ new #[Title('titles.annual_plans')] class extends Component {
                                         ])
                                     >
                                         <span class="text-sm font-bold tabular-nums">{{ $rail['year'] }}</span>
-                                        <span class="type-meta font-normal text-secondary-medium tabular-nums dark:text-secondary-soft">({{ $rail['plans'] }})</span>
+                                        <span class="type-meta font-normal text-secondary-medium tabular-nums dark:text-ink-muted">({{ $rail['plans'] }})</span>
                                         <span class="h-1 w-full overflow-hidden rounded-full bg-board-line" aria-hidden="true">
-                                            <span class="block h-full rounded-full bg-primary" style="width: {{ $rail['coverage'] }}%"></span>
+                                            <span class="block h-full rounded-full bg-primary dark:bg-ink-muted" style="width: {{ $rail['coverage'] }}%"></span>
                                         </span>
                                     </button>
                                 </div>
@@ -1335,13 +1335,13 @@ new #[Title('titles.annual_plans')] class extends Component {
                                 x-bind:class="hoverProgram === {{ $program->id }} ? 'bg-board-head' : ''"
                             >
                                 <div role="rowheader" class="flex min-w-0 items-center gap-3 bg-inherit px-5 py-3">
-                                    <div class="grid size-9 shrink-0 place-items-center rounded-md bg-secondary-soft text-sm font-bold text-secondary-dark dark:bg-secondary-medium dark:text-white" aria-hidden="true">
+                                    <div class="grid size-9 shrink-0 place-items-center rounded-md bg-secondary-soft text-sm font-bold text-secondary-dark dark:bg-surface-2 dark:text-ink" aria-hidden="true">
                                         {{ mb_strtoupper(mb_substr($program->name, 0, 1)) }}
                                     </div>
                                     <div class="min-w-0 flex-1">
                                         <p class="truncate text-sm font-bold">{{ $program->name }}</p>
                                         @if ($program->strategy)
-                                            <span class="mt-0.5 inline-block max-w-full truncate rounded-full border border-board-line px-1.5 py-px type-meta text-secondary-medium dark:text-secondary-soft">{{ $program->strategy->name }}</span>
+                                            <span class="mt-0.5 inline-block max-w-full truncate rounded-full border border-board-line px-1.5 py-px type-meta text-secondary-medium dark:text-ink-muted">{{ $program->strategy->name }}</span>
                                         @else
                                             <p class="truncate type-meta text-secondary-light">{{ __('common.strategy_not_assigned') }}</p>
                                         @endif
@@ -1349,15 +1349,15 @@ new #[Title('titles.annual_plans')] class extends Component {
                                             @foreach ($yearColumns as $coverageYear)
                                                 <span @class([
                                                     'size-1.5 shrink-0 rounded-full',
-                                                    'bg-primary' => $this->planFor($program->id, $coverageYear) !== null,
-                                                    'bg-secondary-soft dark:bg-secondary-medium' => $this->planFor($program->id, $coverageYear) === null,
+                                                    'bg-primary dark:bg-ink-muted' => $this->planFor($program->id, $coverageYear) !== null,
+                                                    'bg-secondary-soft dark:bg-line-strong' => $this->planFor($program->id, $coverageYear) === null,
                                                 ])></span>
                                             @endforeach
                                         </div>
                                     </div>
                                     <div class="shrink-0 text-end">
-                                        <p class="text-sm font-bold tabular-nums">{{ $rowPlans->count() }}<span class="font-medium text-secondary-medium dark:text-secondary-soft">/{{ count($yearColumns) }}</span></p>
-                                        <p class="type-meta text-secondary-medium tabular-nums dark:text-secondary-soft">{{ trans_choice('common.count_target', $rowTargets, ['count' => $rowTargets]) }}</p>
+                                        <p class="text-sm font-bold tabular-nums">{{ $rowPlans->count() }}<span class="font-medium text-secondary-medium dark:text-ink-muted">/{{ count($yearColumns) }}</span></p>
+                                        <p class="type-meta text-secondary-medium tabular-nums dark:text-ink-muted">{{ trans_choice('common.count_target', $rowTargets, ['count' => $rowTargets]) }}</p>
                                     </div>
                                 </div>
 
@@ -1382,12 +1382,12 @@ new #[Title('titles.annual_plans')] class extends Component {
                                                 @class([
                                                     'group/gap flex h-full w-full min-h-14 items-center justify-center rounded-md border border-dashed transition-colors hover:border-primary hover:bg-board focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
                                                     'border-primary' => $year === $activeYear,
-                                                    'border-secondary-soft dark:border-secondary-medium' => $year !== $activeYear,
+                                                    'border-secondary-soft dark:border-line' => $year !== $activeYear,
                                                 ])
                                                 aria-label="{{ __('annual_plans.add_a_plan_for_program_in_year', ['program' => $program->name, 'year' => $year]) }}"
                                             >
                                                 <span aria-hidden="true" class="text-secondary-light group-hover/gap:hidden">—</span>
-                                                <flux:icon.plus aria-hidden="true" class="hidden size-4 text-primary group-hover/gap:block" />
+                                                <flux:icon.plus aria-hidden="true" class="hidden size-4 text-primary dark:text-brand-text group-hover/gap:block" />
                                             </button>@endcan
                                         @else
                                             @php($reportShare = $stats['reports'] > 0 ? (int) round($stats['approved'] / $stats['reports'] * 100) : 0)
@@ -1401,18 +1401,18 @@ new #[Title('titles.annual_plans')] class extends Component {
                                                 @class([
                                                     'relative flex h-full min-h-14 flex-col items-center justify-center gap-1.5 overflow-hidden rounded-md border bg-board transition-[transform,border-color,box-shadow] duration-150 hover:-translate-y-0.5 hover:border-primary hover:shadow-[0_10px_20px_-14px_rgb(0_0_0/0.55)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary motion-reduce:transition-none motion-reduce:hover:translate-y-0',
                                                     'border-primary' => $year === $activeYear,
-                                                    'border-secondary-soft dark:border-secondary-medium' => $year !== $activeYear,
+                                                    'border-secondary-soft dark:border-line' => $year !== $activeYear,
                                                 ])
                                                 aria-label="{{ __('annual_plans.program_year_managed_by_manager_count_targets', ['program' => $program->name, 'year' => $year, 'manager' => $plan->manager?->name ?? __('common.not_assigned'), 'count' => $stats['targets']]) }}"
                                             >
                                                 @if ($stats['targets'] === 0)
                                                     {{-- A flat primary dot flags an open plan with nothing committed yet; the number itself stays full-contrast ink in both themes. --}}
-                                                    <span aria-hidden="true" class="absolute end-1.5 top-1.5 size-1.5 rounded-full bg-primary"></span>
+                                                    <span aria-hidden="true" class="absolute end-1.5 top-1.5 size-1.5 rounded-full bg-primary dark:bg-status-critical"></span>
                                                 @endif
-                                                <span class="text-xl font-bold leading-none tabular-nums text-secondary-dark dark:text-white">{{ $stats['targets'] }}</span>
+                                                <span class="text-xl font-bold leading-none tabular-nums text-secondary-dark dark:text-ink">{{ $stats['targets'] }}</span>
 
                                                 @if ($stats['reports'] > 0)
-                                                    <span class="h-1 w-8 overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium" aria-hidden="true">
+                                                    <span class="h-1 w-8 overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2" aria-hidden="true">
                                                         <span class="block h-full rounded-full bg-status-good" style="width: {{ $reportShare }}%"></span>
                                                     </span>
                                                 @else
@@ -1432,7 +1432,7 @@ new #[Title('titles.annual_plans')] class extends Component {
                                                 @can('update', $plan)<button
                                                     type="button"
                                                     wire:click="openEditModal({{ $plan->id }})"
-                                                    class="grid size-5 place-items-center rounded border border-secondary-soft bg-board text-secondary-medium transition-colors hover:border-primary hover:text-primary focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary dark:border-secondary-medium dark:text-secondary-soft"
+                                                    class="grid size-5 place-items-center rounded border border-secondary-soft bg-board text-secondary-medium transition-colors hover:border-primary hover:text-primary dark:hover:text-brand-text focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary dark:border-line dark:text-ink-muted"
                                                     aria-label="{{ __('annual_plans.edit_the_plan_for_program_in_year', ['program' => $program->name, 'year' => $year]) }}"
                                                 >
                                                     <flux:icon.pencil-square class="size-3" />
@@ -1440,7 +1440,7 @@ new #[Title('titles.annual_plans')] class extends Component {
                                                 @can('delete', $plan)<button
                                                     type="button"
                                                     wire:click="confirmDelete({{ $plan->id }})"
-                                                    class="grid size-5 place-items-center rounded border border-secondary-soft bg-board text-secondary-medium transition-colors hover:border-primary hover:text-primary focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary dark:border-secondary-medium dark:text-secondary-soft"
+                                                    class="grid size-5 place-items-center rounded border border-secondary-soft bg-board text-secondary-medium transition-colors hover:border-primary hover:text-primary dark:hover:text-brand-text focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary dark:border-line dark:text-ink-muted"
                                                     aria-label="{{ __('annual_plans.delete_the_plan_for_program_in_year', ['program' => $program->name, 'year' => $year]) }}"
                                                 >
                                                     <flux:icon.trash class="size-3" />
@@ -1455,7 +1455,7 @@ new #[Title('titles.annual_plans')] class extends Component {
                 </div>
 
                 <div class="border-t border-board-line px-4 pb-3">
-                    <flux:pagination :paginator="$this->programRows" class="text-secondary-medium! [&_button]:text-secondary-medium! [&_button:hover]:bg-secondary-soft! dark:text-secondary-soft! dark:[&_button]:text-secondary-soft! dark:[&_button:hover]:bg-secondary-medium!" scroll-to="#annual-plan-matrix-heading" />
+                    <flux:pagination :paginator="$this->programRows" class="text-secondary-medium! [&_button]:text-secondary-medium! [&_button:hover]:bg-secondary-soft! dark:text-ink-muted! dark:[&_button]:text-ink-muted! dark:[&_button:hover]:bg-surface-2!" scroll-to="#annual-plan-matrix-heading" />
                 </div>
             @endif
         </section>

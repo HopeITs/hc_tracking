@@ -529,7 +529,7 @@ test('a board card hides relations it has none of and keeps a materialised risk'
 
     // A materialised risk always shows, and takes the solid alert treatment.
     Livewire::actingAs($user)->test('pages::projects.index')
-        ->assertSeeHtml('border-primary bg-primary font-semibold text-white');
+        ->assertSeeHtml('border-primary bg-primary dark:border-transparent dark:bg-status-critical-soft dark:text-status-critical font-semibold text-white');
 });
 
 test('a board card with no relations at all says so instead of rendering empty chips', function () {
@@ -574,8 +574,8 @@ test('a board card rates an overdue project critical and an on-track project goo
     Milestone::factory()->create(['project_id' => $overdue->id, 'weight_percentage' => 100, 'status' => MilestoneStatus::Planned]);
 
     Livewire::actingAs($user)->test('pages::projects.index')
-        // Critical fills solid so white type carries it in both themes.
-        ->assertSeeHtml('border-primary bg-primary font-semibold text-white')
+        // Critical fills solid in light (white type); dark uses the soft critical chip.
+        ->assertSeeHtml('border-primary bg-primary dark:border-transparent dark:bg-status-critical-soft dark:text-status-critical font-semibold text-white')
         ->assertSeeHtml('border-primary/40');
 });
 

@@ -17,7 +17,7 @@
 
     /* The one Impact/Outcome/Output identity used across programs, projects and this page. */
     $mark = match ($result->type) {
-        ResultType::Impact => 'bg-secondary-dark ring-secondary-dark dark:bg-white dark:ring-white',
+        ResultType::Impact => 'bg-secondary-dark ring-secondary-dark dark:bg-ink dark:ring-ink',
         ResultType::Outcome => 'bg-primary ring-primary',
         ResultType::Output => 'bg-board ring-secondary-light',
     };
@@ -59,16 +59,16 @@
     data-result-type="{{ $result->type->value }}"
     x-data="{ branchOpen: true, measuresOpen: {{ $indicatorCount > 0 && $indicatorCount <= 4 ? 'true' : 'false' }} }"
 >
-    <article class="logframe-reveal overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] transition-colors hover:border-secondary-light dark:border-secondary-medium dark:bg-secondary-dark dark:shadow-none dark:hover:border-secondary-light" style="--logframe-order: {{ $order }}">
+    <article class="logframe-reveal overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] transition-colors hover:border-secondary-light dark:border-transparent dark:bg-surface-1 dark:shadow-raised dark:hover:border-field-line" style="--logframe-order: {{ $order }}">
         <span aria-hidden="true" class="block {{ $accent }}"></span>
 
         <div class="flex flex-wrap items-start gap-x-3 gap-y-2 px-4 pt-3.5">
             <span class="inline-flex shrink-0 items-center gap-1.5">
                 <span aria-hidden="true" class="size-2.5 rounded-full ring-2 ring-inset {{ $mark }}"></span>
-                <span class="type-label text-secondary-medium dark:text-secondary-soft">{{ $result->type->label() }}</span>
+                <span class="type-label text-secondary-medium dark:text-ink-muted">{{ $result->type->label() }}</span>
             </span>
 
-            <span class="type-meta shrink-0 text-secondary-medium dark:text-secondary-soft">
+            <span class="type-meta shrink-0 text-secondary-medium dark:text-ink-muted">
                 {{ __('programs.logframe_checkout', ['period' => $result->checkout_period->label()]) }}
             </span>
 
@@ -123,7 +123,7 @@
         </div>
 
         @if ($lineage !== [])
-            <p class="mt-1.5 flex flex-wrap items-center gap-1 px-4 type-meta text-secondary-medium dark:text-secondary-soft">
+            <p class="mt-1.5 flex flex-wrap items-center gap-1 px-4 type-meta text-secondary-medium dark:text-ink-muted">
                 <flux:icon.arrow-turn-down-right variant="micro" class="size-3.5 shrink-0 rtl:-scale-x-100" aria-hidden="true" />
                 <span class="sr-only">{{ __('results_framework.contributes_to') }}</span>
                 @foreach ($lineage as $ancestor)
@@ -135,17 +135,17 @@
             </p>
         @endif
 
-        <p class="mt-1.5 px-4 pb-3.5 text-pretty text-secondary-dark {{ $statementClasses }} dark:text-white">{{ $result->statement }}</p>
+        <p class="mt-1.5 px-4 pb-3.5 text-pretty text-secondary-dark {{ $statementClasses }} dark:text-ink">{{ $result->statement }}</p>
 
         {{-- The measurement rail: what this statement is measured by, and how it is tracking. --}}
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-secondary-soft bg-board-head px-4 py-2.5 dark:border-secondary-medium">
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-secondary-soft bg-board-head px-4 py-2.5 dark:border-line">
             @if ($indicatorCount > 0)
                 <button
                     type="button"
                     x-on:click="measuresOpen = ! measuresOpen"
                     x-bind:aria-expanded="measuresOpen.toString()"
                     aria-controls="framework-measures-{{ $result->id }}"
-                    class="inline-flex items-center gap-1.5 rounded-md type-meta font-semibold text-secondary-dark hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-white"
+                    class="inline-flex items-center gap-1.5 rounded-md type-meta font-semibold text-secondary-dark hover:text-primary dark:hover:text-brand-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink"
                 >
                     <flux:icon.chart-bar variant="micro" class="size-3.5" aria-hidden="true" />
                     {{ trans_choice('programs.logframe_count_indicators', $indicatorCount, ['count' => $indicatorCount]) }}
@@ -160,7 +160,7 @@
                 <a
                     href="{{ route('indicators.index', ['create' => $result->id]) }}"
                     wire:navigate
-                    class="inline-flex items-center gap-1 rounded-md type-meta font-semibold text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    class="inline-flex items-center gap-1 rounded-md type-meta font-semibold text-primary dark:text-brand-text hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                     data-test="add-indicator-for-result-{{ $result->id }}"
                 >
                     <flux:icon.plus variant="micro" class="size-3.5" aria-hidden="true" />
@@ -168,13 +168,13 @@
                 </a>
             @endif
 
-            <span class="inline-flex items-center gap-1.5 type-meta text-secondary-medium dark:text-secondary-soft">
+            <span class="inline-flex items-center gap-1.5 type-meta text-secondary-medium dark:text-ink-muted">
                 <flux:icon.flag variant="micro" class="size-3.5" aria-hidden="true" />
                 {{ trans_choice('common.count_target', $measurement['targets'], ['count' => $measurement['targets']]) }}
             </span>
 
             @if ($measurement['reports'] > 0)
-                <span class="inline-flex items-center gap-1.5 type-meta text-secondary-medium dark:text-secondary-soft">
+                <span class="inline-flex items-center gap-1.5 type-meta text-secondary-medium dark:text-ink-muted">
                     <flux:icon.document-check variant="micro" class="size-3.5" aria-hidden="true" />
                     {{ __('results_framework.count_reports_count_approved', ['count' => $measurement['reports'], 'approved' => $measurement['approved']]) }}
                 </span>
@@ -185,7 +185,7 @@
                 <span @class([
                     'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold',
                     'border-funding/30 bg-funding-soft text-funding' => $funder['type'] === 'donor',
-                    'border-secondary-light text-secondary-medium dark:text-secondary-soft' => $funder['type'] !== 'donor',
+                    'border-secondary-light text-secondary-medium dark:text-ink-muted' => $funder['type'] !== 'donor',
                 ])>
                     <flux:icon :name="$funder['type'] === 'donor' ? 'building-library' : 'calendar'" variant="micro" class="size-3" aria-hidden="true" />
                     {{ $funder['label'] }}
@@ -194,9 +194,9 @@
 
             @if ($ratedCount > 0)
                 <span class="inline-flex items-center gap-1" aria-label="{{ __('results_framework.rating_split', ['green' => $rag['green'], 'amber' => $rag['amber'], 'red' => $rag['red']]) }}">
-                    @foreach (['green' => 'bg-status-good', 'amber' => 'bg-status-warn', 'red' => 'bg-primary'] as $band => $fill)
+                    @foreach (['green' => 'bg-status-good', 'amber' => 'bg-status-warn', 'red' => 'bg-primary dark:bg-status-critical'] as $band => $fill)
                         @if ($rag[$band] > 0)
-                            <span class="inline-flex items-center gap-1 rounded-full bg-white px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-secondary-dark dark:bg-secondary-medium dark:text-white">
+                            <span class="inline-flex items-center gap-1 rounded-full bg-white px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-secondary-dark dark:bg-surface-2 dark:text-ink">
                                 <span aria-hidden="true" class="size-1.5 rounded-full {{ $fill }}"></span>{{ $rag[$band] }}
                             </span>
                         @endif
@@ -215,12 +215,12 @@
                         :label="__('indicators.percent_achieved')"
                         label-hidden
                     />
-                    <span class="w-12 shrink-0 text-end type-meta font-bold tabular-nums text-secondary-dark dark:text-white">{{ number_format($achieved, 0) }}%</span>
+                    <span class="w-12 shrink-0 text-end type-meta font-bold tabular-nums text-secondary-dark dark:text-ink">{{ number_format($achieved, 0) }}%</span>
                 </div>
             @endif
 
             @if ($rollup['statements'] > 1)
-                <span class="inline-flex items-center gap-1.5 type-meta text-secondary-medium dark:text-secondary-soft">
+                <span class="inline-flex items-center gap-1.5 type-meta text-secondary-medium dark:text-ink-muted">
                     <flux:icon.share variant="micro" class="size-3.5 rotate-90" aria-hidden="true" />
                     {{ trans_choice('results_framework.count_nested_statement', $rollup['statements'] - 1, ['count' => $rollup['statements'] - 1]) }}
                 </span>
@@ -230,7 +230,7 @@
         {{-- Indicator drawer: baseline, latest reading and target for every measure on this statement. --}}
         @if ($indicatorCount > 0)
             <div id="framework-measures-{{ $result->id }}" x-show="measuresOpen" x-collapse>
-                <ul class="divide-y divide-secondary-soft border-t border-secondary-soft dark:divide-secondary-medium dark:border-secondary-medium">
+                <ul class="divide-y divide-secondary-soft border-t border-secondary-soft dark:divide-line dark:border-line">
                     @foreach ($indicatorRows as $row)
                         @php
                             $indicator = $row['indicator'];
@@ -246,18 +246,18 @@
                           <div class="flex flex-col gap-2.5 @2xl/directory:flex-row @2xl/directory:items-center @2xl/directory:gap-4">
                             <div class="min-w-0 @2xl/directory:flex-1">
                                 <p class="flex flex-wrap items-center gap-2">
-                                    <a href="{{ route('indicators.index', ['inspect' => $indicator->id]) }}" wire:navigate class="truncate text-sm font-semibold text-secondary-dark hover:text-primary hover:underline dark:text-white">{{ $indicator->name }}</a>
+                                    <a href="{{ route('indicators.index', ['inspect' => $indicator->id]) }}" wire:navigate class="truncate text-sm font-semibold text-secondary-dark hover:text-primary dark:hover:text-brand-text hover:underline dark:text-ink">{{ $indicator->name }}</a>
                                     <x-ui.enum-badge :case="$indicator->measure" class="shrink-0" />
                                     @if ($indicator->project !== null)
-                                        <span class="inline-flex shrink-0 items-center gap-1 type-meta text-secondary-medium dark:text-secondary-soft">
+                                        <span class="inline-flex shrink-0 items-center gap-1 type-meta text-secondary-medium dark:text-ink-muted">
                                             <flux:icon.briefcase variant="micro" class="size-3.5" aria-hidden="true" />{{ $indicator->project->name }}
                                         </span>
                                     @endif
                                 </p>
-                                <p class="mt-0.5 flex flex-wrap items-center gap-x-1.5 type-meta text-secondary-medium dark:text-secondary-soft">
+                                <p class="mt-0.5 flex flex-wrap items-center gap-x-1.5 type-meta text-secondary-medium dark:text-ink-muted">
                                     <span class="tabular-nums">{{ $formatValue($indicator->baseline) }}</span>
                                     <flux:icon.arrow-long-right variant="micro" class="size-3.5 rtl:rotate-180" aria-hidden="true" />
-                                    <span class="font-bold tabular-nums text-secondary-dark dark:text-white">{{ $formatValue($row['latest']) }}</span>
+                                    <span class="font-bold tabular-nums text-secondary-dark dark:text-ink">{{ $formatValue($row['latest']) }}</span>
                                     <flux:icon.arrow-long-right variant="micro" class="size-3.5 rtl:rotate-180" aria-hidden="true" />
                                     <span class="tabular-nums">{{ $formatValue($indicator->target) }}</span>
                                     @if ($indicator->unit !== null && $indicator->unit !== '')
@@ -294,7 +294,7 @@
                                     :label="__('indicators.percent_achieved')"
                                     label-hidden
                                 />
-                                <span class="w-12 shrink-0 text-end type-meta font-semibold tabular-nums text-secondary-dark dark:text-white">
+                                <span class="w-12 shrink-0 text-end type-meta font-semibold tabular-nums text-secondary-dark dark:text-ink">
                                     {{ $row['achieved'] === null ? '—' : number_format($row['achieved'], 0).'%' }}
                                 </span>
                                 <x-ui.enum-badge :case="$row['rag']" class="shrink-0" />
@@ -303,22 +303,22 @@
 
                           {{-- The funding chain: every target committed on this indicator, where it was committed, and what has been reported. --}}
                           @if ($row['targetRows'] !== [])
-                            <ul class="mt-2.5 flex flex-col gap-2 border-s border-secondary-soft ps-3 @xl/directory:flex-row @xl/directory:flex-wrap dark:border-secondary-medium">
+                            <ul class="mt-2.5 flex flex-col gap-2 border-s border-secondary-soft ps-3 @xl/directory:flex-row @xl/directory:flex-wrap dark:border-line">
                                 @foreach ($row['targetRows'] as $targetRow)
                                     {{-- Two rows inside the card: where it was committed, then what was committed. Keeps the
                                          source name readable at 375px instead of truncating it to a single letter. --}}
-                                    <li class="flex flex-1 flex-col gap-1.5 rounded-lg border border-secondary-soft px-2.5 py-2 @xl/directory:min-w-72 dark:border-secondary-medium" wire:key="framework-target-{{ $targetRow['target']->id }}">
+                                    <li class="flex flex-1 flex-col gap-1.5 rounded-lg border border-secondary-soft px-2.5 py-2 @xl/directory:min-w-72 dark:border-line" wire:key="framework-target-{{ $targetRow['target']->id }}">
                                         <div class="flex min-w-0 items-center gap-2">
                                             <span @class([
                                                 'inline-flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-semibold',
                                                 'border-funding/30 bg-funding-soft text-funding' => $targetRow['sourceType'] === 'proposal',
-                                                'border-secondary-light text-secondary-medium dark:text-secondary-soft' => $targetRow['sourceType'] !== 'proposal',
+                                                'border-secondary-light text-secondary-medium dark:text-ink-muted' => $targetRow['sourceType'] !== 'proposal',
                                             ])>
                                                 <flux:icon :name="$targetRow['sourceType'] === 'proposal' ? 'building-library' : 'calendar'" variant="micro" class="size-3" aria-hidden="true" />
                                                 {{ $targetRow['sourceType'] === 'proposal' ? __('common.proposal') : __('common.annual_plan') }}
                                             </span>
 
-                                            <span class="min-w-0 flex-1 truncate type-meta text-secondary-dark dark:text-white">
+                                            <span class="min-w-0 flex-1 truncate type-meta text-secondary-dark dark:text-ink">
                                                 @if ($targetRow['sourceLabel'] === null)
                                                     {{-- source_id carries no foreign key, so the plan or proposal can be gone. --}}
                                                     <span class="text-status-warn">{{ __('targets.source_no_longer_available') }}</span>
@@ -327,10 +327,10 @@
                                                 @endif
                                                 @if ($targetRow['donors'] !== [])
                                                     {{-- Plain text, not the funding tint: #6fb0bd on the dark card surface only reaches 2.9:1. --}}
-                                                    <span class="font-bold text-secondary-dark dark:text-white">· {{ implode(', ', $targetRow['donors']) }}</span>
+                                                    <span class="font-bold text-secondary-dark dark:text-ink">· {{ implode(', ', $targetRow['donors']) }}</span>
                                                 @endif
                                                 @if ($targetRow['project'] !== null)
-                                                    <span class="text-secondary-medium dark:text-secondary-soft">· {{ $targetRow['project'] }}</span>
+                                                    <span class="text-secondary-medium dark:text-ink-muted">· {{ $targetRow['project'] }}</span>
                                                 @endif
                                             </span>
                                         </div>
@@ -338,15 +338,15 @@
                                         <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
                                             <x-ui.enum-badge :case="$targetRow['target']->period" class="shrink-0" />
 
-                                            <span class="shrink-0 text-sm font-bold tabular-nums text-secondary-dark dark:text-white">{{ $formatValue($targetRow['target']->target) }}</span>
+                                            <span class="shrink-0 text-sm font-bold tabular-nums text-secondary-dark dark:text-ink">{{ $formatValue($targetRow['target']->target) }}</span>
 
                                             {{-- Approved achievement, by the one rule every page shares (PlanIndicator::achievedValue()). --}}
                                             @if ($targetRow['percent'] !== null)
                                                 <span @class([
                                                     'shrink-0 type-meta font-semibold tabular-nums',
                                                     'text-status-good' => $targetRow['status'] === 'achieved',
-                                                    'text-secondary-dark dark:text-white' => $targetRow['status'] === 'in_progress',
-                                                    'text-secondary-medium dark:text-secondary-soft' => $targetRow['status'] === 'not_started',
+                                                    'text-secondary-dark dark:text-ink' => $targetRow['status'] === 'in_progress',
+                                                    'text-secondary-medium dark:text-ink-muted' => $targetRow['status'] === 'not_started',
                                                 ])>{{ __('results_framework.percent_achieved', ['percent' => number_format($targetRow['percent'], 0)]) }}</span>
                                             @endif
 
@@ -369,16 +369,16 @@
                     @endforeach
                 </ul>
 
-                <div class="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-secondary-soft px-4 py-2 dark:border-secondary-medium">
-                    <a href="{{ route('indicators.index', ['result' => $result->id]) }}" wire:navigate class="type-meta font-semibold text-secondary-medium hover:text-primary hover:underline dark:text-secondary-soft">
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-secondary-soft px-4 py-2 dark:border-line">
+                    <a href="{{ route('indicators.index', ['result' => $result->id]) }}" wire:navigate class="type-meta font-semibold text-secondary-medium hover:text-primary dark:hover:text-brand-text hover:underline dark:text-ink-muted">
                         {{ __('results_framework.manage_indicators') }}
                     </a>
-                    <a href="{{ route('indicators.index', ['create' => $result->id]) }}" wire:navigate class="inline-flex items-center gap-1 type-meta font-semibold text-secondary-medium hover:text-primary hover:underline dark:text-secondary-soft">
+                    <a href="{{ route('indicators.index', ['create' => $result->id]) }}" wire:navigate class="inline-flex items-center gap-1 type-meta font-semibold text-secondary-medium hover:text-primary dark:hover:text-brand-text hover:underline dark:text-ink-muted">
                         <flux:icon.plus variant="micro" class="size-3.5" aria-hidden="true" />
                         {{ __('results_framework.add_indicator') }}
                     </a>
                     @if ($measurement['targets'] > 0)
-                        <a href="{{ route('targets.index', ['result' => $result->id]) }}" wire:navigate class="type-meta font-semibold text-secondary-medium hover:text-primary hover:underline dark:text-secondary-soft">
+                        <a href="{{ route('targets.index', ['result' => $result->id]) }}" wire:navigate class="type-meta font-semibold text-secondary-medium hover:text-primary dark:hover:text-brand-text hover:underline dark:text-ink-muted">
                             {{ __('results_framework.view_targets') }}
                         </a>
                     @endif
@@ -394,7 +394,7 @@
                 x-on:click="branchOpen = ! branchOpen"
                 x-bind:aria-expanded="branchOpen.toString()"
                 aria-controls="framework-branch-{{ $result->id }}"
-                class="mt-2 inline-flex items-center gap-1.5 rounded-md type-meta font-semibold text-secondary-medium hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-secondary-soft"
+                class="mt-2 inline-flex items-center gap-1.5 rounded-md type-meta font-semibold text-secondary-medium hover:text-primary dark:hover:text-brand-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink-muted"
             >
                 <flux:icon.chevron-down variant="micro" class="size-3.5 transition-transform duration-200" x-bind:class="branchOpen ? '' : '-rotate-90 rtl:rotate-90'" aria-hidden="true" />
                 {{ trans_choice('programs.logframe_count_contributing', count($children), ['count' => count($children)]) }}
@@ -404,11 +404,11 @@
                 @foreach ($children as $child)
                     <li class="relative ps-6" wire:key="framework-child-{{ $child['result']->id }}">
                         <span aria-hidden="true" @class([
-                            'absolute start-0 top-0 w-px bg-secondary-soft dark:bg-secondary-medium',
+                            'absolute start-0 top-0 w-px bg-secondary-soft dark:bg-line-strong',
                             'h-7' => $loop->last,
                             '-bottom-4' => ! $loop->last,
                         ])></span>
-                        <span aria-hidden="true" class="absolute start-0 top-7 h-px w-6 bg-secondary-soft dark:bg-secondary-medium"></span>
+                        <span aria-hidden="true" class="absolute start-0 top-7 h-px w-6 bg-secondary-soft dark:bg-line-strong"></span>
 
                         <x-ui.framework-node :node="$child" :depth="$depth + 1" :order="$loop->index" />
                     </li>

@@ -221,7 +221,7 @@ test('the sidebar brand link keeps a single accessible name while the wordmark a
         ->and($markAlts)->toBe(['']);
 });
 
-test('the mobile drawer puts its theme and language toggles in their own row so the logo has room', function () {
+test('the mobile drawer puts its appearance menu and language toggle in their own row so the logo has room', function () {
     $user = User::factory()->role('Team Member')->create();
 
     $response = $this->actingAs($user)->get(route('dashboard'))->assertOk();
@@ -235,5 +235,7 @@ test('the mobile drawer puts its theme and language toggles in their own row so 
 
     expect($headerPreferences)->toHaveCount(0)
         ->and($drawerPreferences)->toHaveCount(1)
-        ->and($xpath->query('.//*[@data-theme-toggle]', $drawerPreferences->item(0)))->toHaveCount(1);
+        ->and($xpath->query('.//*[@data-theme-toggle]', $drawerPreferences->item(0)))->toHaveCount(1)
+        ->and($xpath->query('.//*[@data-locale-toggle]', $drawerPreferences->item(0)))->toHaveCount(1)
+        ->and(collect($xpath->query('.//*[@data-appearance-option]', $drawerPreferences->item(0)))->map->getAttribute('data-appearance-option')->all())->toBe(['light', 'dark', 'system']);
 });

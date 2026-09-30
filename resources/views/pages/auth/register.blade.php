@@ -61,7 +61,7 @@
             </div>
         </form>
 
-        <div class="space-x-1 rtl:space-x-reverse text-center text-sm text-zinc-600 dark:text-zinc-400">
+        <div class="space-x-1 rtl:space-x-reverse text-center text-sm text-zinc-600 dark:text-ink-muted">
             <span>{{ __('authentication.already_have_an_account') }}</span>
             <flux:link :href="route('login')" wire:navigate>{{ __('authentication.log_in_2') }}</flux:link>
         </div>

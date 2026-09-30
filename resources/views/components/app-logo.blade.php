@@ -31,12 +31,12 @@
             --}}
             <span data-sidebar-logo>
                 <span data-sidebar-logo-wordmark>
-                    <img src="{{ asset('logo-tracking.svg') }}" alt="{{ $brandName }}" class="h-9 w-auto dark:hidden" />
-                    <img src="{{ asset('logo-tracking-white.svg') }}" alt="{{ $brandName }}" class="hidden h-9 w-auto dark:block" />
+                    <img src="{{ asset('logo-tracking.svg') }}" alt="{{ $brandName }}" class="h-9 w-auto dark:hidden" data-no-dim />
+                    <img src="{{ asset('logo-tracking-white.svg') }}" alt="{{ $brandName }}" class="hidden h-9 w-auto dark:block" data-no-dim />
                 </span>
 
                 <span class="hidden" data-sidebar-logo-mark>
-                    <img src="{{ asset('logo-tracking-icon.svg') }}" alt="" class="size-9 shrink-0" />
+                    <img src="{{ asset('logo-tracking-icon.svg') }}" alt="" class="size-9 shrink-0" data-no-dim />
                 </span>
             </span>
         </x-slot>
@@ -44,8 +44,8 @@
 @else
     <flux:brand {{ $attributes }}>
         <x-slot name="logo" class="h-auto! min-w-0! justify-start! rounded-none! [:where(&)]:h-auto">
-            <img src="{{ asset('logo-tracking.svg') }}" alt="{{ $brandName }}" class="h-7 w-auto dark:hidden" />
-            <img src="{{ asset('logo-tracking-white.svg') }}" alt="{{ $brandName }}" class="hidden h-7 w-auto dark:block" />
+            <img src="{{ asset('logo-tracking.svg') }}" alt="{{ $brandName }}" class="h-7 w-auto dark:hidden" data-no-dim />
+            <img src="{{ asset('logo-tracking-white.svg') }}" alt="{{ $brandName }}" class="hidden h-7 w-auto dark:block" data-no-dim />
         </x-slot>
     </flux:brand>
 @endif

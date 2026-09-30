@@ -3,7 +3,7 @@
         :name="auth()->user()->name"
         :initials="auth()->user()->initials()"
         circle
-        class="touch-manipulation text-secondary-dark! hover:bg-secondary-soft/70! dark:text-white! dark:hover:bg-white/10!"
+        class="touch-manipulation text-secondary-dark! hover:bg-secondary-soft/70! dark:text-ink! dark:hover:bg-white/10!"
         data-test="sidebar-menu-button"
     />
 

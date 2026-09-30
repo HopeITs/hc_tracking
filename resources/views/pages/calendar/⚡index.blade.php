@@ -1490,21 +1490,21 @@ new #[Title('titles.calendar')] class extends Component {
 
     $markerTone = function (Milestone $milestone): string {
         if ($milestone->isMissed() || $milestone->isOverdue()) {
-            return 'bg-status-critical-soft text-primary';
+            return 'bg-status-critical-soft text-primary dark:text-brand-text';
         }
 
         return match ($milestone->status) {
             MilestoneStatus::Reached => 'bg-status-good-soft text-status-good',
             MilestoneStatus::Ongoing => 'bg-status-warn-soft text-status-warn',
-            MilestoneStatus::Postponed, MilestoneStatus::Cancelled => 'bg-secondary-soft text-secondary-medium dark:bg-secondary-medium dark:text-secondary-soft',
-            MilestoneStatus::Planned => 'bg-white text-secondary-dark ring-1 ring-secondary-soft dark:bg-secondary-dark dark:text-white dark:ring-secondary-medium',
+            MilestoneStatus::Postponed, MilestoneStatus::Cancelled => 'bg-secondary-soft text-secondary-medium dark:bg-surface-2 dark:text-ink-muted',
+            MilestoneStatus::Planned => 'bg-white text-secondary-dark ring-1 ring-secondary-soft dark:bg-surface-1 dark:text-ink dark:ring-line',
         };
     };
 
     $taskTone = fn (TaskStatus $status): string => match ($status) {
         TaskStatus::Done => 'bg-status-good-soft text-status-good',
         TaskStatus::InProgress, TaskStatus::UnderReview => 'bg-funding-soft text-funding',
-        TaskStatus::Todo => 'bg-white text-secondary-dark ring-1 ring-secondary-soft dark:bg-secondary-dark dark:text-white dark:ring-secondary-medium',
+        TaskStatus::Todo => 'bg-white text-secondary-dark ring-1 ring-secondary-soft dark:bg-surface-1 dark:text-ink dark:ring-line',
     };
 
     $reportTone = fn (ReportStatus $status): string => match ($status) {
@@ -1519,7 +1519,7 @@ new #[Title('titles.calendar')] class extends Component {
         }
 
         if ($proposal->planned_date_end->isBefore($today)) {
-            return 'bg-status-critical-soft text-primary';
+            return 'bg-status-critical-soft text-primary dark:text-brand-text';
         }
 
         return 'bg-status-active-soft text-status-active';
@@ -1527,14 +1527,14 @@ new #[Title('titles.calendar')] class extends Component {
 
     $transferTone = fn (ArStatus $status): string => match ($status) {
         ArStatus::Received => 'bg-status-good-soft text-status-good',
-        ArStatus::Failed => 'bg-status-critical-soft text-primary',
+        ArStatus::Failed => 'bg-status-critical-soft text-primary dark:text-brand-text',
         ArStatus::Pending => 'bg-status-active-soft text-status-active',
     };
 
     $donorFollowUpTone = function (\App\Models\Donor $donor): string {
         return $donor->isFollowUpOverdue()
-            ? 'bg-status-critical-soft text-primary'
-            : 'bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white';
+            ? 'bg-status-critical-soft text-primary dark:text-brand-text'
+            : 'bg-secondary-soft text-secondary-dark dark:bg-surface-2 dark:text-ink';
     };
 
     $donorReportTone = function (\App\Models\DonorReport $report): string {
@@ -1543,11 +1543,11 @@ new #[Title('titles.calendar')] class extends Component {
         }
 
         return $report->isOverdue()
-            ? 'bg-status-critical-soft text-primary'
-            : 'bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white';
+            ? 'bg-status-critical-soft text-primary dark:text-brand-text'
+            : 'bg-secondary-soft text-secondary-dark dark:bg-surface-2 dark:text-ink';
     };
 
-    $projectTone = 'bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white';
+    $projectTone = 'bg-secondary-soft text-secondary-dark dark:bg-surface-2 dark:text-ink';
 
     // A dot in front of each chip carries the item TYPE, independent of the
     // tone above (which carries its STATUS) — so a Reached milestone and a
@@ -1555,10 +1555,10 @@ new #[Title('titles.calendar')] class extends Component {
     $typeDotClasses = [
         'milestone' => 'bg-funding',
         'task' => 'bg-status-warn',
-        'report' => 'bg-primary',
+        'report' => 'bg-primary dark:bg-status-critical',
         'proposal' => 'bg-status-active',
         'transfer' => 'bg-status-good',
-        'donor' => 'bg-secondary-dark dark:bg-secondary-light',
+        'donor' => 'bg-secondary-dark dark:bg-ink-muted',
         'project' => 'bg-secondary-medium',
     ];
 
@@ -1572,17 +1572,17 @@ new #[Title('titles.calendar')] class extends Component {
         'report' => 'ring-primary',
         'proposal' => 'ring-status-active',
         'transfer' => 'ring-status-good',
-        'donor' => 'ring-secondary-dark dark:ring-secondary-light',
+        'donor' => 'ring-secondary-dark dark:ring-ink-muted',
         'project' => 'ring-secondary-medium',
     ];
 
     $typeTextClasses = [
         'milestone' => 'text-funding',
         'task' => 'text-status-warn',
-        'report' => 'text-primary',
+        'report' => 'text-primary dark:text-brand-text',
         'proposal' => 'text-status-active',
         'transfer' => 'text-status-good',
-        'donor' => 'text-secondary-dark dark:text-secondary-light',
+        'donor' => 'text-secondary-dark dark:text-ink-faint',
         'project' => 'text-secondary-medium',
     ];
 
@@ -1626,7 +1626,7 @@ new #[Title('titles.calendar')] class extends Component {
     };
 @endphp
 
-<section class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="calendar-heading">
+<section class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="calendar-heading">
     <x-ui.page-header heading-id="calendar-heading" :title="__('common.my_calendar')" />
 
     <div class="flex flex-wrap items-center justify-between gap-3">
@@ -1636,12 +1636,12 @@ new #[Title('titles.calendar')] class extends Component {
             <flux:dropdown position="bottom-start" class="filter-picker">
                 <x-ui.button size="sm" icon:trailing="chevron-down" data-test="calendar-view-mode-button">{{ __('calendar.'.$viewMode) }}</x-ui.button>
                 <flux:menu class="filter-menu">
-                    <div class="px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-secondary-soft">{{ __('calendar.time_period') }}</div>
+                    <div class="px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-ink-muted">{{ __('calendar.time_period') }}</div>
                     @foreach ([['day', 'D'], ['four_days', '4'], ['week', 'W'], ['month', 'M']] as [$periodKey, $shortcut])
                         <flux:menu.item wire:click="setViewMode('{{ $periodKey }}')" data-test="calendar-view-mode-{{ $periodKey }}">
                             <span class="min-w-0 flex-1 truncate">{{ __('calendar.'.$periodKey) }}</span>
-                            <kbd class="me-1 rounded border border-secondary-soft px-1.5 py-0.5 text-[10px] font-semibold dark:border-secondary-medium">{{ $shortcut }}</kbd>
-                            @if ($viewMode === $periodKey)<flux:icon.check class="size-4 shrink-0 text-primary" />@endif
+                            <kbd class="me-1 rounded border border-secondary-soft px-1.5 py-0.5 text-[10px] font-semibold dark:border-line">{{ $shortcut }}</kbd>
+                            @if ($viewMode === $periodKey)<flux:icon.check class="size-4 shrink-0 text-primary dark:text-brand-text" />@endif
                         </flux:menu.item>
                     @endforeach
                 </flux:menu>
@@ -1659,7 +1659,7 @@ new #[Title('titles.calendar')] class extends Component {
         </div>
 
         <div class="flex items-center gap-3">
-            <div class="inline-flex items-center rounded-lg border border-secondary-light bg-white dark:border-secondary-light dark:bg-secondary-dark">
+            <div class="inline-flex items-center rounded-lg border border-secondary-light bg-white dark:border-field-line dark:bg-surface-1">
             <div class="filter-picker relative">
                 <button
                     type="button"
@@ -1669,7 +1669,7 @@ new #[Title('titles.calendar')] class extends Component {
                     aria-haspopup="listbox"
                     aria-label="{{ __('calendar.filter_by_type') }}"
                     data-test="calendar-type-filter-button"
-                    class="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-s-lg px-2.5 py-1.5 text-secondary-dark hover:bg-secondary-soft dark:text-white dark:hover:bg-secondary-medium"
+                    class="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-s-lg px-2.5 py-1.5 text-secondary-dark hover:bg-secondary-soft dark:text-ink dark:hover:bg-surface-2"
                 >
                     <flux:icon.funnel variant="micro" class="size-4" />
                     <span class="hidden text-sm sm:inline">{{ __('calendar.filter_by_type') }}</span>
@@ -1689,19 +1689,19 @@ new #[Title('titles.calendar')] class extends Component {
                             ['task', 'showTasks', 'tasks.task', 'calendar-filter-tasks'],
                             ['report', 'showReports', 'calendar.report_deadline', 'calendar-filter-reports'],
                         ] as [$typeKey, $showProp, $labelKey, $testHook])
-                            <div class="group flex items-center gap-1 rounded-md hover:bg-secondary-soft dark:hover:bg-secondary-medium" role="option" aria-selected="{{ $$showProp ? 'true' : 'false' }}">
+                            <div class="group flex items-center gap-1 rounded-md hover:bg-secondary-soft dark:hover:bg-white/[0.06]" role="option" aria-selected="{{ $$showProp ? 'true' : 'false' }}">
                                 <button type="button" data-flux-menu-item wire:click="toggleType('{{ $typeKey }}')" class="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 py-1.5 text-start text-sm" data-test="{{ $testHook }}">
                                     <span class="size-1.5 shrink-0 rounded-full {{ $typeDotClasses[$typeKey] }}"></span>
                                     <span class="min-w-0 flex-1 truncate">{{ __($labelKey) }}</span>
-                                    @if ($$showProp)<flux:icon.check class="size-4 shrink-0 text-primary" />@endif
+                                    @if ($$showProp)<flux:icon.check class="size-4 shrink-0 text-primary dark:text-brand-text" />@endif
                                 </button>
-                                <button type="button" wire:click="focusOnlyType('{{ $typeKey }}')" class="me-1 shrink-0 cursor-pointer rounded px-1.5 py-1 text-[10px] font-semibold text-secondary-medium opacity-0 hover:bg-white group-hover:opacity-100 dark:text-secondary-soft dark:hover:bg-secondary-dark" data-test="calendar-filter-only-{{ $typeKey }}">
+                                <button type="button" wire:click="focusOnlyType('{{ $typeKey }}')" class="me-1 shrink-0 cursor-pointer rounded px-1.5 py-1 text-[10px] font-semibold text-secondary-medium opacity-0 hover:bg-white group-hover:opacity-100 dark:text-ink-muted dark:hover:bg-white/[0.06]" data-test="calendar-filter-only-{{ $typeKey }}">
                                     {{ __('calendar.only') }}
                                 </button>
                             </div>
                         @endforeach
 
-                        <div class="my-1 border-t border-secondary-soft dark:border-secondary-medium"></div>
+                        <div class="my-1 border-t border-secondary-soft dark:border-line"></div>
 
                         @foreach ([
                             ['proposal', 'showProposals', 'calendar.proposal_deadline', 'calendar-filter-proposals'],
@@ -1710,13 +1710,13 @@ new #[Title('titles.calendar')] class extends Component {
                             ['project', 'showProjects', 'calendar.project_timeline', 'calendar-filter-projects'],
                         ] as [$typeKey, $showProp, $labelKey, $testHook])
                             @continue(! $this->canSeeType($typeKey))
-                            <div class="group flex items-center gap-1 rounded-md hover:bg-secondary-soft dark:hover:bg-secondary-medium" role="option" aria-selected="{{ $$showProp ? 'true' : 'false' }}">
+                            <div class="group flex items-center gap-1 rounded-md hover:bg-secondary-soft dark:hover:bg-white/[0.06]" role="option" aria-selected="{{ $$showProp ? 'true' : 'false' }}">
                                 <button type="button" data-flux-menu-item wire:click="toggleType('{{ $typeKey }}')" class="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 py-1.5 text-start text-sm" data-test="{{ $testHook }}">
                                     <span class="size-1.5 shrink-0 rounded-full {{ $typeDotClasses[$typeKey] }}"></span>
                                     <span class="min-w-0 flex-1 truncate">{{ __($labelKey) }}</span>
-                                    @if ($$showProp)<flux:icon.check class="size-4 shrink-0 text-primary" />@endif
+                                    @if ($$showProp)<flux:icon.check class="size-4 shrink-0 text-primary dark:text-brand-text" />@endif
                                 </button>
-                                <button type="button" wire:click="focusOnlyType('{{ $typeKey }}')" class="me-1 shrink-0 cursor-pointer rounded px-1.5 py-1 text-[10px] font-semibold text-secondary-medium opacity-0 hover:bg-white group-hover:opacity-100 dark:text-secondary-soft dark:hover:bg-secondary-dark" data-test="calendar-filter-only-{{ $typeKey }}">
+                                <button type="button" wire:click="focusOnlyType('{{ $typeKey }}')" class="me-1 shrink-0 cursor-pointer rounded px-1.5 py-1 text-[10px] font-semibold text-secondary-medium opacity-0 hover:bg-white group-hover:opacity-100 dark:text-ink-muted dark:hover:bg-white/[0.06]" data-test="calendar-filter-only-{{ $typeKey }}">
                                     {{ __('calendar.only') }}
                                 </button>
                             </div>
@@ -1725,33 +1725,33 @@ new #[Title('titles.calendar')] class extends Component {
                 @endif
             </div>
 
-            <div class="h-5 w-px shrink-0 bg-secondary-light dark:bg-secondary-medium"></div>
+            <div class="h-5 w-px shrink-0 bg-secondary-light dark:bg-line"></div>
 
             <x-ui.multi-select-popover
                 :label="__('calendar.filter_by_responsible')"
-                class="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-e-lg px-2.5 py-1.5 text-secondary-dark hover:bg-secondary-soft dark:text-white dark:hover:bg-secondary-medium"
+                class="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-e-lg px-2.5 py-1.5 text-secondary-dark hover:bg-secondary-soft dark:text-ink dark:hover:bg-surface-2"
                 data-test="calendar-responsible-filter-button"
             >
                 <x-slot:trigger>
                     <flux:icon.user variant="micro" class="size-4" />
                     <span class="hidden text-sm sm:inline">{{ __('calendar.filter_by_responsible') }}</span>
                     @if ($selectedFilterEmployees->isNotEmpty())
-                        <span class="inline-flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-white" data-test="calendar-responsible-filter-count">{{ $selectedFilterEmployees->count() }}</span>
+                        <span class="inline-flex min-w-4 items-center justify-center rounded-full bg-primary dark:bg-white/10 dark:text-ink px-1 text-[10px] font-semibold text-white" data-test="calendar-responsible-filter-count">{{ $selectedFilterEmployees->count() }}</span>
                     @endif
                 </x-slot:trigger>
 
-                <button type="button" wire:click="$set('filterEmployeeIds', [])" class="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm hover:bg-secondary-soft dark:hover:bg-secondary-medium" data-test="calendar-responsible-filter-me">
+                <button type="button" wire:click="$set('filterEmployeeIds', [])" class="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm hover:bg-secondary-soft dark:hover:bg-white/[0.06]" data-test="calendar-responsible-filter-me">
                     <span class="min-w-0 flex-1 truncate">{{ __('calendar.me') }}</span>
-                    @if ($filterEmployeeIds === [])<flux:icon.check class="ms-auto size-4 shrink-0 text-primary" />@endif
+                    @if ($filterEmployeeIds === [])<flux:icon.check class="ms-auto size-4 shrink-0 text-primary dark:text-brand-text" />@endif
                 </button>
-                <div class="my-1 border-t border-secondary-soft dark:border-secondary-medium"></div>
+                <div class="my-1 border-t border-secondary-soft dark:border-line"></div>
                 @foreach ($this->userOptions as $userOption)
                     <label
                         x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
-                        class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-secondary-soft dark:hover:bg-secondary-medium"
+                        class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-secondary-soft dark:hover:bg-white/[0.06]"
                         data-test="calendar-responsible-filter-option-{{ $userOption->id }}"
                     >
-                        <input type="checkbox" wire:model.live="filterEmployeeIds" value="{{ $userOption->id }}" class="rounded border-secondary-light text-primary focus:ring-primary" />
+                        <input type="checkbox" wire:model.live="filterEmployeeIds" value="{{ $userOption->id }}" class="rounded border-secondary-light text-primary dark:text-brand-text focus:ring-primary" />
                         <span class="min-w-0 truncate">{{ $userOption->name }} · {{ $userOption->secondary_name }}</span>
                     </label>
                 @endforeach
@@ -1784,20 +1784,20 @@ new #[Title('titles.calendar')] class extends Component {
         </x-ui.panel>
     @else
         @if ($focusedType !== null)
-            <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-secondary-soft bg-secondary-soft/30 px-4 py-3 dark:border-secondary-medium dark:bg-secondary-medium/20" data-test="calendar-focused-banner">
+            <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-secondary-soft bg-secondary-soft/30 px-4 py-3 dark:border-line dark:bg-white/[0.04]" data-test="calendar-focused-banner">
                 <div class="flex items-center gap-3">
-                    <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-white ring-1 ring-secondary-soft dark:bg-secondary-dark dark:ring-secondary-medium">
+                    <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-white ring-1 ring-secondary-soft dark:bg-surface-1 dark:ring-line">
                         <span class="size-2.5 rounded-full {{ $typeDotClasses[$focusedType] }}"></span>
                     </span>
                     <div>
-                        <p class="text-sm font-bold text-secondary-dark dark:text-white">{{ __('calendar.showing_type', ['type' => $typeLabels[$focusedType]]) }}</p>
-                        <p class="text-xs text-secondary-medium dark:text-secondary-soft">{{ trans_choice('calendar.items_count', $this->focusedItems->count(), ['count' => $this->focusedItems->count()]) }}</p>
+                        <p class="text-sm font-bold text-secondary-dark dark:text-ink">{{ __('calendar.showing_type', ['type' => $typeLabels[$focusedType]]) }}</p>
+                        <p class="text-xs text-secondary-medium dark:text-ink-muted">{{ trans_choice('calendar.items_count', $this->focusedItems->count(), ['count' => $this->focusedItems->count()]) }}</p>
                     </div>
                 </div>
                 <x-ui.button size="sm" wire:click="resetFilters" data-test="calendar-clear-focus">{{ __('calendar.clear_filter') }}</x-ui.button>
             </div>
         @else
-            <div class="flex flex-wrap items-center gap-4 text-xs text-secondary-medium dark:text-secondary-soft">
+            <div class="flex flex-wrap items-center gap-4 text-xs text-secondary-medium dark:text-ink-muted">
                 <span class="flex items-center gap-1.5"><span class="size-2 shrink-0 rounded-full {{ $typeDotClasses['milestone'] }}"></span>{{ __('tasks.milestone') }}</span>
                 <span class="flex items-center gap-1.5"><span class="size-2 shrink-0 rounded-full {{ $typeDotClasses['task'] }}"></span>{{ __('tasks.task') }}</span>
                 <span class="flex items-center gap-1.5"><span class="size-2 shrink-0 rounded-full {{ $typeDotClasses['report'] }}"></span>{{ __('calendar.report_deadline') }}</span>
@@ -1816,13 +1816,13 @@ new #[Title('titles.calendar')] class extends Component {
 
         <div class="grid gap-4 @6xl/directory:grid-cols-[minmax(0,1fr)_16rem]">
         <div
-            class="relative overflow-hidden rounded-xl border border-secondary-soft dark:border-secondary-medium"
+            class="relative overflow-hidden rounded-xl border border-secondary-soft dark:border-line"
             x-data="{ menuOpen: false, menuX: 0, menuY: 0, menuDate: '' }"
             x-on:click.away="menuOpen = false"
             x-on:keydown.escape.window="menuOpen = false"
         >
             @if ($viewMode === 'month')
-                <div class="grid grid-cols-7 border-b border-secondary-soft bg-secondary-soft/40 text-center text-xs font-semibold uppercase tracking-wide text-secondary-medium dark:border-secondary-medium dark:bg-secondary-medium/40 dark:text-secondary-soft">
+                <div class="grid grid-cols-7 border-b border-secondary-soft bg-secondary-soft/40 text-center text-xs font-semibold uppercase tracking-wide text-secondary-medium dark:border-line dark:bg-surface-2 dark:text-ink-muted">
                     @foreach ($calendar['weeks'][0] as $weekdayHeader)
                         <div class="py-2">{{ $weekdayHeader->translatedFormat('D') }}</div>
                     @endforeach
@@ -1842,7 +1842,7 @@ new #[Title('titles.calendar')] class extends Component {
                                 x-on:click="menuOpen = true; menuX = $event.clientX; menuY = $event.clientY; menuDate = '{{ $day->toDateString() }}'"
                                 x-on:contextmenu.prevent="menuOpen = true; menuX = $event.clientX; menuY = $event.clientY; menuDate = '{{ $day->toDateString() }}'"
                                 @class([
-                                    'flex min-h-28 cursor-pointer flex-col gap-1 border-b border-e border-secondary-soft p-1.5 text-start last:border-e-0 [&:nth-child(7n)]:border-e-0 hover:bg-secondary-soft/40 dark:border-secondary-medium dark:hover:bg-secondary-medium/40 transition-opacity',
+                                    'flex min-h-28 cursor-pointer flex-col gap-1 border-b border-e border-secondary-soft p-1.5 text-start last:border-e-0 [&:nth-child(7n)]:border-e-0 hover:bg-secondary-soft/40 dark:border-line dark:hover:bg-surface-2 transition-opacity',
                                     'opacity-40' => ! $isCurrentMonth,
                                     'opacity-50' => $focusedType !== null && $dayFocusedCount === 0,
                                     'ring-2 ring-inset '.$typeRingClasses[$focusedType ?? 'milestone'] => $focusedType !== null && $dayFocusedCount > 0,
@@ -1851,8 +1851,8 @@ new #[Title('titles.calendar')] class extends Component {
                             >
                                 <span @class([
                                     'inline-flex size-6 items-center justify-center rounded-full text-xs font-semibold tabular-nums',
-                                    'bg-primary text-white' => $isToday,
-                                    'text-secondary-dark dark:text-white' => ! $isToday,
+                                    'bg-primary dark:bg-ink dark:text-surface-0 text-white' => $isToday,
+                                    'text-secondary-dark dark:text-ink' => ! $isToday,
                                 ])>
                                     {{ $day->day }}
                                 </span>
@@ -1885,16 +1885,16 @@ new #[Title('titles.calendar')] class extends Component {
 
                 <div class="overflow-x-auto">
                 <div class="grid" style="{{ $gridColumns }}">
-                    <div class="border-b border-e border-secondary-soft dark:border-secondary-medium"></div>
+                    <div class="border-b border-e border-secondary-soft dark:border-line"></div>
                     @foreach ($periodDays as $day)
                         @php $isToday = $day->isSameDay($today); @endphp
-                        <div class="border-b border-e border-secondary-soft p-2 text-center last:border-e-0 dark:border-secondary-medium">
-                            <div @class(['text-sm font-semibold', 'text-primary' => $isToday, 'text-secondary-dark dark:text-white' => ! $isToday])>{{ $day->translatedFormat('l') }}</div>
-                            <div @class(['text-xs', 'text-primary' => $isToday, 'text-secondary-medium dark:text-secondary-soft' => ! $isToday])>{{ $day->translatedFormat('j M') }}</div>
+                        <div class="border-b border-e border-secondary-soft p-2 text-center last:border-e-0 dark:border-line">
+                            <div @class(['text-sm font-semibold', 'text-primary dark:text-brand-text' => $isToday, 'text-secondary-dark dark:text-ink' => ! $isToday])>{{ $day->translatedFormat('l') }}</div>
+                            <div @class(['text-xs', 'text-primary dark:text-brand-text' => $isToday, 'text-secondary-medium dark:text-ink-muted' => ! $isToday])>{{ $day->translatedFormat('j M') }}</div>
                         </div>
                     @endforeach
 
-                    <div class="flex items-center justify-end border-e border-secondary-soft px-2 py-1.5 text-[11px] font-semibold text-secondary-medium dark:border-secondary-medium dark:text-secondary-soft">{{ __('calendar.all_day') }}</div>
+                    <div class="flex items-center justify-end border-e border-secondary-soft px-2 py-1.5 text-[11px] font-semibold text-secondary-medium dark:border-line dark:text-ink-muted">{{ __('calendar.all_day') }}</div>
                     @foreach ($periodDays as $day)
                         @php
                             $dayFocusedCount = $focusedType === null ? 0 : collect($focusedGroupKeys[$focusedType])->sum(fn (string $key) => $calendar[$key]->get($day->toDateString(), new \Illuminate\Support\Collection)->count());
@@ -1905,7 +1905,7 @@ new #[Title('titles.calendar')] class extends Component {
                             x-on:click="menuOpen = true; menuX = $event.clientX; menuY = $event.clientY; menuDate = '{{ $day->toDateString() }}'"
                             x-on:contextmenu.prevent="menuOpen = true; menuX = $event.clientX; menuY = $event.clientY; menuDate = '{{ $day->toDateString() }}'"
                             @class([
-                                'flex min-h-10 cursor-pointer flex-col gap-1 border-e border-secondary-soft p-1.5 text-start last:border-e-0 hover:bg-secondary-soft/40 dark:border-secondary-medium dark:hover:bg-secondary-medium/40 transition-opacity',
+                                'flex min-h-10 cursor-pointer flex-col gap-1 border-e border-secondary-soft p-1.5 text-start last:border-e-0 hover:bg-secondary-soft/40 dark:border-line dark:hover:bg-surface-2 transition-opacity',
                                 'opacity-50' => $focusedType !== null && $dayFocusedCount === 0,
                                 'ring-2 ring-inset '.$typeRingClasses[$focusedType ?? 'milestone'] => $focusedType !== null && $dayFocusedCount > 0,
                             ])
@@ -1927,16 +1927,16 @@ new #[Title('titles.calendar')] class extends Component {
                     @endforeach
                 </div>
 
-                <div class="max-h-96 overflow-y-auto border-t border-secondary-soft dark:border-secondary-medium" x-init="$el.scrollTop = Math.max(0, {{ $currentHour }} * 48 - 160)">
+                <div class="max-h-96 overflow-y-auto border-t border-secondary-soft dark:border-line" x-init="$el.scrollTop = Math.max(0, {{ $currentHour }} * 48 - 160)">
                     <div class="grid" style="{{ $gridColumns }}">
                         @for ($hour = 0; $hour < 24; $hour++)
-                            <div class="h-12 border-b border-e border-secondary-soft px-2 py-1 text-end text-[11px] text-secondary-medium dark:border-secondary-medium dark:text-secondary-soft">
+                            <div class="h-12 border-b border-e border-secondary-soft px-2 py-1 text-end text-[11px] text-secondary-medium dark:border-line dark:text-ink-muted">
                                 {{ $hour === 0 ? '' : \Carbon\CarbonImmutable::today()->addHours($hour)->translatedFormat('ga') }}
                             </div>
                             @foreach ($periodDays as $day)
-                                <div class="relative h-12 border-b border-e border-secondary-soft last:border-e-0 dark:border-secondary-medium">
+                                <div class="relative h-12 border-b border-e border-secondary-soft last:border-e-0 dark:border-line">
                                     @if ($day->isSameDay($today) && $hour === $currentHour)
-                                        <div class="pointer-events-none absolute inset-x-0 h-px bg-primary" style="top: {{ $currentMinuteFraction * 100 }}%;"></div>
+                                        <div class="pointer-events-none absolute inset-x-0 h-px bg-primary dark:bg-ink" style="top: {{ $currentMinuteFraction * 100 }}%;"></div>
                                     @endif
                                 </div>
                             @endforeach
@@ -1951,14 +1951,14 @@ new #[Title('titles.calendar')] class extends Component {
                 style="display: none"
                 x-cloak
                 :style="{ top: menuY + 'px', left: menuX + 'px' }"
-                class="fixed z-50 min-w-40 rounded-md border border-secondary-soft bg-white py-1 shadow-lg dark:border-secondary-medium dark:bg-secondary-dark"
+                class="fixed z-50 min-w-40 rounded-md border border-secondary-soft bg-white py-1 shadow-lg dark:border-line dark:bg-surface-3 dark:shadow-raised"
                 data-test="calendar-context-menu"
             >
                 @can('create', App\Models\Milestone::class)
                 <button
                     type="button"
                     x-on:click="menuOpen = false; $wire.openCreateModal(menuDate)"
-                    class="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-start text-sm text-secondary-dark hover:bg-secondary-soft dark:text-white dark:hover:bg-secondary-medium"
+                    class="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-start text-sm text-secondary-dark hover:bg-secondary-soft dark:text-ink dark:hover:bg-white/[0.06]"
                     data-test="calendar-context-add-milestone"
                 >
                     <flux:icon.flag variant="micro" class="size-4" />
@@ -1969,7 +1969,7 @@ new #[Title('titles.calendar')] class extends Component {
                     <button
                         type="button"
                         x-on:click="menuOpen = false; $wire.openCreateTaskModal(menuDate)"
-                        class="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-start text-sm text-secondary-dark hover:bg-secondary-soft dark:text-white dark:hover:bg-secondary-medium"
+                        class="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-start text-sm text-secondary-dark hover:bg-secondary-soft dark:text-ink dark:hover:bg-white/[0.06]"
                         data-test="calendar-context-add-task"
                     >
                         <flux:icon.clipboard-document-check variant="micro" class="size-4" />
@@ -1983,8 +1983,8 @@ new #[Title('titles.calendar')] class extends Component {
             <x-ui.panel :title="__('calendar.related_dates')" :count="$this->focusedItems->count()">
                 <div class="flex max-h-96 flex-col gap-2 overflow-y-auto p-2" data-test="calendar-focused-list">
                     @forelse ($this->focusedItems as $item)
-                        <div class="flex items-start gap-2 rounded-xl border border-secondary-soft bg-white p-2.5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] dark:border-secondary-medium dark:bg-secondary-dark" wire:key="calendar-focused-item-{{ $item['kind'] }}-{{ $item['id'] }}-{{ $item['date']->toDateString() }}">
-                            <span class="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary-soft dark:bg-secondary-medium">
+                        <div class="flex items-start gap-2 rounded-xl border border-secondary-soft bg-white p-2.5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] dark:border-line dark:bg-surface-1" wire:key="calendar-focused-item-{{ $item['kind'] }}-{{ $item['id'] }}-{{ $item['date']->toDateString() }}">
+                            <span class="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary-soft dark:bg-surface-2">
                                 @switch($focusedType)
                                     @case('milestone')
                                         <flux:icon.flag variant="micro" class="size-3.5 {{ $typeTextClasses[$focusedType] }}" />
@@ -2027,7 +2027,7 @@ new #[Title('titles.calendar')] class extends Component {
                                         {{ $item['title'] }}
                                     </a>
                                 @endif
-                                <p class="mt-0.5 truncate text-[11px] text-secondary-medium dark:text-secondary-soft">
+                                <p class="mt-0.5 truncate text-[11px] text-secondary-medium dark:text-ink-muted">
                                     {{ $item['date']->translatedFormat('D, j M') }}
                                     @if ($item['subLabel'] !== null)
                                         · {{ $item['subLabel'] }}
@@ -2046,7 +2046,7 @@ new #[Title('titles.calendar')] class extends Component {
             <div class="flex min-h-24 flex-col gap-2 p-2" x-data="taskDropList('my-calendar', (wire, id) => wire.rescheduleTask(id, ''))" data-test="calendar-unscheduled">
                 @forelse ($calendar['unscheduledTasks'] as $task)
                     <div
-                        class="flex cursor-grab flex-col gap-1.5 rounded-xl border border-secondary-soft bg-white p-2.5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md active:cursor-grabbing dark:border-secondary-medium dark:bg-secondary-dark"
+                        class="flex cursor-grab flex-col gap-1.5 rounded-xl border border-secondary-soft bg-white p-2.5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md active:cursor-grabbing dark:border-line dark:bg-surface-1"
                         data-task-id="{{ $task->id }}"
                         wire:key="calendar-unscheduled-{{ $task->id }}"
                     >
@@ -2235,8 +2235,8 @@ new #[Title('titles.calendar')] class extends Component {
     >
         <div class="flex flex-col gap-2" data-test="calendar-daydetail-list">
             @forelse ($this->dayDetailItems as $item)
-                <div class="flex items-start gap-2 rounded-xl border border-secondary-soft bg-white p-2.5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] dark:border-secondary-medium dark:bg-secondary-dark" wire:key="calendar-daydetail-{{ $item['type'] }}-{{ $item['kind'] }}-{{ $item['id'] }}">
-                    <span class="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary-soft dark:bg-secondary-medium">
+                <div class="flex items-start gap-2 rounded-xl border border-secondary-soft bg-white p-2.5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] dark:border-line dark:bg-surface-1" wire:key="calendar-daydetail-{{ $item['type'] }}-{{ $item['kind'] }}-{{ $item['id'] }}">
+                    <span class="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary-soft dark:bg-surface-2">
                         <span class="size-2 rounded-full {{ $typeDotClasses[$item['type']] }}"></span>
                     </span>
                     <div class="min-w-0 flex-1">
@@ -2258,7 +2258,7 @@ new #[Title('titles.calendar')] class extends Component {
                             </a>
                         @endif
                         @if ($item['subLabel'] !== null)
-                            <p class="mt-0.5 truncate text-[11px] text-secondary-medium dark:text-secondary-soft">{{ $item['subLabel'] }}</p>
+                            <p class="mt-0.5 truncate text-[11px] text-secondary-medium dark:text-ink-muted">{{ $item['subLabel'] }}</p>
                         @endif
                     </div>
                 </div>

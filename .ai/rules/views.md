@@ -24,4 +24,7 @@ To style the real input control, pass `input:class="..."` instead — Flux's own
 This same wrapper-vs-control split likely applies to other `flux:with-field`-based components (`flux:select`, `flux:textarea`, etc.) — check for an `input:`/equivalent-prefixed passthrough before assuming a plain `class` prop reaches the visible control.
 
 ## Red text uses text-status-critical, not text-primary
---color-primary (#be1f24) is unreadable as text on the dark ground. --color-status-critical equals primary in light mode and switches to #f2756f in dark, so use text-status-critical for alarm/overdue TEXT. Keep bg-primary/border-primary for dots, buttons and rules. Applied across proposals/⚡show, _task-row and _file-row on 2026-09-21.
+--color-primary (#be1f24) is unreadable as text on the dark ground. --color-status-critical equals primary in light mode and switches to #ff8a86 in dark (Graphite), so use text-status-critical for alarm/overdue TEXT. Non-alarm red text (links, emphasis) that uses text-primary needs `dark:text-brand-text`. Keep bg-primary/border-primary for dots, buttons and rules. Applied across proposals/⚡show, _task-row and _file-row on 2026-09-21.
+
+## Dark mode classes use the Graphite tokens
+Behind `dark:` use only the Graphite tokens (`surface-0..3`, `ink*`, `line*`, `field-line`, `brand*`, `shadow-raised`), never raw `secondary-*`/`zinc-*` greys — see .ai/rules/css.md. Never change a light (non-`dark:`) class when restyling dark mode: light mode stays pixel-identical.

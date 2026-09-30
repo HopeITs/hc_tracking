@@ -74,7 +74,7 @@ test('the active status chip uses the good/green status tone, not the brand red'
 
     $response
         ->assertOk()
-        ->assertSee('bg-status-good text-white', false)
+        ->assertSee('bg-status-good dark:bg-status-good-soft dark:text-status-good text-white', false)
         ->assertDontSee('bg-primary text-white', false);
 });
 

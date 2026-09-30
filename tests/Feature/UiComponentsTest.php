@@ -22,7 +22,7 @@ test('the ui input carries the shared control classes', function () {
 
     expect($html)->toContain('border-secondary-light!')
         ->and($html)->toContain('bg-white!')
-        ->and($html)->toContain('dark:bg-secondary-medium!');
+        ->and($html)->toContain('dark:bg-surface-2!');
 });
 
 test('the enum badge labels a case and tones it', function () {

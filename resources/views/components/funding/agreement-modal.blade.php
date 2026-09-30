@@ -88,7 +88,7 @@
     </x-ui.form-section>
 
     @if ($warning !== null)
-        <div class="mb-3 flex items-start gap-2.5 rounded-lg border border-status-warn/40 bg-status-warn/10 p-3 text-sm text-secondary-dark dark:text-white" role="status" data-agreement-proposal-warning>
+        <div class="mb-3 flex items-start gap-2.5 rounded-lg border border-status-warn/40 bg-status-warn/10 p-3 text-sm text-secondary-dark dark:text-ink" role="status" data-agreement-proposal-warning>
             <flux:icon.exclamation-triangle class="mt-0.5 size-4 shrink-0 text-status-warn" />
             <p>{{ $warning }}</p>
         </div>
@@ -96,7 +96,7 @@
 
     @if ($editing && $confirmingDelete)
         <div class="mb-3 flex flex-col gap-3 rounded-lg border border-primary/40 bg-primary/5 p-3 text-sm sm:flex-row sm:items-center sm:justify-between" role="alert" data-confirm-agreement-delete>
-            <p class="text-secondary-dark dark:text-white">{{ __('funding_agreements.delete_this_agreement_confirm') }}</p>
+            <p class="text-secondary-dark dark:text-ink">{{ __('funding_agreements.delete_this_agreement_confirm') }}</p>
             <div class="flex shrink-0 gap-2">
                 <x-ui.button type="button" size="sm" wire:click="cancelAgreementDelete">{{ __('common.cancel') }}</x-ui.button>
                 <x-ui.button type="button" size="sm" tone="primary" wire:click="deleteAgreement" data-test="confirm-delete-agreement">{{ __('funding_agreements.delete_agreement') }}</x-ui.button>
@@ -110,7 +110,7 @@
                 @if ($deleteBlocker === null)
                     <x-ui.button type="button" tone="ghost" icon="trash" class="text-status-critical!" wire:click="confirmAgreementDelete" data-test="delete-agreement-button">{{ __('funding_agreements.delete_agreement') }}</x-ui.button>
                 @else
-                    <p class="flex items-center gap-1.5 text-xs text-secondary-medium dark:text-secondary-soft" data-agreement-delete-blocked>
+                    <p class="flex items-center gap-1.5 text-xs text-secondary-medium dark:text-ink-muted" data-agreement-delete-blocked>
                         <flux:icon.lock-closed variant="micro" class="size-3.5 shrink-0" />
                         {{ $deleteBlocker }}
                     </p>

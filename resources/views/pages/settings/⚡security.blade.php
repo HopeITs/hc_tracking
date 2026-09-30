@@ -392,7 +392,7 @@ new #[Title('titles.security_settings')] class extends Component {
     }
 }; ?>
 
-<section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="security-heading">
+<section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="security-heading">
     @php
         $signInCheck = $this->signInCheck;
         $appStepAvailable = $canManageTwoFactor ?? false;
@@ -409,7 +409,7 @@ new #[Title('titles.security_settings')] class extends Component {
         {{-- Sign-in protection: what a new sign-in asks for, then each step as a dot on one thread. --}}
         <section aria-labelledby="sign-in-protection-heading" class="grid gap-8">
             <div class="grid gap-2" data-test="sign-in-protection" data-sign-in-check="{{ $signInCheck }}">
-                <h2 id="sign-in-protection-heading" class="type-label uppercase text-secondary-light dark:text-secondary-soft">
+                <h2 id="sign-in-protection-heading" class="type-label uppercase text-secondary-light dark:text-ink-muted">
                     {{ __('settings.sign_in_protection') }}
                 </h2>
                 <p class="flex items-center gap-3 text-3xl font-bold leading-tight tracking-tight @3xl/directory:text-4xl">
@@ -423,7 +423,7 @@ new #[Title('titles.security_settings')] class extends Component {
                     ></span>
                     {{ $protectionHeading }}
                 </p>
-                <p class="max-w-xl text-secondary-medium dark:text-secondary-soft">{{ $protectionDetail }}</p>
+                <p class="max-w-xl text-secondary-medium dark:text-ink-muted">{{ $protectionDetail }}</p>
             </div>
 
             @if ($appStepAvailable && $twoFactorRequired && ! $twoFactorEnabled)
@@ -467,11 +467,11 @@ new #[Title('titles.security_settings')] class extends Component {
                     @endunless
 
                     @if ($emailTwoFactorRequired)
-                        <p class="text-secondary-medium dark:text-secondary-soft" data-test="email-2fa-required">{{ __('settings.email_2fa_required') }}</p>
+                        <p class="text-secondary-medium dark:text-ink-muted" data-test="email-2fa-required">{{ __('settings.email_2fa_required') }}</p>
                     @endif
 
                     @if ($emailTwoFactorEnabled && $signInCheck === 'app')
-                        <p class="text-secondary-medium dark:text-secondary-soft">{{ __('settings.email_2fa_app_takes_priority') }}</p>
+                        <p class="text-secondary-medium dark:text-ink-muted">{{ __('settings.email_2fa_app_takes_priority') }}</p>
                     @endif
                 </x-security.step>
 
@@ -513,7 +513,7 @@ new #[Title('titles.security_settings')] class extends Component {
 
                         @if ($twoFactorEnabled)
                             @if ($twoFactorRequired)
-                                <p class="text-secondary-medium dark:text-secondary-soft" data-test="two-factor-required-cannot-disable">
+                                <p class="text-secondary-medium dark:text-ink-muted" data-test="two-factor-required-cannot-disable">
                                     {{ __('settings.two_factor_required_cannot_disable') }}
                                 </p>
                             @endif
@@ -534,33 +534,33 @@ new #[Title('titles.security_settings')] class extends Component {
 
         {{-- @chisel-passkeys --}}
         @if ($canManagePasskeys)
-            <section aria-labelledby="passkeys-heading" class="grid gap-5 border-t border-secondary-soft pt-10 dark:border-secondary-medium" data-test="passkeys">
+            <section aria-labelledby="passkeys-heading" class="grid gap-5 border-t border-secondary-soft pt-10 dark:border-line" data-test="passkeys">
                 <div>
                     <h2 id="passkeys-heading" class="text-xl font-bold">{{ __('settings.passkeys') }}</h2>
-                    <p class="mt-1 text-sm text-secondary-medium dark:text-secondary-soft">{{ __('settings.manage_your_passkeys_for_passwordless_sign_in') }}</p>
+                    <p class="mt-1 text-sm text-secondary-medium dark:text-ink-muted">{{ __('settings.manage_your_passkeys_for_passwordless_sign_in') }}</p>
                 </div>
 
                 @if ($passkeys === [])
                     <div class="flex items-start gap-3 text-sm" wire:cloak>
-                        <flux:icon.finger-print variant="outline" class="size-5 shrink-0 text-secondary-light dark:text-secondary-soft" />
+                        <flux:icon.finger-print variant="outline" class="size-5 shrink-0 text-secondary-light dark:text-ink-muted" />
                         <div>
                             <p class="font-semibold">{{ __('settings.no_passkeys_yet') }}</p>
-                            <p class="text-secondary-medium dark:text-secondary-soft">{{ __('settings.add_a_passkey_to_sign_in_without_a_password') }}</p>
+                            <p class="text-secondary-medium dark:text-ink-muted">{{ __('settings.add_a_passkey_to_sign_in_without_a_password') }}</p>
                         </div>
                     </div>
                 @else
-                    <ul class="divide-y divide-secondary-soft border-y border-secondary-soft text-sm dark:divide-secondary-medium dark:border-secondary-medium" wire:cloak>
+                    <ul class="divide-y divide-secondary-soft border-y border-secondary-soft text-sm dark:divide-line dark:border-line" wire:cloak>
                         @foreach ($passkeys as $passkey)
                             <li class="flex items-center gap-4 py-3" wire:key="passkey-{{ $passkey['id'] }}">
-                                <flux:icon.key variant="outline" class="size-5 shrink-0 text-secondary-light dark:text-secondary-soft" />
+                                <flux:icon.key variant="outline" class="size-5 shrink-0 text-secondary-light dark:text-ink-muted" />
                                 <div class="min-w-0 flex-1">
                                     <div class="flex flex-wrap items-center gap-2">
                                         <p class="truncate font-semibold">{{ $passkey['name'] }}</p>
                                         @if ($passkey['authenticator'])
-                                            <span class="type-meta rounded-full bg-secondary-soft/60 px-2 py-0.5 text-secondary-medium dark:bg-white/10 dark:text-secondary-soft">{{ $passkey['authenticator'] }}</span>
+                                            <span class="type-meta rounded-full bg-secondary-soft/60 px-2 py-0.5 text-secondary-medium dark:bg-white/10 dark:text-ink-muted">{{ $passkey['authenticator'] }}</span>
                                         @endif
                                     </div>
-                                    <p class="type-meta mt-0.5 text-secondary-medium dark:text-secondary-soft">
+                                    <p class="type-meta mt-0.5 text-secondary-medium dark:text-ink-muted">
                                         {{ __('settings.added_time', ['time' => $passkey['created_at_diff']]) }}
                                         @if ($passkey['last_used_at_diff'])
                                             <span aria-hidden="true" class="mx-1">·</span>
@@ -576,7 +576,7 @@ new #[Title('titles.security_settings')] class extends Component {
                                     icon:variant="outline"
                                     wire:click="confirmDelete({{ $passkey['id'] }})"
                                     :aria-label="__('settings.remove_passkey')"
-                                    class="text-primary hover:bg-primary/10 dark:text-white dark:hover:bg-white/10"
+                                    class="text-primary hover:bg-primary/10 dark:text-ink dark:hover:bg-white/10"
                                 />
                             </li>
                         @endforeach
@@ -589,7 +589,7 @@ new #[Title('titles.security_settings')] class extends Component {
         {{-- @end-chisel-passkeys --}}
 
         {{-- Devices: where this account is signed in, and which browsers skip the sign-in code. --}}
-        <section aria-labelledby="devices-heading" class="grid gap-10 border-t border-secondary-soft pt-10 dark:border-secondary-medium">
+        <section aria-labelledby="devices-heading" class="grid gap-10 border-t border-secondary-soft pt-10 dark:border-line">
             <h2 id="devices-heading" class="text-xl font-bold">{{ __('settings.your_devices') }}</h2>
 
             @if ($canManageSignedInDevices)
@@ -601,7 +601,7 @@ new #[Title('titles.security_settings')] class extends Component {
                     <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
                         <div class="min-w-0 flex-1 basis-64">
                             <h3 class="type-heading">{{ __('settings.signed_in_devices') }}</h3>
-                            <p class="mt-1 text-sm text-secondary-medium dark:text-secondary-soft">{{ __('settings.signed_in_devices_description') }}</p>
+                            <p class="mt-1 text-sm text-secondary-medium dark:text-ink-muted">{{ __('settings.signed_in_devices_description') }}</p>
                         </div>
 
                         @if (collect($signedInDevices)->contains('current', false))
@@ -611,13 +611,13 @@ new #[Title('titles.security_settings')] class extends Component {
                         @endif
                     </div>
 
-                    <ul class="divide-y divide-secondary-soft border-y border-secondary-soft text-sm dark:divide-secondary-medium dark:border-secondary-medium" wire:cloak>
+                    <ul class="divide-y divide-secondary-soft border-y border-secondary-soft text-sm dark:divide-line dark:border-line" wire:cloak>
                         @foreach ($signedInDevices as $device)
                             <li class="flex items-center gap-4 py-3" wire:key="signed-in-device-{{ $loop->index }}">
                                 <flux:icon
                                     :name="$device['mobile'] ? 'device-phone-mobile' : 'computer-desktop'"
                                     variant="outline"
-                                    class="size-5 shrink-0 text-secondary-light dark:text-secondary-soft"
+                                    class="size-5 shrink-0 text-secondary-light dark:text-ink-muted"
                                 />
                                 <div class="min-w-0 flex-1">
                                     <div class="flex flex-wrap items-center gap-2">
@@ -626,7 +626,7 @@ new #[Title('titles.security_settings')] class extends Component {
                                             <span class="type-meta rounded-full bg-status-good-soft px-2 py-0.5 text-status-good">{{ __('settings.this_device') }}</span>
                                         @endif
                                     </div>
-                                    <p class="type-meta mt-0.5 text-secondary-medium dark:text-secondary-soft">
+                                    <p class="type-meta mt-0.5 text-secondary-medium dark:text-ink-muted">
                                         @if ($device['ip_address'])
                                             <span dir="ltr">{{ $device['ip_address'] }}</span>
                                             <span aria-hidden="true" class="mx-1">·</span>
@@ -639,7 +639,7 @@ new #[Title('titles.security_settings')] class extends Component {
                     </ul>
 
                     @unless (collect($signedInDevices)->contains('current', false))
-                        <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('settings.no_other_devices_are_signed_in') }}</p>
+                        <p class="text-sm text-secondary-medium dark:text-ink-muted">{{ __('settings.no_other_devices_are_signed_in') }}</p>
                     @endunless
                 </div>
             @endif
@@ -652,7 +652,7 @@ new #[Title('titles.security_settings')] class extends Component {
                 <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
                     <div class="min-w-0 flex-1 basis-64">
                         <h3 class="type-heading">{{ __('settings.trusted_devices') }}</h3>
-                        <p class="mt-1 text-sm text-secondary-medium dark:text-secondary-soft">{{ __('settings.trusted_devices_description') }}</p>
+                        <p class="mt-1 text-sm text-secondary-medium dark:text-ink-muted">{{ __('settings.trusted_devices_description') }}</p>
                     </div>
 
                     @if ($trustedDevices !== [])
@@ -663,12 +663,12 @@ new #[Title('titles.security_settings')] class extends Component {
                 </div>
 
                 @if ($trustedDevices === [])
-                    <p class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('settings.no_trusted_devices') }}</p>
+                    <p class="text-sm text-secondary-medium dark:text-ink-muted">{{ __('settings.no_trusted_devices') }}</p>
                 @else
-                    <ul class="divide-y divide-secondary-soft border-y border-secondary-soft text-sm dark:divide-secondary-medium dark:border-secondary-medium" wire:cloak>
+                    <ul class="divide-y divide-secondary-soft border-y border-secondary-soft text-sm dark:divide-line dark:border-line" wire:cloak>
                         @foreach ($trustedDevices as $device)
                             <li class="flex items-center gap-4 py-3" wire:key="trusted-device-{{ $loop->index }}">
-                                <flux:icon name="shield-check" variant="outline" class="size-5 shrink-0 text-secondary-light dark:text-secondary-soft" />
+                                <flux:icon name="shield-check" variant="outline" class="size-5 shrink-0 text-secondary-light dark:text-ink-muted" />
                                 <div class="min-w-0 flex-1">
                                     <div class="flex flex-wrap items-center gap-2">
                                         <p class="font-semibold">{{ $device['label'] }}</p>
@@ -676,7 +676,7 @@ new #[Title('titles.security_settings')] class extends Component {
                                             <span class="type-meta rounded-full bg-status-good-soft px-2 py-0.5 text-status-good">{{ __('settings.this_device') }}</span>
                                         @endif
                                     </div>
-                                    <p class="type-meta mt-0.5 text-secondary-medium dark:text-secondary-soft">
+                                    <p class="type-meta mt-0.5 text-secondary-medium dark:text-ink-muted">
                                         {{ __('settings.last_active_time', ['time' => $device['last_used']]) }}
                                         <span aria-hidden="true" class="mx-1">·</span>
                                         {{ __('settings.trusted_until', ['date' => $device['expires']]) }}

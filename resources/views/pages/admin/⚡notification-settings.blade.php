@@ -187,7 +187,7 @@ new #[Title('titles.notification_rules')] class extends Component {
 }; ?>
 
 <section
-    class="rules-page @container/rules flex min-h-full w-full flex-1 flex-col bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white"
+    class="rules-page @container/rules flex min-h-full w-full flex-1 flex-col bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink"
     aria-labelledby="notification-rules-heading"
     x-data="notificationRules(@js($this->clientConfig()))"
 >
@@ -248,7 +248,7 @@ new #[Title('titles.notification_rules')] class extends Component {
         </div>
 
         <div
-            class="rules-savebar sticky bottom-4 z-30 mt-10 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-secondary-dark px-5 py-3 text-white shadow-lg dark:bg-white dark:text-secondary-dark"
+            class="rules-savebar sticky bottom-4 z-30 mt-10 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-secondary-dark px-5 py-3 text-white shadow-lg dark:bg-surface-3 dark:shadow-raised dark:text-ink"
             x-show="dirtyCount > 0"
             x-cloak
             x-transition:enter="rules-savebar-enter"
@@ -264,10 +264,10 @@ new #[Title('titles.notification_rules')] class extends Component {
                 <span x-text="dirtyLabel"></span>
             </p>
             <div class="flex items-center gap-2">
-                <button type="button" x-on:click="discard()" class="min-h-10 rounded-full px-4 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white dark:text-secondary-medium dark:hover:bg-secondary-soft dark:hover:text-secondary-dark">
+                <button type="button" x-on:click="discard()" class="min-h-10 rounded-full px-4 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white dark:text-ink-muted dark:hover:bg-white/[0.06] dark:hover:text-ink">
                     {{ __('notifications.admin.discard') }}
                 </button>
-                <button type="submit" class="inline-flex min-h-10 items-center gap-2 rounded-full bg-primary px-5 text-sm font-bold text-white transition-transform active:scale-[0.97] disabled:opacity-70" x-bind:disabled="saving">
+                <button type="submit" class="inline-flex min-h-10 items-center gap-2 rounded-full bg-primary dark:bg-brand dark:hover:bg-brand-hover px-5 text-sm font-bold text-white transition-transform active:scale-[0.97] disabled:opacity-70" x-bind:disabled="saving">
                     <flux:icon.check variant="micro" x-show="!saving" />
                     <flux:icon.loading variant="micro" x-show="saving" x-cloak />
                     {{ __('notifications.admin.save') }}

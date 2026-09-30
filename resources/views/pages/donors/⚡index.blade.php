@@ -497,9 +497,9 @@ new #[Title('titles.donors')] class extends Component {
     $filtersAreActive = $search !== '' || $type !== '' || $relationship !== '';
     $hasAnyDonor = $filtersAreActive || $this->donors->total() > 0;
     $pulse = $this->pulse;
-    $mutedText = 'text-secondary-medium dark:text-secondary-soft';
-    $inkText = 'text-secondary-dark dark:text-white';
-    $hairline = 'border-secondary-soft dark:border-secondary-medium';
+    $mutedText = 'text-secondary-medium dark:text-ink-muted';
+    $inkText = 'text-secondary-dark dark:text-ink';
+    $hairline = 'border-secondary-soft dark:border-line';
     $amount = fn (float $value): string => Number::format($value, maxPrecision: 0);
     $shortAmount = fn (float $value): string => Number::abbreviate($value, maxPrecision: 1);
     $initials = fn (string $name): string => mb_strtoupper(collect(preg_split('/\s+/u', trim($name)) ?: [])->filter()->take(2)->map(fn (string $word): string => mb_substr($word, 0, 1))->implode('')) ?: '·';
@@ -509,7 +509,7 @@ new #[Title('titles.donors')] class extends Component {
 @endphp
 
 <section
-    class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white"
+    class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink"
     aria-labelledby="donor-directory-heading"
     x-data="{ focus: null, lit(id) { return this.focus === null || this.focus === id } }"
 >
@@ -556,7 +556,7 @@ new #[Title('titles.donors')] class extends Component {
     @if ($filtersAreActive)
         <div class="flex flex-wrap items-center gap-2 text-sm" data-active-filters>
             <span class="{{ $mutedText }}">{{ trans_choice('donors.count_matching_donor', $pulse['donors'], ['count' => $pulse['donors']]) }}</span>
-            <flux:button size="sm" variant="ghost" class="text-secondary-medium! dark:text-secondary-soft!" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
+            <flux:button size="sm" variant="ghost" class="text-secondary-medium! dark:text-ink-muted!" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
         </div>
     @endif
 
@@ -564,7 +564,7 @@ new #[Title('titles.donors')] class extends Component {
         <x-ui.empty-state icon="building-library" :heading="__('donors.no_donors_yet')" :body="__('donors.add_the_first_donor')" />
     @else
         {{-- Overview: one framed band — the money by funder beside what is due next. --}}
-        <div class="overflow-hidden rounded-2xl border {{ $hairline }} bg-white dark:bg-secondary-dark" data-donor-overview>
+        <div class="overflow-hidden rounded-2xl border {{ $hairline }} bg-white dark:bg-surface-1" data-donor-overview>
             {{-- Pulse strip --}}
             <dl @class(['grid grid-cols-2 border-b bg-board-head/70 dark:bg-white/[0.03]', $hairline, '@3xl/directory:grid-cols-4' => $canTransfers, '@3xl/directory:grid-cols-3' => ! $canTransfers]) data-donor-pulse>
                 @foreach ([
@@ -632,7 +632,7 @@ new #[Title('titles.donors')] class extends Component {
                                         >
                                             <span class="truncate text-sm font-semibold {{ $isRest ? $mutedText : $inkText }}">{{ $segment['name'] }}</span>
                                             <span class="relative w-full {{ $isRoomy ? 'h-5' : 'h-3' }}" aria-hidden="true">
-                                                <span class="wallet-grow absolute inset-y-0 start-0 overflow-hidden rounded-full {{ $isRest ? 'bg-secondary-soft dark:bg-secondary-medium' : 'bg-funding/20' }}" style="width: {{ max(1.5, round($segment['committed'] / $largest * 100, 2)) }}%; --wallet-order: {{ $loop->index }}">
+                                                <span class="wallet-grow absolute inset-y-0 start-0 overflow-hidden rounded-full {{ $isRest ? 'bg-secondary-soft dark:bg-line-strong' : 'bg-funding/20' }}" style="width: {{ max(1.5, round($segment['committed'] / $largest * 100, 2)) }}%; --wallet-order: {{ $loop->index }}">
                                                     <span class="absolute inset-y-0 start-0 rounded-full {{ $isRest ? 'bg-secondary-light' : 'bg-funding' }}" style="width: {{ $receivedShare }}%"></span>
                                                 </span>
                                             </span>
@@ -660,10 +660,10 @@ new #[Title('titles.donors')] class extends Component {
                             <p class="mt-3 text-sm {{ $mutedText }}">{{ __('donors.no_transfer_scheduled_ahead') }}</p>
                         @else
                             <ol class="relative mt-4 flex flex-col gap-4" role="list">
-                                <span class="absolute start-[0.28rem] top-2 bottom-2 w-px bg-secondary-soft dark:bg-secondary-medium" aria-hidden="true"></span>
+                                <span class="absolute start-[0.28rem] top-2 bottom-2 w-px bg-secondary-soft dark:bg-line-strong" aria-hidden="true"></span>
                                 @foreach ($this->upcomingTransfers as $transfer)
                                     <li class="relative ps-6" wire:key="upcoming-{{ $transfer['agreementId'] }}-{{ $loop->index }}">
-                                        <span @class(['absolute start-0 top-1 size-2.5 rounded-full ring-4 ring-white dark:ring-secondary-dark', 'bg-primary' => $transfer['overdue'], 'bg-funding' => ! $transfer['overdue']]) aria-hidden="true"></span>
+                                        <span @class(['absolute start-0 top-1 size-2.5 rounded-full ring-4 ring-white dark:ring-surface-1', 'bg-primary dark:bg-status-critical' => $transfer['overdue'], 'bg-funding' => ! $transfer['overdue']]) aria-hidden="true"></span>
                                         <div class="flex items-baseline justify-between gap-3">
                                             <p @class(['text-xs font-bold', 'text-status-critical' => $transfer['overdue'], $mutedText => ! $transfer['overdue']])>
                                                 {{ $transfer['date']->translatedFormat(__('formats.date')) }}
@@ -707,14 +707,14 @@ new #[Title('titles.donors')] class extends Component {
                                         aria-pressed="{{ $isSelected ? 'true' : 'false' }}"
                                         @class([
                                             'grid w-full grid-cols-[7rem_minmax(0,1fr)_1.5rem] items-center gap-3 rounded-md px-2 py-1.5 text-start text-sm transition-colors hover:bg-board-head focus-visible:outline-2 focus-visible:outline-primary dark:hover:bg-white/5',
-                                            'bg-primary/8 dark:bg-white/10' => $isSelected,
+                                            'bg-primary/8 dark:bg-brand/10' => $isSelected,
                                             'opacity-50' => $stop['count'] === 0 && ! $isSelected,
                                         ])
                                         data-type-stop="{{ $stop['value'] }}"
                                     >
                                         <span @class(['truncate font-semibold', 'text-status-critical' => $isSelected, $inkText => ! $isSelected])>{{ $stop['label'] }}</span>
-                                        <span class="h-1.5 rounded-full bg-secondary-soft dark:bg-secondary-medium" aria-hidden="true">
-                                            <span class="block h-full rounded-full {{ $isSelected ? 'bg-primary' : 'bg-secondary-dark dark:bg-white' }}" style="width: {{ round($stop['count'] / $typeMax * 100) }}%"></span>
+                                        <span class="h-1.5 rounded-full bg-secondary-soft dark:bg-surface-2" aria-hidden="true">
+                                            <span class="block h-full rounded-full {{ $isSelected ? 'bg-primary dark:bg-ink' : 'bg-secondary-dark dark:bg-ink-muted' }}" style="width: {{ round($stop['count'] / $typeMax * 100) }}%"></span>
                                         </span>
                                         <span class="text-end font-extrabold tabular-nums {{ $inkText }}">{{ $stop['count'] }}</span>
                                     </button>
@@ -788,8 +788,8 @@ new #[Title('titles.donors')] class extends Component {
                             <div class="flex min-w-0 gap-3">
                                 <span @class([
                                     'flex size-10 shrink-0 items-center justify-center rounded-full text-xs font-extrabold',
-                                    'bg-secondary-dark text-white dark:bg-white dark:text-secondary-dark' => ! $isProspect,
-                                    'border border-dashed border-secondary-light text-secondary-medium dark:text-secondary-soft' => $isProspect,
+                                    'bg-secondary-dark text-white dark:bg-ink dark:text-surface-0' => ! $isProspect,
+                                    'border border-dashed border-secondary-light text-secondary-medium dark:text-ink-muted' => $isProspect,
                                 ]) aria-hidden="true">{{ $initials($donor->name) }}</span>
                                 <div class="min-w-0">
                                     <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -840,7 +840,7 @@ new #[Title('titles.donors')] class extends Component {
                                             <span class="text-lg leading-none font-extrabold tracking-tight tabular-nums {{ $inkText }}">{{ $amount($line['committed']) }} <span class="text-[11px] font-semibold tracking-normal {{ $mutedText }}">{{ $currency }}</span></span>
                                             <span class="text-xs font-bold tabular-nums text-funding">{{ App\Models\DonorProposal::percentLabel($line['received'], $line['committed']) }}%</span>
                                         </p>
-                                        <div class="mt-2 flex h-1.5 w-full gap-0.5 overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium" role="img" aria-label="{{ __('donors.money_bar_label', ['currency' => $currency, 'received' => $amount($line['received']), 'pending' => $amount($line['pending']), 'committed' => $amount($line['committed'])]) }}">
+                                        <div class="mt-2 flex h-1.5 w-full gap-0.5 overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2" role="img" aria-label="{{ __('donors.money_bar_label', ['currency' => $currency, 'received' => $amount($line['received']), 'pending' => $amount($line['pending']), 'committed' => $amount($line['committed'])]) }}">
                                             <span class="money-grow h-full rounded-s-full bg-funding" style="width: {{ $line['committed'] > 0 ? min(100, round($line['received'] / $line['committed'] * 100, 2)) : 0 }}%"></span>
                                             <span class="money-grow money-pending h-full" style="width: {{ $line['committed'] > 0 ? min(100, round($line['pending'] / $line['committed'] * 100, 2)) : 0 }}%"></span>
                                         </div>
@@ -864,10 +864,10 @@ new #[Title('titles.donors')] class extends Component {
                                     <p class="text-sm {{ $mutedText }}">{{ __('donors.nothing_funded_yet') }}</p>
                                 @else
                                     <ul class="relative flex flex-col gap-2" role="list">
-                                        <span class="absolute start-[0.1875rem] top-2 bottom-2 w-px bg-secondary-soft dark:bg-secondary-medium" aria-hidden="true"></span>
+                                        <span class="absolute start-[0.1875rem] top-2 bottom-2 w-px bg-secondary-soft dark:bg-line-strong" aria-hidden="true"></span>
                                         @foreach ($shownAgreements as $agreement)
                                             <li class="relative flex items-start gap-3 ps-5" wire:key="donor-{{ $donor->id }}-agreement-{{ $agreement->id }}">
-                                                <span class="absolute start-0 top-1.5 size-2 rounded-full border-2 border-secondary-dark bg-white dark:border-white dark:bg-secondary-dark" aria-hidden="true"></span>
+                                                <span class="absolute start-0 top-1.5 size-2 rounded-full border-2 border-secondary-dark bg-white dark:border-ink-muted dark:bg-surface-1" aria-hidden="true"></span>
                                                 <span class="min-w-0 flex-1">
                                                     @can('proposals.view')
                                                         <a href="{{ route('proposals.show', $agreement->proposal) }}" wire:navigate class="block truncate text-sm leading-snug font-semibold underline-offset-4 hover:underline {{ $inkText }}">{{ $agreement->proposal?->name }}</a>
@@ -938,7 +938,7 @@ new #[Title('titles.donors')] class extends Component {
             @endif
 
             <div class="mt-3">
-                <flux:pagination :paginator="$this->donors" class="text-secondary-medium! dark:text-secondary-soft!" scroll-to="#donor-directory-heading" />
+                <flux:pagination :paginator="$this->donors" class="text-secondary-medium! dark:text-ink-muted!" scroll-to="#donor-directory-heading" />
             </div>
         </section>
     @endif

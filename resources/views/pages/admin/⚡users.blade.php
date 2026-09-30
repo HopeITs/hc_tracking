@@ -657,31 +657,31 @@ new #[Title('titles.user_directory')] class extends Component {
 ?>
 
 <section
-    class="admin-directory @container/directory mx-auto flex min-h-full w-full max-w-[1800px] flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white"
+    class="admin-directory @container/directory mx-auto flex min-h-full w-full max-w-[1800px] flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink"
     aria-labelledby="access-management-heading"
 >
-    <header class="flex flex-wrap items-center justify-between gap-4 border-b border-secondary-soft pb-6 dark:border-secondary-medium">
+    <header class="flex flex-wrap items-center justify-between gap-4 border-b border-secondary-soft pb-6 dark:border-line">
         <div class="flex items-center gap-2.5">
             <flux:heading id="access-management-heading" size="xl" class="text-3xl! font-bold! leading-none!">
                 {{ __('users.users') }}
             </flux:heading>
-            <span class="inline-flex min-w-7 items-center justify-center rounded-md bg-primary px-2 py-0.5 text-xs font-bold tabular-nums text-white">
+            <span class="inline-flex min-w-7 items-center justify-center rounded-md bg-primary dark:bg-white/10 dark:text-ink px-2 py-0.5 text-xs font-bold tabular-nums text-white">
                 {{ $activeTab === 'users' ? $this->users->total() : $this->roles->count() }}
             </span>
         </div>
 
-        <nav class="flex min-h-11 items-center gap-1 rounded-lg border border-secondary-soft bg-secondary-soft/40 p-1 dark:border-secondary-medium dark:bg-secondary-medium/40" aria-label="{{ __('users.users') }}">
+        <nav class="flex min-h-11 items-center gap-1 rounded-lg border border-secondary-soft bg-secondary-soft/40 p-1 dark:border-line dark:bg-surface-2" aria-label="{{ __('users.users') }}">
             <button type="button" wire:click="showTab('users')" @class([
                 'min-h-9 rounded-md px-4 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
-                'bg-white text-primary shadow-sm dark:bg-secondary-dark' => $activeTab === 'users',
-                'text-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => $activeTab !== 'users',
+                'bg-white text-primary dark:text-brand-text shadow-sm dark:bg-surface-3 dark:shadow-raised' => $activeTab === 'users',
+                'text-secondary-medium hover:text-secondary-dark dark:text-ink-muted dark:hover:text-ink' => $activeTab !== 'users',
             ])>
                 {{ __('users.users') }}
             </button>
             <button type="button" wire:click="showTab('roles')" @class([
                 'min-h-9 rounded-md px-4 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
-                'bg-white text-primary shadow-sm dark:bg-secondary-dark' => $activeTab === 'roles',
-                'text-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => $activeTab !== 'roles',
+                'bg-white text-primary dark:text-brand-text shadow-sm dark:bg-surface-3 dark:shadow-raised' => $activeTab === 'roles',
+                'text-secondary-medium hover:text-secondary-dark dark:text-ink-muted dark:hover:text-ink' => $activeTab !== 'roles',
             ])>
                 {{ __('roles.title') }}
             </button>
@@ -707,32 +707,32 @@ new #[Title('titles.user_directory')] class extends Component {
         </div>
 
         <div class="grid min-w-0 gap-6 xl:grid-cols-[21rem_minmax(0,1fr)]">
-            <section class="flex min-w-0 flex-col overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-secondary-medium dark:bg-secondary-dark dark:shadow-none">
-                <div class="max-h-[min(62vh,44rem)] divide-y divide-secondary-soft overflow-y-auto overscroll-contain dark:divide-secondary-medium">
+            <section class="flex min-w-0 flex-col overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-transparent dark:bg-surface-1 dark:shadow-raised">
+                <div class="max-h-[min(62vh,44rem)] divide-y divide-secondary-soft overflow-y-auto overscroll-contain dark:divide-line">
                     @forelse ($this->users as $user)
                         <button type="button" wire:click="selectUser({{ $user->id }})" wire:key="access-user-{{ $user->id }}" @class([
                             'group relative flex min-h-[4.5rem] w-full items-center gap-3 px-3 py-2.5 text-start transition focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-primary',
-                            'bg-secondary-soft/60 dark:bg-secondary-medium/60' => $selectedUserId === $user->id,
-                            'bg-white hover:bg-secondary-soft/40 dark:bg-secondary-dark dark:hover:bg-secondary-medium/40' => $selectedUserId !== $user->id,
+                            'bg-secondary-soft/60 dark:bg-brand/10' => $selectedUserId === $user->id,
+                            'bg-white hover:bg-secondary-soft/40 dark:bg-surface-1 dark:hover:bg-surface-2' => $selectedUserId !== $user->id,
                         ])>
                             @if ($selectedUserId === $user->id)
-                                <span class="absolute inset-y-2 start-0 w-0.5 rounded-full bg-primary" aria-hidden="true"></span>
+                                <span class="absolute inset-y-2 start-0 w-0.5 rounded-full bg-primary dark:bg-brand" aria-hidden="true"></span>
                             @endif
 
                             <span class="min-w-0 flex-1">
                                 <span @class([
                                     'block truncate text-sm font-bold',
-                                    'text-primary' => $selectedUserId === $user->id,
-                                    'text-secondary-dark dark:text-white' => $selectedUserId !== $user->id,
+                                    'text-primary dark:text-brand-text' => $selectedUserId === $user->id,
+                                    'text-secondary-dark dark:text-ink' => $selectedUserId !== $user->id,
                                 ])>{{ $user->name }}</span>
-                                <span class="block truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $user->email }}</span>
+                                <span class="block truncate text-xs text-secondary-medium dark:text-ink-muted">{{ $user->email }}</span>
                                 <span class="mt-1 flex flex-wrap gap-1">
                                     @forelse ($user->roles->take(2) as $userRole)
-                                        <span class="rounded-md border border-secondary-soft bg-white px-1.5 py-0.5 text-[0.65rem] font-semibold leading-none text-secondary-medium dark:border-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft">
+                                        <span class="rounded-md border border-secondary-soft bg-white px-1.5 py-0.5 text-[0.65rem] font-semibold leading-none text-secondary-medium dark:border-line dark:bg-surface-1 dark:text-ink-muted">
                                             {{ $userRole->name }}
                                         </span>
                                     @empty
-                                        <span class="rounded-md border border-secondary-soft bg-white px-1.5 py-0.5 text-[0.65rem] font-semibold leading-none text-secondary-light dark:border-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft">
+                                        <span class="rounded-md border border-secondary-soft bg-white px-1.5 py-0.5 text-[0.65rem] font-semibold leading-none text-secondary-light dark:border-line dark:bg-surface-1 dark:text-ink-muted">
                                             {{ __('users.no_role') }}
                                         </span>
                                     @endforelse
@@ -744,32 +744,32 @@ new #[Title('titles.user_directory')] class extends Component {
                     @endforelse
                 </div>
 
-                <div class="border-t border-secondary-soft px-3 pb-3 dark:border-secondary-medium">
+                <div class="border-t border-secondary-soft px-3 pb-3 dark:border-line">
                     <flux:pagination
                         :paginator="$this->users"
                         scroll-to="#access-management-heading"
-                        class="text-secondary-medium! [&_button]:text-secondary-medium! [&_button:hover]:bg-secondary-soft! dark:text-secondary-soft! dark:[&_button]:text-secondary-soft! dark:[&_button:hover]:bg-secondary-medium!"
+                        class="text-secondary-medium! [&_button]:text-secondary-medium! [&_button:hover]:bg-secondary-soft! dark:text-ink-muted! dark:[&_button]:text-ink-muted! dark:[&_button:hover]:bg-surface-2!"
                     />
                 </div>
             </section>
 
-            <section class="flex min-w-0 flex-col rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-secondary-medium dark:bg-secondary-dark dark:shadow-none">
+            <section class="flex min-w-0 flex-col rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-transparent dark:bg-surface-1 dark:shadow-raised">
                 @if ($this->selectedUser)
                     @php
                         $selectedUser = $this->selectedUser;
                         $checkboxAccentStyle = '--color-accent: var(--color-primary); --color-accent-foreground: var(--color-white);';
                     @endphp
                     <form wire:submit="saveUserAccess">
-                        <div class="flex flex-wrap items-center gap-3 border-b border-secondary-soft px-6 py-4 dark:border-secondary-medium">
+                        <div class="flex flex-wrap items-center gap-3 border-b border-secondary-soft px-6 py-4 dark:border-line">
                             <div class="min-w-0 flex-1">
-                                <h2 class="truncate text-lg font-bold text-secondary-dark dark:text-white">{{ $selectedUser->name }}</h2>
-                                <p class="truncate text-sm text-secondary-medium dark:text-secondary-soft">{{ $selectedUser->email }}</p>
+                                <h2 class="truncate text-lg font-bold text-secondary-dark dark:text-ink">{{ $selectedUser->name }}</h2>
+                                <p class="truncate text-sm text-secondary-medium dark:text-ink-muted">{{ $selectedUser->email }}</p>
                             </div>
                         </div>
 
                         <div class="space-y-8 p-6">
                             <section aria-labelledby="assigned-roles-title">
-                                <h3 id="assigned-roles-title" class="mb-3 text-sm font-bold text-secondary-dark dark:text-white">{{ __('access.assigned-roles') }}</h3>
+                                <h3 id="assigned-roles-title" class="mb-3 text-sm font-bold text-secondary-dark dark:text-ink">{{ __('access.assigned-roles') }}</h3>
                                 <flux:checkbox.group
                                     wire:model.live="userRoleIds"
                                     style="{{ $checkboxAccentStyle }}"
@@ -787,8 +787,8 @@ new #[Title('titles.user_directory')] class extends Component {
                                 @error('userRoleIds') <p class="mt-1.5 text-xs text-status-critical">{{ $message }}</p> @enderror
                             </section>
 
-                            <section class="border-t border-secondary-soft pt-5 dark:border-secondary-medium" aria-labelledby="active-role-title">
-                                <label id="active-role-title" for="user-active-role" class="mb-2 block text-sm font-bold text-secondary-dark dark:text-white">{{ __('access.active-role') }}</label>
+                            <section class="border-t border-secondary-soft pt-5 dark:border-line" aria-labelledby="active-role-title">
+                                <label id="active-role-title" for="user-active-role" class="mb-2 block text-sm font-bold text-secondary-dark dark:text-ink">{{ __('access.active-role') }}</label>
                                 <x-ui.select id="user-active-role" wire:model.live="userActiveRoleId" :disabled="! Gate::check('update', $selectedUser)" class="sm:max-w-sm">
                                     <flux:select.option value="">—</flux:select.option>
                                     @foreach ($this->roleOptions->whereIn('id', $userRoleIds) as $roleOption)
@@ -798,14 +798,14 @@ new #[Title('titles.user_directory')] class extends Component {
                                 @error('userActiveRoleId') <p class="mt-1.5 text-xs text-status-critical">{{ $message }}</p> @enderror
                             </section>
 
-                            <section class="border-t border-secondary-soft pt-5 dark:border-secondary-medium" aria-labelledby="direct-permissions-title">
-                                <h3 id="direct-permissions-title" class="text-sm font-bold text-secondary-dark dark:text-white">{{ __('access.direct-permissions') }}</h3>
-                                <p class="mt-1 text-xs leading-5 text-secondary-medium dark:text-secondary-soft">{{ __('access.direct-permissions-help') }}</p>
+                            <section class="border-t border-secondary-soft pt-5 dark:border-line" aria-labelledby="direct-permissions-title">
+                                <h3 id="direct-permissions-title" class="text-sm font-bold text-secondary-dark dark:text-ink">{{ __('access.direct-permissions') }}</h3>
+                                <p class="mt-1 text-xs leading-5 text-secondary-medium dark:text-ink-muted">{{ __('access.direct-permissions-help') }}</p>
 
                                 <div class="mt-4 grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-3">
                                     @foreach ($this->permissionGroups as $group)
-                                        <fieldset class="min-w-0 rounded-lg border border-secondary-soft p-3.5 dark:border-secondary-medium">
-                                            <legend class="px-1 text-xs font-bold uppercase tracking-wide text-secondary-medium dark:text-secondary-soft">{{ $group['label'] }}</legend>
+                                        <fieldset class="min-w-0 rounded-lg border border-secondary-soft p-3.5 dark:border-line">
+                                            <legend class="px-1 text-xs font-bold uppercase tracking-wide text-secondary-medium dark:text-ink-muted">{{ $group['label'] }}</legend>
                                             <flux:checkbox.group
                                                 wire:model.live="userPermissionIds"
                                                 style="{{ $checkboxAccentStyle }}"
@@ -827,7 +827,7 @@ new #[Title('titles.user_directory')] class extends Component {
                         </div>
 
                         @can('update', $selectedUser)
-                            <div class="sticky bottom-0 flex justify-end border-t border-secondary-soft bg-white/95 px-6 py-3 backdrop-blur-sm dark:border-secondary-medium dark:bg-secondary-dark/95">
+                            <div class="sticky bottom-0 flex justify-end border-t border-secondary-soft bg-white/95 px-6 py-3 backdrop-blur-sm dark:border-line dark:bg-surface-1/95">
                                 <x-ui.button type="submit" tone="primary" data-test="save-user-access-button">{{ __('access.save-access') }}</x-ui.button>
                             </div>
                         @endcan
@@ -839,10 +839,10 @@ new #[Title('titles.user_directory')] class extends Component {
         </div>
     @else
         <div class="grid min-w-0 gap-6 xl:grid-cols-[19rem_minmax(0,1fr)]">
-            <aside class="min-w-0 overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-secondary-medium dark:bg-secondary-dark dark:shadow-none">
+            <aside class="min-w-0 overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-transparent dark:bg-surface-1 dark:shadow-raised">
                 @can('access-management.manage-roles')
-                    <form wire:submit="createRole" class="border-b border-secondary-soft p-3 dark:border-secondary-medium" data-test="create-role-form">
-                        <label for="new-role-name" class="mb-2 block text-sm font-bold text-secondary-dark dark:text-white">{{ __('roles.new_role') }}</label>
+                    <form wire:submit="createRole" class="border-b border-secondary-soft p-3 dark:border-line" data-test="create-role-form">
+                        <label for="new-role-name" class="mb-2 block text-sm font-bold text-secondary-dark dark:text-ink">{{ __('roles.new_role') }}</label>
                         <div class="grid gap-2">
                             <x-ui.input id="new-role-name" wire:model="newRoleName" :placeholder="__('roles.role_name_placeholder')" />
                             <x-ui.button type="submit" tone="primary">{{ __('roles.create_role') }}</x-ui.button>
@@ -851,18 +851,18 @@ new #[Title('titles.user_directory')] class extends Component {
                     </form>
                 @endcan
 
-                <div data-test="access-role-directory" class="divide-y divide-secondary-soft dark:divide-secondary-medium">
+                <div data-test="access-role-directory" class="divide-y divide-secondary-soft dark:divide-line">
                     @foreach ($this->roles as $roleRow)
                         <button type="button" wire:click="selectRole({{ $roleRow->id }})" wire:key="access-role-{{ $roleRow->id }}" @class([
                             'relative flex min-h-12 w-full items-center justify-between gap-3 px-3 py-2.5 text-start transition focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-primary',
-                            'bg-secondary-soft/60 text-primary dark:bg-secondary-medium/60' => $selectedRoleId === $roleRow->id,
-                            'bg-white text-secondary-medium hover:bg-secondary-soft/40 dark:bg-secondary-dark dark:text-secondary-soft dark:hover:bg-secondary-medium/40' => $selectedRoleId !== $roleRow->id,
+                            'bg-secondary-soft/60 text-primary dark:text-brand-text dark:bg-brand/10' => $selectedRoleId === $roleRow->id,
+                            'bg-white text-secondary-medium hover:bg-secondary-soft/40 dark:bg-surface-1 dark:text-ink-muted dark:hover:bg-surface-2' => $selectedRoleId !== $roleRow->id,
                         ])>
                             @if ($selectedRoleId === $roleRow->id)
-                                <span class="absolute inset-y-2 start-0 w-0.5 rounded-full bg-primary" aria-hidden="true"></span>
+                                <span class="absolute inset-y-2 start-0 w-0.5 rounded-full bg-primary dark:bg-brand" aria-hidden="true"></span>
                             @endif
                             <span class="min-w-0 truncate text-sm font-bold">{{ $roleRow->name }}</span>
-                            <span class="inline-flex min-w-6 shrink-0 items-center justify-center rounded-md border border-secondary-soft bg-white px-1.5 py-0.5 text-[0.65rem] font-semibold text-secondary-medium dark:border-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft">
+                            <span class="inline-flex min-w-6 shrink-0 items-center justify-center rounded-md border border-secondary-soft bg-white px-1.5 py-0.5 text-[0.65rem] font-semibold text-secondary-medium dark:border-line dark:bg-surface-1 dark:text-ink-muted">
                                 {{ $roleRow->users_count }}
                             </span>
                         </button>
@@ -870,27 +870,27 @@ new #[Title('titles.user_directory')] class extends Component {
                 </div>
             </aside>
 
-            <section class="min-w-0 rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-secondary-medium dark:bg-secondary-dark dark:shadow-none">
+            <section class="min-w-0 rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-transparent dark:bg-surface-1 dark:shadow-raised">
                 @if ($this->selectedRole)
-                    <div class="flex flex-wrap items-start justify-between gap-4 border-b border-secondary-soft px-6 py-4 dark:border-secondary-medium">
+                    <div class="flex flex-wrap items-start justify-between gap-4 border-b border-secondary-soft px-6 py-4 dark:border-line">
                         <div class="min-w-0">
                             <div class="flex flex-wrap items-center gap-2">
-                                <h2 class="truncate text-xl font-bold text-secondary-dark dark:text-white">{{ $this->selectedRole->name }}</h2>
+                                <h2 class="truncate text-xl font-bold text-secondary-dark dark:text-ink">{{ $this->selectedRole->name }}</h2>
                                 @if ($this->selectedRoleIsProtected)
-                                    <span class="rounded-md border border-primary px-2 py-1 text-[0.7rem] font-bold text-primary">{{ __('roles.protected_role') }}</span>
+                                    <span class="rounded-md border border-primary px-2 py-1 text-[0.7rem] font-bold text-primary dark:text-brand-text">{{ __('roles.protected_role') }}</span>
                                 @endif
                             </div>
-                            <button type="button" wire:click="showAssignedUsers" class="group mt-1 inline-flex min-h-8 items-center gap-1.5 rounded-md text-sm font-semibold text-secondary-medium underline decoration-secondary-light underline-offset-4 transition hover:text-primary hover:decoration-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-secondary-soft" aria-haspopup="dialog">
-                                <flux:icon.users class="size-4 shrink-0 text-primary" />
+                            <button type="button" wire:click="showAssignedUsers" class="group mt-1 inline-flex min-h-8 items-center gap-1.5 rounded-md text-sm font-semibold text-secondary-medium underline decoration-secondary-light underline-offset-4 transition hover:text-primary dark:hover:text-brand-text hover:decoration-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink-muted" aria-haspopup="dialog">
+                                <flux:icon.users class="size-4 shrink-0 text-primary dark:text-brand-text" />
                                 <span>{{ trans_choice('roles.users_count', $this->selectedRole->users_count, ['count' => $this->selectedRole->users_count]) }}</span>
                             </button>
                             @if ($this->selectedRoleIsProtected)
-                                <p class="mt-1.5 text-xs font-semibold text-primary">{{ __('roles.protected_role_help') }}</p>
+                                <p class="mt-1.5 text-xs font-semibold text-primary dark:text-brand-text">{{ __('roles.protected_role_help') }}</p>
                             @elseif (! $this->canEditSelectedRolePermissions && auth()->user()->can('access-management.manage-permissions'))
-                                <p class="mt-1.5 text-xs font-semibold text-primary" data-test="role-admin-only-note">{{ __('roles.admin_only_role_help') }}</p>
+                                <p class="mt-1.5 text-xs font-semibold text-primary dark:text-brand-text" data-test="role-admin-only-note">{{ __('roles.admin_only_role_help') }}</p>
                             @endif
                             @if (! $this->selectedRoleIsProtected && $this->selectedRoleIsBuiltIn)
-                                <p class="mt-1.5 text-xs text-secondary-medium dark:text-secondary-soft" data-test="role-built-in-note">{{ __('roles.built_in_role_help') }}</p>
+                                <p class="mt-1.5 text-xs text-secondary-medium dark:text-ink-muted" data-test="role-built-in-note">{{ __('roles.built_in_role_help') }}</p>
                             @endif
                         </div>
 
@@ -907,7 +907,7 @@ new #[Title('titles.user_directory')] class extends Component {
 
                     <form wire:submit="saveRolePermissions">
                         <div class="flex flex-wrap items-center justify-between gap-3 px-6 pt-4">
-                            <h3 class="text-sm font-bold text-secondary-dark dark:text-white">{{ __('roles.permissions') }}</h3>
+                            <h3 class="text-sm font-bold text-secondary-dark dark:text-ink">{{ __('roles.permissions') }}</h3>
                             @can('access-management.manage-permissions')
                                 <div class="flex flex-wrap gap-2">
                                     <x-ui.button type="button" tone="ghost" wire:click="selectAllRolePermissions" :disabled="! $this->canEditSelectedRolePermissions">{{ __('roles.select_all') }}</x-ui.button>
@@ -918,8 +918,8 @@ new #[Title('titles.user_directory')] class extends Component {
 
                         <div class="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-3 p-6">
                             @foreach ($this->permissionGroups as $group)
-                                <fieldset class="min-w-0 rounded-lg border border-secondary-soft p-3.5 dark:border-secondary-medium">
-                                    <legend class="px-1 text-xs font-bold uppercase tracking-wide text-secondary-medium dark:text-secondary-soft">{{ $group['label'] }}</legend>
+                                <fieldset class="min-w-0 rounded-lg border border-secondary-soft p-3.5 dark:border-line">
+                                    <legend class="px-1 text-xs font-bold uppercase tracking-wide text-secondary-medium dark:text-ink-muted">{{ $group['label'] }}</legend>
                                     <flux:checkbox.group
                                         wire:model="rolePermissionIds"
                                         style="--color-accent: var(--color-primary); --color-accent-foreground: var(--color-white);"
@@ -940,7 +940,7 @@ new #[Title('titles.user_directory')] class extends Component {
                         </div>
 
                         @can('access-management.manage-permissions')
-                            <div class="sticky bottom-0 flex justify-end border-t border-secondary-soft bg-white/95 px-6 py-3 backdrop-blur-sm dark:border-secondary-medium dark:bg-secondary-dark/95">
+                            <div class="sticky bottom-0 flex justify-end border-t border-secondary-soft bg-white/95 px-6 py-3 backdrop-blur-sm dark:border-line dark:bg-surface-1/95">
                                 <x-ui.button type="submit" tone="primary" data-test="save-role-permissions" :disabled="! $this->canEditSelectedRolePermissions">{{ __('roles.save_permissions') }}</x-ui.button>
                             </div>
                         @endcan
@@ -957,16 +957,16 @@ new #[Title('titles.user_directory')] class extends Component {
             close="closeAssignedUsersModal"
             :cancel-label="__('roles.close')"
         >
-            <div class="divide-y divide-secondary-soft dark:divide-secondary-medium">
+            <div class="divide-y divide-secondary-soft dark:divide-line">
                 @forelse ($this->selectedRoleUsers as $roleUser)
                     <div class="flex min-w-0 items-center justify-between gap-3 px-1 py-3" wire:key="assigned-role-user-{{ $roleUser->id }}">
                         <div class="min-w-0">
-                            <p class="truncate text-sm font-bold text-secondary-dark dark:text-white">{{ $roleUser->name }}</p>
-                            <p class="truncate text-sm text-secondary-medium dark:text-secondary-soft">{{ $roleUser->email }}</p>
+                            <p class="truncate text-sm font-bold text-secondary-dark dark:text-ink">{{ $roleUser->name }}</p>
+                            <p class="truncate text-sm text-secondary-medium dark:text-ink-muted">{{ $roleUser->email }}</p>
                         </div>
                     </div>
                 @empty
-                    <p class="py-8 text-center text-sm text-secondary-medium dark:text-secondary-soft">{{ __('access.no-assigned-users') }}</p>
+                    <p class="py-8 text-center text-sm text-secondary-medium dark:text-ink-muted">{{ __('access.no-assigned-users') }}</p>
                 @endforelse
             </div>
         </x-ui.modal>

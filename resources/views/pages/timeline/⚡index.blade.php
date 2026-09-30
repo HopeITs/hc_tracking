@@ -160,7 +160,7 @@ new #[Title('titles.timeline')] class extends Component {
     }
 @endphp
 
-<section class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="timeline-heading">
+<section class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="timeline-heading">
     <x-ui.page-header
         heading-id="timeline-heading"
         :title="__('titles.timeline')"
@@ -192,11 +192,11 @@ new #[Title('titles.timeline')] class extends Component {
         </x-slot:filters>
     </x-ui.page-header>
 
-    <div class="relative rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-secondary-medium dark:bg-secondary-dark dark:shadow-none" data-timeline-board>
+    <div class="relative rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-transparent dark:bg-surface-1 dark:shadow-raised" data-timeline-board>
         {{-- The three lenses on the same portfolio --}}
         <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-board-line px-4 py-3">
             <x-ui.view-toggle wire-model="view" :active="$activeView" :options="array_values($views)" :label="__('gantt.view')" class="max-w-full overflow-x-auto [&>button]:shrink-0 [&>button]:whitespace-nowrap" />
-            <p class="type-meta text-secondary-medium dark:text-secondary-soft">{{ $views[$activeView]['subtitle'] }}</p>
+            <p class="type-meta text-secondary-medium dark:text-ink-muted">{{ $views[$activeView]['subtitle'] }}</p>
         </div>
 
         <div wire:loading.delay class="pointer-events-none absolute inset-x-4 top-0 h-0.5 animate-pulse rounded-full bg-status-active" aria-hidden="true"></div>

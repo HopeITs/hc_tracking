@@ -4,8 +4,8 @@
 
 <div class="@container" x-data="{ subtasksOpen: {} }">
     <table class="hidden w-full table-fixed border-collapse text-start text-sm @3xl:table">
-        <thead class="bg-secondary-soft/40 dark:bg-secondary-medium/20">
-            <tr class="[&>th]:px-3.5 [&>th]:py-2.5 [&>th]:text-start [&>th]:text-[11px] [&>th]:font-bold [&>th]:tracking-wider [&>th]:text-secondary-medium [&>th]:uppercase [&>th]:dark:text-secondary-soft">
+        <thead class="bg-secondary-soft/40 dark:bg-surface-2">
+            <tr class="[&>th]:px-3.5 [&>th]:py-2.5 [&>th]:text-start [&>th]:text-[11px] [&>th]:font-bold [&>th]:tracking-wider [&>th]:text-secondary-medium [&>th]:uppercase [&>th]:dark:text-ink-faint">
                 <th class="w-9"></th>
                 @include('pages.tasks._sortable-th', ['field' => 'title', 'label' => __('common.name')])
                 @include('pages.tasks._sortable-th', ['field' => 'assignee', 'label' => __('tasks.assignee'), 'class' => 'w-28'])
@@ -15,7 +15,7 @@
                 <th class="w-20"></th>
             </tr>
         </thead>
-        <tbody class="divide-y divide-secondary-soft dark:divide-secondary-medium">
+        <tbody class="divide-y divide-secondary-soft dark:divide-line">
             @foreach ($groupTasks as $task)
                 @include('pages.tasks._list-row', ['task' => $task, 'today' => $today, 'priorityIconClasses' => $priorityIconClasses, 'isSubtask' => false])
                 @foreach ($task->subtasks as $subtask)
@@ -32,7 +32,7 @@
     </table>
 
     {{-- Mobile / tablet fallback: stacked cards instead of a squeezed table. --}}
-    <div class="divide-y divide-secondary-soft @3xl:hidden dark:divide-secondary-medium">
+    <div class="divide-y divide-secondary-soft @3xl:hidden dark:divide-line">
         @foreach ($groupTasks as $task)
             @include('pages.tasks._list-card', ['task' => $task, 'today' => $today, 'priorityIconClasses' => $priorityIconClasses, 'isSubtask' => false])
             @foreach ($task->subtasks as $subtask)

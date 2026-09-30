@@ -44,7 +44,7 @@ test('every page links the manifest and title bar colours matching the header', 
         ->get(route('dashboard'))
         ->assertSeeHtml('rel="manifest"')
         ->assertSeeHtml('<meta name="theme-color" content="#dcddde" media="(prefers-color-scheme: light)" data-theme-color="light">')
-        ->assertSeeHtml('<meta name="theme-color" content="#58595b" media="(prefers-color-scheme: dark)" data-theme-color="dark">')
+        ->assertSeeHtml('<meta name="theme-color" content="#1c1d20" media="(prefers-color-scheme: dark)" data-theme-color="dark">')
         ->assertSeeHtml('data-notification-toasts')
         ->assertSeeHtml('id="hc-notification-labels"');
 });

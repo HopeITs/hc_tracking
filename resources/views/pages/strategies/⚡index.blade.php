@@ -316,9 +316,9 @@ new #[Title('titles.strategies')] class extends Component {
     };
 
     $statusChipClasses = fn (string $status): string => match ($status) {
-        'active' => 'bg-status-good text-white',
-        'upcoming' => 'bg-secondary-dark text-white dark:bg-white dark:text-secondary-dark',
-        default => 'bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white',
+        'active' => 'bg-status-good dark:bg-status-good-soft dark:text-status-good text-white',
+        'upcoming' => 'bg-secondary-dark text-white dark:bg-ink dark:text-surface-0',
+        default => 'bg-secondary-soft text-secondary-dark dark:bg-surface-2 dark:text-ink',
     };
 
     $timelineItems = $portfolio['strategies']->map(fn ($strategy) => [
@@ -336,7 +336,7 @@ new #[Title('titles.strategies')] class extends Component {
 @endphp
 
 <section
-    class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white"
+    class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink"
     aria-labelledby="strategies-heading"
 >
     <x-ui.page-header
@@ -375,19 +375,19 @@ new #[Title('titles.strategies')] class extends Component {
     <div class="flex items-center justify-between gap-3">
         <div class="min-w-0">
             @if ($portfolio['has_records'] && $portfolio['status_counts']['active'] === 0 && ! $portfolio['filters_active'])
-                <div class="inline-flex w-fit items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary" role="status">
+                <div class="inline-flex w-fit items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary dark:text-brand-text" role="status">
                     <flux:icon.clock class="size-4" />
                     {{ __('strategies.no_strategy_currently_covers_year', ['year' => $portfolio['current_year']]) }}
                 </div>
             @elseif ($portfolio['status_counts']['active'] > 0 && ! $portfolio['filters_active'])
-                <p class="type-meta text-secondary-medium dark:text-secondary-soft">
+                <p class="type-meta text-secondary-medium dark:text-ink-muted">
                     {{ trans_choice('strategies.count_current_period', $portfolio['status_counts']['active'], ['count' => $portfolio['status_counts']['active']]) }}
                 </p>
             @endif
         </div>
 
         <div class="flex shrink-0 items-center gap-2">
-            <span wire:loading.delay.flex wire:target="search,filterByStatus,resetFilters" class="hidden items-center gap-1.5 text-xs text-secondary-medium dark:text-secondary-soft"><flux:icon.arrow-path class="size-3.5 animate-spin" /> {{ __('common.updating') }}</span>
+            <span wire:loading.delay.flex wire:target="search,filterByStatus,resetFilters" class="hidden items-center gap-1.5 text-xs text-secondary-medium dark:text-ink-muted"><flux:icon.arrow-path class="size-3.5 animate-spin" /> {{ __('common.updating') }}</span>
             @if ($portfolio['filters_active'])
                 <flux:button size="sm" variant="ghost" wire:click="resetFilters">{{ __('common.reset_filters') }}</flux:button>
             @endif
@@ -423,7 +423,7 @@ new #[Title('titles.strategies')] class extends Component {
                 @foreach ($portfolio['paginated_strategies'] as $strategy)
                     <tr wire:key="strategy-row-{{ $strategy['id'] }}">
                         <x-ui.data-table.cell :label="__('common.strategy')">
-                            <span class="truncate font-semibold text-secondary-dark dark:text-white">{{ $strategy['name'] }}</span>
+                            <span class="truncate font-semibold text-secondary-dark dark:text-ink">{{ $strategy['name'] }}</span>
                         </x-ui.data-table.cell>
                         <x-ui.data-table.cell :label="__('common.period')">
                             <bdi class="tabular-nums">{{ $strategy['start_year'] }}–{{ $strategy['end_year'] }}</bdi>
@@ -464,7 +464,7 @@ new #[Title('titles.strategies')] class extends Component {
                 @endforeach
             </x-ui.data-table>
 
-            <flux:pagination :paginator="$portfolio['paginated_strategies']" class="text-secondary-medium! dark:text-secondary-soft!" />
+            <flux:pagination :paginator="$portfolio['paginated_strategies']" class="text-secondary-medium! dark:text-ink-muted!" />
         </div>
     @endif
 

@@ -11,7 +11,7 @@
     $totalApproved = $planned->sum('approved');
 
     $levelMarks = [
-        ResultType::Impact->value => 'bg-secondary-dark dark:bg-white',
+        ResultType::Impact->value => 'bg-secondary-dark dark:bg-ink',
         ResultType::Outcome->value => 'bg-primary',
         ResultType::Output->value => 'bg-secondary-light',
     ];
@@ -21,22 +21,22 @@
     <header class="flex flex-col gap-5 border-b border-board-line bg-board-head px-5 py-5 @4xl/detail:flex-row @4xl/detail:items-end @4xl/detail:justify-between">
         <div class="max-w-xl">
             <h2 id="program-plans-heading" class="text-xl font-bold text-balance">{{ __('programs.annual_plans') }}</h2>
-            <p class="mt-1 text-sm text-secondary-medium dark:text-secondary-soft">{{ __('programs.plan_years_description') }}</p>
+            <p class="mt-1 text-sm text-secondary-medium dark:text-ink-muted">{{ __('programs.plan_years_description') }}</p>
         </div>
 
         @if ($slots !== [])
             <dl class="grid grid-cols-3 divide-x divide-board-line overflow-hidden rounded-md border border-board-line bg-board rtl:divide-x-reverse">
                 <div class="px-4 py-2.5">
-                    <dt class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('programs.plan_years') }}</dt>
-                    <dd class="mt-0.5 flex items-baseline gap-1 tabular-nums"><span class="text-xl font-bold">{{ $planned->count() }}</span><span class="text-sm text-secondary-medium dark:text-secondary-soft">/ {{ count($slots) }}</span></dd>
+                    <dt class="type-label text-secondary-medium dark:text-ink-muted">{{ __('programs.plan_years') }}</dt>
+                    <dd class="mt-0.5 flex items-baseline gap-1 tabular-nums"><span class="text-xl font-bold">{{ $planned->count() }}</span><span class="text-sm text-secondary-medium dark:text-ink-muted">/ {{ count($slots) }}</span></dd>
                 </div>
                 <div class="px-4 py-2.5">
-                    <dt class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('common.targets') }}</dt>
+                    <dt class="type-label text-secondary-medium dark:text-ink-muted">{{ __('common.targets') }}</dt>
                     <dd class="mt-0.5 text-xl font-bold tabular-nums">{{ $totalTargets }}</dd>
                 </div>
                 <div class="px-4 py-2.5">
-                    <dt class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('common.reports') }}</dt>
-                    <dd class="mt-0.5 flex items-baseline gap-1 tabular-nums"><span class="text-xl font-bold">{{ $totalApproved }}</span><span class="text-sm text-secondary-medium dark:text-secondary-soft">/ {{ $totalReports }}</span></dd>
+                    <dt class="type-label text-secondary-medium dark:text-ink-muted">{{ __('common.reports') }}</dt>
+                    <dd class="mt-0.5 flex items-baseline gap-1 tabular-nums"><span class="text-xl font-bold">{{ $totalApproved }}</span><span class="text-sm text-secondary-medium dark:text-ink-muted">/ {{ $totalReports }}</span></dd>
                 </div>
             </dl>
         @endif
@@ -46,7 +46,7 @@
         <x-ui.empty-state icon="calendar-days" :heading="__('common.no_annual_plans_yet')" :body="__('programs.operational_plans_written_for_this_program_will_appear_here')" />
     @else
         <div class="bg-ground px-4 py-6 @3xl/detail:px-8 @3xl/detail:py-8">
-            <div class="mb-5 flex flex-wrap items-center gap-x-4 gap-y-1 type-meta text-secondary-medium dark:text-secondary-soft">
+            <div class="mb-5 flex flex-wrap items-center gap-x-4 gap-y-1 type-meta text-secondary-medium dark:text-ink-muted">
                 <span>{{ __('programs.plan_years_planned', ['planned' => $planned->count(), 'total' => count($slots)]) }}</span>
                 @if ($strategy !== null)
                     <span class="inline-flex items-center gap-1"><flux:icon.flag variant="micro" class="size-3.5" aria-hidden="true" />{{ __('programs.plan_strategy_window', ['start' => $strategy->start_year, 'end' => $strategy->end_year]) }}</span>
@@ -129,13 +129,13 @@
                             ])></span>
 
                             @if ($isCurrent)
-                                <span class="absolute top-10 hidden -translate-y-[calc(100%+0.75rem)] rounded-full bg-primary px-2 py-0.5 text-[0.6875rem] font-bold text-white @3xl/detail:start-1/2 @3xl/detail:block @3xl/detail:-translate-x-1/2 rtl:@3xl/detail:translate-x-1/2">{{ __('programs.plan_now') }}</span>
+                                <span class="absolute top-10 hidden -translate-y-[calc(100%+0.75rem)] rounded-full bg-primary dark:bg-brand px-2 py-0.5 text-[0.6875rem] font-bold text-white @3xl/detail:start-1/2 @3xl/detail:block @3xl/detail:-translate-x-1/2 rtl:@3xl/detail:translate-x-1/2">{{ __('programs.plan_now') }}</span>
                             @endif
 
                             @if ($plan === null)
                                 <div class="flex h-full min-h-40 flex-col items-center justify-center gap-2 rounded-md border border-dashed border-secondary-light px-4 py-6 text-center">
-                                    <p class="text-lg font-bold text-secondary-medium tabular-nums dark:text-secondary-soft">{{ __('common.fy_year', ['year' => $slot['year']]) }}</p>
-                                    <p class="type-meta text-secondary-medium dark:text-secondary-soft">{{ __('programs.plan_no_plan_written') }}</p>
+                                    <p class="text-lg font-bold text-secondary-medium tabular-nums dark:text-ink-muted">{{ __('common.fy_year', ['year' => $slot['year']]) }}</p>
+                                    <p class="type-meta text-secondary-medium dark:text-ink-muted">{{ __('programs.plan_no_plan_written') }}</p>
                                 </div>
                             @else
                                 @php
@@ -154,20 +154,20 @@
                                     ])
                                 >
                                     @if ($isCurrent)
-                                        <span aria-hidden="true" class="absolute inset-x-0 top-0 h-1 bg-primary"></span>
+                                        <span aria-hidden="true" class="absolute inset-x-0 top-0 h-1 bg-primary dark:bg-brand"></span>
                                     @endif
 
                                     <div class="px-4 pt-4">
                                         <div class="flex items-center justify-between gap-2">
-                                            <p @class(['type-label', 'text-primary' => $isCurrent, 'text-secondary-medium dark:text-secondary-soft' => ! $isCurrent])>{{ $status }}</p>
-                                            <flux:icon.arrow-up-right variant="micro" class="size-4 text-secondary-light transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-primary rtl:-scale-x-100" aria-hidden="true" />
+                                            <p @class(['type-label', 'text-primary dark:text-brand-text' => $isCurrent, 'text-secondary-medium dark:text-ink-muted' => ! $isCurrent])>{{ $status }}</p>
+                                            <flux:icon.arrow-up-right variant="micro" class="size-4 text-secondary-light transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-primary dark:group-hover:text-brand-text rtl:-scale-x-100" aria-hidden="true" />
                                         </div>
                                         <p class="mt-1 text-xl font-bold text-balance tabular-nums">{{ __('common.fy_year', ['year' => $slot['year']]) }}</p>
 
                                         @if ($isCurrent)
                                             <div class="mt-2">
-                                                <div class="h-1 overflow-hidden rounded-full bg-board-line" aria-hidden="true"><div class="h-full rounded-full bg-primary" style="width: {{ $yearElapsed }}%"></div></div>
-                                                <p class="mt-1 type-meta text-secondary-medium dark:text-secondary-soft">{{ __('programs.plan_year_elapsed', ['percent' => $yearElapsed]) }}</p>
+                                                <div class="h-1 overflow-hidden rounded-full bg-board-line" aria-hidden="true"><div class="h-full rounded-full bg-primary dark:bg-ink-muted" style="width: {{ $yearElapsed }}%"></div></div>
+                                                <p class="mt-1 type-meta text-secondary-medium dark:text-ink-muted">{{ __('programs.plan_year_elapsed', ['percent' => $yearElapsed]) }}</p>
                                             </div>
                                         @endif
                                     </div>
@@ -175,7 +175,7 @@
                                     <div class="mt-4 border-t border-board-line px-4 py-3">
                                         <div class="flex items-baseline gap-2">
                                             <span class="type-figure">{{ $slot['targets'] }}</span>
-                                            <span class="text-sm font-semibold text-secondary-medium dark:text-secondary-soft">{{ trans_choice('programs.plan_targets_word', $slot['targets']) }}</span>
+                                            <span class="text-sm font-semibold text-secondary-medium dark:text-ink-muted">{{ trans_choice('programs.plan_targets_word', $slot['targets']) }}</span>
                                         </div>
 
                                         @if ($slot['targets'] === 0)
@@ -191,13 +191,13 @@
                                                     <span class="grow bg-board-line"></span>
                                                 @endif
                                             </div>
-                                            <p class="mt-2 type-meta text-secondary-medium dark:text-secondary-soft">{{ __('programs.plan_target_scope', ['attributed' => $slot['attributed'], 'wide' => $slot['targets'] - $slot['attributed']]) }}</p>
+                                            <p class="mt-2 type-meta text-secondary-medium dark:text-ink-muted">{{ __('programs.plan_target_scope', ['attributed' => $slot['attributed'], 'wide' => $slot['targets'] - $slot['attributed']]) }}</p>
                                         @endif
                                     </div>
 
                                     <div class="border-t border-board-line px-4 py-3">
                                         <div class="flex items-center justify-between gap-2 type-meta">
-                                            <span class="inline-flex items-center gap-1 text-secondary-medium dark:text-secondary-soft"><flux:icon.document-check variant="micro" class="size-3.5" aria-hidden="true" />{{ trans_choice('programs.plan_reports_approved', $slot['reports'], ['count' => $slot['reports'], 'approved' => $slot['approved']]) }}</span>
+                                            <span class="inline-flex items-center gap-1 text-secondary-medium dark:text-ink-muted"><flux:icon.document-check variant="micro" class="size-3.5" aria-hidden="true" />{{ trans_choice('programs.plan_reports_approved', $slot['reports'], ['count' => $slot['reports'], 'approved' => $slot['approved']]) }}</span>
                                             @if ($slot['reports'] > 0)
                                                 <span class="font-semibold tabular-nums">{{ $reportShare }}%</span>
                                             @endif
@@ -223,7 +223,7 @@
                         x-on:click="step({{ $direction }})"
                         aria-label="{{ __($edge === 'start' ? 'programs.plan_scroll_back' : 'programs.plan_scroll_forward') }}"
                         @class([
-                            'absolute top-32 z-10 hidden size-10 cursor-pointer items-center justify-center rounded-full border border-secondary-dark bg-secondary-dark text-white shadow-lg hover:border-primary hover:bg-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary @3xl/detail:flex',
+                            'absolute top-32 z-10 hidden size-10 cursor-pointer items-center justify-center rounded-full border border-secondary-dark bg-secondary-dark text-white shadow-lg hover:border-primary hover:bg-primary dark:hover:border-ink dark:hover:bg-ink dark:hover:text-surface-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary @3xl/detail:flex',
                             '-start-3' => $edge === 'start',
                             '-end-3' => $edge === 'end',
                         ])

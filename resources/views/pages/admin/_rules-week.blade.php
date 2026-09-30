@@ -7,7 +7,7 @@
 <section id="rules-week" aria-labelledby="rules-week-heading" class="rules-group" data-rule-field>
     <div class="flex items-baseline justify-between gap-4">
         <h2 id="rules-week-heading" class="rules-group-title">{{ __('notifications.admin.sections.week') }}</h2>
-        <p class="text-sm font-semibold tabular-nums text-secondary-medium dark:text-secondary-soft" aria-live="polite" x-text="workingCountLabel">{{ count($workingDays) }} {{ trans_choice('notifications.admin.working_days_unit', count($workingDays)) }}</p>
+        <p class="text-sm font-semibold tabular-nums text-secondary-medium dark:text-ink-muted" aria-live="polite" x-text="workingCountLabel">{{ count($workingDays) }} {{ trans_choice('notifications.admin.working_days_unit', count($workingDays)) }}</p>
     </div>
     <p class="rules-group-hint">{{ __('notifications.admin.week_hint') }}</p>
 

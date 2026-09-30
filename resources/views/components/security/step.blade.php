@@ -6,15 +6,15 @@
 --}}
 <li {{ $attributes->class('relative grid grid-cols-[1.5rem_minmax(0,1fr)] gap-x-4') }}>
     @unless ($last)
-        <span aria-hidden="true" class="absolute start-[11px] top-8 bottom-1 border-s-2 border-dotted border-secondary-soft dark:border-secondary-medium"></span>
+        <span aria-hidden="true" class="absolute start-[11px] top-8 bottom-1 border-s-2 border-dotted border-secondary-soft dark:border-line"></span>
     @endunless
 
     <span
         aria-hidden="true"
         @class([
             'relative mt-0.5 grid size-6 place-items-center rounded-full',
-            'bg-primary text-white' => $on,
-            'border-2 border-secondary-light bg-white dark:border-secondary-light dark:bg-secondary-dark' => ! $on,
+            'bg-primary dark:bg-brand text-white' => $on,
+            'border-2 border-secondary-light bg-white dark:border-field-line dark:bg-surface-1' => ! $on,
         ])
     >
         @if ($on)
@@ -31,14 +31,14 @@
                         data-step-state
                         @class([
                             'type-meta rounded-full px-2 py-0.5',
-                            'bg-primary/10 text-primary dark:bg-primary/25 dark:text-white' => $on,
-                            'bg-secondary-soft/60 text-secondary-medium dark:bg-white/10 dark:text-secondary-soft' => ! $on,
+                            'bg-primary/10 text-primary dark:bg-primary/25 dark:text-ink' => $on,
+                            'bg-secondary-soft/60 text-secondary-medium dark:bg-white/10 dark:text-ink-muted' => ! $on,
                         ])
                     >{{ $state }}</span>
                 </div>
 
                 @isset($description)
-                    <p class="mt-1 text-sm text-secondary-medium dark:text-secondary-soft">{{ $description }}</p>
+                    <p class="mt-1 text-sm text-secondary-medium dark:text-ink-muted">{{ $description }}</p>
                 @endisset
             </div>
 

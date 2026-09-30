@@ -222,15 +222,15 @@ new #[Title('titles.strategy')] class extends Component {
     };
 
     $statusChipClasses = match ($status) {
-        'active' => 'bg-status-good text-white',
-        'upcoming' => 'bg-secondary-dark text-white dark:bg-white dark:text-secondary-dark',
-        default => 'bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white',
+        'active' => 'bg-status-good dark:bg-status-good-soft dark:text-status-good text-white',
+        'upcoming' => 'bg-secondary-dark text-white dark:bg-ink dark:text-surface-0',
+        default => 'bg-secondary-soft text-secondary-dark dark:bg-surface-2 dark:text-ink',
     };
 
     $sortAria = fn (string $column): ?string => $sort === $column ? ($direction === 'asc' ? 'ascending' : 'descending') : null;
 @endphp
 
-<section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white">
+<section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink">
     <x-ui.detail-header
         :breadcrumbs="[
             ['label' => __('common.strategies'), 'url' => route('strategies.index')],
@@ -268,13 +268,13 @@ new #[Title('titles.strategy')] class extends Component {
                 'good' => 'stroke-status-good',
                 'warn' => 'stroke-status-warn',
                 'funding' => 'stroke-funding',
-                default => 'stroke-secondary-medium dark:stroke-secondary-light',
+                default => 'stroke-secondary-medium dark:stroke-ink-muted',
             };
             $coverageTextClass = match ($coverageTone) {
                 'good' => 'text-status-good',
                 'warn' => 'text-status-warn',
                 'funding' => 'text-funding',
-                default => 'text-secondary-medium dark:text-secondary-soft',
+                default => 'text-secondary-medium dark:text-ink-muted',
             };
             $ringRadius = 15.5;
             $ringCircumference = 2 * M_PI * $ringRadius;
@@ -285,7 +285,7 @@ new #[Title('titles.strategy')] class extends Component {
             <x-slot:toolbar>
                 <div class="relative flex size-16 shrink-0 items-center justify-center" role="img" :aria-label="__('strategies.average_coverage').': '.round($coveragePct).'%'">
                     <svg class="size-16 -rotate-90" viewBox="0 0 36 36" aria-hidden="true">
-                        <circle cx="18" cy="18" r="{{ $ringRadius }}" fill="none" stroke-width="3" class="stroke-secondary-soft dark:stroke-secondary-medium" />
+                        <circle cx="18" cy="18" r="{{ $ringRadius }}" fill="none" stroke-width="3" class="stroke-secondary-soft dark:stroke-surface-2" />
                         <circle
                             cx="18" cy="18" r="{{ $ringRadius }}" fill="none" stroke-width="3" stroke-linecap="round"
                             class="{{ $coverageRingStrokeClass }} transition-[stroke-dashoffset] duration-500"
@@ -301,24 +301,24 @@ new #[Title('titles.strategy')] class extends Component {
                 @php
                     $yearlyMax = max(1, $this->allPrograms->count());
                     $yearDotClasses = fn (int $count): string => match (true) {
-                        $count <= 0 => 'border-2 border-dashed border-secondary-light bg-white dark:border-secondary-medium dark:bg-secondary-dark',
-                        $count / $yearlyMax > 0.75 => 'border-2 border-secondary-dark bg-secondary-dark dark:border-white dark:bg-white',
-                        $count / $yearlyMax > 0.5 => 'border-2 border-secondary-dark bg-secondary-dark/60 dark:border-white dark:bg-white/60',
-                        $count / $yearlyMax > 0.25 => 'border-2 border-secondary-dark bg-secondary-dark/30 dark:border-white dark:bg-white/30',
-                        default => 'border-2 border-secondary-dark bg-secondary-dark/[0.12] dark:border-white dark:bg-white/[0.15]',
+                        $count <= 0 => 'border-2 border-dashed border-secondary-light bg-white dark:border-ink-faint dark:bg-surface-1',
+                        $count / $yearlyMax > 0.75 => 'border-2 border-secondary-dark bg-secondary-dark dark:border-ink dark:bg-ink',
+                        $count / $yearlyMax > 0.5 => 'border-2 border-secondary-dark bg-secondary-dark/60 dark:border-ink dark:bg-white/60',
+                        $count / $yearlyMax > 0.25 => 'border-2 border-secondary-dark bg-secondary-dark/30 dark:border-ink dark:bg-white/30',
+                        default => 'border-2 border-secondary-dark bg-secondary-dark/[0.12] dark:border-ink dark:bg-white/[0.15]',
                     };
                 @endphp
                 <div class="relative min-w-max px-4 py-2" role="img" aria-label="{{ __('strategies.plan_coverage_by_year') }}">
-                    <div class="absolute inset-x-4 top-1/2 h-px -translate-y-1/2 bg-secondary-soft dark:bg-secondary-medium" aria-hidden="true"></div>
+                    <div class="absolute inset-x-4 top-1/2 h-px -translate-y-1/2 bg-secondary-soft dark:bg-line-strong" aria-hidden="true"></div>
                     <div class="relative flex items-end justify-between gap-6">
                         @foreach ($spanYearsList as $year)
                             @php
                                 $yearCount = $this->yearlyProgramCoverage[$year] ?? 0;
                             @endphp
                             <div class="flex flex-col items-center gap-1.5" title="{{ $year }}: {{ trans_choice('strategies.count_program', $yearCount, ['count' => $yearCount]) }}">
-                                <span class="type-meta font-bold tabular-nums {{ $yearCount > 0 ? 'text-secondary-dark dark:text-white' : 'text-secondary-light dark:text-secondary-medium' }}">{{ $yearCount }}</span>
+                                <span class="type-meta font-bold tabular-nums {{ $yearCount > 0 ? 'text-secondary-dark dark:text-ink' : 'text-secondary-light dark:text-ink-faint' }}">{{ $yearCount }}</span>
                                 <span class="{{ $yearDotClasses($yearCount) }} size-3 shrink-0 rounded-full"></span>
-                                <span class="type-meta text-secondary-medium dark:text-secondary-soft">{{ $year }}</span>
+                                <span class="type-meta text-secondary-medium dark:text-ink-muted">{{ $year }}</span>
                             </div>
                         @endforeach
                     </div>
@@ -348,23 +348,23 @@ new #[Title('titles.strategy')] class extends Component {
                             default => 'chevron-up-down',
                         };
                         $sortIconClasses = fn (string $column) => $sortAria($column) === null
-                            ? 'size-3.5 text-secondary-light dark:text-secondary-medium'
-                            : 'size-3.5 text-primary';
+                            ? 'size-3.5 text-secondary-light dark:text-ink-faint'
+                            : 'size-3.5 text-primary dark:text-brand-text';
                     @endphp
 
                     <th scope="col" aria-sort="{{ $sortAria('name') ?? 'none' }}">
-                        <button type="button" wire:click="sortBy('name')" wire:loading.attr="disabled" wire:target="sortBy" class="inline-flex items-center gap-1 hover:text-secondary-dark dark:hover:text-white" aria-label="{{ __('strategies.sort_by_name') }}">
+                        <button type="button" wire:click="sortBy('name')" wire:loading.attr="disabled" wire:target="sortBy" class="inline-flex items-center gap-1 hover:text-secondary-dark dark:hover:text-ink" aria-label="{{ __('strategies.sort_by_name') }}">
                             {{ __('common.program') }} <flux:icon :name="$sortIcon('name')" :class="$sortIconClasses('name')" />
                         </button>
                     </th>
                     <th scope="col">{{ __('programs.manager') }}</th>
                     <th scope="col" class="text-end!" aria-sort="{{ $sortAria('projects') ?? 'none' }}">
-                        <button type="button" wire:click="sortBy('projects')" wire:loading.attr="disabled" wire:target="sortBy" class="inline-flex items-center gap-1 hover:text-secondary-dark dark:hover:text-white" aria-label="{{ __('strategies.sort_by_projects') }}">
+                        <button type="button" wire:click="sortBy('projects')" wire:loading.attr="disabled" wire:target="sortBy" class="inline-flex items-center gap-1 hover:text-secondary-dark dark:hover:text-ink" aria-label="{{ __('strategies.sort_by_projects') }}">
                             {{ __('common.projects') }} <flux:icon :name="$sortIcon('projects')" :class="$sortIconClasses('projects')" />
                         </button>
                     </th>
                     <th scope="col" class="text-end!" aria-sort="{{ $sortAria('plans') ?? 'none' }}">
-                        <button type="button" wire:click="sortBy('plans')" wire:loading.attr="disabled" wire:target="sortBy" class="inline-flex items-center gap-1 hover:text-secondary-dark dark:hover:text-white" aria-label="{{ __('strategies.sort_by_annual_plans') }}">
+                        <button type="button" wire:click="sortBy('plans')" wire:loading.attr="disabled" wire:target="sortBy" class="inline-flex items-center gap-1 hover:text-secondary-dark dark:hover:text-ink" aria-label="{{ __('strategies.sort_by_annual_plans') }}">
                             {{ __('common.annual_plans') }} <flux:icon :name="$sortIcon('plans')" :class="$sortIconClasses('plans')" />
                         </button>
                     </th>
@@ -384,15 +384,15 @@ new #[Title('titles.strategy')] class extends Component {
                     <tr wire:key="strategy-program-{{ $program->id }}">
                         <x-ui.data-table.cell :label="__('common.program')">
                             <div class="flex min-w-0 items-center gap-2.5">
-                                <div class="flex size-8 shrink-0 items-center justify-center rounded-md bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white">
+                                <div class="flex size-8 shrink-0 items-center justify-center rounded-md bg-secondary-soft text-secondary-dark dark:bg-surface-2 dark:text-ink">
                                     <flux:icon.briefcase class="size-4" />
                                 </div>
                                 @if (Route::has('programs.show'))
-                                    <a href="{{ route('programs.show', $program) }}" wire:navigate class="truncate font-semibold text-secondary-dark hover:underline dark:text-white">
+                                    <a href="{{ route('programs.show', $program) }}" wire:navigate class="truncate font-semibold text-secondary-dark hover:underline dark:text-ink">
                                         {{ $program->name }}
                                     </a>
                                 @else
-                                    <p class="truncate font-semibold text-secondary-dark dark:text-white">{{ $program->name }}</p>
+                                    <p class="truncate font-semibold text-secondary-dark dark:text-ink">{{ $program->name }}</p>
                                 @endif
                             </div>
                         </x-ui.data-table.cell>
@@ -400,10 +400,10 @@ new #[Title('titles.strategy')] class extends Component {
                             <x-ui.employee-chip :employee="$program->manager" compact />
                         </x-ui.data-table.cell>
                         <x-ui.data-table.cell :label="__('common.projects')" numeric>
-                            <span class="inline-flex min-w-8 items-center justify-center rounded-md bg-secondary-soft px-2 py-1 text-xs font-semibold text-secondary-dark dark:bg-secondary-medium dark:text-white">{{ $program->projects_count }}</span>
+                            <span class="inline-flex min-w-8 items-center justify-center rounded-md bg-secondary-soft px-2 py-1 text-xs font-semibold text-secondary-dark dark:bg-surface-2 dark:text-ink">{{ $program->projects_count }}</span>
                         </x-ui.data-table.cell>
                         <x-ui.data-table.cell :label="__('common.annual_plans')" numeric>
-                            <span class="inline-flex min-w-8 items-center justify-center rounded-md border border-secondary-light px-2 py-1 text-xs font-semibold text-secondary-dark dark:text-white">{{ $program->annual_plans_count }}</span>
+                            <span class="inline-flex min-w-8 items-center justify-center rounded-md border border-secondary-light px-2 py-1 text-xs font-semibold text-secondary-dark dark:text-ink">{{ $program->annual_plans_count }}</span>
                         </x-ui.data-table.cell>
                         <x-ui.data-table.cell :label="__('strategies.plan_coverage')">
                             <div class="min-w-28">
@@ -421,7 +421,7 @@ new #[Title('titles.strategy')] class extends Component {
         @endif
 
         <x-slot:footer>
-            <flux:pagination :paginator="$this->programs" class="text-secondary-medium! dark:text-secondary-soft!" />
+            <flux:pagination :paginator="$this->programs" class="text-secondary-medium! dark:text-ink-muted!" />
         </x-slot:footer>
     </x-ui.panel>
 </section>

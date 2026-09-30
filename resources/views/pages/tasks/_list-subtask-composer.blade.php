@@ -19,16 +19,16 @@
     $draftAssignees = collect($this->userOptions)->whereIn('id', collect($subtaskDraft['assignees'])->map(fn ($id) => (int) $id));
 @endphp
 
-<tr x-show="subtasksOpen[{{ $task->id }}]" x-cloak wire:key="task-subtask-composer-{{ $task->id }}" class="bg-secondary-soft/20 dark:bg-secondary-medium/10" data-test="task-subtask-add-row-{{ $task->id }}">
+<tr x-show="subtasksOpen[{{ $task->id }}]" x-cloak wire:key="task-subtask-composer-{{ $task->id }}" class="bg-secondary-soft/20 dark:bg-white/[0.03]" data-test="task-subtask-add-row-{{ $task->id }}">
     <td class="ps-3">
-        <flux:icon.plus variant="micro" class="size-4 shrink-0 text-primary" aria-hidden="true" />
+        <flux:icon.plus variant="micro" class="size-4 shrink-0 text-primary dark:text-brand-text" aria-hidden="true" />
     </td>
     <td class="min-w-0 px-2 py-2.5">
         <input
             type="text"
             x-ref="subtaskAddInput{{ $task->id }}"
             placeholder="{{ __('tasks.add_subtask') }}"
-            class="w-full min-w-0 border-0 bg-transparent p-1 text-sm text-secondary-dark placeholder:text-secondary-light focus:ring-0 focus:outline-none {{ 'ps-5' }} dark:text-white"
+            class="w-full min-w-0 border-0 bg-transparent p-1 text-sm text-secondary-dark placeholder:text-secondary-light focus:ring-0 focus:outline-none {{ 'ps-5' }} dark:text-ink"
             wire:keydown.enter="addSubtaskQuick({{ $task->id }}, $event.target.value); $event.target.value = ''"
             data-test="task-subtask-quick-add-{{ $task->id }}"
         />
@@ -46,12 +46,12 @@
                     </span>
                 @else
                     @foreach ($draftAssignees->take(3) as $userOption)
-                        <span class="inline-flex size-7 items-center justify-center rounded-full border-2 border-white bg-secondary-dark text-[11px] font-semibold text-white dark:border-secondary-dark dark:bg-secondary-medium">
+                        <span class="inline-flex size-7 items-center justify-center rounded-full border-2 border-white bg-secondary-dark text-[11px] font-semibold text-white dark:border-surface-1 dark:bg-surface-3">
                             {{ Illuminate\Support\Str::of($userOption['name'])->explode(' ')->map(fn ($part) => mb_substr($part, 0, 1))->take(2)->implode('') }}
                         </span>
                     @endforeach
                     @if ($draftAssignees->count() > 3)
-                        <span class="inline-flex size-7 items-center justify-center rounded-full border-2 border-white bg-secondary-soft text-[10px] font-semibold text-secondary-dark dark:border-secondary-dark dark:bg-secondary-medium dark:text-white">
+                        <span class="inline-flex size-7 items-center justify-center rounded-full border-2 border-white bg-secondary-soft text-[10px] font-semibold text-secondary-dark dark:border-surface-1 dark:bg-surface-3 dark:text-ink">
                             +{{ $draftAssignees->count() - 3 }}
                         </span>
                     @endif
@@ -67,12 +67,12 @@
                     wire:click="toggleSubtaskDraftAssignee({{ $task->id }}, {{ $userOption['id'] }})"
                     wire:key="task-{{ $task->id }}-subtask-draft-assignee-{{ $userOption['id'] }}"
                     x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
-                    class="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm hover:bg-secondary-soft dark:hover:bg-secondary-medium"
+                    class="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm hover:bg-secondary-soft dark:hover:bg-white/[0.06]"
                     data-test="task-subtask-assignee-option-{{ $task->id }}-{{ $userOption['id'] }}"
                 >
                     <span class="min-w-0 flex-1 truncate">{{ $userOption['name'] }} · {{ $userOption['secondary_name'] }}</span>
                     @if ($isDraftAssigned)
-                        <flux:icon.check class="size-4 shrink-0 text-primary" />
+                        <flux:icon.check class="size-4 shrink-0 text-primary dark:text-brand-text" />
                     @endif
                 </button>
             @endforeach
@@ -84,13 +84,13 @@
             wire:model="subtaskDrafts.{{ $task->id }}.due_date"
             value="{{ $subtaskDraft['due_date'] }}"
             aria-label="{{ __('tasks.due_date_2') }}"
-            class="w-full min-w-0 rounded border-0 bg-transparent p-1 text-xs tabular-nums text-secondary-medium focus:ring-1 focus:ring-primary focus:outline-none dark:text-secondary-soft"
+            class="w-full min-w-0 rounded border-0 bg-transparent p-1 text-xs tabular-nums text-secondary-medium focus:ring-1 focus:ring-primary focus:outline-none dark:text-ink-muted"
             data-test="task-subtask-due-date-{{ $task->id }}"
         />
     </td>
     <td class="px-2">
         <flux:dropdown position="bottom" align="start">
-            <button type="button" aria-label="{{ __('tasks.priority') }}: {{ $draftPriority->label() }}" class="inline-flex size-7 cursor-pointer items-center justify-center rounded hover:bg-secondary-soft dark:hover:bg-secondary-medium" data-test="task-subtask-priority-trigger-{{ $task->id }}">
+            <button type="button" aria-label="{{ __('tasks.priority') }}: {{ $draftPriority->label() }}" class="inline-flex size-7 cursor-pointer items-center justify-center rounded hover:bg-secondary-soft dark:hover:bg-surface-2" data-test="task-subtask-priority-trigger-{{ $task->id }}">
                 <flux:icon.flag :variant="$draftPriority === TaskPriority::Low ? 'outline' : 'solid'" class="size-4 {{ $priorityIconClasses($draftPriority) }}" />
             </button>
             <flux:menu>

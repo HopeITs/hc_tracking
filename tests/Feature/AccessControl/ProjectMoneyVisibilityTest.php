@@ -421,7 +421,7 @@ test('the projects directory keeps the portfolio tile row whole when the committ
         ->test('pages::projects.index')
         ->assertSee(__('projects.tile_beneficiaries'))
         ->assertDontSee(__('projects.tile_committed_funding'))
-        ->assertSeeHtml('dark:bg-secondary-medium grid-cols-1');
+        ->assertSeeHtml('dark:bg-line grid-cols-1');
 });
 
 test('the project page loads no budget pivot for a viewer without funding agreements', function () {
