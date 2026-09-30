@@ -37,6 +37,8 @@
 
             <x-report-bug-button />
 
+            <x-guideline-button />
+
             <x-tour.button />
 
             <flux:dropdown position="top" align="end" data-tour="profile">
@@ -130,6 +132,8 @@
                         </flux:menu.radio.group>
                     </flux:menu>
                 </flux:dropdown>
+
+                <x-guideline-button />
 
                 <x-locale-toggle />
 

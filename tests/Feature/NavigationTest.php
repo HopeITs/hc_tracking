@@ -190,6 +190,28 @@ test('both top headers link to the bug report form in a new tab', function () {
     }
 });
 
+test('both top headers link to the user guideline in a new tab', function () {
+    $user = User::factory()->role('Team Member')->create();
+
+    $response = $this->actingAs($user)->get(route('dashboard'))->assertOk();
+
+    $document = new DOMDocument;
+    $document->loadHTML($response->getContent(), LIBXML_NOERROR | LIBXML_NOWARNING);
+    $xpath = new DOMXPath($document);
+    $links = $xpath->query('//a[@data-guideline]');
+
+    expect($links)->toHaveCount(2)
+        ->and($xpath->query('//*[@data-desktop-navigation-header]//a[@data-guideline]/following::*[@data-locale-toggle]'))->toHaveCount(1);
+
+    foreach ($links as $link) {
+        expect($link->getAttribute('href'))->toBe('https://docs.google.com/document/d/1-cQQQrmqRirFbkwU22RL9YkpIY1_D8n8/edit')
+            ->and($link->getAttribute('target'))->toBe('_blank')
+            ->and($link->getAttribute('rel'))->toContain('noopener')
+            ->and($link->getAttribute('aria-label'))->toBe('User guideline')
+            ->and($link->hasAttribute('data-top-bar-action'))->toBeTrue();
+    }
+});
+
 test('the sidebar arms its collapse animation only from a toggle, so a restored state renders without motion', function () {
     $user = User::factory()->role('Team Member')->create();
 

@@ -9,6 +9,7 @@ return [
     'appearance_system' => 'System',
     'application_navigation' => 'Application navigation',
     'documentation' => 'Documentation',
+    'guideline' => 'User guideline',
     'manage_your_profile_and_account_settings' => 'Manage your profile and account settings',
     'overview' => 'Overview',
     'platform' => 'Platform',
