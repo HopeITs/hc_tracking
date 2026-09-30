@@ -237,23 +237,16 @@ test('both top headers link to the bug report form in a new tab', function () {
     }
 });
 
-<<<<<<< HEAD
 test('both top headers link to the user guideline in a new tab', function () {
-=======
-test('both top headers gather their icon actions on one track, apart from the language toggle', function () {
->>>>>>> Security-handeling-youssef
     $user = User::factory()->role('Team Member')->create();
 
     $response = $this->actingAs($user)->get(route('dashboard'))->assertOk();
 
     $document = new DOMDocument;
     $document->loadHTML($response->getContent(), LIBXML_NOERROR | LIBXML_NOWARNING);
-    $xpath = new DOMXPath($document);
-<<<<<<< HEAD
-    $links = $xpath->query('//a[@data-guideline]');
+    $links = (new DOMXPath($document))->query('//a[@data-guideline]');
 
-    expect($links)->toHaveCount(2)
-        ->and($xpath->query('//*[@data-desktop-navigation-header]//a[@data-guideline]/following::*[@data-locale-toggle]'))->toHaveCount(1);
+    expect($links)->toHaveCount(2);
 
     foreach ($links as $link) {
         expect($link->getAttribute('href'))->toBe('https://docs.google.com/document/d/1-cQQQrmqRirFbkwU22RL9YkpIY1_D8n8/edit')
@@ -261,7 +254,17 @@ test('both top headers gather their icon actions on one track, apart from the la
             ->and($link->getAttribute('rel'))->toContain('noopener')
             ->and($link->getAttribute('aria-label'))->toBe('User guideline')
             ->and($link->hasAttribute('data-top-bar-action'))->toBeTrue();
-=======
+    }
+});
+
+test('both top headers gather their icon actions on one track, apart from the language toggle', function () {
+    $user = User::factory()->role('Team Member')->create();
+
+    $response = $this->actingAs($user)->get(route('dashboard'))->assertOk();
+
+    $document = new DOMDocument;
+    $document->loadHTML($response->getContent(), LIBXML_NOERROR | LIBXML_NOWARNING);
+    $xpath = new DOMXPath($document);
 
     $groups = $xpath->query('//*[@data-top-bar-actions]//*[@data-top-bar-action-group]');
     $desktopGroup = $xpath->query('//*[@data-desktop-navigation-header]//*[@data-top-bar-action-group]');
@@ -274,8 +277,8 @@ test('both top headers gather their icon actions on one track, apart from the la
     foreach ($groups as $group) {
         expect($xpath->query('.//*[@data-test="notification-bell-button"]', $group))->toHaveCount(1)
             ->and($xpath->query('.//*[@data-report-bug]', $group))->toHaveCount(1)
+            ->and($xpath->query('.//*[@data-guideline]', $group))->toHaveCount(1)
             ->and($xpath->query('.//*[@data-test="tour-start-button"]', $group))->toHaveCount(1);
->>>>>>> Security-handeling-youssef
     }
 });
 

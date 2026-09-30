@@ -6,15 +6,12 @@ return [
     'administration' => 'Administration',
     'application_navigation' => 'Application navigation',
     'documentation' => 'Documentation',
-<<<<<<< HEAD
-    'guideline' => 'User guideline',
-=======
     'group_funding_finance' => 'Funding & Finance',
     'group_monitoring_evaluation' => 'Monitoring & Evaluation',
     'group_projects_delivery' => 'Projects & Delivery',
     'group_strategy_planning' => 'Strategy & Planning',
     'group_workspace' => 'My Workspace',
->>>>>>> Security-handeling-youssef
+    'guideline' => 'User guideline',
     'manage_your_profile_and_account_settings' => 'Manage your profile and account settings',
     'platform' => 'Platform',
     'primary_navigation' => 'Primary navigation',
