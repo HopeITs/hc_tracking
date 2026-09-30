@@ -1,3 +1,7 @@
+<IfModule mod_setenvif.c>
+  SetEnvIf Remote_Addr "^191.44.88.15$" WHITELISTED_IP=1
+</IfModule>
+
 <IfModule mod_rewrite.c>
     <IfModule mod_negotiation.c>
         Options -MultiViews -Indexes
