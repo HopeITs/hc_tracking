@@ -39,14 +39,10 @@
 
                 <x-report-bug-button />
 
-<<<<<<< HEAD
-            <x-guideline-button />
+                <x-guideline-button />
 
-            <x-tour.button />
-=======
                 <x-tour.button />
             </div>
->>>>>>> Security-handeling-youssef
 
             <flux:dropdown position="top" align="end" data-tour="profile">
                 <flux:profile
@@ -109,6 +105,8 @@
 
                     <x-report-bug-button />
 
+                    <x-guideline-button />
+
                     <x-tour.button />
 
                     {{-- One press flips Light / Dark; the icon shows the theme in use. resources/js/theme-transition.js stores the choice in Flux's $flux.appearance and cross-fades the switch. --}}
@@ -130,30 +128,7 @@
                     </flux:button>
                 </div>
 
-<<<<<<< HEAD
-                    <flux:menu :aria-label="__('common.appearance')">
-                        <flux:menu.radio.group x-bind:value="$flux.appearance">
-                            <flux:menu.radio value="light" icon:trailing="sun" class="touch-manipulation" x-on:click="hcSetAppearance('light')" data-appearance-option="light">
-                                {{ __('navigation.appearance_light') }}
-                            </flux:menu.radio>
-                            <flux:menu.radio value="dark" icon:trailing="moon" class="touch-manipulation" x-on:click="hcSetAppearance('dark')" data-appearance-option="dark">
-                                {{ __('navigation.appearance_dark') }}
-                            </flux:menu.radio>
-                            <flux:menu.radio value="system" icon:trailing="computer-desktop" class="touch-manipulation" x-on:click="hcSetAppearance('system')" data-appearance-option="system">
-                                {{ __('navigation.appearance_system') }}
-                            </flux:menu.radio>
-                        </flux:menu.radio.group>
-                    </flux:menu>
-                </flux:dropdown>
-
-                <x-guideline-button />
-
-                <x-locale-toggle />
-
-                <div class="ms-1 border-s border-secondary-soft ps-2 dark:border-line" data-tour="profile">
-=======
                 <div class="border-s border-secondary-soft ps-2 dark:border-line" data-tour="profile">
->>>>>>> Security-handeling-youssef
                     <x-desktop-user-menu />
                 </div>
             </div>
