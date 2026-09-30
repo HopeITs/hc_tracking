@@ -18,7 +18,7 @@
 --}}
 
 @if ($mapFiltersActive)
-    <p class="text-xs font-semibold text-secondary-medium dark:text-secondary-soft">
+    <p class="text-xs font-semibold text-secondary-medium dark:text-ink-muted">
         {{ trans_choice('cities.count_matching_cities', $matchingMapCount, ['count' => $matchingMapCount]) }}
     </p>
 @endif
@@ -31,7 +31,7 @@
         <div class="bg-board-head p-4 pt-16">
             <div class="relative mx-auto w-full max-w-xl" style="aspect-ratio: 670.92236 / 590.26318;">
                 {{-- Syria's real governorate boundaries — see HrCity::MapOutlinePath for source and licence. Each governorate strokes with the wrapper's own background colour, so borders read as a gap rather than a drawn line. --}}
-                <svg viewBox="0 0 670.92236 590.26318" class="absolute inset-0 h-full w-full text-secondary-soft [&_path]:stroke-[var(--color-board-head)] dark:text-secondary-medium/70" aria-hidden="true" preserveAspectRatio="xMidYMid meet" fill="currentColor" stroke-width="1.3">
+                <svg viewBox="0 0 670.92236 590.26318" class="absolute inset-0 h-full w-full text-secondary-soft [&_path]:stroke-[var(--color-board-head)] dark:text-line-strong" aria-hidden="true" preserveAspectRatio="xMidYMid meet" fill="currentColor" stroke-width="1.3">
                     {!! $mapOutlinePath !!}
 
                     {{-- Delivery lines fan out from HQ to every city currently running a project — the literal "connections" in the data. --}}
@@ -75,17 +75,17 @@
                             role="tooltip"
                             class="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 flex -translate-x-1/2 flex-col items-center opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
                         >
-                            <span class="rounded-lg bg-secondary-dark px-3 py-1.5 text-start whitespace-nowrap shadow-lg dark:bg-white">
-                                <span class="block text-xs font-bold text-white dark:text-secondary-dark">{{ $city['name'] }}</span>
-                                <span class="block text-[11px] text-secondary-soft dark:text-secondary-medium" dir="auto">{{ $city['secondaryName'] }}</span>
-                                <span class="block text-[11px] text-secondary-soft dark:text-secondary-medium">{{ $city['statusLabel'] }} · {{ $city['projectsLabel'] }}</span>
+                            <span class="rounded-lg bg-secondary-dark px-3 py-1.5 text-start whitespace-nowrap shadow-lg dark:bg-surface-3 dark:shadow-raised">
+                                <span class="block text-xs font-bold text-white dark:text-ink">{{ $city['name'] }}</span>
+                                <span class="block text-[11px] text-secondary-soft dark:text-ink-muted" dir="auto">{{ $city['secondaryName'] }}</span>
+                                <span class="block text-[11px] text-secondary-soft dark:text-ink-muted">{{ $city['statusLabel'] }} · {{ $city['projectsLabel'] }}</span>
                             </span>
-                            <span class="-mt-1 size-2 rotate-45 bg-secondary-dark dark:bg-white"></span>
+                            <span class="-mt-1 size-2 rotate-45 bg-secondary-dark dark:bg-surface-3"></span>
                         </span>
 
                         <span
-                            :class="selected === {{ $city['id'] }} ? 'ring-2 ring-primary ring-offset-2 dark:ring-offset-secondary-dark' : ''"
-                            class="{{ $avatarTone }} {{ $city['isActive'] ? 'border-status-good' : 'border-secondary-light dark:border-secondary-medium' }} {{ $city['matches'] ? '' : 'opacity-30' }} flex shrink-0 items-center justify-center rounded-full border-2 transition-all duration-150 hover:scale-110"
+                            :class="selected === {{ $city['id'] }} ? 'ring-2 ring-primary ring-offset-2 dark:ring-offset-surface-1' : ''"
+                            class="{{ $avatarTone }} {{ $city['isActive'] ? 'border-status-good' : 'border-secondary-light dark:border-ink-faint' }} {{ $city['matches'] ? '' : 'opacity-30' }} flex shrink-0 items-center justify-center rounded-full border-2 transition-all duration-150 hover:scale-110"
                             style="width: {{ $markerSize }}px; height: {{ $markerSize }}px;"
                         >
                             <flux:icon :name="$city['isHq'] ? 'building-office' : 'map-pin'" class="size-1/2" />
@@ -96,13 +96,13 @@
         </div>
 
         <x-slot:footer>
-            <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-secondary-medium dark:text-secondary-soft">
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-secondary-medium dark:text-ink-muted">
                 <span class="flex items-center gap-1.5">
-                    <span class="size-2.5 rounded-full border-2 border-status-good bg-secondary-soft dark:bg-secondary-medium"></span>
+                    <span class="size-2.5 rounded-full border-2 border-status-good bg-secondary-soft dark:bg-line-strong"></span>
                     {{ __('common.active') }}
                 </span>
                 <span class="flex items-center gap-1.5">
-                    <span class="size-2.5 rounded-full border-2 border-secondary-light bg-secondary-soft dark:border-secondary-medium dark:bg-secondary-medium"></span>
+                    <span class="size-2.5 rounded-full border-2 border-secondary-light bg-secondary-soft dark:border-ink-faint dark:bg-line-strong"></span>
                     {{ __('cities.inactive') }}
                 </span>
                 <span class="flex items-center gap-1.5">
@@ -110,7 +110,7 @@
                     {{ __('cities.headquarters_label') }}
                 </span>
                 <span class="flex items-center gap-1.5">
-                    <span class="size-3.5 rounded-full bg-secondary-soft dark:bg-secondary-medium"></span>
+                    <span class="size-3.5 rounded-full bg-secondary-soft dark:bg-line-strong"></span>
                     {{ __('cities.marker_size_hint') }}
                 </span>
                 <span class="ms-auto italic">{{ __('cities.schematic_note') }}</span>
@@ -131,30 +131,30 @@
                 x-show="selected === {{ $city['id'] }}"
                 x-cloak
                 wire:key="detail-{{ $city['id'] }}"
-                class="flex min-h-64 flex-col gap-4 rounded-xl border border-secondary-soft bg-white p-4 dark:border-secondary-medium dark:bg-secondary-dark"
+                class="flex min-h-64 flex-col gap-4 rounded-xl border border-secondary-soft bg-white p-4 dark:border-line dark:bg-surface-1"
             >
                 <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0">
-                        <p class="truncate text-lg font-bold text-secondary-dark dark:text-white">{{ $city['name'] }}</p>
-                        <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft" dir="auto">{{ $city['secondaryName'] }}</p>
+                        <p class="truncate text-lg font-bold text-secondary-dark dark:text-ink">{{ $city['name'] }}</p>
+                        <p class="truncate text-xs text-secondary-medium dark:text-ink-muted" dir="auto">{{ $city['secondaryName'] }}</p>
                     </div>
                     <span @class([
                         'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap',
                         'bg-status-good-soft text-status-good' => $city['isActive'],
-                        'bg-secondary-soft text-secondary-medium dark:bg-secondary-medium dark:text-secondary-soft' => ! $city['isActive'],
+                        'bg-secondary-soft text-secondary-medium dark:bg-surface-2 dark:text-ink-muted' => ! $city['isActive'],
                     ])>{{ $city['statusLabel'] }}</span>
                 </div>
 
                 <div class="flex items-end justify-between gap-3">
                     <div class="min-w-0">
-                        <p class="type-figure text-secondary-dark dark:text-white">{{ $city['total'] }}</p>
-                        <p class="type-meta text-secondary-medium dark:text-secondary-soft">{{ $city['projectsLabel'] }}</p>
+                        <p class="type-figure text-secondary-dark dark:text-ink">{{ $city['total'] }}</p>
+                        <p class="type-meta text-secondary-medium dark:text-ink-muted">{{ $city['projectsLabel'] }}</p>
                     </div>
                     @if ($city['total'] > 0)
                         <div class="min-w-0 text-end">
-                            <p class="type-meta truncate text-secondary-medium dark:text-secondary-soft">{{ $city['programsLabel'] }}</p>
+                            <p class="type-meta truncate text-secondary-medium dark:text-ink-muted">{{ $city['programsLabel'] }}</p>
                             @if ($city['beneficiariesLine'] !== null)
-                                <p class="type-meta truncate text-secondary-medium dark:text-secondary-soft">{{ $city['beneficiariesLine'] }}</p>
+                                <p class="type-meta truncate text-secondary-medium dark:text-ink-muted">{{ $city['beneficiariesLine'] }}</p>
                             @endif
                         </div>
                     @endif
@@ -162,23 +162,23 @@
 
                 @if ($city['total'] > 0)
                     <div>
-                        <div class="flex h-1.5 w-full overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium" role="presentation">
+                        <div class="flex h-1.5 w-full overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2" role="presentation">
                             <div class="h-full bg-status-active" style="width: {{ $city['openPct'] }}%"></div>
-                            <div class="h-full bg-secondary-light dark:bg-secondary-light/60" style="width: {{ 100 - $city['openPct'] }}%"></div>
+                            <div class="h-full bg-secondary-light dark:bg-ink-faint/60" style="width: {{ 100 - $city['openPct'] }}%"></div>
                         </div>
-                        <div class="mt-1 flex items-center justify-between text-[11px] text-secondary-medium dark:text-secondary-soft">
+                        <div class="mt-1 flex items-center justify-between text-[11px] text-secondary-medium dark:text-ink-muted">
                             <span>{{ $city['open'] }} {{ __('cities.open') }}</span>
                             <span>{{ $city['closed'] }} {{ __('cities.closed') }}</span>
                         </div>
                     </div>
                 @else
-                    <p class="type-meta text-secondary-light italic dark:text-secondary-medium">{{ $city['noProjectsLabel'] }}</p>
+                    <p class="type-meta text-secondary-light italic dark:text-ink-faint">{{ $city['noProjectsLabel'] }}</p>
                 @endif
 
                 <a
                     href="{{ $city['href'] }}"
                     wire:navigate
-                    class="group mt-auto flex items-center justify-center gap-1.5 rounded-lg border border-secondary-light px-3 py-2 text-sm font-semibold text-secondary-dark transition-colors hover:bg-secondary-soft dark:border-secondary-medium dark:text-white dark:hover:bg-secondary-medium"
+                    class="group mt-auto flex items-center justify-center gap-1.5 rounded-lg border border-secondary-light px-3 py-2 text-sm font-semibold text-secondary-dark transition-colors hover:bg-secondary-soft dark:border-line dark:text-ink dark:hover:bg-surface-2"
                 >
                     {{ __('common.projects') }}
                     <flux:icon.chevron-right variant="micro" class="size-3.5 transition-transform group-hover:translate-x-0.5 rtl:-scale-x-100 rtl:group-hover:-translate-x-0.5" />
@@ -190,17 +190,17 @@
 
 @if ($unmappedCities->isNotEmpty())
     <div class="flex flex-wrap items-center gap-2">
-        <p class="type-label shrink-0 text-secondary-medium dark:text-secondary-soft">{{ __('cities.not_shown_on_map') }}</p>
+        <p class="type-label shrink-0 text-secondary-medium dark:text-ink-muted">{{ __('cities.not_shown_on_map') }}</p>
         @foreach ($unmappedCities as $city)
             <a
                 href="{{ $city['href'] }}"
                 wire:navigate
                 wire:key="unmapped-{{ $city['id'] }}"
-                class="inline-flex items-center gap-1.5 rounded-full border border-secondary-soft bg-white px-2.5 py-1 text-xs font-semibold text-secondary-dark transition-colors hover:bg-secondary-soft dark:border-secondary-medium dark:bg-secondary-dark dark:text-white dark:hover:bg-secondary-medium"
+                class="inline-flex items-center gap-1.5 rounded-full border border-secondary-soft bg-white px-2.5 py-1 text-xs font-semibold text-secondary-dark transition-colors hover:bg-secondary-soft dark:border-line dark:bg-surface-1 dark:text-ink dark:hover:bg-surface-2"
             >
-                <flux:icon :name="$city['nationwide'] ? 'globe-alt' : 'map-pin'" variant="micro" class="size-3.5 text-secondary-medium dark:text-secondary-soft" />
+                <flux:icon :name="$city['nationwide'] ? 'globe-alt' : 'map-pin'" variant="micro" class="size-3.5 text-secondary-medium dark:text-ink-muted" />
                 {{ $city['nationwide'] ? __('cities.nationwide') : $city['name'] }}
-                <span class="text-secondary-medium dark:text-secondary-soft">· {{ $city['projectsLabel'] }}</span>
+                <span class="text-secondary-medium dark:text-ink-muted">· {{ $city['projectsLabel'] }}</span>
             </a>
         @endforeach
     </div>

@@ -88,6 +88,8 @@ return [
     'search_reports' => 'البحث في التقارير',
     'seen_by_meal' => 'اطّلع عليه الرصد والتقييم',
     'select_a_file_to_upload' => 'اختر ملفًا لرفعه.',
+    'section_narrative' => 'السرد',
+    'section_summary' => 'الملخص',
     'select_a_target' => 'اختر مستهدفًا',
     'select_the_target_this_reports_against' => 'اختر المستهدف الذي يُبلغ عنه هذا التقرير.',
     'set_the_file_date' => 'حدد تاريخ الملف.',

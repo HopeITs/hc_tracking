@@ -8,20 +8,14 @@ use App\Models\HrDepartment;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Auth;
 
 /**
- * Department-scoped task visibility, shared by the tasks index and show
- * pages so a task is hidden from a viewer in exactly one place.
+ * The tasks page's department FILTER: lets a user who sees every department
+ * narrow the list down to one.
  *
- * Only the named team roles (config('access-control.task_department_scoped_
- * roles')) are hard-scoped to their own department at all times — there is
- * no filter to widen it, matching the "Media team only sees Media tasks"
- * policy. Bypass roles (task_department_scope_bypass_roles) see every
- * department with a filter to narrow down; an account holding neither kind
- * of role (elevated, or none at all) sees every department, unfiltered.
- * "My Tasks" (assigned to or created by the viewer) is a separate concern
- * layered on top by the caller, not part of this scope.
+ * It is not what hides tasks from department-scoped viewers — that rule lives
+ * in App\Models\Scopes\TaskVisibilityScope and applies to every task query in
+ * the application, so no page can forget it.
  */
 trait ManagesTaskVisibility
 {
@@ -42,33 +36,5 @@ trait ManagesTaskVisibility
         return $query->where(fn (Builder $query) => $query
             ->whereHas('taskAssignees', fn (Builder $query) => $query->whereIn('employee_id', $employeeIds))
             ->orWhereIn('created_by', $creatorIds));
-    }
-
-    /**
-     * Apply this viewer's department scope: nothing unless they hold one of
-     * the named team roles, in which case it's an unconditional constraint
-     * to their own department (a scoped viewer with no resolvable
-     * department — role held but no linked HR position — sees nothing,
-     * rather than silently falling back to "everything").
-     *
-     * @param  Builder<Task>  $query
-     * @return Builder<Task>
-     */
-    protected function applyViewerDepartmentScope(Builder $query): Builder
-    {
-        /** @var User $user */
-        $user = Auth::user();
-
-        if (! $user->isTaskDepartmentScoped()) {
-            return $query;
-        }
-
-        $departmentId = $user->departmentId();
-
-        if ($departmentId === null) {
-            return $query->whereRaw('1 = 0');
-        }
-
-        return $this->scopeTasksToDepartment($query, $departmentId);
     }
 }

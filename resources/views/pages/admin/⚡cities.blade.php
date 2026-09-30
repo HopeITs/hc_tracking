@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\Like;
 use App\Models\HrCity;
 use App\Models\Project;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -148,8 +149,8 @@ new #[Title('titles.city_directory')] class extends Component {
         $query = HrCity::query()
             ->select(['id', 'name_en', 'name_ar', 'is_active'])
             ->when($search !== '', fn ($query) => $query->where(fn ($query) => $query
-                ->where('name_en', 'like', '%'.$search.'%')
-                ->orWhere('name_ar', 'like', '%'.$search.'%')))
+                ->where('name_en', 'like', Like::contains($search))
+                ->orWhere('name_ar', 'like', Like::contains($search))))
             ->when($this->status !== '', fn ($query) => $query->where('is_active', $this->status === 'active'));
 
         if ($this->sort === 'name') {
@@ -309,7 +310,7 @@ new #[Title('titles.city_directory')] class extends Component {
 ?>
 
 @php
-    $secondaryButtonClasses = 'border-secondary-light! bg-white! text-secondary-dark! hover:bg-secondary-soft! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white! dark:hover:bg-secondary-medium!';
+    $secondaryButtonClasses = 'border-secondary-light! bg-white! text-secondary-dark! hover:bg-secondary-soft! dark:border-field-line! dark:bg-surface-1! dark:text-ink! dark:hover:bg-surface-2!';
     $summary = $this->summary;
     $stats = $this->projectStatsByCity;
 
@@ -317,7 +318,7 @@ new #[Title('titles.city_directory')] class extends Component {
         ['key' => 'covered', 'label' => __('cities.cities_covered'), 'value' => $summary['coveredCities'], 'suffix' => '', 'sub' => __('cities.cities_covered_hint', ['total' => $summary['totalCities']]), 'tone' => 'text-funding'],
         ['key' => 'active', 'label' => __('cities.active_cities'), 'value' => $summary['activeCities'], 'suffix' => '', 'sub' => __('cities.cities_covered_hint', ['total' => $summary['totalCities']]), 'tone' => 'text-status-good'],
         ['key' => 'open', 'label' => __('cities.open_projects'), 'value' => $summary['openProjects'], 'suffix' => '', 'sub' => __('cities.open_projects_hint'), 'tone' => ''],
-        ['key' => 'reached', 'label' => __('cities.beneficiaries_reached'), 'value' => $summary['beneficiaries'], 'suffix' => '', 'sub' => __('cities.beneficiaries_reached_hint'), 'tone' => 'text-primary'],
+        ['key' => 'reached', 'label' => __('cities.beneficiaries_reached'), 'value' => $summary['beneficiaries'], 'suffix' => '', 'sub' => __('cities.beneficiaries_reached_hint'), 'tone' => 'text-primary dark:text-brand-text'],
     ];
 
     // A calm rotation of already-brand-safe soft tones so the grid reads as
@@ -328,7 +329,7 @@ new #[Title('titles.city_directory')] class extends Component {
         'bg-status-active-soft text-status-active',
         'bg-status-good-soft text-status-good',
         'bg-status-warn-soft text-status-warn',
-        'bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white',
+        'bg-secondary-soft text-secondary-dark dark:bg-surface-2 dark:text-ink',
     ];
 
     $sortOptions = [
@@ -353,7 +354,7 @@ new #[Title('titles.city_directory')] class extends Component {
 @endphp
 
 <section
-    class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white"
+    class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink"
     aria-labelledby="city-directory-heading"
 >
     <x-ui.page-header heading-id="city-directory-heading" :title="__('common.cities')" :count="$this->cities->total()">
@@ -397,20 +398,20 @@ new #[Title('titles.city_directory')] class extends Component {
 
         <x-slot:summary>
             {{-- The portfolio's figures, set directly on the page rather than boxed into cards: the numbers are the point (same treatment as reports/⚡index.blade.php). --}}
-            <div class="grid grid-cols-2 gap-x-6 gap-y-6 border-y border-secondary-soft py-6 @xl/directory:grid-cols-4 @xl/directory:divide-x @xl/directory:divide-secondary-soft dark:border-secondary-medium @xl/directory:dark:divide-secondary-medium">
+            <div class="grid grid-cols-2 gap-x-6 gap-y-6 border-y border-secondary-soft py-6 @xl/directory:grid-cols-4 @xl/directory:divide-x @xl/directory:divide-secondary-soft dark:border-line @xl/directory:dark:divide-line">
                 @foreach ($figures as $index => $figure)
                     <div
                         class="logframe-reveal @xl/directory:ps-6 @xl/directory:first:ps-0"
                         style="--logframe-order: {{ $index }}"
                         wire:key="figure-{{ $figure['key'] }}"
                     >
-                        <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ $figure['label'] }}</p>
+                        <p class="type-label text-secondary-medium dark:text-ink-muted">{{ $figure['label'] }}</p>
                         <p
                             class="mt-1.5 text-4xl leading-none font-extrabold tabular-nums {{ $figure['tone'] }}"
                             x-data="countUp({{ (int) $figure['value'] }})"
                             x-text="display + '{{ $figure['suffix'] }}'"
                         >{{ $figure['value'] }}{{ $figure['suffix'] }}</p>
-                        <p class="mt-1 text-xs text-secondary-medium dark:text-secondary-soft">{{ $figure['sub'] }}</p>
+                        <p class="mt-1 text-xs text-secondary-medium dark:text-ink-muted">{{ $figure['sub'] }}</p>
                     </div>
                 @endforeach
             </div>
@@ -430,12 +431,12 @@ new #[Title('titles.city_directory')] class extends Component {
         ])
     @else
     <div class="flex min-h-8 flex-wrap items-center justify-between gap-2">
-        <p class="text-xs font-semibold text-secondary-medium dark:text-secondary-soft">
+        <p class="text-xs font-semibold text-secondary-medium dark:text-ink-muted">
             {{ trans_choice('cities.count_matching_cities', $this->cities->total(), ['count' => $this->cities->total()]) }}
         </p>
 
         <div class="flex items-center gap-2">
-            <span wire:loading.delay.flex wire:target="search,status,sort,clearSearch,gotoPage,previousPage,nextPage" class="hidden items-center gap-1.5 text-xs text-secondary-medium dark:text-secondary-soft">
+            <span wire:loading.delay.flex wire:target="search,status,sort,clearSearch,gotoPage,previousPage,nextPage" class="hidden items-center gap-1.5 text-xs text-secondary-medium dark:text-ink-muted">
                 <flux:icon.arrow-path class="size-3.5 animate-spin" />
                 {{ __('common.updating') }}
             </span>
@@ -444,7 +445,7 @@ new #[Title('titles.city_directory')] class extends Component {
                 <flux:button
                     size="sm"
                     variant="ghost"
-                    class="text-secondary-medium! hover:bg-secondary-soft! hover:text-secondary-dark! dark:text-secondary-soft! dark:hover:bg-secondary-medium! dark:hover:text-white!"
+                    class="text-secondary-medium! hover:bg-secondary-soft! hover:text-secondary-dark! dark:text-ink-muted! dark:hover:bg-surface-2! dark:hover:text-ink!"
                     wire:click="clearSearch"
                 >
                     {{ __('cities.clear_search') }}
@@ -458,7 +459,7 @@ new #[Title('titles.city_directory')] class extends Component {
             icon="map-pin"
             :heading="__('cities.no_matching_cities')"
             :body="__('common.change_the_search_and_try_again')"
-            class="rounded-xl border border-secondary-soft dark:border-secondary-medium"
+            class="rounded-xl border border-secondary-soft dark:border-line"
         >
             <x-slot:action>
                 <flux:button size="sm" :class="$secondaryButtonClasses" wire:click="clearSearch">
@@ -479,12 +480,12 @@ new #[Title('titles.city_directory')] class extends Component {
                     wire:navigate
                     wire:key="city-{{ $city->id }}"
                     aria-label="{{ __('cities.view_projects_in_name', ['name' => $city->name]) }}"
-                    class="logframe-reveal group relative flex flex-col gap-4 overflow-hidden rounded-xl border border-secondary-soft bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] transition-all hover:-translate-y-0.5 hover:border-secondary-light hover:shadow-[0_2px_4px_rgba(16,24,40,0.06),0_4px_8px_rgba(16,24,40,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:border-secondary-medium dark:bg-secondary-dark dark:shadow-none dark:hover:shadow-none"
+                    class="logframe-reveal group relative flex flex-col gap-4 overflow-hidden rounded-xl border border-secondary-soft bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] transition-all hover:-translate-y-0.5 hover:border-secondary-light hover:shadow-[0_2px_4px_rgba(16,24,40,0.06),0_4px_8px_rgba(16,24,40,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:border-transparent dark:bg-surface-1 dark:shadow-raised dark:hover:shadow-raised"
                     style="--logframe-order: {{ min($index, 11) }}"
                 >
                     <span
                         aria-hidden="true"
-                        class="{{ $city->is_active ? 'bg-status-good' : 'bg-secondary-light dark:bg-secondary-medium' }} absolute inset-x-0 top-0 h-1"
+                        class="{{ $city->is_active ? 'bg-status-good' : 'bg-secondary-light dark:bg-ink-faint' }} absolute inset-x-0 top-0 h-1"
                     ></span>
 
                     <div class="flex items-start justify-between gap-3">
@@ -493,15 +494,15 @@ new #[Title('titles.city_directory')] class extends Component {
                                 <flux:icon.map-pin class="size-5" />
                             </div>
                             <div class="min-w-0">
-                                <p class="truncate text-base font-bold text-secondary-dark dark:text-white">{{ $city->name }}</p>
-                                <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft" dir="auto">{{ $city->secondary_name }}</p>
+                                <p class="truncate text-base font-bold text-secondary-dark dark:text-ink">{{ $city->name }}</p>
+                                <p class="truncate text-xs text-secondary-medium dark:text-ink-muted" dir="auto">{{ $city->secondary_name }}</p>
                             </div>
                         </div>
 
                         <span @class([
                             'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap',
                             'bg-status-good-soft text-status-good' => $city->is_active,
-                            'bg-secondary-soft text-secondary-medium dark:bg-secondary-medium dark:text-secondary-soft' => ! $city->is_active,
+                            'bg-secondary-soft text-secondary-medium dark:bg-surface-2 dark:text-ink-muted' => ! $city->is_active,
                         ])>
                             {{ $city->is_active ? __('common.active') : __('cities.inactive') }}
                         </span>
@@ -509,19 +510,19 @@ new #[Title('titles.city_directory')] class extends Component {
 
                     <div class="flex items-end justify-between gap-3">
                         <div class="min-w-0">
-                            <p class="type-figure text-secondary-dark dark:text-white">{{ $cityStats['total'] }}</p>
-                            <p class="type-meta text-secondary-medium dark:text-secondary-soft">
+                            <p class="type-figure text-secondary-dark dark:text-ink">{{ $cityStats['total'] }}</p>
+                            <p class="type-meta text-secondary-medium dark:text-ink-muted">
                                 {{ trans_choice('common.count_project', $cityStats['total'], ['count' => $cityStats['total']]) }}
                             </p>
                         </div>
 
                         @if ($cityStats['total'] > 0)
                             <div class="min-w-0 text-end">
-                                <p class="type-meta truncate text-secondary-medium dark:text-secondary-soft">
+                                <p class="type-meta truncate text-secondary-medium dark:text-ink-muted">
                                     {{ trans_choice('cities.count_program', $cityStats['programs'], ['count' => $cityStats['programs']]) }}
                                 </p>
                                 @if ($cityStats['beneficiaries'] > 0)
-                                    <p class="type-meta truncate text-secondary-medium dark:text-secondary-soft">
+                                    <p class="type-meta truncate text-secondary-medium dark:text-ink-muted">
                                         {{ \Illuminate\Support\Number::format($cityStats['beneficiaries']) }} {{ __('cities.beneficiaries_reached') }}
                                     </p>
                                 @endif
@@ -531,20 +532,20 @@ new #[Title('titles.city_directory')] class extends Component {
 
                     @if ($cityStats['total'] > 0)
                         <div>
-                            <div class="flex h-1.5 w-full overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium" role="presentation">
+                            <div class="flex h-1.5 w-full overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2" role="presentation">
                                 <div class="h-full bg-status-active" style="width: {{ $openPct }}%"></div>
-                                <div class="h-full bg-secondary-light dark:bg-secondary-light/60" style="width: {{ 100 - $openPct }}%"></div>
+                                <div class="h-full bg-secondary-light dark:bg-ink-faint/60" style="width: {{ 100 - $openPct }}%"></div>
                             </div>
-                            <div class="mt-1 flex items-center justify-between text-[11px] text-secondary-medium dark:text-secondary-soft">
+                            <div class="mt-1 flex items-center justify-between text-[11px] text-secondary-medium dark:text-ink-muted">
                                 <span>{{ $cityStats['open'] }} {{ __('cities.open') }}</span>
                                 <span>{{ $cityStats['closed'] }} {{ __('cities.closed') }}</span>
                             </div>
                         </div>
                     @else
-                        <p class="type-meta text-secondary-light italic dark:text-secondary-medium">{{ __('cities.no_projects_here_yet') }}</p>
+                        <p class="type-meta text-secondary-light italic dark:text-ink-faint">{{ __('cities.no_projects_here_yet') }}</p>
                     @endif
 
-                    <span class="mt-auto flex items-center gap-1 text-xs font-semibold text-secondary-medium transition-colors group-hover:text-primary dark:text-secondary-soft dark:group-hover:text-primary">
+                    <span class="mt-auto flex items-center gap-1 text-xs font-semibold text-secondary-medium transition-colors group-hover:text-primary dark:text-ink-muted dark:group-hover:text-brand-text">
                         {{ __('common.projects') }}
                         <flux:icon.chevron-right variant="micro" class="size-3.5 shrink-0 transition-transform duration-200 group-hover:translate-x-0.5 rtl:-scale-x-100 rtl:group-hover:-translate-x-0.5" />
                     </span>
@@ -554,7 +555,7 @@ new #[Title('titles.city_directory')] class extends Component {
 
         <flux:pagination
             :paginator="$this->cities"
-            class="text-secondary-medium! [&_button]:text-secondary-medium! [&_button:hover]:bg-secondary-soft! dark:text-secondary-soft! dark:[&_button]:text-secondary-soft! dark:[&_button:hover]:bg-secondary-medium!"
+            class="text-secondary-medium! [&_button]:text-secondary-medium! [&_button:hover]:bg-secondary-soft! dark:text-ink-muted! dark:[&_button]:text-ink-muted! dark:[&_button:hover]:bg-surface-2!"
             scroll-to="#city-directory-heading"
         />
     @endif

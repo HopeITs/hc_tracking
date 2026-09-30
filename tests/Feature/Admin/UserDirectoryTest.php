@@ -138,7 +138,7 @@ test('administrators can give an hr account access with an initial role', functi
         ->and($user->email_verified_at)->not->toBeNull();
 });
 
-test('administrators can give an hr account access with no role', function () {
+test('an hr account given access with no role chosen starts as Team Member', function () {
     $admin = accessAdmin();
     $hrUserId = insertHrUser(insertHrEmployee(), 'dana@example.org');
 
@@ -151,8 +151,8 @@ test('administrators can give an hr account access with no role', function () {
 
     $user = User::query()->where('hr_user_id', $hrUserId)->sole();
 
-    expect($user->roles)->toBeEmpty()
-        ->and($user->active_role_id)->toBeNull();
+    expect($user->roles->pluck('name')->all())->toBe(['Team Member'])
+        ->and($user->activeRole?->name)->toBe('Team Member');
 });
 
 test('hr accounts that already have access are not offered again', function () {
@@ -208,7 +208,7 @@ test('selecting a user loads their assigned roles, active role, and direct permi
     Livewire::actingAs($admin)
         ->test('pages::admin.users')
         ->call('selectUser', $user->id)
-        ->assertSet('userRoleIds', [$managers->id, $meal->id])
+        ->assertSet('userRoleIds', fn (array $ids): bool => collect($ids)->sort()->values()->all() === collect([$managers->id, $meal->id])->sort()->values()->all())
         ->assertSet('userActiveRoleId', $meal->id)
         ->assertSet('userPermissionIds', [$permission->id]);
 });
@@ -231,7 +231,7 @@ test('administrators can assign multiple roles, pick an active role, and grant a
 
     $refreshed = $user->refresh();
 
-    expect($refreshed->roles->pluck('id')->sort()->values()->all())->toBe([$officer->id, $managers->id])
+    expect($refreshed->roles->pluck('id')->all())->toEqualCanonicalizing([$officer->id, $managers->id])
         ->and($refreshed->active_role_id)->toBe($managers->id)
         ->and($refreshed->permissions->pluck('id')->all())->toBe([$permission->id])
         ->and($refreshed->name)->toBe('Rana Darwish')
@@ -340,7 +340,22 @@ test('a duplicate role name is rejected', function () {
         ->assertHasErrors(['newRoleName']);
 });
 
-test('an authorized user can rename a non-protected role', function () {
+test('an authorized user can rename a custom role', function () {
+    $admin = accessAdmin();
+    $role = Role::create(['name' => 'Field Staff', 'guard_name' => 'web']);
+
+    Livewire::actingAs($admin)
+        ->test('pages::admin.users')
+        ->call('showTab', 'roles')
+        ->call('selectRole', $role->id)
+        ->set('selectedRoleName', 'Field Team')
+        ->call('renameRole')
+        ->assertHasNoErrors();
+
+    expect($role->refresh()->name)->toBe('Field Team');
+});
+
+test('a built-in role keeps its name and cannot be deleted', function (string $action) {
     $admin = accessAdmin();
     $role = Role::query()->where('name', 'Managers')->sole();
 
@@ -348,12 +363,14 @@ test('an authorized user can rename a non-protected role', function () {
         ->test('pages::admin.users')
         ->call('showTab', 'roles')
         ->call('selectRole', $role->id)
+        ->assertSeeHtml('data-test="role-built-in-note"')
+        ->assertDontSeeHtml('id="selected-role-name"')
         ->set('selectedRoleName', 'Programme Managers')
-        ->call('renameRole')
-        ->assertHasNoErrors();
+        ->call($action)
+        ->assertForbidden();
 
-    expect($role->refresh()->name)->toBe('Programme Managers');
-});
+    expect($role->refresh()->name)->toBe('Managers');
+})->with(['renameRole', 'deleteRole']);
 
 test('super admin cannot be renamed or deleted', function () {
     $admin = accessAdmin();
@@ -377,9 +394,9 @@ test('super admin cannot be renamed or deleted', function () {
     expect(Role::query()->where('name', 'Super Admin')->exists())->toBeTrue();
 });
 
-test('an authorized user can delete a non-protected role with no users', function () {
+test('an authorized user can delete a custom role with no users', function () {
     $admin = accessAdmin();
-    $role = Role::query()->where('name', 'MEAL')->sole();
+    $role = Role::create(['name' => 'Field Staff', 'guard_name' => 'web']);
 
     Livewire::actingAs($admin)
         ->test('pages::admin.users')
@@ -388,7 +405,7 @@ test('an authorized user can delete a non-protected role with no users', functio
         ->call('deleteRole')
         ->assertHasNoErrors();
 
-    expect(Role::query()->where('name', 'MEAL')->exists())->toBeFalse();
+    expect(Role::query()->where('name', 'Field Staff')->exists())->toBeFalse();
 });
 
 test('an authorized user can toggle a permission on a role', function () {

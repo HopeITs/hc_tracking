@@ -11,5 +11,5 @@
 
 <span {{ $attributes->class('inline-flex items-baseline gap-1 tabular-nums whitespace-nowrap') }}>
     <span class="font-semibold">{{ $formattedAmount }}</span>
-    <span class="text-xs font-medium text-secondary-medium dark:text-secondary-soft">{{ $currencyCode }}</span>
+    <span class="text-xs font-medium text-secondary-medium dark:text-ink-muted">{{ $currencyCode }}</span>
 </span>

@@ -1,5 +1,27 @@
 <?php
 
+/*
+|--------------------------------------------------------------------------
+| Allowed websocket origins
+|--------------------------------------------------------------------------
+|
+| The browser origins that may open a websocket to Reverb, as a
+| comma-separated list of hosts in REVERB_ALLOWED_ORIGINS (wildcards such
+| as *.example.org work; Reverb matches the Origin header's host with
+| Str::is). Unset or empty allows only the host of APP_URL, so another
+| website cannot open a socket in a signed-in user's browser. With neither
+| set no browser origin is allowed and the frontend falls back to polling.
+| An explicit * still allows every origin.
+*/
+
+$reverbAllowedOrigins = array_values(array_filter(array_map(trim(...), explode(',', (string) env('REVERB_ALLOWED_ORIGINS', '')))));
+
+if ($reverbAllowedOrigins === []) {
+    $appHost = parse_url((string) env('APP_URL', ''), PHP_URL_HOST);
+
+    $reverbAllowedOrigins = is_string($appHost) && $appHost !== '' ? [$appHost] : [];
+}
+
 return [
 
     /*
@@ -29,7 +51,10 @@ return [
     'servers' => [
 
         'reverb' => [
-            'host' => env('REVERB_SERVER_HOST', '0.0.0.0'),
+            // Loopback only unless REVERB_SERVER_HOST says otherwise: in
+            // production a TLS proxy (nginx) forwards wss:// to it, so the
+            // raw port is never reachable from the network.
+            'host' => env('REVERB_SERVER_HOST', '127.0.0.1'),
             'port' => env('REVERB_SERVER_PORT', 8080),
             'path' => env('REVERB_SERVER_PATH', ''),
             'hostname' => env('REVERB_HOST'),
@@ -82,17 +107,22 @@ return [
                     'scheme' => env('REVERB_SCHEME', 'https'),
                     'useTLS' => env('REVERB_SCHEME', 'https') === 'https',
                 ],
-                'allowed_origins' => ['*'],
+                'allowed_origins' => $reverbAllowedOrigins,
                 'ping_interval' => env('REVERB_APP_PING_INTERVAL', 60),
                 'activity_timeout' => env('REVERB_APP_ACTIVITY_TIMEOUT', 30),
-                'max_connections' => env('REVERB_APP_MAX_CONNECTIONS'),
+                // The app key is public (it ships in the JS bundle) and a
+                // script can fake the Origin header, so the server bounds
+                // what any client can do: a cap on open sockets, a message
+                // rate per socket, and no browser-to-browser ("client-")
+                // events, which the app never sends.
+                'max_connections' => env('REVERB_APP_MAX_CONNECTIONS', 1000),
                 'max_message_size' => env('REVERB_APP_MAX_MESSAGE_SIZE', 10_000),
-                'accept_client_events_from' => env('REVERB_APP_ACCEPT_CLIENT_EVENTS_FROM', 'members'),
+                'accept_client_events_from' => env('REVERB_APP_ACCEPT_CLIENT_EVENTS_FROM', 'none'),
                 'rate_limiting' => [
-                    'enabled' => env('REVERB_APP_RATE_LIMITING_ENABLED', false),
+                    'enabled' => env('REVERB_APP_RATE_LIMITING_ENABLED', true),
                     'max_attempts' => env('REVERB_APP_RATE_LIMIT_MAX_ATTEMPTS', 60),
                     'decay_seconds' => env('REVERB_APP_RATE_LIMIT_DECAY_SECONDS', 60),
-                    'terminate_on_limit' => env('REVERB_APP_RATE_LIMIT_TERMINATE', false),
+                    'terminate_on_limit' => env('REVERB_APP_RATE_LIMIT_TERMINATE', true),
                 ],
             ],
         ],

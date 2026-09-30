@@ -19,7 +19,7 @@ test('guests are redirected from the report directory', function () {
 });
 
 test('reports can be filtered by status and meal visibility', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Media Team')->create();
 
     Report::factory()->create(['value' => '111111.00', 'status' => ReportStatus::Approved, 'is_seen_by_meal' => true]);
     Report::factory()->create(['value' => '222222.00', 'status' => ReportStatus::Draft, 'is_seen_by_meal' => false]);
@@ -42,7 +42,7 @@ test('reports can be filtered by status and meal visibility', function () {
 });
 
 test('a report records its author from the authenticated user', function () {
-    $author = User::factory()->create();
+    $author = User::factory()->role('Media Team')->create();
     $target = PlanIndicator::factory()->create([
         'source_type' => 'annual_plan',
         'source_id' => AnnualPlan::factory()->create(['year' => 2026])->id,
@@ -65,7 +65,7 @@ test('a report records its author from the authenticated user', function () {
 });
 
 test('creating a report persists the narrative sections and period window', function () {
-    $author = User::factory()->create();
+    $author = User::factory()->role('Media Team')->create();
     $target = PlanIndicator::factory()->create([
         'source_type' => 'annual_plan',
         'source_id' => AnnualPlan::factory()->create(['year' => 2026])->id,
@@ -99,7 +99,7 @@ test('creating a report persists the narrative sections and period window', func
 });
 
 test('creating a report requires a target a planned date and a value', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Media Team')->create();
 
     Livewire::actingAs($user)
         ->test('pages::reports.index')
@@ -112,13 +112,19 @@ test('creating a report requires a target a planned date and a value', function 
 });
 
 test('editing a report does not change its recorded author', function () {
-    $author = User::factory()->create();
-    $editor = User::factory()->create();
+    $author = User::factory()->role('Media Team')->create();
+    $editor = User::factory()->role('Media Team')->create();
     $report = Report::factory()
         ->for(PlanIndicator::factory()->forAnnualPlan(AnnualPlan::factory()->create(['year' => 2026])))
         ->create(['user_id' => $author->id, 'value' => '100.00', 'planned_date' => '2026-06-30']);
 
+    // Only the author edits a draft; anyone else is refused outright.
     Livewire::actingAs($editor)
+        ->test('pages::reports.index')
+        ->call('openEditModal', $report->id)
+        ->assertForbidden();
+
+    Livewire::actingAs($author)
         ->test('pages::reports.index')
         ->call('openEditModal', $report->id)
         ->set('value', '200.00')
@@ -131,7 +137,7 @@ test('editing a report does not change its recorded author', function () {
 });
 
 test('editing an approved report is refused', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Media Team')->create();
     $report = Report::factory()->approved()->create(['value' => '100.00']);
 
     Livewire::actingAs($user)
@@ -147,7 +153,7 @@ test('editing an approved report is refused', function () {
 });
 
 test('editing a reviewed report is refused', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Media Team')->create();
     $report = Report::factory()->reviewed()->create(['value' => '100.00']);
 
     Livewire::actingAs($user)
@@ -163,8 +169,8 @@ test('editing a reviewed report is refused', function () {
 });
 
 test('saving an edit to a report that was approved meanwhile is refused', function () {
-    $user = User::factory()->create();
-    $report = Report::factory()->create(['value' => '100.00']);
+    $user = User::factory()->role('Media Team')->create();
+    $report = Report::factory()->create(['value' => '100.00', 'user_id' => $user->id]);
 
     $component = Livewire::actingAs($user)
         ->test('pages::reports.index')
@@ -182,7 +188,7 @@ test('saving an edit to a report that was approved meanwhile is refused', functi
 });
 
 test('a report value that would overflow the decimal column is rejected', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Media Team')->create();
     $target = PlanIndicator::factory()->create([
         'source_type' => 'annual_plan',
         'source_id' => AnnualPlan::factory()->create(['year' => 2026])->id,
@@ -199,7 +205,7 @@ test('a report value that would overflow the decimal column is rejected', functi
 });
 
 test('a narrative window end before its start is rejected', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Media Team')->create();
     $target = PlanIndicator::factory()->create([
         'source_type' => 'annual_plan',
         'source_id' => AnnualPlan::factory()->create(['year' => 2026])->id,
@@ -218,7 +224,7 @@ test('a narrative window end before its start is rejected', function () {
 });
 
 test('narrative sections are trimmed and blank narrative sections are stored as null', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Media Team')->create();
     $target = PlanIndicator::factory()->create([
         'source_type' => 'annual_plan',
         'source_id' => AnnualPlan::factory()->create(['year' => 2026])->id,
@@ -242,9 +248,9 @@ test('narrative sections are trimmed and blank narrative sections are stored as 
 });
 
 test('only a draft report offers delete', function () {
-    $user = User::factory()->create();
-    $draft = Report::factory()->create();
-    $approved = Report::factory()->approved()->create();
+    $user = User::factory()->role('Media Team')->create();
+    $draft = Report::factory()->create(['user_id' => $user->id]);
+    $approved = Report::factory()->approved()->create(['user_id' => $user->id]);
 
     Livewire::actingAs($user)
         ->test('pages::reports.index')
@@ -253,15 +259,15 @@ test('only a draft report offers delete', function () {
 });
 
 test('the report directory renders with no reports', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Media Team')->create();
 
     Livewire::actingAs($user)->test('pages::reports.index')->assertSee('No reports yet');
 });
 
 test('the targets page can open the form already tied to a target, and a draft can be opened for editing', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Media Team')->create();
     $target = PlanIndicator::factory()->create();
-    $draft = Report::factory()->create();
+    $draft = Report::factory()->create(['user_id' => $user->id]);
 
     Livewire::actingAs($user)
         ->withQueryParams(['create' => 1, 'target' => $target->id])
@@ -277,7 +283,7 @@ test('the targets page can open the form already tied to a target, and a draft c
 });
 
 test('two targets on one indicator can be told apart in the form, and a target whose source is gone is not offered', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Media Team')->create();
     $indicator = Indicator::factory()->create(['name' => 'Latrines built']);
     $plan = PlanIndicator::factory()->forAnnualPlan(AnnualPlan::factory()->create(['year' => 2026]))->create(['indicator_id' => $indicator->id]);
     $proposal = PlanIndicator::factory()->forProposal(Proposal::factory()->create(['name' => 'WASH Response']))->create(['indicator_id' => $indicator->id]);
@@ -293,7 +299,7 @@ test('two targets on one indicator can be told apart in the form, and a target w
 });
 
 test('a figure must fall inside the plan year or proposal period it was committed for', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Media Team')->create();
     $planTarget = PlanIndicator::factory()->forAnnualPlan(AnnualPlan::factory()->create(['year' => 2026]))->create();
     $proposalTarget = PlanIndicator::factory()
         ->forProposal(Proposal::factory()->create(['planned_date_begin' => '2025-01-01', 'planned_date_end' => '2025-12-31']))
@@ -313,7 +319,7 @@ test('a figure must fall inside the plan year or proposal period it was committe
 });
 
 test('a percentage report cannot exceed 100', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Media Team')->create();
     $target = PlanIndicator::factory()
         ->forAnnualPlan(AnnualPlan::factory()->create(['year' => 2026]))
         ->for(Indicator::factory()->state(['measure' => IndicatorMeasure::Percentage]))
@@ -329,7 +335,7 @@ test('a percentage report cannot exceed 100', function () {
 });
 
 test('the form never writes a submit date: only submitting for review does', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Media Team')->create();
     $target = PlanIndicator::factory()->forAnnualPlan(AnnualPlan::factory()->create(['year' => 2026]))->create();
 
     $component = Livewire::actingAs($user)
@@ -346,8 +352,8 @@ test('the form never writes a submit date: only submitting for review does', fun
 
 test('a draft report can be deleted with its files, and an approved one cannot', function () {
     Storage::fake('local');
-    $user = User::factory()->create();
-    $draft = Report::factory()->create();
+    $user = User::factory()->role('Media Team')->create();
+    $draft = Report::factory()->create(['user_id' => $user->id]);
     Storage::disk('local')->put('report-files/'.$draft->id.'/evidence.pdf', 'pdf');
     ReportFile::factory()->for($draft)->create(['path' => 'report-files/'.$draft->id.'/evidence.pdf', 'original_name' => 'evidence.pdf']);
     $approved = Report::factory()->approved()->create();
@@ -367,7 +373,7 @@ test('a draft report can be deleted with its files, and an approved one cannot',
 });
 
 test('a row shows its target achievement from approved reports only', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Media Team')->create();
     $target = PlanIndicator::factory()->create(['target' => 400]);
     Report::factory()->approved()->for($target)->create(['value' => 100]);
     Report::factory()->for($target)->create(['value' => 300]);
@@ -380,7 +386,7 @@ test('a row shows its target achievement from approved reports only', function (
 });
 
 test('reports can be narrowed to overdue drafts, a project and a single target', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('Media Team')->create();
     $project = Project::factory()->create();
     $projectTarget = PlanIndicator::factory()->create(['project_id' => $project->id]);
     $late = Report::factory()->for($projectTarget)->create(['planned_date' => now()->subMonth()->toDateString(), 'value' => 111]);

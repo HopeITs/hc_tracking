@@ -164,6 +164,10 @@ return [
     'timezone' => 'The :attribute field must be a valid timezone.',
     'unique' => 'The :attribute has already been taken.',
     'uploaded' => 'The :attribute failed to upload.',
+    'secure_upload' => [
+        'content_mismatch' => 'The :attribute is not a genuine file of the type its extension claims.',
+        'active_content' => 'The :attribute contains scripts or macros, which are not allowed.',
+    ],
     'uppercase' => 'The :attribute field must be uppercase.',
     'url' => 'The :attribute field must be a valid URL.',
     'ulid' => 'The :attribute field must be a valid ULID.',
@@ -197,6 +201,8 @@ return [
     |
     */
 
-    'attributes' => [],
+    'attributes' => [
+        'files.*' => 'file',
+    ],
 
 ];

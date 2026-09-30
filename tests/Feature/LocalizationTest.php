@@ -33,7 +33,11 @@ test('every english group has an arabic file with exactly the same keys', functi
     foreach (langGroups() as $group) {
         expect(file_exists(lang_path("ar/{$group}.php")))->toBeTrue("lang/ar/{$group}.php is missing");
 
-        $english = array_keys(Arr::except(langKeys('en', $group), ['attributes']));
+        $english = array_keys(array_filter(
+            langKeys('en', $group),
+            fn (string $key): bool => ! str_starts_with($key, 'attributes.'),
+            ARRAY_FILTER_USE_KEY,
+        ));
         $arabic = array_keys(array_filter(
             langKeys('ar', $group),
             fn (string $key): bool => ! str_starts_with($key, 'attributes.'),
@@ -114,6 +118,28 @@ test('a guest can switch language for their session', function () {
         ->assertSessionHas('locale', 'ar');
 
     $this->get(route('login'))->assertSee('dir="rtl"', false);
+});
+
+test('switching language is limited per user, not shared with a colleague on the same ip', function () {
+    $this->freezeTime();
+    $user = User::factory()->create();
+    $colleague = User::factory()->create();
+
+    foreach (range(1, 10) as $attempt) {
+        $this->actingAs($user)
+            ->withServerVariables(['REMOTE_ADDR' => '10.0.7.1'])
+            ->post(route('locale.update'), ['locale' => 'ar']);
+    }
+
+    $this->actingAs($user)
+        ->withServerVariables(['REMOTE_ADDR' => '10.0.7.1'])
+        ->post(route('locale.update'), ['locale' => 'en'])
+        ->assertStatus(429);
+
+    $this->actingAs($colleague)
+        ->withServerVariables(['REMOTE_ADDR' => '10.0.7.1'])
+        ->post(route('locale.update'), ['locale' => 'ar'])
+        ->assertSessionHas('locale', 'ar');
 });
 
 test('only supported languages are accepted', function () {

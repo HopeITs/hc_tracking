@@ -5,10 +5,10 @@
      scoped to task views instead of rippling into every other page. --}}
 @php
     [$classes, $icon] = match ($case) {
-        \App\Enums\TaskStatus::Todo => ['bg-white text-secondary-dark ring-1 ring-inset ring-secondary-soft dark:bg-secondary-dark dark:text-white dark:ring-secondary-medium', 'stop'],
-        \App\Enums\TaskStatus::InProgress => ['bg-status-active text-white', 'play'],
-        \App\Enums\TaskStatus::UnderReview => ['bg-status-warn text-white', 'eye'],
-        \App\Enums\TaskStatus::Done => ['bg-status-good text-white', 'check'],
+        \App\Enums\TaskStatus::Todo => ['bg-white text-secondary-dark ring-1 ring-inset ring-secondary-soft dark:bg-surface-1 dark:text-ink dark:ring-line', 'stop'],
+        \App\Enums\TaskStatus::InProgress => ['bg-status-active dark:bg-status-active-soft dark:text-status-active text-white', 'play'],
+        \App\Enums\TaskStatus::UnderReview => ['bg-status-warn dark:bg-status-warn-soft dark:text-status-warn text-white', 'eye'],
+        \App\Enums\TaskStatus::Done => ['bg-status-good dark:bg-status-good-soft dark:text-status-good text-white', 'check'],
     };
 @endphp
 

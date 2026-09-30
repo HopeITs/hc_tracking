@@ -97,6 +97,24 @@
     --color-board-line: #dcddde;
     --color-board-head: #f8f8f9;
 
+    /* Graphite dark-mode semantic layer — only referenced behind dark: or inside .dark; light values are equivalents so the utilities exist. */
+    --color-surface-0: #ffffff;
+    --color-surface-1: #ffffff;
+    --color-surface-2: #f8f8f9;
+    --color-surface-3: #ffffff;
+    --color-ink: #58595b;
+    --color-ink-muted: #6d6e71;
+    --color-ink-faint: #939598;
+    --color-line: #dcddde;
+    --color-line-strong: #939598;
+    --color-field-line: #939598;
+    --color-brand: #be1f24;
+    --color-brand-hover: #a81b20;
+    --color-brand-text: #be1f24;
+
+    /* Dark elevation: a 1px top-edge highlight on raised surfaces instead of a drop shadow (dark:shadow-raised). */
+    --shadow-raised: inset 0 1px 0 rgb(255 255 255 / 0.04);
+
     --spacing-ui-2xs: 0.25rem;
     --spacing-ui-xs: 0.5rem;
     --spacing-ui-sm: 0.75rem;
@@ -109,28 +127,47 @@
     --spacing-card: var(--spacing-ui-lg);
     --spacing-section: var(--spacing-ui-3xl);
     --spacing-page: var(--spacing-ui-xl);
+
+    /* Fast start, long soft settle: the sidebar's collapse, expand and mobile drawer motion. */
+    --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 @layer theme {
     .dark {
-        --color-accent: var(--color-white);
-        --color-accent-content: var(--color-white);
-        --color-accent-foreground: var(--color-neutral-800);
+        /* Graphite: cool charcoal from the brand grey hue, one lightness step per layer. */
+        --color-surface-0: #151618;
+        --color-surface-1: #1c1d20;
+        --color-surface-2: #242528;
+        --color-surface-3: #2d2e32;
+        --color-ink: #ececee;
+        --color-ink-muted: #a8aaae;
+        --color-ink-faint: #8a8c93;
+        --color-line: #34353a;
+        --color-line-strong: #4a4b51;
+        --color-field-line: #6b6d74;
+        --color-brand: #d4343a;
+        --color-brand-hover: #e04046;
+        --color-brand-text: #ff7b7f;
 
-        --color-status-good: #4fbf8a;
-        --color-status-good-soft: #16281f;
-        --color-status-warn: #e0a743;
-        --color-status-warn-soft: #2b2212;
-        --color-status-critical: #f2756f;
-        --color-status-critical-soft: #3a1a1b;
-        --color-status-active: #6ba3e0;
-        --color-status-active-soft: #182636;
-        --color-funding: #6fb0bd;
-        --color-funding-soft: #142326;
-        --color-ground: #232425;
-        --color-board: #2e2f31;
-        --color-board-line: #454649;
-        --color-board-head: #343538;
+        /* Flux's neutral accent (primary Flux buttons, checked controls): ink on the page ground. */
+        --color-accent: var(--color-ink);
+        --color-accent-content: var(--color-ink);
+        --color-accent-foreground: var(--color-surface-0);
+
+        --color-status-good: #5fd09a;
+        --color-status-good-soft: #14281e;
+        --color-status-warn: #e8b050;
+        --color-status-warn-soft: #2c2313;
+        --color-status-critical: #ff8a86;
+        --color-status-critical-soft: #381a1c;
+        --color-status-active: #7db3ec;
+        --color-status-active-soft: #172637;
+        --color-funding: #7cc3cf;
+        --color-funding-soft: #122629;
+        --color-ground: var(--color-surface-0);
+        --color-board: var(--color-surface-1);
+        --color-board-line: var(--color-line);
+        --color-board-head: var(--color-surface-2);
     }
 }
 
@@ -186,9 +223,14 @@
     }
 
     .dark .gantt-editor {
-        background: var(--color-secondary-dark);
-        color: #fff;
+        border-color: var(--color-field-line);
+        background: var(--color-surface-2);
+        color: var(--color-ink);
         color-scheme: dark;
+    }
+
+    .dark .gantt-editor:focus {
+        outline-color: color-mix(in srgb, var(--color-brand) 60%, transparent);
     }
 
     /* Gantt baseline: a hatched sliver under the planned bar. */
@@ -214,8 +256,113 @@
         touch-action: none;
     }
 
+    .dark .gantt-link-handle {
+        border-color: var(--color-brand);
+        background: var(--color-surface-1);
+    }
+
     [data-gantt] [role='row']:hover .gantt-link-handle {
         opacity: 1;
+    }
+
+    /* Gantt surfaces: the sticky grid and header must stay opaque over the bars scrolling beneath them. */
+    [data-gantt] {
+        --gantt-surface: var(--color-white);
+        --gantt-surface-hover: var(--color-board-head);
+        --gantt-surface-group: color-mix(in oklab, var(--color-board-head), var(--color-secondary-soft) 30%);
+        --gantt-surface-selected: color-mix(in oklab, var(--color-white), var(--color-status-active) 11%);
+    }
+
+    /* Dark: the grid is a surface-1 panel, hover lifts a step, group rows sit between surface-2 and -3, selection is a brand tint. */
+    .dark [data-gantt] {
+        --gantt-surface: var(--color-surface-1);
+        --gantt-surface-hover: var(--color-surface-2);
+        --gantt-surface-group: color-mix(in oklab, var(--color-surface-2), var(--color-surface-3) 50%);
+        --gantt-surface-selected: color-mix(in oklab, var(--color-surface-1), var(--color-brand) 14%);
+    }
+
+    [data-gantt] .gantt-head,
+    [data-gantt] .gantt-cell {
+        background-color: var(--gantt-surface);
+    }
+
+    [data-gantt] [role='row'] > .gantt-cell {
+        transition: background-color 120ms ease-out;
+    }
+
+    [data-gantt] [role='row'][data-group='true'] > .gantt-cell {
+        background-color: var(--gantt-surface-group);
+    }
+
+    [data-gantt] [role='row']:hover > .gantt-cell {
+        background-color: var(--gantt-surface-hover);
+    }
+
+    [data-gantt] [role='row'][aria-selected='true'] > .gantt-cell {
+        background-color: var(--gantt-surface-selected);
+    }
+
+    [data-gantt] [role='row']:hover > .gantt-lane {
+        background-color: color-mix(in oklab, var(--gantt-surface-hover) 65%, transparent);
+    }
+
+    [data-gantt] [role='row'][aria-selected='true'] > .gantt-lane {
+        background-color: color-mix(in oklab, var(--gantt-surface-selected) 70%, transparent);
+    }
+
+    /* The row's "open" eye shows on hover and on the selected row. */
+    [data-gantt] .gantt-open {
+        display: none;
+    }
+
+    [data-gantt] [role='row']:hover .gantt-open,
+    [data-gantt] [role='row'][aria-selected='true'] .gantt-open {
+        display: grid;
+    }
+
+    /* Route tracing: rows off the traced route recede, their cells stay opaque. */
+    [data-gantt] [role='row'] > .gantt-cell > *,
+    [data-gantt] [role='row'] > .gantt-lane > * {
+        transition: opacity 150ms ease-out;
+    }
+
+    [data-gantt] [role='row'][data-dim='true'] > .gantt-cell > *,
+    [data-gantt] [role='row'][data-dim='true'] > .gantt-lane > * {
+        opacity: 0.26;
+    }
+
+    /* Slip: the hatched run from a late row's planned finish to today. */
+    .gantt-slip {
+        background-color: color-mix(in oklab, var(--color-status-critical) 12%, transparent);
+        background-image: repeating-linear-gradient(135deg, color-mix(in oklab, var(--color-status-critical) 70%, transparent) 0 1.5px, transparent 1.5px 5px);
+        box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-status-critical) 40%, transparent);
+    }
+
+    /* Bars draw in once from their start edge; milestones settle in after them. */
+    [data-gantt] .gantt-grow {
+        animation: gantt-grow 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+        animation-delay: var(--gantt-delay, 0ms);
+    }
+
+    [data-gantt] .gantt-pop {
+        animation: gantt-pop 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+        animation-delay: calc(var(--gantt-delay, 0ms) + 260ms);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        [data-gantt] .gantt-grow,
+        [data-gantt] .gantt-pop {
+            animation: none;
+        }
+    }
+
+    [data-gantt] .gantt-scroller {
+        scrollbar-width: thin;
+        scrollbar-color: var(--color-secondary-soft) transparent;
+    }
+
+    .dark [data-gantt] .gantt-scroller {
+        scrollbar-color: var(--color-line-strong) transparent;
     }
 
     /* Draggable Gantt bars show a grab cursor; the drag itself is JS. */
@@ -282,7 +429,7 @@
     }
 
     .dark .notification-sentence [data-param='subject'] {
-        color: #fff;
+        color: var(--color-ink);
     }
 
     .notification-sentence :is([data-param='from'], [data-param='to'], [data-param='status']) {
@@ -295,7 +442,7 @@
     }
 
     .dark .notification-sentence [data-more-updates] {
-        color: var(--color-secondary-soft);
+        color: var(--color-ink-muted);
     }
 
     /* The thread: a hairline joining one glyph to the next, broken just
@@ -312,7 +459,7 @@
     }
 
     .dark .notification-thread > .notification-row:not(:last-child)::before {
-        background: var(--color-secondary-medium);
+        background: var(--color-line-strong);
     }
 
     @media (prefers-reduced-motion: no-preference) {
@@ -349,6 +496,248 @@
     ::file-selector-button {
         border-color: var(--color-gray-200, currentColor);
     }
+
+    /* Scale the rem grid on QHD/4K so the 90rem page column keeps a sensible share of the screen. */
+    @media (min-width: 2200px) {
+        html {
+            font-size: 112.5%;
+        }
+    }
+
+    @media (min-width: 3200px) {
+        html {
+            font-size: 150%;
+        }
+    }
+}
+
+/*
+ * Dark mode (Graphite) browser surfaces. In the base layer so any utility still
+ * wins: native controls, autofill and the search-cancel glyph follow the dark
+ * scheme; scrollbars (inherited) and selection take the Graphite tokens; photos
+ * are dimmed slightly unless they opt out with data-no-dim (logos, previews, charts).
+ */
+@layer base {
+    .dark {
+        color-scheme: dark;
+        scrollbar-color: var(--color-line-strong) transparent;
+    }
+
+    .dark ::selection {
+        background-color: color-mix(in srgb, var(--color-brand) 35%, transparent);
+    }
+
+    .dark img:not([data-no-dim]) {
+        filter: brightness(0.9);
+    }
+}
+
+/*
+ * Logo preloader (x-preloader, resources/js/preloader.js). data-state drives it:
+ *   boot     server-rendered. Quick mode fades in after 200ms; intro mode
+ *            (html[data-preloader='intro']) is visible at once and plays the
+ *            write-on. Both hide themselves after 10s even if no script runs.
+ *   waiting  visible; the O of HOPE becomes the loading ring.
+ *   shown    visible and solid; pins opacity so the fade starts from 1.
+ *   leaving  fades out while the logo grows slightly.
+ *   hidden   gone, not clickable.
+ */
+.hc-preloader {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: grid;
+    place-items: center;
+    background-color: var(--color-white);
+    color: var(--color-primary);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.dark .hc-preloader {
+    background-color: var(--color-surface-0);
+    color: var(--color-ink);
+}
+
+.hc-preloader:is([data-state='boot'], [data-state='waiting'], [data-state='shown']) {
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.hc-preloader:is([data-state='waiting'], [data-state='shown']) {
+    opacity: 1;
+}
+
+.hc-preloader[data-state='waiting'] {
+    transition: opacity 150ms ease-out;
+}
+
+.hc-preloader[data-state='boot'] {
+    animation:
+        hc-preloader-appear 150ms ease-out 200ms forwards,
+        hc-preloader-failsafe 1ms linear 10s forwards;
+}
+
+html[data-preloader='intro'] .hc-preloader[data-state='boot'] {
+    opacity: 1;
+    animation: hc-preloader-failsafe 1ms linear 10s forwards;
+}
+
+.hc-preloader[data-state='leaving'] {
+    visibility: hidden;
+    opacity: 0;
+    transition:
+        opacity 400ms cubic-bezier(0.4, 0, 0.2, 1),
+        visibility 0s linear 400ms;
+}
+
+.hc-preloader__logo {
+    width: min(15rem, 64vw);
+    overflow: visible;
+    fill: currentColor;
+    transition: transform 400ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hc-preloader[data-state='leaving'] .hc-preloader__logo {
+    transform: scale(1.04);
+}
+
+.hc-preloader__script {
+    fill: var(--color-secondary-medium);
+}
+
+.dark .hc-preloader__script {
+    fill: var(--color-ink);
+}
+
+.hc-preloader__letter,
+.hc-preloader__small {
+    transform-box: fill-box;
+    transform-origin: 50% 100%;
+}
+
+.hc-preloader__wipe {
+    transform-box: fill-box;
+    transform-origin: 0 50%;
+}
+
+.hc-preloader__o {
+    transition: fill-opacity 200ms ease-out;
+}
+
+.hc-preloader__ring {
+    opacity: 0;
+    transition: opacity 200ms ease-out;
+}
+
+.hc-preloader__ring circle {
+    fill: none;
+    stroke: var(--color-primary);
+    stroke-width: 15;
+    stroke-dasharray: 40 96;
+    transform-box: view-box;
+    transform-origin: 81.08px 27.09px;
+}
+
+.dark .hc-preloader__ring circle {
+    stroke: var(--color-brand);
+}
+
+/* The spinning O: quick boot and waiting. */
+.hc-preloader:is([data-state='boot'], [data-state='waiting']) .hc-preloader__o {
+    fill-opacity: 0.2;
+}
+
+.hc-preloader:is([data-state='boot'], [data-state='waiting']) .hc-preloader__ring {
+    opacity: 1;
+}
+
+.hc-preloader:not([data-state='hidden']) .hc-preloader__ring circle {
+    animation: hc-preloader-spin 850ms linear infinite;
+}
+
+/* The write-on intro: the O stays solid while the letters arrive. */
+html[data-preloader='intro'] .hc-preloader[data-state='boot'] .hc-preloader__o {
+    fill-opacity: 1;
+}
+
+html[data-preloader='intro'] .hc-preloader[data-state='boot'] .hc-preloader__ring {
+    opacity: 0;
+}
+
+html[data-preloader='intro'] .hc-preloader[data-state='boot'] .hc-preloader__letter {
+    animation: hc-preloader-rise 500ms cubic-bezier(0.16, 1, 0.3, 1) calc(var(--i) * 55ms) both;
+}
+
+html[data-preloader='intro'] .hc-preloader[data-state='boot'] .hc-preloader__small {
+    animation: hc-preloader-rise 350ms cubic-bezier(0.16, 1, 0.3, 1) calc(250ms + var(--i) * 30ms) both;
+}
+
+html[data-preloader='intro'] .hc-preloader[data-state='boot'] .hc-preloader__wipe {
+    animation: hc-preloader-write 600ms cubic-bezier(0.65, 0, 0.35, 1) 400ms both;
+}
+
+@keyframes hc-preloader-appear {
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes hc-preloader-failsafe {
+    to {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+    }
+}
+
+@keyframes hc-preloader-rise {
+    from {
+        opacity: 0;
+        transform: translateY(14px);
+    }
+}
+
+@keyframes hc-preloader-write {
+    from {
+        transform: scaleX(0);
+    }
+}
+
+@keyframes hc-preloader-spin {
+    to {
+        transform: rotate(1turn);
+    }
+}
+
+@keyframes hc-preloader-breathe {
+    to {
+        fill-opacity: 0.35;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hc-preloader__ring {
+        display: none;
+    }
+
+    .hc-preloader:is([data-state='boot'], [data-state='waiting']) .hc-preloader__o {
+        fill-opacity: 1;
+        animation: hc-preloader-breathe 1.2s ease-in-out infinite alternate;
+    }
+
+    .hc-preloader__logo,
+    .hc-preloader[data-state='leaving'] .hc-preloader__logo {
+        transform: none;
+        transition: none;
+    }
+}
+
+@media print {
+    .hc-preloader {
+        display: none;
+    }
 }
 
 /* Every clickable button gets a hand cursor, matching links. */
@@ -368,6 +757,251 @@ button:not(:disabled),
 
 [data-flux-sidebar-backdrop] {
     @apply bg-zinc-950/50 backdrop-blur-[2px];
+    transition:
+        opacity 300ms var(--ease-drawer),
+        display 300ms allow-discrete;
+}
+
+/* The mobile drawer's backdrop fades in and out instead of popping. */
+[data-flux-sidebar-backdrop]:not([data-flux-sidebar-on-mobile]:not([data-flux-sidebar-collapsed-mobile])) {
+    opacity: 0;
+}
+
+@starting-style {
+    [data-flux-sidebar-backdrop] {
+        opacity: 0;
+    }
+}
+
+/*
+ * Sidebar group headings read as labels, not as one more link: small, bold,
+ * uppercase and quieter than the rows under them. Unlayered on purpose: Flux
+ * styles the heading with its own utilities, and the collapsed rail below
+ * still has to win the colour. Arabic has no capitals and must not be
+ * letter-spaced, so it keeps its size and drops the tracking.
+ */
+[data-navigation-sidebar] [data-flux-sidebar-group] > div:first-child {
+    padding-block: 0.625rem 0.375rem;
+    color: var(--color-secondary-light);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    line-height: 1rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+[data-navigation-sidebar] [data-flux-sidebar-group] > div:first-child:lang(ar) {
+    font-size: 0.75rem;
+    letter-spacing: 0;
+}
+
+:where(.dark) [data-navigation-sidebar] [data-flux-sidebar-group] > div:first-child {
+    color: var(--color-ink-faint);
+}
+
+/*
+ * Desktop sidebar collapse and expand.
+ *
+ * Flux swaps labels, section headings and the logo with display:none, so the
+ * rail snapped to its new width and every icon jumped. Here nothing leaves the
+ * layout: the width eases, labels fade in place, headings hand over to a short
+ * divider, the wordmark crossfades to its mark, and each icon keeps the same
+ * y position in both states (collapsed, each sits centred in a 2rem circle).
+ *
+ * Transitions only run while [data-sidebar-animating] is set by the
+ * flux-sidebar-toggle listener in components/navigation/sidebar.blade.php, so
+ * restoring a saved collapsed state on page load or wire:navigate never animates.
+ */
+@media (width >= 64rem) {
+    /*
+     * The nav reaches into the rail's end padding so its scrollbar sits against
+     * the edge; its own end padding gives back what the scrollbar doesn't use,
+     * so rows are exactly as wide as the rail's content box.
+     */
+    [data-navigation-sidebar] [data-flux-sidebar-nav] {
+        margin-inline-end: -0.75rem;
+        padding-inline-end: calc(0.75rem - var(--sidebar-scrollbar, 0px));
+        scrollbar-gutter: stable;
+        scrollbar-width: thin;
+        scrollbar-color: var(--color-secondary-soft) transparent;
+    }
+
+    .dark [data-navigation-sidebar] [data-flux-sidebar-nav] {
+        scrollbar-color: var(--color-line-strong) transparent;
+    }
+
+    /*
+     * Collapsed, the rail is 4rem plus its 1px border and the scrollbar (see
+     * the sidebar's width class), so the rows' 4rem area keeps even space on
+     * both sides and the scrollbar sits beyond it instead of against a row.
+     */
+    [data-navigation-sidebar][data-flux-sidebar-collapsed-desktop] [data-flux-sidebar-nav] {
+        padding-inline-end: 0.75rem;
+    }
+
+    [data-navigation-sidebar] [data-flux-sidebar-item] {
+        overflow: hidden;
+    }
+
+    /*
+     * Collapsed, each row shrinks to a 2rem circle (the radius is the
+     * in-data-flux-sidebar-collapsed-desktop:rounded-2xl! class, since the
+     * row's rounded-lg! can only be beaten from the utilities layer), centred
+     * in the rail's 4rem area with the icon, grown from 1rem to 1.25rem so it
+     * reads on its own without a label, centred inside it. Row height is
+     * unchanged, so no icon moves vertically.
+     */
+    [data-navigation-sidebar][data-flux-sidebar-collapsed-desktop] [data-flux-sidebar-item] {
+        width: 2rem;
+        justify-content: flex-start;
+        margin-inline-start: calc((4rem - 2rem) / 2 - 0.75rem);
+        padding-inline: calc((2rem - 1.25rem) / 2 - 1px);
+    }
+
+    [data-navigation-sidebar][data-flux-sidebar-collapsed-desktop] [data-flux-sidebar-item] > div:first-child > [data-flux-icon] {
+        width: 1.25rem;
+        height: 1.25rem;
+    }
+
+    [data-navigation-sidebar][data-flux-sidebar-collapsed-desktop] [data-flux-sidebar-item] [data-content] {
+        display: block;
+        opacity: 0;
+    }
+
+    [data-navigation-sidebar][data-flux-sidebar-collapsed-desktop] [data-module-badge] {
+        display: inline-flex;
+        opacity: 0;
+    }
+
+    [data-navigation-sidebar] [data-flux-sidebar-group] > div:first-child {
+        position: relative;
+    }
+
+    [data-navigation-sidebar] [data-flux-sidebar-group] > div:first-child::after {
+        content: '';
+        position: absolute;
+        inset-inline-start: calc((4rem - 1rem) / 2 - 0.75rem);
+        top: 50%;
+        width: 1rem;
+        height: 1px;
+        background: var(--color-secondary-soft);
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .dark [data-navigation-sidebar] [data-flux-sidebar-group] > div:first-child::after {
+        background: var(--color-line);
+    }
+
+    [data-navigation-sidebar][data-flux-sidebar-collapsed-desktop] [data-flux-sidebar-group] > div:first-child {
+        color: transparent;
+    }
+
+    /* The header's own border already separates the first group. */
+    [data-navigation-sidebar][data-flux-sidebar-collapsed-desktop] [data-flux-sidebar-group]:not(:first-child) > div:first-child::after {
+        opacity: 1;
+    }
+
+    [data-navigation-sidebar] [data-flux-sidebar-brand] {
+        overflow: hidden;
+    }
+
+    /* Starts the 2.25rem mark on the same centre line as the nav icons. */
+    [data-navigation-sidebar][data-flux-sidebar-collapsed-desktop] [data-flux-sidebar-brand] {
+        width: auto;
+        justify-content: flex-start;
+        padding-inline: calc((4rem - 2.25rem) / 2 - 0.75rem);
+    }
+
+    [data-sidebar-logo] {
+        display: grid;
+    }
+
+    [data-sidebar-logo] > * {
+        grid-area: 1 / 1;
+        justify-self: start;
+    }
+
+    [data-sidebar-logo-mark] {
+        display: block;
+        opacity: 0;
+    }
+
+    [data-navigation-sidebar][data-flux-sidebar-collapsed-desktop] [data-sidebar-logo-wordmark] {
+        opacity: 0;
+    }
+
+    [data-navigation-sidebar][data-flux-sidebar-collapsed-desktop] [data-sidebar-logo-mark] {
+        opacity: 1;
+    }
+
+    [data-navigation-sidebar][data-sidebar-animating] {
+        transition: width 300ms var(--ease-drawer);
+    }
+
+    [data-navigation-sidebar][data-sidebar-animating] :is([data-flux-sidebar-nav], [data-flux-sidebar-brand]) {
+        transition: padding 300ms var(--ease-drawer);
+    }
+
+    [data-navigation-sidebar][data-sidebar-animating] [data-flux-sidebar-item] {
+        transition:
+            width 300ms var(--ease-drawer),
+            margin 300ms var(--ease-drawer),
+            padding 300ms var(--ease-drawer),
+            border-radius 300ms var(--ease-drawer);
+    }
+
+    [data-navigation-sidebar][data-sidebar-animating] [data-flux-sidebar-item] > div:first-child > [data-flux-icon] {
+        transition:
+            width 300ms var(--ease-drawer),
+            height 300ms var(--ease-drawer);
+    }
+
+    [data-navigation-sidebar][data-sidebar-animating] [data-desktop-navigation-collapse-icon] {
+        transition: rotate 300ms var(--ease-drawer);
+    }
+
+    /* Clip instead of an ellipsis while the text is squeezed. */
+    [data-navigation-sidebar][data-sidebar-animating] :is([data-flux-sidebar-item] [data-content], [data-flux-sidebar-group] > div:first-child) {
+        text-overflow: clip;
+    }
+
+    /* Expanding: the width leads, then text fades in once there is room for it. */
+    [data-navigation-sidebar][data-sidebar-animating] :is([data-flux-sidebar-item] [data-content], [data-module-badge], [data-sidebar-logo-wordmark]) {
+        transition: opacity 200ms ease-out 110ms;
+    }
+
+    [data-navigation-sidebar][data-sidebar-animating] [data-flux-sidebar-group] > div:first-child {
+        transition: color 200ms ease-out 110ms;
+    }
+
+    [data-navigation-sidebar][data-sidebar-animating] [data-flux-sidebar-group] > div:first-child::after,
+    [data-navigation-sidebar][data-sidebar-animating] [data-sidebar-logo-mark] {
+        transition: opacity 100ms ease-out;
+    }
+
+    /* Collapsing: text leaves quickly, then the divider and mark settle in. */
+    [data-navigation-sidebar][data-sidebar-animating][data-flux-sidebar-collapsed-desktop] :is([data-flux-sidebar-item] [data-content], [data-module-badge], [data-sidebar-logo-wordmark]) {
+        transition: opacity 120ms ease-out;
+    }
+
+    [data-navigation-sidebar][data-sidebar-animating][data-flux-sidebar-collapsed-desktop] [data-flux-sidebar-group] > div:first-child {
+        transition: color 120ms ease-out;
+    }
+
+    [data-navigation-sidebar][data-sidebar-animating][data-flux-sidebar-collapsed-desktop] [data-flux-sidebar-group] > div:first-child::after,
+    [data-navigation-sidebar][data-sidebar-animating][data-flux-sidebar-collapsed-desktop] [data-sidebar-logo-mark] {
+        transition: opacity 180ms ease-out 100ms;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    [data-flux-sidebar-backdrop],
+    [data-navigation-sidebar][data-sidebar-animating],
+    [data-navigation-sidebar][data-sidebar-animating] *,
+    [data-navigation-sidebar][data-sidebar-animating] *::after {
+        transition: none !important;
+    }
 }
 
 input:focus[data-flux-control],
@@ -378,14 +1012,19 @@ select:focus[data-flux-control] {
     box-shadow: none;
 }
 
+.dark :is(input, textarea, select):focus[data-flux-control] {
+    outline-color: var(--color-ink-muted);
+}
+
 input[type='search']::-webkit-search-cancel-button {
     cursor: pointer;
     filter: grayscale(1) saturate(0) brightness(0.72);
     opacity: 0.85;
 }
 
+/* color-scheme: dark already draws the native glyph light; only keep it neutral. */
 .dark input[type='search']::-webkit-search-cancel-button {
-    filter: grayscale(1) saturate(0) brightness(1.7);
+    filter: grayscale(1) saturate(0);
 }
 
 /* Keep administrative directories inside their approved brand palette. */
@@ -401,7 +1040,8 @@ input[type='search']::-webkit-search-cancel-button {
 .dark .admin-directory [data-flux-table] thead,
 .dark .admin-directory [data-flux-table] tbody,
 .dark .admin-directory [data-flux-table] tr {
-    color: var(--color-white) !important;
+    color: var(--color-ink) !important;
+    outline-color: var(--color-line) !important;
 }
 
 .admin-directory [data-flux-control] {
@@ -413,8 +1053,10 @@ input[type='search']::-webkit-search-cancel-button {
 }
 
 .dark .admin-directory [data-flux-control] {
-    background-color: var(--color-secondary-medium) !important;
-    color: var(--color-white) !important;
+    border-color: var(--color-field-line) !important;
+    background-color: var(--color-surface-2) !important;
+    color: var(--color-ink) !important;
+    outline-color: var(--color-field-line) !important;
 }
 
 .admin-directory [data-flux-control]::placeholder,
@@ -430,6 +1072,19 @@ input[type='search']::-webkit-search-cancel-button {
     box-shadow: none !important;
     outline: 2px solid var(--color-secondary-medium) !important;
     outline-offset: 2px !important;
+}
+
+.dark .admin-directory [data-flux-control]::placeholder,
+.dark .admin-directory [data-flux-input]>div,
+.dark .admin-directory [data-flux-clear-button],
+.dark .admin-directory [data-flux-clear-button] [data-flux-icon] {
+    color: var(--color-ink-faint) !important;
+}
+
+.dark .admin-directory [data-flux-control]:focus,
+.dark .admin-directory [data-flux-control]:focus-visible,
+.dark .admin-directory [data-flux-button]:focus-visible {
+    outline-color: var(--color-ink-muted) !important;
 }
 
 /* The tinted-fill filter row treatment: shared by every directory-style index page's toolbar, not just Programs. */
@@ -482,16 +1137,42 @@ input[type='search']::-webkit-search-cancel-button {
     box-shadow: none !important;
 }
 
+/*
+ * Dark filters: every control, the search input included, is a surface-2 field
+ * with ink text (the search input used to keep the light tint under white text).
+ * Fields stay on surface-2 when hovered or focused — only the border lifts — so
+ * ink-faint placeholders never sit on surface-3 (4.0 : 1).
+ */
 .dark :is(.program-directory-filters, .directory-filters) [data-flux-control] {
-    background-color: color-mix(in srgb, var(--color-secondary-medium) 70%, var(--color-secondary-dark)) !important;
+    border-color: var(--color-field-line) !important;
+    background-color: var(--color-surface-2) !important;
+    color: var(--color-ink) !important;
 }
 
 .dark :is(.program-directory-filters, .directory-filters) [data-flux-label] {
-    color: var(--color-secondary-soft) !important;
+    color: var(--color-ink-muted) !important;
 }
 
 .dark :is(.program-directory-filters, .directory-filters) [data-flux-control]:hover {
-    background-color: var(--color-secondary-medium) !important;
+    border-color: var(--color-ink-faint) !important;
+    background-color: var(--color-surface-2) !important;
+}
+
+.dark :is(.program-directory-filters, .directory-filters) [data-flux-control]:focus,
+.dark :is(.program-directory-filters, .directory-filters) [data-flux-control]:focus-visible {
+    border-color: var(--color-ink-muted) !important;
+}
+
+/* As in light, the directory search keeps its resting border while focused. */
+.dark :is(#program-search, #strategy-search):is(:focus, :focus-visible) {
+    border-color: var(--color-field-line) !important;
+}
+
+/* Chrome paints autofill with a UA !important background; an inset shadow is the only way to keep the field dark. */
+.dark :is(.program-directory-filters, .directory-filters) [data-flux-control]:autofill {
+    box-shadow: inset 0 0 0 100vmax var(--color-surface-2) !important;
+    -webkit-text-fill-color: var(--color-ink);
+    caret-color: var(--color-ink);
 }
 
 :is(.program-filter-picker, .filter-picker) [data-flux-button] {
@@ -541,32 +1222,42 @@ input[type='search']::-webkit-search-cancel-button {
 }
 
 .dark :is(.program-filter-picker, .filter-picker) [data-flux-button] {
-    border-color: var(--color-secondary-medium) !important;
-    background-color: color-mix(in srgb, var(--color-secondary-medium) 70%, var(--color-secondary-dark)) !important;
-    color: var(--color-white) !important;
+    border-color: var(--color-field-line) !important;
+    background-color: var(--color-surface-2) !important;
+    color: var(--color-ink) !important;
 }
 
-.dark :is(.program-filter-picker, .filter-picker) [data-flux-button]:hover,
+.dark :is(.program-filter-picker, .filter-picker) [data-flux-button]:hover {
+    border-color: var(--color-ink-faint) !important;
+    background-color: var(--color-surface-2) !important;
+}
+
 .dark :is(.program-filter-picker, .filter-picker) [data-flux-menu-item][data-active] {
-    background-color: var(--color-secondary-medium) !important;
+    background-color: rgb(255 255 255 / 0.06) !important;
 }
 
 .dark :is(.program-filter-picker, .filter-picker) [data-flux-menu] {
-    border-color: var(--color-secondary-medium) !important;
-    background-color: var(--color-secondary-dark) !important;
+    border-color: var(--color-line) !important;
+    background-color: var(--color-surface-3) !important;
+    box-shadow: var(--shadow-raised) !important;
 }
 
 .dark :is(.program-filter-menu, .filter-menu) [data-flux-control] {
-    border-color: var(--color-secondary-medium) !important;
-    background-color: var(--color-secondary-medium) !important;
+    border-color: var(--color-field-line) !important;
+    background-color: var(--color-surface-2) !important;
+    color: var(--color-ink) !important;
 }
 
 .dark :is(.program-filter-picker, .filter-picker) [data-flux-menu-item] {
-    color: var(--color-white) !important;
+    color: var(--color-ink) !important;
 }
 
 .admin-directory [data-flux-control][data-invalid] {
     border-color: var(--color-primary) !important;
+}
+
+.dark .admin-directory [data-flux-control][data-invalid] {
+    border-color: var(--color-brand-text) !important;
 }
 
 .admin-directory [data-flux-button] {
@@ -584,15 +1275,37 @@ input[type='search']::-webkit-search-cancel-button {
     color: var(--color-secondary-dark) !important;
 }
 
+.dark .admin-directory [data-flux-button][aria-label='Toggle password visibility'] {
+    color: var(--color-ink-muted) !important;
+}
+
 .dark .admin-directory [data-flux-button][aria-label='Toggle password visibility']:hover,
 .dark .admin-directory ui-close [data-flux-button]:hover {
-    background-color: var(--color-secondary-medium) !important;
-    color: var(--color-white) !important;
+    background-color: rgb(255 255 255 / 0.06) !important;
+    color: var(--color-ink) !important;
 }
 
 @layer base {
     .admin-directory ui-close [data-flux-button] {
         color: var(--color-secondary-light) !important;
+    }
+
+    /* Same layer as the rule above, so it can out-rank Flux's own `!` classes on the close X. */
+    .dark .admin-directory ui-close [data-flux-button] {
+        color: var(--color-ink-muted) !important;
+    }
+
+    .dark .admin-directory ui-close [data-flux-button]:hover {
+        color: var(--color-ink) !important;
+    }
+
+    /* Flux's own modal X (its absolute top-end wrapper, not a page's modal.close) is text-zinc-500! in dark: 2.9 : 1 on surface-3. */
+    .dark :is([data-flux-modal] > dialog, [data-flux-modal-content]) > .absolute.top-0.end-0 > [data-flux-modal-close] > [data-flux-button] {
+        color: var(--color-ink-muted) !important;
+    }
+
+    .dark :is([data-flux-modal] > dialog, [data-flux-modal-content]) > .absolute.top-0.end-0 > [data-flux-modal-close] > [data-flux-button]:hover {
+        color: var(--color-ink) !important;
     }
 }
 
@@ -603,6 +1316,10 @@ input[type='search']::-webkit-search-cancel-button {
     backdrop-filter: blur(4px) saturate(75%);
     transition-duration: 180ms;
     transition-timing-function: ease-out;
+}
+
+.dark [data-flux-modal] > dialog::backdrop {
+    background-color: rgb(0 0 0 / 0.6) !important;
 }
 
 [data-flux-modal] > dialog:not([data-flux-flyout]):not([data-flux-modal-overflow]) {
@@ -619,6 +1336,13 @@ input[type='search']::-webkit-search-cancel-button {
     box-shadow:
         0 2px 8px color-mix(in srgb, var(--color-secondary-dark) 22%, transparent),
         0 24px 64px color-mix(in srgb, var(--color-secondary-dark) 48%, transparent) !important;
+}
+
+/* Dark overlays: no drop shadow, a line border and the top-edge highlight; the backdrop does the separating. */
+.dark [data-flux-modal] > dialog:not(.bg-transparent):not([data-flux-flyout]):not([data-flux-modal-overflow]),
+.dark [data-flux-modal] [data-flux-modal-content]:not(.bg-transparent) {
+    border-color: var(--color-line) !important;
+    box-shadow: var(--shadow-raised) !important;
 }
 
 [data-flux-modal] > dialog:not([data-flux-flyout]):not([data-flux-modal-overflow]),
@@ -655,6 +1379,859 @@ input[type='search']::-webkit-search-cancel-button {
     }
 }
 
+/*
+ * Form field kit (x-ui.form-*). Every field is the header filter picker's
+ * 44px tinted box, so a form row never mixes looks: dropdown triggers take
+ * that look from the .filter-picker rules above, every other control from
+ * .form-box here.
+ */
+.form-label {
+    display: block;
+    margin-bottom: 0.375rem;
+    color: var(--color-secondary-medium);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+/* Tracking pulls Arabic letters apart, and Arabic has no capitals. */
+.form-label:lang(ar) {
+    letter-spacing: normal;
+    text-transform: none;
+}
+
+.dark .form-label {
+    color: var(--color-ink-muted);
+}
+
+.form-required {
+    color: var(--color-status-critical);
+}
+
+.form-box {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding-inline: 0.875rem;
+    border: 1px solid var(--color-secondary-soft);
+    border-radius: 0.5rem;
+    background-color: color-mix(in srgb, var(--color-secondary-soft) 38%, var(--color-white));
+    color: var(--color-secondary-dark);
+    font-size: 0.875rem;
+    transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.form-box:hover {
+    border-color: var(--color-secondary-light);
+    background-color: var(--color-white);
+}
+
+.form-box:focus-within {
+    border-color: var(--color-secondary-medium);
+    background-color: var(--color-white);
+    outline: 2px solid var(--color-secondary-medium);
+    outline-offset: 2px;
+}
+
+.form-box[data-invalid] {
+    border-color: var(--color-primary);
+}
+
+.form-box-multiline {
+    align-items: stretch;
+}
+
+.form-box:has(.form-box-input:disabled) {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.form-box-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 2.625rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    outline: none;
+}
+
+textarea.form-box-input {
+    height: auto;
+    padding-block: 0.5rem;
+    line-height: 1.4;
+    resize: none;
+}
+
+.form-box-input::placeholder {
+    color: var(--color-secondary-light);
+}
+
+.form-affix {
+    flex-shrink: 0;
+    color: var(--color-secondary-medium);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.form-help {
+    margin-top: 0.25rem;
+    color: var(--color-secondary-medium);
+    font-size: 0.75rem;
+    line-height: 1rem;
+}
+
+.form-error {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-top: 0.25rem;
+    color: var(--color-status-critical);
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1rem;
+}
+
+.dark .form-box {
+    border-color: var(--color-field-line);
+    background-color: var(--color-surface-2);
+    color: var(--color-ink);
+}
+
+.dark .form-box:hover {
+    border-color: var(--color-ink-faint);
+    background-color: var(--color-surface-2);
+}
+
+.dark .form-box:focus-within {
+    border-color: var(--color-ink-muted);
+    background-color: var(--color-surface-2);
+    outline-color: var(--color-ink-muted);
+}
+
+/* brand-text, not brand: an invalid border must clear 3 : 1 against a surface-3 dialog too. */
+.dark .form-box[data-invalid] {
+    border-color: var(--color-brand-text);
+}
+
+.dark .form-box-input {
+    color-scheme: dark;
+}
+
+.dark .form-box-input::placeholder {
+    color: var(--color-ink-faint);
+}
+
+.dark .form-affix,
+.dark .form-help {
+    color: var(--color-ink-muted);
+}
+
+.dark .form-required,
+.dark .form-error {
+    color: var(--color-brand-text);
+}
+
+/* Form dropdowns are the header filter picker; these add the form-only states. */
+.form-select-placeholder {
+    color: var(--color-secondary-light);
+    font-weight: 400;
+}
+
+.dark .form-select-placeholder {
+    color: var(--color-ink-faint);
+}
+
+.filter-picker [data-flux-button][aria-invalid='true'] {
+    border-color: var(--color-primary) !important;
+}
+
+.dark .filter-picker [data-flux-button][aria-invalid='true'] {
+    border-color: var(--color-brand-text) !important;
+}
+
+.filter-picker [data-flux-button]:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* A value the form shows but will not let you change (a pinned donor, a fixed currency). */
+.form-box[data-locked] {
+    cursor: not-allowed;
+    font-weight: 500;
+}
+
+.form-box[data-locked]:hover {
+    border-color: var(--color-secondary-soft);
+    background-color: color-mix(in srgb, var(--color-secondary-soft) 38%, var(--color-white));
+}
+
+.dark .form-box[data-locked]:hover {
+    border-color: var(--color-field-line);
+    background-color: var(--color-surface-2);
+}
+
+/*
+ * Modal shell (x-ui.modal): header and footer pinned, only the body scrolls,
+ * and only when the window is genuinely too short. Below the sm breakpoint
+ * the dialog becomes a full-height sheet with two full-width buttons.
+ */
+[data-flux-modal] > dialog.modal-shell:not([data-flux-flyout]):not([data-flux-modal-overflow]) {
+    padding: 0;
+    overflow: hidden;
+    background-color: var(--color-white);
+    color: var(--color-secondary-dark);
+}
+
+[data-flux-modal] > dialog.modal-shell[open]:not([data-flux-flyout]):not([data-flux-modal-overflow]) {
+    display: flex;
+    flex-direction: column;
+}
+
+.dark [data-flux-modal] > dialog.modal-shell:not([data-flux-flyout]):not([data-flux-modal-overflow]) {
+    background-color: var(--color-surface-3);
+    color: var(--color-ink);
+}
+
+.modal-shell-frame {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.modal-shell-header {
+    display: flex;
+    flex-shrink: 0;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1rem 1.5rem 0.875rem;
+    border-bottom: 1px solid var(--color-secondary-soft);
+}
+
+.modal-shell-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    line-height: 1.75rem;
+}
+
+.modal-shell-description {
+    color: var(--color-secondary-medium);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+}
+
+.modal-shell-close {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    margin-inline-end: -0.5rem;
+    border-radius: 0.375rem;
+    color: var(--color-secondary-light);
+}
+
+.modal-shell-close:hover {
+    background-color: var(--color-secondary-soft);
+    color: var(--color-secondary-dark);
+}
+
+.modal-shell-close:focus-visible {
+    outline: 2px solid var(--color-secondary-medium);
+    outline-offset: 2px;
+}
+
+.modal-shell-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 1.25rem 1.5rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    container: modal / inline-size;
+}
+
+.modal-shell-footer {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.75rem 1.5rem;
+    border-top: 1px solid var(--color-secondary-soft);
+    background-color: var(--color-board-head);
+}
+
+.modal-shell-meta {
+    color: var(--color-secondary-medium);
+    font-size: 0.75rem;
+}
+
+.modal-shell-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-inline-start: auto;
+}
+
+.modal-shell-submit {
+    display: flex;
+    gap: 0.5rem;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+/* Rail forms (xl) sit a little wider; their sections bring their own vertical rhythm. */
+.modal-shell-xl .modal-shell-header {
+    padding: 0.875rem 1.75rem 0.75rem;
+}
+
+.modal-shell-lg .modal-shell-title,
+.modal-shell-xl .modal-shell-title {
+    font-size: 1.25rem;
+}
+
+.modal-shell-xl .modal-shell-body {
+    padding: 0 1.75rem;
+}
+
+.modal-shell-xl .modal-shell-footer {
+    padding-inline: 1.75rem;
+}
+
+/* Viewers (file previews) fill the body edge to edge. */
+.modal-shell .modal-shell-body.modal-shell-body-flush {
+    padding: 0;
+}
+
+.dark .modal-shell-header,
+.dark .modal-shell-footer {
+    border-color: var(--color-line);
+}
+
+.dark .modal-shell-footer {
+    background-color: var(--color-surface-3);
+}
+
+.dark .modal-shell-description,
+.dark .modal-shell-meta {
+    color: var(--color-ink-muted);
+}
+
+.dark .modal-shell-close {
+    color: var(--color-ink-muted);
+}
+
+.dark .modal-shell-close:hover {
+    background-color: rgb(255 255 255 / 0.06);
+    color: var(--color-ink);
+}
+
+.dark .modal-shell-close:focus-visible {
+    outline-color: var(--color-ink-muted);
+}
+
+@media (width < 40rem) {
+    [data-flux-modal] > dialog.modal-shell:not([data-flux-flyout]):not([data-flux-modal-overflow]) {
+        width: 100%;
+        max-width: 100%;
+        height: 100dvh;
+        max-height: 100dvh;
+        margin: 0;
+        border-radius: 0;
+    }
+
+    .modal-shell-header,
+    .modal-shell-xl .modal-shell-header {
+        padding-inline: 1rem;
+    }
+
+    .modal-shell-body,
+    .modal-shell-xl .modal-shell-body {
+        padding-inline: 1rem;
+    }
+
+    .modal-shell-footer,
+    .modal-shell-xl .modal-shell-footer {
+        padding: 0.75rem 1rem;
+    }
+
+    .modal-shell-footer {
+        flex-wrap: wrap;
+    }
+
+    /* The required note is decoration; anything else in the meta slot (a delete action) stays, on its own row. */
+    .modal-shell-meta {
+        flex: 1 1 100%;
+    }
+
+    .modal-shell-meta-note {
+        display: none;
+    }
+
+    .modal-shell-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: 100%;
+    }
+
+    .modal-shell-actions [data-flux-button] {
+        width: 100%;
+        min-height: 2.75rem;
+    }
+
+    .modal-shell-submit > * {
+        flex: 1 1 0;
+    }
+}
+
+/*
+ * Rail sections (x-ui.form-section). In a wide dialog each section's name sits
+ * in a start-side rail, one dot per section on a single thread (the app's
+ * dot-thread motif), so headings cost width instead of height. Narrower
+ * dialogs fold the rail into a dot + hairline heading above the fields.
+ */
+.form-section {
+    display: grid;
+    gap: 0.75rem;
+    padding-block: 0.75rem;
+}
+
+.form-section-rail {
+    position: relative;
+    min-width: 0;
+}
+
+.form-section-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.25rem;
+}
+
+.form-section-heading::after {
+    content: '';
+    flex: 1 1 auto;
+    height: 1px;
+    background-color: var(--color-secondary-soft);
+}
+
+.form-section-dot {
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+    width: 7px;
+    height: 7px;
+    border-radius: 9999px;
+    background-color: var(--color-secondary-dark);
+    box-shadow: 0 0 0 4px var(--color-white);
+}
+
+.form-section[data-invalid] .form-section-dot {
+    background-color: var(--color-primary);
+}
+
+.form-section-hint {
+    margin-top: 0.125rem;
+    margin-inline-start: 17px;
+    color: var(--color-secondary-medium);
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.form-section[data-invalid] .form-section-hint {
+    color: var(--color-status-critical);
+}
+
+.form-section-figure {
+    color: var(--color-secondary-dark);
+    font-weight: 600;
+}
+
+.dark .form-section-heading::after {
+    background-color: var(--color-line);
+}
+
+/* The ring is a gap cut into the thread, so it takes the dialog's own surface. */
+.dark .form-section-dot {
+    background-color: var(--color-ink-muted);
+    box-shadow: 0 0 0 4px var(--color-surface-3);
+}
+
+.dark .form-section[data-invalid] .form-section-dot {
+    background-color: var(--color-brand);
+}
+
+.dark .form-section-hint {
+    color: var(--color-ink-muted);
+}
+
+.dark .form-section[data-invalid] .form-section-hint {
+    color: var(--color-brand-text);
+}
+
+.dark .form-section-figure {
+    color: var(--color-ink);
+}
+
+@container modal (width >= 56rem) {
+    .form-section {
+        grid-template-columns: 10rem minmax(0, 1fr);
+        column-gap: 2rem;
+    }
+
+    .form-section + .form-section {
+        border-top: 1px solid color-mix(in srgb, var(--color-secondary-soft) 70%, transparent);
+    }
+
+    .dark .form-section + .form-section {
+        border-top-color: var(--color-line);
+    }
+
+    .form-section-heading::after {
+        content: none;
+    }
+
+    /* The thread: out of the first dot, through every section, into the last dot. */
+    .form-section-rail::before {
+        content: '';
+        position: absolute;
+        inset-inline-start: 3px;
+        top: -0.75rem;
+        bottom: -0.75rem;
+        width: 1px;
+        background-color: var(--color-secondary-soft);
+    }
+
+    .form-section:first-child .form-section-rail::before {
+        top: 0.625rem;
+    }
+
+    .form-section:last-child .form-section-rail::before {
+        bottom: auto;
+        height: 1.375rem;
+    }
+
+    .form-section:only-child .form-section-rail::before {
+        content: none;
+    }
+
+    .dark .form-section-rail::before {
+        background-color: var(--color-line-strong);
+    }
+}
+
+/* Confirmations (x-ui.confirm-modal): the small warning mark beside the title. */
+.confirm-mark {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    margin-top: 0.125rem;
+    border-radius: 9999px;
+}
+
+/*
+ * The install dialog's reasons (x-notifications.install-modal) on the app's
+ * dot thread: a hairline runs from each dot down into the next, and the first
+ * dot is filled.
+ */
+.install-thread {
+    display: grid;
+    gap: 1.125rem;
+}
+
+.install-thread-step {
+    position: relative;
+    padding-inline-start: 1.875rem;
+}
+
+.install-thread-step:not(:last-child)::before {
+    position: absolute;
+    top: 1.0625rem;
+    bottom: -1.5rem;
+    inset-inline-start: 0.3125rem;
+    width: 1px;
+    background-color: var(--color-secondary-soft);
+    content: '';
+}
+
+.install-thread-dot {
+    position: absolute;
+    top: 0.375rem;
+    inset-inline-start: 0;
+    width: 0.6875rem;
+    height: 0.6875rem;
+    border: 2px solid var(--color-primary);
+    border-radius: 9999px;
+    background-color: var(--color-white);
+}
+
+.install-thread-step:first-child .install-thread-dot {
+    background-color: var(--color-primary);
+}
+
+.install-thread-title {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    line-height: 1.375rem;
+}
+
+.install-thread-text {
+    color: var(--color-secondary-medium);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+}
+
+.dark .install-thread-step:not(:last-child)::before {
+    background-color: var(--color-line-strong);
+}
+
+.dark .install-thread-dot {
+    border-color: var(--color-brand);
+    background-color: var(--color-surface-3);
+}
+
+.dark .install-thread-step:first-child .install-thread-dot {
+    background-color: var(--color-brand);
+}
+
+.dark .install-thread-text {
+    color: var(--color-ink-muted);
+}
+
+/* One-click segments (x-ui.form-segmented): the same 44px box, split into choices. */
+.form-segmented {
+    display: flex;
+    gap: 3px;
+    min-height: 2.75rem;
+    padding: 3px;
+    border: 1px solid var(--color-secondary-soft);
+    border-radius: 0.5rem;
+    background-color: color-mix(in srgb, var(--color-secondary-soft) 38%, var(--color-white));
+}
+
+.form-segmented[data-invalid] {
+    border-color: var(--color-primary);
+}
+
+.form-segment {
+    display: inline-flex;
+    flex: 1 1 0;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    min-width: 0;
+    padding-inline: 0.5rem;
+    border-radius: 0.375rem;
+    color: var(--color-secondary-medium);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.form-segment[aria-checked='true'] {
+    background-color: var(--color-white);
+    color: var(--color-secondary-dark);
+    box-shadow:
+        0 1px 2px color-mix(in srgb, var(--color-secondary-dark) 18%, transparent),
+        0 0 0 1px color-mix(in srgb, var(--color-secondary-dark) 8%, transparent);
+}
+
+.form-segment:focus-visible {
+    outline: 2px solid var(--color-secondary-medium);
+    outline-offset: 1px;
+}
+
+.form-segment:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.dark .form-segmented {
+    border-color: var(--color-field-line);
+    background-color: var(--color-surface-2);
+}
+
+.dark .form-segmented[data-invalid] {
+    border-color: var(--color-brand-text);
+}
+
+.dark .form-segment {
+    color: var(--color-ink-muted);
+}
+
+.dark .form-segment[aria-checked='true'] {
+    background-color: var(--color-surface-3);
+    color: var(--color-ink);
+    box-shadow:
+        var(--shadow-raised),
+        0 0 0 1px var(--color-line-strong);
+}
+
+.dark .form-segment:focus-visible {
+    outline-color: var(--color-ink-muted);
+}
+
+/* File field (x-ui.form-file): a dashed drop zone, then the chosen file with its progress. */
+.form-file-zone,
+.form-file-chosen {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    min-height: 5.5rem;
+    padding-inline: 1.25rem;
+    border-radius: 0.5rem;
+}
+
+.form-file-zone {
+    border: 1px dashed var(--color-secondary-light);
+    background-color: color-mix(in srgb, var(--color-secondary-soft) 38%, var(--color-white));
+    cursor: pointer;
+    transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.form-file-zone:hover,
+.form-file[data-dragging] .form-file-zone {
+    border-color: var(--color-secondary-medium);
+    background-color: var(--color-white);
+}
+
+.form-file-zone:focus-within {
+    outline: 2px solid var(--color-secondary-medium);
+    outline-offset: 2px;
+}
+
+.form-file[data-invalid] .form-file-zone {
+    border-color: var(--color-primary);
+}
+
+.form-file-chosen {
+    border: 1px solid var(--color-secondary-soft);
+    background-color: var(--color-white);
+}
+
+.form-file-icon,
+.form-file-doc {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+}
+
+.form-file-icon {
+    border-radius: 9999px;
+    background-color: var(--color-white);
+    color: var(--color-secondary-medium);
+}
+
+.form-file-doc {
+    border-radius: 0.5rem;
+    background-color: color-mix(in srgb, var(--color-primary) 10%, transparent);
+    color: var(--color-status-critical);
+}
+
+.form-file-browse {
+    color: var(--color-status-critical);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.form-file-track {
+    flex: 1 1 auto;
+    height: 0.25rem;
+    overflow: hidden;
+    border-radius: 9999px;
+    background-color: var(--color-secondary-soft);
+}
+
+.form-file-bar {
+    display: block;
+    height: 100%;
+    border-radius: 9999px;
+    background-color: var(--color-secondary-dark);
+    transition: width 150ms ease;
+}
+
+.form-file-remove {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.375rem;
+    color: var(--color-secondary-light);
+}
+
+.form-file-remove:hover {
+    background-color: var(--color-secondary-soft);
+    color: var(--color-secondary-dark);
+}
+
+.dark .form-file-zone {
+    border-color: var(--color-field-line);
+    background-color: var(--color-surface-2);
+}
+
+.dark .form-file-zone:hover,
+.dark .form-file[data-dragging] .form-file-zone {
+    border-color: var(--color-ink-muted);
+    background-color: var(--color-surface-2);
+}
+
+.dark .form-file-zone:focus-within {
+    outline-color: var(--color-ink-muted);
+}
+
+.dark .form-file[data-invalid] .form-file-zone {
+    border-color: var(--color-brand-text);
+}
+
+.dark .form-file-chosen {
+    border-color: var(--color-line);
+    background-color: var(--color-surface-2);
+}
+
+.dark .form-file-icon {
+    background-color: var(--color-surface-3);
+    color: var(--color-ink-muted);
+}
+
+.dark .form-file-track {
+    background-color: var(--color-line-strong);
+}
+
+.dark .form-file-bar {
+    background-color: var(--color-ink);
+}
+
+.dark .form-file-remove {
+    color: var(--color-ink-muted);
+}
+
+.dark .form-file-remove:hover {
+    background-color: rgb(255 255 255 / 0.06);
+    color: var(--color-ink);
+}
+
+/* End of the form field kit. */
+
 .admin-directory [data-flux-error] {
     color: var(--color-primary) !important;
 }
@@ -665,10 +2242,14 @@ input[type='search']::-webkit-search-cancel-button {
     color: var(--color-secondary-medium) !important;
 }
 
+.dark .admin-directory [data-flux-error] {
+    color: var(--color-brand-text) !important;
+}
+
 .dark .admin-directory [data-flux-pagination],
 .dark .admin-directory [data-flux-pagination]>div {
-    border-color: var(--color-secondary-medium) !important;
-    color: var(--color-secondary-soft) !important;
+    border-color: var(--color-line) !important;
+    color: var(--color-ink-muted) !important;
 }
 
 /* \[:where(&)\]:size-4 {
@@ -681,7 +2262,7 @@ input[type='search']::-webkit-search-cancel-button {
 }
 
 .dark .target-pending {
-    background-image: repeating-linear-gradient(135deg, rgb(255 255 255 / 0.45) 0 2px, transparent 2px 5px);
+    background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--color-ink) 45%, transparent) 0 2px, transparent 2px 5px);
 }
 
 @keyframes target-bar-grow {
@@ -694,6 +2275,204 @@ input[type='search']::-webkit-search-cancel-button {
     from {
         opacity: 0;
         transform: translateY(0.5rem);
+    }
+}
+
+/*
+ * Flux toasts (Flux::toast(), CRUD confirmations), styled as a centred,
+ * SweetAlert-style popup instead of a corner snackbar. `position="center"` on
+ * <flux:toast.group> (see the app and auth layouts) is the hook for all of this.
+ *
+ * True centring: Flux's own [position*="center"] rule only centers horizontally.
+ * The group collapses to zero height (its dialog is absolutely positioned inside
+ * it), so auto margins alone don't centre it vertically — Flux's CSS only sets
+ * top/bottom for "top"/"bottom" positions, and "center" matches neither, leaving
+ * the dialog at its static position. `top: 50%` plus a same-height translateY
+ * fixes that regardless of the dialog's rendered height.
+ *
+ * The rest restyles Flux's fixed toast markup (vendor/livewire/flux/stubs/.../
+ * toast/index.blade.php has no class hooks of its own) by structural position:
+ * card (first div) > content row (its only child) > [icon+text row, action/close row].
+ */
+ui-toast-group[position='center'] {
+    margin-top: auto;
+    margin-bottom: auto;
+
+    [data-flux-toast-dialog] {
+        top: 50%;
+        /* !important: Flux's JS sets an inline `transform` on this element itself
+           (it positions stacked toasts by translating each one), which otherwise
+           always beats an external rule regardless of specificity. */
+        transform: translateY(-50%) scale(0.94) !important;
+        transition: opacity 0.25s allow-discrete, transform 0.25s allow-discrete, height 0.35s allow-discrete;
+
+        &.showing {
+            transform: translateY(-50%) scale(1) !important;
+        }
+
+        /* Card: Flux's own p-2/rounded-xl/shadow-lg wrapper, widened and padded into a popup.
+           The backdrop dimming the rest of the page is a giant-spread box-shadow rather than
+           a real ::backdrop — a real backdrop only paints while the popover is genuinely
+           open, and the group here never reliably reports "closed" once every toast in it
+           has been dismissed, which left the dimming stuck on screen. A shadow is just paint
+           tied to this element, so it appears and fades with the popup itself, every time. */
+        > div {
+            position: relative;
+            overflow: hidden;
+            width: 22rem;
+            max-width: calc(100vw - 2.5rem);
+            padding: 1.75rem 1.5rem 1.375rem;
+            border-radius: 1.25rem;
+            box-shadow:
+                0 2px 8px color-mix(in srgb, var(--color-secondary-dark) 22%, transparent),
+                0 24px 64px color-mix(in srgb, var(--color-secondary-dark) 40%, transparent),
+                0 0 0 100vmax color-mix(in srgb, var(--color-secondary-dark) 45%, transparent);
+        }
+
+        /* Content row: stack icon above text instead of side-by-side, and centre it. */
+        > div > div {
+            flex-direction: column;
+            align-items: center;
+            gap: 0.625rem;
+            overflow: visible;
+        }
+
+        /* Icon + text column: also stacked, icon first. */
+        > div > div > div:first-child {
+            flex-direction: column;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0;
+            text-align: center;
+        }
+
+        /* The variant icon becomes a colour-tinted circular badge. */
+        svg {
+            width: 2.75rem;
+            height: 2.75rem;
+            padding: 0.625rem;
+            border-radius: 9999px;
+        }
+
+        /* Action/close row: off the content flow, into the card's top-end corner,
+           clear of the icon badge's own padding. */
+        > div > div > div:last-child {
+            position: absolute;
+            top: 0.375rem;
+            inset-inline-end: 0.375rem;
+        }
+
+        /* The dismiss countdown. Flux tracks its own `duration` in JS with no CSS
+           hook, so this assumes the shared default (Flux::toast()'s 5s) — every
+           toast in this app relies on that default rather than passing its own. */
+        > div::after {
+            content: '';
+            position: absolute;
+            inset-inline: 0;
+            bottom: 0;
+            height: 3px;
+            transform-origin: left center;
+            animation: hc-center-toast-countdown 5s linear forwards;
+        }
+
+        &[data-variant='success'] {
+            svg {
+                background-color: var(--color-status-good-soft);
+                color: var(--color-status-good);
+            }
+
+            > div::after {
+                background-color: var(--color-status-good);
+            }
+        }
+
+        &[data-variant='warning'] {
+            svg {
+                background-color: var(--color-status-warn-soft);
+                color: var(--color-status-warn);
+            }
+
+            > div::after {
+                background-color: var(--color-status-warn);
+            }
+        }
+
+        &[data-variant='danger'] {
+            svg {
+                background-color: var(--color-status-critical-soft);
+                color: var(--color-status-critical);
+            }
+
+            > div::after {
+                background-color: var(--color-status-critical);
+            }
+        }
+
+        &:not([data-variant]),
+        &[data-variant='info'] {
+            svg {
+                background-color: var(--color-status-active-soft);
+                color: var(--color-status-active);
+            }
+
+            > div::after {
+                background-color: var(--color-status-active);
+            }
+        }
+    }
+}
+
+[dir='rtl'] ui-toast-group[position='center'] [data-flux-toast-dialog] > div::after {
+    transform-origin: right center;
+}
+
+/* Dark toasts: a surface-3 card on a black/60 dim, Graphite text, no drop shadow. */
+.dark [data-flux-toast-dialog] > div {
+    border-color: var(--color-line);
+    background-color: var(--color-surface-3);
+}
+
+.dark ui-toast-group[position='center'] [data-flux-toast-dialog] > div {
+    box-shadow:
+        var(--shadow-raised),
+        0 0 0 100vmax rgb(0 0 0 / 0.6);
+}
+
+/* Heading, then text: the text is primary on its own and supporting under a heading, as in Flux. */
+.dark [data-flux-toast-dialog] > div > div > div:first-child > div > div {
+    color: var(--color-ink);
+}
+
+.dark [data-flux-toast-dialog] > div > div > div:first-child > div > div:not(:empty) + div {
+    color: var(--color-ink-muted);
+}
+
+.dark [data-flux-toast-dialog] ui-close button {
+    color: var(--color-ink-muted);
+}
+
+.dark [data-flux-toast-dialog] ui-close button:hover {
+    color: var(--color-ink);
+}
+
+@keyframes hc-center-toast-countdown {
+    from {
+        transform: scaleX(1);
+    }
+    to {
+        transform: scaleX(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    ui-toast-group[position='center'] [data-flux-toast-dialog] {
+        transition: opacity 0.2s;
+        transform: none !important;
+
+        > div::after {
+            animation: none;
+            opacity: 0;
+        }
     }
 }
 
@@ -741,6 +2520,10 @@ input[type='search']::-webkit-search-cancel-button {
 .cal-scroller {
     scrollbar-width: thin;
     scrollbar-color: var(--color-secondary-light) transparent;
+}
+
+.dark .cal-scroller {
+    scrollbar-color: var(--color-line-strong) transparent;
 }
 
 .cal-ledger {
@@ -961,7 +2744,7 @@ input[type='search']::-webkit-search-cancel-button {
 }
 
 .dark .chrono-cursor {
-    background: var(--color-white);
+    background: var(--color-ink);
 }
 
 /*
@@ -1018,13 +2801,19 @@ input[type='search']::-webkit-search-cancel-button {
 }
 
 .dark .dossier ::selection {
-    color: var(--color-white);
+    background: color-mix(in srgb, var(--color-brand) 35%, transparent);
+    color: var(--color-ink);
 }
 
 .dossier {
     caret-color: var(--color-primary);
     scrollbar-width: thin;
     scrollbar-color: var(--color-secondary-light) transparent;
+}
+
+.dark .dossier {
+    caret-color: var(--color-brand-text);
+    scrollbar-color: var(--color-line-strong) transparent;
 }
 
 /*
@@ -1153,7 +2942,7 @@ input[type='search']::-webkit-search-cancel-button {
 }
 
 .dark .connection-thread > li:not(:last-child)::before {
-    background: var(--color-secondary-medium);
+    background: var(--color-line-strong);
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -1213,9 +3002,9 @@ input[type='search']::-webkit-search-cancel-button {
     background-color: color-mix(in srgb, var(--color-secondary-soft) 40%, transparent);
 }
 
-:root.dark .measure-track,
+.dark:root .measure-track,
 .dark .measure-track {
-    background-color: color-mix(in srgb, var(--color-secondary-medium) 45%, transparent);
+    background-color: var(--color-line);
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -1254,7 +3043,7 @@ input[type='search']::-webkit-search-cancel-button {
 }
 
 .dark .ledger-spread::before {
-    background: var(--color-secondary-medium);
+    background: var(--color-line);
 }
 
 /*
@@ -1272,7 +3061,7 @@ input[type='search']::-webkit-search-cancel-button {
 }
 
 .dark .ledger-strike::before {
-    background: var(--color-secondary-medium);
+    background: var(--color-line);
 }
 
 /*
@@ -1284,7 +3073,7 @@ input[type='search']::-webkit-search-cancel-button {
 }
 
 .dark .ledger-chip {
-    background: var(--color-secondary-dark);
+    background: var(--color-surface-1);
 }
 
 .exec-ledger [aria-expanded='true'] .ledger-chip,
@@ -1292,9 +3081,10 @@ input[type='search']::-webkit-search-cancel-button {
     background: color-mix(in srgb, var(--color-secondary-soft) 20%, var(--color-white));
 }
 
+/* Must match the open row's dark ground (.ledger-reveal: dark:bg-surface-2). */
 .dark .exec-ledger [aria-expanded='true'] .ledger-chip,
 .dark .ledger-reveal .ledger-chip {
-    background: color-mix(in srgb, var(--color-secondary-medium) 15%, var(--color-secondary-dark));
+    background: var(--color-surface-2);
 }
 
 /*
@@ -1337,12 +3127,16 @@ input[type='search']::-webkit-search-cancel-button {
 }
 
 .dark .exec-ledger .ledger-open:hover {
-    background-color: color-mix(in srgb, var(--color-secondary-medium) 30%, transparent);
+    background-color: var(--color-surface-2);
 }
 
 .exec-ledger .ledger-open:focus-visible {
     outline: 2px solid var(--color-primary);
     outline-offset: 2px;
+}
+
+.dark .exec-ledger .ledger-open:focus-visible {
+    outline-color: var(--color-brand);
 }
 
 /*
@@ -1355,13 +3149,19 @@ input[type='search']::-webkit-search-cancel-button {
 }
 
 .dark .exec-ledger ::selection {
-    color: var(--color-white);
+    background: color-mix(in srgb, var(--color-brand) 35%, transparent);
+    color: var(--color-ink);
 }
 
 .exec-ledger {
     caret-color: var(--color-primary);
     scrollbar-width: thin;
     scrollbar-color: var(--color-secondary-light) transparent;
+}
+
+.dark .exec-ledger {
+    caret-color: var(--color-brand-text);
+    scrollbar-color: var(--color-line-strong) transparent;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -1405,6 +3205,26 @@ input[type='search']::-webkit-search-cancel-button {
     }
 }
 
+@keyframes gantt-grow {
+    from {
+        clip-path: inset(0 100% 0 0 round 5px);
+    }
+    to {
+        clip-path: inset(0 0 0 0 round 5px);
+    }
+}
+
+@keyframes gantt-pop {
+    from {
+        opacity: 0;
+        scale: 0.4;
+    }
+    to {
+        opacity: 1;
+        scale: 1;
+    }
+}
+
 /*
  * Gantt print / "Save as PDF": only the chart being printed is shown, every
  * row is rendered (resources/js/gantt/export.js) and the scroller unrolls.
@@ -1433,6 +3253,7 @@ input[type='search']::-webkit-search-cancel-button {
         -webkit-print-color-adjust: exact;
     }
 
+    html.gantt-print-mode .gantt-printing .gantt-split,
     html.gantt-print-mode .gantt-printing .gantt-scroller {
         height: auto !important;
         overflow: visible !important;
@@ -1473,5 +3294,727 @@ input[type='search']::-webkit-search-cancel-button {
     70%, to {
         opacity: 0;
         transform: scale(2.8);
+    }
+}
+
+/*
+ * Notification rules (pages/admin/⚡notification-settings + _rules-* partials):
+ * one row per rule — name and hint on the start side, one control on the end side.
+ */
+@layer components {
+    .rules-page {
+        --rules-ground: var(--color-white);
+        --rules-ink: var(--color-secondary-dark);
+        --rules-muted: var(--color-secondary-medium);
+        --rules-line: var(--color-secondary-soft);
+        --rules-accent: var(--color-primary);
+    }
+
+    .dark .rules-page {
+        --rules-ground: var(--color-surface-2);
+        --rules-ink: var(--color-ink);
+        --rules-muted: var(--color-ink-muted);
+        --rules-line: var(--color-line);
+        --rules-accent: var(--color-brand-text);
+    }
+
+    .rules-page [x-cloak] {
+        display: none !important;
+    }
+
+    /* ---- Groups and rows ---- */
+    .rules-group {
+        min-width: 0;
+        scroll-margin-top: 6rem;
+    }
+
+    .rules-group-title {
+        font-size: 1.125rem;
+        font-weight: 700;
+        line-height: 1.3;
+        color: var(--rules-ink);
+    }
+
+    .rules-group-hint {
+        margin-top: 0.25rem;
+        font-size: 0.875rem;
+        line-height: 1.5;
+        color: var(--rules-muted);
+    }
+
+    .rules-rows {
+        margin-top: 0.75rem;
+    }
+
+    .rules-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 0.375rem 1.5rem;
+        padding-block: 0.875rem;
+        border-top: 1px solid var(--rules-line);
+    }
+
+    .rules-row-label {
+        display: block;
+        font-size: 0.9375rem;
+        font-weight: 600;
+        line-height: 1.35;
+        color: var(--rules-ink);
+    }
+
+    .rules-row-hint {
+        margin-top: 0.125rem;
+        font-size: 0.8125rem;
+        line-height: 1.45;
+        color: var(--rules-muted);
+    }
+
+    .rules-row-control {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.25rem;
+    }
+
+    .rules-row-error {
+        grid-column: 1 / -1;
+        margin-top: 0.25rem;
+        font-size: 0.875rem;
+        color: var(--color-status-critical);
+    }
+
+    @container rules (max-width: 26rem) {
+        .rules-row {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .rules-row-control {
+            align-items: flex-start;
+        }
+    }
+
+    .rules-default {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--rules-accent);
+        text-decoration: underline;
+        text-underline-offset: 2px;
+    }
+
+    .rules-default:hover {
+        text-decoration-thickness: 2px;
+    }
+
+    /* ---- Stepper ---- */
+    .rules-stepper {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.125rem;
+        padding: 0.1875rem;
+        border: 1px solid var(--rules-line);
+        border-radius: 9999px;
+        background: var(--rules-ground);
+        transition: border-color 150ms ease, box-shadow 150ms ease;
+    }
+
+    .rules-stepper:focus-within {
+        border-color: var(--rules-accent);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--rules-accent) 18%, transparent);
+    }
+
+    .rules-stepper:has([aria-invalid='true']) {
+        border-color: var(--color-status-critical);
+    }
+
+    .rules-stepper-button {
+        display: grid;
+        width: 2rem;
+        height: 2rem;
+        flex: none;
+        place-items: center;
+        border-radius: 9999px;
+        color: var(--rules-ink);
+        transition: background-color 150ms ease, color 150ms ease, transform 120ms ease;
+    }
+
+    .rules-stepper-button:hover:not(:disabled) {
+        background: var(--color-primary);
+        color: var(--color-white);
+    }
+
+    .rules-stepper-button:active:not(:disabled) {
+        transform: scale(0.9);
+    }
+
+    .rules-stepper-button:disabled {
+        cursor: not-allowed;
+        opacity: 0.3;
+    }
+
+    .rules-stepper-input {
+        width: 2.75rem;
+        border: 0;
+        background: transparent;
+        font-size: 1.0625rem;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        text-align: end;
+        color: var(--rules-ink);
+        outline: none;
+        -moz-appearance: textfield;
+        appearance: textfield;
+    }
+
+    .rules-stepper-input::-webkit-inner-spin-button,
+    .rules-stepper-input::-webkit-outer-spin-button {
+        margin: 0;
+        -webkit-appearance: none;
+    }
+
+    .rules-stepper-unit {
+        min-width: 6rem;
+        padding-inline: 0.375rem 0.25rem;
+        font-size: 0.8125rem;
+        white-space: nowrap;
+        color: var(--rules-muted);
+    }
+
+    .rules-stepper-unit.is-short {
+        min-width: 0;
+    }
+
+    .rules-time {
+        height: 2.5rem;
+        padding-inline: 0.875rem;
+        border: 1px solid var(--rules-line);
+        border-radius: 9999px;
+        background: var(--rules-ground);
+        font-size: 1rem;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        color: var(--rules-ink);
+        outline: none;
+        transition: border-color 150ms ease, box-shadow 150ms ease;
+    }
+
+    .dark .rules-time {
+        color-scheme: dark;
+    }
+
+    .rules-time:focus {
+        border-color: var(--rules-accent);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--rules-accent) 18%, transparent);
+    }
+
+    .rules-time[aria-invalid='true'] {
+        border-color: var(--color-status-critical);
+    }
+
+    /* ---- Warning chips ---- */
+    .rules-chip {
+        display: inline-flex;
+        height: 2rem;
+        align-items: center;
+        gap: 0.125rem;
+        padding-inline: 0.75rem 0.25rem;
+        border-radius: 9999px;
+        background: var(--color-status-warn-soft);
+        font-size: 0.9375rem;
+        font-weight: 700;
+        color: var(--color-status-warn);
+    }
+
+    .rules-chip:not(:has(.rules-chip-remove:not([style*='none']))) {
+        padding-inline-end: 0.75rem;
+    }
+
+    .rules-chip-remove {
+        display: grid;
+        width: 1.5rem;
+        height: 1.5rem;
+        place-items: center;
+        border-radius: 9999px;
+        transition: background-color 150ms ease;
+    }
+
+    .rules-chip-remove:hover {
+        background: color-mix(in srgb, var(--color-status-warn) 20%, transparent);
+    }
+
+    .rules-chip-add {
+        display: inline-flex;
+        height: 2rem;
+        align-items: center;
+        padding-inline: 0.625rem 0.1875rem;
+        border: 1px dashed var(--color-secondary-light);
+        border-radius: 9999px;
+    }
+
+    .rules-chip-add:focus-within {
+        border-style: solid;
+        border-color: var(--rules-accent);
+    }
+
+    .rules-chip-add input {
+        width: 2.75rem;
+        border: 0;
+        background: transparent;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        color: var(--rules-ink);
+        outline: none;
+        appearance: textfield;
+    }
+
+    .rules-chip-add input::-webkit-inner-spin-button,
+    .rules-chip-add input::-webkit-outer-spin-button {
+        margin: 0;
+        -webkit-appearance: none;
+    }
+
+    .rules-chip-add button {
+        display: grid;
+        width: 1.625rem;
+        height: 1.625rem;
+        place-items: center;
+        border-radius: 9999px;
+        color: var(--rules-ink);
+        transition: background-color 150ms ease, color 150ms ease;
+    }
+
+    .rules-chip-add button:hover {
+        background: var(--color-primary);
+        color: var(--color-white);
+    }
+
+    /* ---- Working week ---- */
+    .rules-week {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 0.375rem;
+    }
+
+    .rules-day {
+        display: flex;
+        height: 3rem;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--rules-line);
+        border-radius: 0.75rem;
+        color: var(--rules-muted);
+        cursor: pointer;
+        user-select: none;
+        container: rules-day / inline-size;
+        transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease, transform 150ms ease;
+    }
+
+    .rules-day:hover {
+        border-color: var(--color-secondary-light);
+    }
+
+    .rules-day:active {
+        transform: scale(0.96);
+    }
+
+    .rules-day:has(:checked) {
+        border-color: var(--color-primary);
+        background: var(--color-primary);
+        color: var(--color-white);
+    }
+
+    .rules-day:has(:focus-visible) {
+        outline: 2px solid var(--rules-accent);
+        outline-offset: 2px;
+    }
+
+    .rules-day-name {
+        font-size: 0.875rem;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    /* A tile names its day in full only when it is wide enough to hold the longest name. */
+    .rules-day-full {
+        display: none;
+    }
+
+    @container rules-day (min-width: 5.75rem) {
+        .rules-day-full {
+            display: inline;
+        }
+
+        .rules-day-short {
+            display: none;
+        }
+    }
+
+    /* Arabic short weekday names are single letters, and the full names are short enough for any tile. */
+    .rules-day-full:lang(ar) {
+        display: inline;
+    }
+
+    .rules-day-short:lang(ar) {
+        display: none;
+    }
+
+    .rules-week.is-shaking {
+        animation: rules-shake 420ms ease both;
+    }
+
+    /* ---- What happens to a late item ---- */
+    .rules-flow {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.625rem 1.25rem;
+        margin-top: 1rem;
+        padding: 0.875rem 1rem;
+        border-radius: 0.875rem;
+        background: color-mix(in srgb, var(--rules-line) 35%, transparent);
+    }
+
+    .rules-flow-step {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4375rem;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        white-space: nowrap;
+        color: var(--rules-ink);
+    }
+
+    .rules-flow-mark {
+        width: 0.625rem;
+        height: 0.625rem;
+        flex: none;
+        border-radius: 9999px;
+    }
+
+    [data-kind='warn'] .rules-flow-mark {
+        background: var(--color-status-warn);
+    }
+
+    [data-kind='due'] .rules-flow-mark {
+        width: 0.25rem;
+        height: 0.875rem;
+        border-radius: 2px;
+        background: var(--rules-ink);
+    }
+
+    [data-kind='due'] {
+        font-weight: 800;
+    }
+
+    [data-kind='remind'] .rules-flow-mark {
+        border: 2px solid var(--rules-accent);
+    }
+
+    [data-kind='escalate'] .rules-flow-mark {
+        border-radius: 2px;
+        background: var(--rules-accent);
+        transform: rotate(45deg) scale(0.85);
+    }
+
+    [data-kind='escalate'] {
+        color: var(--rules-accent);
+    }
+
+    /* ---- Save bar ---- */
+    .rules-savebar-pulse {
+        width: 0.5rem;
+        height: 0.5rem;
+        border-radius: 9999px;
+        background: var(--color-primary);
+    }
+
+    .rules-savebar-enter {
+        transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1), opacity 320ms ease;
+    }
+
+    .rules-savebar-leave {
+        transition: transform 180ms ease-in, opacity 180ms ease-in;
+    }
+
+    .rules-savebar-from {
+        opacity: 0;
+        transform: translateY(1rem);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .rules-page *,
+        .rules-page *::before,
+        .rules-page *::after {
+            transition-duration: 1ms !important;
+            animation-duration: 1ms !important;
+        }
+    }
+
+    /*
+     * Dark: controls take the field border (row dividers keep --rules-line) and
+     * red fills move to the dark brand red. :where(.dark) keeps each rule at the
+     * specificity of the light rule it shadows, so the focus and invalid states
+     * above still out-rank the resting border exactly as they do in light.
+     */
+    :where(.dark) :is(.rules-stepper, .rules-time, .rules-day, .rules-chip-add) {
+        border-color: var(--color-field-line);
+    }
+
+    :where(.dark) .rules-day:hover {
+        border-color: var(--color-ink-faint);
+    }
+
+    :where(.dark) .rules-day:has(:checked) {
+        border-color: var(--color-brand);
+        background: var(--color-brand);
+    }
+
+    :where(.dark) .rules-stepper-button:hover:not(:disabled),
+    :where(.dark) .rules-chip-add button:hover {
+        background: var(--color-brand);
+    }
+
+    :where(.dark) .rules-savebar-pulse {
+        background: var(--color-brand);
+    }
+}
+
+@keyframes rules-shake {
+    20%, 60% {
+        transform: translateX(-6px);
+    }
+    40%, 80% {
+        transform: translateX(6px);
+    }
+}
+
+/* ---- Top bar icon buttons and their tooltips ----
+   Scoped to [data-top-bar-actions] (both top headers in layouts/app/sidebar.blade.php) so the
+   26 other Flux tooltips in the app keep Flux's stock look. Unlayered on purpose: Flux's
+   tooltip and button classes live in Tailwind's utilities layer, which any unlayered rule beats. */
+[data-top-bar-action] {
+    border-radius: 9999px;
+    transition:
+        background-color 200ms ease-out,
+        color 200ms ease-out,
+        transform 150ms ease-out;
+
+    & svg {
+        transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    &:hover svg {
+        transform: scale(1.08);
+    }
+
+    &:active {
+        transform: scale(0.95);
+    }
+}
+
+[data-top-bar-actions] [data-flux-tooltip-content] {
+    /* Floating UI writes an inline overflow-y: auto on every positioned popover, which would
+       clip the arrow; the !important is the only way past an inline style. */
+    overflow: visible !important;
+    margin-top: 0.25rem;
+    padding: 0.4375rem 0.75rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: var(--color-secondary-dark);
+    color: var(--color-white);
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.125rem;
+    white-space: nowrap;
+    box-shadow:
+        0 1px 2px color-mix(in srgb, var(--color-secondary-dark) 16%, transparent),
+        0 6px 16px color-mix(in srgb, var(--color-secondary-dark) 24%, transparent);
+
+    /* Arrow: every top-bar tooltip opens below its button (tooltip:position="bottom"). */
+    &::before {
+        content: '';
+        position: absolute;
+        top: -0.25rem;
+        left: 50%;
+        width: 0.5rem;
+        height: 0.5rem;
+        border-radius: 0.125rem;
+        background: inherit;
+        translate: -50% 0;
+        rotate: 45deg;
+    }
+}
+
+.dark [data-top-bar-actions] [data-flux-tooltip-content] {
+    background: var(--color-surface-3);
+    color: var(--color-ink);
+    box-shadow:
+        var(--shadow-raised),
+        0 0 0 1px var(--color-line);
+}
+
+/* Fade + 4px slide in. `translate` (not `transform`) so it never fights Flux's positioning;
+   behind @supports so a browser on the popover polyfill still shows the tooltip, unanimated. */
+@supports selector(:popover-open) {
+    [data-top-bar-actions] [data-flux-tooltip-content] {
+        opacity: 0;
+        translate: 0 -0.25rem;
+        transition:
+            opacity 150ms ease-out,
+            translate 150ms cubic-bezier(0.16, 1, 0.3, 1),
+            overlay 150ms allow-discrete,
+            display 150ms allow-discrete;
+
+        &:popover-open {
+            opacity: 1;
+            translate: 0 0;
+        }
+    }
+
+    @starting-style {
+        [data-top-bar-actions] [data-flux-tooltip-content]:popover-open {
+            opacity: 0;
+            translate: 0 -0.25rem;
+        }
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    [data-top-bar-action],
+    [data-top-bar-action] svg,
+    [data-top-bar-actions] [data-flux-tooltip-content] {
+        transition-duration: 0.01ms !important;
+    }
+
+    [data-top-bar-action]:hover svg,
+    [data-top-bar-action]:active {
+        transform: none;
+    }
+}
+
+/*
+ * ApexCharts tooltips (resources/js/charts.js switches them to theme 'dark' in dark
+ * mode). Unlayered on purpose: they must beat the stylesheet ApexCharts injects.
+ */
+.dark .apexcharts-tooltip.apexcharts-theme-dark {
+    background: var(--color-surface-3);
+    color: var(--color-ink);
+    border: 1px solid var(--color-line);
+    box-shadow: var(--shadow-raised);
+}
+
+.dark .apexcharts-tooltip.apexcharts-theme-dark .apexcharts-tooltip-title {
+    background: var(--color-surface-2);
+    border-bottom: 1px solid var(--color-line);
+}
+
+/*
+ * Flux in dark mode: overlays on surface-3, fields on surface-2.
+ *
+ * Flux colours itself with its own dark: utilities (dark:bg-zinc-800 on modals,
+ * dark:bg-zinc-700 on menus and tooltips, dark:bg-white/10 on fields). Those live
+ * in Tailwind's utilities layer, so a rule in @layer components can never
+ * out-rank them, and an unlayered rule would out-rank every utility in the app.
+ * These rules therefore sit in @layer utilities, after Tailwind's generated
+ * ones, at the specificity of the Flux class they replace (0,1,0 — everything
+ * else is inside :where()). A tie goes to the later rule, so they beat Flux's
+ * resting classes, while Flux's own state variants (disabled, data-invalid,
+ * data-active) and any page utility with `!` or a state variant still win.
+ */
+@layer utilities {
+    /* Modals, modal content and flyouts. The resting modal's border and shadow are the unlayered !important rules above. */
+    :where(.dark [data-flux-modal] > dialog, .dark [data-flux-modal] [data-flux-modal-content]):not(.bg-transparent, [data-flux-modal-overflow]) {
+        border-color: var(--color-line);
+        background-color: var(--color-surface-3);
+        --tw-ring-color: var(--color-line);
+    }
+
+    /* Menus (every dropdown panel in the app is a flux:menu). */
+    :where(.dark) [data-flux-menu] {
+        border-color: var(--color-line);
+        background-color: var(--color-surface-3);
+        box-shadow: var(--shadow-raised);
+    }
+
+    :where(.dark) :is([data-flux-menu-item], [data-flux-menu-radio], [data-flux-menu-checkbox]) {
+        color: var(--color-ink);
+    }
+
+    :where(.dark) [data-flux-menu-heading] {
+        color: var(--color-ink-muted);
+    }
+
+    /* Tooltips (the top-bar ones have their own unlayered look above). */
+    :where(.dark) [data-flux-tooltip-content] {
+        border-color: var(--color-line);
+        background-color: var(--color-surface-3);
+        color: var(--color-ink);
+    }
+
+    /* Fields; checkboxes, radios and file inputs keep Flux's own look. */
+    :where(.dark) :where(input, textarea, select):where(:not([type='checkbox'], [type='radio'], [type='file']))[data-flux-control] {
+        border-color: var(--color-field-line);
+        background-color: var(--color-surface-2);
+        color: var(--color-ink);
+    }
+
+    :where(.dark) :where(input, textarea)[data-flux-control]::placeholder {
+        color: var(--color-ink-faint);
+    }
+
+    /* Invalid fields: ties Flux's dark:data-invalid:border-red-500 (0,2,0) and wins by order. */
+    :where(.dark) [data-flux-control][data-invalid] {
+        border-color: var(--color-brand-text);
+    }
+
+    :where(.dark select)[data-flux-control] option {
+        background-color: var(--color-surface-3);
+        color: var(--color-ink);
+    }
+
+    /* Tables: a surface-2 header with ink-faint labels, line row dividers. */
+    :where(.dark) [data-flux-column] {
+        border-color: var(--color-line);
+        background-color: var(--color-surface-2);
+        color: var(--color-ink-faint);
+    }
+
+    :where(.dark) [data-flux-cell] {
+        border-color: var(--color-line);
+    }
+}
+
+/*
+ * Two Flux dark classes cannot be tied without also beating Flux's own states or
+ * `!`: the active menu row (dark:data-active:bg-zinc-600, which danger rows swap
+ * for red) and the menu separator (dark:bg-zinc-600!). Instead the zinc-600
+ * token they read is re-pointed on those elements alone; a custom property set
+ * on the element itself wins in any layer, and neither element has descendants
+ * that read zinc-600.
+ */
+@layer components {
+    :where(.dark) :is([data-flux-menu-item], [data-flux-menu-radio], [data-flux-menu-checkbox]),
+    :where(.dark) [data-flux-sidebar-group-dropdown] [data-flux-sidebar-item] {
+        --color-zinc-600: rgb(255 255 255 / 0.06);
+    }
+
+    :where(.dark) [data-flux-menu-separator] > [data-flux-separator] {
+        --color-zinc-600: var(--color-line);
+    }
+}
+
+/*
+ * Theme switch (resources/js, document.startViewTransition()): a short cross-fade
+ * of the whole page. These pseudo-elements only exist during a transition.
+ */
+::view-transition-old(root),
+::view-transition-new(root) {
+    animation-duration: 200ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+        animation: none;
     }
 }

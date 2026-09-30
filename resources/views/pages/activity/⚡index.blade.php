@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Notifications\ActivityPresenter;
 use App\Notifications\NotificationPresenter;
 use App\Notifications\SubjectLinks;
+use App\Support\Like;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -78,8 +79,8 @@ new #[Title('titles.activity_log')] class extends Component {
             ->when($this->module !== '', fn (Builder $query) => $query->where('module', $this->module))
             ->when(ctype_digit($this->actor), fn (Builder $query) => $query->where('actor_id', (int) $this->actor))
             ->when($term !== '', fn (Builder $query) => $query->where(fn (Builder $query) => $query
-                ->where('event', 'like', '%'.addcslashes($term, '%_\\').'%')
-                ->orWhere('properties', 'like', '%'.addcslashes($term, '%_\\').'%')))
+                ->where('event', 'like', Like::contains($term))
+                ->orWhere('properties', 'like', Like::contains($term))))
             ->when($this->validDate($this->from), fn (Builder $query) => $query->where('created_at', '>=', CarbonImmutable::parse($this->from)->startOfDay()))
             ->when($this->validDate($this->to), fn (Builder $query) => $query->where('created_at', '<=', CarbonImmutable::parse($this->to)->endOfDay()))
             ->when($sortingByModule, fn (Builder $query) => $query->orderBy('module', $this->sortDirection))
@@ -191,7 +192,7 @@ new #[Title('titles.activity_log')] class extends Component {
      * risk runs warn amber, everything else runs the neutral program-delivery
      * ink.
      */
-    public function moduleTone(string $module): string
+    protected function moduleTone(string $module): string
     {
         return match ($module) {
             'donors', 'proposals', 'funding-agreements', 'transfers', 'accounts' => 'funding',
@@ -214,11 +215,11 @@ new #[Title('titles.activity_log')] class extends Component {
     $tagClasses = fn (string $tone): string => match ($tone) {
         'funding' => 'border-funding/40 text-funding',
         'warn' => 'border-status-warn/40 text-status-warn',
-        default => 'border-secondary-light text-secondary-medium dark:text-secondary-soft',
+        default => 'border-secondary-light text-secondary-medium dark:text-ink-muted',
     };
 @endphp
 
-<section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="activity-log-heading">
+<section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="activity-log-heading">
     <x-ui.page-header heading-id="activity-log-heading" :title="__('activity.log_title')" :count="$this->activities->total()">
         <x-slot:filters>
             <x-ui.input type="search" icon="magnifying-glass" :label="__('activity.filters.search')" wire:model.live.debounce.300ms="search" clearable />
@@ -250,39 +251,39 @@ new #[Title('titles.activity_log')] class extends Component {
     <div
         role="group"
         aria-label="{{ __('activity.pulse.heading') }}"
-        class="grid grid-cols-2 divide-y divide-board-line rounded-xl border border-board-line bg-board @2xl/directory:grid-cols-4 @2xl/directory:divide-x @2xl/directory:divide-y-0 dark:shadow-none"
+        class="grid grid-cols-2 divide-y divide-board-line rounded-xl border border-board-line bg-board @2xl/directory:grid-cols-4 @2xl/directory:divide-x @2xl/directory:divide-y-0 dark:shadow-raised dark:border-transparent"
     >
         <div class="p-3.5">
-            <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('activity.pulse.today') }}</p>
+            <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('activity.pulse.today') }}</p>
             <p class="type-heading mt-1 tabular-nums">{{ $summary['today'] }}</p>
         </div>
 
         <div class="p-3.5">
-            <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('activity.pulse.week') }}</p>
+            <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('activity.pulse.week') }}</p>
             <p class="type-heading mt-1 tabular-nums">{{ $summary['week'] }}</p>
         </div>
 
         <div class="p-3.5">
-            <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('activity.pulse.busiest_module') }}</p>
+            <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('activity.pulse.busiest_module') }}</p>
             @if ($summary['module'] !== null)
                 <p class="type-heading mt-1 flex items-baseline gap-1.5">
                     <span class="truncate">{{ $summary['module']['label'] }}</span>
-                    <span class="type-meta shrink-0 tabular-nums text-secondary-medium dark:text-secondary-soft">({{ $summary['module']['count'] }})</span>
+                    <span class="type-meta shrink-0 tabular-nums text-secondary-medium dark:text-ink-muted">({{ $summary['module']['count'] }})</span>
                 </p>
             @else
-                <p class="type-heading mt-1 text-secondary-medium dark:text-secondary-soft">{{ __('activity.pulse.quiet') }}</p>
+                <p class="type-heading mt-1 text-secondary-medium dark:text-ink-muted">{{ __('activity.pulse.quiet') }}</p>
             @endif
         </div>
 
         <div class="p-3.5">
-            <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('activity.pulse.top_actor') }}</p>
+            <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('activity.pulse.top_actor') }}</p>
             @if ($summary['actor'] !== null)
                 <p class="type-heading mt-1 flex items-baseline gap-1.5">
                     <span class="truncate">{{ $summary['actor']['name'] }}</span>
-                    <span class="type-meta shrink-0 tabular-nums text-secondary-medium dark:text-secondary-soft">({{ $summary['actor']['count'] }})</span>
+                    <span class="type-meta shrink-0 tabular-nums text-secondary-medium dark:text-ink-muted">({{ $summary['actor']['count'] }})</span>
                 </p>
             @else
-                <p class="type-heading mt-1 text-secondary-medium dark:text-secondary-soft">{{ __('activity.pulse.quiet') }}</p>
+                <p class="type-heading mt-1 text-secondary-medium dark:text-ink-muted">{{ __('activity.pulse.quiet') }}</p>
             @endif
         </div>
     </div>
@@ -329,10 +330,10 @@ new #[Title('titles.activity_log')] class extends Component {
                                     class="flex w-full cursor-pointer items-center justify-between gap-3 px-3.5 py-2 text-start hover:bg-board-line/40"
                                 >
                                     <span class="inline-flex min-w-0 items-center gap-2">
-                                        <flux:icon.chevron-right variant="micro" class="size-3.5 shrink-0 text-secondary-medium rtl:-scale-x-100 dark:text-secondary-soft" x-bind:class="open && 'rotate-90 rtl:rotate-90'" style="transition: transform 150ms" />
-                                        <span class="type-label truncate text-secondary-dark dark:text-white">{{ $dayLabel }}</span>
+                                        <flux:icon.chevron-right variant="micro" class="size-3.5 shrink-0 text-secondary-medium rtl:-scale-x-100 dark:text-ink-muted" x-bind:class="open && 'rotate-90 rtl:rotate-90'" style="transition: transform 150ms" />
+                                        <span class="type-label truncate text-secondary-dark dark:text-ink">{{ $dayLabel }}</span>
                                     </span>
-                                    <span class="type-meta shrink-0 tabular-nums text-secondary-medium dark:text-secondary-soft">{{ trans_choice('activity.ledger.entry_count', $dayActivities->count(), ['count' => $dayActivities->count()]) }}</span>
+                                    <span class="type-meta shrink-0 tabular-nums text-secondary-medium dark:text-ink-muted">{{ trans_choice('activity.ledger.entry_count', $dayActivities->count(), ['count' => $dayActivities->count()]) }}</span>
                                 </button>
                             </td>
                         </tr>
@@ -366,11 +367,11 @@ new #[Title('titles.activity_log')] class extends Component {
 
                             <x-ui.data-table.cell :label="__('activity.ledger.linked_to')">
                                 @if ($programName !== null)
-                                    <a href="{{ route('programs.show', tap(new Program, fn ($program) => $program->id = $activity->program_id)) }}" wire:navigate class="truncate text-secondary-dark hover:text-status-critical hover:underline dark:text-white">
+                                    <a href="{{ route('programs.show', tap(new Program, fn ($program) => $program->id = $activity->program_id)) }}" wire:navigate class="truncate text-secondary-dark hover:text-status-critical hover:underline dark:text-ink">
                                         {{ $programName }}
                                     </a>
                                 @else
-                                    <span class="text-secondary-light dark:text-secondary-medium">—</span>
+                                    <span class="text-secondary-light dark:text-ink-faint">—</span>
                                 @endif
                             </x-ui.data-table.cell>
 
@@ -378,7 +379,7 @@ new #[Title('titles.activity_log')] class extends Component {
                                 @if ($url !== null)
                                     <a href="{{ $url }}" wire:navigate class="font-semibold text-status-critical hover:underline">{{ __('activity.open_record') }}</a>
                                 @elseif (! $exists)
-                                    <span class="text-secondary-medium dark:text-secondary-soft">{{ __('activity.record_gone') }}</span>
+                                    <span class="text-secondary-medium dark:text-ink-muted">{{ __('activity.record_gone') }}</span>
                                 @endif
                             </x-ui.data-table.cell>
                         </tr>

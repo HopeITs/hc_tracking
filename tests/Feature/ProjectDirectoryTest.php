@@ -14,18 +14,20 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
+use function Livewire\invade;
+
 test('guests are redirected from the project directory', function () {
     $this->get(route('projects.index'))->assertRedirect(route('login'));
 });
 
 test('authenticated users see the project directory', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     $this->actingAs($user)->get(route('projects.index'))->assertOk()->assertSeeText('Projects');
 });
 
 test('projects can be filtered by search city program owner and status', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $firstOwner = insertHrEmployee(firstNameEn: 'Layla', lastNameEn: 'Haddad');
     $secondOwner = insertHrEmployee(firstNameEn: 'Omar', lastNameEn: 'Khalil', firstNameAr: 'عمر', lastNameAr: 'خليل');
     $aleppo = insertHrCity('Aleppo');
@@ -51,7 +53,7 @@ test('projects can be filtered by search city program owner and status', functio
 });
 
 test('projects can be filtered by strategy across every one of its programs', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $waterStrategy = Strategy::factory()->create();
     $otherStrategy = Strategy::factory()->create();
     $water = Program::factory()->create(['name' => 'Water Security', 'strategy_id' => $waterStrategy->id]);
@@ -68,7 +70,7 @@ test('projects can be filtered by strategy across every one of its programs', fu
 });
 
 test('the status URL filter selects projects by lifecycle state', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Project::factory()->active()->create(['name' => 'Active Water Network']);
     Project::factory()->closed()->create(['name' => 'Closed Shelter Project']);
 
@@ -80,7 +82,7 @@ test('the status URL filter selects projects by lifecycle state', function () {
 });
 
 test('a project can be created with lifecycle dates and independent beneficiary targets', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $city = insertHrCity();
     $program = Program::factory()->create();
     $owner = insertHrEmployee();
@@ -119,7 +121,7 @@ test('a project can be created with lifecycle dates and independent beneficiary 
 });
 
 test('nullable project details are normalized before saving', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $city = insertHrCity();
     $program = Program::factory()->create();
     $owner = insertHrEmployee();
@@ -145,7 +147,7 @@ test('nullable project details are normalized before saving', function () {
 });
 
 test('creating a project requires a name a city a program and an owner', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
         ->test('pages::projects.index')
@@ -161,7 +163,7 @@ test('creating a project requires a name a city a program and an owner', functio
 });
 
 test('a project cannot be placed in a city that does not exist in hr', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
         ->test('pages::projects.index')
@@ -177,7 +179,7 @@ test('a project cannot be placed in a city that does not exist in hr', function 
 });
 
 test('project lifecycle dates and targets reject invalid values', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $city = insertHrCity();
     $program = Program::factory()->create();
     $owner = insertHrEmployee();
@@ -204,7 +206,7 @@ test('project lifecycle dates and targets reject invalid values', function () {
 });
 
 test('a project can be renamed relocated and moved through its lifecycle', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create([
         'name' => 'Old Name',
         'description' => 'Original scope',
@@ -259,7 +261,7 @@ test('a project can be renamed relocated and moved through its lifecycle', funct
 });
 
 test('the project directory offers no delete action', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Project::factory()->create();
 
     Livewire::actingAs($user)
@@ -269,7 +271,7 @@ test('the project directory offers no delete action', function () {
 });
 
 test('the project directory renders with no projects', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)->test('pages::projects.index')->assertSee('No projects yet');
 });
@@ -303,7 +305,7 @@ function projectsForEachLens(): array
 }
 
 test('each triage lens selects only the projects that trip it', function (string $lens, string $expected) {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     projectsForEachLens();
 
     $component = Livewire::actingAs($user)->test('pages::projects.index')->set('lens', $lens);
@@ -317,7 +319,7 @@ test('each triage lens selects only the projects that trip it', function (string
 ]);
 
 test('an unknown lens filters nothing away', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     projectsForEachLens();
 
     $component = Livewire::actingAs($user)->test('pages::projects.index')->set('lens', 'not-a-lens');
@@ -327,7 +329,7 @@ test('an unknown lens filters nothing away', function () {
 });
 
 test('triage counts ignore the active lens so a tile never shrinks itself', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     projectsForEachLens();
 
     $component = Livewire::actingAs($user)->test('pages::projects.index');
@@ -341,7 +343,7 @@ test('triage counts ignore the active lens so a tile never shrinks itself', func
 });
 
 test('the active triage lens renders a complete inset border', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     projectsForEachLens();
 
     $html = Livewire::actingAs($user)
@@ -359,7 +361,7 @@ test('the active triage lens renders a complete inset border', function () {
 });
 
 test('lifecycle counts ignore the status filter but respect every other filter', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $aleppo = insertHrCity('Aleppo');
     $homs = insertHrCity('Homs');
 
@@ -381,7 +383,7 @@ test('lifecycle counts ignore the status filter but respect every other filter',
 });
 
 test('committed funding counts a proposal shared by two projects once', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $proposal = Proposal::factory()->create();
     DonorProposal::factory()->create(['proposal_id' => $proposal->id, 'budget' => '1000.00']);
 
@@ -395,7 +397,7 @@ test('committed funding counts a proposal shared by two projects once', function
 });
 
 test('committed funding reports one line per currency and never adds them together', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
 
     foreach ([Currency::Usd, Currency::Eur] as $currency) {
@@ -412,7 +414,7 @@ test('committed funding reports one line per currency and never adds them togeth
 });
 
 test('weighted milestone progress is derived from the reached weight and capped at 100', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $weighted = Project::factory()->create(['name' => 'Weighted Works']);
     $unweighted = Project::factory()->create(['name' => 'Unweighted Works']);
     $overweight = Project::factory()->create(['name' => 'Overweight Works']);
@@ -429,13 +431,13 @@ test('weighted milestone progress is derived from the reached weight and capped 
     $component = Livewire::actingAs($user)->test('pages::projects.index');
     $page = $component->instance()->projects->getCollection()->keyBy('name');
 
-    expect($component->instance()->progressFor($page['Weighted Works']))->toBe(40.0)
-        ->and($component->instance()->progressFor($page['Unweighted Works']))->toBeNull()
-        ->and($component->instance()->progressFor($page['Overweight Works']))->toBe(100.0);
+    expect(invade($component->instance())->progressFor($page['Weighted Works']))->toBe(40.0)
+        ->and(invade($component->instance())->progressFor($page['Unweighted Works']))->toBeNull()
+        ->and(invade($component->instance())->progressFor($page['Overweight Works']))->toBe(100.0);
 });
 
 test('every view renders the same filtered project set and an unknown view falls back to the board', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Project::factory()->active()->create(['name' => 'Aleppo Wells']);
     Project::factory()->closed()->create(['name' => 'Homs Shelter']);
 
@@ -453,7 +455,7 @@ test('every view renders the same filtered project set and an unknown view falls
 });
 
 test('projects can be sorted by name dates and recency with undated projects last', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Project::factory()->create(['name' => 'Beta', 'start_date' => '2026-03-01', 'end_date' => '2026-12-31', 'updated_at' => '2026-01-01 00:00:00']);
     Project::factory()->create(['name' => 'Alpha', 'start_date' => '2026-06-01', 'end_date' => '2026-07-31', 'updated_at' => '2026-02-01 00:00:00']);
     Project::factory()->create(['name' => 'Gamma', 'start_date' => null, 'end_date' => null, 'updated_at' => '2026-03-01 00:00:00']);
@@ -480,7 +482,7 @@ test('projects can be sorted by name dates and recency with undated projects las
 });
 
 test('the board groups projects by lifecycle state and pages them in twenty-fours', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Project::factory()->count(2)->closed()->create();
     Project::factory()->count(2)->active()->create();
     Project::factory()->count(21)->create();
@@ -498,7 +500,7 @@ test('the board groups projects by lifecycle state and pages them in twenty-four
 });
 
 test('the project directory renders within its query budget', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Project::factory()->count(5)->create();
 
     $queries = 0;
@@ -512,7 +514,7 @@ test('the project directory renders within its query budget', function () {
 });
 
 test('a board card hides relations it has none of and keeps a materialised risk', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
     Milestone::factory()->count(2)->create(['project_id' => $project->id]);
 
@@ -527,11 +529,11 @@ test('a board card hides relations it has none of and keeps a materialised risk'
 
     // A materialised risk always shows, and takes the solid alert treatment.
     Livewire::actingAs($user)->test('pages::projects.index')
-        ->assertSeeHtml('border-primary bg-primary font-semibold text-white');
+        ->assertSeeHtml('border-primary bg-primary dark:border-transparent dark:bg-status-critical-soft dark:text-status-critical font-semibold text-white');
 });
 
 test('a board card with no relations at all says so instead of rendering empty chips', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Project::factory()->active()->create(['name' => 'Bare Project']);
 
     Livewire::actingAs($user)->test('pages::projects.index')
@@ -540,7 +542,7 @@ test('a board card with no relations at all says so instead of rendering empty c
 });
 
 test('a board card opens the project through an eye action, not a clickable name', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
 
     Livewire::actingAs($user)->test('pages::projects.index')
@@ -551,7 +553,7 @@ test('a board card opens the project through an eye action, not a clickable name
 });
 
 test('a board card never prints the progress bar accessibility label as visible copy', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
     Milestone::factory()->create(['project_id' => $project->id, 'weight_percentage' => 100, 'status' => MilestoneStatus::Reached]);
 
@@ -563,7 +565,7 @@ test('a board card never prints the progress bar accessibility label as visible 
 });
 
 test('a board card rates an overdue project critical and an on-track project good', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $overdue = Project::factory()->active()->create([
         'name' => 'Overdue Project',
         'start_date' => now()->subYear(),
@@ -572,13 +574,13 @@ test('a board card rates an overdue project critical and an on-track project goo
     Milestone::factory()->create(['project_id' => $overdue->id, 'weight_percentage' => 100, 'status' => MilestoneStatus::Planned]);
 
     Livewire::actingAs($user)->test('pages::projects.index')
-        // Critical fills solid so white type carries it in both themes.
-        ->assertSeeHtml('border-primary bg-primary font-semibold text-white')
+        // Critical fills solid in light (white type); dark uses the soft critical chip.
+        ->assertSeeHtml('border-primary bg-primary dark:border-transparent dark:bg-status-critical-soft dark:text-status-critical font-semibold text-white')
         ->assertSeeHtml('border-primary/40');
 });
 
 test('every view opens a project through the same eye action instead of a clickable name', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
     $showUrl = route('projects.show', $project);
 
@@ -593,7 +595,7 @@ test('every view opens a project through the same eye action instead of a clicka
 });
 
 test('a project is archived rather than deleted, keeping every record it carries', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
     Milestone::factory()->count(2)->create(['project_id' => $project->id]);
     Risk::factory()->create(['project_id' => $project->id]);
@@ -614,7 +616,7 @@ test('a project is archived rather than deleted, keeping every record it carries
 });
 
 test('an archived project can be restored back into the portfolio as a draft', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create(['name' => 'Wells Of Hope', 'status' => ProjectStatus::Archived]);
 
     Livewire::actingAs($user)->test('pages::projects.index')->call('restoreProject', $project->id);
@@ -623,7 +625,7 @@ test('an archived project can be restored back into the portfolio as a draft', f
 });
 
 test('restoring only applies to archived projects', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
 
     Livewire::actingAs($user)->test('pages::projects.index')->call('restoreProject', $project->id);
@@ -632,7 +634,7 @@ test('restoring only applies to archived projects', function () {
 });
 
 test('cancelling the archive confirmation leaves the project where it was', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
 
     Livewire::actingAs($user)->test('pages::projects.index')
@@ -645,7 +647,7 @@ test('cancelling the archive confirmation leaves the project where it was', func
 });
 
 test('the archive confirmation names the work the project keeps', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
     Milestone::factory()->count(3)->create(['project_id' => $project->id]);
 
@@ -660,7 +662,7 @@ test('the archive confirmation names the work the project keeps', function () {
 });
 
 test('archiving a project that vanished mid-confirmation closes cleanly instead of erroring', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
 
     $component = Livewire::actingAs($user)->test('pages::projects.index')->call('confirmArchive', $project->id);
@@ -674,7 +676,7 @@ test('archiving a project that vanished mid-confirmation closes cleanly instead 
 });
 
 test('every view offers archive for a live project and restore for an archived one', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $live = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
     $archived = Project::factory()->create(['name' => 'Retired Project', 'status' => ProjectStatus::Archived]);
 
@@ -686,4 +688,64 @@ test('every view offers archive for a live project and restore for an archived o
             ->assertSeeHtml('restoreProject('.$archived->id.')')
             ->assertSeeHtml('Restore Retired Project');
     }
+});
+
+test('the project form lays its fields along a three-section rail with no native selects', function () {
+    $user = User::factory()->role('General Manager')->create();
+
+    $html = Livewire::actingAs($user)->test('pages::projects.index')->call('openCreateModal')->html();
+
+    $document = new DOMDocument;
+    @$document->loadHTML('<?xml encoding="utf-8" ?>'.$html);
+    $xpath = new DOMXPath($document);
+    $dialog = '//dialog[contains(@class, "modal-shell")][.//*[@data-test="save-project-button"]]';
+    $headings = array_map(
+        fn (DOMNode $heading): string => trim($heading->textContent),
+        iterator_to_array($xpath->query($dialog.'//*[contains(@class, "form-section-heading")]')),
+    );
+
+    expect($xpath->query($dialog)->length)->toBe(1)
+        ->and($headings)->toBe(['Details', 'Placement', 'Beneficiaries'])
+        ->and($xpath->query($dialog.'//select')->length)->toBe(0)
+        ->and($xpath->query($dialog.'//*[@data-form-select]')->length)->toBe(4)
+        ->and($xpath->query($dialog.'[@*[name()="wire:close"]="closeProjectModal"]')->length)->toBe(1)
+        ->and($xpath->query($dialog.'//form[@*[name()="wire:submit"]="saveProject"]')->length)->toBe(1);
+});
+
+test('a failed project save points at the rail sections that hold the problems', function () {
+    $user = User::factory()->role('General Manager')->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::projects.index')
+        ->call('openCreateModal')
+        ->call('saveProject')
+        ->assertHasErrors(['name', 'cityId', 'programId', 'userId'])
+        ->assertSeeText('1 field needs attention')
+        ->assertSeeText('3 fields need attention')
+        ->assertSeeHtml('aria-invalid="true"');
+});
+
+test('editing a project shows its saved choices in the form pickers', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $city = insertHrCity('Idlib', 'إدلب');
+    $owner = insertHrEmployee(firstNameEn: 'Lina', lastNameEn: 'Haddad', firstNameAr: 'لينا', lastNameAr: 'حداد');
+    $program = Program::factory()->create();
+    $project = Project::factory()->create([
+        'status' => ProjectStatus::Active,
+        'city_id' => $city,
+        'program_id' => $program->id,
+        'user_id' => $owner,
+    ]);
+
+    $html = Livewire::actingAs($user)->test('pages::projects.index')->call('openEditModal', $project->id)->html();
+
+    $document = new DOMDocument;
+    @$document->loadHTML('<?xml encoding="utf-8" ?>'.$html);
+    $xpath = new DOMXPath($document);
+    $triggerLabel = fn (string $model): string => trim($xpath->query('//*[@data-form-select="'.$model.'"]//*[@data-trigger-label]')->item(0)->textContent);
+
+    expect($triggerLabel('projectStatus'))->toBe('Active')
+        ->and($triggerLabel('cityId'))->toBe('Idlib · إدلب')
+        ->and($triggerLabel('programId'))->toBe($program->name)
+        ->and($triggerLabel('userId'))->toBe('Lina Haddad · لينا حداد');
 });

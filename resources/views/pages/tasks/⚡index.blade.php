@@ -1,5 +1,8 @@
 <?php
 
+use App\Support\Like;
+use App\Actions\Tasks\ChangeTaskStatus;
+use App\Actions\Tasks\CompleteTask;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Livewire\Concerns\ManagesTaskVisibility;
@@ -9,6 +12,7 @@ use App\Models\Milestone;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\Scopes\TaskVisibilityScope;
 use App\Models\Task;
 use App\Models\TaskAssignee;
 use App\Notifications\UnreadSubjects;
@@ -20,9 +24,11 @@ use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -100,10 +106,13 @@ new #[Title('titles.tasks')] class extends Component
 
     public bool $showTaskDrawer = false;
 
+    #[Locked]
     public ?int $editingTaskId = null;
 
+    #[Locked]
     public ?int $editingTaskCreatedBy = null;
 
+    #[Locked]
     public ?int $deletingTaskId = null;
 
     public bool $showDeleteModal = false;
@@ -181,6 +190,12 @@ new #[Title('titles.tasks')] class extends Component
 
     public function updatedMyTasksOnly(): void
     {
+        $this->resetPage();
+    }
+
+    public function toggleMyTasksOnly(): void
+    {
+        $this->myTasksOnly = ! $this->myTasksOnly;
         $this->resetPage();
     }
 
@@ -387,13 +402,13 @@ new #[Title('titles.tasks')] class extends Component
                 // a subtask panel in place (client-side, no extra round trip) instead
                 // of sending people to the parent task's own page to see them. Each
                 // subtask's own assignees are loaded the same way as the parent's.
-                'subtasks:id,parent_task_id,title,status,priority,due_date',
+                'subtasks:id,parent_task_id,title,status,priority,due_date,created_by',
                 'subtasks.taskAssignees.employee:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
             ])
             ->when($search !== '', function (Builder $query) use ($search): void {
                 $query->where(function (Builder $query) use ($search): void {
-                    $query->where('title', 'like', '%'.$search.'%')
-                        ->orWhere('description', 'like', '%'.$search.'%')
+                    $query->where('title', 'like', Like::contains($search))
+                        ->orWhere('description', 'like', Like::contains($search))
                         ->orWhereHas('taskAssignees', fn (Builder $query) => $query->whereIn('employee_id', HrEmployee::idsMatchingName($search)));
                 });
             })
@@ -428,8 +443,7 @@ new #[Title('titles.tasks')] class extends Component
                         fn (Builder $query) => $query->where('employee_id', $employeeId),
                     ))
                     ->orWhere('created_by', $user->id));
-            })
-            ->tap(fn (Builder $query) => $this->applyViewerDepartmentScope($query));
+            });
     }
 
     /**
@@ -856,6 +870,8 @@ new #[Title('titles.tasks')] class extends Component
 
     public function openCreateDrawer(?string $dueDate = null, ?string $status = null, ?string $milestoneId = null): void
     {
+        Gate::authorize('create', Task::class);
+
         $this->resetTaskForm();
 
         if ($dueDate !== null) {
@@ -893,6 +909,8 @@ new #[Title('titles.tasks')] class extends Component
      */
     public function quickCreateTask(string $title, ?string $status = null, ?string $milestoneId = null, ?string $rowKey = null, ?string $dueDate = null): void
     {
+        Gate::authorize('create', Task::class);
+
         $title = trim($title);
 
         if ($title === '') {
@@ -968,7 +986,7 @@ new #[Title('titles.tasks')] class extends Component
      *
      * @return array{status: string, priority: string, due_date: string, assignees: array<int, string>}
      */
-    public function taskDraft(string $rowKey, ?string $defaultStatus = null): array
+    protected function taskDraft(string $rowKey, ?string $defaultStatus = null): array
     {
         $defaults = [
             'status' => $defaultStatus ?? TaskStatus::Todo->value,
@@ -1038,7 +1056,7 @@ new #[Title('titles.tasks')] class extends Component
      *
      * @return array{status: string, priority: string, due_date: string, assignees: array<int, string>}
      */
-    public function subtaskDraft(Task $parent): array
+    protected function subtaskDraft(Task $parent): array
     {
         $defaults = [
             'status' => TaskStatus::Todo->value,
@@ -1094,6 +1112,8 @@ new #[Title('titles.tasks')] class extends Component
             return;
         }
 
+        Gate::authorize('create', Task::class);
+
         $draft = $this->subtaskDraft($parent);
         $status = TaskStatus::tryFrom($draft['status']) ?? TaskStatus::Todo;
         $priority = TaskPriority::tryFrom($draft['priority']) ?? TaskPriority::Medium;
@@ -1138,6 +1158,8 @@ new #[Title('titles.tasks')] class extends Component
             ->with('taskAssignees:id,task_id,employee_id')
             ->findOrFail($taskId);
 
+        Gate::authorize('update', $task);
+
         $this->resetValidation();
         $this->editingTaskId = $task->id;
         $this->editingTaskCreatedBy = $task->created_by;
@@ -1157,6 +1179,12 @@ new #[Title('titles.tasks')] class extends Component
 
     public function saveTask(): void
     {
+        if ($this->editingTaskId === null) {
+            Gate::authorize('create', Task::class);
+        } else {
+            Gate::authorize('update', Task::query()->findOrFail($this->editingTaskId));
+        }
+
         $this->trimTaskForm();
 
         $validated = $this->validate([
@@ -1250,6 +1278,8 @@ new #[Title('titles.tasks')] class extends Component
 
     public function confirmDelete(int $taskId): void
     {
+        Gate::authorize('delete', Task::query()->findOrFail($taskId));
+
         $this->deletingTaskId = $taskId;
         $this->showDeleteModal = true;
         unset($this->deletingTask);
@@ -1272,9 +1302,11 @@ new #[Title('titles.tasks')] class extends Component
         $deleted = DB::transaction(function () use ($taskId): bool {
             $task = Task::query()->lockForUpdate()->find($taskId);
 
-            if ($task === null || $task->subtasks()->exists()) {
+            if ($task === null || $task->subtasks()->withoutGlobalScope(TaskVisibilityScope::class)->exists()) {
                 return false;
             }
+
+            Gate::authorize('delete', $task);
 
             return (bool) $task->delete();
         });
@@ -1302,17 +1334,13 @@ new #[Title('titles.tasks')] class extends Component
             return;
         }
 
-        if ($task->status === TaskStatus::Done) {
+        if (! app(CompleteTask::class)->handle($task)) {
             Flux::toast(variant: 'danger', text: __('tasks.completed_tasks_cannot_change_status'));
 
             return;
         }
 
-        $task->status = TaskStatus::Done;
-        $task->completed_date = CarbonImmutable::today();
-        $task->progress_percentage = 100;
-
-        $task->save();
+        Flux::toast(variant: 'success', text: __('tasks.task_marked_done'));
     }
 
     public function quickSetStatus(int $taskId, string $status): void
@@ -1334,26 +1362,13 @@ new #[Title('titles.tasks')] class extends Component
             return;
         }
 
-        if ($task->status === TaskStatus::Done) {
+        if (! app(ChangeTaskStatus::class)->handle($task, $newStatus)) {
             Flux::toast(variant: 'danger', text: __('tasks.completed_tasks_cannot_change_status'));
 
             return;
         }
 
-        $task->status = $newStatus;
-
-        if ($newStatus === TaskStatus::InProgress) {
-            $task->start_date ??= CarbonImmutable::today();
-        }
-
-        if ($newStatus === TaskStatus::Done) {
-            $task->completed_date ??= CarbonImmutable::today();
-            $task->progress_percentage = 100;
-        } elseif ($task->completed_date !== null) {
-            $task->completed_date = null;
-        }
-
-        $task->save();
+        Flux::toast(variant: 'success', text: __('tasks.task_status_changed', ['status' => $newStatus->label()]));
     }
 
     public function quickSetPriority(int $taskId, string $priority): void
@@ -1365,8 +1380,12 @@ new #[Title('titles.tasks')] class extends Component
             return;
         }
 
+        Gate::authorize('update', $task);
+
         $task->priority = $newPriority;
         $task->save();
+
+        Flux::toast(variant: 'success', text: __('tasks.task_priority_changed', ['priority' => $newPriority->label()]));
     }
 
     /**
@@ -1384,6 +1403,8 @@ new #[Title('titles.tasks')] class extends Component
             return;
         }
 
+        Gate::authorize('update', $task);
+
         $existing = $task->taskAssignees()->where('employee_id', $employeeId)->first();
 
         if ($existing !== null) {
@@ -1395,10 +1416,14 @@ new #[Title('titles.tasks')] class extends Component
 
             $existing->delete();
 
+            Flux::toast(variant: 'success', text: __('tasks.assignee_removed'));
+
             return;
         }
 
         $task->taskAssignees()->create(['employee_id' => $employeeId]);
+
+        Flux::toast(variant: 'success', text: __('tasks.assignee_added'));
     }
 
     public function rescheduleTask(int $taskId, string $date): void
@@ -1412,6 +1437,8 @@ new #[Title('titles.tasks')] class extends Component
         if ($task === null) {
             return;
         }
+
+        Gate::authorize('update', $task);
 
         if ($task->created_by !== auth()->id()) {
             Flux::toast(variant: 'danger', text: __('tasks.only_the_task_creator_can_change_the_due_date'));
@@ -1463,7 +1490,7 @@ new #[Title('titles.tasks')] class extends Component
     $canPickDepartment = auth()->user()->canViewAllTaskDepartments();
 @endphp
 
-<section class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="task-directory-heading">
+<section class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="task-directory-heading">
     <x-ui.page-header heading-id="task-directory-heading" :title="__('common.tasks')" :count="$this->taskStats['total']">
         <x-slot:filters>
             <x-ui.input type="search" icon="magnifying-glass" :label="__('tasks.search_tasks')" :placeholder="__('tasks.title_description_or_assignee')" wire:model.live.debounce.300ms="search" clearable />
@@ -1509,7 +1536,9 @@ new #[Title('titles.tasks')] class extends Component
             @endif
         </x-slot:filters>
         <x-slot:actions>
-            <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateDrawer" data-test="create-task-button">{{ __('tasks.add_task') }}</x-ui.button>
+            @can('create', App\Models\Task::class)
+                <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateDrawer" data-test="create-task-button">{{ __('tasks.add_task') }}</x-ui.button>
+            @endcan
         </x-slot:actions>
     </x-ui.page-header>
 
@@ -1531,14 +1560,14 @@ new #[Title('titles.tasks')] class extends Component
         </button>
     </div>
 
-    <div class="flex flex-col gap-3 rounded-2xl border border-secondary-soft bg-secondary-soft/20 p-4 dark:border-secondary-medium dark:bg-secondary-medium/10" data-test="my-tasks-rail">
+    <div class="flex flex-col gap-3 rounded-2xl border border-secondary-soft bg-secondary-soft/20 p-4 dark:border-line dark:bg-white/[0.03]" data-test="my-tasks-rail">
         <div class="flex items-center justify-between gap-3">
             <div class="flex items-center gap-2">
-                <flux:icon name="user-circle" variant="micro" class="size-5 text-primary" aria-hidden="true" />
-                <h2 class="text-sm font-bold text-secondary-dark dark:text-white">{{ __('tasks.my_tasks') }}</h2>
+                <flux:icon name="user-circle" variant="micro" class="size-5 text-primary dark:text-brand-text" aria-hidden="true" />
+                <h2 class="text-sm font-bold text-secondary-dark dark:text-ink">{{ __('tasks.my_tasks') }}</h2>
             </div>
             @if ($this->myTasksPreview->isNotEmpty())
-                <button type="button" wire:click="$set('myTasksOnly', {{ $myTasksOnly ? 'false' : 'true' }})" class="text-xs font-semibold text-primary hover:underline" data-test="my-tasks-view-all">
+                <button type="button" wire:click="toggleMyTasksOnly" class="text-xs font-semibold text-primary dark:text-brand-text hover:underline" data-test="my-tasks-view-all">
                     {{ $myTasksOnly ? __('tasks.showing_my_tasks_only') : __('tasks.view_all') }}
                 </button>
             @endif
@@ -1551,14 +1580,20 @@ new #[Title('titles.tasks')] class extends Component
                     <div
                         role="button"
                         tabindex="0"
-                        wire:click="openEditDrawer({{ $myTask->id }})"
+                        @can('update', $myTask)
+                            wire:click="openEditDrawer({{ $myTask->id }})"
+                            x-on:keydown="if (! $event.target.closest('a') && ($event.key === 'Enter' || $event.key === ' ')) { $event.preventDefault(); $wire.openEditDrawer({{ $myTask->id }}) }"
+                        @else
+                            {{-- Only the status is theirs to change: open the task's own page. --}}
+                            x-on:click="if (! $event.target.closest('a')) { Livewire.navigate({{ Illuminate\Support\Js::from(route('tasks.show', $myTask)) }}) }"
+                            x-on:keydown="if (! $event.target.closest('a') && ($event.key === 'Enter' || $event.key === ' ')) { $event.preventDefault(); Livewire.navigate({{ Illuminate\Support\Js::from(route('tasks.show', $myTask)) }}) }"
+                        @endcan
                         wire:key="my-task-{{ $myTask->id }}"
                         data-test="my-task-card-{{ $myTask->id }}"
-                        x-on:keydown="if (! $event.target.closest('a') && ($event.key === 'Enter' || $event.key === ' ')) { $event.preventDefault(); $wire.openEditDrawer({{ $myTask->id }}) }"
                         @class([
-                            'flex w-64 shrink-0 flex-col gap-2 rounded-xl border p-3 text-left shadow-sm transition-shadow hover:shadow-md dark:bg-secondary-dark',
+                            'flex w-64 shrink-0 flex-col gap-2 rounded-xl border p-3 text-left shadow-sm transition-shadow hover:shadow-md dark:bg-surface-1',
                             'border-primary/30 bg-white dark:border-status-critical/30' => $isAssignedToMe,
-                            'border-dashed border-secondary-light bg-secondary-soft/30 dark:border-secondary-medium dark:bg-secondary-medium/10' => ! $isAssignedToMe,
+                            'border-dashed border-secondary-light bg-secondary-soft/30 dark:border-line dark:bg-white/[0.03]' => ! $isAssignedToMe,
                         ])
                     >
                         <div class="flex items-center justify-between gap-2">
@@ -1573,7 +1608,7 @@ new #[Title('titles.tasks')] class extends Component
                         @unless ($isAssignedToMe)
                             @php $assigneeName = $myTask->taskAssignees->first()?->employee?->name; @endphp
                             @if ($assigneeName !== null)
-                                <span class="inline-flex items-start gap-1 text-[10px] font-semibold text-secondary-medium dark:text-secondary-soft" data-test="my-task-role-delegated-{{ $myTask->id }}">
+                                <span class="inline-flex items-start gap-1 text-[10px] font-semibold text-secondary-medium dark:text-ink-muted" data-test="my-task-role-delegated-{{ $myTask->id }}">
                                     <flux:icon.paper-airplane variant="micro" class="mt-0.5 size-3 shrink-0" aria-hidden="true" />
                                     <span class="break-words">{{ __('tasks.assigned_to_name', ['name' => $assigneeName]) }}</span>
                                 </span>
@@ -1584,10 +1619,10 @@ new #[Title('titles.tasks')] class extends Component
                             wire:navigate
                             title="{{ $myTask->title }}"
                             x-on:click.stop
-                            class="truncate text-sm font-semibold text-secondary-dark hover:text-primary hover:underline dark:text-white dark:hover:text-status-critical"
+                            class="truncate text-sm font-semibold text-secondary-dark hover:text-primary hover:underline dark:text-ink dark:hover:text-status-critical"
                             data-test="my-task-title-{{ $myTask->id }}"
                         >{{ $myTask->title }}</a>
-                        <div class="flex items-center justify-between text-xs text-secondary-medium dark:text-secondary-soft">
+                        <div class="flex items-center justify-between text-xs text-secondary-medium dark:text-ink-muted">
                             <span @class(['font-semibold text-status-critical' => $myTask->isOverdue() || $myTask->isMissed()])>
                                 {{ $myTask->due_date?->translatedFormat('M j') ?? __('tasks.no_due_date') }}
                             </span>
@@ -1597,12 +1632,12 @@ new #[Title('titles.tasks')] class extends Component
                 @endforeach
             </div>
         @else
-            <p class="text-sm text-secondary-medium dark:text-secondary-soft" data-test="my-tasks-empty">{{ __('common.no_tasks_yet') }}</p>
+            <p class="text-sm text-secondary-medium dark:text-ink-muted" data-test="my-tasks-empty">{{ __('common.no_tasks_yet') }}</p>
         @endif
     </div>
 
     <div class="flex flex-wrap items-center justify-between gap-3">
-        <div class="inline-flex flex-wrap gap-1 rounded-lg border border-secondary-soft bg-secondary-soft/40 p-1 dark:border-secondary-medium dark:bg-secondary-medium/40" role="group" aria-label="{{ __('tasks.view') }}">
+        <div class="inline-flex flex-wrap gap-1 rounded-lg border border-secondary-soft bg-secondary-soft/40 p-1 dark:border-line dark:bg-surface-2" role="group" aria-label="{{ __('tasks.view') }}">
             @foreach ([
                 'list' => ['icon' => 'queue-list', 'label' => __('tasks.list_view')],
                 'board' => ['icon' => 'view-columns', 'label' => __('tasks.board_view')],
@@ -1615,8 +1650,8 @@ new #[Title('titles.tasks')] class extends Component
                     data-test="task-view-{{ $viewOption }}"
                     @class([
                         'inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-md px-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
-                        'bg-white text-secondary-dark shadow-sm dark:bg-secondary-dark dark:text-white' => $view === $viewOption,
-                        'text-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => $view !== $viewOption,
+                        'bg-white text-secondary-dark shadow-sm dark:bg-surface-3 dark:shadow-raised dark:text-ink' => $view === $viewOption,
+                        'text-secondary-medium hover:text-secondary-dark dark:text-ink-muted dark:hover:text-ink' => $view !== $viewOption,
                     ])
                 >
                     <flux:icon :name="$viewMeta['icon']" variant="micro" class="size-4" aria-hidden="true" />
@@ -1655,6 +1690,21 @@ new #[Title('titles.tasks')] class extends Component
             @if ($filtersAreActive)
                 <flux:button size="sm" variant="ghost" class="self-end" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
             @endif
+
+            <button
+                type="button"
+                wire:click="toggleMyTasksOnly"
+                aria-pressed="{{ $myTasksOnly ? 'true' : 'false' }}"
+                data-test="task-filter-my-tasks-only"
+                @class([
+                    'inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-primary',
+                    'border-primary bg-primary dark:bg-ink dark:text-surface-0 dark:border-ink text-white' => $myTasksOnly,
+                    'border-secondary-light text-secondary-medium hover:bg-secondary-soft dark:text-ink-muted dark:hover:bg-surface-2' => ! $myTasksOnly,
+                ])
+            >
+                <flux:icon.user variant="micro" class="size-3.5" />
+                {{ __('tasks.my_tasks_only') }}
+            </button>
         </div>
     </div>
 
@@ -1664,7 +1714,7 @@ new #[Title('titles.tasks')] class extends Component
                 <x-slot:action>
                     @if ($filtersAreActive)
                         <x-ui.button size="sm" wire:click="clearFilters">{{ __('common.reset_filters') }}</x-ui.button>
-                    @else
+                    @elseif (auth()->user()->can('create', App\Models\Task::class))
                         <x-ui.button size="sm" tone="primary" icon="plus" wire:click="openCreateDrawer">{{ __('tasks.add_task') }}</x-ui.button>
                     @endif
                 </x-slot:action>
@@ -1685,217 +1735,114 @@ new #[Title('titles.tasks')] class extends Component
         @endswitch
     @endif
 
-    <x-ui.drawer wire:model="showTaskDrawer" max-width="max-w-2xl" :title="$editingTaskId === null ? __('tasks.add_task') : __('tasks.edit_task')" :subtitle="__('tasks.every_task_delivers_against_a_proposal_a_milestone_is_option')">
-        <form wire:submit="saveTask" id="task-drawer-form" class="flex flex-col gap-7">
-            <div class="flex flex-col gap-4">
-                <x-ui.input wire:model="title" :label="__('tasks.task_title')" type="text" maxlength="255" required autofocus />
-                <flux:textarea wire:model="description" :label="__('common.description')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!" />
+    @php
+        $isStatusLocked = $editingTaskId !== null && $taskStatus === TaskStatus::Done->value;
+        $isDueDatePast = preg_match('/^\d{4}-\d{2}-\d{2}$/', $dueDate) === 1
+            && \Carbon\CarbonImmutable::parse($dueDate)->lt(\Carbon\CarbonImmutable::today());
+        $isMissedDraft = $isDueDatePast && $taskStatus === TaskStatus::Todo->value;
+        $isOverdueDraft = $isDueDatePast && ! $isMissedDraft && $taskStatus !== TaskStatus::Done->value;
+        $isDueDateLocked = $editingTaskId !== null && $editingTaskCreatedBy !== auth()->id();
+    @endphp
+
+    {{-- Same form, sections and fields as the calendar page's task modal; the tasks page adds its own locks (done status, creator-only due date). --}}
+    <x-ui.modal
+        wire:model="showTaskDrawer"
+        size="xl"
+        :title="$editingTaskId === null ? __('tasks.add_task') : __('tasks.edit_task')"
+        :description="__('tasks.every_task_delivers_against_a_proposal_a_milestone_is_option')"
+        submit="saveTask"
+        close="closeTaskDrawer"
+        required-note
+    >
+        <x-ui.form-section :title="__('common.section_details')" :fields="['title', 'description']">
+            <div class="grid gap-y-3">
+                <x-ui.form-input wire:model="title" :label="__('tasks.task_title')" maxlength="255" required autofocus />
+                <x-ui.form-textarea wire:model="description" :label="__('common.description')" rows="2" />
             </div>
+        </x-ui.form-section>
 
-            <div class="flex flex-col gap-3 border-t border-secondary-soft pt-5 dark:border-secondary-medium">
-                <p class="text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('tasks.delivery_details') }}</p>
-                <div class="grid gap-4 sm:grid-cols-2">
-                    <x-ui.select wire:model.live="taskSourceType" :label="__('tasks.source_type')" required>
-                        <flux:select.option value="">{{ __('common.select') }}</flux:select.option>
-                        @foreach ($this->sourceTypeOptions as $sourceTypeOption)
-                            <flux:select.option :value="$sourceTypeOption['value']" :wire:key="'task-drawer-source-type-'.$sourceTypeOption['value']">{{ $sourceTypeOption['label'] }}</flux:select.option>
-                        @endforeach
-                    </x-ui.select>
-                    <x-ui.select wire:model="taskSourceId" :label="__('tasks.source')" required>
-                        <flux:select.option value="">{{ __('common.select') }}</flux:select.option>
-                        @foreach ($this->sourceOptions as $sourceOption)
-                            <flux:select.option :value="$sourceOption['id']" :wire:key="'task-drawer-source-'.$sourceOption['id']">{{ $sourceOption['name'] }}</flux:select.option>
-                        @endforeach
-                    </x-ui.select>
-                </div>
-            </div>
-
-            <div class="grid gap-5 border-t border-secondary-soft pt-5 sm:grid-cols-2 dark:border-secondary-medium">
-                <div class="min-w-0">
-                    <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft" id="task-drawer-status-label">{{ __('common.status') }}</label>
-                    @php $isStatusLocked = $editingTaskId !== null && $taskStatus === TaskStatus::Done->value; @endphp
-                    <div class="grid grid-cols-2 gap-1.5" role="radiogroup" aria-labelledby="task-drawer-status-label">
-                        @foreach (TaskStatus::cases() as $statusCase)
-                            @php
-                                $isStatusSelected = $taskStatus === $statusCase->value;
-                                [$statusSelectedClasses, $statusIcon] = match ($statusCase) {
-                                    TaskStatus::Todo => ['border-secondary-dark bg-white text-secondary-dark dark:border-white dark:bg-secondary-dark dark:text-white', 'stop'],
-                                    TaskStatus::InProgress => ['border-status-active bg-status-active text-white', 'play'],
-                                    TaskStatus::UnderReview => ['border-status-warn bg-status-warn text-white', 'eye'],
-                                    TaskStatus::Done => ['border-status-good bg-status-good text-white', 'check'],
-                                };
-                            @endphp
-                            <button
-                                type="button"
-                                role="radio"
-                                aria-checked="{{ $isStatusSelected ? 'true' : 'false' }}"
-                                @disabled($isStatusLocked)
-                                wire:click="$set('taskStatus', '{{ $statusCase->value }}')"
-                                @class([
-                                    'inline-flex min-h-10 cursor-pointer touch-manipulation items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-semibold whitespace-nowrap transition-colors',
-                                    $statusSelectedClasses => $isStatusSelected,
-                                    'border-secondary-light text-secondary-medium hover:border-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => ! $isStatusSelected,
-                                    'cursor-not-allowed opacity-60' => $isStatusLocked,
-                                ])
-                                data-test="task-drawer-status-{{ $statusCase->value }}"
-                            >
-                                <flux:icon :name="$statusIcon" variant="micro" class="size-3.5 shrink-0" aria-hidden="true" />
-                                {{ $statusCase->label() }}
-                            </button>
-                        @endforeach
-                    </div>
-                    @if ($isStatusLocked)
-                        <p class="mt-1.5 text-xs text-secondary-medium dark:text-secondary-soft">{{ __('tasks.completed_tasks_cannot_change_status') }}</p>
-                    @endif
-                    <flux:error name="taskStatus" class="mt-1.5" />
-                </div>
-
-                <div class="min-w-0">
-                    <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft" id="task-drawer-priority-label">{{ __('tasks.priority') }}</label>
-                    <div class="grid grid-cols-3 gap-1.5" role="radiogroup" aria-labelledby="task-drawer-priority-label">
-                        @foreach (TaskPriority::cases() as $priorityCase)
-                            @php
-                                $isPrioritySelected = $taskPriority === $priorityCase->value;
-                                $priorityTone = match ($priorityCase) {
-                                    TaskPriority::High => 'text-primary',
-                                    TaskPriority::Medium => 'text-status-warn',
-                                    TaskPriority::Low => 'text-secondary-light',
-                                };
-                            @endphp
-                            <button
-                                type="button"
-                                role="radio"
-                                aria-checked="{{ $isPrioritySelected ? 'true' : 'false' }}"
-                                wire:click="$set('taskPriority', '{{ $priorityCase->value }}')"
-                                @class([
-                                    'inline-flex min-h-10 cursor-pointer touch-manipulation items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-semibold whitespace-nowrap transition-colors',
-                                    'border-secondary-dark bg-secondary-dark text-white dark:border-secondary-medium dark:bg-secondary-medium' => $isPrioritySelected,
-                                    'border-secondary-light text-secondary-medium hover:border-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => ! $isPrioritySelected,
-                                ])
-                                data-test="task-drawer-priority-{{ $priorityCase->value }}"
-                            >
-                                <flux:icon.flag :variant="$priorityCase === TaskPriority::Low ? 'outline' : 'solid'" class="size-3.5 shrink-0 {{ $priorityTone }}" />
-                                {{ $priorityCase->label() }}
-                            </button>
-                        @endforeach
-                    </div>
-                    <flux:error name="taskPriority" class="mt-1.5" />
-                </div>
-            </div>
-
-            <div class="border-t border-secondary-soft pt-5 dark:border-secondary-medium">
-                <div class="mb-1.5 flex items-center justify-between">
-                    <label class="text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft" for="task-drawer-progress-slider">{{ __('tasks.progress_2') }}</label>
-                </div>
-                <div class="flex items-center gap-3">
-                    <input
-                        id="task-drawer-progress-slider"
-                        type="range"
-                        wire:model="progressPercentage"
-                        min="0"
-                        max="100"
-                        step="1"
-                        class="h-1.5 w-full flex-1 cursor-pointer accent-primary"
-                        data-test="task-drawer-progress-slider"
-                    />
-                    <div class="relative w-16 shrink-0">
-                        <input
-                            type="number"
-                            wire:model="progressPercentage"
-                            min="0"
-                            max="100"
-                            required
-                            class="w-full rounded-lg border border-secondary-light bg-white py-1.5 ps-2 pe-6 text-end text-sm font-semibold tabular-nums text-secondary-dark focus:ring-1 focus:ring-primary focus:outline-none dark:border-secondary-light dark:bg-secondary-medium dark:text-white"
-                            aria-label="{{ __('tasks.progress_2') }}"
-                            data-test="task-drawer-progress-input"
-                        />
-                        <span class="pointer-events-none absolute inset-y-0 end-2 flex items-center text-sm text-secondary-medium dark:text-secondary-soft">%</span>
-                    </div>
-                </div>
-                <flux:error name="progressPercentage" class="mt-1.5" />
-            </div>
-
-            <div class="min-w-0 border-t border-secondary-soft pt-5 dark:border-secondary-medium">
-                <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('tasks.assignees') }}</label>
-                @php
-                    $selectedAssigneeOptions = collect($this->userOptions)->whereIn('id', collect($assignedTo)->map(fn ($id) => (int) $id));
-                    $assigneeTriggerLabel = match (true) {
-                        $selectedAssigneeOptions->isEmpty() => __('common.select'),
-                        $selectedAssigneeOptions->count() <= 2 => $selectedAssigneeOptions->pluck('name')->implode(', '),
-                        default => __('common.count_selected', ['count' => $selectedAssigneeOptions->count()]),
-                    };
-                @endphp
-                <x-ui.multi-select-popover
-                    :label="__('tasks.assignees')"
-                    class="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-secondary-light bg-white px-3 py-2 text-start text-sm dark:border-secondary-light dark:bg-secondary-medium"
-                    data-test="task-assignee-picker"
-                >
-                    <x-slot:trigger>
-                        <span class="min-w-0 truncate">{{ $assigneeTriggerLabel }}</span>
-                        <flux:icon.chevron-up-down class="size-4 shrink-0 text-secondary-medium dark:text-secondary-soft" aria-hidden="true" />
-                    </x-slot:trigger>
-
-                    @foreach ($this->userOptions as $userOption)
-                        <label
-                            x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
-                            class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-secondary-soft dark:hover:bg-secondary-medium"
-                        >
-                            <input type="checkbox" wire:model.live="assignedTo" value="{{ $userOption['id'] }}" class="rounded border-secondary-light text-primary focus:ring-primary" data-test="task-assignee-checkbox-{{ $userOption['id'] }}" />
-                            <span class="min-w-0 truncate">{{ $userOption['name'] }} · {{ $userOption['secondary_name'] }}</span>
-                        </label>
+        <x-ui.form-section :title="__('common.section_placement')" :fields="['taskSourceType', 'taskSourceId']">
+            <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                <x-ui.form-select wire:model.live="taskSourceType" :label="__('tasks.source_type')" :placeholder="__('common.select')" required>
+                    @foreach ($this->sourceTypeOptions as $sourceTypeOption)
+                        <flux:select.option :value="$sourceTypeOption['value']">{{ $sourceTypeOption['label'] }}</flux:select.option>
                     @endforeach
-                </x-ui.multi-select-popover>
-                <flux:error name="assignedTo" class="mt-1.5" />
-            </div>
+                </x-ui.form-select>
 
-            <div class="border-t border-secondary-soft pt-5 dark:border-secondary-medium">
-                @php
-                    $isDueDatePast = preg_match('/^\d{4}-\d{2}-\d{2}$/', $dueDate) === 1
-                        && \Carbon\CarbonImmutable::parse($dueDate)->lt(\Carbon\CarbonImmutable::today());
-                    $isMissedDraft = $isDueDatePast && $taskStatus === \App\Enums\TaskStatus::Todo->value;
-                    $isOverdueDraft = $isDueDatePast && ! $isMissedDraft && $taskStatus !== \App\Enums\TaskStatus::Done->value;
-                    $isDueDateLocked = $editingTaskId !== null && $editingTaskCreatedBy !== auth()->id();
-                @endphp
-                <div class="mb-1.5 flex items-center gap-2">
-                    <p class="text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('tasks.timeline') }}</p>
-                    @if ($isMissedDraft)
-                        <span class="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold tracking-wide text-primary uppercase">{{ __('tasks.missed') }}</span>
-                    @elseif ($isOverdueDraft)
-                        <span class="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold tracking-wide text-primary uppercase">{{ __('tasks.overdue') }}</span>
-                    @endif
-                </div>
-                <div class="grid gap-4 sm:grid-cols-3">
-                    <x-ui.input wire:model="startDate" :label="__('common.start_date')" type="date" />
-                    <x-ui.input wire:model="dueDate" :label="__('tasks.due_date_2')" type="date" :disabled="$isDueDateLocked" />
-                    <x-ui.input wire:model="completedDate" :label="__('tasks.completed_date')" type="date" />
-                </div>
-                @if ($isDueDateLocked)
-                    <p class="mt-1.5 text-xs text-secondary-medium dark:text-secondary-soft">{{ __('tasks.only_the_task_creator_can_change_the_due_date') }}</p>
-                @endif
+                <x-ui.form-select wire:model="taskSourceId" :label="__('tasks.source')" :placeholder="__('common.select')" required>
+                    @foreach ($this->sourceOptions as $sourceOption)
+                        <flux:select.option :value="$sourceOption['id']">{{ $sourceOption['name'] }}</flux:select.option>
+                    @endforeach
+                </x-ui.form-select>
             </div>
-        </form>
+        </x-ui.form-section>
 
-        <x-slot:footer>
-            <div class="grid grid-cols-2 gap-2 sm:flex sm:justify-end">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="closeTaskDrawer">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" form="task-drawer-form" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" data-test="save-task-button">{{ $editingTaskId === null ? __('tasks.create_task') : __('common.save_changes') }}</x-ui.button>
-            </div>
-        </x-slot:footer>
-    </x-ui.drawer>
+        <x-ui.form-section :title="__('tasks.section_progress')" :fields="['taskStatus', 'taskPriority', 'progressPercentage', 'assignedTo']">
+            <div class="grid grid-cols-2 gap-x-4 gap-y-3">
+                <x-ui.form-segmented
+                    wire:model="taskStatus"
+                    :label="__('common.status')"
+                    required
+                    class="col-span-2"
+                    :disabled="$isStatusLocked"
+                    :help="$isStatusLocked ? __('tasks.completed_tasks_cannot_change_status') : null"
+                    :options="[
+                        ['value' => TaskStatus::Todo->value, 'label' => TaskStatus::Todo->label(), 'dot' => 'border border-secondary-light', 'test' => 'task-drawer-status-'.TaskStatus::Todo->value],
+                        ['value' => TaskStatus::InProgress->value, 'label' => TaskStatus::InProgress->label(), 'dot' => 'bg-status-active', 'test' => 'task-drawer-status-'.TaskStatus::InProgress->value],
+                        ['value' => TaskStatus::UnderReview->value, 'label' => TaskStatus::UnderReview->label(), 'dot' => 'bg-status-warn', 'test' => 'task-drawer-status-'.TaskStatus::UnderReview->value],
+                        ['value' => TaskStatus::Done->value, 'label' => TaskStatus::Done->label(), 'dot' => 'bg-status-good', 'test' => 'task-drawer-status-'.TaskStatus::Done->value],
+                    ]"
+                />
 
-    <flux:modal wire:model="showDeleteModal" wire:close="cancelDelete" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        @php $pendingDeleteTask = $this->deletingTask; @endphp
-        <div class="flex flex-col gap-4">
-            <flux:heading size="lg">{{ __('tasks.delete_this_task') }}</flux:heading>
-            <flux:subheading>
-                {{ $pendingDeleteTask !== null
-                    ? __('tasks.are_you_sure_you_want_to_delete_this_task', ['title' => $pendingDeleteTask->title])
-                    : __('tasks.its_attachment_records_are_removed_with_it_nothing_outside') }}
-            </flux:subheading>
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="cancelDelete">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="button" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="deleteTask" data-test="confirm-delete-task">{{ __('tasks.delete_task') }}</x-ui.button>
+                <x-ui.form-segmented
+                    wire:model="taskPriority"
+                    :label="__('tasks.priority')"
+                    required
+                    :options="[
+                        ['value' => TaskPriority::Low->value, 'label' => TaskPriority::Low->label(), 'icon' => 'flag', 'iconClass' => 'text-secondary-light', 'test' => 'task-drawer-priority-'.TaskPriority::Low->value],
+                        ['value' => TaskPriority::Medium->value, 'label' => TaskPriority::Medium->label(), 'icon' => 'flag', 'iconClass' => 'text-status-warn', 'test' => 'task-drawer-priority-'.TaskPriority::Medium->value],
+                        ['value' => TaskPriority::High->value, 'label' => TaskPriority::High->label(), 'icon' => 'flag', 'iconClass' => 'text-status-critical', 'test' => 'task-drawer-priority-'.TaskPriority::High->value],
+                    ]"
+                />
+
+                <x-ui.form-input wire:model="progressPercentage" :label="__('tasks.progress_2')" type="number" min="0" max="100" suffix="%" required data-test="task-drawer-progress-input" />
+
+                <x-ui.form-multiselect wire:model="assignedTo" :label="__('tasks.assignees')" :placeholder="__('common.select')" class="col-span-2" data-test="task-assignee-picker">
+                    @foreach ($this->userOptions as $userOption)
+                        <flux:select.option :value="$userOption['id']">{{ $userOption['name'] }} · {{ $userOption['secondary_name'] }}</flux:select.option>
+                    @endforeach
+                </x-ui.form-multiselect>
             </div>
-        </div>
-    </flux:modal>
+        </x-ui.form-section>
+
+        <x-ui.form-section :title="__('common.section_schedule')" :fields="['startDate', 'dueDate', 'completedDate']">
+            @if ($isMissedDraft || $isOverdueDraft)
+                <x-slot:hint>
+                    <span class="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold tracking-wide text-status-critical uppercase">{{ $isMissedDraft ? __('tasks.missed') : __('tasks.overdue') }}</span>
+                </x-slot:hint>
+            @endif
+
+            <div class="grid grid-cols-2 gap-x-4 gap-y-3 @4xl/modal:grid-cols-3">
+                <x-ui.form-input wire:model="startDate" :label="__('common.start_date')" type="date" />
+                <x-ui.form-input wire:model="dueDate" :label="__('tasks.due_date_2')" type="date" :disabled="$isDueDateLocked" :help="$isDueDateLocked ? __('tasks.only_the_task_creator_can_change_the_due_date') : null" />
+                <x-ui.form-input wire:model="completedDate" :label="__('tasks.completed_date')" type="date" />
+            </div>
+        </x-ui.form-section>
+
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="save-task-button">{{ $editingTaskId === null ? __('tasks.create_task') : __('common.save_changes') }}</x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
+
+    <x-ui.confirm-modal
+        wire:model="showDeleteModal"
+        close="cancelDelete"
+        :title="__('tasks.delete_this_task')"
+        :message="$this->deletingTask !== null
+            ? __('tasks.are_you_sure_you_want_to_delete_this_task', ['title' => $this->deletingTask->title])
+            : __('tasks.its_attachment_records_are_removed_with_it_nothing_outside')"
+        confirm="deleteTask"
+        :confirm-label="__('tasks.delete_task')"
+        confirm-test="confirm-delete-task"
+    />
 </section>

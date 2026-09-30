@@ -4,12 +4,15 @@ namespace App\Providers;
 
 use App\Actions\Fortify\AuthenticateWithHrAccount;
 use App\Actions\Fortify\CreateNewUser;
+use App\Actions\Fortify\RedirectIfTwoFactorRequired;
 use App\Actions\Fortify\ResetUserPassword;
 use App\Http\Responses\LoginResponse;
 use App\Http\Responses\TwoFactorLoginResponse;
 use App\Models\User;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
@@ -47,11 +50,17 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
         Fortify::createUsersUsing(CreateNewUser::class);
 
+        // After the password: the authenticator app challenge, or an emailed code.
+        Fortify::redirectUserForTwoFactorAuthenticationUsing(RedirectIfTwoFactorRequired::class);
+
         // Passwords live in the HR system: log in and confirm against HR.
         Fortify::authenticateUsing(new AuthenticateWithHrAccount);
         Fortify::confirmPasswordsUsing(
             fn (User $user, ?string $password): bool => AuthenticateWithHrAccount::confirmsPassword($user, $password),
         );
+
+        // The HR password typed at login also counts as a password confirmation.
+        Event::listen(fn (Login $event) => AuthenticateWithHrAccount::confirmPasswordCheckedAtLogin($event));
 
         // A passkey skips the HR password check, so ask HR whether the account is still active.
         Passkeys::authorizeLoginUsing(fn (Request $request, User $user): bool => ! $user->hasLostHrAccess());
@@ -63,7 +72,6 @@ class FortifyServiceProvider extends ServiceProvider
     private function configureViews(): void
     {
         Fortify::loginView(fn () => view('pages::auth.login'));
-        Fortify::verifyEmailView(fn () => view('pages::auth.verify-email'));
         Fortify::twoFactorChallengeView(fn () => view('pages::auth.two-factor-challenge'));
         Fortify::confirmPasswordView(fn () => view('pages::auth.confirm-password'));
         Fortify::registerView(fn () => view('pages::auth.register'));
@@ -73,11 +81,26 @@ class FortifyServiceProvider extends ServiceProvider
 
     /**
      * Configure rate limiting.
+     *
+     * The `two-factor` limiter guards both second steps: Fortify's POST
+     * /two-factor-challenge (authenticator or recovery code) and the app's
+     * POST email-two-factor-challenge. Whoever reaches either already knows
+     * the account's HR password, so a per-minute limit alone still allowed
+     * about 7,200 guesses a day; the hourly and daily caps bring that down
+     * to 30. Each limit needs its own `by` key: ThrottleRequests keys a
+     * limit by limiter name plus `by` value, not by its decay, so limits
+     * sharing a key would share one counter.
      */
     private function configureRateLimiting(): void
     {
         RateLimiter::for('two-factor', function (Request $request) {
-            return Limit::perMinute(5)->by($request->session()->get('login.id'));
+            $loginId = $request->session()->get('login.id');
+
+            return [
+                Limit::perMinute(5)->by('minute:'.$loginId),
+                Limit::perHour(15)->by('hour:'.$loginId),
+                Limit::perDay(30)->by('day:'.$loginId),
+            ];
         });
 
         RateLimiter::for('login', function (Request $request) {
@@ -89,9 +112,13 @@ class FortifyServiceProvider extends ServiceProvider
         RateLimiter::for('passkeys', function (Request $request) {
             $credentialId = $request->input('credential.id');
 
-            return Limit::perMinute(10)->by(
-                ($credentialId ?: $request->session()->getId()).'|'.$request->ip(),
-            );
+            // The first key is the caller's to choose (any credential id, or
+            // a fresh session on every request), so it alone limits nothing
+            // for a script. The second caps each IP whatever it sends.
+            return [
+                Limit::perMinute(10)->by(($credentialId ?: $request->session()->getId()).'|'.$request->ip()),
+                Limit::perMinute(60)->by('ip:'.$request->ip()),
+            ];
         });
     }
 }

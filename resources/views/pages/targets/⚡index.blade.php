@@ -1,7 +1,9 @@
 <?php
 
+use App\Support\Like;
 use App\Enums\IndicatorMeasure;
 use App\Enums\Period;
+use App\Models\AnnualPlan;
 use App\Models\Donor;
 use App\Models\Indicator;
 use App\Models\PlanIndicator;
@@ -9,16 +11,17 @@ use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Report;
-use App\Models\AnnualPlan;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -79,9 +82,13 @@ new #[Title('titles.targets')] class extends Component {
     public string $result = '';
 
     public bool $showTargetModal = false;
+    #[Locked]
     public ?int $editingTargetId = null;
+    #[Locked]
     public ?int $deletingTargetId = null;
     public bool $showDeleteModal = false;
+
+    #[Locked]
     public ?int $expandedTargetId = null;
 
     public string $targetSourceType = 'annual_plan';
@@ -97,7 +104,7 @@ new #[Title('titles.targets')] class extends Component {
      */
     public function mount(): void
     {
-        if (request()->boolean('create')) {
+        if (request()->boolean('create') && Gate::allows('targets.create')) {
             $this->openCreateModal();
 
             if ($this->indicator !== '' && Indicator::query()->whereKey((int) $this->indicator)->exists()) {
@@ -206,7 +213,7 @@ new #[Title('titles.targets')] class extends Component {
         return PlanIndicator::query()
             // The indicator, the result it measures, or the proposal it was committed in.
             ->when($search !== '', function ($query) use ($search): void {
-                $like = '%'.$search.'%';
+                $like = Like::contains($search);
 
                 $query->where(fn ($query) => $query
                     ->whereHas('indicator', fn ($query) => $query
@@ -373,6 +380,23 @@ new #[Title('titles.targets')] class extends Component {
             ->paginate(6, ['result_id']);
     }
 
+    /**
+     * Whether the viewer may see the budgets funders committed to a proposal.
+     */
+    protected function canViewAgreements(): bool
+    {
+        return auth()->user()?->can('funding-agreements.view') ?? false;
+    }
+
+    /**
+     * The proposal relation that lists its donors: with each budget for someone
+     * who may see agreements, otherwise names only so no amount is ever loaded.
+     */
+    protected function donorRelation(): string
+    {
+        return $this->canViewAgreements() ? 'donors' : 'donorNames';
+    }
+
     /** @return Collection<int, PlanIndicator> */
     #[Computed]
     public function targets(): Collection
@@ -392,7 +416,7 @@ new #[Title('titles.targets')] class extends Component {
                 'source' => fn (MorphTo $morphTo) => $morphTo->morphWith([
                     AnnualPlan::class => ['program:id'],
                     // projects: which projects the proposal funds, for chainIssues().
-                    Proposal::class => ['donors:id,name', 'projects:id'],
+                    Proposal::class => [$this->donorRelation().':id,name', 'projects:id'],
                 ]),
                 'indicator:id,name,result_id,project_id,measure,unit,baseline',
                 'indicator.result:id,statement,type,program_id',
@@ -586,7 +610,7 @@ new #[Title('titles.targets')] class extends Component {
      * report_files cascade from reports. A measurement is not discarded to tidy
      * up a target.
      */
-    public function canDelete(int $targetId): bool
+    protected function canDelete(int $targetId): bool
     {
         $target = PlanIndicator::query()->select(['id'])->withCount('reports')->find($targetId);
 
@@ -600,7 +624,7 @@ new #[Title('titles.targets')] class extends Component {
      * foreign key, so a raw delete of a plan or proposal leaves this dangling
      * and the caller must render an explicit fallback.
      */
-    public function sourceLabel(PlanIndicator $target): ?string
+    protected function sourceLabel(PlanIndicator $target): ?string
     {
         $source = $target->source;
 
@@ -621,12 +645,16 @@ new #[Title('titles.targets')] class extends Component {
 
     public function openCreateModal(): void
     {
+        Gate::authorize('targets.create');
+
         $this->resetTargetForm();
         $this->showTargetModal = true;
     }
 
     public function openEditModal(int $targetId): void
     {
+        Gate::authorize('targets.update');
+
         $target = PlanIndicator::query()
             ->select(['id', 'source_type', 'source_id', 'indicator_id', 'target', 'project_id', 'period'])
             ->findOrFail($targetId);
@@ -645,6 +673,8 @@ new #[Title('titles.targets')] class extends Component {
 
     public function saveTarget(): void
     {
+        Gate::authorize($this->editingTargetId === null ? 'targets.create' : 'targets.update');
+
         $validated = $this->validate([
             'targetSourceType' => ['required', Rule::in(self::SOURCE_TYPES)],
             'targetSourceId' => ['required', 'integer'],
@@ -758,6 +788,8 @@ new #[Title('titles.targets')] class extends Component {
 
     public function confirmDelete(int $targetId): void
     {
+        Gate::authorize('targets.delete');
+
         $this->deletingTargetId = $targetId;
         $this->showDeleteModal = true;
     }
@@ -770,6 +802,8 @@ new #[Title('titles.targets')] class extends Component {
 
     public function deleteTarget(): void
     {
+        Gate::authorize('targets.delete');
+
         if ($this->deletingTargetId === null) {
             return;
         }
@@ -822,23 +856,27 @@ new #[Title('titles.targets')] class extends Component {
         default => null,
     };
     $sourceTypeLabels = ['annual_plan' => __('common.annual_plan'), 'proposal' => __('common.proposal')];
+    $donorRelation = $this->donorRelation();
+    $canViewBudgets = $this->canViewAgreements();
+    $canOpenProposals = auth()->user()->can('proposals.view');
+    $canOpenDonors = auth()->user()->can('donors.view');
     $pulse = $this->pulse;
     $statusMeta = [
         'achieved' => ['label' => __('targets.status_achieved'), 'count' => $pulse['achieved'], 'fill' => 'bg-status-good', 'text' => 'text-status-good', 'dot' => 'bg-status-good'],
-        'in_progress' => ['label' => __('targets.status_in_progress'), 'count' => $pulse['in_progress'], 'fill' => 'bg-secondary-dark dark:bg-white', 'text' => 'text-secondary-dark dark:text-white', 'dot' => 'bg-secondary-dark dark:bg-white'],
+        'in_progress' => ['label' => __('targets.status_in_progress'), 'count' => $pulse['in_progress'], 'fill' => 'bg-secondary-dark dark:bg-ink-muted', 'text' => 'text-secondary-dark dark:text-ink', 'dot' => 'bg-secondary-dark dark:bg-ink-muted'],
         'not_started' => ['label' => __('targets.status_not_started'), 'count' => $pulse['not_started'], 'fill' => 'bg-secondary-light', 'text' => 'text-secondary-light', 'dot' => 'bg-secondary-light'],
     ];
     $shareOf = fn (int $part): float => $pulse['total'] > 0 ? round($part / $pulse['total'] * 100, 1) : 0;
     $formatValue = fn (float $value): string => fmod($value, 1.0) === 0.0 ? number_format($value) : number_format($value, 2);
     $resultMark = fn ($type): string => match ($type?->value) {
-        'impact' => 'bg-secondary-dark ring-secondary-dark dark:bg-white dark:ring-white',
+        'impact' => 'bg-secondary-dark ring-secondary-dark dark:bg-ink dark:ring-ink',
         'outcome' => 'bg-primary ring-primary',
-        default => 'bg-white ring-secondary-light dark:bg-secondary-dark',
+        default => 'bg-white ring-secondary-light dark:bg-surface-1',
     };
     $groups = $this->targets->groupBy(fn ($target) => $target->indicator->result_id);
 @endphp
 
-<section class="@container/directory admin-directory flex min-h-full w-full flex-1 flex-col gap-8 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="target-directory-heading">
+<section class="@container/directory admin-directory flex min-h-full w-full flex-1 flex-col gap-8 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="target-directory-heading">
     <x-ui.page-header
         heading-id="target-directory-heading"
         :title="__('common.targets')"
@@ -892,9 +930,9 @@ new #[Title('titles.targets')] class extends Component {
         </x-slot:filters>
 
         <x-slot:actions>
-            <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-target-button">
+            @can('targets.create')<x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-target-button">
                 {{ __('targets.commit_target') }}
-            </x-ui.button>
+            </x-ui.button>@endcan
         </x-slot:actions>
     </x-ui.page-header>
 
@@ -912,7 +950,7 @@ new #[Title('titles.targets')] class extends Component {
                 @endif
             </h2>
 
-            <div class="flex h-2.5 w-full gap-0.5 overflow-hidden rounded-full bg-secondary-soft/60 dark:bg-secondary-medium/50" role="img" aria-label="{{ __('targets.status_breakdown') }}: {{ collect($statusMeta)->map(fn ($meta) => $meta['label'].' '.$meta['count'])->join(', ') }}">
+            <div class="flex h-2.5 w-full gap-0.5 overflow-hidden rounded-full bg-secondary-soft/60 dark:bg-surface-2" role="img" aria-label="{{ __('targets.status_breakdown') }}: {{ collect($statusMeta)->map(fn ($meta) => $meta['label'].' '.$meta['count'])->join(', ') }}">
                 @foreach ($statusMeta as $statusKey => $meta)
                     @if ($meta['count'] > 0)
                         <span @class(['h-full transition-opacity duration-300 ease-out', $meta['fill'], 'opacity-25' => $status !== '' && $status !== $statusKey]) style="width: {{ $shareOf($meta['count']) }}%"></span>
@@ -929,8 +967,8 @@ new #[Title('titles.targets')] class extends Component {
                         data-test="status-filter-{{ $statusKey }}"
                         @class([
                             'inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border px-3.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
-                            'border-secondary-dark bg-secondary-dark text-white dark:border-white dark:bg-white dark:text-secondary-dark' => $status === $statusKey,
-                            'border-secondary-soft hover:border-secondary-light dark:border-secondary-medium dark:hover:border-secondary-light' => $status !== $statusKey,
+                            'border-secondary-dark bg-secondary-dark text-white dark:border-ink dark:bg-ink dark:text-surface-0' => $status === $statusKey,
+                            'border-secondary-soft hover:border-secondary-light dark:border-line dark:hover:border-field-line' => $status !== $statusKey,
                         ])
                     >
                         <span aria-hidden="true" class="size-2 rounded-full {{ $meta['dot'] }}"></span>
@@ -944,19 +982,19 @@ new #[Title('titles.targets')] class extends Component {
 
         <dl class="flex flex-wrap gap-x-10 gap-y-4 @5xl/directory:justify-end">
             <div class="flex flex-col gap-1.5">
-                <dt class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('targets.committed_in_plans') }}</dt>
+                <dt class="type-label text-secondary-medium dark:text-ink-muted">{{ __('targets.committed_in_plans') }}</dt>
                 <dd class="text-3xl font-bold leading-none tabular-nums">{{ number_format($pulse['plans']) }}</dd>
             </div>
             <div class="flex flex-col gap-1.5">
-                <dt class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('targets.committed_in_proposals') }}</dt>
-                <dd class="text-3xl font-bold leading-none tabular-nums text-funding dark:text-white">{{ number_format($pulse['proposals']) }}</dd>
+                <dt class="type-label text-secondary-medium dark:text-ink-muted">{{ __('targets.committed_in_proposals') }}</dt>
+                <dd class="text-3xl font-bold leading-none tabular-nums text-funding dark:text-ink">{{ number_format($pulse['proposals']) }}</dd>
             </div>
             <div class="flex flex-col gap-1.5">
-                <dt class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('targets.reports_awaiting_approval') }}</dt>
+                <dt class="type-label text-secondary-medium dark:text-ink-muted">{{ __('targets.reports_awaiting_approval') }}</dt>
                 <dd class="flex items-baseline gap-2">
                     <span class="text-3xl font-bold leading-none tabular-nums">{{ number_format($pulse['reviewed']) }}</span>
                     @if ($pulse['drafts'] > 0)
-                        <span class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">{{ trans_choice('targets.count_draft', $pulse['drafts'], ['count' => number_format($pulse['drafts'])]) }}</span>
+                        <span class="text-xs tabular-nums text-secondary-medium dark:text-ink-muted">{{ trans_choice('targets.count_draft', $pulse['drafts'], ['count' => number_format($pulse['drafts'])]) }}</span>
                     @endif
                 </dd>
             </div>
@@ -964,27 +1002,27 @@ new #[Title('titles.targets')] class extends Component {
     </div>
 
     <div class="flex flex-col">
-        <div class="flex min-h-11 flex-wrap items-center justify-between gap-3 border-b border-secondary-soft pb-3 dark:border-secondary-medium">
-            <p class="type-meta text-secondary-medium dark:text-secondary-soft" aria-live="polite">
+        <div class="flex min-h-11 flex-wrap items-center justify-between gap-3 border-b border-secondary-soft pb-3 dark:border-line">
+            <p class="type-meta text-secondary-medium dark:text-ink-muted" aria-live="polite">
                 {{ trans_choice('targets.count_matching_target', $this->matchingCount, ['count' => $this->matchingCount]) }}
                 @if ($this->resultPage->lastPage() > 1)
                     · {{ __('targets.results_page', ['from' => $this->resultPage->firstItem(), 'to' => $this->resultPage->lastItem(), 'total' => $this->resultPage->total()]) }}
                 @endif
             </p>
             @if ($scopeLabel !== null)
-                <button type="button" wire:click="clearIndicatorScope" class="inline-flex max-w-full items-center gap-1.5 rounded-full border border-secondary-dark bg-secondary-dark px-3 py-1 text-xs font-semibold text-white hover:opacity-90 dark:border-white dark:bg-white dark:text-secondary-dark" data-test="indicator-scope-chip">
+                <button type="button" wire:click="clearIndicatorScope" class="inline-flex max-w-full items-center gap-1.5 rounded-full border border-secondary-dark bg-secondary-dark px-3 py-1 text-xs font-semibold text-white hover:opacity-90 dark:border-ink dark:bg-ink dark:text-surface-0" data-test="indicator-scope-chip">
                     <span class="truncate">{{ $scopeLabel }}</span>
                     <flux:icon.x-mark variant="micro" class="size-3.5 shrink-0" aria-hidden="true" />
                     <span class="sr-only">{{ __('common.reset_filters') }}</span>
                 </button>
             @endif
             <div class="flex items-center gap-4">
-                <span class="hidden items-center gap-4 text-xs text-secondary-medium @3xl/directory:inline-flex dark:text-secondary-soft">
-                    <span class="inline-flex items-center gap-1.5"><span aria-hidden="true" class="h-1.5 w-4 rounded-full bg-secondary-dark dark:bg-white"></span>{{ __('targets.legend_approved') }}</span>
+                <span class="hidden items-center gap-4 text-xs text-secondary-medium @3xl/directory:inline-flex dark:text-ink-muted">
+                    <span class="inline-flex items-center gap-1.5"><span aria-hidden="true" class="h-1.5 w-4 rounded-full bg-secondary-dark dark:bg-ink-muted"></span>{{ __('targets.legend_approved') }}</span>
                     <span class="inline-flex items-center gap-1.5"><span aria-hidden="true" class="target-pending h-1.5 w-4 rounded-full"></span>{{ __('targets.legend_pending') }}</span>
                 </span>
                 @if ($filtersAreActive)
-                    <flux:button size="sm" variant="ghost" class="text-secondary-medium! dark:text-secondary-soft!" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
+                    <flux:button size="sm" variant="ghost" class="text-secondary-medium! dark:text-ink-muted!" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
                 @endif
             </div>
         </div>
@@ -1005,7 +1043,7 @@ new #[Title('titles.targets')] class extends Component {
                         <header class="flex items-start gap-3 pb-3">
                             <span aria-hidden="true" class="mt-1 size-3 shrink-0 rounded-full ring-2 ring-inset {{ $resultMark($groupResult->type) }}"></span>
                             <div class="flex min-w-0 flex-col gap-0.5">
-                                <p class="type-label text-secondary-medium dark:text-secondary-soft">
+                                <p class="type-label text-secondary-medium dark:text-ink-muted">
                                     {{ $groupResult->type?->label() }}
                                     <span class="normal-case tracking-normal">· {{ trans_choice('targets.count_target', $groupTargets->count(), ['count' => $groupTargets->count()]) }}</span>
                                 </p>
@@ -1014,15 +1052,16 @@ new #[Title('titles.targets')] class extends Component {
                         </header>
 
                         {{-- The thread: every target hangs off its result. --}}
-                        <ol class="ms-1.5 flex flex-col border-s border-secondary-soft dark:border-secondary-medium">
+                        <ol class="ms-1.5 flex flex-col border-s border-secondary-soft dark:border-line">
                             @foreach ($groupTargets as $target)
                                 @php
                                     $source = $target->source;
                                     $sourceLabel = $this->sourceLabel($target);
                                     $isProposal = $target->source_type === 'proposal';
+                                    // Names stay for everyone; a link only for someone who may open its page.
                                     $sourceUrl = match (true) {
                                         $source instanceof AnnualPlan => route('annual-plans.show', $source),
-                                        $source instanceof Proposal => route('proposals.show', $source),
+                                        $source instanceof Proposal && $canOpenProposals => route('proposals.show', $source),
                                         default => null,
                                     };
                                     $targetIndicator = $target->indicator;
@@ -1038,10 +1077,10 @@ new #[Title('titles.targets')] class extends Component {
                                     $pendingWidth = $targetAmount > 0 ? max(0, min(100 - $approvedWidth, $pendingAmount / $targetAmount * 100)) : 0;
                                     $isExpanded = $expandedTargetId === $target->id;
                                     $chainIssues = $sourceLabel === null ? [] : $target->chainIssues();
-                                    $linkClass = 'rounded-sm font-medium text-secondary-dark underline decoration-secondary-soft decoration-1 underline-offset-[3px] transition-colors hover:decoration-current focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-white dark:decoration-secondary-medium';
+                                    $linkClass = 'rounded-sm font-medium text-secondary-dark underline decoration-secondary-soft decoration-1 underline-offset-[3px] transition-colors hover:decoration-current focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink dark:decoration-line-strong';
                                 @endphp
                                 <li class="relative" wire:key="target-{{ $target->id }}">
-                                    <span aria-hidden="true" class="absolute top-[1.4rem] -start-[5.5px] z-10 size-2.5 rounded-full ring-4 ring-white {{ $statusMeta[$rowStatus]['dot'] }} dark:ring-secondary-dark"></span>
+                                    <span aria-hidden="true" class="absolute top-[1.4rem] -start-[5.5px] z-10 size-2.5 rounded-full ring-4 ring-white {{ $statusMeta[$rowStatus]['dot'] }} dark:ring-surface-1"></span>
 
                                     <div @class([
                                         'grid gap-4 rounded-e-lg py-4 ps-6 pe-2 transition-colors duration-150 @4xl/directory:grid-cols-[minmax(0,1fr)_minmax(16rem,20rem)_auto] @4xl/directory:items-center @4xl/directory:gap-10',
@@ -1050,22 +1089,22 @@ new #[Title('titles.targets')] class extends Component {
                                     ])>
                                         <div class="flex min-w-0 flex-col gap-2">
                                             <div class="flex flex-wrap items-center gap-2">
-                                                <a href="{{ route('indicators.index', ['inspect' => $targetIndicator->id]) }}" wire:navigate class="text-[15px] font-semibold leading-snug hover:text-primary hover:underline">{{ $targetIndicator->name }}</a>
+                                                <a href="{{ route('indicators.index', ['inspect' => $targetIndicator->id]) }}" wire:navigate class="text-[15px] font-semibold leading-snug hover:text-primary dark:hover:text-brand-text hover:underline">{{ $targetIndicator->name }}</a>
                                                 <x-ui.enum-badge :case="$target->period" />
                                             </div>
 
                                             {{-- A row saved before the chain rules existed, or changed around them. --}}
                                             @foreach ($chainIssues as $issue)
-                                                <p class="flex items-start gap-1.5 text-xs font-semibold text-primary" data-test="chain-issue-{{ $target->id }}">
+                                                <p class="flex items-start gap-1.5 text-xs font-semibold text-primary dark:text-brand-text" data-test="chain-issue-{{ $target->id }}">
                                                     <flux:icon.link-slash variant="micro" class="mt-px size-3.5 shrink-0" aria-hidden="true" />
                                                     {{ __($issue) }}
                                                 </p>
                                             @endforeach
 
                                             {{-- Lineage: where it was committed, the money or plan behind it, then who delivers it. --}}
-                                            <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-secondary-medium dark:text-secondary-soft">
+                                            <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-secondary-medium dark:text-ink-muted">
                                                 {{-- Rendered from the morph map key, never a class name. --}}
-                                                <span @class(['inline-flex items-center gap-1 font-medium', 'text-funding dark:text-secondary-soft' => $isProposal])>
+                                                <span @class(['inline-flex items-center gap-1 font-medium', 'text-funding dark:text-ink-muted' => $isProposal])>
                                                     @if ($isProposal)
                                                         <flux:icon.document-text variant="micro" class="size-3.5" aria-hidden="true" />
                                                     @else
@@ -1076,11 +1115,15 @@ new #[Title('titles.targets')] class extends Component {
                                                 @if ($sourceLabel === null)
                                                     {{-- source_id has no foreign key: the plan or proposal can be
                                                          removed out from under this row. --}}
-                                                    <span class="rounded-md border border-primary px-2 py-0.5 text-[11px] font-semibold text-primary">
+                                                    <span class="rounded-md border border-primary px-2 py-0.5 text-[11px] font-semibold text-primary dark:text-brand-text">
                                                         {{ __('targets.source_no_longer_available') }}
                                                     </span>
                                                 @else
-                                                    <a href="{{ $sourceUrl }}" wire:navigate class="{{ $linkClass }}">{{ $sourceLabel }}</a>
+                                                    @if ($sourceUrl !== null)
+                                                        <a href="{{ $sourceUrl }}" wire:navigate class="{{ $linkClass }}">{{ $sourceLabel }}</a>
+                                                    @else
+                                                        <span class="font-medium text-secondary-dark dark:text-ink">{{ $sourceLabel }}</span>
+                                                    @endif
                                                     @if ($source instanceof AnnualPlan && $source->program !== null)
                                                         <span class="text-secondary-light" aria-hidden="true">/</span>
                                                         <span class="sr-only">{{ __('common.program') }}:</span>
@@ -1088,13 +1131,17 @@ new #[Title('titles.targets')] class extends Component {
                                                     @elseif ($source instanceof Proposal)
                                                         <x-ui.enum-badge :case="$source->status" />
                                                         <span class="inline-flex flex-wrap items-center gap-x-1.5">
-                                                            <flux:icon.banknotes variant="micro" class="size-3.5 text-funding dark:text-secondary-soft" aria-hidden="true" />
+                                                            <flux:icon.banknotes variant="micro" class="size-3.5 text-funding dark:text-ink-muted" aria-hidden="true" />
                                                             <span class="sr-only">{{ __('common.donors') }}:</span>
-                                                            @forelse ($source->donors as $donor)
+                                                            @forelse ($source->getRelation($donorRelation) as $donor)
                                                                 <span class="inline-flex items-baseline gap-1.5">
-                                                                    <a href="{{ route('donors.show', $donor) }}" wire:navigate class="{{ $linkClass }}">{{ $donor->name }}</a>
-                                                                    @if ($donor->pivot?->budget !== null)
-                                                                        <x-ui.money :amount="$donor->pivot->budget" :currency="$donor->pivot->currency" class="text-xs text-funding dark:text-secondary-soft" />
+                                                                    @if ($canOpenDonors)
+                                                                        <a href="{{ route('donors.show', $donor) }}" wire:navigate class="{{ $linkClass }}">{{ $donor->name }}</a>
+                                                                    @else
+                                                                        <span class="font-medium text-secondary-dark dark:text-ink">{{ $donor->name }}</span>
+                                                                    @endif
+                                                                    @if ($canViewBudgets && $donor->pivot?->budget !== null)
+                                                                        <x-ui.money :amount="$donor->pivot->budget" :currency="$donor->pivot->currency" class="text-xs text-funding dark:text-ink-muted" />
                                                                     @endif
                                                                 </span>@if (! $loop->last)<span aria-hidden="true">,</span>@endif
                                                             @empty
@@ -1120,21 +1167,21 @@ new #[Title('titles.targets')] class extends Component {
                                         <div class="flex flex-col gap-2">
                                             <div class="flex items-baseline justify-between gap-3">
                                                 <span class="text-3xl font-bold leading-none tracking-tight tabular-nums {{ $statusMeta[$rowStatus]['text'] }}">{{ number_format($achievedPercent) }}<span class="text-lg font-semibold">%</span></span>
-                                                <span class="min-w-0 text-end text-[13px] tabular-nums text-secondary-medium dark:text-secondary-soft">
-                                                    <span class="font-semibold text-secondary-dark dark:text-white">{{ $formatValue($actualAmount) }}{{ $unitSuffix }}</span>
+                                                <span class="min-w-0 text-end text-[13px] tabular-nums text-secondary-medium dark:text-ink-muted">
+                                                    <span class="font-semibold text-secondary-dark dark:text-ink">{{ $formatValue($actualAmount) }}{{ $unitSuffix }}</span>
                                                     {{ __('targets.of_target', ['target' => $formatValue($targetAmount).$unitSuffix]) }}
                                                     @if ($unitWord !== null)
                                                         <span class="break-words">{{ $unitWord }}</span>
                                                     @endif
                                                 </span>
                                             </div>
-                                            <div class="flex h-2 w-full overflow-hidden rounded-full bg-secondary-soft/60 dark:bg-secondary-medium/50" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ (int) round($approvedWidth) }}" aria-label="{{ __('targets.achievement_of', ['indicator' => $targetIndicator->name]) }}">
+                                            <div class="flex h-2 w-full overflow-hidden rounded-full bg-secondary-soft/60 dark:bg-surface-2" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ (int) round($approvedWidth) }}" aria-label="{{ __('targets.achievement_of', ['indicator' => $targetIndicator->name]) }}">
                                                 <span class="target-bar h-full rounded-full {{ $statusMeta[$rowStatus]['fill'] }}" style="width: {{ $approvedWidth }}%"></span>
                                                 @if ($pendingWidth > 0)
                                                     <span class="target-pending h-full" style="width: {{ $pendingWidth }}%"></span>
                                                 @endif
                                             </div>
-                                            <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-secondary-medium dark:text-secondary-soft">
+                                            <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-secondary-medium dark:text-ink-muted">
                                                 @if ($target->reports_count > 0)
                                                     <button
                                                         type="button"
@@ -1142,7 +1189,7 @@ new #[Title('titles.targets')] class extends Component {
                                                         aria-expanded="{{ $isExpanded ? 'true' : 'false' }}"
                                                         aria-controls="target-reports-{{ $target->id }}"
                                                         data-test="toggle-reports-{{ $target->id }}"
-                                                        class="-mx-1 inline-flex min-h-7 cursor-pointer items-center gap-1 rounded-md px-1 font-medium tabular-nums text-secondary-dark transition-colors hover:bg-secondary-soft/60 focus-visible:outline-2 focus-visible:outline-primary dark:text-white dark:hover:bg-white/10"
+                                                        class="-mx-1 inline-flex min-h-7 cursor-pointer items-center gap-1 rounded-md px-1 font-medium tabular-nums text-secondary-dark transition-colors hover:bg-secondary-soft/60 focus-visible:outline-2 focus-visible:outline-primary dark:text-ink dark:hover:bg-white/10"
                                                     >
                                                         {{ trans_choice('targets.count_report', $target->reports_count, ['count' => $target->reports_count]) }}
                                                         <flux:icon.chevron-down variant="micro" @class(['size-3.5 transition-transform duration-200', 'rotate-180' => $isExpanded]) aria-hidden="true" />
@@ -1174,10 +1221,10 @@ new #[Title('titles.targets')] class extends Component {
                                                     <x-ui.button tone="ghost" size="sm" icon="document-plus" class="size-9!" :href="route('reports.index', ['create' => 1, 'target' => $target->id])" wire:navigate :aria-label="__('targets.record_a_report_for', ['indicator' => $targetIndicator->name])" data-test="record-report-{{ $target->id }}" />
                                                 </flux:tooltip>
                                             @endif
-                                            <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $target->id }})" :aria-label="__('targets.edit_target')" />
+                                            @can('targets.update')<x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $target->id }})" :aria-label="__('targets.edit_target')" />@endcan
 
                                             @if ($target->reports_count === 0)
-                                                <x-ui.button tone="ghost" size="sm" icon="trash" class="size-9!" wire:click="confirmDelete({{ $target->id }})" :aria-label="__('targets.delete_target')" />
+                                                @can('targets.delete')<x-ui.button tone="ghost" size="sm" icon="trash" class="size-9!" wire:click="confirmDelete({{ $target->id }})" :aria-label="__('targets.delete_target')" />@endcan
                                             @else
                                                 <flux:tooltip :content="__('targets.targets_that_have_been_reported_against_cannot_be_deleted')">
                                                     <span class="inline-flex size-9 cursor-not-allowed items-center justify-center text-secondary-light" aria-disabled="true">
@@ -1191,7 +1238,7 @@ new #[Title('titles.targets')] class extends Component {
                                     @if ($isExpanded)
                                         {{-- The report trail: every measurement behind the figure, newest first. --}}
                                         <div id="target-reports-{{ $target->id }}" class="target-trail ms-6 me-2 mb-3 mt-1">
-                                            <ol class="flex flex-col divide-y divide-secondary-soft dark:divide-secondary-medium">
+                                            <ol class="flex flex-col divide-y divide-secondary-soft dark:divide-line">
                                                 @foreach ($this->expandedReports as $report)
                                                     <li wire:key="target-report-{{ $report->id }}">
                                                         <a href="{{ route('reports.show', $report) }}" wire:navigate class="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 rounded-md px-3 py-2.5 transition-colors hover:bg-ground focus-visible:outline-2 focus-visible:outline-primary @2xl/directory:grid-cols-[minmax(0,1fr)_auto_auto_auto] dark:hover:bg-white/[0.04]">
@@ -1202,9 +1249,9 @@ new #[Title('titles.targets')] class extends Component {
                                                                 @else
                                                                     {{ $report->planned_date?->translatedFormat(__('formats.date')) }}
                                                                 @endif
-                                                                <span class="font-normal text-secondary-medium dark:text-secondary-soft">· {{ $report->user?->name }}</span>
+                                                                <span class="font-normal text-secondary-medium dark:text-ink-muted">· {{ $report->user?->name }}</span>
                                                                 </span>
-                                                                <span class="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs font-normal text-secondary-medium dark:text-secondary-soft">
+                                                                <span class="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs font-normal text-secondary-medium dark:text-ink-muted">
                                                                     <span class="inline-flex items-center gap-1">
                                                                         <flux:icon.paper-clip variant="micro" class="size-3.5" aria-hidden="true" />
                                                                         {{ trans_choice('targets.count_evidence_file', $report->files_count, ['count' => $report->files_count]) }}
@@ -1237,107 +1284,99 @@ new #[Title('titles.targets')] class extends Component {
             </div>
         @endif
 
-        <flux:pagination :paginator="$this->resultPage" class="pt-4 text-secondary-medium! dark:text-secondary-soft!" scroll-to="#target-directory-heading" />
+        <flux:pagination :paginator="$this->resultPage" class="pt-4 text-secondary-medium! dark:text-ink-muted!" scroll-to="#target-directory-heading" />
     </div>
 
-    <flux:modal wire:model="showTargetModal" class="w-full max-w-2xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
+    <x-ui.modal
+        wire:model="showTargetModal"
+        size="xl"
+        :title="$editingTargetId === null ? __('targets.commit_target') : __('targets.edit_target')"
+        :description="__('targets.a_target_is_committed_either_in_an_annual_operational_plan_o')"
+        submit="saveTarget"
+        close="closeTargetModal"
+        required-note
+    >
         @if ($showTargetModal)
-        <form wire:submit="saveTarget" class="space-y-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ $editingTargetId === null ? __('targets.commit_target') : __('targets.edit_target') }}</flux:heading>
-                <flux:subheading>{{ __('targets.a_target_is_committed_either_in_an_annual_operational_plan_o') }}</flux:subheading>
-            </div>
-
             @php
                 $formIndicator = $this->formIndicator;
                 $formIsPercentage = $formIndicator?->measure === IndicatorMeasure::Percentage;
+                $indicatorHelp = $formIndicator === null ? null : $formIndicator->measure->label().($formIndicator->project !== null ? ' · '.__('targets.scoped_to_project', ['project' => $formIndicator->project->name]) : '');
             @endphp
 
             {{-- The indicator comes first: it decides which plans and projects fit. --}}
-            <div>
-                <x-ui.select wire:model.live="targetIndicatorId" :label="__('targets.indicator')" required>
-                    <flux:select.option value="">{{ __('targets.select_an_indicator') }}</flux:select.option>
-                    @foreach ($this->indicatorOptions as $indicatorOption)
-                        <flux:select.option :value="$indicatorOption->id" :wire:key="'tgt-indicator-'.$indicatorOption->id">{{ $indicatorOption->name }} — {{ Str::limit($indicatorOption->result?->statement, 50) }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
-                @if ($formIndicator !== null)
-                    <p class="mt-1.5 type-meta text-secondary-medium dark:text-secondary-soft">
-                        {{ $formIndicator->measure->label() }}
-                        @if ($formIndicator->project !== null)
-                            · {{ __('targets.scoped_to_project', ['project' => $formIndicator->project->name]) }}
-                        @endif
-                    </p>
-                @endif
-            </div>
-
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.select wire:model.live="targetSourceType" :label="__('targets.committed_in')" required>
-                    @foreach ($sourceTypeLabels as $sourceKey => $sourceLabel)
-                        <flux:select.option :value="$sourceKey" :wire:key="'tgt-source-option-'.$sourceKey">{{ $sourceLabel }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
-
-                <div>
-                    <x-ui.select wire:model.live="targetSourceId" :label="$targetSourceType === 'proposal' ? __('common.proposal') : __('common.annual_plan')" required>
-                        <flux:select.option value="">{{ __('targets.select_a_source') }}</flux:select.option>
-                        @foreach ($this->sourceOptions as $sourceOption)
-                            <flux:select.option :value="$sourceOption['id']" :wire:key="'tgt-src-'.$targetSourceType.'-'.$sourceOption['id']">
-                                {{ $sourceOption['label'] }}
-                            </flux:select.option>
+            <x-ui.form-section :title="__('common.section_details')" :fields="['targetIndicatorId', 'targetSourceType', 'targetSourceId']">
+                <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                    <x-ui.form-select wire:model.live="targetIndicatorId" :label="__('targets.indicator')" :placeholder="__('targets.select_an_indicator')" :help="$indicatorHelp" required autofocus class="@2xl/modal:col-span-2">
+                        @foreach ($this->indicatorOptions as $indicatorOption)
+                            <flux:select.option :value="$indicatorOption->id">{{ $indicatorOption->name }} — {{ Str::limit($indicatorOption->result?->statement, 50) }}</flux:select.option>
                         @endforeach
-                    </x-ui.select>
-                    @if ($targetSourceType === 'annual_plan' && $formIndicator?->result?->program_id !== null)
-                        <p class="mt-1.5 type-meta text-secondary-medium dark:text-secondary-soft">{{ __('targets.only_plans_of_the_result_program_are_offered') }}</p>
-                    @endif
+                    </x-ui.form-select>
+
+                    <x-ui.form-segmented
+                        wire:model.live="targetSourceType"
+                        :label="__('targets.committed_in')"
+                        required
+                        :options="collect($sourceTypeLabels)->map(fn (string $sourceLabel, string $sourceKey): array => ['value' => $sourceKey, 'label' => $sourceLabel])->values()->all()"
+                    />
+
+                    <x-ui.form-select
+                        wire:model.live="targetSourceId"
+                        :label="$targetSourceType === 'proposal' ? __('common.proposal') : __('common.annual_plan')"
+                        :placeholder="__('targets.select_a_source')"
+                        :help="$targetSourceType === 'annual_plan' && $formIndicator?->result?->program_id !== null ? __('targets.only_plans_of_the_result_program_are_offered') : null"
+                        required
+                    >
+                        @foreach ($this->sourceOptions as $sourceOption)
+                            <flux:select.option :value="$sourceOption['id']">{{ $sourceOption['label'] }}</flux:select.option>
+                        @endforeach
+                    </x-ui.form-select>
                 </div>
-            </div>
+            </x-ui.form-section>
 
-            <div class="grid gap-4 sm:grid-cols-3">
-                <x-ui.input wire:model="targetValue" :label="$formIsPercentage ? __('targets.target_value_percent') : __('targets.target_value')" type="number" step="0.01" min="0" :max="$formIsPercentage ? 100 : null" required />
+            <x-ui.form-section :title="__('targets.section_commitment')" :fields="['targetValue', 'targetPeriod', 'targetProjectId']">
+                <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                    <x-ui.form-input wire:model="targetValue" :label="$formIsPercentage ? __('targets.target_value_percent') : __('targets.target_value')" type="number" step="0.01" min="0" :max="$formIsPercentage ? 100 : null" :suffix="$formIsPercentage ? '%' : null" required />
 
-                <x-ui.select wire:model="targetPeriod" :label="__('targets.reporting_period')" required>
-                    @foreach (Period::cases() as $periodCase)
-                        <flux:select.option :value="$periodCase->value" :wire:key="'tgt-period-option-'.$periodCase->value">{{ $periodCase->label() }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
+                    <x-ui.form-segmented
+                        wire:model="targetPeriod"
+                        :label="__('targets.reporting_period')"
+                        required
+                        :options="collect(Period::cases())->map(fn (Period $periodCase): array => ['value' => $periodCase->value, 'label' => $periodCase->label()])->all()"
+                    />
 
-                <x-ui.select wire:model="targetProjectId" :label="__('common.project')" :disabled="$formIndicator?->project_id !== null">
-                    @if ($formIndicator?->project_id === null)
-                        <flux:select.option value="">{{ __('common.organisation_wide') }}</flux:select.option>
-                    @endif
-                    @foreach ($this->formProjectOptions as $projectOption)
-                        <flux:select.option :value="$projectOption->id" :wire:key="'tgt-project-option-'.$projectOption->id">{{ $projectOption->name }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
-            </div>
-
-            @if ($targetSourceId !== '')
-                <p class="-mt-2 type-meta text-secondary-medium dark:text-secondary-soft">
-                    {{ $targetSourceType === 'proposal' ? __('targets.only_projects_the_proposal_funds_are_offered') : __('targets.only_projects_in_the_plan_program_are_offered') }}
-                </p>
-            @endif
-
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeTargetModal">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-target-button">
-                    {{ $editingTargetId === null ? __('targets.commit_target') : __('common.save_changes') }}
-                </x-ui.button>
-            </div>
-        </form>
+                    <x-ui.form-select
+                        wire:model="targetProjectId"
+                        :label="__('common.project')"
+                        :disabled="$formIndicator?->project_id !== null"
+                        :locked-reason="$formIndicator?->project !== null ? __('targets.scoped_to_project', ['project' => $formIndicator->project->name]) : null"
+                        :help="$targetSourceId !== '' ? ($targetSourceType === 'proposal' ? __('targets.only_projects_the_proposal_funds_are_offered') : __('targets.only_projects_in_the_plan_program_are_offered')) : null"
+                        class="@2xl/modal:col-span-2"
+                    >
+                        @if ($formIndicator?->project_id === null)
+                            <flux:select.option value="">{{ __('common.organisation_wide') }}</flux:select.option>
+                        @endif
+                        @foreach ($this->formProjectOptions as $projectOption)
+                            <flux:select.option :value="$projectOption->id">{{ $projectOption->name }}</flux:select.option>
+                        @endforeach
+                    </x-ui.form-select>
+                </div>
+            </x-ui.form-section>
         @endif
-    </flux:modal>
 
-    <flux:modal wire:model="showDeleteModal" wire:close="cancelDelete" class="w-full max-w-md border border-secondary-light! bg-white! dark:bg-secondary-dark!">
-        @if ($deletingTargetId !== null)
-        <div class="space-y-4">
-            <flux:heading size="lg">{{ __('targets.delete_this_target') }}</flux:heading>
-            <flux:subheading>{{ __('targets.only_a_target_with_no_reports_can_be_deleted_otherwise_every') }}</flux:subheading>
-            <div class="flex justify-end gap-2 border-t border-secondary-soft pt-4 dark:border-secondary-medium">
-                <x-ui.button type="button" wire:click="cancelDelete">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="button" tone="primary" wire:click="deleteTarget" data-test="confirm-delete-target">{{ __('targets.delete_target') }}</x-ui.button>
-            </div>
-        </div>
-        @endif
-    </flux:modal>
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="save-target-button">
+                {{ $editingTargetId === null ? __('targets.commit_target') : __('common.save_changes') }}
+            </x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
+
+    <x-ui.confirm-modal
+        wire:model="showDeleteModal"
+        close="cancelDelete"
+        :title="__('targets.delete_this_target')"
+        :message="__('targets.only_a_target_with_no_reports_can_be_deleted_otherwise_every')"
+        confirm="deleteTarget"
+        :confirm-label="__('targets.delete_target')"
+        confirm-test="confirm-delete-target"
+    />
 </section>

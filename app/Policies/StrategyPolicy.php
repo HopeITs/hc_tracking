@@ -14,7 +14,7 @@ class StrategyPolicy
      */
     public function viewAny(User $user): bool
     {
-        return true;
+        return $user->can('strategies.view');
     }
 
     /**
@@ -22,7 +22,7 @@ class StrategyPolicy
      */
     public function view(User $user, Strategy $strategy): bool
     {
-        return true;
+        return $user->can('strategies.view');
     }
 
     /**

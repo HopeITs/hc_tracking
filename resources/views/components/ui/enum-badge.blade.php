@@ -55,11 +55,11 @@
     };
 
     $toneClasses = match ($tone) {
-        'accent' => 'border-primary bg-primary text-white',
-        'solid' => 'border-secondary-dark bg-secondary-dark text-white dark:border-secondary-medium dark:bg-secondary-medium',
-        'outline' => 'border-secondary-light text-secondary-medium dark:text-secondary-soft',
+        'accent' => 'border-primary bg-primary dark:border-transparent dark:bg-status-critical-soft dark:text-status-critical text-white',
+        'solid' => 'border-secondary-dark bg-secondary-dark text-white dark:border-transparent dark:bg-white/10 dark:text-ink',
+        'outline' => 'border-secondary-light text-secondary-medium dark:text-ink-muted',
         'good' => 'border-status-good/30 bg-status-good-soft text-status-good',
-        'muted' => 'border-secondary-light bg-secondary-soft text-secondary-medium dark:bg-secondary-medium dark:text-secondary-soft',
+        'muted' => 'border-secondary-light bg-secondary-soft text-secondary-medium dark:bg-surface-2 dark:text-ink-muted',
         'none' => '',
     };
 @endphp

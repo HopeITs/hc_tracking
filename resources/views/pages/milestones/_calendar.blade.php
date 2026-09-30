@@ -7,14 +7,14 @@
 
     $markerTone = function (\App\Models\Milestone $milestone): string {
         if ($milestone->isMissed() || $milestone->isOverdue()) {
-            return 'bg-status-critical-soft text-primary';
+            return 'bg-status-critical-soft text-primary dark:text-brand-text';
         }
 
         return match ($milestone->status) {
             MilestoneStatus::Reached => 'bg-status-good-soft text-status-good',
             MilestoneStatus::Ongoing => 'bg-status-warn-soft text-status-warn',
-            MilestoneStatus::Postponed, MilestoneStatus::Cancelled => 'bg-secondary-soft text-secondary-medium dark:bg-secondary-medium dark:text-secondary-soft',
-            MilestoneStatus::Planned => 'bg-white text-secondary-dark ring-1 ring-secondary-soft dark:bg-secondary-dark dark:text-white dark:ring-secondary-medium',
+            MilestoneStatus::Postponed, MilestoneStatus::Cancelled => 'bg-secondary-soft text-secondary-medium dark:bg-surface-2 dark:text-ink-muted',
+            MilestoneStatus::Planned => 'bg-white text-secondary-dark ring-1 ring-secondary-soft dark:bg-surface-1 dark:text-ink dark:ring-line',
         };
     };
 
@@ -32,12 +32,12 @@
         <flux:dropdown position="bottom-start" class="filter-picker">
             <x-ui.button size="sm" icon:trailing="chevron-down" data-test="milestone-calendar-view-mode-button">{{ __('calendar.'.$viewMode) }}</x-ui.button>
             <flux:menu class="filter-menu">
-                <div class="px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-secondary-soft">{{ __('calendar.time_period') }}</div>
+                <div class="px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-ink-muted">{{ __('calendar.time_period') }}</div>
                 @foreach ([['day', 'D'], ['four_days', '4'], ['week', 'W'], ['month', 'M']] as [$periodKey, $shortcut])
                     <flux:menu.item wire:click="setViewMode('{{ $periodKey }}')" data-test="milestone-calendar-view-mode-{{ $periodKey }}">
                         <span class="min-w-0 flex-1 truncate">{{ __('calendar.'.$periodKey) }}</span>
-                        <kbd class="me-1 rounded border border-secondary-soft px-1.5 py-0.5 text-[10px] font-semibold dark:border-secondary-medium">{{ $shortcut }}</kbd>
-                        @if ($viewMode === $periodKey)<flux:icon.check class="size-4 shrink-0 text-primary" />@endif
+                        <kbd class="me-1 rounded border border-secondary-soft px-1.5 py-0.5 text-[10px] font-semibold dark:border-line">{{ $shortcut }}</kbd>
+                        @if ($viewMode === $periodKey)<flux:icon.check class="size-4 shrink-0 text-primary dark:text-brand-text" />@endif
                     </flux:menu.item>
                 @endforeach
             </flux:menu>
@@ -56,8 +56,8 @@
 </div>
 
 @if ($viewMode === 'month')
-    <div class="overflow-hidden rounded-xl border border-secondary-soft dark:border-secondary-medium">
-        <div class="grid grid-cols-7 border-b border-secondary-soft bg-secondary-soft/40 text-center text-xs font-semibold uppercase tracking-wide text-secondary-medium dark:border-secondary-medium dark:bg-secondary-medium/40 dark:text-secondary-soft">
+    <div class="overflow-hidden rounded-xl border border-secondary-soft dark:border-line">
+        <div class="grid grid-cols-7 border-b border-secondary-soft bg-secondary-soft/40 text-center text-xs font-semibold uppercase tracking-wide text-secondary-medium dark:border-line dark:bg-surface-2 dark:text-ink-muted">
             @foreach ($calendar['weeks'][0] as $weekdayHeader)
                 <div class="py-2">{{ $weekdayHeader->translatedFormat('D') }}</div>
             @endforeach
@@ -72,15 +72,15 @@
                         $isToday = $day->isSameDay($today);
                     @endphp
                     <div
-                        x-on:click="$event.target.closest('[data-milestone-chip]') || $wire.openCreateModal('{{ $day->toDateString() }}')"
+                        @can('create', App\Models\Milestone::class) x-on:click="$event.target.closest('[data-milestone-chip]') || $wire.openCreateModal('{{ $day->toDateString() }}')" @endcan
                         wire:key="milestone-calendar-day-{{ $day->toDateString() }}"
-                        class="flex min-h-28 cursor-pointer flex-col gap-1 border-b border-e border-secondary-soft p-1.5 text-start last:border-e-0 [&:nth-child(7n)]:border-e-0 hover:bg-secondary-soft/40 dark:border-secondary-medium dark:hover:bg-secondary-medium/40 {{ $isCurrentMonth ? '' : 'opacity-40' }}"
+                        class="flex min-h-28 cursor-pointer flex-col gap-1 border-b border-e border-secondary-soft p-1.5 text-start last:border-e-0 [&:nth-child(7n)]:border-e-0 hover:bg-secondary-soft/40 dark:border-line dark:hover:bg-surface-2 {{ $isCurrentMonth ? '' : 'opacity-40' }}"
                         data-test="milestone-calendar-day-{{ $day->toDateString() }}"
                     >
                         <span @class([
                             'inline-flex size-6 items-center justify-center rounded-full text-xs font-semibold tabular-nums',
-                            'bg-primary text-white' => $isToday,
-                            'text-secondary-dark dark:text-white' => ! $isToday,
+                            'bg-primary dark:bg-ink dark:text-surface-0 text-white' => $isToday,
+                            'text-secondary-dark dark:text-ink' => ! $isToday,
                         ])>
                             {{ $day->day }}
                         </span>
@@ -92,9 +92,11 @@
                                     {{ $milestone->name }}
                                 </a>
                                 @if ($milestone->children_count === 0 && $milestone->tasks_count === 0)
+                                    @can('milestones.delete')
                                     <button type="button" wire:click="confirmDelete({{ $milestone->id }})" class="hidden shrink-0 cursor-pointer group-hover:block" aria-label="{{ __('common.delete_name', ['name' => $milestone->name]) }}">
                                         <flux:icon.x-mark variant="micro" class="size-3" />
                                     </button>
+                                    @endcan
                                 @endif
                             </div>
                         @endforeach
@@ -113,25 +115,25 @@
         $gridColumns = 'grid-template-columns: 4.5rem repeat('.count($periodDays).', minmax(0, 1fr)); min-width: '.$gridMinWidth.'rem;';
     @endphp
 
-    <div class="overflow-hidden rounded-xl border border-secondary-soft dark:border-secondary-medium">
+    <div class="overflow-hidden rounded-xl border border-secondary-soft dark:border-line">
         <div class="overflow-x-auto">
             <div class="grid" style="{{ $gridColumns }}">
-                <div class="border-b border-e border-secondary-soft dark:border-secondary-medium"></div>
+                <div class="border-b border-e border-secondary-soft dark:border-line"></div>
                 @foreach ($periodDays as $day)
                     @php $isToday = $day->isSameDay($today); @endphp
-                    <div class="border-b border-e border-secondary-soft p-2 text-center last:border-e-0 dark:border-secondary-medium">
-                        <div @class(['text-sm font-semibold', 'text-primary' => $isToday, 'text-secondary-dark dark:text-white' => ! $isToday])>{{ $day->translatedFormat('l') }}</div>
-                        <div @class(['text-xs', 'text-primary' => $isToday, 'text-secondary-medium dark:text-secondary-soft' => ! $isToday])>{{ $day->translatedFormat('j M') }}</div>
+                    <div class="border-b border-e border-secondary-soft p-2 text-center last:border-e-0 dark:border-line">
+                        <div @class(['text-sm font-semibold', 'text-primary dark:text-brand-text' => $isToday, 'text-secondary-dark dark:text-ink' => ! $isToday])>{{ $day->translatedFormat('l') }}</div>
+                        <div @class(['text-xs', 'text-primary dark:text-brand-text' => $isToday, 'text-secondary-medium dark:text-ink-muted' => ! $isToday])>{{ $day->translatedFormat('j M') }}</div>
                     </div>
                 @endforeach
 
-                <div class="flex items-center justify-end border-e border-secondary-soft px-2 py-1.5 text-[11px] font-semibold text-secondary-medium dark:border-secondary-medium dark:text-secondary-soft">{{ __('calendar.all_day') }}</div>
+                <div class="flex items-center justify-end border-e border-secondary-soft px-2 py-1.5 text-[11px] font-semibold text-secondary-medium dark:border-line dark:text-ink-muted">{{ __('calendar.all_day') }}</div>
                 @foreach ($periodDays as $day)
                     @php $dayMilestones = $calendar['milestonesByDay']->get($day->toDateString(), new \Illuminate\Support\Collection); @endphp
                     <div
-                        x-on:click="$event.target.closest('[data-milestone-chip]') || $wire.openCreateModal('{{ $day->toDateString() }}')"
+                        @can('create', App\Models\Milestone::class) x-on:click="$event.target.closest('[data-milestone-chip]') || $wire.openCreateModal('{{ $day->toDateString() }}')" @endcan
                         wire:key="milestone-calendar-allday-{{ $day->toDateString() }}"
-                        class="flex min-h-10 cursor-pointer flex-col gap-1 border-e border-secondary-soft p-1.5 text-start last:border-e-0 hover:bg-secondary-soft/40 dark:border-secondary-medium dark:hover:bg-secondary-medium/40"
+                        class="flex min-h-10 cursor-pointer flex-col gap-1 border-e border-secondary-soft p-1.5 text-start last:border-e-0 hover:bg-secondary-soft/40 dark:border-line dark:hover:bg-surface-2"
                         data-test="milestone-calendar-allday-{{ $day->toDateString() }}"
                     >
                         @foreach ($dayMilestones as $milestone)
@@ -141,9 +143,11 @@
                                     {{ $milestone->name }}
                                 </a>
                                 @if ($milestone->children_count === 0 && $milestone->tasks_count === 0)
+                                    @can('milestones.delete')
                                     <button type="button" wire:click="confirmDelete({{ $milestone->id }})" class="hidden shrink-0 cursor-pointer group-hover:block" aria-label="{{ __('common.delete_name', ['name' => $milestone->name]) }}">
                                         <flux:icon.x-mark variant="micro" class="size-3" />
                                     </button>
+                                    @endcan
                                 @endif
                             </div>
                         @endforeach
@@ -151,16 +155,16 @@
                 @endforeach
             </div>
 
-            <div class="max-h-96 overflow-y-auto border-t border-secondary-soft dark:border-secondary-medium" x-init="$el.scrollTop = Math.max(0, {{ $currentHour }} * 48 - 160)">
+            <div class="max-h-96 overflow-y-auto border-t border-secondary-soft dark:border-line" x-init="$el.scrollTop = Math.max(0, {{ $currentHour }} * 48 - 160)">
                 <div class="grid" style="{{ $gridColumns }}">
                     @for ($hour = 0; $hour < 24; $hour++)
-                        <div class="h-12 border-b border-e border-secondary-soft px-2 py-1 text-end text-[11px] text-secondary-medium dark:border-secondary-medium dark:text-secondary-soft">
+                        <div class="h-12 border-b border-e border-secondary-soft px-2 py-1 text-end text-[11px] text-secondary-medium dark:border-line dark:text-ink-muted">
                             {{ $hour === 0 ? '' : \Carbon\CarbonImmutable::today()->addHours($hour)->translatedFormat('ga') }}
                         </div>
                         @foreach ($periodDays as $day)
-                            <div class="relative h-12 border-b border-e border-secondary-soft last:border-e-0 dark:border-secondary-medium">
+                            <div class="relative h-12 border-b border-e border-secondary-soft last:border-e-0 dark:border-line">
                                 @if ($day->isSameDay($today) && $hour === $currentHour)
-                                    <div class="pointer-events-none absolute inset-x-0 h-px bg-primary" style="top: {{ $currentMinuteFraction * 100 }}%;"></div>
+                                    <div class="pointer-events-none absolute inset-x-0 h-px bg-primary dark:bg-ink" style="top: {{ $currentMinuteFraction * 100 }}%;"></div>
                                 @endif
                             </div>
                         @endforeach

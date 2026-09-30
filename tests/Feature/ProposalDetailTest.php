@@ -227,7 +227,7 @@ test('a pending tranche whose scheduled date has passed puts the money reading i
 });
 
 test('the work reading counts finished tasks and groups them under the project their milestone reaches', function () {
-    $user = User::factory()->role('Financial')->create();
+    $user = User::factory()->role('General Manager')->create();
     $proposal = Proposal::factory()->create();
 
     $project = Project::factory()->create(['name' => 'Aleppo Water Response']);
@@ -286,7 +286,7 @@ test('a task sourced from a milestone whose project this proposal does not fund 
 });
 
 test('a task sourced directly from the proposal is listed apart from funded-project work', function () {
-    $user = User::factory()->role('Financial')->create();
+    $user = User::factory()->role('General Manager')->create();
     $proposal = Proposal::factory()->create();
 
     $funded = Project::factory()->create(['name' => 'Aleppo Water Response']);
@@ -380,7 +380,7 @@ test('an unknown tab from an old bookmark falls back to status history rather th
 });
 
 test('each tab shows only its own content and the strip counts its records', function () {
-    $user = User::factory()->role('Financial')->create();
+    $user = User::factory()->role('General Manager')->create();
     $proposal = Proposal::factory()->create();
 
     ProposalStatusNote::factory()->create(['proposal_id' => $proposal->id, 'context' => 'Board signed off']);
@@ -580,7 +580,7 @@ test('a proposal with no money still renders the chronology and offers no climb'
 });
 
 test('the tasks tab puts open work before finished work and flags overdue and lagging tasks', function () {
-    $user = User::factory()->role('Financial')->create();
+    $user = User::factory()->role('General Manager')->create();
     $proposal = Proposal::factory()->create();
 
     Task::factory()->completed()->create(['source_type' => 'proposal', 'source_id' => $proposal->id, 'title' => 'Finished survey']);

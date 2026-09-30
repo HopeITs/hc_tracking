@@ -72,6 +72,7 @@ return [
     'the_indicator_and_source_are_locked_once_reported_against' => 'Reports have been filed against this target, so its indicator and plan or proposal can no longer change. You can still edit the value, period and project.',
     'this_indicator_already_has_a_target_here' => 'This indicator already has a target in this plan or proposal for the same project. Edit that one instead.',
     'scoped_to_project' => 'Scoped to :project',
+    'section_commitment' => 'Commitment',
     'only_plans_of_the_result_program_are_offered' => 'Only plans of the result\'s program are offered.',
     'only_projects_the_proposal_funds_are_offered' => 'Only projects this proposal funds are offered.',
     'only_projects_in_the_plan_program_are_offered' => 'Only projects in this plan\'s program are offered.',

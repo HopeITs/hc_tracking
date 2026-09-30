@@ -23,22 +23,22 @@
 
     $markerTone = fn ($milestone): string => match (true) {
         $milestone->status === MilestoneStatus::Reached => 'border-status-good bg-status-good',
-        $milestone->status === MilestoneStatus::Cancelled => 'border-secondary-light bg-secondary-soft dark:border-secondary-medium dark:bg-secondary-medium/40',
-        $milestone->isMissed() || $milestone->isOverdue() => 'border-primary bg-primary',
+        $milestone->status === MilestoneStatus::Cancelled => 'border-secondary-light bg-secondary-soft dark:border-line dark:bg-white/10',
+        $milestone->isMissed() || $milestone->isOverdue() => 'border-primary bg-primary dark:bg-status-critical dark:border-status-critical',
         $milestone->status === MilestoneStatus::Ongoing => 'border-status-warn bg-status-warn',
-        default => 'border-secondary-dark bg-board dark:border-white',
+        default => 'border-secondary-dark bg-board dark:border-ink-muted',
     };
 @endphp
 
 <div {{ $attributes->class('flex flex-col gap-1') }}>
     @if ($milestones->isNotEmpty())
         {{-- Legend --}}
-        <div class="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-board-line px-3.5 pt-3.5 pb-3 type-meta text-secondary-medium dark:text-secondary-soft" aria-hidden="true">
+        <div class="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-board-line px-3.5 pt-3.5 pb-3 type-meta text-secondary-medium dark:text-ink-muted" aria-hidden="true">
             <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-status-good bg-status-good"></span>{{ MilestoneStatus::Reached->label() }}</span>
-            <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-secondary-dark bg-board dark:border-white"></span>{{ MilestoneStatus::Planned->label() }}</span>
+            <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-secondary-dark bg-board dark:border-ink-muted"></span>{{ MilestoneStatus::Planned->label() }}</span>
             <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-status-warn bg-status-warn"></span>{{ MilestoneStatus::Ongoing->label() }}</span>
-            <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-primary bg-primary"></span>{{ __('milestones.missed') }} / {{ __('milestones.overdue') }}</span>
-            <span class="inline-flex items-center gap-1.5"><span class="h-3.5 w-0.5 bg-primary"></span>{{ __('ui.today') }}</span>
+            <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-primary bg-primary dark:bg-status-critical dark:border-status-critical"></span>{{ __('milestones.missed') }} / {{ __('milestones.overdue') }}</span>
+            <span class="inline-flex items-center gap-1.5"><span class="h-3.5 w-0.5 bg-primary dark:bg-ink"></span>{{ __('ui.today') }}</span>
         </div>
 
         @if ($window !== null)
@@ -46,9 +46,9 @@
                 <span></span>
                 <div class="relative h-8">
                     @foreach ($ticks as $tick)
-                        <span class="absolute bottom-2 -translate-x-1/2 type-meta whitespace-nowrap text-secondary-medium tabular-nums rtl:translate-x-1/2 dark:text-secondary-soft" style="inset-inline-start: {{ $tick['at'] }}%">{{ $tick['label'] }}</span>
+                        <span class="absolute bottom-2 -translate-x-1/2 type-meta whitespace-nowrap text-secondary-medium tabular-nums rtl:translate-x-1/2 dark:text-ink-muted" style="inset-inline-start: {{ $tick['at'] }}%">{{ $tick['label'] }}</span>
                     @endforeach
-                    <span class="absolute bottom-1.5 -translate-x-1/2 rounded-full bg-primary px-2 py-0.5 text-[0.6875rem] font-bold whitespace-nowrap text-white rtl:translate-x-1/2" style="inset-inline-start: {{ $todayAt }}%">{{ __('ui.today') }}</span>
+                    <span class="absolute bottom-1.5 -translate-x-1/2 rounded-full bg-primary dark:bg-ink dark:text-surface-0 px-2 py-0.5 text-[0.6875rem] font-bold whitespace-nowrap text-white rtl:translate-x-1/2" style="inset-inline-start: {{ $todayAt }}%">{{ __('ui.today') }}</span>
                 </div>
                 <span></span>
             </div>
@@ -64,8 +64,8 @@
             <li class="grid gap-3 px-3.5 py-3 @4xl/detail:grid-cols-[minmax(12rem,16rem)_1fr_9rem] @4xl/detail:items-center @4xl/detail:gap-4" wire:key="milestone-timeline-{{ $milestone->id }}">
                 {{-- Identity --}}
                 <div class="min-w-0">
-                    <p class="truncate font-semibold text-secondary-dark dark:text-white">{{ $milestone->name }}</p>
-                    <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 type-meta text-secondary-medium dark:text-secondary-soft">
+                    <p class="truncate font-semibold text-secondary-dark dark:text-ink">{{ $milestone->name }}</p>
+                    <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 type-meta text-secondary-medium dark:text-ink-muted">
                         <x-ui.enum-badge :case="$milestone->status" />
                         @if ($milestone->weight_percentage !== null)
                             <span class="tabular-nums">{{ __('milestones.weight_weight', ['weight' => number_format((float) $milestone->weight_percentage, 0)]) }}</span>
@@ -107,7 +107,7 @@
                                         x-show="open"
                                         style="display: none"
                                         role="tooltip"
-                                        class="pointer-events-none absolute bottom-full start-1/2 z-30 mb-1.5 w-max max-w-56 -translate-x-1/2 rounded-md bg-secondary-dark px-2.5 py-1.5 text-start text-xs leading-snug text-white shadow-lg rtl:translate-x-1/2 dark:bg-white dark:text-secondary-dark"
+                                        class="pointer-events-none absolute bottom-full start-1/2 z-30 mb-1.5 w-max max-w-56 -translate-x-1/2 rounded-md bg-secondary-dark px-2.5 py-1.5 text-start text-xs leading-snug text-white shadow-lg rtl:translate-x-1/2 dark:bg-surface-3 dark:shadow-raised dark:text-ink"
                                     >
                                         <span class="block font-semibold">{{ $milestone->name }}</span>
                                         <span class="block opacity-80">{{ $milestone->planned_start_date->translatedFormat(__('formats.date')) }} · {{ $milestone->status->label() }}</span>
@@ -115,10 +115,10 @@
                                 </button>
                             @endif
                         @else
-                            <span class="absolute inset-x-0 top-1/2 flex h-7 -translate-y-1/2 items-center justify-center rounded-md border border-dashed border-secondary-light type-meta text-secondary-medium dark:text-secondary-soft">{{ __('common.unscheduled') }}</span>
+                            <span class="absolute inset-x-0 top-1/2 flex h-7 -translate-y-1/2 items-center justify-center rounded-md border border-dashed border-secondary-light type-meta text-secondary-medium dark:text-ink-muted">{{ __('common.unscheduled') }}</span>
                         @endif
                     </div>
-                    <p class="mt-1 type-meta text-secondary-medium tabular-nums dark:text-secondary-soft">
+                    <p class="mt-1 type-meta text-secondary-medium tabular-nums dark:text-ink-muted">
                         <bdi>{{ $milestone->planned_start_date?->translatedFormat(__('formats.date')) ?? __('common.unscheduled') }}</bdi>
                         @if ($milestone->actual_end_date !== null)
                             <span aria-hidden="true">·</span> {{ __('milestones.actual_end_date') }}: {{ $milestone->actual_end_date->translatedFormat(__('formats.date')) }}

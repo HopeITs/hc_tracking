@@ -1,11 +1,11 @@
 @props(['title', 'count' => null, 'description' => null, 'headingId' => null])
 
-<header {{ $attributes->class('grid gap-8 border-b border-secondary-soft pb-7 @6xl:grid-cols-[minmax(16rem,.7fr)_minmax(0,1.3fr)] @6xl:items-center dark:border-secondary-medium') }}>
+<header data-page-header {{ $attributes->class('grid gap-8 border-b border-secondary-soft pb-7 @6xl:grid-cols-[minmax(16rem,.7fr)_minmax(0,1.3fr)] @6xl:items-center dark:border-line') }}>
     <div class="min-w-0">
         <div class="flex items-center gap-2.5">
             <flux:heading :id="$headingId" size="xl" class="text-3xl! font-bold! leading-none!">{{ $title }}</flux:heading>
             @if ($count !== null)
-                <span data-count-badge class="inline-flex min-w-7 items-center justify-center rounded-md bg-primary px-2 py-0.5 text-xs font-bold tabular-nums text-white">{{ $count }}</span>
+                <span data-count-badge class="inline-flex min-w-7 items-center justify-center rounded-md bg-primary dark:bg-white/10 dark:text-ink px-2 py-0.5 text-xs font-bold tabular-nums text-white">{{ $count }}</span>
             @endif
         </div>
     </div>

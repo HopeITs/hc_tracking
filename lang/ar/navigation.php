@@ -6,16 +6,23 @@ return [
     'administration' => 'الإدارة',
     'application_navigation' => 'التنقل في التطبيق',
     'documentation' => 'التوثيق',
+<<<<<<< HEAD
+    'guideline' => 'دليل الاستخدام',
+=======
+    'group_funding_finance' => 'التمويل والمالية',
+    'group_monitoring_evaluation' => 'المتابعة والتقييم',
+    'group_projects_delivery' => 'المشاريع والتنفيذ',
+    'group_strategy_planning' => 'الاستراتيجية والتخطيط',
+    'group_workspace' => 'مساحة عملي',
+>>>>>>> Security-handeling-youssef
     'manage_your_profile_and_account_settings' => 'إدارة ملفك الشخصي وإعدادات حسابك',
-    'overview' => 'نظرة عامة',
     'platform' => 'المنصة',
     'primary_navigation' => 'التنقل الرئيسي',
     'repository' => 'المستودع',
-    'results_learning' => 'النتائج والتعلّم',
     'search' => 'بحث',
     'switch_language' => 'تغيير اللغة',
     'toggle_sidebar' => 'طي القائمة الجانبية أو توسيعها',
-    'toggle_theme' => 'التبديل بين الوضع الفاتح والداكن',
+    'report_a_problem' => 'الإبلاغ عن مشكلة أو خطأ',
     'roles_and_permissions' => 'الأدوار والصلاحيات',
     'user_directory' => 'دليل المستخدمين',
 ];

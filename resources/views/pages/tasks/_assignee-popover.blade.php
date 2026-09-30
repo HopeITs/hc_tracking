@@ -21,9 +21,9 @@
         role="listbox"
         aria-multiselectable="true"
         aria-label="{{ __('tasks.assignees') }}"
-        class="fixed z-50 w-64 rounded-lg border border-secondary-soft bg-white p-1 shadow-lg dark:border-secondary-medium dark:bg-secondary-dark"
+        class="fixed z-50 w-64 rounded-lg border border-secondary-soft bg-white p-1 shadow-lg dark:border-line dark:bg-surface-3 dark:shadow-raised"
     >
-        <div class="border-b border-secondary-soft p-1.5 dark:border-secondary-medium">
+        <div class="border-b border-secondary-soft p-1.5 dark:border-line">
             <x-ui.input
                 type="search"
                 size="sm"
@@ -43,11 +43,11 @@
                     x-on:click="$store.assigneePicker.toggle($wire, {{ $userOption['id'] }})"
                     x-show="$store.assigneePicker.optionSearch === '' || {{ Js::from(mb_strtolower($userOption['name'].' '.$userOption['secondary_name'])) }}.includes($store.assigneePicker.optionSearch.toLowerCase())"
                     wire:key="assignee-popover-option-{{ $userOption['id'] }}"
-                    class="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm hover:bg-secondary-soft dark:hover:bg-secondary-medium"
+                    class="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm hover:bg-secondary-soft dark:hover:bg-white/[0.06]"
                     data-test="assignee-popover-option-{{ $userOption['id'] }}"
                 >
                     <span class="min-w-0 flex-1 truncate">{{ $userOption['name'] }} · {{ $userOption['secondary_name'] }}</span>
-                    <flux:icon.check x-show="$store.assigneePicker.isAssigned({{ $userOption['id'] }})" class="size-4 shrink-0 text-primary" />
+                    <flux:icon.check x-show="$store.assigneePicker.isAssigned({{ $userOption['id'] }})" class="size-4 shrink-0 text-primary dark:text-brand-text" />
                 </button>
             @endforeach
         </div>

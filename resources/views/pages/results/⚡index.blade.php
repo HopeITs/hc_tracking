@@ -15,9 +15,11 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Collection as BaseCollection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -49,8 +51,10 @@ new #[Title('titles.results_framework')] class extends Component {
 
     public bool $showDeleteModal = false;
 
+    #[Locked]
     public ?int $editingResultId = null;
 
+    #[Locked]
     public ?int $deletingResultId = null;
 
     public string $statement = '';
@@ -127,7 +131,7 @@ new #[Title('titles.results_framework')] class extends Component {
                         // can resolve to null; the view renders that explicitly.
                         'planIndicators.source' => fn (MorphTo $morphTo) => $morphTo->morphWith([
                             AnnualPlan::class => [],
-                            Proposal::class => ['donors'],
+                            Proposal::class => ['donorNames:id,name'],
                         ]),
                     ])
                     ->orderBy('name')
@@ -193,7 +197,7 @@ new #[Title('titles.results_framework')] class extends Component {
                 default => null,
             },
             'donors' => $source instanceof Proposal
-                ? $source->donors->pluck('name')->values()->all()
+                ? $source->donorNames->pluck('name')->values()->all()
                 : [],
             'project' => $target->project?->name,
             'reports' => $target->reports->count(),
@@ -707,7 +711,7 @@ new #[Title('titles.results_framework')] class extends Component {
      * indicators (indicators cascade, and plan_indicators and reports cascade
      * from those — three tables lost behind one click).
      */
-    public function canDelete(int $resultId): bool
+    protected function canDelete(int $resultId): bool
     {
         $result = Result::query()
             ->select(['id'])
@@ -722,6 +726,8 @@ new #[Title('titles.results_framework')] class extends Component {
      */
     public function openCreateModal(?int $parentResultId = null): void
     {
+        Gate::authorize('results.create');
+
         $this->resetResultForm();
 
         if ($parentResultId !== null) {
@@ -744,6 +750,8 @@ new #[Title('titles.results_framework')] class extends Component {
 
     public function openEditModal(int $resultId): void
     {
+        Gate::authorize('results.update');
+
         $result = Result::query()
             ->select(['id', 'statement', 'parent_id', 'program_id', 'type', 'checkout_period'])
             ->findOrFail($resultId);
@@ -760,6 +768,8 @@ new #[Title('titles.results_framework')] class extends Component {
 
     public function saveResult(): void
     {
+        Gate::authorize($this->editingResultId === null ? 'results.create' : 'results.update');
+
         $this->statement = trim($this->statement);
 
         $validated = $this->validate([
@@ -872,6 +882,8 @@ new #[Title('titles.results_framework')] class extends Component {
 
     public function confirmDelete(int $resultId): void
     {
+        Gate::authorize('results.delete');
+
         $this->deletingResultId = $resultId;
         $this->showDeleteModal = true;
     }
@@ -884,6 +896,8 @@ new #[Title('titles.results_framework')] class extends Component {
 
     public function deleteResult(): void
     {
+        Gate::authorize('results.delete');
+
         if ($this->deletingResultId === null) {
             return;
         }
@@ -943,7 +957,7 @@ new #[Title('titles.results_framework')] class extends Component {
     $programCount = $this->groupedRoots->count();
 
     $levelMarks = [
-        ResultType::Impact->value => 'bg-secondary-dark ring-secondary-dark dark:bg-white dark:ring-white',
+        ResultType::Impact->value => 'bg-secondary-dark ring-secondary-dark dark:bg-ink dark:ring-ink',
         ResultType::Outcome->value => 'bg-primary ring-primary',
         ResultType::Output->value => 'bg-board ring-secondary-light',
     ];
@@ -975,7 +989,7 @@ new #[Title('titles.results_framework')] class extends Component {
     ];
 @endphp
 
-<section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="results-framework-heading">
+<section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="results-framework-heading">
     <x-ui.page-header
         heading-id="results-framework-heading"
         :title="__('common.results_framework')"
@@ -1008,15 +1022,15 @@ new #[Title('titles.results_framework')] class extends Component {
         </x-slot:filters>
 
         <x-slot:actions>
-            <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-result-button">
+            @can('results.create')<x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-result-button">
                 {{ __('results_framework.add_result') }}
-            </x-ui.button>
+            </x-ui.button>@endcan
         </x-slot:actions>
     </x-ui.page-header>
 
     {{-- The framework at a glance: four figures, then the chain they describe. --}}
     <x-ui.panel data-test="framework-overview">
-        <div class="grid gap-px bg-secondary-soft @xl/directory:grid-cols-2 @4xl/directory:grid-cols-4 dark:bg-secondary-medium">
+        <div class="grid gap-px bg-secondary-soft @xl/directory:grid-cols-2 @4xl/directory:grid-cols-4 dark:bg-line">
             @php
                 $headline = [
                     [
@@ -1056,24 +1070,24 @@ new #[Title('titles.results_framework')] class extends Component {
             @endphp
 
             @foreach ($headline as $cell)
-                <div class="flex items-start justify-between gap-3 bg-white p-4 dark:bg-secondary-dark" wire:key="framework-headline-{{ $loop->index }}">
+                <div class="flex items-start justify-between gap-3 bg-white p-4 dark:bg-surface-1" wire:key="framework-headline-{{ $loop->index }}">
                     <div class="min-w-0">
-                        <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ $cell['label'] }}</p>
+                        <p class="type-label text-secondary-medium dark:text-ink-muted">{{ $cell['label'] }}</p>
                         <p @class([
                             'type-figure mt-2',
                             'text-status-good' => $cell['tone'] === 'good',
                             'text-status-warn' => $cell['tone'] === 'warn',
-                            'text-primary' => $cell['tone'] === 'critical',
-                            'text-secondary-dark dark:text-white' => $cell['tone'] === 'neutral',
+                            'text-primary dark:text-brand-text' => $cell['tone'] === 'critical',
+                            'text-secondary-dark dark:text-ink' => $cell['tone'] === 'neutral',
                         ])>{{ $cell['value'] }}</p>
-                        <p class="mt-1 type-meta text-secondary-medium dark:text-secondary-soft">{{ $cell['sub'] }}</p>
+                        <p class="mt-1 type-meta text-secondary-medium dark:text-ink-muted">{{ $cell['sub'] }}</p>
                     </div>
                     <div @class([
                         'flex size-10 shrink-0 items-center justify-center rounded-xl',
                         'bg-status-good-soft text-status-good' => $cell['tone'] === 'good',
                         'bg-status-warn-soft text-status-warn' => $cell['tone'] === 'warn',
-                        'bg-status-critical-soft text-primary' => $cell['tone'] === 'critical',
-                        'bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white' => $cell['tone'] === 'neutral',
+                        'bg-status-critical-soft text-primary dark:text-brand-text' => $cell['tone'] === 'critical',
+                        'bg-secondary-soft text-secondary-dark dark:bg-surface-2 dark:text-ink' => $cell['tone'] === 'neutral',
                     ])>
                         <flux:icon :name="$cell['icon']" class="size-5" />
                     </div>
@@ -1082,7 +1096,7 @@ new #[Title('titles.results_framework')] class extends Component {
         </div>
 
         {{-- The chain itself. Each rung is a filter: click a level to narrow the page to it. --}}
-        <div class="flex flex-col gap-4 border-t border-secondary-soft bg-board-head px-4 py-4 @4xl/directory:flex-row @4xl/directory:items-center dark:border-secondary-medium">
+        <div class="flex flex-col gap-4 border-t border-secondary-soft bg-board-head px-4 py-4 @4xl/directory:flex-row @4xl/directory:items-center dark:border-line">
             <ol class="flex min-w-0 flex-1 flex-col gap-2 @2xl/directory:flex-row @2xl/directory:items-stretch" aria-label="{{ __('programs.logframe_results_chain') }}">
                 @foreach (ResultType::cases() as $levelIndex => $levelCase)
                     @php
@@ -1097,17 +1111,17 @@ new #[Title('titles.results_framework')] class extends Component {
                             data-test="level-filter-{{ $levelCase->value }}"
                             @class([
                                 'group flex min-w-0 flex-1 flex-col rounded-xl border p-3 text-start transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
-                                'border-primary bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:bg-secondary-dark' => $isActiveLevel,
-                                'border-secondary-soft bg-white hover:-translate-y-0.5 hover:border-secondary-light dark:border-secondary-medium dark:bg-secondary-dark' => ! $isActiveLevel,
+                                'border-primary bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:bg-surface-1' => $isActiveLevel,
+                                'border-secondary-soft bg-white hover:-translate-y-0.5 hover:border-secondary-light dark:border-line dark:bg-surface-1' => ! $isActiveLevel,
                             ])
                         >
                             <span class="flex items-center gap-2">
                                 <span aria-hidden="true" class="size-2.5 shrink-0 rounded-full ring-2 ring-inset {{ $levelMarks[$levelCase->value] }}"></span>
-                                <span class="type-label truncate text-secondary-medium dark:text-secondary-soft">{{ $levelCase->label() }}</span>
-                                <span class="ms-auto text-xl font-bold tabular-nums text-secondary-dark dark:text-white">{{ $level['statements'] }}</span>
+                                <span class="type-label truncate text-secondary-medium dark:text-ink-muted">{{ $levelCase->label() }}</span>
+                                <span class="ms-auto text-xl font-bold tabular-nums text-secondary-dark dark:text-ink">{{ $level['statements'] }}</span>
                             </span>
 
-                            <span class="mt-1.5 block type-meta text-secondary-medium dark:text-secondary-soft">
+                            <span class="mt-1.5 block type-meta text-secondary-medium dark:text-ink-muted">
                                 {{ __('results_framework.measured_count_of_total', ['count' => $level['measured'], 'total' => $level['statements']]) }}
                                 · {{ trans_choice('programs.logframe_count_indicators', $level['indicators'], ['count' => $level['indicators']]) }}
                             </span>
@@ -1131,7 +1145,7 @@ new #[Title('titles.results_framework')] class extends Component {
                 @endforeach
             </ol>
 
-            <div class="flex shrink-0 items-center gap-3 border-secondary-soft @4xl/directory:border-s @4xl/directory:ps-5 dark:border-secondary-medium">
+            <div class="flex shrink-0 items-center gap-3 border-secondary-soft @4xl/directory:border-s @4xl/directory:ps-5 dark:border-line">
                 <x-ui.progress-ring
                     size="lg"
                     :value="$overview['coverage']"
@@ -1139,11 +1153,11 @@ new #[Title('titles.results_framework')] class extends Component {
                     :label="__('results_framework.measurement_coverage')"
                 />
                 <div class="min-w-0">
-                    <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('results_framework.measurement_coverage') }}</p>
-                    <p class="mt-1 text-sm font-semibold text-secondary-dark dark:text-white">
+                    <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('results_framework.measurement_coverage') }}</p>
+                    <p class="mt-1 text-sm font-semibold text-secondary-dark dark:text-ink">
                         {{ __('results_framework.measured_count_of_total', ['count' => $overview['measured'], 'total' => $overview['statements']]) }}
                     </p>
-                    <p class="mt-0.5 type-meta text-secondary-medium dark:text-secondary-soft">
+                    <p class="mt-0.5 type-meta text-secondary-medium dark:text-ink-muted">
                         {{ trans_choice('common.count_target', $overview['targets'], ['count' => $overview['targets']]) }}
                         · {{ __('results_framework.count_reports_count_approved', ['count' => $overview['reports'], 'approved' => $overview['approved']]) }}
                     </p>
@@ -1155,14 +1169,14 @@ new #[Title('titles.results_framework')] class extends Component {
                                 <span @class([
                                     'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold',
                                     'border-funding/30 bg-funding-soft text-funding' => $funder['type'] === 'donor',
-                                    'border-secondary-light text-secondary-medium dark:text-secondary-soft' => $funder['type'] !== 'donor',
+                                    'border-secondary-light text-secondary-medium dark:text-ink-muted' => $funder['type'] !== 'donor',
                                 ])>
                                     <flux:icon :name="$funder['type'] === 'donor' ? 'building-library' : 'calendar'" variant="micro" class="size-3" aria-hidden="true" />
                                     {{ $funder['label'] }}
                                 </span>
                             @endforeach
                             @if (count($overview['funders']) > 4)
-                                <span class="type-meta text-secondary-medium dark:text-secondary-soft">+{{ count($overview['funders']) - 4 }}</span>
+                                <span class="type-meta text-secondary-medium dark:text-ink-muted">+{{ count($overview['funders']) - 4 }}</span>
                             @endif
                         </div>
                     @endif
@@ -1181,8 +1195,8 @@ new #[Title('titles.results_framework')] class extends Component {
                 data-test="focus-chip-{{ $chip['key'] }}"
                 @class([
                     'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 type-meta font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
-                    'border-primary bg-primary text-white' => $focus === $chip['key'],
-                    'border-secondary-soft bg-white text-secondary-medium hover:border-secondary-light hover:text-secondary-dark dark:border-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft dark:hover:text-white' => $focus !== $chip['key'],
+                    'border-primary bg-primary dark:bg-ink dark:text-surface-0 dark:border-ink text-white' => $focus === $chip['key'],
+                    'border-secondary-soft bg-white text-secondary-medium hover:border-secondary-light hover:text-secondary-dark dark:border-line dark:bg-surface-1 dark:text-ink-muted dark:hover:text-ink' => $focus !== $chip['key'],
                 ])
             >
                 <flux:icon :name="$chip['icon']" variant="micro" class="size-3.5" aria-hidden="true" />
@@ -1190,13 +1204,13 @@ new #[Title('titles.results_framework')] class extends Component {
                 <span @class([
                     'inline-flex min-w-5 items-center justify-center rounded-full px-1 text-[11px] font-bold tabular-nums',
                     'bg-white/20' => $focus === $chip['key'],
-                    'bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white' => $focus !== $chip['key'],
+                    'bg-secondary-soft text-secondary-dark dark:bg-surface-2 dark:text-ink' => $focus !== $chip['key'],
                 ])>{{ $chip['count'] }}</span>
             </button>
         @endforeach
 
         @if ($filtersAreActive)
-            <flux:button size="sm" variant="ghost" class="text-secondary-medium! dark:text-secondary-soft!" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
+            <flux:button size="sm" variant="ghost" class="text-secondary-medium! dark:text-ink-muted!" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
         @endif
 
         <x-ui.view-toggle
@@ -1219,9 +1233,9 @@ new #[Title('titles.results_framework')] class extends Component {
                 :body="$filtersAreActive ? __('common.change_the_search_or_filters_and_try_again') : __('results_framework.add_the_first_impact_statement_to_start_the_logframe')"
             >
                 <x-slot:action>
-                    <x-ui.button tone="primary" :icon="$filtersAreActive ? 'arrow-path' : 'plus'" wire:click="{{ $filtersAreActive ? 'clearFilters' : 'openCreateModal' }}">
+                    @if ($filtersAreActive || auth()->user()->can('results.create'))<x-ui.button tone="primary" :icon="$filtersAreActive ? 'arrow-path' : 'plus'" wire:click="{{ $filtersAreActive ? 'clearFilters' : 'openCreateModal' }}">
                         {{ $filtersAreActive ? __('common.reset_filters') : __('results_framework.add_result') }}
-                    </x-ui.button>
+                    </x-ui.button>@endif
                 </x-slot:action>
             </x-ui.empty-state>
         </x-ui.panel>
@@ -1230,17 +1244,17 @@ new #[Title('titles.results_framework')] class extends Component {
         <x-ui.panel :title="__('results_framework.matrix')" :count="$overview['statements']" :subtitle="__('results_framework.every_statement_with_what_measures_it_and_how_it_is_tracking')">
             <div class="overflow-x-auto">
                 <div class="min-w-[64rem]">
-                    <div class="grid grid-cols-[minmax(0,1fr)_7rem_5.5rem_5.5rem_12rem_6rem_6rem] items-center gap-3 border-b border-secondary-soft bg-board-head px-4 py-2 dark:border-secondary-medium">
-                        <span class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('results_framework.statement') }}</span>
-                        <span class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('common.type') }}</span>
-                        <span class="type-label text-end text-secondary-medium dark:text-secondary-soft">{{ __('common.indicators') }}</span>
-                        <span class="type-label text-end text-secondary-medium dark:text-secondary-soft">{{ __('common.targets') }}</span>
-                        <span class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('indicators.percent_achieved') }}</span>
-                        <span class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('results_framework.rating') }}</span>
-                        <span class="type-label text-end text-secondary-medium dark:text-secondary-soft">{{ __('common.actions') }}</span>
+                    <div class="grid grid-cols-[minmax(0,1fr)_7rem_5.5rem_5.5rem_12rem_6rem_6rem] items-center gap-3 border-b border-secondary-soft bg-board-head px-4 py-2 dark:border-line">
+                        <span class="type-label text-secondary-medium dark:text-ink-muted">{{ __('results_framework.statement') }}</span>
+                        <span class="type-label text-secondary-medium dark:text-ink-muted">{{ __('common.type') }}</span>
+                        <span class="type-label text-end text-secondary-medium dark:text-ink-muted">{{ __('common.indicators') }}</span>
+                        <span class="type-label text-end text-secondary-medium dark:text-ink-muted">{{ __('common.targets') }}</span>
+                        <span class="type-label text-secondary-medium dark:text-ink-muted">{{ __('indicators.percent_achieved') }}</span>
+                        <span class="type-label text-secondary-medium dark:text-ink-muted">{{ __('results_framework.rating') }}</span>
+                        <span class="type-label text-end text-secondary-medium dark:text-ink-muted">{{ __('common.actions') }}</span>
                     </div>
 
-                    <div class="divide-y divide-secondary-soft dark:divide-secondary-medium">
+                    <div class="divide-y divide-secondary-soft dark:divide-line">
                         @foreach ($this->visibleNodes as $row)
                             @php
                                 $node = $row['node'];
@@ -1265,8 +1279,8 @@ new #[Title('titles.results_framework')] class extends Component {
                                 <div class="flex min-w-0 items-center gap-2" style="padding-inline-start: {{ $node['depth'] * 1.25 }}rem">
                                     <span aria-hidden="true" class="size-2 shrink-0 rounded-full ring-2 ring-inset {{ $levelMarks[$matrixResult->type->value] }}"></span>
                                     <div class="min-w-0">
-                                        <p class="truncate text-sm font-semibold text-secondary-dark dark:text-white">{{ $matrixResult->statement }}</p>
-                                        <p class="truncate type-meta text-secondary-medium dark:text-secondary-soft">
+                                        <p class="truncate text-sm font-semibold text-secondary-dark dark:text-ink">{{ $matrixResult->statement }}</p>
+                                        <p class="truncate type-meta text-secondary-medium dark:text-ink-muted">
                                             {{ $row['program'] }} · {{ __('programs.logframe_checkout', ['period' => $matrixResult->checkout_period->label()]) }}
                                             @foreach ($matrixMeasurement['funders'] as $funder)
                                                 · {{ $funder['label'] }}
@@ -1280,10 +1294,10 @@ new #[Title('titles.results_framework')] class extends Component {
                                 <span @class([
                                     'text-end text-sm font-semibold tabular-nums',
                                     'text-status-warn' => $matrixIndicators === 0,
-                                    'text-secondary-dark dark:text-white' => $matrixIndicators > 0,
+                                    'text-secondary-dark dark:text-ink' => $matrixIndicators > 0,
                                 ])>{{ $matrixIndicators }}</span>
 
-                                <span class="text-end text-sm font-semibold tabular-nums text-secondary-dark dark:text-white">{{ $matrixMeasurement['targets'] }}</span>
+                                <span class="text-end text-sm font-semibold tabular-nums text-secondary-dark dark:text-ink">{{ $matrixMeasurement['targets'] }}</span>
 
                                 <div class="flex items-center gap-2">
                                     {{-- Clamped: progress-bar flags anything over its max as a warning, and over-achievement is not one. --}}
@@ -1295,7 +1309,7 @@ new #[Title('titles.results_framework')] class extends Component {
                                         :label="__('indicators.percent_achieved')"
                                         label-hidden
                                     />
-                                    <span class="w-11 shrink-0 text-end type-meta font-semibold tabular-nums text-secondary-dark dark:text-white">
+                                    <span class="w-11 shrink-0 text-end type-meta font-semibold tabular-nums text-secondary-dark dark:text-ink">
                                         {{ $matrixMeasurement['achieved'] === null ? '—' : number_format($matrixMeasurement['achieved'], 0).'%' }}
                                     </span>
                                 </div>
@@ -1304,9 +1318,9 @@ new #[Title('titles.results_framework')] class extends Component {
                                     @if ($matrixRated === 0)
                                         <span class="text-secondary-light">—</span>
                                     @else
-                                        @foreach (['green' => 'bg-status-good', 'amber' => 'bg-status-warn', 'red' => 'bg-primary'] as $band => $fill)
+                                        @foreach (['green' => 'bg-status-good', 'amber' => 'bg-status-warn', 'red' => 'bg-primary dark:bg-status-critical'] as $band => $fill)
                                             @if ($matrixRag[$band] > 0)
-                                                <span class="inline-flex items-center gap-1 text-[11px] font-bold tabular-nums text-secondary-dark dark:text-white">
+                                                <span class="inline-flex items-center gap-1 text-[11px] font-bold tabular-nums text-secondary-dark dark:text-ink">
                                                     <span aria-hidden="true" class="size-1.5 rounded-full {{ $fill }}"></span>{{ $matrixRag[$band] }}
                                                 </span>
                                             @endif
@@ -1315,23 +1329,23 @@ new #[Title('titles.results_framework')] class extends Component {
                                 </div>
 
                                 <div class="flex items-center justify-end gap-0.5">
-                                    <x-ui.button
+                                    @can('results.update')<x-ui.button
                                         tone="ghost"
                                         size="sm"
                                         icon="pencil-square"
                                         class="size-8!"
                                         wire:click="openEditModal({{ $matrixResult->id }})"
                                         :aria-label="__('common.edit_name', ['name' => $matrixResult->statement])"
-                                    />
+                                    />@endcan
                                     @if ($node['deletable'])
-                                        <x-ui.button
+                                        @can('results.delete')<x-ui.button
                                             tone="ghost"
                                             size="sm"
                                             icon="trash"
                                             class="size-8!"
                                             wire:click="confirmDelete({{ $matrixResult->id }})"
                                             :aria-label="__('common.delete_name', ['name' => $matrixResult->statement])"
-                                        />
+                                        />@endcan
                                     @else
                                         <flux:tooltip :content="__('results_framework.locked_while_it_carries_nested_results_or_indicators')">
                                             <span class="inline-flex size-8 cursor-not-allowed items-center justify-center text-secondary-light" aria-disabled="true">
@@ -1373,7 +1387,7 @@ new #[Title('titles.results_framework')] class extends Component {
                         </span>
 
                         @if ($groupProgram !== null)
-                            <a href="{{ route('programs.show', $groupProgram) }}" wire:navigate class="type-meta font-semibold text-secondary-medium hover:text-primary hover:underline dark:text-secondary-soft">
+                            <a href="{{ route('programs.show', $groupProgram) }}" wire:navigate class="type-meta font-semibold text-secondary-medium hover:text-primary dark:hover:text-brand-text hover:underline dark:text-ink-muted">
                                 {{ __('common.view_name', ['name' => $groupProgram->name]) }}
                             </a>
                         @endif
@@ -1389,78 +1403,86 @@ new #[Title('titles.results_framework')] class extends Component {
         @endforeach
     @endif
 
-    <flux:modal wire:model="showResultModal" class="w-full max-w-2xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
+    <x-ui.modal
+        wire:model="showResultModal"
+        size="xl"
+        :title="$editingResultId === null ? __('results_framework.add_result') : __('results_framework.edit_result')"
+        :description="__('results_framework.an_output_contributes_to_an_outcome_which_contributes_to_an')"
+        submit="saveResult"
+        close="closeResultModal"
+        required-note
+    >
         @if ($showResultModal)
-        <form wire:submit="saveResult" class="space-y-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ $editingResultId === null ? __('results_framework.add_result') : __('results_framework.edit_result') }}</flux:heading>
-                <flux:subheading>{{ __('results_framework.an_output_contributes_to_an_outcome_which_contributes_to_an') }}</flux:subheading>
-            </div>
+            <x-ui.form-section :title="__('common.section_details')" :fields="['statement', 'resultType', 'checkoutPeriod']">
+                <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                    <x-ui.form-textarea wire:model="statement" :label="__('results_framework.statement')" required autofocus class="@2xl/modal:col-span-2" />
 
-            <flux:textarea wire:model="statement" :label="__('results_framework.statement')" rows="3" required class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
+                    {{-- The Impact / Outcome / Output marks are the logframe's own (see components-ui rules). --}}
+                    <x-ui.form-segmented
+                        wire:model.live="resultType"
+                        :label="__('common.type')"
+                        required
+                        :options="[
+                            ['value' => ResultType::Impact->value, 'label' => ResultType::Impact->label(), 'dot' => 'bg-secondary-dark dark:bg-ink'],
+                            ['value' => ResultType::Outcome->value, 'label' => ResultType::Outcome->label(), 'dot' => 'bg-primary'],
+                            ['value' => ResultType::Output->value, 'label' => ResultType::Output->label(), 'dot' => 'bg-board ring-1 ring-secondary-light'],
+                        ]"
+                    />
 
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.select wire:model.live="resultType" :label="__('common.type')" required>
-                    @foreach (ResultType::cases() as $typeCase)
-                        <flux:select.option :value="$typeCase->value" :wire:key="'result-type-option-'.$typeCase->value">{{ $typeCase->label() }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
+                    <x-ui.form-segmented
+                        wire:model="checkoutPeriod"
+                        :label="__('results_framework.checked')"
+                        required
+                        :options="collect(Period::cases())->map(fn (Period $periodCase): array => ['value' => $periodCase->value, 'label' => $periodCase->label()])->all()"
+                    />
+                </div>
+            </x-ui.form-section>
 
-                <x-ui.select wire:model="checkoutPeriod" :label="__('results_framework.checked')" required>
-                    @foreach (Period::cases() as $periodCase)
-                        <flux:select.option :value="$periodCase->value" :wire:key="'result-period-'.$periodCase->value">{{ $periodCase->label() }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
-            </div>
-
-            <div class="grid gap-4 sm:grid-cols-2">
-                <div>
-                    <x-ui.select wire:model.live="parentId" :label="__('results_framework.contributes_to')" :disabled="$resultType === ResultType::Impact->value">
+            <x-ui.form-section :title="__('common.section_placement')" :fields="['parentId', 'resultProgramId']">
+                <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                    <x-ui.form-select
+                        wire:model.live="parentId"
+                        :label="__('results_framework.contributes_to')"
+                        :disabled="$resultType === ResultType::Impact->value"
+                        :locked-reason="__('results_framework.an_impact_sits_at_the_top_of_the_chain')"
+                        :help="__('results_framework.only_the_level_directly_above_is_offered')"
+                    >
                         <flux:select.option value="">{{ __('common.top_level') }}</flux:select.option>
                         @foreach ($this->parentOptions as $parentOption)
-                            <flux:select.option :value="$parentOption->id" :wire:key="'result-parent-'.$parentOption->id">
-                                {{ Str::limit($parentOption->statement, 60) }} · {{ $parentOption->program?->name ?? __('common.unassigned') }}
-                            </flux:select.option>
+                            <flux:select.option :value="$parentOption->id">{{ Str::limit($parentOption->statement, 60) }} · {{ $parentOption->program?->name ?? __('common.unassigned') }}</flux:select.option>
                         @endforeach
-                    </x-ui.select>
-                    <p class="mt-1.5 type-meta text-secondary-medium dark:text-secondary-soft">
-                        {{ $resultType === ResultType::Impact->value ? __('results_framework.an_impact_sits_at_the_top_of_the_chain') : __('results_framework.only_the_level_directly_above_is_offered') }}
-                    </p>
-                </div>
+                    </x-ui.form-select>
 
-                <div>
-                    <x-ui.select wire:model="resultProgramId" :label="__('common.program')" :disabled="$parentId !== ''">
+                    <x-ui.form-select
+                        wire:model="resultProgramId"
+                        :label="__('common.program')"
+                        :disabled="$parentId !== ''"
+                        :locked-reason="__('results_framework.follows_the_program_of_the_result_it_contributes_to')"
+                        :help="$editingResultId !== null ? __('results_framework.nested_results_move_with_it') : null"
+                    >
                         <flux:select.option value="">{{ __('common.unassigned') }}</flux:select.option>
                         @foreach ($this->programOptions as $programOption)
-                            <flux:select.option :value="$programOption->id" :wire:key="'result-program-option-'.$programOption->id">{{ $programOption->name }}</flux:select.option>
+                            <flux:select.option :value="$programOption->id">{{ $programOption->name }}</flux:select.option>
                         @endforeach
-                    </x-ui.select>
-                    @if ($parentId !== '')
-                        <p class="mt-1.5 type-meta text-secondary-medium dark:text-secondary-soft">{{ __('results_framework.follows_the_program_of_the_result_it_contributes_to') }}</p>
-                    @elseif ($editingResultId !== null)
-                        <p class="mt-1.5 type-meta text-secondary-medium dark:text-secondary-soft">{{ __('results_framework.nested_results_move_with_it') }}</p>
-                    @endif
+                    </x-ui.form-select>
                 </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeResultModal">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-result-button">
-                    {{ $editingResultId === null ? __('results_framework.add_result') : __('common.save_changes') }}
-                </x-ui.button>
-            </div>
-        </form>
+            </x-ui.form-section>
         @endif
-    </flux:modal>
 
-    <flux:modal wire:model="showDeleteModal" wire:close="cancelDelete" class="w-full max-w-md border border-secondary-light! bg-white! dark:bg-secondary-dark!">
-        <div class="space-y-4">
-            <flux:heading size="lg">{{ __('results_framework.delete_this_result') }}</flux:heading>
-            <flux:subheading>{{ __('results_framework.only_a_result_with_no_nested_results_and_no_indicators_can_b') }}</flux:subheading>
-            <div class="flex justify-end gap-2 border-t border-secondary-soft pt-4 dark:border-secondary-medium">
-                <x-ui.button type="button" wire:click="cancelDelete">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="button" tone="primary" wire:click="deleteResult" data-test="confirm-delete-result">{{ __('results_framework.delete_result') }}</x-ui.button>
-            </div>
-        </div>
-    </flux:modal>
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="save-result-button">
+                {{ $editingResultId === null ? __('results_framework.add_result') : __('common.save_changes') }}
+            </x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
+
+    <x-ui.confirm-modal
+        wire:model="showDeleteModal"
+        close="cancelDelete"
+        :title="__('results_framework.delete_this_result')"
+        :message="__('results_framework.only_a_result_with_no_nested_results_and_no_indicators_can_b')"
+        confirm="deleteResult"
+        :confirm-label="__('results_framework.delete_result')"
+        confirm-test="confirm-delete-result"
+    />
 </section>

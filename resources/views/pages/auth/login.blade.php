@@ -9,13 +9,13 @@
             @csrf
 
             @php
-                $fieldClasses = 'rounded-lg! border! border-blue-100! bg-blue-50! px-4! py-2.5! h-auto! text-secondary-dark! placeholder:text-secondary-medium! focus:outline! focus:outline-2! focus:outline-secondary-medium! focus:outline-offset-2! focus:shadow-none! dark:border-secondary-medium! dark:bg-secondary-medium! dark:text-white! dark:placeholder:text-secondary-soft!';
+                $fieldClasses = 'rounded-lg! border! border-blue-100! bg-blue-50! px-4! py-2.5! h-auto! text-secondary-dark! placeholder:text-secondary-medium! focus:outline! focus:outline-2! focus:outline-secondary-medium! focus:outline-offset-2! focus:shadow-none! dark:border-field-line! dark:bg-surface-2! dark:text-ink! dark:placeholder:text-ink-faint! dark:focus:outline-ink-muted!';
             @endphp
 
             <!-- Email Address -->
             <div>
-                <label for="login-email" class="mb-1.5 block text-sm font-semibold text-secondary-dark dark:text-white">
-                    {{ __('authentication.email_address') }} <span class="text-primary">*</span>
+                <label for="login-email" class="mb-1.5 block text-sm font-semibold text-secondary-dark dark:text-ink">
+                    {{ __('authentication.email_address') }} <span class="text-primary dark:text-brand-text">*</span>
                 </label>
                 <flux:input
                     id="login-email"
@@ -28,13 +28,13 @@
                     placeholder="email@example.com"
                     input:class="{{ $fieldClasses }}"
                 />
-                <flux:error name="email" class="text-primary!" />
+                <flux:error name="email" class="text-primary! dark:text-brand-text!" />
             </div>
 
             <!-- Password -->
             <div class="relative">
-                <label for="login-password" class="mb-1.5 block text-sm font-semibold text-secondary-dark dark:text-white">
-                    {{ __('common.password') }} <span class="text-primary">*</span>
+                <label for="login-password" class="mb-1.5 block text-sm font-semibold text-secondary-dark dark:text-ink">
+                    {{ __('common.password') }} <span class="text-primary dark:text-brand-text">*</span>
                 </label>
                 <flux:input
                     id="login-password"
@@ -46,7 +46,7 @@
                     viewable
                     input:class="{{ $fieldClasses }}"
                 />
-                <flux:error name="password" class="text-primary!" />
+                <flux:error name="password" class="text-primary! dark:text-brand-text!" />
 
                 @if (Route::has('password.request'))
                     <flux:link class="absolute top-0 text-sm end-0" :href="route('password.request')" wire:navigate>
@@ -63,13 +63,30 @@
                 style="--color-accent: var(--color-primary); --color-accent-foreground: var(--color-white);"
             />
 
+            @if (\App\Support\Turnstile::isEnabled())
+                <!-- Human check (Cloudflare Turnstile) -->
+                <div>
+                    <div
+                        class="cf-turnstile"
+                        data-sitekey="{{ config('services.turnstile.site_key') }}"
+                        data-language="{{ app()->getLocale() }}"
+                        data-size="flexible"
+                        data-theme="auto"
+                        data-test="login-human-check"
+                    ></div>
+                    <flux:error :name="\App\Support\Turnstile::ResponseField" class="text-primary! dark:text-brand-text!" />
+                </div>
+
+                <script src="{{ \App\Support\Turnstile::Origin }}/turnstile/v0/api.js" async defer></script>
+            @endif
+
             <x-ui.button type="submit" tone="primary" class="min-h-11 w-full cursor-pointer!" data-test="login-button">
                 {{ __('authentication.sign_in') }}
             </x-ui.button>
         </form>
 
         @if (Route::has('register'))
-            <div class="space-x-1 text-sm text-center rtl:space-x-reverse text-zinc-600 dark:text-zinc-400">
+            <div class="space-x-1 text-sm text-center rtl:space-x-reverse text-zinc-600 dark:text-ink-muted">
                 <span>{{ __('authentication.don_t_have_an_account') }}</span>
                 <flux:link :href="route('register')" wire:navigate>{{ __('authentication.sign_up') }}</flux:link>
             </div>

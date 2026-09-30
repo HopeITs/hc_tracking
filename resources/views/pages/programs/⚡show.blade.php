@@ -6,6 +6,7 @@ use App\Enums\ReportStatus;
 use App\Enums\ResultType;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Models\AnnualPlan;
 use App\Models\HrEmployee;
 use App\Models\Milestone;
 use App\Models\PlanIndicator;
@@ -14,8 +15,8 @@ use App\Models\Project;
 use App\Models\Report;
 use App\Models\Result;
 use App\Models\Risk;
-use App\Models\AnnualPlan;
 use App\Models\Task;
+use App\Support\Like;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
@@ -23,9 +24,11 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -34,6 +37,7 @@ use Livewire\WithPagination;
 new #[Title('titles.program')] class extends Component {
     use WithPagination;
 
+    #[Locked]
     public int $programId;
 
     #[Url(except: 'projects')]
@@ -130,7 +134,7 @@ new #[Title('titles.program')] class extends Component {
             ->where('program_id', $this->programId)
             ->when($this->projectSearch !== '', fn ($query) => $query->whereRaw(
                 "name like ? escape '!'",
-                ['%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $this->projectSearch).'%'],
+                ['%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], mb_substr($this->projectSearch, 0, Like::MaxTermLength)).'%'],
             ))
             ->when($status !== null, fn ($query) => $query->where('status', $status->value))
             ->with([
@@ -425,7 +429,7 @@ new #[Title('titles.program')] class extends Component {
      * milestone's project. A program-direct task has no project and groups
      * separately.
      */
-    public function taskProjectId(Task $task): ?int
+    protected function taskProjectId(Task $task): ?int
     {
         return match ($task->source_type) {
             'project' => $task->source_id,
@@ -443,6 +447,8 @@ new #[Title('titles.program')] class extends Component {
 
     public function openAddTaskModal(): void
     {
+        Gate::authorize('create', Task::class);
+
         $this->resetValidation();
         $this->newTaskTitle = '';
         $this->newTaskStatus = TaskStatus::Todo->value;
@@ -465,6 +471,8 @@ new #[Title('titles.program')] class extends Component {
      */
     public function addTask(): void
     {
+        Gate::authorize('create', Task::class);
+
         $this->newTaskTitle = trim($this->newTaskTitle);
 
         $validated = $this->validate([
@@ -546,42 +554,42 @@ new #[Title('titles.program')] class extends Component {
 };
 ?>
 
-<section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white">
-    <header class="border-b border-secondary-soft @4xl/detail:border-b-0 dark:border-secondary-medium">
-        <nav aria-label="{{ __('ui.breadcrumb') }}" class="flex flex-wrap items-center gap-1.5 text-xs text-secondary-medium dark:text-secondary-soft">
-            <a href="{{ route('programs.index') }}" wire:navigate class="rounded font-medium hover:text-secondary-dark hover:underline dark:hover:text-white">{{ __('common.programs') }}</a>
+<section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink">
+    <header class="border-b border-secondary-soft @4xl/detail:border-b-0 dark:border-line">
+        <nav aria-label="{{ __('ui.breadcrumb') }}" class="flex flex-wrap items-center gap-1.5 text-xs text-secondary-medium dark:text-ink-muted">
+            <a href="{{ route('programs.index') }}" wire:navigate class="rounded font-medium hover:text-secondary-dark hover:underline dark:hover:text-ink">{{ __('common.programs') }}</a>
             <span aria-hidden="true" class="text-secondary-light">/</span>
-            <span aria-current="page" class="font-semibold text-secondary-dark dark:text-white">{{ $this->program->name }}</span>
+            <span aria-current="page" class="font-semibold text-secondary-dark dark:text-ink">{{ $this->program->name }}</span>
         </nav>
 
         <div class="mt-5 flex flex-col gap-7 @4xl/detail:flex-row @4xl/detail:items-stretch @4xl/detail:gap-10">
-            <div class="min-w-0 @4xl/detail:flex-1 @4xl/detail:border-b @4xl/detail:border-secondary-soft dark:border-secondary-medium">
+            <div class="min-w-0 @4xl/detail:flex-1 @4xl/detail:border-b @4xl/detail:border-secondary-soft dark:border-line">
                 <div class="flex items-start gap-3 @4xl/detail:min-h-[8.3125rem]">
-                    <div class="flex size-11 shrink-0 items-center justify-center rounded-md bg-primary text-white"><flux:icon name="briefcase" class="size-5" /></div>
+                    <div class="flex size-11 shrink-0 items-center justify-center rounded-md bg-primary dark:bg-white/10 dark:text-ink text-white"><flux:icon name="briefcase" class="size-5" /></div>
                     <div class="min-w-0">
-                        <p class="text-xs font-semibold tracking-[0.12em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('common.program') }}</p>
+                        <p class="text-xs font-semibold tracking-[0.12em] text-secondary-medium uppercase dark:text-ink-muted">{{ __('common.program') }}</p>
                         <div class="mt-1 flex items-center gap-2">
-                            <h1 class="text-3xl font-bold tracking-tight text-secondary-dark dark:text-white @3xl/detail:text-4xl">{{ $this->program->name }}</h1>
+                            <h1 class="text-3xl font-bold tracking-tight text-secondary-dark dark:text-ink @3xl/detail:text-4xl">{{ $this->program->name }}</h1>
                             @if (app(\App\Notifications\UnreadSubjects::class)->has(auth()->user(), 'program', $this->program->id))
-                                <span class="size-2.5 shrink-0 rounded-full bg-primary" data-unread-dot title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
+                                <span class="size-2.5 shrink-0 rounded-full bg-primary dark:bg-ink" data-unread-dot title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
                             @endif
                         </div>
                     </div>
                 </div>
 
-                <dl class="grid gap-5 border-t border-secondary-soft pt-4 @3xl/detail:grid-cols-3 dark:border-secondary-medium">
+                <dl class="grid gap-5 border-t border-secondary-soft pt-4 @3xl/detail:grid-cols-3 dark:border-line">
                     <div class="min-w-0">
-                        <dt class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('programs.linked_strategy') }}</dt>
+                        <dt class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-ink-muted">{{ __('programs.linked_strategy') }}</dt>
                         <dd class="mt-1.5 truncate text-sm font-semibold">
                             @if ($this->program->strategy)
-                                <a href="{{ route('strategies.show', $this->program->strategy) }}" wire:navigate class="hover:text-primary hover:underline">{{ $this->program->strategy->name }}</a>
+                                <a href="{{ route('strategies.show', $this->program->strategy) }}" wire:navigate class="hover:text-primary dark:hover:text-brand-text hover:underline">{{ $this->program->strategy->name }}</a>
                             @else
-                                <span class="font-normal text-secondary-medium dark:text-secondary-soft">{{ __('common.not_assigned') }}</span>
+                                <span class="font-normal text-secondary-medium dark:text-ink-muted">{{ __('common.not_assigned') }}</span>
                             @endif
                         </dd>
                     </div>
                     <div class="min-w-0">
-                        <dt class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('programs.direct_manager') }}</dt>
+                        <dt class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-ink-muted">{{ __('programs.direct_manager') }}</dt>
                         <dd class="mt-1.5 truncate text-sm font-semibold">
                             {{ $this->program->manager?->name ?? __('common.not_assigned') }}
                             @if ($this->program->manager)
@@ -590,29 +598,29 @@ new #[Title('titles.program')] class extends Component {
                         </dd>
                     </div>
                     <div class="min-w-0">
-                        <dt class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('programs.updated') }}</dt>
+                        <dt class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-ink-muted">{{ __('programs.updated') }}</dt>
                         <dd class="mt-1.5 truncate text-sm font-semibold">{{ $this->program->updated_at?->translatedFormat(__('formats.date')) ?? '—' }}</dd>
                     </div>
                 </dl>
             </div>
 
-            <aside class="overflow-hidden rounded-lg border border-secondary-soft bg-white text-secondary-dark @4xl/detail:w-[22rem] @4xl/detail:shrink-0 dark:border-secondary-medium dark:bg-secondary-dark dark:text-white" aria-label="{{ __('programs.delivery_health') }}">
+            <aside class="overflow-hidden rounded-lg border border-secondary-soft bg-white text-secondary-dark @4xl/detail:w-[22rem] @4xl/detail:shrink-0 dark:border-line dark:bg-surface-1 dark:text-ink" aria-label="{{ __('programs.delivery_health') }}">
                 <div class="min-h-32 p-5">
                     <div class="flex items-start justify-between gap-4">
                         <div class="min-w-0">
-                            <p class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('programs.delivery_health') }}</p>
+                            <p class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-ink-muted">{{ __('programs.delivery_health') }}</p>
                             <p class="mt-1 text-sm font-semibold">{{ __('programs.milestone_progress') }}</p>
                         </div>
-                        <span class="shrink-0 text-3xl font-bold tracking-tight text-primary tabular-nums">{{ $this->milestoneProgress['percentage'] === null ? '—' : number_format($this->milestoneProgress['percentage'], 0).'%' }}</span>
+                        <span class="shrink-0 text-3xl font-bold tracking-tight text-primary dark:text-brand-text tabular-nums">{{ $this->milestoneProgress['percentage'] === null ? '—' : number_format($this->milestoneProgress['percentage'], 0).'%' }}</span>
                     </div>
-                    <p class="mt-3 text-xs text-secondary-medium tabular-nums dark:text-secondary-soft">{{ $this->milestoneProgress['percentage'] === null ? __('programs.no_weighted_milestones') : __('programs.weighted_progress_of_total', ['reached' => number_format($this->milestoneProgress['reached'], 0), 'total' => number_format($this->milestoneProgress['total'], 0)]) }}</p>
-                    <div class="mt-4 h-2 overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium" role="progressbar" aria-valuemin="0" aria-valuemax="100" @if ($this->milestoneProgress['percentage'] !== null) aria-valuenow="{{ $this->milestoneProgress['percentage'] }}" @endif aria-label="{{ __('programs.milestone_progress') }}">
-                        <div class="h-full rounded-full bg-primary motion-reduce:transition-none" style="width: {{ $this->milestoneProgress['percentage'] ?? 0 }}%"></div>
+                    <p class="mt-3 text-xs text-secondary-medium tabular-nums dark:text-ink-muted">{{ $this->milestoneProgress['percentage'] === null ? __('programs.no_weighted_milestones') : __('programs.weighted_progress_of_total', ['reached' => number_format($this->milestoneProgress['reached'], 0), 'total' => number_format($this->milestoneProgress['total'], 0)]) }}</p>
+                    <div class="mt-4 h-2 overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2" role="progressbar" aria-valuemin="0" aria-valuemax="100" @if ($this->milestoneProgress['percentage'] !== null) aria-valuenow="{{ $this->milestoneProgress['percentage'] }}" @endif aria-label="{{ __('programs.milestone_progress') }}">
+                        <div class="h-full rounded-full bg-primary dark:bg-ink-muted motion-reduce:transition-none" style="width: {{ $this->milestoneProgress['percentage'] ?? 0 }}%"></div>
                     </div>
                 </div>
-                <div class="border-t border-secondary-soft px-5 py-4 dark:border-secondary-medium">
-                    <p class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('programs.projects_by_status') }}</p>
-                    <div class="mt-3 flex h-2 overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium" role="img" aria-label="{{ __('programs.projects_by_status') }}">
+                <div class="border-t border-secondary-soft px-5 py-4 dark:border-line">
+                    <p class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-ink-muted">{{ __('programs.projects_by_status') }}</p>
+                    <div class="mt-3 flex h-2 overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2" role="img" aria-label="{{ __('programs.projects_by_status') }}">
                         @foreach ($this->projectStatusSegments as $segment)
                             @if ($segment['count'] > 0)<span class="{{ $segment['tone'] }}" style="flex: {{ $segment['count'] }}" title="{{ $segment['label'] }}: {{ $segment['count'] }}"></span>@endif
                         @endforeach
@@ -620,7 +628,7 @@ new #[Title('titles.program')] class extends Component {
                     <div class="mt-3 flex flex-wrap gap-2">
                         @foreach ($this->projectStatusSegments as $segment)
                             @if ($segment['count'] > 0)
-                                <span class="inline-flex items-center gap-1.5 rounded-md border border-secondary-soft px-2 py-1 text-xs font-medium text-secondary-medium dark:border-secondary-medium dark:text-secondary-soft"><span class="size-1.5 rounded-full {{ $segment['tone'] }}"></span>{{ $segment['label'] }} <span class="font-semibold tabular-nums">{{ $segment['count'] }}</span></span>
+                                <span class="inline-flex items-center gap-1.5 rounded-md border border-secondary-soft px-2 py-1 text-xs font-medium text-secondary-medium dark:border-line dark:text-ink-muted"><span class="size-1.5 rounded-full {{ $segment['tone'] }}"></span>{{ $segment['label'] }} <span class="font-semibold tabular-nums">{{ $segment['count'] }}</span></span>
                             @endif
                         @endforeach
                     </div>
@@ -629,16 +637,16 @@ new #[Title('titles.program')] class extends Component {
         </div>
     </header>
 
-    <div class="flex flex-wrap items-center gap-1 border-b border-secondary-soft dark:border-secondary-medium" role="tablist" aria-label="{{ __('programs.connection_views') }}">
+    <div class="flex flex-wrap items-center gap-1 border-b border-secondary-soft dark:border-line" role="tablist" aria-label="{{ __('programs.connection_views') }}">
         @foreach ($this->tabs as $tabOption)
             @php $isActive = $tab === $tabOption['key']; @endphp
             <button type="button" role="tab" wire:key="program-tab-{{ $tabOption['key'] }}" wire:click="$set('tab', '{{ $tabOption['key'] }}')" aria-selected="{{ $isActive ? 'true' : 'false' }}" @class([
                 'inline-flex min-h-11 items-center gap-1.5 border-b-2 px-3 text-sm font-semibold transition-colors',
-                'border-primary text-secondary-dark dark:text-white' => $isActive,
-                'border-transparent text-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => ! $isActive,
+                'border-primary text-secondary-dark dark:text-ink' => $isActive,
+                'border-transparent text-secondary-medium hover:text-secondary-dark dark:text-ink-muted dark:hover:text-ink' => ! $isActive,
             ])>
                 <span>{{ $tabOption['label'] }}</span>
-                <span class="inline-flex min-w-5 items-center justify-center rounded-md border border-secondary-light px-1 py-0.5 text-[11px] font-semibold tabular-nums text-secondary-medium dark:border-secondary-medium dark:text-secondary-soft">{{ $tabOption['count'] }}</span>
+                <span class="inline-flex min-w-5 items-center justify-center rounded-md border border-secondary-light px-1 py-0.5 text-[11px] font-semibold tabular-nums text-secondary-medium dark:border-line dark:text-ink-muted">{{ $tabOption['count'] }}</span>
             </button>
         @endforeach
     </div>
@@ -654,13 +662,13 @@ new #[Title('titles.program')] class extends Component {
     @elseif ($tab === 'tasks')
         <x-ui.panel :title="__('common.tasks')" :count="$this->tasks->count()" :subtitle="__('programs.tasks_across_the_program_its_projects_and_their_milestones')">
             <x-slot:toolbar>
-                <x-ui.button tone="primary" size="sm" icon="plus" wire:click="openAddTaskModal" data-test="add-program-task-button">{{ __('tasks.add_task') }}</x-ui.button>
+                @can('create', App\Models\Task::class)<x-ui.button tone="primary" size="sm" icon="plus" wire:click="openAddTaskModal" data-test="add-program-task-button">{{ __('tasks.add_task') }}</x-ui.button>@endcan
             </x-slot:toolbar>
 
             @if ($this->tasks->isEmpty())
                 <x-ui.empty-state icon="clipboard-document-list" :heading="__('common.no_tasks_yet')" :body="__('programs.tasks_for_this_program_will_appear_here')">
                     <x-slot:action>
-                        <x-ui.button size="sm" tone="primary" icon="plus" wire:click="openAddTaskModal">{{ __('tasks.add_task') }}</x-ui.button>
+                        @can('create', App\Models\Task::class)<x-ui.button size="sm" tone="primary" icon="plus" wire:click="openAddTaskModal">{{ __('tasks.add_task') }}</x-ui.button>@endcan
                     </x-slot:action>
                 </x-ui.empty-state>
             @else
@@ -669,8 +677,8 @@ new #[Title('titles.program')] class extends Component {
                     $taskTotal = $this->tasks->count();
                     $taskOverdue = $this->tasks->filter(fn (Task $task): bool => $task->status !== TaskStatus::Done && $task->due_date !== null && $task->due_date->lt(today()))->count();
                     $taskUnassigned = $this->tasks->filter(fn (Task $task): bool => $task->taskAssignees->isEmpty())->count();
-                    $taskInkText = 'text-secondary-dark dark:text-white';
-                    $taskMutedText = 'text-secondary-medium dark:text-secondary-soft';
+                    $taskInkText = 'text-secondary-dark dark:text-ink';
+                    $taskMutedText = 'text-secondary-medium dark:text-ink-muted';
 
                     $ordered = $this->tasks->sortBy([
                         fn (Task $a, Task $b): int => ($a->status === TaskStatus::Done) <=> ($b->status === TaskStatus::Done),
@@ -688,7 +696,7 @@ new #[Title('titles.program')] class extends Component {
                     $looseTasks = $ordered->filter(fn (Task $task): bool => $this->taskProjectId($task) === null)->values();
                 @endphp
 
-                <div class="grid gap-3 border-b border-secondary-soft p-3.5 @lg/detail:grid-cols-3 dark:border-secondary-medium">
+                <div class="grid gap-3 border-b border-secondary-soft p-3.5 @lg/detail:grid-cols-3 dark:border-line">
                     <x-ui.stat-tile :label="__('programs.stat_tasks_done')" :value="$taskDone" :denominator="$taskTotal" />
                     <x-ui.stat-tile :label="__('tasks.overdue')" :value="$taskOverdue" :tone="$taskOverdue > 0 ? 'warn' : null" />
                     <x-ui.stat-tile :label="__('common.unassigned')" :value="$taskUnassigned" />
@@ -704,10 +712,10 @@ new #[Title('titles.program')] class extends Component {
                 <div class="flex flex-col gap-8 px-3.5 pb-3.5 @6xl/detail:px-5 @6xl/detail:pb-5">
                     @foreach ($taskGroups as $group)
                         <section class="min-w-0" wire:key="program-task-group-{{ $group['project']->id }}">
-                            <header class="border-b border-secondary-soft pt-4 pb-3 dark:border-secondary-medium">
+                            <header class="border-b border-secondary-soft pt-4 pb-3 dark:border-line">
                                 <a href="{{ route('projects.show', $group['project']) }}" wire:navigate class="min-w-0 truncate text-base font-bold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary {{ $taskInkText }}">{{ $group['project']->name }}</a>
                             </header>
-                            <ul class="divide-y divide-secondary-soft dark:divide-secondary-medium">
+                            <ul class="divide-y divide-secondary-soft dark:divide-line">
                                 @foreach ($group['tasks'] as $task)
                                     @include('pages.programs._task-row', ['task' => $task, 'inkText' => $taskInkText, 'mutedText' => $taskMutedText])
                                 @endforeach
@@ -717,10 +725,10 @@ new #[Title('titles.program')] class extends Component {
 
                     @if ($looseTasks->isNotEmpty())
                         <section class="min-w-0" data-loose-tasks>
-                            <header class="border-b border-secondary-soft pt-4 pb-3 dark:border-secondary-medium">
+                            <header class="border-b border-secondary-soft pt-4 pb-3 dark:border-line">
                                 <p class="text-base font-bold {{ $taskInkText }}">{{ __('programs.work_not_tied_to_a_project') }}</p>
                             </header>
-                            <ul class="divide-y divide-secondary-soft dark:divide-secondary-medium">
+                            <ul class="divide-y divide-secondary-soft dark:divide-line">
                                 @foreach ($looseTasks as $task)
                                     @include('pages.programs._task-row', ['task' => $task, 'inkText' => $taskInkText, 'mutedText' => $taskMutedText])
                                 @endforeach
@@ -741,105 +749,5 @@ new #[Title('titles.program')] class extends Component {
         <livewire:activity.timeline :subjects="['program' => [$this->program->id]]" :key="'program-activity-'.$this->program->id" />
     </section>
 
-    @php
-        $selectedNewTaskAssigneeOptions = $this->userOptions->whereIn('id', collect($newTaskAssignedTo)->map(fn ($id) => (int) $id));
-        $newTaskAssigneeTriggerLabel = match (true) {
-            $selectedNewTaskAssigneeOptions->isEmpty() => __('common.select'),
-            $selectedNewTaskAssigneeOptions->count() <= 2 => $selectedNewTaskAssigneeOptions->pluck('name')->implode(', '),
-            default => __('common.count_selected', ['count' => $selectedNewTaskAssigneeOptions->count()]),
-        };
-    @endphp
-
-    <flux:modal name="program-add-task-modal" wire:model="showAddTaskModal" wire:close="closeAddTaskModal" class="w-full max-w-2xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <form wire:submit="addTask" class="flex flex-col gap-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ __('tasks.add_task') }}</flux:heading>
-            </div>
-
-            <x-ui.input wire:model="newTaskTitle" :label="__('tasks.task_title')" type="text" maxlength="255" required autofocus data-test="new-program-task-title-input" />
-
-            <div class="grid gap-5 sm:grid-cols-2">
-                <div class="min-w-0">
-                    <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft" id="new-program-task-status-label">{{ __('common.status') }}</label>
-                    <div class="grid grid-cols-2 gap-1.5" role="radiogroup" aria-labelledby="new-program-task-status-label">
-                        @foreach (TaskStatus::cases() as $statusCase)
-                            @php $isNewTaskStatusSelected = $newTaskStatus === $statusCase->value; @endphp
-                            <button
-                                type="button"
-                                role="radio"
-                                aria-checked="{{ $isNewTaskStatusSelected ? 'true' : 'false' }}"
-                                wire:click="$set('newTaskStatus', '{{ $statusCase->value }}')"
-                                @class([
-                                    'inline-flex min-h-10 cursor-pointer touch-manipulation items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-semibold whitespace-nowrap transition-colors',
-                                    'border-secondary-dark bg-secondary-dark text-white dark:border-white dark:bg-white dark:text-secondary-dark' => $isNewTaskStatusSelected,
-                                    'border-secondary-light text-secondary-medium hover:border-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => ! $isNewTaskStatusSelected,
-                                ])
-                                data-test="new-program-task-status-{{ $statusCase->value }}"
-                            >
-                                {{ $statusCase->label() }}
-                            </button>
-                        @endforeach
-                    </div>
-                    <flux:error name="newTaskStatus" class="mt-1.5" />
-                </div>
-
-                <div class="min-w-0">
-                    <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft" id="new-program-task-priority-label">{{ __('tasks.priority') }}</label>
-                    <div class="grid grid-cols-3 gap-1.5" role="radiogroup" aria-labelledby="new-program-task-priority-label">
-                        @foreach (TaskPriority::cases() as $priorityCase)
-                            @php $isNewTaskPrioritySelected = $newTaskPriority === $priorityCase->value; @endphp
-                            <button
-                                type="button"
-                                role="radio"
-                                aria-checked="{{ $isNewTaskPrioritySelected ? 'true' : 'false' }}"
-                                wire:click="$set('newTaskPriority', '{{ $priorityCase->value }}')"
-                                @class([
-                                    'inline-flex min-h-10 cursor-pointer touch-manipulation items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-semibold whitespace-nowrap transition-colors',
-                                    'border-secondary-dark bg-secondary-dark text-white dark:border-secondary-medium dark:bg-secondary-medium' => $isNewTaskPrioritySelected,
-                                    'border-secondary-light text-secondary-medium hover:border-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => ! $isNewTaskPrioritySelected,
-                                ])
-                                data-test="new-program-task-priority-{{ $priorityCase->value }}"
-                            >
-                                {{ $priorityCase->label() }}
-                            </button>
-                        @endforeach
-                    </div>
-                    <flux:error name="newTaskPriority" class="mt-1.5" />
-                </div>
-            </div>
-
-            <div class="min-w-0">
-                <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('tasks.assignees') }}</label>
-                <x-ui.multi-select-popover
-                    :label="__('tasks.assignees')"
-                    in-modal
-                    class="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-secondary-light bg-white px-3 py-2 text-start text-sm dark:border-secondary-light dark:bg-secondary-medium"
-                    data-test="new-program-task-assignee-picker"
-                >
-                    <x-slot:trigger>
-                        <span class="min-w-0 truncate">{{ $newTaskAssigneeTriggerLabel }}</span>
-                        <flux:icon.chevron-up-down class="size-4 shrink-0 text-secondary-medium dark:text-secondary-soft" aria-hidden="true" />
-                    </x-slot:trigger>
-
-                    @foreach ($this->userOptions as $userOption)
-                        <label
-                            x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
-                            class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-secondary-soft dark:hover:bg-secondary-medium"
-                        >
-                            <input type="checkbox" wire:model.live="newTaskAssignedTo" value="{{ $userOption->id }}" class="rounded border-secondary-light text-primary focus:ring-primary" data-test="new-program-task-assignee-checkbox-{{ $userOption->id }}" />
-                            <span class="min-w-0 truncate">{{ $userOption->name }} · {{ $userOption->secondary_name }}</span>
-                        </label>
-                    @endforeach
-                </x-ui.multi-select-popover>
-                <flux:error name="newTaskAssignedTo" class="mt-1.5" />
-            </div>
-
-            <x-ui.input wire:model="newTaskDueDate" :label="__('tasks.due_date_2')" type="date" />
-
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="closeAddTaskModal">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" data-test="save-new-program-task-button">{{ __('tasks.add_task') }}</x-ui.button>
-            </div>
-        </form>
-    </flux:modal>
+    <x-tasks.add-task-modal test-prefix="new-program-task" :user-options="$this->userOptions" />
 </section>

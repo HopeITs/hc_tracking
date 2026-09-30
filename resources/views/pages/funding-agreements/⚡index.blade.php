@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\Like;
 use App\Enums\ArStatus;
 use App\Enums\Currency;
 use App\Livewire\Concerns\ManagesAgreementForm;
@@ -90,9 +91,9 @@ new #[Title('titles.funding_agreements')] class extends Component {
             ->when($search !== '', function (Builder $query) use ($search): void {
                 $query->where(function (Builder $query) use ($search): void {
                     $query
-                        ->where('project_num', 'like', '%'.$search.'%')
-                        ->orWhereHas('donor', fn (Builder $query) => $query->where('name', 'like', '%'.$search.'%'))
-                        ->orWhereHas('proposal', fn (Builder $query) => $query->where('name', 'like', '%'.$search.'%'));
+                        ->where('project_num', 'like', Like::contains($search))
+                        ->orWhereHas('donor', fn (Builder $query) => $query->where('name', 'like', Like::contains($search)))
+                        ->orWhereHas('proposal', fn (Builder $query) => $query->where('name', 'like', Like::contains($search)));
                 });
             })
             ->when($this->donor !== '', fn (Builder $query) => $query->where('donor_id', (int) $this->donor))
@@ -435,7 +436,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
     /**
      * The key a month's quarter is filed under, e.g. 2026-Q3.
      */
-    public function quarterKey(CarbonInterface $date): string
+    protected function quarterKey(CarbonInterface $date): string
     {
         return $date->year.'-Q'.$date->quarter;
     }
@@ -444,7 +445,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
      * How many months a date sits after the calendar's first month, with the
      * day as a fraction, so a lane can place it at `offset × month width`.
      */
-    public function monthOffset(CarbonInterface $start, CarbonInterface $date): float
+    protected function monthOffset(CarbonInterface $start, CarbonInterface $date): float
     {
         $wholeMonths = ($date->year - $start->year) * 12 + ($date->month - $start->month);
 
@@ -456,7 +457,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
      *
      * @return 'received'|'failed'|'transit'|'late'|'upcoming'
      */
-    public function trancheState(TransfersTracking $transfer): string
+    protected function trancheState(TransfersTracking $transfer): string
     {
         return $transfer->state();
     }
@@ -465,7 +466,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
      * A whole percentage of $of, floored so nothing is claimed early, but
      * never shown as 0 while there is something to count.
      */
-    public function percentLabel(float $value, float $of): string
+    protected function percentLabel(float $value, float $of): string
     {
         return DonorProposal::percentLabel($value, $of);
     }
@@ -480,7 +481,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
      *
      * @return array{received: float, pending: float, unscheduled: float, share: int, percentLabel: string, missingNet: int, otherCurrencies: array<string, float>, overdueSince: ?CarbonImmutable, overdueAmount: float, failedAmount: float, nextDue: ?CarbonImmutable, accounts: list<string>}
      */
-    public function agreementMoney(DonorProposal $agreement): array
+    protected function agreementMoney(DonorProposal $agreement): array
     {
         $currency = $agreement->currency;
         $budget = (float) $agreement->budget;
@@ -545,9 +546,9 @@ new #[Title('titles.funding_agreements')] class extends Component {
 @php
     $filtersAreActive = $search !== '' || $donor !== '' || $currency !== '' || $stage !== '';
     $hasAnyAgreement = $filtersAreActive || $this->agreements->total() > 0;
-    $mutedText = 'text-secondary-medium dark:text-secondary-soft';
-    $inkText = 'text-secondary-dark dark:text-white';
-    $hairline = 'border-secondary-soft dark:border-secondary-medium';
+    $mutedText = 'text-secondary-medium dark:text-ink-muted';
+    $inkText = 'text-secondary-dark dark:text-ink';
+    $hairline = 'border-secondary-soft dark:border-line';
     $amount = fn (float $value): string => Number::format($value, maxPrecision: 0);
     $shortAmount = fn (float $value): string => Number::abbreviate($value, maxPrecision: 1);
     $calendar = $this->calendar;
@@ -568,19 +569,19 @@ new #[Title('titles.funding_agreements')] class extends Component {
         'upcoming' => __('funding_agreements.tranche_state_upcoming'),
     ];
     $stageDot = [
-        'overdue' => 'bg-primary',
+        'overdue' => 'bg-primary dark:bg-status-critical',
         'failed' => 'money-failed',
         'upcoming' => 'money-pending',
-        'unscheduled' => 'border border-dashed border-secondary-medium dark:border-secondary-soft',
+        'unscheduled' => 'border border-dashed border-secondary-medium dark:border-ink-faint',
         'in_transit' => 'bg-status-warn',
         'received' => 'bg-funding',
     ];
     $beadClass = [
         'received' => 'bg-funding',
-        'upcoming' => 'money-pending border border-status-warn bg-white dark:bg-secondary-dark',
+        'upcoming' => 'money-pending border border-status-warn bg-white dark:bg-surface-1',
         'transit' => 'bg-status-warn',
-        'late' => 'bg-primary ring-4 ring-primary/15',
-        'failed' => 'border-2 border-primary bg-white dark:bg-secondary-dark',
+        'late' => 'bg-primary dark:bg-status-critical ring-4 ring-primary/15',
+        'failed' => 'border-2 border-primary bg-white dark:bg-surface-1',
     ];
     $tagClass = [
         'received' => 'bg-funding-soft text-funding',
@@ -591,7 +592,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
     ];
 @endphp
 
-<section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="agreement-directory-heading">
+<section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="agreement-directory-heading">
     <x-ui.page-header
         heading-id="agreement-directory-heading"
         :title="__('common.funding_agreements')"
@@ -641,7 +642,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
                         ['stage' => null, 'key' => 'unrecorded', 'value' => $line['netMissing'], 'display' => $line['netMissing'], 'fill' => 'money-unrecorded', 'label' => __('funding_agreements.received_net_not_recorded')],
                         ['stage' => 'in_transit', 'value' => $line['inTransit'], 'display' => $line['inTransit'], 'fill' => 'bg-status-warn', 'label' => __('funding_agreements.stage_in_transit')],
                         ['stage' => 'upcoming', 'value' => $line['upcoming'], 'display' => $line['upcoming'], 'fill' => 'money-pending', 'label' => __('funding_agreements.stage_upcoming')],
-                        ['stage' => 'overdue', 'value' => $line['overdue'], 'display' => $line['overdue'], 'fill' => 'bg-primary', 'label' => __('funding_agreements.stage_overdue')],
+                        ['stage' => 'overdue', 'value' => $line['overdue'], 'display' => $line['overdue'], 'fill' => 'bg-primary dark:bg-status-critical', 'label' => __('funding_agreements.stage_overdue')],
                         ['stage' => 'failed', 'value' => $line['failed'], 'display' => $line['failed'], 'fill' => 'money-failed', 'label' => __('funding_agreements.stage_failed')],
                         ['stage' => 'unscheduled', 'value' => $line['unscheduled'], 'display' => $line['unscheduled'], 'fill' => 'ledger-unscheduled', 'label' => __('funding_agreements.not_scheduled_yet')],
                     ];
@@ -649,7 +650,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
                     $figures = [
                         ['stage' => 'in_transit', 'value' => $line['inTransit'], 'tone' => 'text-status-warn', 'dot' => 'bg-status-warn', 'label' => __('funding_agreements.stage_in_transit'), 'note' => trans_choice('funding_agreements.count_tranches', $line['inTransitCount'], ['count' => $line['inTransitCount']])],
                         ['stage' => 'upcoming', 'value' => $line['upcoming'], 'tone' => 'text-status-warn', 'dot' => 'money-pending', 'label' => __('funding_agreements.stage_upcoming'), 'note' => $line['nextUpcoming'] !== null ? __('funding_agreements.next_due_on', ['date' => $line['nextUpcoming']->translatedFormat(__('formats.date_short'))]) : trans_choice('funding_agreements.count_tranches', $line['upcomingCount'], ['count' => $line['upcomingCount']])],
-                        ['stage' => 'overdue', 'value' => $line['overdue'], 'tone' => 'text-status-critical', 'dot' => 'bg-primary', 'label' => __('funding_agreements.stage_overdue'), 'note' => trans_choice('funding_agreements.count_tranches', $line['overdueCount'], ['count' => $line['overdueCount']])],
+                        ['stage' => 'overdue', 'value' => $line['overdue'], 'tone' => 'text-status-critical', 'dot' => 'bg-primary dark:bg-status-critical', 'label' => __('funding_agreements.stage_overdue'), 'note' => trans_choice('funding_agreements.count_tranches', $line['overdueCount'], ['count' => $line['overdueCount']])],
                         ['stage' => 'failed', 'value' => $line['failed'], 'tone' => 'text-status-critical', 'dot' => 'money-failed', 'label' => __('funding_agreements.stage_failed'), 'note' => trans_choice('funding_agreements.count_tranches', $line['failedCount'], ['count' => $line['failedCount']])],
                         ['stage' => 'unscheduled', 'value' => $line['unscheduled'], 'tone' => $inkText, 'dot' => 'ledger-unscheduled', 'label' => __('funding_agreements.not_scheduled_yet'), 'note' => __('funding_agreements.percent_of_committed', ['percent' => $this->percentLabel($line['unscheduled'], $line['committed'])])],
                     ];
@@ -694,7 +695,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
                                         @disabled($isEmpty && ! $isActive)
                                         @class([
                                             'group -m-2 rounded-lg p-2 text-start transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-primary enabled:hover:bg-board-head disabled:cursor-default dark:enabled:hover:bg-white/5 @6xl/ledger:text-end',
-                                            'bg-board-head ring-1 ring-secondary-dark dark:bg-white/5 dark:ring-white' => $isActive,
+                                            'bg-board-head ring-1 ring-secondary-dark dark:bg-white/5 dark:ring-ink' => $isActive,
                                         ])
                                         data-ledger-figure="{{ $figure['stage'] }}"
                                     >
@@ -739,7 +740,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
                                         @class([
                                             'ledger-segment h-full min-w-1.5 cursor-pointer first:rounded-s-full last:rounded-e-full transition-[filter,transform] duration-150 hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
                                             $segment['fill'],
-                                            'outline-2 outline-offset-2 outline-secondary-dark dark:outline-white' => $isActive,
+                                            'outline-2 outline-offset-2 outline-secondary-dark dark:outline-ink' => $isActive,
                                         ])
                                         style="flex: {{ round($segment['value'] / $scale * 1000) }} 1 0%"
                                         data-segment="{{ $segment['stage'] }}"
@@ -831,12 +832,12 @@ new #[Title('titles.funding_agreements')] class extends Component {
 
                 <div class="hidden items-center gap-2 @3xl/cal:flex">
                     <button type="button" x-on:click="goToToday()" class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-colors hover:bg-board-head focus-visible:outline-2 focus-visible:outline-primary dark:hover:bg-white/5 {{ $hairline }} {{ $inkText }}" data-jump-today>
-                        <span class="size-2 rounded-full bg-primary" aria-hidden="true"></span>
+                        <span class="size-2 rounded-full bg-primary dark:bg-ink" aria-hidden="true"></span>
                         {{ __('common.today') }}
                     </button>
                     <div class="inline-flex rounded-lg bg-board-head p-1 dark:bg-white/5" role="group" aria-label="{{ __('funding_agreements.calendar_zoom') }}">
-                        <button type="button" x-on:click="setZoom('month')" :aria-pressed="(zoom === 'month').toString()" class="min-h-7 rounded-md px-3 text-xs font-bold transition-colors {{ $mutedText }} aria-pressed:bg-white aria-pressed:text-secondary-dark aria-pressed:shadow-sm dark:aria-pressed:bg-secondary-medium dark:aria-pressed:text-white">{{ __('funding_agreements.zoom_months') }}</button>
-                        <button type="button" x-on:click="setZoom('quarter')" :aria-pressed="(zoom === 'quarter').toString()" class="min-h-7 rounded-md px-3 text-xs font-bold transition-colors {{ $mutedText }} aria-pressed:bg-white aria-pressed:text-secondary-dark aria-pressed:shadow-sm dark:aria-pressed:bg-secondary-medium dark:aria-pressed:text-white">{{ __('funding_agreements.zoom_quarters') }}</button>
+                        <button type="button" x-on:click="setZoom('month')" :aria-pressed="(zoom === 'month').toString()" class="min-h-7 rounded-md px-3 text-xs font-bold transition-colors {{ $mutedText }} aria-pressed:bg-white aria-pressed:text-secondary-dark aria-pressed:shadow-sm dark:aria-pressed:bg-surface-2 dark:aria-pressed:text-ink">{{ __('funding_agreements.zoom_months') }}</button>
+                        <button type="button" x-on:click="setZoom('quarter')" :aria-pressed="(zoom === 'quarter').toString()" class="min-h-7 rounded-md px-3 text-xs font-bold transition-colors {{ $mutedText }} aria-pressed:bg-white aria-pressed:text-secondary-dark aria-pressed:shadow-sm dark:aria-pressed:bg-surface-2 dark:aria-pressed:text-ink">{{ __('funding_agreements.zoom_quarters') }}</button>
                     </div>
                 </div>
             </div>
@@ -855,7 +856,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
                         @disabled($stageCount === 0 && ! $isActive)
                         @class([
                             'inline-flex min-h-9 items-center gap-2 rounded-full border ps-3 pe-3.5 text-xs font-semibold transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-default disabled:opacity-45',
-                            'border-secondary-dark bg-secondary-dark text-white dark:border-white dark:bg-white dark:text-secondary-dark' => $isActive,
+                            'border-secondary-dark bg-secondary-dark text-white dark:border-ink dark:bg-ink dark:text-surface-0' => $isActive,
                             $hairline.' hover:border-secondary-light hover:bg-board-head dark:hover:bg-white/5 '.$inkText => ! $isActive,
                         ])
                         data-stage="{{ $stageKey }}"
@@ -863,7 +864,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
                     >
                         <span class="size-2.5 shrink-0 rounded-full {{ $stageDot[$stageKey] }}" aria-hidden="true"></span>
                         {{ $stageLabels[$stageKey] }}
-                        <span @class(['tabular-nums', 'text-white/70 dark:text-secondary-medium' => $isActive, $mutedText => ! $isActive])>{{ $stageCount }}</span>
+                        <span @class(['tabular-nums', 'text-white/70 dark:text-surface-0/70' => $isActive, $mutedText => ! $isActive])>{{ $stageCount }}</span>
                         @if ($isActive)
                             <flux:icon.x-mark variant="micro" class="size-3.5" />
                         @endif
@@ -871,7 +872,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
                 @endforeach
 
                 @if ($filtersAreActive)
-                    <flux:button size="sm" variant="ghost" class="ms-auto text-secondary-medium! dark:text-secondary-soft!" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
+                    <flux:button size="sm" variant="ghost" class="ms-auto text-secondary-medium! dark:text-ink-muted!" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
                 @endif
             </nav>
 
@@ -900,8 +901,8 @@ new #[Title('titles.funding_agreements')] class extends Component {
                                     @class([
                                         'absolute inset-y-0 border-s',
                                         'border-secondary-light' => $month['year'] !== null,
-                                        'border-secondary-soft/70 dark:border-secondary-medium/70' => $month['year'] === null && $month['quarter'],
-                                        'border-secondary-soft/40 dark:border-secondary-medium/40' => ! $month['quarter'],
+                                        'border-secondary-soft/70 dark:border-line-strong' => $month['year'] === null && $month['quarter'],
+                                        'border-secondary-soft/40 dark:border-line' => ! $month['quarter'],
                                     ])
                                     @if (! $month['quarter']) x-show="zoom === 'month'" @endif
                                     style="inset-inline-start: calc(var(--month-w) * {{ $index }})"
@@ -918,7 +919,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
                                     style="inset-inline-start: calc(var(--month-w) * {{ $quarter['index'] }}); width: calc(var(--month-w) * 3)"
                                 ></span>
                             @endforeach
-                            <span x-ref="today" class="cal-today absolute inset-y-0 z-[1] w-0.5 -translate-x-1/2 bg-primary rtl:translate-x-1/2" style="inset-inline-start: calc(var(--month-w) * {{ $calendar['today'] }})"></span>
+                            <span x-ref="today" class="cal-today absolute inset-y-0 z-[1] w-0.5 -translate-x-1/2 bg-primary dark:bg-ink rtl:translate-x-1/2" style="inset-inline-start: calc(var(--month-w) * {{ $calendar['today'] }})"></span>
                         </div>
 
                         @php
@@ -945,8 +946,8 @@ new #[Title('titles.funding_agreements')] class extends Component {
                         @endphp
 
                         {{-- Sticky head: period labels and what is expected to land in each period. --}}
-                        <div class="sticky top-0 z-20 hidden bg-white/95 backdrop-blur-sm @3xl/cal:grid dark:bg-secondary-dark/95" style="grid-template-columns: var(--lane-w) var(--track-w)">
-                            <div x-ref="laneHead" class="sticky start-0 z-10 flex flex-col justify-end gap-1 border-e bg-white px-4 pt-3 pb-2 dark:bg-secondary-dark {{ $hairline }}">
+                        <div class="sticky top-0 z-20 hidden bg-white/95 backdrop-blur-sm @3xl/cal:grid dark:bg-surface-1/95" style="grid-template-columns: var(--lane-w) var(--track-w)">
+                            <div x-ref="laneHead" class="sticky start-0 z-10 flex flex-col justify-end gap-1 border-e bg-white px-4 pt-3 pb-2 dark:bg-surface-1 {{ $hairline }}">
                                 <p class="text-xs font-bold {{ $inkText }}" x-text="zoom === 'quarter' ? @js(__('funding_agreements.expected_each_quarter')) : @js(__('funding_agreements.expected_each_month'))">{{ __('funding_agreements.expected_each_month') }}</p>
                                 <p class="text-[11px] leading-snug {{ $mutedText }}" x-text="zoom === 'quarter' ? @js(__('funding_agreements.select_a_quarter_to_highlight_its_tranches')) : @js(__('funding_agreements.select_a_month_to_highlight_its_tranches'))">{{ __('funding_agreements.select_a_month_to_highlight_its_tranches') }}</p>
                             </div>
@@ -966,7 +967,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
                                             >{{ $period['label'] }}@if ($period['year'] !== null) <span class="{{ $mutedText }} font-semibold">{{ $period['year'] }}</span>@endif</span>
                                         @endforeach
                                     @endforeach
-                                    <span class="absolute top-0.5 z-[2] -translate-x-1/2 rounded-full bg-primary px-1.5 py-px text-[10px] leading-4 font-bold text-white rtl:translate-x-1/2" style="inset-inline-start: calc(var(--month-w) * {{ $calendar['today'] }})">{{ __('common.today') }}</span>
+                                    <span class="absolute top-0.5 z-[2] -translate-x-1/2 rounded-full bg-primary dark:bg-ink dark:text-surface-0 px-1.5 py-px text-[10px] leading-4 font-bold text-white rtl:translate-x-1/2" style="inset-inline-start: calc(var(--month-w) * {{ $calendar['today'] }})">{{ __('common.today') }}</span>
                                 </div>
 
                                 @foreach ($calendar['inflow'] as $inflowCurrency => $inflow)
@@ -1002,7 +1003,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
                                                             <span class="flex h-full w-1.5 shrink-0 flex-col-reverse overflow-hidden rounded-full" aria-hidden="true">
                                                                 <span class="cal-inflow-bar shrink-0 bg-funding" style="height: {{ $barHeight($periodMoney['received']) }}%"></span>
                                                                 <span class="cal-inflow-bar money-pending shrink-0" style="height: {{ $barHeight($periodMoney['pending']) }}%"></span>
-                                                                <span class="cal-inflow-bar shrink-0 bg-primary" style="height: {{ $barHeight($periodMoney['late']) }}%"></span>
+                                                                <span class="cal-inflow-bar shrink-0 bg-primary dark:bg-status-critical" style="height: {{ $barHeight($periodMoney['late']) }}%"></span>
                                                                 <span class="cal-inflow-bar money-failed shrink-0" style="height: {{ $barHeight($periodMoney['failed']) }}%"></span>
                                                             </span>
                                                             @php
@@ -1049,7 +1050,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
                                 >
                                     <div class="grid @3xl/cal:grid-cols-[var(--lane-w)_var(--track-w)]">
                                         {{-- Identity and money, pinned while the months scroll. --}}
-                                        <div class="relative z-10 flex gap-3.5 bg-white py-4 transition-colors duration-150 group-hover/lane:bg-board-head group-[.is-open]/lane:bg-board-head @3xl/cal:sticky @3xl/cal:start-0 @3xl/cal:border-e @3xl/cal:px-4 dark:bg-secondary-dark {{ $hairline }}">
+                                        <div class="relative z-10 flex gap-3.5 bg-white py-4 transition-colors duration-150 group-hover/lane:bg-board-head group-[.is-open]/lane:bg-board-head @3xl/cal:sticky @3xl/cal:start-0 @3xl/cal:border-e @3xl/cal:px-4 dark:bg-surface-1 {{ $hairline }}">
                                             <x-ui.progress-ring :value="$money['share']" size="md" tone="funding" :label="__('funding_agreements.percent_received', ['percent' => $money['percentLabel']])" class="mt-0.5" />
                                             <div class="min-w-0 flex-1">
                                                 <div class="flex items-start justify-between gap-2">
@@ -1075,7 +1076,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
 
                                                 @if ($hasOverdue)
                                                     <p class="mt-1.5 flex items-center gap-1.5 text-xs font-bold text-status-critical tabular-nums" data-overdue>
-                                                        <span class="size-1.5 rounded-full bg-primary" aria-hidden="true"></span>
+                                                        <span class="size-1.5 rounded-full bg-primary dark:bg-status-critical" aria-hidden="true"></span>
                                                         {{ __('funding_agreements.amount_overdue_since', ['amount' => $shortAmount($money['overdueAmount']), 'date' => $money['overdueSince']->translatedFormat(__('formats.date_short'))]) }}
                                                         · {{ trans_choice('funding_agreements.count_days_late', (int) $money['overdueSince']->diffInDays(\Carbon\CarbonImmutable::today()), ['count' => (int) $money['overdueSince']->diffInDays(\Carbon\CarbonImmutable::today())]) }}
                                                     </p>
@@ -1124,7 +1125,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
                                         <div class="relative hidden min-h-full @3xl/cal:block" style="width: var(--track-w)">
                                             @if ($placed->isEmpty())
                                                 <p class="sticky start-[calc(var(--lane-w)+1rem)] flex h-full w-max items-center gap-2 px-4 text-xs {{ $mutedText }}">
-                                                    <span class="size-3 rounded-full border border-dashed border-secondary-medium dark:border-secondary-soft" aria-hidden="true"></span>
+                                                    <span class="size-3 rounded-full border border-dashed border-secondary-medium dark:border-ink-faint" aria-hidden="true"></span>
                                                     {{ __('funding_agreements.no_tranches_scheduled_yet') }}
                                                 </p>
                                             @else
@@ -1182,7 +1183,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
                                                                 >{{ $shortAmount((float) $transfer->payment_amount) }}</span>
                                                             </button>
                                                             {{-- Tooltip: the tranche in words. --}}
-                                                            <span class="pointer-events-none invisible absolute top-full start-0 z-30 mt-3 w-max max-w-60 -translate-x-1/2 rounded-lg bg-secondary-dark px-2.5 py-2 text-start text-[11px] leading-snug text-white opacity-0 shadow-[0_8px_24px_-8px_rgb(0_0_0/0.4)] transition-opacity duration-150 group-hover/pill:visible group-hover/pill:opacity-100 group-focus-within/pill:visible group-focus-within/pill:opacity-100 rtl:translate-x-1/2 dark:bg-white dark:text-secondary-dark" aria-hidden="true">
+                                                            <span class="pointer-events-none invisible absolute top-full start-0 z-30 mt-3 w-max max-w-60 -translate-x-1/2 rounded-lg bg-secondary-dark px-2.5 py-2 text-start text-[11px] leading-snug text-white opacity-0 shadow-[0_8px_24px_-8px_rgb(0_0_0/0.4)] transition-opacity duration-150 group-hover/pill:visible group-hover/pill:opacity-100 group-focus-within/pill:visible group-focus-within/pill:opacity-100 rtl:translate-x-1/2 dark:bg-surface-3 dark:shadow-raised dark:text-ink" aria-hidden="true">
                                                                 <span class="block text-xs font-bold tabular-nums">{{ $amount((float) $transfer->payment_amount) }} {{ $transfer->amount_transfered_currency->value }}</span>
                                                                 <span class="block tabular-nums opacity-80">{{ $transfer->scheduled_date->translatedFormat(__('formats.date')) }} · {{ $stateLabel }}</span>
                                                                 @if ($state === 'received' && $transfer->net_amount_received !== null)
@@ -1243,7 +1244,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
                                                         <dd class="mt-1 flex flex-wrap gap-x-3 gap-y-1">
                                                             @forelse ($projects as $project)
                                                                 <a href="{{ route('projects.show', $project) }}" wire:navigate class="inline-flex items-center gap-1.5 font-bold underline-offset-4 hover:underline {{ $inkText }}" wire:key="agreement-{{ $agreement->id }}-project-{{ $project->id }}">
-                                                                    <span class="size-1.5 shrink-0 rounded-full border border-secondary-dark dark:border-white" aria-hidden="true"></span>{{ $project->name }}
+                                                                    <span class="size-1.5 shrink-0 rounded-full border border-secondary-dark dark:border-ink-muted" aria-hidden="true"></span>{{ $project->name }}
                                                                 </a>
                                                             @empty
                                                                 <span class="{{ $mutedText }}">{{ __('funding_agreements.no_projects_linked_yet') }}</span>
@@ -1263,10 +1264,10 @@ new #[Title('titles.funding_agreements')] class extends Component {
                                                     @if ($agreement->transfers->isEmpty())
                                                         <p class="text-xs {{ $mutedText }}">{{ __('funding_agreements.no_tranches_scheduled_yet') }}</p>
                                                     @else
-                                                        <div class="overflow-x-auto">
-                                                            <table class="w-full min-w-[36rem] text-xs">
+                                                        <div class="@container">
+                                                            <table class="w-full text-xs @max-xl:block">
                                                                 <caption class="sr-only">{{ __('funding_agreements.tranches_of_name', ['name' => $agreementName]) }}</caption>
-                                                                <thead>
+                                                                <thead class="@max-xl:hidden">
                                                                     <tr class="text-start {{ $mutedText }}">
                                                                         <th scope="col" class="pb-2 text-start font-semibold">{{ __('funding_agreements.due') }}</th>
                                                                         <th scope="col" class="pb-2 text-end font-semibold">{{ __('funding_agreements.amount') }}</th>
@@ -1276,7 +1277,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
                                                                         <th scope="col" class="pb-2 ps-4 text-start font-semibold">{{ __('funding_agreements.account') }}</th>
                                                                     </tr>
                                                                 </thead>
-                                                                <tbody>
+                                                                <tbody class="[&>tr>td]:@max-xl:block [&>tr>td]:@max-xl:whitespace-normal [&>tr>td]:@max-xl:before:block [&>tr>td]:@max-xl:before:text-[11px] [&>tr>td]:@max-xl:before:font-semibold [&>tr>td]:@max-xl:before:content-[attr(data-label)] [&>tr>td]:@max-xl:before:text-secondary-medium dark:[&>tr>td]:@max-xl:before:text-secondary-soft [&>tr>td]:@max-xl:p-0 [&>tr]:@max-xl:grid [&>tr]:@max-xl:grid-cols-2 [&>tr]:@max-xl:gap-x-4 [&>tr]:@max-xl:gap-y-2 [&>tr]:@max-xl:py-3 @max-xl:block">
                                                                     @foreach ($agreement->transfers as $transfer)
                                                                         @php
                                                                             $state = $this->trancheState($transfer);
@@ -1287,15 +1288,15 @@ new #[Title('titles.funding_agreements')] class extends Component {
                                                                             wire:key="ledger-row-{{ $transfer->id }}"
                                                                             data-ledger-row="{{ $state }}"
                                                                         >
-                                                                            <td class="py-2 pe-3 font-semibold whitespace-nowrap tabular-nums {{ $inkText }}">{{ $transfer->scheduled_date?->translatedFormat(__('formats.date')) ?? '—' }}</td>
-                                                                            <td class="py-2 pe-3 text-end font-bold whitespace-nowrap tabular-nums {{ $inkText }}">{{ $amount((float) $transfer->payment_amount) }} <span class="font-semibold {{ $mutedText }}">{{ $transfer->amount_transfered_currency->value }}</span></td>
-                                                                            <td class="py-2 ps-4 pe-3 whitespace-nowrap">
+                                                                            <td data-label="{{ __('funding_agreements.due') }}" class="py-2 pe-3 font-semibold whitespace-nowrap tabular-nums {{ $inkText }}">{{ $transfer->scheduled_date?->translatedFormat(__('formats.date')) ?? '—' }}</td>
+                                                                            <td data-label="{{ __('funding_agreements.amount') }}" class="py-2 pe-3 text-end font-bold whitespace-nowrap tabular-nums {{ $inkText }}">{{ $amount((float) $transfer->payment_amount) }} <span class="font-semibold {{ $mutedText }}">{{ $transfer->amount_transfered_currency->value }}</span></td>
+                                                                            <td data-label="{{ __('common.status') }}" class="py-2 ps-4 pe-3 whitespace-nowrap">
                                                                                 <span class="inline-flex items-center gap-1.5 rounded-full py-0.5 ps-1.5 pe-2 text-[11px] font-bold {{ $tagClass[$state] }}">
                                                                                     <span class="size-2 rounded-full {{ $beadClass[$state] }}" aria-hidden="true"></span>{{ $trancheStateLabels[$state] }}
                                                                                 </span>
                                                                             </td>
-                                                                            <td class="py-2 pe-3 whitespace-nowrap tabular-nums {{ $mutedText }}">{{ $transfer->transfer_date?->translatedFormat(__('formats.date')) ?? '—' }}</td>
-                                                                            <td class="py-2 pe-3 text-end whitespace-nowrap tabular-nums">
+                                                                            <td data-label="{{ __('funding_agreements.sent') }}" class="py-2 pe-3 whitespace-nowrap tabular-nums {{ $mutedText }}">{{ $transfer->transfer_date?->translatedFormat(__('formats.date')) ?? '—' }}</td>
+                                                                            <td data-label="{{ __('funding_agreements.landed') }}" class="py-2 pe-3 text-end whitespace-nowrap tabular-nums">
                                                                                 @if ($state === 'received' && $transfer->net_amount_received !== null)
                                                                                     <span class="font-bold text-funding">{{ $amount((float) $transfer->net_amount_received) }} {{ $transfer->amount_received_currency->value }}</span>
                                                                                     @if ($transfer->amount_received !== null)
@@ -1310,7 +1311,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
                                                                                     <span class="{{ $mutedText }}">—</span>
                                                                                 @endif
                                                                             </td>
-                                                                            <td class="py-2 ps-4 {{ $inkText }}">{{ $transfer->account?->account_name ?? __('funding_agreements.no_account_assigned') }}</td>
+                                                                            <td data-label="{{ __('funding_agreements.account') }}" class="py-2 ps-4 {{ $inkText }}">{{ $transfer->account?->account_name ?? __('funding_agreements.no_account_assigned') }}</td>
                                                                         </tr>
                                                                     @endforeach
                                                                 </tbody>
@@ -1332,7 +1333,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
                 </div>
 
                 <div class="mt-4">
-                    <flux:pagination :paginator="$this->agreements" class="text-secondary-medium! dark:text-secondary-soft!" scroll-to="#agreement-directory-heading" />
+                    <flux:pagination :paginator="$this->agreements" class="text-secondary-medium! dark:text-ink-muted!" scroll-to="#agreement-directory-heading" />
                 </div>
             @endif
         </section>

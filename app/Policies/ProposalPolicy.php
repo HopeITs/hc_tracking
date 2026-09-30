@@ -14,7 +14,7 @@ class ProposalPolicy
      */
     public function viewAny(User $user): bool
     {
-        return true;
+        return $user->can('proposals.view');
     }
 
     /**
@@ -22,7 +22,7 @@ class ProposalPolicy
      */
     public function view(User $user, Proposal $proposal): bool
     {
-        return true;
+        return $user->can('proposals.view');
     }
 
     /**

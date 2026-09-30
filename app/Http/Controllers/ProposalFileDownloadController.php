@@ -6,6 +6,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Media;
 use App\Models\Proposal;
+use App\Support\UploadName;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -19,13 +21,22 @@ class ProposalFileDownloadController extends Controller
      */
     public function __invoke(Proposal $proposal, Media $media): StreamedResponse
     {
+        Gate::authorize('view', $proposal);
+
         abort_unless(
             $media->mediable_type === 'proposal' && $media->mediable_id === $proposal->id,
             404
         );
 
+        abort_if(
+            $media->collection->isFundingPaper() && ! auth()->user()->can('funding-agreements.view'),
+            403
+        );
+
         abort_unless(Storage::disk($media->disk)->exists($media->path), 404);
 
-        return Storage::disk($media->disk)->download($media->path, $media->original_name);
+        return Storage::disk($media->disk)->download($media->path, UploadName::clean($media->original_name), [
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 }

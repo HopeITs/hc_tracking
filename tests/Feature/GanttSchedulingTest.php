@@ -14,7 +14,7 @@ use Livewire\Livewire;
  */
 function schedulePage(Project $project)
 {
-    return Livewire::actingAs(User::factory()->create())
+    return Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::projects.show', ['project' => $project]);
 }
 

@@ -1,13 +1,16 @@
 <?php
 
+use App\Support\Like;
 use App\Models\HrEmployee;
 use App\Models\Program;
 use App\Models\Strategy;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -28,6 +31,7 @@ new #[Title('titles.programs')] class extends Component {
     public int $visibleProgramCount = 8;
 
     public bool $showProgramModal = false;
+    #[Locked]
     public ?int $editingProgramId = null;
     public string $editingProgramName = '';
     public string $strategyId = '';
@@ -140,7 +144,7 @@ new #[Title('titles.programs')] class extends Component {
                 $query->where(function (Builder $query) use ($search): void {
                     $query
                         ->whereNameLike($search)
-                        ->orWhereHas('strategy', fn (Builder $query) => $query->where('name', 'like', '%'.$search.'%'))
+                        ->orWhereHas('strategy', fn (Builder $query) => $query->where('name', 'like', Like::contains($search)))
                         ->orWhereIn('manager_id', HrEmployee::idsMatchingName($search));
                 });
             })
@@ -176,6 +180,8 @@ new #[Title('titles.programs')] class extends Component {
             ->select(['id', 'strategy_id', 'manager_id'])
             ->findOrFail($programId);
 
+        Gate::authorize('update', $program);
+
         $this->resetValidation();
         $this->editingProgramId = $program->id;
         $this->editingProgramName = $program->name;
@@ -192,6 +198,8 @@ new #[Title('titles.programs')] class extends Component {
      */
     public function saveProgram(): void
     {
+        Gate::authorize('update', Program::query()->findOrFail($this->editingProgramId));
+
         $validated = $this->validate([
             'strategyId' => ['nullable', 'integer', Rule::exists(Strategy::class, 'id')],
             'managerId' => ['nullable', 'integer', Rule::exists(HrEmployee::class, 'id')],
@@ -233,16 +241,13 @@ new #[Title('titles.programs')] class extends Component {
     $summary = $this->programSummary;
     $visiblePrograms = $this->programs->take($visibleProgramCount);
     $hasMorePrograms = $this->programs->count() > $visibleProgramCount;
-    $controlClasses = 'border-secondary-light! bg-white! text-secondary-dark! placeholder:text-secondary-light! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!';
-    $primaryButtonClasses = 'border-primary! bg-primary! text-white! hover:border-primary! hover:bg-primary!';
-    $secondaryButtonClasses = 'border-secondary-light! bg-white! text-secondary-dark! hover:bg-secondary-soft! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white! dark:hover:bg-secondary-medium!';
 @endphp
 
-<section class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-8 bg-white px-1 text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="program-directory-heading">
+<section class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-8 bg-white px-1 text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="program-directory-heading">
     <x-ui.page-header heading-id="program-directory-heading" :title="__('common.programs')" :count="$summary['total']">
         <x-slot:filters>
             <div class="min-w-0">
-                <label for="program-search" class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-secondary-soft">{{ __('programs.search_programs') }}</label>
+                <label for="program-search" class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-ink-muted">{{ __('programs.search_programs') }}</label>
                 <x-ui.input id="program-search" type="search" icon="magnifying-glass" :aria-label="__('programs.search_programs')" :placeholder="__('programs.program_strategy_or_manager')" wire:model.live.debounce.300ms="search" />
             </div>
             <x-ui.header-filter-select id="program-strategy" :label="__('common.strategy')" :search-label="__('programs.search_strategies')" wire:model.live="strategy" :value="$strategy">
@@ -265,7 +270,7 @@ new #[Title('titles.programs')] class extends Component {
         </x-slot:filters>
     </x-ui.page-header>
 
-    <div class="flex justify-end"><span wire:loading.delay.flex wire:target="search,strategy,manager,gap,clearFilters" class="hidden items-center gap-1.5 text-xs text-secondary-medium dark:text-secondary-soft"><flux:icon.arrow-path class="size-3.5 animate-spin" /> {{ __('common.updating') }}</span>@if ($filtersAreActive)<flux:button size="sm" variant="ghost" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>@endif</div>
+    <div class="flex justify-end"><span wire:loading.delay.flex wire:target="search,strategy,manager,gap,clearFilters" class="hidden items-center gap-1.5 text-xs text-secondary-medium dark:text-ink-muted"><flux:icon.arrow-path class="size-3.5 animate-spin" /> {{ __('common.updating') }}</span>@if ($filtersAreActive)<flux:button size="sm" variant="ghost" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>@endif</div>
 
         @if ($visiblePrograms->isEmpty())
             <x-ui.empty-state icon="briefcase" :heading="$filtersAreActive ? __('programs.no_matching_programs') : __('programs.no_programs_from_hr_yet')" :body="$filtersAreActive ? __('common.change_the_search_or_filters_and_try_again') : __('programs.programs_appear_here_once_they_are_added_in_the_hr_system')">
@@ -278,11 +283,11 @@ new #[Title('titles.programs')] class extends Component {
         @else
             <div class="grid gap-6 @3xl/directory:grid-cols-2 @6xl/directory:grid-cols-4">
                 @foreach ($visiblePrograms as $program)
-                    <article class="group relative flex min-h-56 min-w-0 flex-col gap-4 rounded-lg border border-secondary-soft bg-white p-4 transition-colors duration-200 hover:border-primary focus-within:border-primary dark:border-secondary-medium dark:bg-secondary-dark dark:hover:border-primary" wire:key="program-card-{{ $program->id }}">
+                    <article class="group relative flex min-h-56 min-w-0 flex-col gap-4 rounded-lg border border-secondary-soft bg-white p-4 transition-colors duration-200 hover:border-primary focus-within:border-primary dark:border-line dark:bg-surface-1 dark:hover:border-primary" wire:key="program-card-{{ $program->id }}">
                         <a href="{{ route('programs.show', $program) }}" wire:navigate class="absolute inset-0 z-0 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" :aria-label="__('programs.open_name', ['name' => $program->name])"></a>
-                        <div class="relative z-10 flex items-start justify-between gap-3 pointer-events-none"><div class="flex min-w-0 items-center gap-3"><div class="grid size-10 shrink-0 place-items-center rounded-md bg-primary text-white"><flux:icon.briefcase class="size-5" /></div><div class="min-w-0"><p class="text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary-medium dark:text-secondary-soft">{{ __('common.program') }}</p><h2 class="mt-1 truncate text-base font-semibold text-secondary-dark dark:text-white">{{ $program->name }}</h2></div></div><div class="pointer-events-auto flex shrink-0 items-center gap-1"><a href="{{ route('programs.show', $program) }}" wire:navigate class="grid size-11 place-items-center rounded-md border-0! bg-transparent! text-secondary-dark! transition-colors hover:bg-secondary-soft! dark:text-white! dark:hover:bg-secondary-medium! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary @3xl/directory:size-8!" :aria-label="__('programs.open_name', ['name' => $program->name])"><flux:icon.eye class="size-4.5" /></a><x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation @3xl/directory:size-8!" wire:click="openEditModal({{ $program->id }})" :aria-label="__('common.edit_name', ['name' => $program->name])" /></div></div>
-                        <dl class="relative z-10 grid grid-cols-2 gap-4 pointer-events-none"><div class="min-w-0"><dt class="text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary-medium dark:text-secondary-soft">{{ __('common.strategy') }}</dt><dd class="mt-1 truncate text-sm font-medium text-secondary-dark dark:text-white">{{ $program->strategy?->name ?? __('common.not_assigned') }}</dd>@if ($program->strategy)<p class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $program->strategy->start_year }}–{{ $program->strategy->end_year }}</p>@endif</div><div class="min-w-0"><dt class="text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary-medium dark:text-secondary-soft">{{ __('programs.manager') }}</dt><dd class="mt-1">@if ($program->manager)<x-ui.employee-chip :employee="$program->manager" compact />@else<span class="text-sm text-secondary-medium dark:text-secondary-soft">{{ __('common.not_assigned') }}</span>@endif</dd></div></dl>
-                        <div class="relative z-10 mt-auto grid grid-cols-2 border-t border-secondary-soft pt-3 dark:border-secondary-medium pointer-events-none"><div><p class="text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary-medium dark:text-secondary-soft">{{ __('common.projects') }}</p><p class="mt-1 text-2xl font-bold tabular-nums text-secondary-dark dark:text-white">{{ $program->projects_count }}</p></div><div><p class="text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary-medium dark:text-secondary-soft">{{ __('programs.annual_plans') }}</p><p class="mt-1 text-2xl font-bold tabular-nums text-secondary-dark dark:text-white">{{ $program->annual_plans_count }}</p></div></div>
+                        <div class="relative z-10 flex items-start justify-between gap-3 pointer-events-none"><div class="flex min-w-0 items-center gap-3"><div class="grid size-10 shrink-0 place-items-center rounded-md bg-primary dark:bg-white/10 dark:text-ink text-white"><flux:icon.briefcase class="size-5" /></div><div class="min-w-0"><p class="text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary-medium dark:text-ink-muted">{{ __('common.program') }}</p><h2 class="mt-1 truncate text-base font-semibold text-secondary-dark dark:text-ink">{{ $program->name }}</h2></div></div><div class="pointer-events-auto flex shrink-0 items-center gap-1"><a href="{{ route('programs.show', $program) }}" wire:navigate class="grid size-11 place-items-center rounded-md border-0! bg-transparent! text-secondary-dark! transition-colors hover:bg-secondary-soft! dark:text-ink! dark:hover:bg-surface-2! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary @3xl/directory:size-8!" :aria-label="__('programs.open_name', ['name' => $program->name])"><flux:icon.eye class="size-4.5" /></a>@can('programs.update')<x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation @3xl/directory:size-8!" wire:click="openEditModal({{ $program->id }})" :aria-label="__('common.edit_name', ['name' => $program->name])" />@endcan</div></div>
+                        <dl class="relative z-10 grid grid-cols-2 gap-4 pointer-events-none"><div class="min-w-0"><dt class="text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary-medium dark:text-ink-muted">{{ __('common.strategy') }}</dt><dd class="mt-1 truncate text-sm font-medium text-secondary-dark dark:text-ink">{{ $program->strategy?->name ?? __('common.not_assigned') }}</dd>@if ($program->strategy)<p class="text-xs tabular-nums text-secondary-medium dark:text-ink-muted">{{ $program->strategy->start_year }}–{{ $program->strategy->end_year }}</p>@endif</div><div class="min-w-0"><dt class="text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary-medium dark:text-ink-muted">{{ __('programs.manager') }}</dt><dd class="mt-1">@if ($program->manager)<x-ui.employee-chip :employee="$program->manager" compact />@else<span class="text-sm text-secondary-medium dark:text-ink-muted">{{ __('common.not_assigned') }}</span>@endif</dd></div></dl>
+                        <div class="relative z-10 mt-auto grid grid-cols-2 border-t border-secondary-soft pt-3 dark:border-line pointer-events-none"><div><p class="text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary-medium dark:text-ink-muted">{{ __('common.projects') }}</p><p class="mt-1 text-2xl font-bold tabular-nums text-secondary-dark dark:text-ink">{{ $program->projects_count }}</p></div><div><p class="text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary-medium dark:text-ink-muted">{{ __('programs.annual_plans') }}</p><p class="mt-1 text-2xl font-bold tabular-nums text-secondary-dark dark:text-ink">{{ $program->annual_plans_count }}</p></div></div>
                     </article>
                 @endforeach
             </div>
@@ -291,46 +296,32 @@ new #[Title('titles.programs')] class extends Component {
             @endif
         @endif
 
-    <flux:modal wire:model="showProgramModal" class="w-full max-w-2xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <form wire:submit="saveProgram" class="space-y-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ __('programs.assign_name', ['name' => $editingProgramName]) }}</flux:heading>
-                <flux:subheading>{{ __('programs.the_program_name_is_managed_in_the_hr_system_link_it_to_a_st') }}</flux:subheading>
-            </div>
+    <x-ui.modal
+        wire:model="showProgramModal"
+        size="md"
+        :title="__('programs.assign_name', ['name' => $editingProgramName])"
+        :description="__('programs.the_program_name_is_managed_in_the_hr_system_link_it_to_a_st')"
+        submit="saveProgram"
+        close="closeProgramModal"
+    >
+        <div class="grid gap-y-4">
+            <x-ui.form-select wire:model="strategyId" :label="__('programs.linked_strategy')" autofocus>
+                <flux:select.option value="">{{ __('common.not_assigned') }}</flux:select.option>
+                @foreach ($this->strategyOptions as $strategyOption)
+                    <flux:select.option :value="$strategyOption->id">{{ $strategyOption->name }} ({{ $strategyOption->start_year }}–{{ $strategyOption->end_year }})</flux:select.option>
+                @endforeach
+            </x-ui.form-select>
 
-            <div class="grid gap-4 sm:grid-cols-2">
-                <flux:select wire:model="strategyId" :class="$controlClasses" :label="__('programs.linked_strategy')">
-                    <flux:select.option value="">{{ __('common.not_assigned') }}</flux:select.option>
-                    @foreach ($this->strategyOptions as $strategyOption)
-                        <flux:select.option :value="$strategyOption->id" :wire:key="'strategy-option-'.$strategyOption->id">
-                            {{ $strategyOption->name }} ({{ $strategyOption->start_year }}–{{ $strategyOption->end_year }})
-                        </flux:select.option>
-                    @endforeach
-                </flux:select>
+            <x-ui.form-select wire:model="managerId" :label="__('programs.direct_manager')" :help="__('programs.the_assigned_manager_is_the_hr_employee_directly_accountable')">
+                <flux:select.option value="">{{ __('common.not_assigned') }}</flux:select.option>
+                @foreach ($this->managerOptions as $managerOption)
+                    <flux:select.option :value="$managerOption->id">{{ $managerOption->name }} · {{ $managerOption->secondary_name }}</flux:select.option>
+                @endforeach
+            </x-ui.form-select>
+        </div>
 
-                <flux:select wire:model="managerId" :class="$controlClasses" :label="__('programs.direct_manager')">
-                    <flux:select.option value="">{{ __('common.not_assigned') }}</flux:select.option>
-                    @foreach ($this->managerOptions as $managerOption)
-                        <flux:select.option :value="$managerOption->id" :wire:key="'manager-option-'.$managerOption->id">
-                            {{ $managerOption->name }} · {{ $managerOption->secondary_name }}
-                        </flux:select.option>
-                    @endforeach
-                </flux:select>
-            </div>
-
-            <div class="rounded-lg border border-secondary-soft bg-secondary-soft/50 p-3 text-sm text-secondary-medium dark:border-secondary-medium dark:bg-secondary-medium/50 dark:text-secondary-soft">
-                <div class="flex items-start gap-2.5">
-                    <flux:icon.information-circle class="mt-0.5 size-4 shrink-0" />
-                    <p>{{ __('programs.the_assigned_manager_is_the_hr_employee_directly_accountable') }}</p>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <flux:button type="button" variant="filled" :class="$secondaryButtonClasses.' min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto'" wire:click="closeProgramModal">{{ __('common.cancel') }}</flux:button>
-                <flux:button type="submit" variant="primary" :class="$primaryButtonClasses.' min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto'" data-test="save-program-button">
-                    {{ __('common.save_changes') }}
-                </flux:button>
-            </div>
-        </form>
-    </flux:modal>
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="save-program-button">{{ __('common.save_changes') }}</x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
 </section>

@@ -24,6 +24,7 @@ return [
     'name_or_email' => 'Name or email',
     'no_matching_users' => 'No matching users',
     'no_role' => 'No role',
+    'default_role_option' => ':role (default)',
     'operational_access_for_assigned_projects_tasks_and_reports' => 'Operational access for assigned projects, tasks, and reports.',
     'pending' => 'Pending',
     'pending_verification' => 'Pending verification',

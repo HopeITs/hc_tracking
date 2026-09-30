@@ -136,6 +136,8 @@ return [
     'schedule_the_rest' => 'جدولة المتبقي',
     'schedule_tranche' => 'جدولة دفعة',
     'scheduled_beyond_the_budget' => 'جُدول :amount :currency بما يتجاوز الميزانيات المتفق عليها.',
+    'section_amount' => 'المبلغ',
+    'section_parties' => 'الأطراف',
     'scheduled_first_the_transferred_and_received_currencies_can' => 'المجدولة أولًا. قد تختلف عملة التحويل عن عملة الاستلام.',
     'search_agreements' => 'البحث في الاتفاقيات',
     'select_a_donor' => 'اختر مانحًا',

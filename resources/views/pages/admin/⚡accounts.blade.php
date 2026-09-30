@@ -1,14 +1,17 @@
 <?php
 
+use App\Support\Like;
 use App\Enums\ArStatus;
 use App\Enums\Currency;
 use App\Models\Account;
+use App\Models\TransfersTracking;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
-use App\Models\TransfersTracking;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -27,6 +30,7 @@ new #[Title('titles.accounts')] class extends Component {
     public string $currencyFilter = '';
 
     public bool $showAccountModal = false;
+    #[Locked]
     public ?int $editingAccountId = null;
     public string $accountName = '';
     public string $bankName = '';
@@ -54,6 +58,7 @@ new #[Title('titles.accounts')] class extends Component {
      * Paired with $closingAccountId — see the flux:modal binding note below.
      */
     public bool $showCloseModal = false;
+    #[Locked]
     public ?int $closingAccountId = null;
 
     public function updatedSearch(): void
@@ -79,6 +84,17 @@ new #[Title('titles.accounts')] class extends Component {
         $this->resetPage();
     }
 
+    /**
+     * Only people who may change accounts see full account numbers and can
+     * find an account by its number; everyone else sees the last four
+     * characters, so a search cannot confirm a guessed number either.
+     */
+    #[Computed]
+    public function showsFullAccountNumbers(): bool
+    {
+        return auth()->user()->can('accounts.update');
+    }
+
     /** @return LengthAwarePaginator<int, Account> */
     #[Computed]
     public function accounts(): LengthAwarePaginator
@@ -92,9 +108,10 @@ new #[Title('titles.accounts')] class extends Component {
             ->when(
                 $search !== '',
                 fn ($query) => $query->where(fn ($query) => $query
-                    ->where('account_name', 'like', '%'.$search.'%')
-                    ->orWhere('bank_name', 'like', '%'.$search.'%')
-                    ->orWhere('account_number', 'like', '%'.$search.'%')),
+                    ->where('account_name', 'like', Like::contains($search))
+                    ->orWhere('bank_name', 'like', Like::contains($search))
+                    ->orWhere('account_number_last4', Account::lastFour($search))
+                    ->when($this->showsFullAccountNumbers, fn ($query) => $query->orWhereIn('id', Account::idsMatchingAccountNumber($search)))),
             )
             ->when($this->state === 'active', fn ($query) => $query->where('is_active', true))
             ->when($this->state === 'closed', fn ($query) => $query->where('is_active', false))
@@ -174,12 +191,16 @@ new #[Title('titles.accounts')] class extends Component {
 
     public function openCreateModal(): void
     {
+        Gate::authorize('accounts.create');
+
         $this->resetAccountForm();
         $this->showAccountModal = true;
     }
 
     public function openEditModal(int $accountId): void
     {
+        Gate::authorize('accounts.update');
+
         $account = Account::query()
             ->select(['id', 'account_name', 'bank_name', 'currency', 'authorized_person', 'account_number', 'iban', 'swift_code', 'country', 'po_box_street', 'company_address', 'opened_at', 'closed_at', 'is_active'])
             ->withCount('transfers')
@@ -206,6 +227,8 @@ new #[Title('titles.accounts')] class extends Component {
 
     public function saveAccount(): void
     {
+        Gate::authorize($this->editingAccountId === null ? 'accounts.create' : 'accounts.update');
+
         $this->accountName = trim($this->accountName);
         $this->bankName = trim($this->bankName);
         $this->authorizedPerson = trim($this->authorizedPerson);
@@ -269,6 +292,8 @@ new #[Title('titles.accounts')] class extends Component {
 
     public function confirmClose(int $accountId): void
     {
+        Gate::authorize('accounts.delete');
+
         $this->closingAccountId = $accountId;
         $this->showCloseModal = true;
     }
@@ -292,6 +317,9 @@ new #[Title('titles.accounts')] class extends Component {
         if ($this->closingAccountId === null) {
             return;
         }
+
+        // Closing is the account's end of life, so it sits behind accounts.delete.
+        Gate::authorize('accounts.delete');
 
         Account::query()->findOrFail($this->closingAccountId)->close();
 
@@ -352,7 +380,7 @@ new #[Title('titles.accounts')] class extends Component {
     ];
 @endphp
 
-<section class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="account-directory-heading">
+<section class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="account-directory-heading">
     <x-ui.page-header
         heading-id="account-directory-heading"
         :title="__('common.accounts')"
@@ -375,11 +403,13 @@ new #[Title('titles.accounts')] class extends Component {
             </x-ui.header-filter-select>
         </x-slot:filters>
 
-        <x-slot:actions>
-            <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-account-button">
-                {{ __('accounts.open_account') }}
-            </x-ui.button>
-        </x-slot:actions>
+        @can('accounts.create')
+            <x-slot:actions>
+                <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-account-button">
+                    {{ __('accounts.open_account') }}
+                </x-ui.button>
+            </x-slot:actions>
+        @endcan
 
         <x-slot:summary>
             <div class="grid grid-cols-1 gap-4 @2xl/directory:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
@@ -406,7 +436,7 @@ new #[Title('titles.accounts')] class extends Component {
 
                         <div class="min-w-0 flex-1 space-y-2">
                             @if ($fundsByCurrency->isEmpty())
-                                <p class="type-meta text-secondary-medium dark:text-secondary-soft">{{ __('accounts.no_funds_received_yet') }}</p>
+                                <p class="type-meta text-secondary-medium dark:text-ink-muted">{{ __('accounts.no_funds_received_yet') }}</p>
                             @else
                                 @foreach ($fundsByCurrency as $currency => $total)
                                     <div class="flex items-center justify-between gap-3 rounded-lg bg-funding-soft px-3 py-2" wire:key="currency-total-{{ $currency }}">
@@ -417,12 +447,12 @@ new #[Title('titles.accounts')] class extends Component {
                             @endif
 
                             <div class="flex items-center gap-4 pt-1">
-                                <span class="flex items-center gap-1.5 type-meta text-secondary-medium dark:text-secondary-soft">
+                                <span class="flex items-center gap-1.5 type-meta text-secondary-medium dark:text-ink-muted">
                                     <span class="size-2 shrink-0 rounded-full bg-status-good" aria-hidden="true"></span>
                                     {{ __('accounts.open') }} ({{ $summary['active'] }})
                                 </span>
-                                <span class="flex items-center gap-1.5 type-meta text-secondary-medium dark:text-secondary-soft">
-                                    <span class="size-2 shrink-0 rounded-full bg-secondary-light dark:bg-secondary-medium" aria-hidden="true"></span>
+                                <span class="flex items-center gap-1.5 type-meta text-secondary-medium dark:text-ink-muted">
+                                    <span class="size-2 shrink-0 rounded-full bg-secondary-light dark:bg-ink-faint" aria-hidden="true"></span>
                                     {{ __('accounts.closed') }} ({{ $summary['closed'] }})
                                 </span>
                             </div>
@@ -438,7 +468,7 @@ new #[Title('titles.accounts')] class extends Component {
             icon="building-library"
             :heading="$search !== '' || $state !== '' || $currencyFilter !== '' ? __('accounts.no_matching_accounts') : __('accounts.no_accounts_yet')"
             :body="$search !== '' || $state !== '' || $currencyFilter !== '' ? __('common.change_the_search_or_filters_and_try_again') : __('accounts.open_the_first_account')"
-            class="rounded-xl border border-secondary-soft dark:border-secondary-medium"
+            class="rounded-xl border border-secondary-soft dark:border-line"
         />
     @else
         <div class="grid grid-cols-1 gap-4 @sm/directory:grid-cols-2 @4xl/directory:grid-cols-3 @7xl/directory:grid-cols-4">
@@ -450,12 +480,12 @@ new #[Title('titles.accounts')] class extends Component {
                 @endphp
                 <article
                     wire:key="account-{{ $account->id }}"
-                    class="logframe-reveal group relative flex flex-col gap-4 overflow-hidden rounded-xl border border-secondary-soft bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] transition-all hover:-translate-y-0.5 hover:border-secondary-light hover:shadow-[0_2px_4px_rgba(16,24,40,0.06),0_4px_8px_rgba(16,24,40,0.08)] dark:border-secondary-medium dark:bg-secondary-dark dark:shadow-none dark:hover:shadow-none"
+                    class="logframe-reveal group relative flex flex-col gap-4 overflow-hidden rounded-xl border border-secondary-soft bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] transition-all hover:-translate-y-0.5 hover:border-secondary-light hover:shadow-[0_2px_4px_rgba(16,24,40,0.06),0_4px_8px_rgba(16,24,40,0.08)] dark:border-transparent dark:bg-surface-1 dark:shadow-raised dark:hover:shadow-raised"
                     style="--logframe-order: {{ min($index, 11) }}"
                 >
                     <span
                         aria-hidden="true"
-                        class="{{ $account->is_active ? 'bg-status-good' : 'bg-secondary-light dark:bg-secondary-medium' }} absolute inset-x-0 top-0 h-1"
+                        class="{{ $account->is_active ? 'bg-status-good' : 'bg-secondary-light dark:bg-ink-faint' }} absolute inset-x-0 top-0 h-1"
                     ></span>
 
                     <div class="flex items-start justify-between gap-3">
@@ -464,9 +494,9 @@ new #[Title('titles.accounts')] class extends Component {
                                 <flux:icon.building-library class="size-5" />
                             </div>
                             <div class="min-w-0">
-                                <p class="truncate text-base font-bold text-secondary-dark dark:text-white">{{ $account->account_name }}</p>
-                                <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $account->bank_name }} · {{ $account->currency->value }} · {{ $account->account_number }}</p>
-                                <p class="truncate text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">
+                                <p class="truncate text-base font-bold text-secondary-dark dark:text-ink">{{ $account->account_name }}</p>
+                                <p class="truncate text-xs text-secondary-medium dark:text-ink-muted">{{ $account->bank_name }} · {{ $account->currency->value }} · <span dir="ltr" data-test="account-number">{{ $this->showsFullAccountNumbers ? $account->account_number : $account->maskedAccountNumber() }}</span></p>
+                                <p class="truncate text-xs tabular-nums text-secondary-medium dark:text-ink-muted">
                                     @if ($account->opened_at !== null)
                                         {{ __('accounts.opened_date', ['date' => $account->opened_at->translatedFormat(__('formats.date'))]) }}
                                     @else
@@ -482,7 +512,7 @@ new #[Title('titles.accounts')] class extends Component {
                         <span @class([
                             'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap',
                             'bg-status-good-soft text-status-good' => $account->is_active,
-                            'bg-secondary-soft text-secondary-medium dark:bg-secondary-medium dark:text-secondary-soft' => ! $account->is_active,
+                            'bg-secondary-soft text-secondary-medium dark:bg-surface-2 dark:text-ink-muted' => ! $account->is_active,
                         ])>
                             {{ $account->is_active ? __('accounts.open') : __('accounts.closed') }}
                         </span>
@@ -490,33 +520,35 @@ new #[Title('titles.accounts')] class extends Component {
 
                     <div class="min-w-0 space-y-1.5">
                         @if ($currencyTotals->isEmpty())
-                            <p class="type-meta text-secondary-light italic dark:text-secondary-medium">{{ __('accounts.no_transfers_yet') }}</p>
+                            <p class="type-meta text-secondary-light italic dark:text-ink-faint">{{ __('accounts.no_transfers_yet') }}</p>
                         @else
                             @foreach ($currencyTotals as $currency => $total)
-                                <div class="flex items-center justify-between gap-2 rounded-lg bg-secondary-soft px-2.5 py-1.5 dark:bg-secondary-medium/40" wire:key="account-{{ $account->id }}-currency-{{ $currency }}">
-                                    <span class="type-meta text-secondary-medium dark:text-secondary-soft">{{ __('ui.received') }}</span>
+                                <div class="flex items-center justify-between gap-2 rounded-lg bg-secondary-soft px-2.5 py-1.5 dark:bg-surface-2" wire:key="account-{{ $account->id }}-currency-{{ $currency }}">
+                                    <span class="type-meta text-secondary-medium dark:text-ink-muted">{{ __('ui.received') }}</span>
                                     <x-ui.money :amount="$total" :currency="$currency" />
                                 </div>
                             @endforeach
                         @endif
                     </div>
 
-                    <div class="mt-auto flex items-center justify-between gap-3 border-t border-secondary-soft pt-3 dark:border-secondary-medium">
+                    <div class="mt-auto flex items-center justify-between gap-3 border-t border-secondary-soft pt-3 dark:border-line">
                         <div class="min-w-0">
-                            <a href="{{ route('transfers.index', ['account' => $account->id]) }}" wire:navigate class="type-meta font-semibold text-secondary-medium underline-offset-4 hover:text-primary hover:underline dark:text-secondary-soft">
+                            <a href="{{ route('transfers.index', ['account' => $account->id]) }}" wire:navigate class="type-meta font-semibold text-secondary-medium underline-offset-4 hover:text-primary dark:hover:text-brand-text hover:underline dark:text-ink-muted">
                                 {{ trans_choice('accounts.count_transfer', $account->transfers_count, ['count' => $account->transfers_count]) }}
                             </a>
                             @if ($lastTransferAt !== null)
-                                <p class="type-meta text-secondary-light dark:text-secondary-medium">{{ __('accounts.last_transfer_date', ['date' => $lastTransferAt->translatedFormat(__('formats.date'))]) }}</p>
+                                <p class="type-meta text-secondary-light dark:text-ink-faint">{{ __('accounts.last_transfer_date', ['date' => $lastTransferAt->translatedFormat(__('formats.date'))]) }}</p>
                             @endif
                         </div>
 
                         <div class="flex shrink-0 items-center gap-1">
                             <x-ui.button tone="ghost" size="sm" icon="eye" class="size-9!" :href="route('transfers.index', ['account' => $account->id])" wire:navigate :aria-label="__('accounts.view_transfers_for_name', ['name' => $account->account_name])" />
-                            <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $account->id }})" :aria-label="__('common.edit_name', ['name' => $account->account_name])" />
+                            @can('accounts.update')
+                                <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $account->id }})" :aria-label="__('common.edit_name', ['name' => $account->account_name])" />
+                            @endcan
 
-                            {{-- No delete anywhere: transfers_tracking.account_id RESTRICTs. --}}
-                            @if ($account->is_active)
+                            {{-- No delete anywhere: transfers_tracking.account_id RESTRICTs. Closing needs accounts.delete. --}}
+                            @if ($account->is_active && auth()->user()->can('accounts.delete'))
                                 <x-ui.button tone="ghost" size="sm" icon="lock-closed" class="size-9!" wire:click="confirmClose({{ $account->id }})" :aria-label="__('accounts.close_name', ['name' => $account->account_name])" />
                             @endif
                         </div>
@@ -527,88 +559,86 @@ new #[Title('titles.accounts')] class extends Component {
 
         <flux:pagination
             :paginator="$this->accounts"
-            class="text-secondary-medium! [&_button]:text-secondary-medium! [&_button:hover]:bg-secondary-soft! dark:text-secondary-soft! dark:[&_button]:text-secondary-soft! dark:[&_button:hover]:bg-secondary-medium!"
+            class="text-secondary-medium! [&_button]:text-secondary-medium! [&_button:hover]:bg-secondary-soft! dark:text-ink-muted! dark:[&_button]:text-ink-muted! dark:[&_button:hover]:bg-surface-2!"
             scroll-to="#account-directory-heading"
         />
     @endif
 
-    <flux:modal wire:model="showAccountModal" class="w-full max-w-lg border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <form wire:submit="saveAccount" class="space-y-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ $editingAccountId === null ? __('accounts.open_account') : __('accounts.edit_account') }}</flux:heading>
-                <flux:subheading>{{ __('accounts.a_new_account_is_usable_immediately_to_stop_it_receiving_tra') }}</flux:subheading>
-            </div>
-
+    <x-ui.modal
+        wire:model="showAccountModal"
+        size="xl"
+        :title="$editingAccountId === null ? __('accounts.open_account') : __('accounts.edit_account')"
+        :description="__('accounts.a_new_account_is_usable_immediately_to_stop_it_receiving_tra')"
+        submit="saveAccount"
+        close="closeAccountModal"
+        required-note
+    >
+        <x-ui.form-section :title="__('common.section_details')" :fields="['accountName', 'bankName', 'currency', 'authorizedPerson', 'openedAt']">
             @if ($editingAccountId !== null)
-                <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-lg bg-secondary-soft px-3 py-2.5 dark:bg-secondary-medium/40">
-                    <div class="flex items-center gap-1.5">
-                        <span class="type-meta text-secondary-medium dark:text-secondary-soft">{{ __('accounts.current_status') }}</span>
+                <x-slot:hint>
+                    <span class="flex flex-col gap-0.5">
                         <span @class([
-                            'rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap',
+                            'inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap',
                             'bg-status-good-soft text-status-good' => $editingAccountIsActive,
-                            'bg-secondary-medium/60 text-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft' => ! $editingAccountIsActive,
+                            'bg-secondary-soft text-secondary-medium dark:bg-surface-2 dark:text-ink-muted' => ! $editingAccountIsActive,
                         ])>
                             {{ $editingAccountIsActive ? __('accounts.open') : __('accounts.closed') }}
                         </span>
-                    </div>
-
-                    @if ($editingAccountClosedAt !== null)
-                        <span class="type-meta text-secondary-medium dark:text-secondary-soft">
-                            {{ __('accounts.closed_date', ['date' => \Carbon\CarbonImmutable::parse($editingAccountClosedAt)->translatedFormat(__('formats.date'))]) }}
-                        </span>
-                    @endif
-
-                    <span class="type-meta text-secondary-medium dark:text-secondary-soft">
-                        {{ trans_choice('accounts.count_transfer', $editingAccountTransfersCount, ['count' => $editingAccountTransfersCount]) }}
+                        @if ($editingAccountClosedAt !== null)
+                            <span>{{ __('accounts.closed_date', ['date' => \Carbon\CarbonImmutable::parse($editingAccountClosedAt)->translatedFormat(__('formats.date'))]) }}</span>
+                        @endif
+                        <span>{{ trans_choice('accounts.count_transfer', $editingAccountTransfersCount, ['count' => $editingAccountTransfersCount]) }}</span>
                     </span>
-                </div>
+                </x-slot:hint>
             @endif
 
-            <x-ui.input wire:model="accountName" :label="__('accounts.account_name')" type="text" maxlength="255" required autofocus />
+            <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                <x-ui.form-input wire:model="accountName" :label="__('accounts.account_name')" maxlength="255" required autofocus class="@2xl/modal:col-span-2" />
+                <x-ui.form-input wire:model="bankName" :label="__('accounts.bank_name')" maxlength="255" required />
 
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.input wire:model="bankName" :label="__('accounts.bank_name')" type="text" maxlength="255" required />
-                <x-ui.select wire:model="currency" :label="__('common.currency')" required>
-                    @foreach (Currency::cases() as $currencyCase)
-                        <flux:select.option :value="$currencyCase->value" :wire:key="'account-currency-'.$currencyCase->value">{{ $currencyCase->value }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
+                <x-ui.form-segmented
+                    wire:model="currency"
+                    :label="__('common.currency')"
+                    required
+                    :options="collect(Currency::cases())->map(fn (Currency $currencyCase): array => ['value' => $currencyCase->value, 'label' => $currencyCase->value])->all()"
+                />
+
+                <x-ui.form-input wire:model="authorizedPerson" :label="__('accounts.authorized_person')" maxlength="255" />
+                <x-ui.form-input wire:model="openedAt" :label="__('accounts.opened_on')" type="date" />
             </div>
+        </x-ui.form-section>
 
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.input wire:model="accountNumber" :label="__('accounts.account_number')" type="text" maxlength="100" required />
-                <x-ui.input wire:model="iban" :label="__('accounts.iban')" type="text" maxlength="100" />
+        <x-ui.form-section :title="__('accounts.section_bank')" :fields="['accountNumber', 'iban', 'swiftCode', 'country']">
+            <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                <x-ui.form-input wire:model="accountNumber" :label="__('accounts.account_number')" maxlength="100" required dir="ltr" />
+                <x-ui.form-input wire:model="iban" :label="__('accounts.iban')" maxlength="100" dir="ltr" />
+                <x-ui.form-input wire:model="swiftCode" :label="__('accounts.swift_code')" maxlength="50" dir="ltr" />
+                <x-ui.form-input wire:model="country" :label="__('donors.country')" maxlength="100" required />
             </div>
+        </x-ui.form-section>
 
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.input wire:model="swiftCode" :label="__('accounts.swift_code')" type="text" maxlength="50" />
-                <x-ui.input wire:model="country" :label="__('donors.country')" type="text" maxlength="100" required />
+        <x-ui.form-section :title="__('accounts.section_address')" :fields="['poBoxStreet', 'companyAddress']">
+            <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                <x-ui.form-textarea wire:model="poBoxStreet" :label="__('accounts.po_box_street')" rows="2" />
+                <x-ui.form-textarea wire:model="companyAddress" :label="__('accounts.company_address')" rows="2" />
             </div>
+        </x-ui.form-section>
 
-            <x-ui.input wire:model="authorizedPerson" :label="__('accounts.authorized_person')" type="text" maxlength="255" />
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="save-account-button">
+                {{ $editingAccountId === null ? __('accounts.open_account') : __('common.save_changes') }}
+            </x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
 
-            <flux:textarea wire:model="poBoxStreet" :label="__('accounts.po_box_street')" rows="2" class="border-secondary-light! bg-white! text-secondary-dark! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!" />
-            <flux:textarea wire:model="companyAddress" :label="__('accounts.company_address')" rows="2" class="border-secondary-light! bg-white! text-secondary-dark! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!" />
-
-            <x-ui.input wire:model="openedAt" :label="__('accounts.opened_on')" type="date" />
-
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeAccountModal">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-account-button">
-                    {{ $editingAccountId === null ? __('accounts.open_account') : __('common.save_changes') }}
-                </x-ui.button>
-            </div>
-        </form>
-    </flux:modal>
-
-    <flux:modal wire:model="showCloseModal" class="w-full max-w-md border border-secondary-light! bg-white! dark:bg-secondary-dark!">
-        <div class="space-y-4">
-            <flux:heading size="lg">{{ __('accounts.close_this_account') }}</flux:heading>
-            <flux:subheading>{{ __('accounts.it_stops_accepting_new_transfers_existing_transfer_records_a') }}</flux:subheading>
-            <div class="flex justify-end gap-2 border-t border-secondary-soft pt-4 dark:border-secondary-medium">
-                <x-ui.button type="button" wire:click="cancelClose">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="button" tone="primary" wire:click="closeAccount" data-test="confirm-close-account">{{ __('accounts.close_account') }}</x-ui.button>
-            </div>
-        </div>
-    </flux:modal>
+    <x-ui.confirm-modal
+        wire:model="showCloseModal"
+        close="cancelClose"
+        tone="neutral"
+        :title="__('accounts.close_this_account')"
+        :message="__('accounts.it_stops_accepting_new_transfers_existing_transfer_records_a')"
+        confirm="closeAccount"
+        :confirm-label="__('accounts.close_account')"
+        confirm-test="confirm-close-account"
+    />
 </section>

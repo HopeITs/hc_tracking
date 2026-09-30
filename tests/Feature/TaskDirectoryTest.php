@@ -10,18 +10,20 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
+use function Livewire\invade;
+
 test('guests are redirected from the task directory', function () {
     $this->get(route('tasks.index'))->assertRedirect(route('login'));
 });
 
 test('authenticated users can view the task directory', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     $this->actingAs($user)->get(route('tasks.index'))->assertOk()->assertSeeText('Tasks');
 });
 
 test('tasks can be filtered by search status priority and assignee', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $alice = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
     $bob = insertHrEmployee(firstNameEn: 'Bob', lastNameEn: 'Rahman');
 
@@ -56,8 +58,33 @@ test('tasks can be filtered by search status priority and assignee', function ()
         ->assertSee('Draft distribution plan')->assertSee('Verify beneficiary list');
 });
 
+test('the my tasks only filter is a checkbox that scopes every view', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $me = insertHrEmployee(firstNameEn: 'Signed', lastNameEn: 'InUser');
+    $user->forceFill(['employee_id' => $me])->save();
+
+    $mine = Task::factory()->create(['title' => 'My own task']);
+    $mine->taskAssignees()->delete();
+    $mine->taskAssignees()->create(['employee_id' => $me]);
+
+    $other = Task::factory()->create(['title' => 'Someone else\'s task']);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->assertSeeHtml('data-test="task-filter-my-tasks-only"')
+        ->assertSee('My own task')->assertSee('Someone else\'s task')
+        ->set('myTasksOnly', true)
+        ->assertSee('My own task')->assertDontSee('Someone else\'s task')
+        ->set('view', 'list')
+        ->assertSee('My own task')->assertDontSee('Someone else\'s task')
+        ->set('view', 'calendar')
+        ->assertSee('My own task')->assertDontSee('Someone else\'s task')
+        ->set('myTasksOnly', false)
+        ->assertSee('My own task')->assertSee('Someone else\'s task');
+});
+
 test('tasks can be filtered by source type and by a specific source record', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $milestone = Milestone::factory()->create(['name' => 'First distribution']);
     $proposal = Proposal::factory()->create();
 
@@ -73,7 +100,7 @@ test('tasks can be filtered by source type and by a specific source record', fun
 });
 
 test('a task records its creator and safely normalizes optional values', function () {
-    $creator = User::factory()->create();
+    $creator = User::factory()->role('General Manager')->create();
     $assignee = insertHrEmployee();
     $proposal = Proposal::factory()->create();
 
@@ -107,7 +134,7 @@ test('a task records its creator and safely normalizes optional values', functio
 });
 
 test('a task can have several assignees at once', function () {
-    $creator = User::factory()->create();
+    $creator = User::factory()->role('General Manager')->create();
     $alice = insertHrEmployee();
     $bob = insertHrEmployee();
     $proposal = Proposal::factory()->create();
@@ -129,7 +156,7 @@ test('a task can have several assignees at once', function () {
 });
 
 test('creating a task rejects missing and invalid required selections', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
         ->test('pages::tasks.index')
@@ -145,7 +172,7 @@ test('creating a task rejects missing and invalid required selections', function
 });
 
 test('creating a task rejects a missing source type or source', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
         ->test('pages::tasks.index')
@@ -159,7 +186,7 @@ test('creating a task rejects a missing source type or source', function () {
 });
 
 test('creating a task rejects an unrecognized source type', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
         ->test('pages::tasks.index')
@@ -175,7 +202,7 @@ test('creating a task rejects an unrecognized source type', function () {
 });
 
 test('creating a task with no assignee at all is rejected', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
         ->test('pages::tasks.index')
@@ -191,7 +218,7 @@ test('creating a task with no assignee at all is rejected', function () {
 });
 
 test('creating a task rejects invalid workflow values and progress', function (string $property, string $value) {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
         ->test('pages::tasks.index')
@@ -213,7 +240,7 @@ test('creating a task rejects invalid workflow values and progress', function (s
 ]);
 
 test('a due date before the start date is rejected', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
         ->test('pages::tasks.index')
@@ -231,8 +258,8 @@ test('a due date before the start date is rejected', function () {
 });
 
 test('a task can be fully edited without changing its creator', function () {
-    $creator = User::factory()->create();
-    $editor = User::factory()->create();
+    $creator = User::factory()->role('General Manager')->create();
+    $editor = User::factory()->role('General Manager')->create();
     $newAssignee = insertHrEmployee();
     $originalProposal = Proposal::factory()->create();
     $newMilestone = Milestone::factory()->create();
@@ -276,7 +303,7 @@ test('a task can be fully edited without changing its creator', function () {
 });
 
 test('editing a task to drop an assignee removes only that assignment', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $alice = insertHrEmployee();
     $bob = insertHrEmployee();
     $task = Task::factory()->create();
@@ -296,7 +323,7 @@ test('editing a task to drop an assignee removes only that assignment', function
 });
 
 test('toggleAssignee adds and removes an assignee directly from the list row', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $alice = insertHrEmployee();
     $bob = insertHrEmployee();
     $task = Task::factory()->create();
@@ -319,7 +346,7 @@ test('toggleAssignee adds and removes an assignee directly from the list row', f
 });
 
 test('toggleAssignee refuses to remove the last remaining assignee', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $alice = insertHrEmployee();
     $task = Task::factory()->create();
     $task->taskAssignees()->delete();
@@ -334,7 +361,7 @@ test('toggleAssignee refuses to remove the last remaining assignee', function ()
 });
 
 test('the list row assignee trigger opens a shared multi select popover of every employee', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $alice = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
     $bob = insertHrEmployee(firstNameEn: 'Bob', lastNameEn: 'Rahman');
     $task = Task::factory()->create();
@@ -354,7 +381,7 @@ test('the list row assignee trigger opens a shared multi select popover of every
 });
 
 test('a task can be deleted and takes only its own attachments with it', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $task = Task::factory()->create();
     $otherTask = Task::factory()->create();
     $attachment = TaskAttachment::factory()->create(['task_id' => $task->id]);
@@ -378,7 +405,7 @@ test('a task can be deleted and takes only its own attachments with it', functio
 });
 
 test('the delete confirmation can be cancelled without deleting the task', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $task = Task::factory()->create();
 
     Livewire::actingAs($user)
@@ -393,7 +420,7 @@ test('the delete confirmation can be cancelled without deleting the task', funct
 });
 
 test('delete is a no-op until a task is confirmed', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $task = Task::factory()->create();
 
     Livewire::actingAs($user)->test('pages::tasks.index')->call('deleteTask')->assertHasNoErrors();
@@ -402,7 +429,7 @@ test('delete is a no-op until a task is confirmed', function () {
 });
 
 test('task rows link to the registered task detail route', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $task = Task::factory()->create(['title' => 'Open my details']);
 
     Livewire::actingAs($user)
@@ -411,7 +438,7 @@ test('task rows link to the registered task detail route', function () {
 });
 
 test('task directory content is escaped', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $assignee = insertHrEmployee(firstNameEn: '<script>assignee()</script>', lastNameEn: '');
     $milestone = Milestone::factory()->create(['name' => '<svg onload=milestone()>']);
     $task = Task::factory()->create([
@@ -433,22 +460,22 @@ test('task directory content is escaped', function () {
 });
 
 test('the task directory renders with no tasks', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)->test('pages::tasks.index')->assertSee('No tasks yet');
 });
 
 test('the my tasks rail stays visible and shows an empty state when the viewer has no tasks', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)->test('pages::tasks.index')
         ->assertSeeHtml('data-test="my-tasks-rail"')
         ->assertSeeHtml('data-test="my-tasks-empty"')
-        ->assertSee('My Tasks');
+        ->assertSee('Tasks Related to Me');
 });
 
 test('the my tasks rail card title links to the task detail page', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $task = Task::factory()->create(['title' => 'Reconcile the ledger', 'created_by' => $user->id]);
 
     Livewire::actingAs($user)
@@ -458,7 +485,7 @@ test('the my tasks rail card title links to the task detail page', function () {
 });
 
 test('toggling completion marks a task done, and a completed task cannot be un-completed', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $task = Task::factory()->create(['status' => TaskStatus::InProgress, 'progress_percentage' => 40, 'completed_date' => null]);
 
     Livewire::actingAs($user)->test('pages::tasks.index')->call('toggleComplete', $task->id);
@@ -478,7 +505,7 @@ test('toggling completion marks a task done, and a completed task cannot be un-c
 });
 
 test('clicking a column header sorts by it ascending, then toggles descending on a second click', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Task::factory()->create(['title' => 'Bravo task']);
     Task::factory()->create(['title' => 'Alpha task']);
 
@@ -495,7 +522,7 @@ test('clicking a column header sorts by it ascending, then toggles descending on
 });
 
 test('sorting by priority and status follows workflow severity order, not alphabetical order', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Task::factory()->create(['title' => 'Low priority task', 'priority' => TaskPriority::Low, 'status' => TaskStatus::UnderReview]);
     Task::factory()->create(['title' => 'High priority task', 'priority' => TaskPriority::High, 'status' => TaskStatus::Todo]);
 
@@ -512,7 +539,7 @@ test('sorting by priority and status follows workflow severity order, not alphab
 });
 
 test('sorting by assignee orders by employee name even though it lives on the read-only hr connection', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $zoe = insertHrEmployee(firstNameEn: 'Zoe', lastNameEn: 'Youssef');
     $amir = insertHrEmployee(firstNameEn: 'Amir', lastNameEn: 'Nasser');
     $zoeTask = Task::factory()->create(['title' => 'Zoe task']);
@@ -528,7 +555,7 @@ test('sorting by assignee orders by employee name even though it lives on the re
 });
 
 test('sorting by created date orders newest or oldest first', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Task::factory()->create(['title' => 'Older task', 'created_at' => now()->subDay()]);
     Task::factory()->create(['title' => 'Newer task', 'created_at' => now()]);
 
@@ -541,7 +568,7 @@ test('sorting by created date orders newest or oldest first', function () {
 });
 
 test('an unrecognized sort field is ignored and leaves the current sort untouched', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
         ->test('pages::tasks.index')
@@ -551,7 +578,7 @@ test('an unrecognized sort field is ignored and leaves the current sort untouche
 });
 
 test('sorting stays server-side and correct across paginated pages', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Task::factory()->count(25)->sequence(fn ($sequence) => ['title' => sprintf('Task %02d', $sequence->index)])->create();
 
     $component = Livewire::actingAs($user)->test('pages::tasks.index')->call('setSort', 'title');
@@ -568,7 +595,7 @@ test('sorting stays server-side and correct across paginated pages', function ()
 });
 
 test('the list view computes stat tiles with one aggregate query instead of loading every matching task', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Task::factory()->count(10)->create();
 
     $page = Livewire::actingAs($user)->test('pages::tasks.index');
@@ -594,7 +621,7 @@ test('the list view computes stat tiles with one aggregate query instead of load
 
 test('the My Tasks rail visually distinguishes tasks assigned to the viewer from tasks the viewer only delegated', function () {
     $employeeId = insertHrEmployee();
-    $user = User::factory()->create(['employee_id' => $employeeId]);
+    $user = User::factory()->role('General Manager')->create(['employee_id' => $employeeId]);
 
     $assignedToMe = Task::factory()->create(['title' => 'Assigned to me', 'created_by' => $user->id]);
     $assignedToMe->taskAssignees()->delete();
@@ -614,7 +641,7 @@ test('the My Tasks rail visually distinguishes tasks assigned to the viewer from
 });
 
 test('the list view groups tasks by status with a colored collapsible header', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Task::factory()->create(['title' => 'Grouped todo task', 'status' => TaskStatus::Todo]);
     Task::factory()->create(['title' => 'Grouped done task', 'status' => TaskStatus::Done]);
 
@@ -629,7 +656,7 @@ test('the list view groups tasks by status with a colored collapsible header', f
 });
 
 test('quickCreateTask opens the drawer pre-filled with the title and the group context', function () {
-    $user = User::factory()->create(['employee_id' => null]);
+    $user = User::factory()->role('General Manager')->create(['employee_id' => null]);
     $milestone = Milestone::factory()->create();
 
     Livewire::actingAs($user)
@@ -650,7 +677,7 @@ test('quickCreateTask opens the drawer pre-filled with the title and the group c
 });
 
 test('quickCreateTask does nothing for a blank title', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
         ->test('pages::tasks.index')
@@ -660,7 +687,7 @@ test('quickCreateTask does nothing for a blank title', function () {
 
 test('quickCreateTask creates the task directly with no drawer when the milestone and assignee are both known', function () {
     $employeeId = insertHrEmployee();
-    $user = User::factory()->create(['employee_id' => $employeeId]);
+    $user = User::factory()->role('General Manager')->create(['employee_id' => $employeeId]);
     $milestone = Milestone::factory()->create();
 
     Livewire::actingAs($user)
@@ -678,7 +705,7 @@ test('quickCreateTask creates the task directly with no drawer when the mileston
 
 test('quickCreateTask falls back to the active source filter when no milestone context is given', function () {
     $employeeId = insertHrEmployee();
-    $user = User::factory()->create(['employee_id' => $employeeId]);
+    $user = User::factory()->role('General Manager')->create(['employee_id' => $employeeId]);
     $proposal = Proposal::factory()->create();
 
     Livewire::actingAs($user)
@@ -696,7 +723,7 @@ test('quickCreateTask falls back to the active source filter when no milestone c
 
 test('quickCreateTask falls back to the drawer when neither a milestone nor an active source filter is known', function () {
     $employeeId = insertHrEmployee();
-    $user = User::factory()->create(['employee_id' => $employeeId]);
+    $user = User::factory()->role('General Manager')->create(['employee_id' => $employeeId]);
 
     Livewire::actingAs($user)
         ->test('pages::tasks.index')
@@ -708,7 +735,7 @@ test('quickCreateTask falls back to the drawer when neither a milestone nor an a
 });
 
 test('quickCreateTask falls back to the drawer when the signed-in user has no linked HR employee', function () {
-    $user = User::factory()->create(['employee_id' => null]);
+    $user = User::factory()->role('General Manager')->create(['employee_id' => null]);
     $milestone = Milestone::factory()->create();
 
     Livewire::actingAs($user)
@@ -725,7 +752,7 @@ test('the list view inline add task row honours its own due date priority status
     // rather than being merged with the fallback.
     $alice = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
     $bob = insertHrEmployee(firstNameEn: 'Bob', lastNameEn: 'Rahman');
-    $user = User::factory()->create(['employee_id' => $alice]);
+    $user = User::factory()->role('General Manager')->create(['employee_id' => $alice]);
     $milestone = Milestone::factory()->create();
 
     Livewire::actingAs($user)
@@ -751,7 +778,7 @@ test('the list view inline add task row honours its own due date priority status
 
 test('quickCreateTask falling back to the drawer carries the row draft into the drawer fields', function () {
     $bob = insertHrEmployee(firstNameEn: 'Bob', lastNameEn: 'Rahman');
-    $user = User::factory()->create(['employee_id' => null]);
+    $user = User::factory()->role('General Manager')->create(['employee_id' => null]);
 
     Livewire::actingAs($user)
         ->test('pages::tasks.index')
@@ -771,22 +798,22 @@ test('quickCreateTask falling back to the drawer carries the row draft into the 
 
 test('toggleTaskDraftAssignee toggles an employee in and out of the add-task draft', function () {
     $alice = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     $component = Livewire::actingAs($user)
         ->test('pages::tasks.index')
         ->call('toggleTaskDraftAssignee', 'row-1', $alice);
 
-    expect($component->instance()->taskDraft('row-1')['assignees'])->toBe([(string) $alice]);
+    expect(invade($component->instance())->taskDraft('row-1')['assignees'])->toBe([(string) $alice]);
 
     $component->call('toggleTaskDraftAssignee', 'row-1', $alice);
 
-    expect($component->instance()->taskDraft('row-1')['assignees'])->toBe([]);
+    expect(invade($component->instance())->taskDraft('row-1')['assignees'])->toBe([]);
 });
 
 test('quickCreateTask uses the calendar days own due date over any draft due date', function () {
     $employeeId = insertHrEmployee();
-    $user = User::factory()->create(['employee_id' => $employeeId]);
+    $user = User::factory()->role('General Manager')->create(['employee_id' => $employeeId]);
     $milestone = Milestone::factory()->create();
 
     Livewire::actingAs($user)
@@ -805,7 +832,7 @@ test('quickCreateTask uses the calendar days own due date over any draft due dat
 });
 
 test('addSubtaskQuick creates a subtask inheriting the parent source and assignees', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $alice = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
     $milestone = Milestone::factory()->create();
     $parent = Task::factory()->create(['source_type' => 'milestone', 'source_id' => $milestone->id]);
@@ -825,7 +852,7 @@ test('addSubtaskQuick creates a subtask inheriting the parent source and assigne
 });
 
 test('addSubtaskQuick refuses to nest a subtask under another subtask', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $parent = Task::factory()->create();
     $subtask = Task::factory()->create(['parent_task_id' => $parent->id]);
 
@@ -837,7 +864,7 @@ test('addSubtaskQuick refuses to nest a subtask under another subtask', function
 });
 
 test('addSubtaskQuick does nothing for a blank title', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $parent = Task::factory()->create();
 
     Livewire::actingAs($user)
@@ -848,15 +875,13 @@ test('addSubtaskQuick does nothing for a blank title', function () {
 });
 
 test('subtaskDraft defaults to todo medium priority no due date and the parents own assignees', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $alice = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
     $parent = Task::factory()->create();
     $parent->taskAssignees()->delete();
     $parent->taskAssignees()->create(['employee_id' => $alice]);
 
-    $draft = Livewire::actingAs($user)
-        ->test('pages::tasks.index')
-        ->instance()
+    $draft = invade(Livewire::actingAs($user)->test('pages::tasks.index')->instance())
         ->subtaskDraft($parent->fresh(['taskAssignees']));
 
     expect($draft)->toBe([
@@ -868,7 +893,7 @@ test('subtaskDraft defaults to todo medium priority no due date and the parents 
 });
 
 test('the list view inline add subtask row honours its own due date priority status and assignees', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $alice = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
     $bob = insertHrEmployee(firstNameEn: 'Bob', lastNameEn: 'Rahman');
     $parent = Task::factory()->create();
@@ -894,7 +919,7 @@ test('the list view inline add subtask row honours its own due date priority sta
 });
 
 test('toggleSubtaskDraftAssignee removes an employee already in the draft', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $alice = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
     $parent = Task::factory()->create();
     $parent->taskAssignees()->delete();
@@ -904,11 +929,11 @@ test('toggleSubtaskDraftAssignee removes an employee already in the draft', func
         ->test('pages::tasks.index')
         ->call('toggleSubtaskDraftAssignee', $parent->id, $alice);
 
-    expect($component->instance()->subtaskDraft($parent->fresh(['taskAssignees']))['assignees'])->toBe([]);
+    expect(invade($component->instance())->subtaskDraft($parent->fresh(['taskAssignees']))['assignees'])->toBe([]);
 });
 
 test('addSubtaskQuick falls back to the parents own assignees when the draft has none', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $alice = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
     $parent = Task::factory()->create();
     $parent->taskAssignees()->delete();
@@ -925,7 +950,7 @@ test('addSubtaskQuick falls back to the parents own assignees when the draft has
 });
 
 test('dropping a task into a different board column persists the status change', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $task = Task::factory()->create(['status' => TaskStatus::Todo]);
 
     Livewire::actingAs($user)
@@ -939,7 +964,7 @@ test('dropping a task into a different board column persists the status change',
 });
 
 test('dropping a task that no longer exists reports the failure instead of failing silently', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $deletedTask = Task::factory()->create();
     $deletedId = $deletedTask->id;
     $deletedTask->delete();
@@ -953,7 +978,7 @@ test('dropping a task that no longer exists reports the failure instead of faili
 });
 
 test('the board view offers a keyboard accessible select as a non pointer alternative to dragging', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $task = Task::factory()->create(['status' => TaskStatus::Todo]);
 
     Livewire::actingAs($user)
@@ -964,7 +989,7 @@ test('the board view offers a keyboard accessible select as a non pointer altern
 });
 
 test('the board view marks a todo task missed once its due date passes', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $missedTask = Task::factory()->create([
         'title' => 'Still in todo',
         'status' => TaskStatus::Todo,
@@ -984,7 +1009,7 @@ test('the board view marks a todo task missed once its due date passes', functio
 });
 
 test('the board view marks an in progress task overdue once its due date passes, not missed', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $task = Task::factory()->create([
         'status' => TaskStatus::InProgress,
         'due_date' => now()->subDays(3)->toDateString(),
@@ -1000,7 +1025,7 @@ test('the board view marks an in progress task overdue once its due date passes,
 });
 
 test('the board view shows a subtask count badge on parent cards', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $parent = Task::factory()->create(['title' => 'Parent with subtasks']);
     Task::factory()->subtaskOf($parent)->create();
 
@@ -1011,7 +1036,7 @@ test('the board view shows a subtask count badge on parent cards', function () {
 });
 
 test('the board view offers an inline priority flag dropdown for subtasks, like the add task row', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $parent = Task::factory()->create();
     $subtask = Task::factory()->subtaskOf($parent)->create(['priority' => TaskPriority::Low]);
 
@@ -1027,7 +1052,7 @@ test('the board view offers an inline priority flag dropdown for subtasks, like 
 });
 
 test('a task with subtasks cannot be deleted until they are moved or removed', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $parent = Task::factory()->create();
     $subtask = Task::factory()->subtaskOf($parent)->create();
 
@@ -1043,7 +1068,7 @@ test('a task with subtasks cannot be deleted until they are moved or removed', f
 });
 
 test('a task with no subtasks deletes normally', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $task = Task::factory()->create();
 
     Livewire::actingAs($user)
@@ -1056,7 +1081,7 @@ test('a task with no subtasks deletes normally', function () {
 });
 
 test('quickSetStatus moves a task and syncs its completion fields', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $task = Task::factory()->create(['status' => TaskStatus::Todo, 'completed_date' => null]);
 
     Livewire::actingAs($user)
@@ -1076,7 +1101,7 @@ test('quickSetStatus moves a task and syncs its completion fields', function () 
 });
 
 test('quickSetStatus sets the start date when a task moves into ongoing', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $task = Task::factory()->create(['status' => TaskStatus::Todo, 'start_date' => null]);
 
     Livewire::actingAs($user)
@@ -1088,7 +1113,7 @@ test('quickSetStatus sets the start date when a task moves into ongoing', functi
 });
 
 test('quickSetStatus does not overwrite an already-recorded start date', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $task = Task::factory()->create(['status' => TaskStatus::Todo, 'start_date' => '2026-01-01']);
 
     Livewire::actingAs($user)
@@ -1100,7 +1125,7 @@ test('quickSetStatus does not overwrite an already-recorded start date', functio
 });
 
 test('the stats section counts overdue and missed tasks separately and filters by each', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $missedTask = Task::factory()->create(['status' => TaskStatus::Todo, 'due_date' => now()->subDay()->toDateString()]);
     Task::factory()->create(['status' => TaskStatus::InProgress, 'due_date' => now()->subDay()->toDateString()]);
 
@@ -1115,7 +1140,7 @@ test('the stats section counts overdue and missed tasks separately and filters b
 });
 
 test('quickSetStatus refuses to change the status of a completed task', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $task = Task::factory()->completed()->create();
 
     Livewire::actingAs($user)
@@ -1127,7 +1152,7 @@ test('quickSetStatus refuses to change the status of a completed task', function
 });
 
 test('the calendar view places tasks on their due date and lists unscheduled tasks separately', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Task::factory()->create(['title' => 'Scheduled task', 'due_date' => now()->startOfMonth()->addDays(2)->toDateString()]);
     Task::factory()->create(['title' => 'Unscheduled task', 'due_date' => null]);
 
@@ -1140,7 +1165,7 @@ test('the calendar view places tasks on their due date and lists unscheduled tas
 });
 
 test('the calendar view labels a missed todo chip differently from an overdue in progress chip', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $missedTask = Task::factory()->create([
         'title' => 'Missed on calendar',
         'status' => TaskStatus::Todo,
@@ -1160,7 +1185,7 @@ test('the calendar view labels a missed todo chip differently from an overdue in
 });
 
 test('the calendar view switches between day, 4-days, week and month periods', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
         ->test('pages::tasks.index')
@@ -1177,7 +1202,7 @@ test('the calendar view switches between day, 4-days, week and month periods', f
 });
 
 test('the calendar view period navigation moves the anchor date in day/week/4-day modes', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
         ->test('pages::tasks.index')
@@ -1193,7 +1218,7 @@ test('the calendar view period navigation moves the anchor date in day/week/4-da
 });
 
 test('a task shows on its due date in the week calendar view', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Task::factory()->create(['title' => 'Weekly task', 'due_date' => '2026-04-15']);
 
     Livewire::actingAs($user)
@@ -1205,7 +1230,7 @@ test('a task shows on its due date in the week calendar view', function () {
 });
 
 test('rescheduleTask sets or clears a due date from calendar drag and drop', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $task = Task::factory()->create(['due_date' => null, 'created_by' => $user->id]);
 
     Livewire::actingAs($user)
@@ -1229,8 +1254,8 @@ test('rescheduleTask sets or clears a due date from calendar drag and drop', fun
 });
 
 test('rescheduleTask refuses to change the due date for anyone but the task creator', function () {
-    $creator = User::factory()->create();
-    $otherUser = User::factory()->create();
+    $creator = User::factory()->role('General Manager')->create();
+    $otherUser = User::factory()->role('General Manager')->create();
     $task = Task::factory()->create(['due_date' => '2026-05-01', 'created_by' => $creator->id]);
 
     Livewire::actingAs($otherUser)

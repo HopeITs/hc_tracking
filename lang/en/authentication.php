@@ -41,4 +41,12 @@ return [
     'sign_in' => 'Sign In',
     'sign_up' => 'Sign up',
     'this_is_a_secure_area_of_the_application_please_confirm_your' => 'This is a secure area of the application. Please confirm your password before continuing.',
+    'email_code_title' => 'Check your email',
+    'email_code_description' => 'We emailed you a 6-digit sign-in code. Enter it below to finish signing in.',
+    'email_code_invalid' => 'That code is wrong or has expired. Request a new code and try again.',
+    'email_code_resend' => 'Send me a new code',
+    'email_code_not_sent' => 'We could not send your sign-in code by email. Try again in a moment, or contact IT if it keeps happening.',
+    'human_check_failed' => 'We could not confirm that you are not a robot. Wait for the check above the button to finish, then try again.',
+    'trust_this_device' => 'Don\'t ask for a code on this device for 30 days',
+    'email_code_resent' => 'A new code is on its way to your email.',
 ];

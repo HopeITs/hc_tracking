@@ -217,7 +217,7 @@ test('transfer tracking renders with no transfers', function () {
 });
 
 test('a user without transfer permissions cannot schedule a tranche', function () {
-    $viewer = User::factory()->role('Managers')->create();
+    $viewer = User::factory()->role('Managers')->create()->givePermissionTo('transfers.view');
     $agreement = DonorProposal::factory()->create(['currency' => Currency::Usd]);
 
     $fresh = fn () => Livewire::actingAs($viewer)->test('pages::transfers.index');

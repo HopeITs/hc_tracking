@@ -1,0 +1,12 @@
+# Findings already in git history, reviewed 2026-09-28. Each is dead or rotated,
+# so it is pinned here instead of rewriting history. Never add a live secret.
+
+# APP_KEY committed in .env.example; retired, and must never be used by any environment.
+3ebfc62491f2b26afb0545420a1e587c7e502c96:.env.example:laravel-app-key:4
+3ebfc62491f2b26afb0545420a1e587c7e502c96:.env.example:env-secret-assignment:4
+
+# CSRF token inside an expired session row of the archived pre-rebuild dump.
+20413f097c3db0b429f3a4eb3a6019c301fb0533:database/archive/hc-tracking_20260904-121146.sql:generic-api-key:801
+
+# Access key of a local brainstorming preview server that no longer runs.
+a7572cf2e9d8de07a1551f1c47cdaf23a3b48cd2:.superpowers/brainstorm/1914-1790171651/state/server-info:generic-api-key:1

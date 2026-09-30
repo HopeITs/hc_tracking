@@ -1,5 +1,7 @@
 <?php
 
+use App\Actions\Tasks\DeleteTaskAttachment;
+use App\Actions\Tasks\SaveTaskAttachment;
 use App\Enums\FileType;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
@@ -7,14 +9,13 @@ use App\Models\HrEmployee;
 use App\Models\Milestone;
 use App\Models\Task;
 use App\Models\TaskAttachment;
+use App\Rules\SecureUpload;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
@@ -65,6 +66,7 @@ new #[Title('titles.task')] class extends Component
 
     public bool $showFileModal = false;
 
+    #[Locked]
     public ?int $editingFileId = null;
 
     public $newFile = null;
@@ -75,10 +77,12 @@ new #[Title('titles.task')] class extends Component
 
     public bool $showDeleteFileModal = false;
 
+    #[Locked]
     public ?int $deletingFileId = null;
 
     public bool $showPreviewModal = false;
 
+    #[Locked]
     public ?int $previewingFileId = null;
 
     public function mount(Task $task): void
@@ -151,8 +155,20 @@ new #[Title('titles.task')] class extends Component
         return HrEmployee::pickerOptions();
     }
 
+    /**
+     * Save the task. Editors (tasks.update, or the task's creator) change
+     * every field; its assignees may only move status and progress, so for
+     * them every other field keeps its stored value.
+     */
     public function updateTask(): void
     {
+        $task = Task::query()->findOrFail($this->taskId);
+        $canEdit = Gate::allows('update', $task);
+
+        if (! $canEdit) {
+            Gate::authorize('updateStatus', $task);
+        }
+
         $this->title = trim($this->title);
         $this->description = trim($this->description);
 
@@ -177,18 +193,26 @@ new #[Title('titles.task')] class extends Component
             'progressPercentage.max' => __('tasks.progress_cannot_exceed_100_percent'),
         ]);
 
-        $task = Task::query()->findOrFail($this->taskId);
+        DB::transaction(function () use ($task, $validated, $canEdit): void {
+            $progress = [
+                'status' => $validated['taskStatus'],
+                'completed_date' => $validated['completedDate'] === '' ? null : $validated['completedDate'],
+                'progress_percentage' => (int) $validated['progressPercentage'],
+            ];
 
-        DB::transaction(function () use ($task, $validated): void {
+            if (! $canEdit) {
+                $task->fill($progress)->save();
+
+                return;
+            }
+
             $task->fill([
+                ...$progress,
                 'title' => $validated['title'],
                 'description' => $validated['description'] === '' ? null : $validated['description'],
-                'status' => $validated['taskStatus'],
                 'priority' => $validated['taskPriority'],
                 'start_date' => $validated['startDate'] === '' ? null : $validated['startDate'],
                 'due_date' => $validated['dueDate'] === '' ? null : $validated['dueDate'],
-                'completed_date' => $validated['completedDate'] === '' ? null : $validated['completedDate'],
-                'progress_percentage' => (int) $validated['progressPercentage'],
             ])->save();
 
             $employeeIds = collect($validated['assignedTo'])->map(fn ($id): int => (int) $id)->unique()->values();
@@ -215,6 +239,8 @@ new #[Title('titles.task')] class extends Component
      */
     public function openAddSubtaskModal(): void
     {
+        Gate::authorize('create', Task::class);
+
         $this->resetValidation();
         $this->newSubtaskTitle = '';
         $this->newSubtaskStatus = TaskStatus::Todo->value;
@@ -231,6 +257,14 @@ new #[Title('titles.task')] class extends Component
 
     public function addSubtask(): void
     {
+        // Subtasks are one level deep: judged by the column, since the parent
+        // itself may be hidden from this viewer.
+        if ($this->task->parent_task_id !== null) {
+            return;
+        }
+
+        Gate::authorize('create', Task::class);
+
         $this->newSubtaskTitle = trim($this->newSubtaskTitle);
 
         $validated = $this->validate([
@@ -323,7 +357,7 @@ new #[Title('titles.task')] class extends Component
         $allowedTypes = implode(',', FileType::values());
 
         $validated = $this->validate([
-            'newFile' => [$isCreate ? 'required' : 'nullable', 'file', 'max:5120', 'mimes:'.$allowedTypes, 'extensions:'.$allowedTypes],
+            'newFile' => [$isCreate ? 'required' : 'nullable', 'bail', 'file', 'max:5120', 'mimes:'.$allowedTypes, 'extensions:'.$allowedTypes, new SecureUpload],
             'fileDisplayName' => [$isCreate ? 'nullable' : 'required', 'string', 'max:255'],
             'fileDate' => ['required', 'date'],
         ], [
@@ -332,39 +366,12 @@ new #[Title('titles.task')] class extends Component
             'fileDate.required' => __('tasks.set_the_file_date'),
         ]);
 
-        $file = $isCreate
-            ? new TaskAttachment(['task_id' => $this->taskId])
-            : $this->taskAttachment($this->editingFileId);
-
-        $replacedFile = null;
-
-        if ($this->newFile !== null) {
-            if (! $isCreate && $file->original_name !== null) {
-                $replacedFile = ['disk' => $file->disk, 'path' => $file->path];
-            }
-
-            $file->fill([
-                'disk' => 'local',
-                'path' => $this->newFile->store('task-attachments/'.$this->taskId, 'local'),
-                'type' => FileType::from(Str::lower($this->newFile->getClientOriginalExtension())),
-                'mime_type' => $this->newFile->getMimeType(),
-                'size' => $this->newFile->getSize(),
-                'uploaded_by' => auth()->id(),
-            ]);
-        }
-
-        $displayName = trim((string) ($validated['fileDisplayName'] ?? ''));
-
-        $file->fill([
-            'original_name' => $displayName !== ''
-                ? $this->displayNameWithExtension($displayName, $file->type)
-                : $this->newFile->getClientOriginalName(),
-            'date' => $validated['fileDate'],
-        ])->save();
-
-        if ($replacedFile !== null) {
-            $this->removeFromDisk($file->id, $replacedFile['disk'], $replacedFile['path']);
-        }
+        app(SaveTaskAttachment::class)->handle(
+            $this->task,
+            $isCreate ? null : $this->taskAttachment($this->editingFileId),
+            $this->newFile,
+            $validated,
+        );
 
         $this->closeFileModal();
         unset($this->attachments);
@@ -408,13 +415,7 @@ new #[Title('titles.task')] class extends Component
             return;
         }
 
-        $file = $this->taskAttachment($this->deletingFileId);
-
-        if ($file->original_name !== null) {
-            $this->removeFromDisk($file->id, $file->disk, $file->path);
-        }
-
-        $file->delete();
+        app(DeleteTaskAttachment::class)->handle($this->task, $this->taskAttachment($this->deletingFileId));
 
         $this->closeDeleteFileModal();
         unset($this->attachments);
@@ -471,40 +472,10 @@ new #[Title('titles.task')] class extends Component
     {
         return TaskAttachment::query()->where('task_id', $this->taskId)->findOrFail($fileId);
     }
-
-    /**
-     * A user-typed display name, guaranteed to carry the file's real
-     * extension, since it becomes the downloaded filename.
-     */
-    private function displayNameWithExtension(string $displayName, FileType $type): string
-    {
-        if (Str::lower(pathinfo($displayName, PATHINFO_EXTENSION)) === $type->value) {
-            return $displayName;
-        }
-
-        return $displayName.'.'.$type->value;
-    }
-
-    /**
-     * Remove a stored file, logging rather than surfacing a storage failure
-     * so a disk hiccup never leaves a record stuck in the UI.
-     */
-    private function removeFromDisk(int $fileId, string $disk, string $path): void
-    {
-        try {
-            Storage::disk($disk)->delete($path);
-        } catch (\Throwable $exception) {
-            Log::warning('Failed to delete task attachment from disk.', [
-                'task_attachment_id' => $fileId,
-                'path' => $path,
-                'error' => $exception->getMessage(),
-            ]);
-        }
-    }
 };
 ?>
 
-<section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="task-detail-heading">
+<section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="task-detail-heading">
     @php $assignees = $this->task->taskAssignees->pluck('employee')->filter(); @endphp
 
     <x-ui.detail-header
@@ -549,145 +520,159 @@ new #[Title('titles.task')] class extends Component
 
     @if ($this->task->description !== null)
         <x-ui.panel :title="__('common.description')">
-            <p class="whitespace-pre-line p-3.5 text-sm text-secondary-medium dark:text-secondary-soft">{{ $this->task->description }}</p>
+            <p class="whitespace-pre-line p-3.5 text-sm text-secondary-medium dark:text-ink-muted">{{ $this->task->description }}</p>
         </x-ui.panel>
     @endif
 
     @php
-        $selectedAssigneeOptions = $this->userOptions->whereIn('id', collect($assignedTo)->map(fn ($id) => (int) $id));
-        $assigneeTriggerLabel = match (true) {
-            $selectedAssigneeOptions->isEmpty() => __('common.select'),
-            $selectedAssigneeOptions->count() <= 2 => $selectedAssigneeOptions->pluck('name')->implode(', '),
-            default => __('common.count_selected', ['count' => $selectedAssigneeOptions->count()]),
-        };
-        $selectedNewSubtaskAssigneeOptions = $this->userOptions->whereIn('id', collect($newSubtaskAssignedTo)->map(fn ($id) => (int) $id));
-        $newSubtaskAssigneeTriggerLabel = match (true) {
-            $selectedNewSubtaskAssigneeOptions->isEmpty() => __('common.select'),
-            $selectedNewSubtaskAssigneeOptions->count() <= 2 => $selectedNewSubtaskAssigneeOptions->pluck('name')->implode(', '),
-            default => __('common.count_selected', ['count' => $selectedNewSubtaskAssigneeOptions->count()]),
-        };
+        $canEditTask = auth()->user()->can('update', $this->task);
+        $canUpdateTaskStatus = $canEditTask || auth()->user()->can('updateStatus', $this->task);
+
+        if ($canEditTask) {
+            $selectedAssigneeOptions = $this->userOptions->whereIn('id', collect($assignedTo)->map(fn ($id) => (int) $id));
+            $assigneeTriggerLabel = match (true) {
+                $selectedAssigneeOptions->isEmpty() => __('common.select'),
+                $selectedAssigneeOptions->count() <= 2 => $selectedAssigneeOptions->pluck('name')->implode(', '),
+                default => __('common.count_selected', ['count' => $selectedAssigneeOptions->count()]),
+            };
+        }
     @endphp
 
-    <x-ui.panel :title="__('tasks.edit_task')" :subtitle="__('tasks.edit_task_hint')">
-        <form wire:submit="updateTask" class="flex flex-col gap-5 p-4">
-            <x-ui.input wire:model="title" :label="__('tasks.task_title')" type="text" maxlength="255" required />
+    @if ($canUpdateTaskStatus)
+        <x-ui.panel
+            :title="$canEditTask ? __('tasks.edit_task') : __('tasks.update_task_status')"
+            :subtitle="$canEditTask ? __('tasks.edit_task_hint') : __('tasks.update_task_status_hint')"
+        >
+            <form wire:submit="updateTask" class="flex flex-col gap-5 p-4" data-test="task-edit-form">
+                @if ($canEditTask)
+                    <x-ui.input wire:model="title" :label="__('tasks.task_title')" type="text" maxlength="255" required data-test="task-edit-title-input" />
 
-            <flux:textarea wire:model="description" :label="__('common.description')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!" />
+                    <flux:textarea wire:model="description" :label="__('common.description')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:border-field-line! dark:bg-surface-2! dark:text-ink!" />
+                @endif
 
-            <div class="grid gap-5 sm:grid-cols-2">
-                <div class="min-w-0">
-                    <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft" id="task-edit-status-label">{{ __('common.status') }}</label>
-                    <div class="grid grid-cols-2 gap-1.5" role="radiogroup" aria-labelledby="task-edit-status-label">
-                        @foreach (TaskStatus::cases() as $statusCase)
-                            @php $isStatusSelected = $taskStatus === $statusCase->value; @endphp
-                            <button
-                                type="button"
-                                role="radio"
-                                aria-checked="{{ $isStatusSelected ? 'true' : 'false' }}"
-                                wire:click="$set('taskStatus', '{{ $statusCase->value }}')"
-                                @class([
-                                    'inline-flex min-h-10 cursor-pointer touch-manipulation items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-semibold whitespace-nowrap transition-colors',
-                                    'border-secondary-dark bg-secondary-dark text-white dark:border-white dark:bg-white dark:text-secondary-dark' => $isStatusSelected,
-                                    'border-secondary-light text-secondary-medium hover:border-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => ! $isStatusSelected,
-                                ])
-                                data-test="task-edit-status-{{ $statusCase->value }}"
-                            >
-                                {{ $statusCase->label() }}
-                            </button>
-                        @endforeach
+                <div @class(['grid gap-5', 'sm:grid-cols-2' => $canEditTask])>
+                    <div class="min-w-0">
+                        <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-ink-muted" id="task-edit-status-label">{{ __('common.status') }}</label>
+                        <div class="grid grid-cols-2 gap-1.5" role="radiogroup" aria-labelledby="task-edit-status-label">
+                            @foreach (TaskStatus::cases() as $statusCase)
+                                @php $isStatusSelected = $taskStatus === $statusCase->value; @endphp
+                                <button
+                                    type="button"
+                                    role="radio"
+                                    aria-checked="{{ $isStatusSelected ? 'true' : 'false' }}"
+                                    wire:click="$set('taskStatus', '{{ $statusCase->value }}')"
+                                    @class([
+                                        'inline-flex min-h-10 cursor-pointer touch-manipulation items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-semibold whitespace-nowrap transition-colors',
+                                        'border-secondary-dark bg-secondary-dark text-white dark:border-ink dark:bg-ink dark:text-surface-0' => $isStatusSelected,
+                                        'border-secondary-light text-secondary-medium hover:border-secondary-medium hover:text-secondary-dark dark:text-ink-muted dark:hover:text-ink' => ! $isStatusSelected,
+                                    ])
+                                    data-test="task-edit-status-{{ $statusCase->value }}"
+                                >
+                                    {{ $statusCase->label() }}
+                                </button>
+                            @endforeach
+                        </div>
+                        <flux:error name="taskStatus" class="mt-1.5" />
                     </div>
-                    <flux:error name="taskStatus" class="mt-1.5" />
+
+                    @if ($canEditTask)
+                        <div class="min-w-0">
+                            <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-ink-muted" id="task-edit-priority-label">{{ __('tasks.priority') }}</label>
+                            <div class="grid grid-cols-3 gap-1.5" role="radiogroup" aria-labelledby="task-edit-priority-label">
+                                @foreach (TaskPriority::cases() as $priorityCase)
+                                    @php $isPrioritySelected = $taskPriority === $priorityCase->value; @endphp
+                                    <button
+                                        type="button"
+                                        role="radio"
+                                        aria-checked="{{ $isPrioritySelected ? 'true' : 'false' }}"
+                                        wire:click="$set('taskPriority', '{{ $priorityCase->value }}')"
+                                        @class([
+                                            'inline-flex min-h-10 cursor-pointer touch-manipulation items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-semibold whitespace-nowrap transition-colors',
+                                            'border-secondary-dark bg-secondary-dark text-white dark:border-ink dark:bg-ink dark:text-surface-0' => $isPrioritySelected,
+                                            'border-secondary-light text-secondary-medium hover:border-secondary-medium hover:text-secondary-dark dark:text-ink-muted dark:hover:text-ink' => ! $isPrioritySelected,
+                                        ])
+                                        data-test="task-edit-priority-{{ $priorityCase->value }}"
+                                    >
+                                        {{ $priorityCase->label() }}
+                                    </button>
+                                @endforeach
+                            </div>
+                            <flux:error name="taskPriority" class="mt-1.5" />
+                        </div>
+                    @endif
                 </div>
 
                 <div class="min-w-0">
-                    <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft" id="task-edit-priority-label">{{ __('tasks.priority') }}</label>
-                    <div class="grid grid-cols-3 gap-1.5" role="radiogroup" aria-labelledby="task-edit-priority-label">
-                        @foreach (TaskPriority::cases() as $priorityCase)
-                            @php $isPrioritySelected = $taskPriority === $priorityCase->value; @endphp
-                            <button
-                                type="button"
-                                role="radio"
-                                aria-checked="{{ $isPrioritySelected ? 'true' : 'false' }}"
-                                wire:click="$set('taskPriority', '{{ $priorityCase->value }}')"
-                                @class([
-                                    'inline-flex min-h-10 cursor-pointer touch-manipulation items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-semibold whitespace-nowrap transition-colors',
-                                    'border-secondary-dark bg-secondary-dark text-white dark:border-secondary-medium dark:bg-secondary-medium' => $isPrioritySelected,
-                                    'border-secondary-light text-secondary-medium hover:border-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => ! $isPrioritySelected,
-                                ])
-                                data-test="task-edit-priority-{{ $priorityCase->value }}"
-                            >
-                                {{ $priorityCase->label() }}
-                            </button>
-                        @endforeach
+                    <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-ink-muted" for="task-edit-progress-slider">{{ __('tasks.progress_2') }}</label>
+                    <div class="flex items-center gap-3">
+                        <input id="task-edit-progress-slider" type="range" wire:model="progressPercentage" min="0" max="100" step="1" class="h-1.5 w-full flex-1 cursor-pointer accent-primary" data-test="task-edit-progress-slider" />
+                        <div class="relative w-16 shrink-0">
+                            <input type="number" wire:model="progressPercentage" min="0" max="100" required class="w-full rounded-lg border border-secondary-light bg-white py-1.5 ps-2 pe-6 text-end text-sm font-semibold tabular-nums text-secondary-dark focus:ring-1 focus:ring-primary focus:outline-none dark:border-field-line dark:bg-surface-2 dark:text-ink" aria-label="{{ __('tasks.progress_2') }}" data-test="task-edit-progress-input" />
+                            <span class="pointer-events-none absolute inset-y-0 end-2 flex items-center text-sm text-secondary-medium dark:text-ink-muted">%</span>
+                        </div>
                     </div>
-                    <flux:error name="taskPriority" class="mt-1.5" />
+                    <flux:error name="progressPercentage" class="mt-1.5" />
                 </div>
-            </div>
 
-            <div class="min-w-0">
-                <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft" for="task-edit-progress-slider">{{ __('tasks.progress_2') }}</label>
-                <div class="flex items-center gap-3">
-                    <input id="task-edit-progress-slider" type="range" wire:model="progressPercentage" min="0" max="100" step="1" class="h-1.5 w-full flex-1 cursor-pointer accent-primary" data-test="task-edit-progress-slider" />
-                    <div class="relative w-16 shrink-0">
-                        <input type="number" wire:model="progressPercentage" min="0" max="100" required class="w-full rounded-lg border border-secondary-light bg-white py-1.5 ps-2 pe-6 text-end text-sm font-semibold tabular-nums text-secondary-dark focus:ring-1 focus:ring-primary focus:outline-none dark:border-secondary-light dark:bg-secondary-medium dark:text-white" aria-label="{{ __('tasks.progress_2') }}" data-test="task-edit-progress-input" />
-                        <span class="pointer-events-none absolute inset-y-0 end-2 flex items-center text-sm text-secondary-medium dark:text-secondary-soft">%</span>
-                    </div>
-                </div>
-                <flux:error name="progressPercentage" class="mt-1.5" />
-            </div>
-
-            <div class="min-w-0">
-                <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('tasks.assignees') }}</label>
-                <x-ui.multi-select-popover
-                    :label="__('tasks.assignees')"
-                    class="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-secondary-light bg-white px-3 py-2 text-start text-sm dark:border-secondary-light dark:bg-secondary-medium"
-                    data-test="task-edit-assignee-picker"
-                >
-                    <x-slot:trigger>
-                        <span class="min-w-0 truncate">{{ $assigneeTriggerLabel }}</span>
-                        <flux:icon.chevron-up-down class="size-4 shrink-0 text-secondary-medium dark:text-secondary-soft" aria-hidden="true" />
-                    </x-slot:trigger>
-
-                    @foreach ($this->userOptions as $userOption)
-                        <label
-                            x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
-                            class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-secondary-soft dark:hover:bg-secondary-medium"
+                @if ($canEditTask)
+                    <div class="min-w-0">
+                        <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-ink-muted">{{ __('tasks.assignees') }}</label>
+                        <x-ui.multi-select-popover
+                            :label="__('tasks.assignees')"
+                            class="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-secondary-light bg-white px-3 py-2 text-start text-sm dark:border-field-line dark:bg-surface-2"
+                            data-test="task-edit-assignee-picker"
                         >
-                            <input type="checkbox" wire:model.live="assignedTo" value="{{ $userOption->id }}" class="rounded border-secondary-light text-primary focus:ring-primary" data-test="task-edit-assignee-checkbox-{{ $userOption->id }}" />
-                            <span class="min-w-0 truncate">{{ $userOption->name }} · {{ $userOption->secondary_name }}</span>
-                        </label>
-                    @endforeach
-                </x-ui.multi-select-popover>
-                <flux:error name="assignedTo" class="mt-1.5" />
-            </div>
+                            <x-slot:trigger>
+                                <span class="min-w-0 truncate">{{ $assigneeTriggerLabel }}</span>
+                                <flux:icon.chevron-up-down class="size-4 shrink-0 text-secondary-medium dark:text-ink-muted" aria-hidden="true" />
+                            </x-slot:trigger>
 
-            <div class="grid gap-4 sm:grid-cols-3">
-                <x-ui.input wire:model="startDate" :label="__('common.start_date')" type="date" />
-                <x-ui.input wire:model="dueDate" :label="__('tasks.due_date_2')" type="date" />
-                <x-ui.input wire:model="completedDate" :label="__('tasks.completed_date')" type="date" />
-            </div>
-            <flux:error name="dueDate" class="-mt-3" />
+                            @foreach ($this->userOptions as $userOption)
+                                <label
+                                    x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
+                                    class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-secondary-soft dark:hover:bg-white/[0.06]"
+                                >
+                                    <input type="checkbox" wire:model.live="assignedTo" value="{{ $userOption->id }}" class="rounded border-secondary-light text-primary dark:text-brand-text focus:ring-primary" data-test="task-edit-assignee-checkbox-{{ $userOption->id }}" />
+                                    <span class="min-w-0 truncate">{{ $userOption->name }} · {{ $userOption->secondary_name }}</span>
+                                </label>
+                            @endforeach
+                        </x-ui.multi-select-popover>
+                        <flux:error name="assignedTo" class="mt-1.5" />
+                    </div>
+                @endif
 
-            <div class="flex justify-end gap-2 border-t border-secondary-soft pt-4 dark:border-secondary-medium">
-                <x-ui.button type="submit" tone="primary" class="min-h-11 touch-manipulation sm:min-h-10" data-test="update-task-button">{{ __('common.save_changes') }}</x-ui.button>
-            </div>
-        </form>
-    </x-ui.panel>
+                <div @class(['grid gap-4', 'sm:grid-cols-3' => $canEditTask])>
+                    @if ($canEditTask)
+                        <x-ui.input wire:model="startDate" :label="__('common.start_date')" type="date" />
+                        <x-ui.input wire:model="dueDate" :label="__('tasks.due_date_2')" type="date" />
+                    @endif
+                    <x-ui.input wire:model="completedDate" :label="__('tasks.completed_date')" type="date" data-test="task-edit-completed-date-input" />
+                </div>
+                @if ($canEditTask)
+                    <flux:error name="dueDate" class="-mt-3" />
+                @endif
 
-    @if ($this->task->parentTask === null)
+                <div class="flex justify-end gap-2 border-t border-secondary-soft pt-4 dark:border-line">
+                    <x-ui.button type="submit" tone="primary" class="min-h-11 touch-manipulation sm:min-h-10" data-test="update-task-button">{{ __('common.save_changes') }}</x-ui.button>
+                </div>
+            </form>
+        </x-ui.panel>
+    @endif
+
+    @if ($this->task->parent_task_id === null)
         <x-ui.panel :title="__('tasks.related_tasks')" :count="$this->subtasks->count()" :subtitle="__('tasks.subtasks_inherit_this_task_s_proposal_milestone_and_assign')">
             <x-slot:toolbar>
-                <x-ui.button tone="primary" size="sm" icon="plus" wire:click="openAddSubtaskModal" data-test="add-subtask-button">{{ __('tasks.add_subtask') }}</x-ui.button>
+                @can('create', App\Models\Task::class)<x-ui.button tone="primary" size="sm" icon="plus" wire:click="openAddSubtaskModal" data-test="add-subtask-button">{{ __('tasks.add_subtask') }}</x-ui.button>@endcan
             </x-slot:toolbar>
 
             @if ($this->subtasks->isEmpty())
                 <x-ui.empty-state icon="rectangle-stack" :heading="__('tasks.no_subtasks_yet')" :body="__('tasks.break_this_task_down_into_smaller_steps')">
                     <x-slot:action>
-                        <x-ui.button size="sm" tone="primary" icon="plus" wire:click="openAddSubtaskModal">{{ __('tasks.add_subtask') }}</x-ui.button>
+                        @can('create', App\Models\Task::class)<x-ui.button size="sm" tone="primary" icon="plus" wire:click="openAddSubtaskModal">{{ __('tasks.add_subtask') }}</x-ui.button>@endcan
                     </x-slot:action>
                 </x-ui.empty-state>
             @else
-                <ul class="divide-y divide-secondary-soft dark:divide-secondary-medium">
+                <ul class="divide-y divide-secondary-soft dark:divide-line">
                     @foreach ($this->subtasks as $subtask)
                         @php $subtaskAssignees = $subtask->taskAssignees->pluck('employee')->filter(); @endphp
                         <li class="flex flex-wrap items-center justify-between gap-3 p-3.5" wire:key="subtask-{{ $subtask->id }}">
@@ -695,10 +680,10 @@ new #[Title('titles.task')] class extends Component
                                 {{ $subtask->title }}
                             </a>
                             <div class="flex shrink-0 items-center gap-3">
-                                <span class="w-40 shrink-0 truncate text-xs text-secondary-medium dark:text-secondary-soft">
+                                <span class="w-40 shrink-0 truncate text-xs text-secondary-medium dark:text-ink-muted">
                                     {{ $subtaskAssignees->isEmpty() ? __('common.not_assigned') : $subtaskAssignees->map->name->implode(', ') }}
                                 </span>
-                                <span class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">
+                                <span class="text-xs tabular-nums text-secondary-medium dark:text-ink-muted">
                                     {{ $subtask->due_date?->translatedFormat(__('formats.date')) ?? '—' }}
                                 </span>
                                 <x-ui.enum-badge :case="$subtask->status" />
@@ -730,7 +715,7 @@ new #[Title('titles.task')] class extends Component
                 @endif
             </x-ui.empty-state>
         @else
-            <ul class="divide-y divide-secondary-soft dark:divide-secondary-medium">
+            <ul class="divide-y divide-secondary-soft dark:divide-line">
                 @foreach ($this->attachments as $attachment)
                     @php
                         $attachmentName = $attachment->displayName();
@@ -743,23 +728,23 @@ new #[Title('titles.task')] class extends Component
                     @endphp
                     <li class="flex flex-wrap items-center gap-3 p-3.5" wire:key="task-attachment-{{ $attachment->id }}">
                         @if ($isStored && in_array($attachment->type, [FileType::Jpg, FileType::Png], true))
-                            <button type="button" wire:click="openPreview({{ $attachment->id }})" class="size-10 shrink-0 overflow-hidden rounded-xl border border-secondary-soft dark:border-secondary-medium" aria-label="{{ __('tasks.preview_name', ['name' => $attachmentName]) }}">
-                                <img src="{{ route('tasks.files.preview', [$this->task, $attachment]) }}" alt="" loading="lazy" class="size-full object-cover" />
+                            <button type="button" wire:click="openPreview({{ $attachment->id }})" class="size-10 shrink-0 overflow-hidden rounded-xl border border-secondary-soft dark:border-line" aria-label="{{ __('tasks.preview_name', ['name' => $attachmentName]) }}">
+                                <img src="{{ route('tasks.files.preview', [$this->task, $attachment]) }}" alt="" loading="lazy" class="size-full object-cover" data-no-dim />
                             </button>
                         @else
-                            <span class="inline-flex size-10 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-secondary-soft bg-board-head dark:border-secondary-medium dark:bg-secondary-medium/30">
-                                <flux:icon :name="$fileIcon" variant="micro" class="size-3.5 text-secondary-medium dark:text-secondary-soft" />
-                                <span class="text-[10px] font-bold text-secondary-dark dark:text-white">{{ Str::upper($attachment->type->value) }}</span>
+                            <span class="inline-flex size-10 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-secondary-soft bg-board-head dark:border-line dark:bg-surface-2">
+                                <flux:icon :name="$fileIcon" variant="micro" class="size-3.5 text-secondary-medium dark:text-ink-muted" />
+                                <span class="text-[10px] font-bold text-secondary-dark dark:text-ink">{{ Str::upper($attachment->type->value) }}</span>
                             </span>
                         @endif
 
                         <div class="min-w-0 flex-1">
                             @if ($isStored)
-                                <button type="button" wire:click="openPreview({{ $attachment->id }})" class="block max-w-full truncate text-start text-sm font-medium hover:text-primary hover:underline" title="{{ $attachmentName }}" data-test="preview-file-name">{{ $attachmentName }}</button>
+                                <button type="button" wire:click="openPreview({{ $attachment->id }})" class="block max-w-full truncate text-start text-sm font-medium hover:text-primary dark:hover:text-brand-text hover:underline" title="{{ $attachmentName }}" data-test="preview-file-name">{{ $attachmentName }}</button>
                             @else
                                 <p class="truncate text-sm font-medium" title="{{ $attachmentName }}">{{ $attachmentName }}</p>
                             @endif
-                            <p class="flex flex-wrap items-center gap-x-1.5 text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">
+                            <p class="flex flex-wrap items-center gap-x-1.5 text-xs tabular-nums text-secondary-medium dark:text-ink-muted">
                                 <time datetime="{{ $attachment->date?->toDateString() }}">{{ $attachment->date?->translatedFormat(__('formats.date')) }}</time>
                                 @if ($attachment->size !== null)
                                     <span aria-hidden="true">&middot;</span>
@@ -780,7 +765,7 @@ new #[Title('titles.task')] class extends Component
                                 <x-ui.button tone="ghost" size="sm" icon="eye" class="size-8!" wire:click="openPreview({{ $attachment->id }})" :aria-label="__('tasks.preview_name', ['name' => $attachmentName])" data-test="preview-file-button" />
                                 <a
                                     href="{{ route('tasks.files.download', [$this->task, $attachment]) }}"
-                                    class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-secondary-soft dark:hover:bg-secondary-medium dark:hover:text-white"
+                                    class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-ink-muted dark:hover:bg-surface-2 dark:hover:text-ink"
                                     aria-label="{{ __('common.download_name', ['name' => $attachmentName]) }}"
                                     data-test="download-file-link"
                                 >
@@ -790,7 +775,7 @@ new #[Title('titles.task')] class extends Component
 
                             @if ($canEditAttachments)
                                 <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-8!" wire:click="openEditFileModal({{ $attachment->id }})" :aria-label="__('common.edit_name', ['name' => $attachmentName])" data-test="edit-file-button" />
-                                <x-ui.button tone="ghost" size="sm" icon="trash" class="size-8! text-primary! hover:bg-status-critical-soft!" wire:click="confirmDeleteFile({{ $attachment->id }})" :aria-label="__('common.delete_name', ['name' => $attachmentName])" data-test="delete-file-button" />
+                                <x-ui.button tone="ghost" size="sm" icon="trash" class="size-8! text-primary! dark:text-brand-text! hover:bg-status-critical-soft!" wire:click="confirmDeleteFile({{ $attachment->id }})" :aria-label="__('common.delete_name', ['name' => $attachmentName])" data-test="delete-file-button" />
                             @endif
                         </div>
                     </li>
@@ -804,250 +789,197 @@ new #[Title('titles.task')] class extends Component
         <livewire:activity.timeline :subjects="['task' => [$this->task->id]]" :key="'task-activity-'.$this->task->id" />
     </section>
 
-    @if ($this->task->parentTask === null)
-        <flux:modal wire:model="showAddSubtaskModal" wire:close="closeAddSubtaskModal" class="w-full max-w-2xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <form wire:submit="addSubtask" class="flex flex-col gap-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ __('tasks.add_subtask') }}</flux:heading>
-            </div>
+    @if ($this->task->parent_task_id === null)
+        <x-ui.modal
+            wire:model="showAddSubtaskModal"
+            size="md"
+            :title="__('tasks.add_subtask')"
+            submit="addSubtask"
+            close="closeAddSubtaskModal"
+            required-note
+        >
+            <div class="grid grid-cols-2 gap-x-4 gap-y-4">
+                <x-ui.form-input wire:model="newSubtaskTitle" :label="__('tasks.subtask_title')" maxlength="255" required autofocus class="col-span-2" data-test="new-subtask-title-input" />
 
-            <x-ui.input wire:model="newSubtaskTitle" :label="__('tasks.subtask_title')" type="text" maxlength="255" required autofocus data-test="new-subtask-title-input" />
+                <x-ui.form-segmented
+                    wire:model="newSubtaskStatus"
+                    :label="__('common.status')"
+                    class="col-span-2"
+                    :options="[
+                        ['value' => TaskStatus::Todo->value, 'label' => TaskStatus::Todo->label(), 'dot' => 'border border-secondary-light', 'test' => 'new-subtask-status-'.TaskStatus::Todo->value],
+                        ['value' => TaskStatus::InProgress->value, 'label' => TaskStatus::InProgress->label(), 'dot' => 'bg-status-active', 'test' => 'new-subtask-status-'.TaskStatus::InProgress->value],
+                        ['value' => TaskStatus::UnderReview->value, 'label' => TaskStatus::UnderReview->label(), 'dot' => 'bg-status-warn', 'test' => 'new-subtask-status-'.TaskStatus::UnderReview->value],
+                        ['value' => TaskStatus::Done->value, 'label' => TaskStatus::Done->label(), 'dot' => 'bg-status-good', 'test' => 'new-subtask-status-'.TaskStatus::Done->value],
+                    ]"
+                />
 
-            <div class="grid gap-5 sm:grid-cols-2">
-                <div class="min-w-0">
-                    <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft" id="new-subtask-status-label">{{ __('common.status') }}</label>
-                    <div class="grid grid-cols-2 gap-1.5" role="radiogroup" aria-labelledby="new-subtask-status-label">
-                        @foreach (TaskStatus::cases() as $statusCase)
-                            @php $isNewSubtaskStatusSelected = $newSubtaskStatus === $statusCase->value; @endphp
-                            <button
-                                type="button"
-                                role="radio"
-                                aria-checked="{{ $isNewSubtaskStatusSelected ? 'true' : 'false' }}"
-                                wire:click="$set('newSubtaskStatus', '{{ $statusCase->value }}')"
-                                @class([
-                                    'inline-flex min-h-10 cursor-pointer touch-manipulation items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-semibold whitespace-nowrap transition-colors',
-                                    'border-secondary-dark bg-secondary-dark text-white dark:border-white dark:bg-white dark:text-secondary-dark' => $isNewSubtaskStatusSelected,
-                                    'border-secondary-light text-secondary-medium hover:border-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => ! $isNewSubtaskStatusSelected,
-                                ])
-                                data-test="new-subtask-status-{{ $statusCase->value }}"
-                            >
-                                {{ $statusCase->label() }}
-                            </button>
-                        @endforeach
-                    </div>
-                    <flux:error name="newSubtaskStatus" class="mt-1.5" />
-                </div>
+                <x-ui.form-segmented
+                    wire:model="newSubtaskPriority"
+                    :label="__('tasks.priority')"
+                    :options="[
+                        ['value' => TaskPriority::Low->value, 'label' => TaskPriority::Low->label(), 'icon' => 'flag', 'iconClass' => 'text-secondary-light', 'test' => 'new-subtask-priority-'.TaskPriority::Low->value],
+                        ['value' => TaskPriority::Medium->value, 'label' => TaskPriority::Medium->label(), 'icon' => 'flag', 'iconClass' => 'text-status-warn', 'test' => 'new-subtask-priority-'.TaskPriority::Medium->value],
+                        ['value' => TaskPriority::High->value, 'label' => TaskPriority::High->label(), 'icon' => 'flag', 'iconClass' => 'text-status-critical', 'test' => 'new-subtask-priority-'.TaskPriority::High->value],
+                    ]"
+                />
 
-                <div class="min-w-0">
-                    <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft" id="new-subtask-priority-label">{{ __('tasks.priority') }}</label>
-                    <div class="grid grid-cols-3 gap-1.5" role="radiogroup" aria-labelledby="new-subtask-priority-label">
-                        @foreach (TaskPriority::cases() as $priorityCase)
-                            @php $isNewSubtaskPrioritySelected = $newSubtaskPriority === $priorityCase->value; @endphp
-                            <button
-                                type="button"
-                                role="radio"
-                                aria-checked="{{ $isNewSubtaskPrioritySelected ? 'true' : 'false' }}"
-                                wire:click="$set('newSubtaskPriority', '{{ $priorityCase->value }}')"
-                                @class([
-                                    'inline-flex min-h-10 cursor-pointer touch-manipulation items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-semibold whitespace-nowrap transition-colors',
-                                    'border-secondary-dark bg-secondary-dark text-white dark:border-secondary-medium dark:bg-secondary-medium' => $isNewSubtaskPrioritySelected,
-                                    'border-secondary-light text-secondary-medium hover:border-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => ! $isNewSubtaskPrioritySelected,
-                                ])
-                                data-test="new-subtask-priority-{{ $priorityCase->value }}"
-                            >
-                                {{ $priorityCase->label() }}
-                            </button>
-                        @endforeach
-                    </div>
-                    <flux:error name="newSubtaskPriority" class="mt-1.5" />
-                </div>
-            </div>
+                <x-ui.form-input wire:model="newSubtaskDueDate" :label="__('tasks.due_date_2')" type="date" />
 
-            <div class="min-w-0">
-                <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('tasks.assignees') }}</label>
-                <x-ui.multi-select-popover
-                    :label="__('tasks.assignees')"
-                    in-modal
-                    class="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-secondary-light bg-white px-3 py-2 text-start text-sm dark:border-secondary-light dark:bg-secondary-medium"
-                    data-test="new-subtask-assignee-picker"
-                >
-                    <x-slot:trigger>
-                        <span class="min-w-0 truncate">{{ $newSubtaskAssigneeTriggerLabel }}</span>
-                        <flux:icon.chevron-up-down class="size-4 shrink-0 text-secondary-medium dark:text-secondary-soft" aria-hidden="true" />
-                    </x-slot:trigger>
-
+                <x-ui.form-multiselect wire:model="newSubtaskAssignedTo" :label="__('tasks.assignees')" :placeholder="__('common.select')" class="col-span-2" data-test="new-subtask-assignee-picker">
                     @foreach ($this->userOptions as $userOption)
-                        <label
-                            x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
-                            class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-secondary-soft dark:hover:bg-secondary-medium"
-                        >
-                            <input type="checkbox" wire:model.live="newSubtaskAssignedTo" value="{{ $userOption->id }}" class="rounded border-secondary-light text-primary focus:ring-primary" data-test="new-subtask-assignee-checkbox-{{ $userOption->id }}" />
-                            <span class="min-w-0 truncate">{{ $userOption->name }} · {{ $userOption->secondary_name }}</span>
-                        </label>
+                        <flux:select.option :value="$userOption->id">{{ $userOption->name }} · {{ $userOption->secondary_name }}</flux:select.option>
                     @endforeach
-                </x-ui.multi-select-popover>
-                <flux:error name="newSubtaskAssignedTo" class="mt-1.5" />
+                </x-ui.form-multiselect>
             </div>
 
-            <x-ui.input wire:model="newSubtaskDueDate" :label="__('tasks.due_date_2')" type="date" />
-
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="closeAddSubtaskModal">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" data-test="save-new-subtask-button">{{ __('tasks.add_subtask') }}</x-ui.button>
-            </div>
-        </form>
-        </flux:modal>
+            <x-slot:actions>
+                <x-ui.button type="submit" tone="primary" data-test="save-new-subtask-button">{{ __('tasks.add_subtask') }}</x-ui.button>
+            </x-slot:actions>
+        </x-ui.modal>
     @endif
 
-    <flux:modal wire:model="showFileModal" wire:close="closeFileModal" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
+    <x-ui.modal
+        wire:model="showFileModal"
+        size="md"
+        :title="$editingFileId === null ? __('tasks.upload_file') : __('tasks.edit_file')"
+        :description="__('tasks.allowed_file_types_and_size', ['types' => Str::upper(implode(', ', FileType::values())), 'size' => '5 MB'])"
+        submit="saveFile"
+        close="closeFileModal"
+        required-note
+    >
         @if ($showFileModal)
-            <form wire:submit="saveFile" class="space-y-5">
-                <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                    <flux:heading size="lg">{{ $editingFileId === null ? __('tasks.upload_file') : __('tasks.edit_file') }}</flux:heading>
-                    <flux:subheading>{{ __('tasks.allowed_file_types_and_size', ['types' => Str::upper(implode(', ', FileType::values())), 'size' => '5 MB']) }}</flux:subheading>
-                </div>
+            <div class="grid gap-y-4">
+                <x-ui.form-file
+                    wire:model="newFile"
+                    :label="$editingFileId === null ? __('tasks.choose_a_file') : __('tasks.replace_file_optional')"
+                    :accept="collect(FileType::values())->map(fn ($extension) => '.'.$extension)->implode(',')"
+                    :required="$editingFileId === null"
+                />
 
-                <div>
-                    <x-ui.input
-                        type="file"
-                        wire:model="newFile"
-                        :label="$editingFileId === null ? __('tasks.choose_a_file') : __('tasks.replace_file_optional')"
-                        accept="{{ collect(FileType::values())->map(fn ($extension) => '.'.$extension)->implode(',') }}"
-                        :required="$editingFileId === null"
-                    />
-                    <p wire:loading wire:target="newFile" class="mt-1.5 text-xs text-secondary-medium dark:text-secondary-soft">{{ __('tasks.uploading') }}</p>
-                </div>
-
-                <x-ui.input wire:model="fileDisplayName" :label="__('tasks.file_display_name')" :placeholder="$editingFileId === null ? __('tasks.defaults_to_the_uploaded_file_name') : null" :required="$editingFileId !== null" />
-
-                <x-ui.input wire:model="fileDate" :label="__('tasks.attachment_date')" type="date" required />
-
-                <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                    <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="closeFileModal">{{ __('common.cancel') }}</x-ui.button>
-                    <x-ui.button type="submit" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:loading.attr="disabled" wire:target="newFile,saveFile" data-test="save-file-button">
-                        {{ $editingFileId === null ? __('tasks.upload_file') : __('common.save_changes') }}
-                    </x-ui.button>
-                </div>
-            </form>
-        @endif
-    </flux:modal>
-
-    <flux:modal wire:model="showDeleteFileModal" wire:close="closeDeleteFileModal" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        @if ($showDeleteFileModal && $deletingFileId !== null && ($deletingAttachment = $this->attachments->firstWhere('id', $deletingFileId)) !== null)
-            <div class="space-y-5">
-                <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                    <flux:heading size="lg">{{ __('common.delete_name', ['name' => $deletingAttachment->displayName()]) }}</flux:heading>
-                </div>
-
-                <div class="grid grid-cols-2 gap-2 sm:flex sm:justify-end">
-                    <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="closeDeleteFileModal">{{ __('common.cancel') }}</x-ui.button>
-                    <x-ui.button type="button" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="deleteFile" data-test="confirm-delete-file-button">{{ __('common.delete') }}</x-ui.button>
+                <div class="grid grid-cols-2 gap-x-4 gap-y-4">
+                    <x-ui.form-input wire:model="fileDisplayName" :label="__('tasks.file_display_name')" :placeholder="$editingFileId === null ? __('tasks.defaults_to_the_uploaded_file_name') : null" :required="$editingFileId !== null" />
+                    <x-ui.form-input wire:model="fileDate" :label="__('tasks.attachment_date')" type="date" required />
                 </div>
             </div>
         @endif
-    </flux:modal>
 
-    <flux:modal wire:model="showPreviewModal" wire:close="closePreview" class="w-full max-w-5xl border border-secondary-light! bg-white! p-0! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        @if ($showPreviewModal && ($previewFile = $this->attachments->firstWhere('id', $previewingFileId)) !== null)
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" wire:loading.attr="disabled" wire:target="newFile,saveFile" data-test="save-file-button">
+                {{ $editingFileId === null ? __('tasks.upload_file') : __('common.save_changes') }}
+            </x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
+
+    @php
+        $previewFile = $showPreviewModal ? $this->attachments->firstWhere('id', $previewingFileId) : null;
+        $previewMeta = $previewFile === null ? null : collect([
+            Str::upper($previewFile->type->value),
+            $previewFile->size !== null ? \Illuminate\Support\Number::fileSize($previewFile->size, precision: 1) : null,
+            $previewFile->date?->translatedFormat(__('formats.date')),
+            $this->attachments->count() > 1 ? __('tasks.preview_position', [
+                'position' => $this->attachments->search(fn ($candidate) => $candidate->id === $previewFile->id) + 1,
+                'total' => $this->attachments->count(),
+            ]) : null,
+        ])->filter()->implode(' · ');
+    @endphp
+
+    <x-ui.modal
+        wire:model="showPreviewModal"
+        size="xl"
+        :title="$previewFile?->displayName() ?? ''"
+        :description="$previewMeta"
+        close="closePreview"
+        :cancel-label="__('common.close')"
+        flush
+    >
+        @if ($previewFile !== null)
             @php
                 $previewName = $previewFile->displayName();
                 $previewUrl = route('tasks.files.preview', [$this->task, $previewFile]);
                 $downloadUrl = route('tasks.files.download', [$this->task, $previewFile]);
-                $previewPosition = $this->attachments->search(fn ($candidate) => $candidate->id === $previewFile->id) + 1;
             @endphp
+
+            <x-slot:headerActions>
+                @if ($this->attachments->count() > 1)
+                    <x-ui.button tone="ghost" size="sm" icon="chevron-left" class="size-8! rtl:[&_svg]:-scale-x-100" wire:click="previewAdjacent(-1)" :aria-label="__('tasks.previous_file')" />
+                    <x-ui.button tone="ghost" size="sm" icon="chevron-right" class="size-8! rtl:[&_svg]:-scale-x-100" wire:click="previewAdjacent(1)" :aria-label="__('tasks.next_file')" />
+                @endif
+                @if ($previewFile->isPreviewable())
+                    <a href="{{ $previewUrl }}" target="_blank" rel="noopener" class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-ink-muted dark:hover:bg-surface-2 dark:hover:text-ink" aria-label="{{ __('tasks.open_in_new_tab') }}">
+                        <flux:icon name="arrow-top-right-on-square" variant="micro" class="size-4" />
+                    </a>
+                @endif
+                <a href="{{ $downloadUrl }}" class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-ink-muted dark:hover:bg-surface-2 dark:hover:text-ink" aria-label="{{ __('common.download_name', ['name' => $previewName]) }}">
+                    <flux:icon name="arrow-down-tray" variant="micro" class="size-4" />
+                </a>
+            </x-slot:headerActions>
+
             <div
-                class="flex max-h-[90dvh] flex-col"
+                class="bg-board-head dark:bg-surface-2"
                 wire:key="preview-{{ $previewFile->id }}"
                 x-data
                 x-on:keydown.left.window="$wire.previewAdjacent(document.dir === 'rtl' ? 1 : -1)"
                 x-on:keydown.right.window="$wire.previewAdjacent(document.dir === 'rtl' ? -1 : 1)"
             >
-                <div class="flex flex-wrap items-center gap-3 border-b border-secondary-soft py-3 ps-5 pe-14 dark:border-secondary-medium">
-                    <div class="min-w-0 flex-1">
-                        <flux:heading size="lg" class="truncate" title="{{ $previewName }}">{{ $previewName }}</flux:heading>
-                        <p class="flex flex-wrap items-center gap-x-1.5 text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">
-                            <span class="font-bold">{{ Str::upper($previewFile->type->value) }}</span>
-                            @if ($previewFile->size !== null)
-                                <span aria-hidden="true">&middot;</span>
-                                <span>{{ \Illuminate\Support\Number::fileSize($previewFile->size, precision: 1) }}</span>
-                            @endif
-                            <span aria-hidden="true">&middot;</span>
-                            <time datetime="{{ $previewFile->date?->toDateString() }}">{{ $previewFile->date?->translatedFormat(__('formats.date')) }}</time>
-                            @if ($this->attachments->count() > 1)
-                                <span aria-hidden="true">&middot;</span>
-                                <span>{{ __('tasks.preview_position', ['position' => $previewPosition, 'total' => $this->attachments->count()]) }}</span>
-                            @endif
-                        </p>
+                @if (! $previewFile->isStored())
+                    <x-ui.empty-state icon="eye-slash" :heading="__('tasks.preview_not_available')" :body="__('tasks.this_record_has_no_stored_file')" />
+                @elseif ($previewFile->type === FileType::Pdf)
+                    <iframe src="{{ $previewUrl }}#view=FitH" title="{{ $previewName }}" class="h-[75dvh] w-full border-0 bg-white" data-test="pdf-preview"></iframe>
+                @elseif ($previewFile->isPreviewable())
+                    <div class="flex min-h-[50dvh] items-center justify-center p-4">
+                        <img src="{{ $previewUrl }}" alt="{{ $previewName }}" class="max-h-[75dvh] max-w-full rounded-lg object-contain shadow-sm" data-test="image-preview" data-no-dim />
                     </div>
+                @else
+                    {{-- Word/Excel: rendered client-side by resources/js/file-preview.js from the authenticated download route. --}}
+                    <div
+                        wire:ignore
+                        x-data="officePreview(@js(['url' => $downloadUrl, 'type' => $previewFile->type->value]))"
+                        class="flex h-[75dvh] flex-col"
+                        data-test="office-preview"
+                    >
+                        <div x-show="sheets.length > 1" class="flex shrink-0 gap-1 overflow-x-auto border-b border-secondary-soft bg-white px-3 py-2 dark:border-line dark:bg-surface-1">
+                            <template x-for="(sheetName, index) in sheets" :key="index">
+                                <button
+                                    type="button"
+                                    x-on:click="showSheet(index)"
+                                    x-text="sheetName"
+                                    class="shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold whitespace-nowrap"
+                                    :class="index === activeSheet ? 'bg-primary dark:bg-ink dark:text-surface-0 text-white' : 'text-secondary-medium hover:bg-secondary-soft dark:text-ink-muted dark:hover:bg-surface-2'"
+                                ></button>
+                            </template>
+                        </div>
 
-                    <div class="flex shrink-0 items-center gap-1">
-                        @if ($this->attachments->count() > 1)
-                            <x-ui.button tone="ghost" size="sm" icon="chevron-left" class="size-8! rtl:[&_svg]:-scale-x-100" wire:click="previewAdjacent(-1)" :aria-label="__('tasks.previous_file')" />
-                            <x-ui.button tone="ghost" size="sm" icon="chevron-right" class="size-8! rtl:[&_svg]:-scale-x-100" wire:click="previewAdjacent(1)" :aria-label="__('tasks.next_file')" />
-                        @endif
-                        @if ($previewFile->isPreviewable())
-                            <a href="{{ $previewUrl }}" target="_blank" rel="noopener" class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-secondary-soft dark:hover:bg-secondary-medium dark:hover:text-white" aria-label="{{ __('tasks.open_in_new_tab') }}">
-                                <flux:icon name="arrow-top-right-on-square" variant="micro" class="size-4" />
-                            </a>
-                        @endif
-                        <a href="{{ $downloadUrl }}" class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-secondary-soft dark:hover:bg-secondary-medium dark:hover:text-white" aria-label="{{ __('common.download_name', ['name' => $previewName]) }}">
-                            <flux:icon name="arrow-down-tray" variant="micro" class="size-4" />
-                        </a>
+                        <div x-show="status === 'loading'" class="flex flex-1 items-center justify-center gap-2 text-sm text-secondary-medium dark:text-ink-muted">
+                            <flux:icon.loading class="size-5" />
+                            {{ __('tasks.loading_preview') }}
+                        </div>
+
+                        <div x-show="status === 'error'" x-cloak class="flex-1">
+                            <x-ui.empty-state icon="exclamation-triangle" :heading="__('tasks.preview_not_available')" :body="__('tasks.this_file_could_not_be_previewed')">
+                                <x-slot:action>
+                                    <a href="{{ $downloadUrl }}" class="inline-flex items-center gap-1.5 rounded-lg bg-primary dark:bg-brand dark:hover:bg-brand-hover px-3 py-2 text-sm font-semibold text-white hover:opacity-90">
+                                        <flux:icon name="arrow-down-tray" variant="micro" class="size-4" />
+                                        {{ __('common.download_name', ['name' => $previewName]) }}
+                                    </a>
+                                </x-slot:action>
+                            </x-ui.empty-state>
+                        </div>
+
+                        <div x-show="status === 'ready'" x-cloak x-ref="canvas" class="min-h-0 flex-1 overflow-auto"></div>
+
+                        <p x-show="truncated" x-cloak class="shrink-0 border-t border-secondary-soft bg-white px-3 py-2 text-xs text-secondary-medium dark:border-line dark:bg-surface-1 dark:text-ink-muted">{{ __('tasks.sheet_preview_truncated', ['rows' => 500]) }}</p>
                     </div>
-                </div>
-
-                <div class="min-h-0 flex-1 overflow-auto bg-board-head dark:bg-secondary-medium/20">
-                    @if (! $previewFile->isStored())
-                        <x-ui.empty-state icon="eye-slash" :heading="__('tasks.preview_not_available')" :body="__('tasks.this_record_has_no_stored_file')" />
-                    @elseif ($previewFile->type === FileType::Pdf)
-                        <iframe src="{{ $previewUrl }}#view=FitH" title="{{ $previewName }}" class="h-[75dvh] w-full border-0 bg-white" data-test="pdf-preview"></iframe>
-                    @elseif ($previewFile->isPreviewable())
-                        <div class="flex min-h-[50dvh] items-center justify-center p-4">
-                            <img src="{{ $previewUrl }}" alt="{{ $previewName }}" class="max-h-[75dvh] max-w-full rounded-lg object-contain shadow-sm" data-test="image-preview" />
-                        </div>
-                    @else
-                        {{-- Word/Excel: rendered client-side by resources/js/file-preview.js from the authenticated download route. --}}
-                        <div
-                            wire:ignore
-                            x-data="officePreview(@js(['url' => $downloadUrl, 'type' => $previewFile->type->value]))"
-                            class="flex h-[75dvh] flex-col"
-                            data-test="office-preview"
-                        >
-                            <div x-show="sheets.length > 1" class="flex shrink-0 gap-1 overflow-x-auto border-b border-secondary-soft bg-white px-3 py-2 dark:border-secondary-medium dark:bg-secondary-dark">
-                                <template x-for="(sheetName, index) in sheets" :key="index">
-                                    <button
-                                        type="button"
-                                        x-on:click="showSheet(index)"
-                                        x-text="sheetName"
-                                        class="shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold whitespace-nowrap"
-                                        :class="index === activeSheet ? 'bg-primary text-white' : 'text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium'"
-                                    ></button>
-                                </template>
-                            </div>
-
-                            <div x-show="status === 'loading'" class="flex flex-1 items-center justify-center gap-2 text-sm text-secondary-medium dark:text-secondary-soft">
-                                <flux:icon.loading class="size-5" />
-                                {{ __('tasks.loading_preview') }}
-                            </div>
-
-                            <div x-show="status === 'error'" x-cloak class="flex-1">
-                                <x-ui.empty-state icon="exclamation-triangle" :heading="__('tasks.preview_not_available')" :body="__('tasks.this_file_could_not_be_previewed')">
-                                    <x-slot:action>
-                                        <a href="{{ $downloadUrl }}" class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:opacity-90">
-                                            <flux:icon name="arrow-down-tray" variant="micro" class="size-4" />
-                                            {{ __('common.download_name', ['name' => $previewName]) }}
-                                        </a>
-                                    </x-slot:action>
-                                </x-ui.empty-state>
-                            </div>
-
-                            <div x-show="status === 'ready'" x-cloak x-ref="canvas" class="min-h-0 flex-1 overflow-auto"></div>
-
-                            <p x-show="truncated" x-cloak class="shrink-0 border-t border-secondary-soft bg-white px-3 py-2 text-xs text-secondary-medium dark:border-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft">{{ __('tasks.sheet_preview_truncated', ['rows' => 500]) }}</p>
-                        </div>
-                    @endif
-                </div>
+                @endif
             </div>
         @endif
-    </flux:modal>
+    </x-ui.modal>
+
+    <x-ui.confirm-modal
+        wire:model="showDeleteFileModal"
+        close="closeDeleteFileModal"
+        :title="$showDeleteFileModal && $deletingFileId !== null && ($deletingAttachment = $this->attachments->firstWhere('id', $deletingFileId)) !== null ? __('common.delete_name', ['name' => $deletingAttachment->displayName()]) : __('common.delete')"
+        confirm="deleteFile"
+        :confirm-label="__('common.delete')"
+        confirm-test="confirm-delete-file-button"
+    />
 </section>

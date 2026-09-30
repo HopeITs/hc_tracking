@@ -29,13 +29,13 @@
     ];
 @endphp
 
-<figure {{ $attributes->class('flex flex-col') }} role="group" aria-labelledby="{{ $chartId }}-caption">
+<figure data-chart {{ $attributes->class('flex flex-col') }} role="group" aria-labelledby="{{ $chartId }}-caption">
     <figcaption id="{{ $chartId }}-caption" class="sr-only">{{ $label }}</figcaption>
 
     @if ($isEmpty)
         <div class="flex flex-col items-center justify-center gap-2 text-center" style="min-height: {{ $height }}px">
             <flux:icon.chart-pie class="size-6 text-secondary-light" />
-            <p class="type-meta text-secondary-medium dark:text-secondary-soft">{{ $empty ?? __('ui.no_records') }}</p>
+            <p class="type-meta text-secondary-medium dark:text-ink-muted">{{ $empty ?? __('ui.no_records') }}</p>
         </div>
     @else
         <div
@@ -46,7 +46,7 @@
             class="relative"
             style="min-height: {{ $height }}px"
         >
-            <div x-show="! ready" class="absolute inset-0 animate-pulse rounded-lg bg-secondary-soft/50 dark:bg-secondary-medium/40" aria-hidden="true"></div>
+            <div x-show="! ready" class="absolute inset-0 animate-pulse rounded-lg bg-secondary-soft/50 dark:bg-surface-2" aria-hidden="true"></div>
             <div x-ref="canvas"></div>
         </div>
 

@@ -16,7 +16,7 @@ use Livewire\Livewire;
  */
 function ganttRowsFor(Project $project): array
 {
-    $component = Livewire::actingAs(User::factory()->create())
+    $component = Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::projects.show', ['project' => $project])
         ->set('tab', 'plan');
 
@@ -27,7 +27,7 @@ test('the plan tab renders the gantt chart', function () {
     $project = Project::factory()->create();
     Milestone::factory()->create(['project_id' => $project->id, 'name' => 'Baseline assessment', 'planned_start_date' => '2026-10-01', 'planned_end_date' => '2026-10-20']);
 
-    Livewire::actingAs(User::factory()->create())
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::projects.show', ['project' => $project])
         ->set('tab', 'plan')
         ->assertSeeHtml('data-gantt')
@@ -37,7 +37,7 @@ test('the plan tab renders the gantt chart', function () {
 test('the plan tab shows an empty state when there is nothing to plan', function () {
     $project = Project::factory()->create();
 
-    Livewire::actingAs(User::factory()->create())
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::projects.show', ['project' => $project])
         ->set('tab', 'plan')
         ->assertDontSeeHtml('data-gantt')
@@ -96,7 +96,7 @@ test('tasks raised against another project never leak into this plan', function 
  */
 function projectPage(Project $project)
 {
-    return Livewire::actingAs(User::factory()->create())
+    return Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::projects.show', ['project' => $project]);
 }
 

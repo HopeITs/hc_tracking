@@ -1,13 +1,16 @@
 <?php
 
+use App\Support\Like;
 use App\Models\Project;
 use App\Models\Risk;
 use Flux\Flux;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -30,8 +33,10 @@ new #[Title('titles.risks')] class extends Component {
 
     public bool $showRiskModal = false;
 
+    #[Locked]
     public ?int $editingRiskId = null;
 
+    #[Locked]
     public ?int $deletingRiskId = null;
 
     public bool $showDeleteModal = false;
@@ -90,9 +95,9 @@ new #[Title('titles.risks')] class extends Component {
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($query) use ($search): void {
                     $query
-                        ->where('name', 'like', '%'.$search.'%')
-                        ->orWhere('impact', 'like', '%'.$search.'%')
-                        ->orWhereHas('project', fn ($query) => $query->where('name', 'like', '%'.$search.'%'));
+                        ->where('name', 'like', Like::contains($search))
+                        ->orWhere('impact', 'like', Like::contains($search))
+                        ->orWhereHas('project', fn ($query) => $query->where('name', 'like', Like::contains($search)));
                 });
             })
             ->when($includeProject && $this->project !== '', fn ($query) => $query->where('project_id', (int) $this->project))
@@ -201,6 +206,8 @@ new #[Title('titles.risks')] class extends Component {
 
     public function openCreateModal(): void
     {
+        Gate::authorize('create', Risk::class);
+
         $this->resetRiskForm();
         $this->showRiskModal = true;
     }
@@ -208,7 +215,16 @@ new #[Title('titles.risks')] class extends Component {
     /** Quick-toggle a risk's materialised state directly from its card, without opening the edit modal. */
     public function setHappened(int $riskId, bool $happened): void
     {
-        Risk::query()->findOrFail($riskId)->update(['happened' => $happened]);
+        $risk = Risk::query()->findOrFail($riskId);
+
+        Gate::authorize('update', $risk);
+
+        $risk->update(['happened' => $happened]);
+
+        Flux::toast(
+            variant: 'success',
+            text: $happened ? __('risks.risk_marked_materialised') : __('risks.risk_marked_unmaterialised'),
+        );
     }
 
     public function openEditModal(int $riskId): void
@@ -216,6 +232,8 @@ new #[Title('titles.risks')] class extends Component {
         $risk = Risk::query()
             ->select(['id', 'name', 'impact', 'solution', 'happened', 'project_id'])
             ->findOrFail($riskId);
+
+        Gate::authorize('update', $risk);
 
         $this->resetValidation();
         $this->editingRiskId = $risk->id;
@@ -229,6 +247,12 @@ new #[Title('titles.risks')] class extends Component {
 
     public function saveRisk(): void
     {
+        if ($this->editingRiskId === null) {
+            Gate::authorize('create', Risk::class);
+        } else {
+            Gate::authorize('update', Risk::query()->findOrFail($this->editingRiskId));
+        }
+
         $this->name = trim($this->name);
         $this->impact = trim($this->impact);
         $this->solution = trim($this->solution);
@@ -249,6 +273,12 @@ new #[Title('titles.risks')] class extends Component {
         $risk = $this->editingRiskId === null
             ? new Risk
             : Risk::query()->findOrFail($this->editingRiskId);
+
+        // Logging a risk on a project, or moving one onto it, needs the right
+        // to log risks there.
+        if (! $risk->exists || $risk->project_id !== (int) $validated['riskProjectId']) {
+            Gate::authorize('create', [Risk::class, (int) $validated['riskProjectId']]);
+        }
 
         $risk->fill([
             'name' => $validated['name'],
@@ -272,6 +302,8 @@ new #[Title('titles.risks')] class extends Component {
 
     public function confirmDelete(int $riskId): void
     {
+        Gate::authorize('delete', Risk::query()->findOrFail($riskId));
+
         $this->deletingRiskId = $riskId;
         $this->showDeleteModal = true;
     }
@@ -292,7 +324,11 @@ new #[Title('titles.risks')] class extends Component {
             return;
         }
 
-        Risk::query()->findOrFail($this->deletingRiskId)->delete();
+        $risk = Risk::query()->findOrFail($this->deletingRiskId);
+
+        Gate::authorize('delete', $risk);
+
+        $risk->delete();
 
         $this->showDeleteModal = false;
         $this->deletingRiskId = null;
@@ -324,7 +360,7 @@ new #[Title('titles.risks')] class extends Component {
     $filtersAreActive = $search !== '' || $project !== '' || $materialisedOnly || $unmitigated;
 @endphp
 
-<section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="risk-register-heading">
+<section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="risk-register-heading">
     <x-ui.page-header
         heading-id="risk-register-heading"
         :title="__('common.risks')"
@@ -342,9 +378,9 @@ new #[Title('titles.risks')] class extends Component {
         </x-slot:filters>
 
         <x-slot:actions>
-            <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-risk-button">
+            @can('create', App\Models\Risk::class)<x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-risk-button">
                 {{ __('risks.log_risk') }}
-            </x-ui.button>
+            </x-ui.button>@endcan
         </x-slot:actions>
 
         <x-slot:summary>
@@ -356,8 +392,8 @@ new #[Title('titles.risks')] class extends Component {
                     data-test="materialised-toggle"
                     @class([
                         'inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-primary',
-                        'border-primary bg-primary text-white' => $materialisedOnly,
-                        'border-secondary-light text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium' => ! $materialisedOnly,
+                        'border-primary bg-primary dark:bg-ink dark:text-surface-0 dark:border-ink text-white' => $materialisedOnly,
+                        'border-secondary-light text-secondary-medium hover:bg-secondary-soft dark:text-ink-muted dark:hover:bg-surface-2' => ! $materialisedOnly,
                     ])
                 >
                     <flux:icon.exclamation-triangle variant="micro" class="size-3.5" />
@@ -372,7 +408,7 @@ new #[Title('titles.risks')] class extends Component {
                     @class([
                         'inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-primary',
                         'border-status-warn/30 bg-status-warn-soft text-status-warn' => $unmitigated,
-                        'border-secondary-light text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium' => ! $unmitigated,
+                        'border-secondary-light text-secondary-medium hover:bg-secondary-soft dark:text-ink-muted dark:hover:bg-surface-2' => ! $unmitigated,
                     ])
                 >
                     <flux:icon.shield-exclamation variant="micro" class="size-3.5" />
@@ -384,7 +420,7 @@ new #[Title('titles.risks')] class extends Component {
 
     @php $chart = $this->projectRiskChart; $landscape = $this->riskLandscape; @endphp
     @if (count($chart['categories']) > 0)
-        <div x-data="{ open: true }" class="overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-secondary-medium dark:bg-secondary-dark dark:shadow-none">
+        <div x-data="{ open: true }" class="overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-transparent dark:bg-surface-1 dark:shadow-raised">
             <button
                 type="button"
                 x-on:click="open = !open"
@@ -392,20 +428,20 @@ new #[Title('titles.risks')] class extends Component {
                 class="flex min-h-12 w-full flex-wrap items-center justify-between gap-2 px-4 py-3 text-start"
             >
                 <div class="min-w-0">
-                    <p class="truncate text-base font-bold text-secondary-dark dark:text-white">{{ __('risks.risks_by_project') }}</p>
-                    <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ __('risks.risks_by_project_hint') }}</p>
+                    <p class="truncate text-base font-bold text-secondary-dark dark:text-ink">{{ __('risks.risks_by_project') }}</p>
+                    <p class="truncate text-xs text-secondary-medium dark:text-ink-muted">{{ __('risks.risks_by_project_hint') }}</p>
                 </div>
-                <flux:icon.chevron-down variant="micro" class="size-4 shrink-0 text-secondary-medium transition-transform dark:text-secondary-soft" x-bind:class="open && 'rotate-180'" />
+                <flux:icon.chevron-down variant="micro" class="size-4 shrink-0 text-secondary-medium transition-transform dark:text-ink-muted" x-bind:class="open && 'rotate-180'" />
             </button>
 
-            <div x-show="open" x-collapse class="border-t border-secondary-soft px-2 pt-3 pb-2 dark:border-secondary-medium">
+            <div x-show="open" x-collapse class="border-t border-secondary-soft px-2 pt-3 pb-2 dark:border-line">
                 <div class="flex flex-wrap items-center gap-4 px-2 pb-2" role="group" aria-label="{{ __('risks.risks_by_project') }}">
-                    <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-secondary-dark dark:text-white">
-                        <span class="size-2.5 shrink-0 rounded-full bg-primary" aria-hidden="true"></span>
+                    <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-secondary-dark dark:text-ink">
+                        <span class="size-2.5 shrink-0 rounded-full bg-primary dark:bg-status-critical" aria-hidden="true"></span>
                         {{ __('risks.challenges') }} · <span class="tabular-nums">{{ $landscape['challenges'] }}</span>
                     </span>
-                    <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-secondary-medium dark:text-secondary-soft">
-                        <span class="size-2.5 shrink-0 rounded-full bg-secondary-light dark:bg-secondary-medium" aria-hidden="true"></span>
+                    <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-secondary-medium dark:text-ink-muted">
+                        <span class="size-2.5 shrink-0 rounded-full bg-secondary-light dark:bg-ink-faint" aria-hidden="true"></span>
                         {{ __('risks.potential_risks') }} · <span class="tabular-nums">{{ $landscape['potential'] }}</span>
                     </span>
                 </div>
@@ -426,7 +462,7 @@ new #[Title('titles.risks')] class extends Component {
     <x-ui.panel :subtitle="trans_choice('risks.count_matching_risk', $this->risks->total(), ['count' => $this->risks->total()])">
         <x-slot:toolbar>
             @if ($filtersAreActive)
-                <flux:button size="sm" variant="ghost" class="text-secondary-medium! hover:bg-secondary-soft! dark:text-secondary-soft!" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
+                <flux:button size="sm" variant="ghost" class="text-secondary-medium! hover:bg-secondary-soft! dark:text-ink-muted!" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
             @endif
         </x-slot:toolbar>
 
@@ -440,17 +476,17 @@ new #[Title('titles.risks')] class extends Component {
                     @if ($filtersAreActive)
                         <x-ui.button size="sm" wire:click="clearFilters">{{ __('common.reset_filters') }}</x-ui.button>
                     @else
-                        <x-ui.button size="sm" tone="primary" icon="plus" wire:click="openCreateModal">{{ __('risks.log_risk') }}</x-ui.button>
+                        @can('create', App\Models\Risk::class)<x-ui.button size="sm" tone="primary" icon="plus" wire:click="openCreateModal">{{ __('risks.log_risk') }}</x-ui.button>@endcan
                     @endif
                 </x-slot:action>
             </x-ui.empty-state>
         @else
             <div class="grid grid-cols-1 gap-3 p-3.5 @4xl:grid-cols-2">
                 @foreach ($this->risks as $risk)
-                    <article class="flex flex-col gap-2 rounded-lg border border-secondary-soft p-3.5 dark:border-secondary-medium" wire:key="risk-{{ $risk->id }}">
+                    <article class="flex flex-col gap-2 rounded-lg border border-secondary-soft p-3.5 dark:border-line" wire:key="risk-{{ $risk->id }}">
                         <div class="flex items-start justify-between gap-3">
                             <div
-                                class="inline-flex shrink-0 overflow-hidden rounded-full border border-secondary-light dark:border-secondary-medium"
+                                class="inline-flex shrink-0 overflow-hidden rounded-full border border-secondary-light dark:border-field-line"
                                 role="radiogroup"
                                 aria-label="{{ __('common.state') }}"
                                 data-test="happened-toggle-{{ $risk->id }}"
@@ -460,16 +496,17 @@ new #[Title('titles.risks')] class extends Component {
                                     role="radio"
                                     aria-checked="{{ $risk->happened ? 'false' : 'true' }}"
                                     wire:click="setHappened({{ $risk->id }}, false)"
+                                    @disabled(! auth()->user()->can('update', $risk))
                                     @class([
                                         'inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold transition-colors',
-                                        'bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white' => ! $risk->happened,
-                                        'text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium' => $risk->happened,
+                                        'bg-secondary-soft text-secondary-dark dark:bg-surface-2 dark:text-ink' => ! $risk->happened,
+                                        'text-secondary-medium hover:bg-secondary-soft dark:text-ink-muted dark:hover:bg-surface-2' => $risk->happened,
                                     ])
                                 >
                                     <span @class([
                                         'size-2.5 shrink-0 rounded-full border',
-                                        'border-secondary-dark bg-secondary-dark dark:border-white dark:bg-white' => ! $risk->happened,
-                                        'border-secondary-light dark:border-secondary-soft' => $risk->happened,
+                                        'border-secondary-dark bg-secondary-dark dark:border-ink-muted dark:bg-ink-muted' => ! $risk->happened,
+                                        'border-secondary-light dark:border-ink-faint' => $risk->happened,
                                     ]) aria-hidden="true"></span>
                                     {{ __('risks.potential_risk') }}
                                 </button>
@@ -478,36 +515,37 @@ new #[Title('titles.risks')] class extends Component {
                                     role="radio"
                                     aria-checked="{{ $risk->happened ? 'true' : 'false' }}"
                                     wire:click="setHappened({{ $risk->id }}, true)"
+                                    @disabled(! auth()->user()->can('update', $risk))
                                     @class([
-                                        'inline-flex items-center gap-1.5 border-s border-secondary-light px-2.5 py-1 text-xs font-semibold transition-colors dark:border-secondary-medium',
-                                        'bg-primary text-white' => $risk->happened,
-                                        'text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium' => ! $risk->happened,
+                                        'inline-flex items-center gap-1.5 border-s border-secondary-light px-2.5 py-1 text-xs font-semibold transition-colors dark:border-line',
+                                        'bg-primary dark:border-transparent dark:bg-status-critical-soft dark:text-status-critical text-white' => $risk->happened,
+                                        'text-secondary-medium hover:bg-secondary-soft dark:text-ink-muted dark:hover:bg-surface-2' => ! $risk->happened,
                                     ])
                                 >
                                     <span @class([
                                         'size-2.5 shrink-0 rounded-full border',
                                         'border-white bg-white' => $risk->happened,
-                                        'border-secondary-light dark:border-secondary-soft' => ! $risk->happened,
+                                        'border-secondary-light dark:border-ink-faint' => ! $risk->happened,
                                     ]) aria-hidden="true"></span>
                                     {{ __('common.materialised') }}
                                 </button>
                             </div>
                             <div class="flex shrink-0 items-center gap-1.5">
-                                <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation @sm/directory:size-9!" wire:click="openEditModal({{ $risk->id }})" :aria-label="__('common.edit_name', ['name' => $risk->name])" />
-                                <x-ui.button tone="ghost" size="sm" icon="trash" class="size-11! touch-manipulation @sm/directory:size-9!" wire:click="confirmDelete({{ $risk->id }})" :aria-label="__('common.delete_name', ['name' => $risk->name])" />
+                                @can('update', $risk)<x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation @sm/directory:size-9!" wire:click="openEditModal({{ $risk->id }})" :aria-label="__('common.edit_name', ['name' => $risk->name])" />@endcan
+                                @can('delete', $risk)<x-ui.button tone="ghost" size="sm" icon="trash" class="size-11! touch-manipulation @sm/directory:size-9!" wire:click="confirmDelete({{ $risk->id }})" :aria-label="__('common.delete_name', ['name' => $risk->name])" />@endcan
                             </div>
                         </div>
 
                         <div class="min-w-0">
-                            <p class="type-heading truncate text-secondary-dark dark:text-white">{{ $risk->name }}</p>
-                            <a href="{{ route('projects.show', $risk->project) }}" wire:navigate class="text-xs text-secondary-medium hover:underline dark:text-secondary-soft">
+                            <p class="type-heading truncate text-secondary-dark dark:text-ink">{{ $risk->name }}</p>
+                            <a href="{{ route('projects.show', $risk->project) }}" wire:navigate class="text-xs text-secondary-medium hover:underline dark:text-ink-muted">
                                 {{ $risk->project->name }} · {{ $risk->project->city?->name ?? __('common.unknown_city') }}
                             </a>
                         </div>
 
                         <div class="flex flex-col gap-1.5">
-                            <p class="text-xs text-secondary-medium dark:text-secondary-soft">
-                                <span class="font-semibold text-secondary-dark dark:text-white">{{ __('common.impact') }}:</span>
+                            <p class="text-xs text-secondary-medium dark:text-ink-muted">
+                                <span class="font-semibold text-secondary-dark dark:text-ink">{{ __('common.impact') }}:</span>
                                 {{ $risk->impact ?? '—' }}
                             </p>
 
@@ -515,14 +553,15 @@ new #[Title('titles.risks')] class extends Component {
                                  potential risk that hasn't occurred yet has nothing to mitigate. --}}
                             @if ($risk->happened)
                                 @if ($risk->solution !== null && $risk->solution !== '')
-                                    <p class="text-xs text-secondary-medium dark:text-secondary-soft">
-                                        <span class="font-semibold text-secondary-dark dark:text-white">{{ __('common.mitigation') }}:</span>
+                                    <p class="text-xs text-secondary-medium dark:text-ink-muted">
+                                        <span class="font-semibold text-secondary-dark dark:text-ink">{{ __('common.mitigation') }}:</span>
                                         {{ $risk->solution }}
                                     </p>
                                 @else
                                     <button
                                         type="button"
                                         wire:click="openEditModal({{ $risk->id }})"
+                                        @disabled(! auth()->user()->can('update', $risk))
                                         class="inline-flex w-fit items-center gap-1 rounded-md border border-status-warn/30 bg-status-warn-soft px-2 py-0.5 text-xs font-semibold text-status-warn hover:opacity-80"
                                     >
                                         <flux:icon.exclamation-circle variant="micro" class="size-3.5" />
@@ -537,91 +576,60 @@ new #[Title('titles.risks')] class extends Component {
         @endif
 
         <x-slot:footer>
-            <flux:pagination :paginator="$this->risks" class="text-secondary-medium! dark:text-secondary-soft!" scroll-to="#risk-register-heading" />
+            <flux:pagination :paginator="$this->risks" class="text-secondary-medium! dark:text-ink-muted!" scroll-to="#risk-register-heading" />
         </x-slot:footer>
     </x-ui.panel>
 
-    <flux:modal wire:model="showRiskModal" class="w-full max-w-2xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <form wire:submit="saveRisk" class="flex flex-col gap-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ $editingRiskId === null ? __('risks.log_risk') : __('risks.edit_risk') }}</flux:heading>
-            </div>
+    <x-ui.modal
+        wire:model="showRiskModal"
+        size="xl"
+        :title="$editingRiskId === null ? __('risks.log_risk') : __('risks.edit_risk')"
+        submit="saveRisk"
+        close="closeRiskModal"
+        required-note
+    >
+        <x-ui.form-section :title="__('common.section_details')" :fields="['name', 'riskProjectId', 'happened']">
+            <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                <x-ui.form-input wire:model="name" :label="__('risks.risk_name')" maxlength="255" required autofocus class="@2xl/modal:col-span-2" />
 
-            <x-ui.input wire:model="name" :label="__('risks.risk_name')" type="text" maxlength="255" required autofocus />
-
-            <flux:textarea wire:model="impact" :label="__('common.impact')" rows="3" required />
-
-            <flux:textarea wire:model="solution" :label="__('common.mitigation')" rows="3" />
-
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.select wire:model="riskProjectId" :label="__('common.project')" required>
-                    <flux:select.option value="">{{ __('common.select_a_project') }}</flux:select.option>
+                <x-ui.form-select wire:model="riskProjectId" :label="__('common.project')" :placeholder="__('common.select_a_project')" required>
                     @foreach ($this->projectOptions as $projectOption)
-                        <flux:select.option :value="$projectOption->id" :wire:key="'risk-project-option-'.$projectOption->id">{{ $projectOption->name }}</flux:select.option>
+                        <flux:select.option :value="$projectOption->id">{{ $projectOption->name }}</flux:select.option>
                     @endforeach
-                </x-ui.select>
+                </x-ui.form-select>
 
-                <div class="self-end">
-                    <span class="mb-1.5 block text-[11px] font-semibold uppercase leading-4 tracking-[0.1em] text-secondary-medium dark:text-secondary-soft">{{ __('common.state') }}</span>
-                    <div class="inline-flex w-full overflow-hidden rounded-lg border border-secondary-light dark:border-secondary-medium" role="radiogroup" aria-label="{{ __('common.state') }}">
-                        <button
-                            type="button"
-                            role="radio"
-                            aria-checked="{{ ! $happened ? 'true' : 'false' }}"
-                            wire:click="$set('happened', false)"
-                            @class([
-                                'flex flex-1 items-center justify-center gap-1.5 px-3 py-2 text-sm font-semibold transition-colors',
-                                'bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white' => ! $happened,
-                                'text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium' => $happened,
-                            ])
-                        >
-                            <span @class([
-                                'size-2.5 shrink-0 rounded-full border',
-                                'border-secondary-dark bg-secondary-dark dark:border-white dark:bg-white' => ! $happened,
-                                'border-secondary-light dark:border-secondary-soft' => $happened,
-                            ]) aria-hidden="true"></span>
-                            {{ __('risks.potential_risk') }}
-                        </button>
-                        <button
-                            type="button"
-                            role="radio"
-                            aria-checked="{{ $happened ? 'true' : 'false' }}"
-                            wire:click="$set('happened', true)"
-                            @class([
-                                'flex flex-1 items-center justify-center gap-1.5 border-s border-secondary-light px-3 py-2 text-sm font-semibold transition-colors dark:border-secondary-medium',
-                                'bg-primary text-white' => $happened,
-                                'text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium' => ! $happened,
-                            ])
-                            data-test="form-materialised-option"
-                        >
-                            <span @class([
-                                'size-2.5 shrink-0 rounded-full border',
-                                'border-white bg-white' => $happened,
-                                'border-secondary-light dark:border-secondary-soft' => ! $happened,
-                            ]) aria-hidden="true"></span>
-                            {{ __('common.materialised') }}
-                        </button>
-                    </div>
-                </div>
+                <x-ui.form-segmented
+                    wire:model="happened"
+                    :label="__('common.state')"
+                    :options="[
+                        ['value' => '0', 'label' => __('risks.potential_risk'), 'dot' => 'border border-secondary-light bg-transparent'],
+                        ['value' => '1', 'label' => __('common.materialised'), 'dot' => 'bg-primary dark:bg-status-critical', 'test' => 'form-materialised-option'],
+                    ]"
+                />
             </div>
+        </x-ui.form-section>
 
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="closeRiskModal">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" data-test="save-risk-button">
-                    {{ $editingRiskId === null ? __('risks.log_risk') : __('common.save_changes') }}
-                </x-ui.button>
+        <x-ui.form-section :title="__('risks.section_assessment')" :fields="['impact', 'solution']">
+            <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                <x-ui.form-textarea wire:model="impact" :label="__('common.impact')" required />
+                <x-ui.form-textarea wire:model="solution" :label="__('common.mitigation')" />
             </div>
-        </form>
-    </flux:modal>
+        </x-ui.form-section>
 
-    <flux:modal wire:model="showDeleteModal" wire:close="cancelDelete" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <div class="flex flex-col gap-4">
-            <flux:heading size="lg">{{ __('risks.delete_this_risk') }}</flux:heading>
-            <flux:subheading>{{ __('risks.the_risk_and_its_mitigation_notes_are_removed_nothing_else_i') }}</flux:subheading>
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="cancelDelete">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="button" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="deleteRisk" data-test="confirm-delete-risk">{{ __('risks.delete_risk') }}</x-ui.button>
-            </div>
-        </div>
-    </flux:modal>
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="save-risk-button">
+                {{ $editingRiskId === null ? __('risks.log_risk') : __('common.save_changes') }}
+            </x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
+
+    <x-ui.confirm-modal
+        wire:model="showDeleteModal"
+        close="cancelDelete"
+        :title="__('risks.delete_this_risk')"
+        :message="__('risks.the_risk_and_its_mitigation_notes_are_removed_nothing_else_i')"
+        confirm="deleteRisk"
+        :confirm-label="__('risks.delete_risk')"
+        confirm-test="confirm-delete-risk"
+    />
 </section>

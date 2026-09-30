@@ -136,6 +136,8 @@ return [
     'schedule_the_rest' => 'Schedule the rest',
     'schedule_tranche' => 'Schedule tranche',
     'scheduled_beyond_the_budget' => ':amount :currency is scheduled beyond the agreed budgets.',
+    'section_amount' => 'Amount',
+    'section_parties' => 'Parties',
     'scheduled_first_the_transferred_and_received_currencies_can' => 'Scheduled first. The transferred and received currencies can differ.',
     'search_agreements' => 'Search agreements',
     'select_a_donor' => 'Select a donor',

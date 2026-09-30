@@ -1,13 +1,25 @@
+@php
+    /*
+     * Someone who still has to turn on two-factor authentication only reaches
+     * the security page: the inbox bell, its live channel and the badge
+     * counts stay hidden until they have (see EnsureTwoFactorIsEnabled).
+     */
+    $showsInbox = auth()->check() && ! \App\Http\Middleware\EnsureTwoFactorIsEnabled::mustEnrol(auth()->user());
+@endphp
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ \App\Enums\Locale::current()->direction() }}" class="dark">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ \App\Enums\Locale::current()->direction() }}">
     <head>
         @include('partials.head')
     </head>
-    <body class="min-h-screen bg-white dark:bg-zinc-800" @auth data-user-id="{{ auth()->id() }}" data-notification-popups="{{ auth()->user()->notification_popups ? 'on' : 'off' }}" @endauth>
+    <body class="min-h-screen bg-white dark:bg-surface-0" @if ($showsInbox) data-user-id="{{ auth()->id() }}" data-notification-popups="{{ auth()->user()->notification_popups ? 'on' : 'off' }}" data-session-lifetime="{{ (int) config('session.lifetime') }}" @endif>
+        @persist('preloader')
+            <x-preloader />
+        @endpersist
+
         <x-navigation.sidebar />
 
         <!-- Mobile User Menu -->
-        <flux:header sticky class="z-40 min-h-16 border-b border-secondary-soft bg-white px-3 py-2 lg:hidden dark:border-secondary-medium dark:bg-secondary-dark">
+        <flux:header sticky class="z-40 min-h-16 border-b border-secondary-soft bg-white px-3 py-2 lg:hidden dark:border-line dark:bg-surface-1" data-top-bar-actions>
             <flux:sidebar.toggle
                 class="size-11! touch-manipulation lg:hidden"
                 icon="bars-2"
@@ -17,9 +29,26 @@
 
             <flux:spacer />
 
-            <livewire:notifications.bell />
+            {{-- The icon actions share one track, the same one the language toggle sits on. --}}
+            <div class="me-1 inline-flex items-center gap-1 rounded-full bg-secondary-soft/40 p-1 dark:bg-surface-2" data-top-bar-action-group>
+                <x-notifications.install-button />
 
-            <flux:dropdown position="top" align="end">
+                @if ($showsInbox)
+                    <livewire:notifications.bell />
+                @endif
+
+                <x-report-bug-button />
+
+<<<<<<< HEAD
+            <x-guideline-button />
+
+            <x-tour.button />
+=======
+                <x-tour.button />
+            </div>
+>>>>>>> Security-handeling-youssef
+
+            <flux:dropdown position="top" align="end" data-tour="profile">
                 <flux:profile
                     icon-trailing="chevron-down"
                     class="min-h-11 min-w-11 touch-manipulation"
@@ -43,6 +72,10 @@
 
                     <flux:menu.separator />
 
+                    <flux:menu.item :href="route('security.edit')" icon="shield-check" class="min-h-11 touch-manipulation" data-test="security-menu-item">
+                        {{ __('common.security') }}
+                    </flux:menu.item>
+
                     <form method="POST" action="{{ route('logout') }}" class="w-full">
                         @csrf
                         <flux:menu.item
@@ -60,30 +93,67 @@
         </flux:header>
 
         <!-- Desktop Top Navigation -->
-        <flux:header sticky class="z-40 hidden min-h-16 border-b border-secondary-soft bg-white px-4 py-2 lg:flex dark:border-secondary-medium dark:bg-secondary-dark" data-desktop-navigation-header>
+        <flux:header sticky class="z-40 hidden min-h-16 border-b border-secondary-soft bg-white px-4 py-2 lg:flex dark:border-line dark:bg-surface-1" data-desktop-navigation-header data-top-bar-actions>
             <flux:spacer />
 
-            <div class="flex items-center gap-1.5">
-                <livewire:notifications.bell />
+            <div class="flex items-center gap-3">
+                <x-locale-toggle />
 
-                <flux:button
-                    x-data
-                    x-on:click="$flux.dark = ! $flux.dark"
-                    variant="ghost"
-                    size="sm"
-                    square
-                    class="size-9! touch-manipulation text-secondary-medium! hover:bg-secondary-soft! hover:text-secondary-dark! dark:text-secondary-soft! dark:hover:bg-white/10! dark:hover:text-white!"
-                    :aria-label="__('navigation.toggle_theme')"
-                    :tooltip="__('navigation.toggle_theme')"
-                    data-theme-toggle
-                >
-                    <flux:icon.moon x-show="! $flux.dark" variant="mini" />
-                    <flux:icon.sun x-show="$flux.dark" x-cloak variant="mini" />
-                </flux:button>
+                {{-- The icon actions share one track, the same one the language toggle sits on. --}}
+                <div class="inline-flex items-center gap-2 rounded-full bg-secondary-soft/40 px-2 py-1 dark:bg-surface-2" data-top-bar-action-group>
+                    <x-notifications.install-button />
+
+                    @if ($showsInbox)
+                        <livewire:notifications.bell />
+                    @endif
+
+                    <x-report-bug-button />
+
+                    <x-tour.button />
+
+                    {{-- One press flips Light / Dark; the icon shows the theme in use. resources/js/theme-transition.js stores the choice in Flux's $flux.appearance and cross-fades the switch. --}}
+                    <flux:button
+                        x-data
+                        x-on:click="hcToggleAppearance()"
+                        variant="ghost"
+                        size="sm"
+                        square
+                        class="size-8! touch-manipulation text-secondary-medium! hover:bg-white! hover:text-secondary-dark! hover:shadow-sm dark:text-ink-muted! dark:hover:bg-surface-3! dark:hover:text-ink! dark:hover:shadow-raised"
+                        :aria-label="__('common.appearance')"
+                        :tooltip="__('common.appearance')"
+                        tooltip:position="bottom"
+                        data-theme-toggle
+                        data-top-bar-action
+                    >
+                        <flux:icon.sun x-show="! $flux.dark" x-cloak variant="outline" class="size-4.5!" />
+                        <flux:icon.moon x-show="$flux.dark" x-cloak variant="outline" class="size-4.5!" />
+                    </flux:button>
+                </div>
+
+<<<<<<< HEAD
+                    <flux:menu :aria-label="__('common.appearance')">
+                        <flux:menu.radio.group x-bind:value="$flux.appearance">
+                            <flux:menu.radio value="light" icon:trailing="sun" class="touch-manipulation" x-on:click="hcSetAppearance('light')" data-appearance-option="light">
+                                {{ __('navigation.appearance_light') }}
+                            </flux:menu.radio>
+                            <flux:menu.radio value="dark" icon:trailing="moon" class="touch-manipulation" x-on:click="hcSetAppearance('dark')" data-appearance-option="dark">
+                                {{ __('navigation.appearance_dark') }}
+                            </flux:menu.radio>
+                            <flux:menu.radio value="system" icon:trailing="computer-desktop" class="touch-manipulation" x-on:click="hcSetAppearance('system')" data-appearance-option="system">
+                                {{ __('navigation.appearance_system') }}
+                            </flux:menu.radio>
+                        </flux:menu.radio.group>
+                    </flux:menu>
+                </flux:dropdown>
+
+                <x-guideline-button />
 
                 <x-locale-toggle />
 
-                <div class="ms-1 border-s border-secondary-soft ps-2 dark:border-secondary-medium">
+                <div class="ms-1 border-s border-secondary-soft ps-2 dark:border-line" data-tour="profile">
+=======
+                <div class="border-s border-secondary-soft ps-2 dark:border-line" data-tour="profile">
+>>>>>>> Security-handeling-youssef
                     <x-desktop-user-menu />
                 </div>
             </div>
@@ -91,8 +161,10 @@
 
         {{ $slot }}
 
+        <x-tour.overlay />
+
         @persist('toast')
-            <flux:toast.group>
+            <flux:toast.group position="center">
                 <flux:toast />
             </flux:toast.group>
         @endpersist
@@ -101,6 +173,8 @@
             @persist('notification-toasts')
                 <x-notifications.toasts />
             @endpersist
+
+            <x-notifications.install-modal />
         @endauth
 
         @fluxScripts

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
+use App\Actions\Transfers\DeleteTransfer;
+use App\Actions\Transfers\SaveTransfer;
 use App\Enums\ArStatus;
 use App\Enums\Currency;
 use App\Models\Account;
@@ -17,6 +19,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 
 /**
  * The payment tranche form, shared by the transfer directory and the proposal
@@ -42,6 +45,7 @@ trait ManagesTransferForm
 
     public bool $confirmingTransferDelete = false;
 
+    #[Locked]
     public ?int $editingTransferId = null;
 
     public string $transferAgreementId = '';
@@ -91,10 +95,26 @@ trait ManagesTransferForm
         return null;
     }
 
+    /**
+     * Whether the viewer may schedule or edit a tranche. The agreement and
+     * account pick-lists carry budgets and bank account names, and the modal
+     * flag is client-settable, so they are only ever built for these viewers.
+     */
+    protected function canUseTransferForm(): bool
+    {
+        $user = auth()->user();
+
+        return $user !== null && ($user->can('transfers.create') || $user->can('transfers.update'));
+    }
+
     /** @return Collection<int, Account> */
     #[Computed]
     public function accountOptions(): Collection
     {
+        if (! $this->canUseTransferForm()) {
+            return new Collection;
+        }
+
         return Account::query()->select(['id', 'account_name', 'is_active'])->orderBy('account_name')->orderBy('id')->get();
     }
 
@@ -102,6 +122,10 @@ trait ManagesTransferForm
     #[Computed]
     public function agreementOptions(): Collection
     {
+        if (! $this->canUseTransferForm()) {
+            return new Collection;
+        }
+
         return $this->scopedAgreements()
             ->select(['id', 'donor_id', 'proposal_id', 'project_num', 'currency', 'budget'])
             ->with(['donor:id,name', 'proposal:id,name'])
@@ -272,26 +296,7 @@ trait ManagesTransferForm
             'receiveDate.required_if' => __('transfers.enter_the_date_the_money_landed'),
         ]);
 
-        $transfer = $existing ?? new TransfersTracking;
-
-        $transfer->fill([
-            'donor_proposal_id' => (int) $validated['transferAgreementId'],
-            'account_id' => $validated['transferAccountId'] === '' || $validated['transferAccountId'] === null
-                ? null
-                : (int) $validated['transferAccountId'],
-            'payment_amount' => $validated['paymentAmount'],
-            'amount_transfered_currency' => $validated['transferredCurrency'],
-            'scheduled_date' => $validated['scheduledDate'] === '' ? null : $validated['scheduledDate'],
-            'transfer_date' => $validated['transferDate'] === '' ? null : $validated['transferDate'],
-            'fees' => $validated['fees'],
-            'fees_currency' => $validated['feesCurrency'],
-            'amount_received' => $validated['amountReceived'] === '' ? null : $validated['amountReceived'],
-            'exchange_rate' => $validated['exchangeRate'],
-            'net_amount_received' => $validated['netAmountReceived'] === '' ? null : $validated['netAmountReceived'],
-            'amount_received_currency' => $validated['receivedCurrency'],
-            'receive_date' => $validated['receiveDate'] === '' ? null : $validated['receiveDate'],
-            'ar_status' => $validated['transferArStatus'],
-        ])->save();
+        $transfer = app(SaveTransfer::class)->handle($existing, $validated);
 
         $isCreate = $transfer->wasRecentlyCreated;
 
@@ -332,7 +337,7 @@ trait ManagesTransferForm
         }
 
         $transfer = $this->scopedTransfer($this->editingTransferId);
-        $transfer->delete();
+        app(DeleteTransfer::class)->handle($transfer);
 
         $this->showTransferModal = false;
         $this->resetTransferForm();

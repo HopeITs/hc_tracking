@@ -19,6 +19,7 @@ use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 
@@ -186,7 +187,7 @@ test('a file uploads to the proposal and downloads only through its own proposal
 
     proposalPage()
         ->call('openCreateFileModal')
-        ->set('newFile', UploadedFile::fake()->create('signed.pdf', 100, 'application/pdf'))
+        ->set('newFile', validUpload('signed.pdf', 100))
         ->set('fileCategory', MediaCollection::Agreement->value)
         ->set('fileDisplayName', 'ECHO agreement')
         ->call('saveFile')
@@ -197,7 +198,9 @@ test('a file uploads to the proposal and downloads only through its own proposal
     expect($media->mediable_id)->toBe($this->proposal->id)
         ->and($media->original_name)->toBe('ECHO agreement.pdf');
 
-    $this->actingAs($this->user)->get(route('proposals.files.download', [$this->proposal, $media]))->assertOk();
+    $this->actingAs($this->user)->get(route('proposals.files.download', [$this->proposal, $media]))
+        ->assertOk()
+        ->assertHeader('X-Content-Type-Options', 'nosniff');
     $this->actingAs($this->user)->get(route('proposals.files.download', [Proposal::factory()->create(), $media]))->assertNotFound();
 });
 
@@ -221,6 +224,8 @@ test('deleting a proposal removes its file rows', function () {
 });
 
 test('deadlines list only open items in date order and group them by urgency', function () {
+    // A viewer who sees every department's tasks, so the task deadline counts.
+    $this->user = User::factory()->role('General Manager')->create();
     $agreement = usdAgreement($this->proposal);
     TransfersTracking::factory()->create(['donor_proposal_id' => $agreement->id, 'scheduled_date' => '2026-06-01', 'ar_status' => ArStatus::Pending]);
     TransfersTracking::factory()->create(['donor_proposal_id' => $agreement->id, 'scheduled_date' => '2026-06-02', 'ar_status' => ArStatus::Received]);
@@ -286,7 +291,7 @@ test('replacing a file stores the new one and removes the old one from disk', fu
 
     $page = proposalPage()
         ->call('openCreateFileModal')
-        ->set('newFile', UploadedFile::fake()->create('draft.docx', 50))
+        ->set('newFile', validUpload('draft.docx', 50))
         ->set('fileCategory', MediaCollection::Proposal->value)
         ->call('saveFile');
 
@@ -294,7 +299,7 @@ test('replacing a file stores the new one and removes the old one from disk', fu
     $oldPath = $media->path;
 
     $page->call('openEditFileModal', $media->id)
-        ->set('newFile', UploadedFile::fake()->create('final.pdf', 80, 'application/pdf'))
+        ->set('newFile', validUpload('final.pdf', 80))
         ->set('fileDisplayName', 'Final proposal')
         ->call('saveFile')
         ->assertHasNoErrors();
@@ -323,8 +328,11 @@ test('the preview serves a proposal pdf and a funded project file inline, and no
     $this->actingAs($this->user)->get(route('proposals.files.preview', [$this->proposal, $own]))
         ->assertOk()
         ->assertHeader('Content-Type', 'application/pdf')
-        ->assertHeader('X-Content-Type-Options', 'nosniff');
-    $this->actingAs($this->user)->get(route('proposals.files.preview', [$this->proposal, $projectFile]))->assertOk();
+        ->assertHeader('X-Content-Type-Options', 'nosniff')
+        ->assertHeaderMissing('Content-Security-Policy');
+    $this->actingAs($this->user)->get(route('proposals.files.preview', [$this->proposal, $projectFile]))
+        ->assertOk()
+        ->assertHeader('Content-Security-Policy', 'sandbox');
     $this->actingAs($this->user)->get(route('proposals.files.preview', [$this->proposal, $unfunded]))->assertNotFound();
     $this->actingAs($this->user)->get(route('proposals.files.preview', [$this->proposal, $word]))->assertNotFound();
 });
@@ -371,7 +379,7 @@ test('the money reading names every currency after the one its figure leads with
 });
 
 test('a user without proposal permissions sees no edit controls and cannot change anything', function () {
-    $viewer = User::factory()->role('General Manager')->create();
+    $viewer = User::factory()->role('Team Member')->create()->givePermissionTo('proposals.view');
     $agreement = usdAgreement($this->proposal);
     $media = Media::factory()->create(['mediable_type' => 'proposal', 'mediable_id' => $this->proposal->id]);
     $page = Livewire::actingAs($viewer)->test('pages::proposals.show', ['proposal' => $this->proposal]);
@@ -389,7 +397,8 @@ test('a user without proposal permissions sees no edit controls and cannot chang
 
     $fresh()->call('openStatusModal')->assertForbidden();
     $fresh()->set('newStatus', ProposalStatus::Completed->value)->set('statusContext', 'Done')->set('statusDate', '2026-06-15')->call('changeStatus')->assertForbidden();
-    $fresh()->set('deletingFileId', $media->id)->call('deleteFile')->assertForbidden();
+    $fresh()->call('confirmDeleteFile', $media->id)->assertForbidden();
+    expect(fn () => $fresh()->set('deletingFileId', $media->id))->toThrow(CannotUpdateLockedPropertyException::class);
     $fresh()->call('openAgreementEdit', $agreement->id)->assertForbidden();
     $fresh()->call('openTransferCreate', $agreement->id)->assertForbidden();
 

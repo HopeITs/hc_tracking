@@ -10,13 +10,13 @@ test('guests are redirected from the risk register', function () {
 });
 
 test('authenticated users can view the risk register', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     $this->actingAs($user)->get(route('risks.index'))->assertOk()->assertSeeText('Risks');
 });
 
 test('risks can be filtered by search project and whether they materialised', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $first = Project::factory()->create(['name' => 'Aleppo Wells']);
     $second = Project::factory()->create(['name' => 'Homs Shelter']);
 
@@ -46,7 +46,7 @@ test('risks can be filtered by search project and whether they materialised', fu
 });
 
 test('the materialised-only URL filter selects materialised risks', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Risk::factory()->create(['name' => 'Materialised risk', 'happened' => true]);
     Risk::factory()->create(['name' => 'Open risk', 'happened' => false]);
 
@@ -58,7 +58,7 @@ test('the materialised-only URL filter selects materialised risks', function () 
 });
 
 test('a risk can be logged against a project', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
 
     Livewire::actingAs($user)
@@ -83,7 +83,7 @@ test('a risk can be logged against a project', function () {
 });
 
 test('blank mitigation is normalized to null', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
 
     Livewire::actingAs($user)
@@ -100,7 +100,7 @@ test('blank mitigation is normalized to null', function () {
 });
 
 test('logging a risk requires a name an impact and an existing project', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
         ->test('pages::risks.index')
@@ -115,7 +115,7 @@ test('logging a risk requires a name an impact and an existing project', functio
 });
 
 test('a risk can be edited and marked as materialised', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $risk = Risk::factory()->create(['name' => 'Old risk', 'solution' => null, 'happened' => false]);
     $newProject = Project::factory()->create();
 
@@ -141,7 +141,7 @@ test('a risk can be edited and marked as materialised', function () {
 });
 
 test('a risk can be deleted after confirmation', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $risk = Risk::factory()->create();
 
     Livewire::actingAs($user)
@@ -158,7 +158,7 @@ test('a risk can be deleted after confirmation', function () {
 });
 
 test('cancelling a delete closes the modal without deleting the risk', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $risk = Risk::factory()->create();
 
     Livewire::actingAs($user)
@@ -173,7 +173,7 @@ test('cancelling a delete closes the modal without deleting the risk', function 
 });
 
 test('delete is a no-op until a risk is confirmed', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $risk = Risk::factory()->create();
 
     Livewire::actingAs($user)->test('pages::risks.index')->call('deleteRisk')->assertHasNoErrors();
@@ -182,7 +182,7 @@ test('delete is a no-op until a risk is confirmed', function () {
 });
 
 test('a risk can be marked materialised directly from its card', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $risk = Risk::factory()->create(['happened' => false]);
 
     Livewire::actingAs($user)
@@ -194,7 +194,7 @@ test('a risk can be marked materialised directly from its card', function () {
 });
 
 test('a risk can be moved back to potential directly from its card', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $risk = Risk::factory()->create(['happened' => true]);
 
     Livewire::actingAs($user)
@@ -206,7 +206,7 @@ test('a risk can be moved back to potential directly from its card', function ()
 });
 
 test('risk content is escaped in the register', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create(['name' => '<script>project()</script>']);
     Risk::factory()->create([
         'project_id' => $project->id,
@@ -229,13 +229,13 @@ test('risk content is escaped in the register', function () {
 });
 
 test('the risk register renders with no risks', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)->test('pages::risks.index')->assertSee('No risks logged');
 });
 
 test('the materialised count stays stable regardless of the materialised-only toggle', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Risk::factory()->count(2)->create(['happened' => true]);
     Risk::factory()->create(['happened' => false]);
 
@@ -249,7 +249,7 @@ test('the materialised count stays stable regardless of the materialised-only to
 });
 
 test('toggling materialised-only filters the register to materialised risks', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Risk::factory()->create(['name' => 'Materialised risk', 'happened' => true]);
     Risk::factory()->create(['name' => 'Open risk', 'happened' => false]);
 
@@ -265,7 +265,7 @@ test('toggling materialised-only filters the register to materialised risks', fu
 });
 
 test('the unmitigated toggle filters to challenges with no mitigation recorded', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Risk::factory()->create(['name' => 'Has mitigation', 'solution' => 'A plan.', 'happened' => true]);
     Risk::factory()->create(['name' => 'No mitigation', 'solution' => null, 'happened' => true]);
     Risk::factory()->create(['name' => 'Blank mitigation', 'solution' => '', 'happened' => true]);
@@ -285,7 +285,7 @@ test('the unmitigated toggle filters to challenges with no mitigation recorded',
 });
 
 test('a potential risk that has not happened never counts toward challenges without a solution', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Risk::factory()->create(['name' => 'Not yet occurred', 'solution' => null, 'happened' => false]);
 
     $component = Livewire::actingAs($user)->test('pages::risks.index');
@@ -296,7 +296,7 @@ test('a potential risk that has not happened never counts toward challenges with
 });
 
 test('clearing filters also clears the unmitigated toggle', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
         ->test('pages::risks.index')
@@ -307,7 +307,7 @@ test('clearing filters also clears the unmitigated toggle', function () {
 });
 
 test('the project chart splits challenges from potential risks per project', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $projectA = Project::factory()->create(['name' => 'Project A']);
     $projectB = Project::factory()->create(['name' => 'Project B']);
 
@@ -328,7 +328,7 @@ test('the project chart splits challenges from potential risks per project', fun
 });
 
 test('the risk landscape totals match the currently filtered risks', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     Risk::factory()->count(2)->create(['happened' => true]);
     Risk::factory()->create(['happened' => false]);
 
@@ -342,7 +342,7 @@ test('the risk landscape totals match the currently filtered risks', function ()
 });
 
 test('the project chart respects every active filter, including the project filter itself', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $projectA = Project::factory()->create(['name' => 'Project A']);
     $projectB = Project::factory()->create(['name' => 'Project B']);
 
@@ -363,3 +363,23 @@ test('the project chart respects every active filter, including the project filt
     $projectFilteredChart = $component->get('projectRiskChart');
     expect($projectFilteredChart['categories'])->toBe(['Project A']);
 });
+
+test('the state picker in the risk form saves the string values it sends as the boolean state', function (string $sent, bool $stored) {
+    $user = User::factory()->role('General Manager')->create();
+    $project = Project::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::risks.index')
+        ->call('openCreateModal')
+        ->set('name', 'Fuel shortage')
+        ->set('impact', 'Generators cannot run.')
+        ->set('riskProjectId', (string) $project->id)
+        ->set('happened', $sent)
+        ->call('saveRisk')
+        ->assertHasNoErrors();
+
+    $this->assertDatabaseHas('risks', ['name' => 'Fuel shortage', 'happened' => $stored]);
+})->with([
+    'materialised' => ['1', true],
+    'potential' => ['0', false],
+]);

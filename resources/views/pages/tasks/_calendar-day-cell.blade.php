@@ -38,11 +38,12 @@
     @endforeach
 </div>
 
+@can('create', App\Models\Task::class)
 <button
     type="button"
     x-show="!addOpen[{{ Js::from($day->toDateString()) }}]"
     x-on:click="addOpen[{{ Js::from($day->toDateString()) }}] = true; $nextTick(() => $refs['calendarAddInput{{ $day->toDateString() }}']?.focus())"
-    class="inline-flex shrink-0 items-center gap-0.5 self-start rounded px-1 py-0.5 text-[10px] text-secondary-medium opacity-0 hover:bg-secondary-soft group-hover/day:opacity-100 dark:text-secondary-soft dark:hover:bg-secondary-medium"
+    class="inline-flex shrink-0 items-center gap-0.5 self-start rounded px-1 py-0.5 text-[10px] text-secondary-medium opacity-0 hover:bg-secondary-soft group-hover/day:opacity-100 dark:text-ink-muted dark:hover:bg-surface-2"
     :aria-label="{{ Js::from(__('tasks.add_task')) }}"
     data-test="task-calendar-add-toggle-{{ $day->toDateString() }}"
 >
@@ -55,7 +56,7 @@
         type="text"
         x-ref="calendarAddInput{{ $day->toDateString() }}"
         placeholder="{{ __('tasks.add_task') }}"
-        class="w-full min-w-0 border-0 bg-transparent p-0.5 text-[11px] text-secondary-dark placeholder:text-secondary-light focus:ring-0 focus:outline-none dark:text-white"
+        class="w-full min-w-0 border-0 bg-transparent p-0.5 text-[11px] text-secondary-dark placeholder:text-secondary-light focus:ring-0 focus:outline-none dark:text-ink"
         wire:keydown.enter="quickCreateTask($event.target.value, null, null, {{ Js::from($dayRowKey) }}, {{ Js::from($day->toDateString()) }}); $event.target.value = ''"
         data-test="task-calendar-quick-add-{{ $day->toDateString() }}"
     />
@@ -72,12 +73,12 @@
                     </span>
                 @else
                     @foreach ($dayDraftAssignees->take(2) as $userOption)
-                        <span class="inline-flex size-5 items-center justify-center rounded-full border-2 border-white bg-secondary-dark text-[8px] font-semibold text-white dark:border-secondary-dark dark:bg-secondary-medium">
+                        <span class="inline-flex size-5 items-center justify-center rounded-full border-2 border-white bg-secondary-dark text-[8px] font-semibold text-white dark:border-surface-1 dark:bg-surface-3">
                             {{ Illuminate\Support\Str::of($userOption['name'])->explode(' ')->map(fn ($part) => mb_substr($part, 0, 1))->take(2)->implode('') }}
                         </span>
                     @endforeach
                     @if ($dayDraftAssignees->count() > 2)
-                        <span class="inline-flex size-5 items-center justify-center rounded-full border-2 border-white bg-secondary-soft text-[8px] font-semibold text-secondary-dark dark:border-secondary-dark dark:bg-secondary-medium dark:text-white">
+                        <span class="inline-flex size-5 items-center justify-center rounded-full border-2 border-white bg-secondary-soft text-[8px] font-semibold text-secondary-dark dark:border-surface-1 dark:bg-surface-3 dark:text-ink">
                             +{{ $dayDraftAssignees->count() - 2 }}
                         </span>
                     @endif
@@ -93,19 +94,19 @@
                     wire:click="toggleTaskDraftAssignee({{ Js::from($dayRowKey) }}, {{ $userOption['id'] }})"
                     wire:key="task-calendar-add-{{ $day->toDateString() }}-assignee-{{ $userOption['id'] }}"
                     x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
-                    class="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm hover:bg-secondary-soft dark:hover:bg-secondary-medium"
+                    class="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm hover:bg-secondary-soft dark:hover:bg-white/[0.06]"
                     data-test="task-calendar-add-assignee-option-{{ $day->toDateString() }}-{{ $userOption['id'] }}"
                 >
                     <span class="min-w-0 flex-1 truncate">{{ $userOption['name'] }} · {{ $userOption['secondary_name'] }}</span>
                     @if ($isDayDraftAssigned)
-                        <flux:icon.check class="size-4 shrink-0 text-primary" />
+                        <flux:icon.check class="size-4 shrink-0 text-primary dark:text-brand-text" />
                     @endif
                 </button>
             @endforeach
         </x-ui.multi-select-popover>
 
         <flux:dropdown position="bottom" align="start">
-            <button type="button" aria-label="{{ __('tasks.priority') }}: {{ $dayDraftPriority->label() }}" class="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded hover:bg-secondary-soft dark:hover:bg-secondary-medium" data-test="task-calendar-add-priority-trigger-{{ $day->toDateString() }}">
+            <button type="button" aria-label="{{ __('tasks.priority') }}: {{ $dayDraftPriority->label() }}" class="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded hover:bg-secondary-soft dark:hover:bg-surface-2" data-test="task-calendar-add-priority-trigger-{{ $day->toDateString() }}">
                 <flux:icon.flag :variant="$dayDraftPriority === TaskPriority::Low ? 'outline' : 'solid'" class="size-3 {{ $priorityIconClasses($dayDraftPriority) }}" />
             </button>
             <flux:menu>
@@ -120,3 +121,4 @@
         </flux:dropdown>
     </div>
 </div>
+@endcan

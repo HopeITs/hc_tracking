@@ -30,6 +30,7 @@ return [
     'phone' => 'Phone',
     'reports_submitted' => 'Reports submitted',
     'search_donors' => 'Search donors',
+    'section_contact' => 'Contact',
     'this_donor_has_signed_a_funding_agreement_and_cannot_be_dele' => 'This donor has signed a funding agreement and cannot be deleted.',
     'all_donors' => 'All donors',
     'and_count_more' => '{1} and :count more agreement|[2,*] and :count more agreements',

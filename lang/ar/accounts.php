@@ -45,6 +45,8 @@ return [
     'opening_date_unknown' => 'تاريخ الفتح غير معروف',
     'po_box_street' => 'عنوان فرع المصرف',
     'search_accounts' => 'البحث في الحسابات',
+    'section_address' => 'العنوان',
+    'section_bank' => 'البيانات المصرفية',
     'swift_code' => 'رمز السويفت (SWIFT / BIC)',
     'total_transfers' => 'إجمالي التحويلات',
     'view_transfers_for_name' => 'عرض تحويلات :name',

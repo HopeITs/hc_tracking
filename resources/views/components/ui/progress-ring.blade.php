@@ -21,7 +21,7 @@
         'warn' => 'stroke-status-warn',
         'critical' => 'stroke-primary',
         'funding' => 'stroke-funding',
-        default => 'stroke-secondary-dark dark:stroke-white',
+        default => 'stroke-secondary-dark dark:stroke-ink-muted',
     };
 @endphp
 
@@ -41,7 +41,7 @@
             r="{{ $radius }}"
             fill="none"
             stroke-width="{{ $stroke }}"
-            class="stroke-secondary-soft dark:stroke-secondary-medium"
+            class="stroke-secondary-soft dark:stroke-surface-2"
         />
         @if ($value !== null)
             <circle
@@ -59,7 +59,7 @@
     </svg>
 
     @if ($size === 'lg')
-        <span class="type-figure absolute text-secondary-dark tabular-nums dark:text-white" aria-hidden="true">
+        <span class="type-figure absolute text-secondary-dark tabular-nums dark:text-ink" aria-hidden="true">
             {{ $value === null ? '—' : round($value).'%' }}
         </span>
     @endif

@@ -19,9 +19,11 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection as BaseCollection;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -70,6 +72,7 @@ new #[Title('titles.indicators')] class extends Component {
     public string $view = 'cards';
 
     public bool $showIndicatorModal = false;
+    #[Locked]
     public ?int $editingIndicatorId = null;
     public string $name = '';
     public string $indicatorResultId = '';
@@ -81,11 +84,15 @@ new #[Title('titles.indicators')] class extends Component {
     public string $indicatorProjectId = '';
 
     public bool $showDeleteModal = false;
+    #[Locked]
     public ?int $deletingIndicatorId = null;
 
     public bool $showProgressModal = false;
+    #[Locked]
     public ?int $progressIndicatorId = null;
+    #[Locked]
     public ?int $editingReadingId = null;
+    #[Locked]
     public ?int $deletingReadingId = null;
     public string $progressDate = '';
     public string $progressValue = '';
@@ -93,6 +100,8 @@ new #[Title('titles.indicators')] class extends Component {
     public string $progressSourceOfVerification = '';
 
     public bool $showInspectModal = false;
+
+    #[Locked]
     public ?int $inspectingIndicatorId = null;
 
     /**
@@ -107,7 +116,7 @@ new #[Title('titles.indicators')] class extends Component {
     {
         $createForResult = request()->integer('create');
 
-        if ($createForResult > 0 && Result::query()->whereKey($createForResult)->exists()) {
+        if ($createForResult > 0 && Gate::allows('indicators.create') && Result::query()->whereKey($createForResult)->exists()) {
             $this->openCreateModal();
             $this->indicatorResultId = (string) $createForResult;
         }
@@ -219,7 +228,7 @@ new #[Title('titles.indicators')] class extends Component {
                 // resolve to null; the view renders that explicitly.
                 'planIndicators.source' => fn (MorphTo $morphTo) => $morphTo->morphWith([
                     AnnualPlan::class => [],
-                    Proposal::class => ['donors', 'projects:id'],
+                    Proposal::class => ['donorNames:id,name', 'projects:id'],
                 ]),
             ])
             ->orderBy('name')
@@ -257,7 +266,7 @@ new #[Title('titles.indicators')] class extends Component {
                 default => null,
             },
             'donors' => $source instanceof Proposal
-                ? $source->donors->pluck('name')->values()->all()
+                ? $source->donorNames->pluck('name')->values()->all()
                 : [],
             'project' => $target->project?->name,
             'reports' => $reports->count(),
@@ -720,7 +729,7 @@ new #[Title('titles.indicators')] class extends Component {
      * Refused once any target exists: plan_indicators cascades from indicators,
      * and reports and report_files cascade from those.
      */
-    public function canDelete(int $indicatorId): bool
+    protected function canDelete(int $indicatorId): bool
     {
         $indicator = Indicator::query()->select(['id'])->withCount('planIndicators')->find($indicatorId);
 
@@ -729,12 +738,16 @@ new #[Title('titles.indicators')] class extends Component {
 
     public function openCreateModal(): void
     {
+        Gate::authorize('indicators.create');
+
         $this->resetIndicatorForm();
         $this->showIndicatorModal = true;
     }
 
     public function openEditModal(int $indicatorId): void
     {
+        Gate::authorize('indicators.update');
+
         $indicator = Indicator::query()
             ->select(['id', 'name', 'result_id', 'project_id', 'measure', 'unit', 'baseline', 'target', 'frequency'])
             ->findOrFail($indicatorId);
@@ -754,6 +767,8 @@ new #[Title('titles.indicators')] class extends Component {
 
     public function saveIndicator(): void
     {
+        Gate::authorize($this->editingIndicatorId === null ? 'indicators.create' : 'indicators.update');
+
         $this->name = trim($this->name);
         $this->unit = trim($this->unit);
         $isPercentage = $this->indicatorMeasure === IndicatorMeasure::Percentage->value;
@@ -882,6 +897,8 @@ new #[Title('titles.indicators')] class extends Component {
 
     public function confirmDelete(int $indicatorId): void
     {
+        Gate::authorize('indicators.delete');
+
         $this->deletingIndicatorId = $indicatorId;
         $this->showDeleteModal = true;
     }
@@ -894,6 +911,8 @@ new #[Title('titles.indicators')] class extends Component {
 
     public function deleteIndicator(): void
     {
+        Gate::authorize('indicators.delete');
+
         if ($this->deletingIndicatorId === null) {
             return;
         }
@@ -926,6 +945,8 @@ new #[Title('titles.indicators')] class extends Component {
 
     public function openProgressModal(int $indicatorId): void
     {
+        Gate::authorize('indicators.update');
+
         $this->resetValidation();
         $this->progressIndicatorId = $indicatorId;
         $this->editingReadingId = null;
@@ -942,6 +963,8 @@ new #[Title('titles.indicators')] class extends Component {
      */
     public function openEditReadingModal(int $readingId): void
     {
+        Gate::authorize('indicators.update');
+
         $reading = IndicatorProgress::query()->findOrFail($readingId);
 
         $this->resetValidation();
@@ -956,6 +979,8 @@ new #[Title('titles.indicators')] class extends Component {
 
     public function saveProgress(): void
     {
+        Gate::authorize('indicators.update');
+
         if ($this->progressIndicatorId === null) {
             return;
         }
@@ -1015,6 +1040,8 @@ new #[Title('titles.indicators')] class extends Component {
      */
     public function confirmDeleteReading(int $readingId): void
     {
+        Gate::authorize('indicators.update');
+
         $this->deletingReadingId = $readingId;
     }
 
@@ -1025,6 +1052,8 @@ new #[Title('titles.indicators')] class extends Component {
 
     public function deleteReading(): void
     {
+        Gate::authorize('indicators.update');
+
         if ($this->deletingReadingId === null || $this->inspectingIndicatorId === null) {
             return;
         }
@@ -1091,13 +1120,13 @@ new #[Title('titles.indicators')] class extends Component {
     // One fixed visual identity for Impact/Outcome/Output app-wide; see
     // .ai/rules/components-ui.md. Copied, never reinvented.
     $levelMarks = [
-        ResultType::Impact->value => 'bg-secondary-dark ring-secondary-dark dark:bg-white dark:ring-white',
+        ResultType::Impact->value => 'bg-secondary-dark ring-secondary-dark dark:bg-ink dark:ring-ink',
         ResultType::Outcome->value => 'bg-primary ring-primary',
         ResultType::Output->value => 'bg-board ring-secondary-light',
     ];
 
     $levelAccents = [
-        ResultType::Impact->value => 'bg-secondary-dark dark:bg-white',
+        ResultType::Impact->value => 'bg-secondary-dark dark:bg-ink',
         ResultType::Outcome->value => 'bg-primary',
         ResultType::Output->value => 'bg-secondary-light',
     ];
@@ -1121,15 +1150,15 @@ new #[Title('titles.indicators')] class extends Component {
     $toneText = fn (string $tone): string => match ($tone) {
         'good' => 'text-status-good',
         'warn' => 'text-status-warn',
-        'critical' => 'text-primary',
-        default => 'text-secondary-medium dark:text-secondary-soft',
+        'critical' => 'text-primary dark:text-brand-text',
+        default => 'text-secondary-medium dark:text-ink-muted',
     };
 
     $toneFill = fn (string $tone): string => match ($tone) {
         'good' => 'bg-status-good',
         'warn' => 'bg-status-warn',
-        'critical' => 'bg-primary',
-        default => 'bg-secondary-medium dark:bg-secondary-soft',
+        'critical' => 'bg-primary dark:bg-status-critical',
+        default => 'bg-secondary-medium dark:bg-ink-muted',
     };
 
     /**
@@ -1181,8 +1210,8 @@ new #[Title('titles.indicators')] class extends Component {
     $ragSegments = [
         ['key' => App\Enums\RagStatus::Green->value, 'label' => App\Enums\RagStatus::Green->label(), 'count' => $overview['rag']['green'], 'fill' => 'bg-status-good', 'dot' => 'bg-status-good'],
         ['key' => App\Enums\RagStatus::Amber->value, 'label' => App\Enums\RagStatus::Amber->label(), 'count' => $overview['rag']['amber'], 'fill' => 'bg-status-warn', 'dot' => 'bg-status-warn'],
-        ['key' => App\Enums\RagStatus::Red->value, 'label' => App\Enums\RagStatus::Red->label(), 'count' => $overview['rag']['red'], 'fill' => 'bg-primary', 'dot' => 'bg-primary'],
-        ['key' => 'unrated', 'label' => __('indicators.unrated'), 'count' => $overview['unrated'], 'fill' => 'bg-secondary-soft dark:bg-secondary-medium', 'dot' => 'bg-secondary-light'],
+        ['key' => App\Enums\RagStatus::Red->value, 'label' => App\Enums\RagStatus::Red->label(), 'count' => $overview['rag']['red'], 'fill' => 'bg-primary dark:bg-status-critical', 'dot' => 'bg-primary dark:bg-status-critical'],
+        ['key' => 'unrated', 'label' => __('indicators.unrated'), 'count' => $overview['unrated'], 'fill' => 'bg-secondary-soft dark:bg-line-strong', 'dot' => 'bg-secondary-light'],
     ];
 
     $focusChips = [
@@ -1195,15 +1224,15 @@ new #[Title('titles.indicators')] class extends Component {
 
     $reportStatusChip = fn (App\Enums\ReportStatus $status): string => match ($status) {
         App\Enums\ReportStatus::Approved => 'border-status-good/30 bg-status-good-soft text-status-good',
-        App\Enums\ReportStatus::Reviewed => 'border-secondary-light text-secondary-medium dark:text-secondary-soft',
-        App\Enums\ReportStatus::Draft => 'border-secondary-light bg-secondary-soft text-secondary-medium dark:bg-secondary-medium dark:text-secondary-soft',
+        App\Enums\ReportStatus::Reviewed => 'border-secondary-light text-secondary-medium dark:text-ink-muted',
+        App\Enums\ReportStatus::Draft => 'border-secondary-light bg-secondary-soft text-secondary-medium dark:bg-surface-2 dark:text-ink-muted',
     };
 
     $onTrackShare = $overview['rated'] === 0 ? null : ($overview['rag']['green'] / $overview['rated']) * 100;
 @endphp
 
 <section
-    class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white"
+    class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink"
     aria-labelledby="indicator-directory-heading"
 >
     <x-ui.page-header
@@ -1238,15 +1267,15 @@ new #[Title('titles.indicators')] class extends Component {
         </x-slot:filters>
 
         <x-slot:actions>
-            <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-indicator-button">
+            @can('indicators.create')<x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-indicator-button">
                 {{ __('indicators.add_indicator') }}
-            </x-ui.button>
+            </x-ui.button>@endcan
         </x-slot:actions>
     </x-ui.page-header>
 
     {{-- Measurement at a glance: four figures, then how the ratings split. --}}
     <x-ui.panel data-test="indicator-overview">
-        <div class="grid gap-px bg-secondary-soft @xl/directory:grid-cols-2 @4xl/directory:grid-cols-4 dark:bg-secondary-medium">
+        <div class="grid gap-px bg-secondary-soft @xl/directory:grid-cols-2 @4xl/directory:grid-cols-4 dark:bg-line">
             @php
                 $achievementTone = match (true) {
                     $overview['achieved'] === null => 'neutral',
@@ -1295,24 +1324,24 @@ new #[Title('titles.indicators')] class extends Component {
             @endphp
 
             @foreach ($headline as $cell)
-                <div class="flex items-start justify-between gap-3 bg-white p-4 dark:bg-secondary-dark" wire:key="indicator-headline-{{ $loop->index }}">
+                <div class="flex items-start justify-between gap-3 bg-white p-4 dark:bg-surface-1" wire:key="indicator-headline-{{ $loop->index }}">
                     <div class="min-w-0">
-                        <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ $cell['label'] }}</p>
+                        <p class="type-label text-secondary-medium dark:text-ink-muted">{{ $cell['label'] }}</p>
                         <p @class([
                             'type-figure mt-2',
                             'text-status-good' => $cell['tone'] === 'good',
                             'text-status-warn' => $cell['tone'] === 'warn',
-                            'text-primary' => $cell['tone'] === 'critical',
-                            'text-secondary-dark dark:text-white' => $cell['tone'] === 'neutral',
+                            'text-primary dark:text-brand-text' => $cell['tone'] === 'critical',
+                            'text-secondary-dark dark:text-ink' => $cell['tone'] === 'neutral',
                         ])>{{ $cell['value'] }}</p>
-                        <p class="mt-1 type-meta text-secondary-medium dark:text-secondary-soft">{{ $cell['sub'] }}</p>
+                        <p class="mt-1 type-meta text-secondary-medium dark:text-ink-muted">{{ $cell['sub'] }}</p>
                     </div>
                     <div @class([
                         'flex size-10 shrink-0 items-center justify-center rounded-xl',
                         'bg-status-good-soft text-status-good' => $cell['tone'] === 'good',
                         'bg-status-warn-soft text-status-warn' => $cell['tone'] === 'warn',
-                        'bg-status-critical-soft text-primary' => $cell['tone'] === 'critical',
-                        'bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white' => $cell['tone'] === 'neutral',
+                        'bg-status-critical-soft text-primary dark:text-brand-text' => $cell['tone'] === 'critical',
+                        'bg-secondary-soft text-secondary-dark dark:bg-surface-2 dark:text-ink' => $cell['tone'] === 'neutral',
                     ])>
                         <flux:icon :name="$cell['icon']" class="size-5" />
                     </div>
@@ -1321,14 +1350,14 @@ new #[Title('titles.indicators')] class extends Component {
         </div>
 
         {{-- The rating split, as one bar. Every band is a filter. --}}
-        <div class="flex flex-col gap-3 border-t border-secondary-soft bg-board-head px-4 py-4 @3xl/directory:flex-row @3xl/directory:items-center @3xl/directory:gap-6 dark:border-secondary-medium">
+        <div class="flex flex-col gap-3 border-t border-secondary-soft bg-board-head px-4 py-4 @3xl/directory:flex-row @3xl/directory:items-center @3xl/directory:gap-6 dark:border-line">
             <div class="min-w-0 flex-1">
                 <div class="flex items-baseline justify-between gap-3">
-                    <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('indicators.how_the_ratings_split') }}</p>
-                    <p class="type-meta text-secondary-medium dark:text-secondary-soft">{{ __('indicators.rated_against_percent_of_the_year_elapsed', ['percent' => number_format($overview['elapsed'], 0)]) }}</p>
+                    <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('indicators.how_the_ratings_split') }}</p>
+                    <p class="type-meta text-secondary-medium dark:text-ink-muted">{{ __('indicators.rated_against_percent_of_the_year_elapsed', ['percent' => number_format($overview['elapsed'], 0)]) }}</p>
                 </div>
 
-                <div class="mt-2 flex h-2.5 w-full overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium" role="group" aria-label="{{ __('indicators.how_the_ratings_split') }}">
+                <div class="mt-2 flex h-2.5 w-full overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2" role="group" aria-label="{{ __('indicators.how_the_ratings_split') }}">
                     @foreach ($ragSegments as $segment)
                         @if ($segment['count'] > 0)
                             <button
@@ -1359,8 +1388,8 @@ new #[Title('titles.indicators')] class extends Component {
                             aria-pressed="{{ $rag === $segment['key'] ? 'true' : 'false' }}"
                             @class([
                                 'inline-flex items-center gap-1.5 rounded-md px-1 py-0.5 type-meta transition-colors focus-visible:outline-2 focus-visible:outline-primary',
-                                'font-bold text-secondary-dark dark:text-white' => $rag === $segment['key'],
-                                'text-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => $rag !== $segment['key'],
+                                'font-bold text-secondary-dark dark:text-ink' => $rag === $segment['key'],
+                                'text-secondary-medium hover:text-secondary-dark dark:text-ink-muted dark:hover:text-ink' => $rag !== $segment['key'],
                             ])
                         >
                             <span aria-hidden="true" class="size-2 shrink-0 rounded-full {{ $segment['dot'] }}"></span>
@@ -1372,7 +1401,7 @@ new #[Title('titles.indicators')] class extends Component {
             </div>
 
             {{-- Who is paying for what is being measured. --}}
-            <div class="flex shrink-0 items-center gap-3 border-secondary-soft @3xl/directory:border-s @3xl/directory:ps-6 dark:border-secondary-medium">
+            <div class="flex shrink-0 items-center gap-3 border-secondary-soft @3xl/directory:border-s @3xl/directory:ps-6 dark:border-line">
                 <x-ui.progress-ring
                     size="lg"
                     :value="$overview['achieved']"
@@ -1380,14 +1409,14 @@ new #[Title('titles.indicators')] class extends Component {
                     :label="__('indicators.average_achievement')"
                 />
                 <div class="min-w-0">
-                    <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('indicators.commitments_behind_these_indicators') }}</p>
-                    <p class="mt-1 text-sm font-semibold text-secondary-dark dark:text-white">
+                    <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('indicators.commitments_behind_these_indicators') }}</p>
+                    <p class="mt-1 text-sm font-semibold text-secondary-dark dark:text-ink">
                         {{ trans_choice('common.count_target', $overview['targets'], ['count' => $overview['targets']]) }}
                         · {{ __('indicators.count_of_total_reports_approved', ['count' => $overview['approved'], 'total' => $overview['reports']]) }}
                     </p>
 
                     {{-- Counted, not summed: the targets span different units and measures. --}}
-                    <p class="mt-0.5 type-meta tabular-nums text-secondary-medium dark:text-secondary-soft">
+                    <p class="mt-0.5 type-meta tabular-nums text-secondary-medium dark:text-ink-muted">
                         {{ __('indicators.count_of_total_targets_achieved', ['count' => $overview['targetsAchieved'], 'total' => $overview['targets']]) }}
                         @if ($overview['overdueReports'] > 0)
                             · <span class="font-semibold text-status-warn">{{ trans_choice('indicators.count_report_overdue', $overview['overdueReports'], ['count' => $overview['overdueReports']]) }}</span>
@@ -1401,14 +1430,14 @@ new #[Title('titles.indicators')] class extends Component {
                                 <span @class([
                                     'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold',
                                     'border-funding/30 bg-funding-soft text-funding' => $funder['type'] === 'donor',
-                                    'border-secondary-light text-secondary-medium dark:text-secondary-soft' => $funder['type'] !== 'donor',
+                                    'border-secondary-light text-secondary-medium dark:text-ink-muted' => $funder['type'] !== 'donor',
                                 ])>
                                     <flux:icon :name="$funder['type'] === 'donor' ? 'building-library' : 'calendar'" variant="micro" class="size-3" aria-hidden="true" />
                                     {{ $funder['label'] }}
                                 </span>
                             @endforeach
                             @if (count($overview['funders']) > 4)
-                                <span class="type-meta text-secondary-medium dark:text-secondary-soft">+{{ count($overview['funders']) - 4 }}</span>
+                                <span class="type-meta text-secondary-medium dark:text-ink-muted">+{{ count($overview['funders']) - 4 }}</span>
                             @endif
                         </div>
                     @endif
@@ -1428,8 +1457,8 @@ new #[Title('titles.indicators')] class extends Component {
                 data-test="focus-chip-{{ $chip['key'] }}"
                 @class([
                     'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 type-meta font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
-                    'border-primary bg-primary text-white' => $focus === $chip['key'],
-                    'border-secondary-soft bg-white text-secondary-medium hover:border-secondary-light hover:text-secondary-dark dark:border-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft dark:hover:text-white' => $focus !== $chip['key'],
+                    'border-primary bg-primary dark:bg-ink dark:text-surface-0 dark:border-ink text-white' => $focus === $chip['key'],
+                    'border-secondary-soft bg-white text-secondary-medium hover:border-secondary-light hover:text-secondary-dark dark:border-line dark:bg-surface-1 dark:text-ink-muted dark:hover:text-ink' => $focus !== $chip['key'],
                 ])
             >
                 <flux:icon :name="$chip['icon']" variant="micro" class="size-3.5" aria-hidden="true" />
@@ -1437,13 +1466,13 @@ new #[Title('titles.indicators')] class extends Component {
                 <span @class([
                     'inline-flex min-w-5 items-center justify-center rounded-full px-1 text-[11px] font-bold tabular-nums',
                     'bg-white/20' => $focus === $chip['key'],
-                    'bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white' => $focus !== $chip['key'],
+                    'bg-secondary-soft text-secondary-dark dark:bg-surface-2 dark:text-ink' => $focus !== $chip['key'],
                 ])>{{ $chip['count'] }}</span>
             </button>
         @endforeach
 
         @if ($filtersAreActive)
-            <flux:button size="sm" variant="ghost" class="text-secondary-medium! dark:text-secondary-soft!" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
+            <flux:button size="sm" variant="ghost" class="text-secondary-medium! dark:text-ink-muted!" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
         @endif
 
         <x-ui.view-toggle
@@ -1466,9 +1495,9 @@ new #[Title('titles.indicators')] class extends Component {
                 :body="$filtersAreActive ? __('common.change_the_search_or_filters_and_try_again') : __('indicators.add_the_first_indicator_against_a_result')"
             >
                 <x-slot:action>
-                    <x-ui.button tone="primary" :icon="$filtersAreActive ? 'arrow-path' : 'plus'" wire:click="{{ $filtersAreActive ? 'clearFilters' : 'openCreateModal' }}">
+                    @if ($filtersAreActive || auth()->user()->can('indicators.create'))<x-ui.button tone="primary" :icon="$filtersAreActive ? 'arrow-path' : 'plus'" wire:click="{{ $filtersAreActive ? 'clearFilters' : 'openCreateModal' }}">
                         {{ $filtersAreActive ? __('common.reset_filters') : __('indicators.add_indicator') }}
-                    </x-ui.button>
+                    </x-ui.button>@endif
                 </x-slot:action>
             </x-ui.empty-state>
         </x-ui.panel>
@@ -1481,18 +1510,18 @@ new #[Title('titles.indicators')] class extends Component {
         >
             <div class="overflow-x-auto">
                 <div class="min-w-[68rem]">
-                    <div class="grid grid-cols-[minmax(0,1fr)_8rem_7rem_7rem_9rem_5.5rem_5rem_9rem] items-center gap-3 border-b border-secondary-soft bg-board-head px-4 py-2 dark:border-secondary-medium">
-                        <span class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('common.indicator_name') }}</span>
-                        <span class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('indicators.baseline_to_target') }}</span>
-                        <span class="type-label text-end text-secondary-medium dark:text-secondary-soft">{{ __('indicators.latest') }}</span>
-                        <span class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('indicators.trend') }}</span>
-                        <span class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('indicators.percent_achieved') }}</span>
-                        <span class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('indicators.rating') }}</span>
-                        <span class="type-label text-end text-secondary-medium dark:text-secondary-soft">{{ __('common.targets') }}</span>
-                        <span class="type-label text-end text-secondary-medium dark:text-secondary-soft">{{ __('common.actions') }}</span>
+                    <div class="grid grid-cols-[minmax(0,1fr)_8rem_7rem_7rem_9rem_5.5rem_5rem_9rem] items-center gap-3 border-b border-secondary-soft bg-board-head px-4 py-2 dark:border-line">
+                        <span class="type-label text-secondary-medium dark:text-ink-muted">{{ __('common.indicator_name') }}</span>
+                        <span class="type-label text-secondary-medium dark:text-ink-muted">{{ __('indicators.baseline_to_target') }}</span>
+                        <span class="type-label text-end text-secondary-medium dark:text-ink-muted">{{ __('indicators.latest') }}</span>
+                        <span class="type-label text-secondary-medium dark:text-ink-muted">{{ __('indicators.trend') }}</span>
+                        <span class="type-label text-secondary-medium dark:text-ink-muted">{{ __('indicators.percent_achieved') }}</span>
+                        <span class="type-label text-secondary-medium dark:text-ink-muted">{{ __('indicators.rating') }}</span>
+                        <span class="type-label text-end text-secondary-medium dark:text-ink-muted">{{ __('common.targets') }}</span>
+                        <span class="type-label text-end text-secondary-medium dark:text-ink-muted">{{ __('common.actions') }}</span>
                     </div>
 
-                    <div class="divide-y divide-secondary-soft dark:divide-secondary-medium">
+                    <div class="divide-y divide-secondary-soft dark:divide-line">
                         @foreach ($paged as $row)
                             @php
                                 $indicator = $row['indicator'];
@@ -1507,13 +1536,13 @@ new #[Title('titles.indicators')] class extends Component {
                                         <span aria-hidden="true" class="size-2 shrink-0 rounded-full ring-2 ring-inset {{ $levelMarks[$indicator->result->type->value] }}"></span>
                                         <p class="truncate text-sm font-semibold">{{ $indicator->name }}</p>
                                     </div>
-                                    <p class="mt-0.5 truncate type-meta text-secondary-medium dark:text-secondary-soft">
+                                    <p class="mt-0.5 truncate type-meta text-secondary-medium dark:text-ink-muted">
                                         {{ Str::limit($indicator->result->statement, 60) }}
                                         · {{ $indicator->result->program?->name ?? __('common.unassigned') }}
                                     </p>
                                 </div>
 
-                                <p class="type-meta tabular-nums text-secondary-medium dark:text-secondary-soft">
+                                <p class="type-meta tabular-nums text-secondary-medium dark:text-ink-muted">
                                     {{ $figure($row['baseline']) }} <flux:icon.arrow-long-right variant="micro" class="inline size-3 rtl:rotate-180" aria-hidden="true" /> {{ $figure($row['targetValue']) }}
                                     @if ($unit !== null)
                                         <span class="text-secondary-light">{{ $unit }}</span>
@@ -1547,7 +1576,7 @@ new #[Title('titles.indicators')] class extends Component {
                                     <p class="text-sm font-bold tabular-nums {{ $toneText($tone) }}">
                                         {{ $row['achieved'] === null ? '—' : number_format($row['achieved'], 1).'%' }}
                                     </p>
-                                    <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium">
+                                    <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2">
                                         @if ($achievedPct !== null)
                                             <div class="h-full rounded-full {{ $toneFill($tone) }}" style="width: {{ $achievedPct }}%"></div>
                                         @endif
@@ -1556,11 +1585,11 @@ new #[Title('titles.indicators')] class extends Component {
 
                                 <x-ui.enum-badge :case="$row['rag']" />
 
-                                <p class="text-end text-sm tabular-nums text-secondary-medium dark:text-secondary-soft">
+                                <p class="text-end text-sm tabular-nums text-secondary-medium dark:text-ink-muted">
                                     @if ($row['targets'] === [])
                                         0
                                     @else
-                                        <a href="{{ route('targets.index', ['indicator' => $indicator->id]) }}" wire:navigate class="hover:text-primary hover:underline" title="{{ __('indicators.count_of_total_targets_achieved', ['count' => $row['targetsAchieved'], 'total' => count($row['targets'])]) }}">
+                                        <a href="{{ route('targets.index', ['indicator' => $indicator->id]) }}" wire:navigate class="hover:text-primary dark:hover:text-brand-text hover:underline" title="{{ __('indicators.count_of_total_targets_achieved', ['count' => $row['targetsAchieved'], 'total' => count($row['targets'])]) }}">
                                             {{ $row['targetsAchieved'] }}/{{ count($row['targets']) }}
                                         </a>
                                     @endif
@@ -1568,10 +1597,10 @@ new #[Title('titles.indicators')] class extends Component {
 
                                 <div class="flex items-center justify-end gap-0.5">
                                     <x-ui.button tone="ghost" size="sm" icon="arrows-pointing-out" class="size-9!" wire:click="openInspectModal({{ $indicator->id }})" :aria-label="__('indicators.view_the_chain_for_name', ['name' => $indicator->name])" />
-                                    <x-ui.button tone="ghost" size="sm" icon="plus-circle" class="size-9!" wire:click="openProgressModal({{ $indicator->id }})" :aria-label="__('indicators.log_a_reading_for_name', ['name' => $indicator->name])" data-test="log-reading-button-{{ $indicator->id }}" />
-                                    <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $indicator->id }})" :aria-label="__('common.edit_name', ['name' => $indicator->name])" />
+                                    @can('indicators.update')<x-ui.button tone="ghost" size="sm" icon="plus-circle" class="size-9!" wire:click="openProgressModal({{ $indicator->id }})" :aria-label="__('indicators.log_a_reading_for_name', ['name' => $indicator->name])" data-test="log-reading-button-{{ $indicator->id }}" />@endcan
+                                    @can('indicators.update')<x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $indicator->id }})" :aria-label="__('common.edit_name', ['name' => $indicator->name])" />@endcan
                                     @if ($row['targets'] === [])
-                                        <x-ui.button tone="ghost" size="sm" icon="trash" class="size-9!" wire:click="confirmDelete({{ $indicator->id }})" :aria-label="__('common.delete_name', ['name' => $indicator->name])" />
+                                        @can('indicators.delete')<x-ui.button tone="ghost" size="sm" icon="trash" class="size-9!" wire:click="confirmDelete({{ $indicator->id }})" :aria-label="__('common.delete_name', ['name' => $indicator->name])" />@endcan
                                     @else
                                         <flux:tooltip :content="__('indicators.indicators_carrying_targets_cannot_be_deleted')">
                                             <span class="inline-flex size-9 cursor-not-allowed items-center justify-center text-secondary-light" aria-disabled="true">
@@ -1587,7 +1616,7 @@ new #[Title('titles.indicators')] class extends Component {
             </div>
 
             <x-slot:footer>
-                <flux:pagination :paginator="$paged" class="text-secondary-medium! dark:text-secondary-soft!" scroll-to="#indicator-directory-heading" />
+                <flux:pagination :paginator="$paged" class="text-secondary-medium! dark:text-ink-muted!" scroll-to="#indicator-directory-heading" />
             </x-slot:footer>
         </x-ui.panel>
     @else
@@ -1611,7 +1640,7 @@ new #[Title('titles.indicators')] class extends Component {
                 @endphp
 
                 <article
-                    class="group relative flex flex-col overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] transition-all hover:-translate-y-0.5 hover:border-secondary-light hover:shadow-[0_2px_4px_rgba(16,24,40,0.06),0_4px_8px_rgba(16,24,40,0.08)] dark:border-secondary-medium dark:bg-secondary-dark dark:shadow-none dark:hover:shadow-none"
+                    class="group relative flex flex-col overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] transition-all hover:-translate-y-0.5 hover:border-secondary-light hover:shadow-[0_2px_4px_rgba(16,24,40,0.06),0_4px_8px_rgba(16,24,40,0.08)] dark:border-transparent dark:bg-surface-1 dark:shadow-raised dark:hover:shadow-raised"
                     wire:key="indicator-card-{{ $indicator->id }}"
                     data-result-type="{{ $indicator->result->type->value }}"
                 >
@@ -1622,7 +1651,7 @@ new #[Title('titles.indicators')] class extends Component {
                         <div class="flex min-w-0 items-start gap-2">
                             <span aria-hidden="true" class="mt-1 size-2.5 shrink-0 rounded-full ring-2 ring-inset {{ $levelMarks[$indicator->result->type->value] }}"></span>
                             <div class="min-w-0 flex-1">
-                                <p class="truncate type-meta text-secondary-medium dark:text-secondary-soft" title="{{ $indicator->result->statement }}">
+                                <p class="truncate type-meta text-secondary-medium dark:text-ink-muted" title="{{ $indicator->result->statement }}">
                                     {{ Str::limit($indicator->result->statement, 64) }}
                                 </p>
                                 <p class="mt-0.5 truncate type-meta text-secondary-light">
@@ -1633,18 +1662,18 @@ new #[Title('titles.indicators')] class extends Component {
                             <x-ui.enum-badge :case="$row['rag']" class="shrink-0" />
                         </div>
 
-                        <h3 class="text-base font-bold leading-snug text-secondary-dark dark:text-white">{{ $indicator->name }}</h3>
+                        <h3 class="text-base font-bold leading-snug text-secondary-dark dark:text-ink">{{ $indicator->name }}</h3>
 
                         {{-- The rail: baseline, where we are, where the calendar says we should be, target. --}}
                         <div>
                             <div class="flex items-baseline justify-between gap-2">
-                                <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('indicators.trajectory') }}</p>
+                                <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('indicators.trajectory') }}</p>
                                 <p class="text-lg font-bold tabular-nums leading-none {{ $toneText($tone) }}">
                                     {{ $row['achieved'] === null ? '—' : number_format($row['achieved'], 1).'%' }}
                                 </p>
                             </div>
 
-                            <div class="relative mt-2 h-2.5 w-full overflow-visible rounded-full bg-secondary-soft dark:bg-secondary-medium">
+                            <div class="relative mt-2 h-2.5 w-full overflow-visible rounded-full bg-secondary-soft dark:bg-surface-2">
                                 @if ($latestPct !== null)
                                     <div class="h-full rounded-full transition-[width] duration-500 motion-reduce:transition-none {{ $toneFill($tone) }}" style="width: {{ $latestPct }}%"></div>
                                 @endif
@@ -1659,15 +1688,15 @@ new #[Title('titles.indicators')] class extends Component {
                                 @endif
                             </div>
 
-                            <div class="mt-1.5 flex items-baseline justify-between gap-2 type-meta tabular-nums text-secondary-medium dark:text-secondary-soft">
+                            <div class="mt-1.5 flex items-baseline justify-between gap-2 type-meta tabular-nums text-secondary-medium dark:text-ink-muted">
                                 <span>{{ __('indicators.baseline') }} {{ $figure($row['baseline']) }}</span>
-                                <span class="font-semibold text-secondary-dark dark:text-white">
+                                <span class="font-semibold text-secondary-dark dark:text-ink">
                                     {{ $figure($row['latest']) }}{{ $unit !== null ? ' '.$unit : '' }}
                                     @if ($row['delta'] !== null && $row['delta'] !== 0.0)
                                         <span @class([
                                             'ms-0.5 font-semibold',
                                             'text-status-good' => $row['delta'] > 0,
-                                            'text-secondary-medium dark:text-secondary-soft' => $row['delta'] < 0,
+                                            'text-secondary-medium dark:text-ink-muted' => $row['delta'] < 0,
                                         ])>{{ $row['delta'] > 0 ? '+' : '−' }}{{ $figure(abs($row['delta'])) }}</span>
                                     @endif
                                 </span>
@@ -1676,7 +1705,7 @@ new #[Title('titles.indicators')] class extends Component {
                         </div>
 
                         {{-- The readings themselves, against the target they chase. --}}
-                        <div class="rounded-lg border border-secondary-soft bg-board-head p-2.5 dark:border-secondary-medium ">
+                        <div class="rounded-lg border border-secondary-soft bg-board-head p-2.5 dark:border-line ">
                             @if ($sparkline !== null)
                                 <div class="relative {{ $toneText($tone) }}">
                                     <svg viewBox="0 0 100 30" preserveAspectRatio="none" class="h-12 w-full overflow-visible" aria-hidden="true">
@@ -1702,7 +1731,7 @@ new #[Title('titles.indicators')] class extends Component {
                                 </div>
                             @endif
 
-                            <p class="mt-1.5 truncate type-meta text-secondary-medium dark:text-secondary-soft">
+                            <p class="mt-1.5 truncate type-meta text-secondary-medium dark:text-ink-muted">
                                 @if ($row['latestDate'] === null)
                                     {{ __('indicators.never_measured') }}
                                 @else
@@ -1719,8 +1748,8 @@ new #[Title('titles.indicators')] class extends Component {
                         @if ($row['targets'] !== [])
                             <a href="{{ route('targets.index', ['indicator' => $indicator->id]) }}" wire:navigate class="group/targets block rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
                                 <div class="flex items-baseline justify-between gap-2">
-                                    <p class="type-label text-secondary-medium group-hover/targets:text-primary dark:text-secondary-soft">{{ __('indicators.targets_achieved') }}</p>
-                                    <p class="type-meta tabular-nums text-secondary-medium dark:text-secondary-soft">
+                                    <p class="type-label text-secondary-medium group-hover/targets:text-primary dark:group-hover/targets:text-brand-text dark:text-ink-muted">{{ __('indicators.targets_achieved') }}</p>
+                                    <p class="type-meta tabular-nums text-secondary-medium dark:text-ink-muted">
                                         {{ $row['targetsAchieved'] }} / {{ count($row['targets']) }}
                                     </p>
                                 </div>
@@ -1748,14 +1777,14 @@ new #[Title('titles.indicators')] class extends Component {
                             @endif
 
                             @if ($row['overdueReports'] > 0)
-                                <span class="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-status-critical-soft px-2 py-0.5 text-xs font-semibold text-primary">
+                                <span class="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-status-critical-soft px-2 py-0.5 text-xs font-semibold text-primary dark:text-brand-text">
                                     <flux:icon.document-text variant="micro" class="size-3" aria-hidden="true" />
                                     {{ trans_choice('indicators.count_report_overdue', $row['overdueReports'], ['count' => $row['overdueReports']]) }}
                                 </span>
                             @endif
 
                             @if ($row['chainIssues'] > 0)
-                                <span class="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-status-critical-soft px-2 py-0.5 text-xs font-semibold text-primary">
+                                <span class="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-status-critical-soft px-2 py-0.5 text-xs font-semibold text-primary dark:text-brand-text">
                                     <flux:icon.link-slash variant="micro" class="size-3" aria-hidden="true" />
                                     {{ trans_choice('indicators.count_target_out_of_step', $row['chainIssues'], ['count' => $row['chainIssues']]) }}
                                 </span>
@@ -1765,7 +1794,7 @@ new #[Title('titles.indicators')] class extends Component {
                                 <span @class([
                                     'inline-flex max-w-full items-center gap-1 truncate rounded-full border px-2 py-0.5 text-[11px] font-semibold',
                                     'border-funding/30 bg-funding-soft text-funding' => $funder['type'] === 'donor',
-                                    'border-secondary-light text-secondary-medium dark:text-secondary-soft' => $funder['type'] !== 'donor',
+                                    'border-secondary-light text-secondary-medium dark:text-ink-muted' => $funder['type'] !== 'donor',
                                 ])>
                                     <flux:icon :name="$funder['type'] === 'donor' ? 'building-library' : 'calendar'" variant="micro" class="size-3 shrink-0" aria-hidden="true" />
                                     <span class="truncate">{{ $funder['label'] }}</span>
@@ -1773,21 +1802,21 @@ new #[Title('titles.indicators')] class extends Component {
                             @endforeach
 
                             @if (count($row['funders']) > 2)
-                                <span class="type-meta text-secondary-medium dark:text-secondary-soft">+{{ count($row['funders']) - 2 }}</span>
+                                <span class="type-meta text-secondary-medium dark:text-ink-muted">+{{ count($row['funders']) - 2 }}</span>
                             @endif
                         </div>
                     </div>
 
-                    <div class="mt-auto flex items-center gap-1 border-t border-secondary-soft px-2.5 py-2 dark:border-secondary-medium">
+                    <div class="mt-auto flex items-center gap-1 border-t border-secondary-soft px-2.5 py-2 dark:border-line">
                         <x-ui.button tone="ghost" size="sm" icon="arrows-pointing-out" class="min-h-9" wire:click="openInspectModal({{ $indicator->id }})" data-test="inspect-indicator-{{ $indicator->id }}">
                             {{ __('indicators.the_chain') }}
                         </x-ui.button>
 
                         <div class="ms-auto flex items-center gap-0.5">
-                            <x-ui.button tone="ghost" size="sm" icon="plus-circle" class="size-9!" wire:click="openProgressModal({{ $indicator->id }})" :aria-label="__('indicators.log_a_reading_for_name', ['name' => $indicator->name])" data-test="log-reading-button-{{ $indicator->id }}" />
-                            <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $indicator->id }})" :aria-label="__('common.edit_name', ['name' => $indicator->name])" />
+                            @can('indicators.update')<x-ui.button tone="ghost" size="sm" icon="plus-circle" class="size-9!" wire:click="openProgressModal({{ $indicator->id }})" :aria-label="__('indicators.log_a_reading_for_name', ['name' => $indicator->name])" data-test="log-reading-button-{{ $indicator->id }}" />@endcan
+                            @can('indicators.update')<x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $indicator->id }})" :aria-label="__('common.edit_name', ['name' => $indicator->name])" />@endcan
                             @if ($row['targets'] === [])
-                                <x-ui.button tone="ghost" size="sm" icon="trash" class="size-9!" wire:click="confirmDelete({{ $indicator->id }})" :aria-label="__('common.delete_name', ['name' => $indicator->name])" />
+                                @can('indicators.delete')<x-ui.button tone="ghost" size="sm" icon="trash" class="size-9!" wire:click="confirmDelete({{ $indicator->id }})" :aria-label="__('common.delete_name', ['name' => $indicator->name])" />@endcan
                             @else
                                 <flux:tooltip :content="__('indicators.indicators_carrying_targets_cannot_be_deleted')">
                                     <span class="inline-flex size-9 cursor-not-allowed items-center justify-center text-secondary-light" aria-disabled="true">
@@ -1804,14 +1833,20 @@ new #[Title('titles.indicators')] class extends Component {
         @if ($paged->hasPages())
             <x-ui.panel>
                 <div class="px-4 py-2">
-                    <flux:pagination :paginator="$paged" class="text-secondary-medium! dark:text-secondary-soft!" scroll-to="#indicator-directory-heading" />
+                    <flux:pagination :paginator="$paged" class="text-secondary-medium! dark:text-ink-muted!" scroll-to="#indicator-directory-heading" />
                 </div>
             </x-ui.panel>
         @endif
     @endif
 
     {{-- The chain: every reading behind the number, and every commitment in front of it. --}}
-    <flux:modal wire:model="showInspectModal" wire:close="closeInspectModal" class="w-full max-w-4xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
+    <x-ui.modal
+        wire:model="showInspectModal"
+        size="xl"
+        close="closeInspectModal"
+        :cancel-label="__('common.close')"
+        :title="$showInspectModal && $this->inspected !== null ? $this->inspected['indicator']->name : ''"
+    >
         @if ($showInspectModal && $this->inspected !== null)
             @php
                 $row = $this->inspected;
@@ -1820,11 +1855,11 @@ new #[Title('titles.indicators')] class extends Component {
                 $unit = $indicator->measure === IndicatorMeasure::Percentage ? '%' : $indicator->unit;
             @endphp
 
-            <div class="space-y-5">
-                <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
+            <div class="space-y-5 py-5">
+                <div class="border-b border-secondary-soft pb-4 dark:border-line">
                     {{-- The whole chain above this indicator: program, then every
                          statement it rolls up through, then what it is scoped to. --}}
-                    <div class="flex flex-wrap items-center gap-x-1.5 gap-y-1 type-meta text-secondary-medium dark:text-secondary-soft">
+                    <div class="flex flex-wrap items-center gap-x-1.5 gap-y-1 type-meta text-secondary-medium dark:text-ink-muted">
                         <span>{{ $indicator->result->program?->name ?? __('common.unassigned') }}</span>
 
                         @foreach (array_reverse($row['lineage']) as $ancestor)
@@ -1842,16 +1877,15 @@ new #[Title('titles.indicators')] class extends Component {
                         </span>
 
                         <flux:icon.chevron-right variant="micro" class="size-3 rtl:rotate-180" aria-hidden="true" />
-                        <span class="font-semibold text-secondary-dark dark:text-white">{{ $indicator->project?->name ?? __('common.organisation_wide') }}</span>
+                        <span class="font-semibold text-secondary-dark dark:text-ink">{{ $indicator->project?->name ?? __('common.organisation_wide') }}</span>
                     </div>
 
-                    <flux:heading size="lg" class="mt-2">{{ $indicator->name }}</flux:heading>
 
                     <div class="mt-3 flex flex-wrap items-center gap-2">
                         <x-ui.enum-badge :case="$row['rag']" />
                         <x-ui.enum-badge :case="$indicator->frequency" />
                         <x-ui.enum-badge :case="$indicator->measure" />
-                        <span class="type-meta tabular-nums text-secondary-medium dark:text-secondary-soft">
+                        <span class="type-meta tabular-nums text-secondary-medium dark:text-ink-muted">
                             {{ __('indicators.baseline') }} {{ $figure($row['baseline']) }}
                             <flux:icon.arrow-long-right variant="micro" class="inline size-3 rtl:rotate-180" aria-hidden="true" />
                             {{ __('indicators.target') }} {{ $figure($row['targetValue']) }}{{ $unit !== null ? ' '.$unit : '' }}
@@ -1864,17 +1898,17 @@ new #[Title('titles.indicators')] class extends Component {
 
                 <div class="grid gap-5 lg:grid-cols-2">
                     <section aria-labelledby="inspect-readings-heading">
-                        <h3 id="inspect-readings-heading" class="type-label text-secondary-medium dark:text-secondary-soft">
+                        <h3 id="inspect-readings-heading" class="type-label text-secondary-medium dark:text-ink-muted">
                             {{ __('indicators.reading_history') }}
                             <span class="ms-1 tabular-nums">{{ $row['readings'] }}</span>
                         </h3>
 
                         @if ($this->inspectedReadings->isEmpty())
-                            <p class="mt-3 rounded-lg border border-dashed border-secondary-light p-4 text-center type-meta text-secondary-medium dark:text-secondary-soft">
+                            <p class="mt-3 rounded-lg border border-dashed border-secondary-light p-4 text-center type-meta text-secondary-medium dark:text-ink-muted">
                                 {{ __('indicators.no_readings_logged_yet') }}
                             </p>
                         @else
-                            <ol class="mt-3 max-h-80 space-y-0 overflow-y-auto border-s border-secondary-soft ps-4 dark:border-secondary-medium">
+                            <ol class="mt-3 max-h-80 space-y-0 overflow-y-auto border-s border-secondary-soft ps-4 dark:border-line">
                                 @foreach ($this->inspectedReadings as $entry)
                                     <li class="relative pb-4 last:pb-0" wire:key="reading-{{ $entry['reading']->id }}">
                                         <span aria-hidden="true" class="absolute -start-[1.3125rem] top-1.5 size-2 rounded-full {{ $loop->first ? $toneFill($tone) : 'bg-secondary-light' }}"></span>
@@ -1886,24 +1920,24 @@ new #[Title('titles.indicators')] class extends Component {
                                                     <span @class([
                                                         'ms-1 type-meta font-semibold',
                                                         'text-status-good' => $entry['delta'] > 0,
-                                                        'text-secondary-medium dark:text-secondary-soft' => $entry['delta'] < 0,
+                                                        'text-secondary-medium dark:text-ink-muted' => $entry['delta'] < 0,
                                                     ])>{{ $entry['delta'] > 0 ? '+' : '−' }}{{ $figure(abs($entry['delta'])) }}</span>
                                                 @endif
                                             </p>
-                                            <p class="shrink-0 type-meta text-secondary-medium dark:text-secondary-soft">
+                                            <p class="shrink-0 type-meta text-secondary-medium dark:text-ink-muted">
                                                 {{ $entry['reading']->date->translatedFormat(__('formats.date')) }}
                                             </p>
                                         </div>
 
                                         @if ($entry['reading']->source_of_verification !== null)
-                                            <p class="mt-0.5 type-meta text-secondary-medium dark:text-secondary-soft">
+                                            <p class="mt-0.5 type-meta text-secondary-medium dark:text-ink-muted">
                                                 <flux:icon.document-check variant="micro" class="inline size-3" aria-hidden="true" />
                                                 {{ $entry['reading']->source_of_verification }}
                                             </p>
                                         @endif
 
                                         @if ($entry['reading']->notes !== null)
-                                            <p class="mt-0.5 type-meta text-secondary-medium dark:text-secondary-soft">{{ $entry['reading']->notes }}</p>
+                                            <p class="mt-0.5 type-meta text-secondary-medium dark:text-ink-muted">{{ $entry['reading']->notes }}</p>
                                         @endif
 
                                         <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -1915,14 +1949,14 @@ new #[Title('titles.indicators')] class extends Component {
 
                                             @if ($deletingReadingId === $entry['reading']->id)
                                                 <span class="ms-auto inline-flex items-center gap-1.5 type-meta">
-                                                    <span class="font-semibold text-primary">{{ __('indicators.delete_this_reading') }}</span>
+                                                    <span class="font-semibold text-primary dark:text-brand-text">{{ __('indicators.delete_this_reading') }}</span>
                                                     <x-ui.button size="sm" tone="primary" class="min-h-7! px-2!" wire:click="deleteReading" data-test="confirm-delete-reading-{{ $entry['reading']->id }}">{{ __('common.delete') }}</x-ui.button>
                                                     <x-ui.button size="sm" class="min-h-7! px-2!" wire:click="cancelDeleteReading">{{ __('common.cancel') }}</x-ui.button>
                                                 </span>
                                             @else
                                                 <span class="ms-auto inline-flex items-center gap-0.5">
-                                                    <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-7!" wire:click="openEditReadingModal({{ $entry['reading']->id }})" :aria-label="__('indicators.edit_reading_from_date', ['date' => $entry['reading']->date->translatedFormat(__('formats.date'))])" data-test="edit-reading-{{ $entry['reading']->id }}" />
-                                                    <x-ui.button tone="ghost" size="sm" icon="trash" class="size-7!" wire:click="confirmDeleteReading({{ $entry['reading']->id }})" :aria-label="__('indicators.delete_reading_from_date', ['date' => $entry['reading']->date->translatedFormat(__('formats.date'))])" data-test="delete-reading-{{ $entry['reading']->id }}" />
+                                                    @can('indicators.update')<x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-7!" wire:click="openEditReadingModal({{ $entry['reading']->id }})" :aria-label="__('indicators.edit_reading_from_date', ['date' => $entry['reading']->date->translatedFormat(__('formats.date'))])" data-test="edit-reading-{{ $entry['reading']->id }}" />@endcan
+                                                    @can('indicators.update')<x-ui.button tone="ghost" size="sm" icon="trash" class="size-7!" wire:click="confirmDeleteReading({{ $entry['reading']->id }})" :aria-label="__('indicators.delete_reading_from_date', ['date' => $entry['reading']->date->translatedFormat(__('formats.date'))])" data-test="delete-reading-{{ $entry['reading']->id }}" />@endcan
                                                 </span>
                                             @endif
                                         </div>
@@ -1934,12 +1968,12 @@ new #[Title('titles.indicators')] class extends Component {
 
                     <section aria-labelledby="inspect-targets-heading">
                         <div class="flex items-center justify-between gap-2">
-                            <h3 id="inspect-targets-heading" class="type-label text-secondary-medium dark:text-secondary-soft">
+                            <h3 id="inspect-targets-heading" class="type-label text-secondary-medium dark:text-ink-muted">
                                 {{ __('indicators.committed_targets') }}
                                 <span class="ms-1 tabular-nums">{{ count($row['targets']) }}</span>
                             </h3>
                             @if ($row['targets'] !== [])
-                                <a href="{{ route('targets.index', ['indicator' => $indicator->id]) }}" wire:navigate class="type-meta font-semibold text-secondary-medium hover:text-primary hover:underline dark:text-secondary-soft">
+                                <a href="{{ route('targets.index', ['indicator' => $indicator->id]) }}" wire:navigate class="type-meta font-semibold text-secondary-medium hover:text-primary dark:hover:text-brand-text hover:underline dark:text-ink-muted">
                                     {{ __('indicators.open_in_targets') }}
                                 </a>
                             @endif
@@ -1947,7 +1981,7 @@ new #[Title('titles.indicators')] class extends Component {
 
                         @if ($row['targets'] === [])
                             <div class="mt-3 flex flex-col items-center gap-3 rounded-lg border border-dashed border-secondary-light p-4 text-center">
-                                <p class="type-meta text-secondary-medium dark:text-secondary-soft">{{ __('indicators.no_targets_committed_against_this_indicator_yet') }}</p>
+                                <p class="type-meta text-secondary-medium dark:text-ink-muted">{{ __('indicators.no_targets_committed_against_this_indicator_yet') }}</p>
                                 <x-ui.button size="sm" tone="primary" icon="flag" :href="route('targets.index', ['indicator' => $indicator->id, 'create' => 1])" wire:navigate data-test="commit-target-for-indicator">
                                     {{ __('indicators.commit_a_target') }}
                                 </x-ui.button>
@@ -1955,7 +1989,7 @@ new #[Title('titles.indicators')] class extends Component {
                         @else
                             <ul class="mt-3 max-h-96 space-y-2 overflow-y-auto">
                                 @foreach ($row['targets'] as $target)
-                                    <li class="rounded-lg border border-secondary-soft bg-board-head p-3 dark:border-secondary-medium" wire:key="target-{{ $target['target']->id }}">
+                                    <li class="rounded-lg border border-secondary-soft bg-board-head p-3 dark:border-line" wire:key="target-{{ $target['target']->id }}">
                                         <div class="flex items-baseline justify-between gap-2">
                                             <p class="min-w-0 truncate text-sm font-semibold">
                                                 {{ $target['sourceLabel'] ?? __('indicators.source_no_longer_available') }}
@@ -1963,7 +1997,7 @@ new #[Title('titles.indicators')] class extends Component {
                                             <p class="shrink-0 text-sm font-bold tabular-nums">{{ $figure((float) $target['target']->target) }}{{ $unit !== null ? ' '.$unit : '' }}</p>
                                         </div>
 
-                                        <p class="mt-0.5 type-meta text-secondary-medium dark:text-secondary-soft">
+                                        <p class="mt-0.5 type-meta text-secondary-medium dark:text-ink-muted">
                                             {{ $target['target']->period->label() }}
                                             · {{ $target['project'] ?? __('common.organisation_wide') }}
                                         </p>
@@ -1980,18 +2014,18 @@ new #[Title('titles.indicators')] class extends Component {
                                         @endif
 
                                         @foreach ($target['issues'] as $issue)
-                                            <p class="mt-2 flex items-start gap-1.5 type-meta font-semibold text-primary">
+                                            <p class="mt-2 flex items-start gap-1.5 type-meta font-semibold text-primary dark:text-brand-text">
                                                 <flux:icon.link-slash variant="micro" class="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
                                                 {{ __($issue) }}
                                             </p>
                                         @endforeach
 
                                         {{-- Approved reports only (PlanIndicator::achievedValue()); the rest is shown as pending. --}}
-                                        <div class="mt-2.5 border-t border-secondary-soft pt-2.5 dark:border-secondary-medium">
+                                        <div class="mt-2.5 border-t border-secondary-soft pt-2.5 dark:border-line">
                                             <div class="flex items-baseline justify-between gap-2">
-                                                <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('indicators.achieved') }}</p>
-                                                <p class="type-meta tabular-nums text-secondary-medium dark:text-secondary-soft">
-                                                    <span class="font-semibold text-secondary-dark dark:text-white">{{ $figure($target['achieved']) }}</span> / {{ $figure($target['committed']) }}
+                                                <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('indicators.achieved') }}</p>
+                                                <p class="type-meta tabular-nums text-secondary-medium dark:text-ink-muted">
+                                                    <span class="font-semibold text-secondary-dark dark:text-ink">{{ $figure($target['achieved']) }}</span> / {{ $figure($target['committed']) }}
                                                     @if ($target['percent'] !== null)
                                                         · {{ number_format($target['percent'], 0) }}%
                                                     @endif
@@ -2007,7 +2041,7 @@ new #[Title('titles.indicators')] class extends Component {
                                                 label-hidden
                                             />
 
-                                            <p class="mt-1 type-meta tabular-nums text-secondary-medium dark:text-secondary-soft">
+                                            <p class="mt-1 type-meta tabular-nums text-secondary-medium dark:text-ink-muted">
                                                 {{ __('indicators.count_of_total_reports_approved', ['count' => $target['approved'], 'total' => $target['reports']]) }}
                                                 @if ($target['pending'] > 0)
                                                     · {{ __('indicators.value_pending_approval', ['value' => $figure($target['pending'])]) }}
@@ -2024,8 +2058,8 @@ new #[Title('titles.indicators')] class extends Component {
                                                                 <span class="inline-flex shrink-0 items-center rounded border px-1.5 py-px text-[10px] font-semibold {{ $reportStatusChip($report->status) }}">
                                                                     {{ $report->status->label() }}
                                                                 </span>
-                                                                <span class="tabular-nums font-semibold text-secondary-dark dark:text-white">{{ $figure((float) $report->value) }}</span>
-                                                                <span class="min-w-0 truncate text-secondary-medium dark:text-secondary-soft">
+                                                                <span class="tabular-nums font-semibold text-secondary-dark dark:text-ink">{{ $figure((float) $report->value) }}</span>
+                                                                <span class="min-w-0 truncate text-secondary-medium dark:text-ink-muted">
                                                                     @if ($report->period_start !== null && $report->period_end !== null)
                                                                         {{ $report->period_start->translatedFormat(__('formats.date_short')) }}–{{ $report->period_end->translatedFormat(__('formats.date_short')) }}
                                                                     @else
@@ -2033,7 +2067,7 @@ new #[Title('titles.indicators')] class extends Component {
                                                                     @endif
                                                                 </span>
                                                                 @if ($report->isOverdue())
-                                                                    <span class="ms-auto shrink-0 font-semibold text-primary">
+                                                                    <span class="ms-auto shrink-0 font-semibold text-primary dark:text-brand-text">
                                                                         {{ __('ui.schedule_due_date', ['date' => $report->planned_date->translatedFormat(__('formats.date_short'))]) }}
                                                                     </span>
                                                                 @endif
@@ -2043,7 +2077,7 @@ new #[Title('titles.indicators')] class extends Component {
                                                 </ul>
                                             @endif
 
-                                            <a href="{{ route('reports.index', ['create' => 1, 'target' => $target['target']->id]) }}" wire:navigate class="mt-2 inline-flex items-center gap-1 type-meta font-semibold text-primary hover:underline" data-test="record-report-for-target-{{ $target['target']->id }}">
+                                            <a href="{{ route('reports.index', ['create' => 1, 'target' => $target['target']->id]) }}" wire:navigate class="mt-2 inline-flex items-center gap-1 type-meta font-semibold text-primary dark:text-brand-text hover:underline" data-test="record-report-for-target-{{ $target['target']->id }}">
                                                 <flux:icon.plus variant="micro" class="size-3.5" aria-hidden="true" />
                                                 {{ __('indicators.record_a_report') }}
                                             </a>
@@ -2054,123 +2088,124 @@ new #[Title('titles.indicators')] class extends Component {
                         @endif
                     </section>
                 </div>
+            </div>
 
-                <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                    <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:me-auto sm:w-auto" wire:click="closeInspectModal">{{ __('common.close') }}</x-ui.button>
-                    @if ($row['targets'] !== [])
-                        <x-ui.button icon="flag" class="min-h-11 w-full sm:min-h-10 sm:w-auto" :href="route('targets.index', ['indicator' => $indicator->id, 'create' => 1])" wire:navigate>
-                            {{ __('indicators.commit_a_target') }}
-                        </x-ui.button>
-                    @endif
-                    <x-ui.button type="button" tone="primary" icon="plus-circle" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="openProgressModal({{ $indicator->id }})">
-                        {{ __('indicators.log_reading') }}
+            <x-slot:actions>
+                @if ($row['targets'] !== [])
+                    <x-ui.button icon="flag" :href="route('targets.index', ['indicator' => $indicator->id, 'create' => 1])" wire:navigate>
+                        {{ __('indicators.commit_a_target') }}
                     </x-ui.button>
-                </div>
-            </div>
+                @endif
+                @can('indicators.update')<x-ui.button type="button" tone="primary" icon="plus-circle" wire:click="openProgressModal({{ $indicator->id }})">
+                    {{ __('indicators.log_reading') }}
+                </x-ui.button>@endcan
+            </x-slot:actions>
         @endif
-    </flux:modal>
+    </x-ui.modal>
 
-    <flux:modal wire:model="showIndicatorModal" class="w-full max-w-2xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
+    <x-ui.modal
+        wire:model="showIndicatorModal"
+        size="xl"
+        :title="$editingIndicatorId === null ? __('indicators.add_indicator') : __('indicators.edit_indicator')"
+        :description="__('indicators.an_indicator_measures_exactly_one_result')"
+        submit="saveIndicator"
+        close="closeIndicatorModal"
+        required-note
+    >
         @if ($showIndicatorModal)
-        <form wire:submit="saveIndicator" class="space-y-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ $editingIndicatorId === null ? __('indicators.add_indicator') : __('indicators.edit_indicator') }}</flux:heading>
-                <flux:subheading>{{ __('indicators.an_indicator_measures_exactly_one_result') }}</flux:subheading>
-            </div>
-
-            <x-ui.input wire:model="name" :label="__('common.indicator_name')" type="text" maxlength="255" required autofocus />
-
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.select wire:model.live="indicatorResultId" :label="__('indicators.result')" required>
-                    <flux:select.option value="">{{ __('indicators.select_a_result') }}</flux:select.option>
-                    @foreach ($this->resultOptions as $resultOption)
-                        <flux:select.option :value="$resultOption->id" :wire:key="'ind-result-option-'.$resultOption->id">{{ $resultOption->type->label() }} · {{ Str::limit($resultOption->statement, 60) }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
-
-                <x-ui.select wire:model.live="indicatorMeasure" :label="__('indicators.measure')" required>
-                    @foreach (IndicatorMeasure::cases() as $measureCase)
-                        <flux:select.option :value="$measureCase->value" :wire:key="'ind-measure-option-'.$measureCase->value">{{ $measureCase->label() }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
-            </div>
-
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.select wire:model="frequency" :label="__('indicators.frequency')" required>
-                    @foreach (Period::cases() as $periodCase)
-                        <flux:select.option :value="$periodCase->value" :wire:key="'ind-frequency-'.$periodCase->value">{{ $periodCase->label() }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
-
-                <div>
-                    <x-ui.select wire:model="indicatorProjectId" :label="__('common.project')">
-                        <flux:select.option value="">{{ __('common.organisation_wide') }}</flux:select.option>
-                        @foreach ($this->projectOptions as $projectOption)
-                            <flux:select.option :value="$projectOption->id" :wire:key="'ind-project-'.$projectOption->id">{{ $projectOption->name }}</flux:select.option>
-                        @endforeach
-                    </x-ui.select>
-                    @if ($indicatorResultId !== '')
-                        <p class="mt-1.5 type-meta text-secondary-medium dark:text-secondary-soft">{{ __('indicators.only_projects_delivering_the_result_program_are_offered') }}</p>
-                    @endif
-                </div>
-            </div>
-
             @php
                 $formIsPercentage = $indicatorMeasure === IndicatorMeasure::Percentage->value;
             @endphp
-            <div @class(['grid gap-4', 'sm:grid-cols-3' => ! $formIsPercentage, 'sm:grid-cols-2' => $formIsPercentage])>
-                @unless ($formIsPercentage)
-                    <x-ui.input wire:model="unit" :label="__('indicators.unit')" type="text" maxlength="50" :placeholder="__('indicators.unit_placeholder')" />
-                @endunless
-                <x-ui.input wire:model="baseline" :label="$formIsPercentage ? __('indicators.baseline_percent') : __('indicators.baseline')" type="number" step="0.01" min="0" :max="$formIsPercentage ? 100 : null" />
-                <x-ui.input wire:model="target" :label="$formIsPercentage ? __('indicators.lifetime_target_percent') : __('indicators.lifetime_target')" type="number" step="0.01" min="0" :max="$formIsPercentage ? 100 : null" />
-            </div>
 
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeIndicatorModal">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-indicator-button">
-                    {{ $editingIndicatorId === null ? __('indicators.create_indicator') : __('common.save_changes') }}
-                </x-ui.button>
-            </div>
-        </form>
+            <x-ui.form-section :title="__('common.section_details')" :fields="['name', 'indicatorResultId', 'indicatorProjectId']">
+                <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                    <x-ui.form-input wire:model="name" :label="__('common.indicator_name')" maxlength="255" required autofocus class="@2xl/modal:col-span-2" />
+
+                    <x-ui.form-select wire:model.live="indicatorResultId" :label="__('indicators.result')" :placeholder="__('indicators.select_a_result')" required>
+                        @foreach ($this->resultOptions as $resultOption)
+                            <flux:select.option :value="$resultOption->id">{{ $resultOption->type->label() }} · {{ Str::limit($resultOption->statement, 60) }}</flux:select.option>
+                        @endforeach
+                    </x-ui.form-select>
+
+                    <x-ui.form-select
+                        wire:model="indicatorProjectId"
+                        :label="__('common.project')"
+                        :help="$indicatorResultId !== '' ? __('indicators.only_projects_delivering_the_result_program_are_offered') : null"
+                    >
+                        <flux:select.option value="">{{ __('common.organisation_wide') }}</flux:select.option>
+                        @foreach ($this->projectOptions as $projectOption)
+                            <flux:select.option :value="$projectOption->id">{{ $projectOption->name }}</flux:select.option>
+                        @endforeach
+                    </x-ui.form-select>
+                </div>
+            </x-ui.form-section>
+
+            <x-ui.form-section :title="__('indicators.section_measurement')" :fields="['indicatorMeasure', 'frequency', 'unit', 'baseline', 'target']">
+                <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                    <x-ui.form-segmented
+                        wire:model.live="indicatorMeasure"
+                        :label="__('indicators.measure')"
+                        required
+                        :options="collect(IndicatorMeasure::cases())->map(fn (IndicatorMeasure $measureCase): array => ['value' => $measureCase->value, 'label' => $measureCase->label()])->all()"
+                    />
+
+                    <x-ui.form-segmented
+                        wire:model="frequency"
+                        :label="__('indicators.frequency')"
+                        required
+                        :options="collect(Period::cases())->map(fn (Period $periodCase): array => ['value' => $periodCase->value, 'label' => $periodCase->label()])->all()"
+                    />
+
+                    <div @class(['grid gap-x-4 gap-y-3 @2xl/modal:col-span-2', 'grid-cols-3' => ! $formIsPercentage, 'grid-cols-2' => $formIsPercentage])>
+                        @unless ($formIsPercentage)
+                            <x-ui.form-input wire:model="unit" :label="__('indicators.unit')" maxlength="50" :placeholder="__('indicators.unit_placeholder')" />
+                        @endunless
+                        <x-ui.form-input wire:model="baseline" :label="$formIsPercentage ? __('indicators.baseline_percent') : __('indicators.baseline')" type="number" step="0.01" min="0" :max="$formIsPercentage ? 100 : null" :suffix="$formIsPercentage ? '%' : null" />
+                        <x-ui.form-input wire:model="target" :label="$formIsPercentage ? __('indicators.lifetime_target_percent') : __('indicators.lifetime_target')" type="number" step="0.01" min="0" :max="$formIsPercentage ? 100 : null" :suffix="$formIsPercentage ? '%' : null" />
+                    </div>
+                </div>
+            </x-ui.form-section>
         @endif
-    </flux:modal>
 
-    <flux:modal wire:model="showDeleteModal" wire:close="cancelDelete" class="w-full max-w-md border border-secondary-light! bg-white! dark:bg-secondary-dark!">
-        <div class="space-y-4">
-            <flux:heading size="lg">{{ __('indicators.delete_this_indicator') }}</flux:heading>
-            <flux:subheading>{{ __('indicators.only_an_indicator_carrying_no_targets_can_be_deleted') }}</flux:subheading>
-            <div class="flex justify-end gap-2 border-t border-secondary-soft pt-4 dark:border-secondary-medium">
-                <x-ui.button type="button" wire:click="cancelDelete">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="button" tone="primary" wire:click="deleteIndicator" data-test="confirm-delete-indicator">{{ __('indicators.delete_indicator') }}</x-ui.button>
-            </div>
-        </div>
-    </flux:modal>
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="save-indicator-button">
+                {{ $editingIndicatorId === null ? __('indicators.create_indicator') : __('common.save_changes') }}
+            </x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
 
-    <flux:modal wire:model="showProgressModal" wire:close="closeProgressModal" class="w-full max-w-lg border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
+    <x-ui.confirm-modal
+        wire:model="showDeleteModal"
+        close="cancelDelete"
+        :title="__('indicators.delete_this_indicator')"
+        :message="__('indicators.only_an_indicator_carrying_no_targets_can_be_deleted')"
+        confirm="deleteIndicator"
+        :confirm-label="__('indicators.delete_indicator')"
+        confirm-test="confirm-delete-indicator"
+    />
+
+    <x-ui.modal
+        wire:model="showProgressModal"
+        size="md"
+        :title="$editingReadingId === null ? __('indicators.log_a_reading') : __('indicators.edit_reading')"
+        :description="__('indicators.one_dated_number_with_the_evidence_it_came_from')"
+        submit="saveProgress"
+        close="closeProgressModal"
+        required-note
+    >
         @if ($showProgressModal)
-        <form wire:submit="saveProgress" class="space-y-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ $editingReadingId === null ? __('indicators.log_a_reading') : __('indicators.edit_reading') }}</flux:heading>
-                <flux:subheading>{{ __('indicators.one_dated_number_with_the_evidence_it_came_from') }}</flux:subheading>
+            <div class="grid grid-cols-2 gap-x-4 gap-y-4">
+                <x-ui.form-input wire:model="progressDate" :label="__('indicators.date')" type="date" :max="now()->toDateString()" required autofocus />
+                <x-ui.form-input wire:model="progressValue" :label="__('indicators.value')" type="number" step="0.01" required />
+                <x-ui.form-input wire:model="progressSourceOfVerification" :label="__('indicators.source_of_verification')" maxlength="255" class="col-span-2" />
+                <x-ui.form-textarea wire:model="progressNotes" :label="__('common.notes')" class="col-span-2" />
             </div>
-
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.input wire:model="progressDate" :label="__('indicators.date')" type="date" :max="now()->toDateString()" required />
-                <x-ui.input wire:model="progressValue" :label="__('indicators.value')" type="number" step="0.01" required />
-            </div>
-
-            <x-ui.input wire:model="progressSourceOfVerification" :label="__('indicators.source_of_verification')" type="text" maxlength="255" />
-
-            <flux:textarea wire:model="progressNotes" :label="__('common.notes')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
-
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeProgressModal">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-progress-button">
-                    {{ $editingReadingId === null ? __('indicators.log_reading') : __('common.save_changes') }}
-                </x-ui.button>
-            </div>
-        </form>
         @endif
-    </flux:modal>
+
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="save-progress-button">
+                {{ $editingReadingId === null ? __('indicators.log_reading') : __('common.save_changes') }}
+            </x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
 </section>

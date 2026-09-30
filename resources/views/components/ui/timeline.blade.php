@@ -58,9 +58,9 @@
     $toneClasses = fn (string $tone): string => match ($tone) {
         'good' => 'bg-status-good',
         'warn' => 'bg-status-warn',
-        'critical' => 'bg-primary',
+        'critical' => 'bg-primary dark:bg-status-critical',
         'funding' => 'bg-funding',
-        default => 'bg-secondary-dark dark:bg-white',
+        default => 'bg-secondary-dark dark:bg-ink-muted',
     };
 @endphp
 
@@ -76,7 +76,7 @@
                 <div class="shrink-0" style="width: 13rem"></div>
                 <div class="relative h-4 min-w-0 flex-1">
                     @foreach ($ticks as $tick)
-                        <span class="type-meta absolute top-0 tabular-nums text-secondary-light dark:text-secondary-medium" style="inset-inline-start: {{ $position($tick) }}%">
+                        <span class="type-meta absolute top-0 tabular-nums text-secondary-light dark:text-ink-faint" style="inset-inline-start: {{ $position($tick) }}%">
                             {{ $ticksByYear ? $tick->format('Y') : $tick->translatedFormat(__('formats.month_short')) }}
                         </span>
                     @endforeach
@@ -85,7 +85,7 @@
         </div>
     @endif
 
-    <div class="flex flex-col divide-y divide-board-line rounded-xl border border-board-line bg-board shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:shadow-none">
+    <div class="flex flex-col divide-y divide-board-line rounded-xl border border-board-line bg-board shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:shadow-raised dark:border-transparent">
         @if ($rows->isEmpty())
             {{ $slot }}
         @endif
@@ -102,17 +102,17 @@
             <div class="flex flex-col gap-2 p-3 @2xl:flex-row @2xl:items-center @2xl:gap-4" wire:key="timeline-{{ $item['key'] }}">
                 <div class="min-w-0 @2xl:w-52 @2xl:shrink-0">
                     @if (! empty($item['href']))
-                        <a href="{{ $item['href'] }}" wire:navigate class="truncate text-sm font-semibold text-secondary-dark hover:underline dark:text-white">{{ $item['label'] }}</a>
+                        <a href="{{ $item['href'] }}" wire:navigate class="truncate text-sm font-semibold text-secondary-dark hover:underline dark:text-ink">{{ $item['label'] }}</a>
                     @else
-                        <p class="truncate text-sm font-semibold text-secondary-dark dark:text-white">{{ $item['label'] }}</p>
+                        <p class="truncate text-sm font-semibold text-secondary-dark dark:text-ink">{{ $item['label'] }}</p>
                     @endif
                     @if (! empty($item['sublabel']))
-                        <p class="type-meta text-secondary-medium dark:text-secondary-soft">{{ $item['sublabel'] }}</p>
+                        <p class="type-meta text-secondary-medium dark:text-ink-muted">{{ $item['sublabel'] }}</p>
                     @endif
                 </div>
 
                 <div class="relative hidden h-2 min-w-0 flex-1 @2xl:block" aria-label="{{ $start?->translatedFormat(__('formats.date')) }} – {{ $end?->translatedFormat(__('formats.date')) }}">
-                    <div class="absolute inset-y-0 start-0 end-0 rounded-full bg-secondary-soft dark:bg-secondary-medium"></div>
+                    <div class="absolute inset-y-0 start-0 end-0 rounded-full bg-secondary-soft dark:bg-surface-2"></div>
                     <div
                         class="{{ $toneClasses($tone) }} absolute inset-y-0 rounded-full"
                         style="inset-inline-start: {{ $startPct }}%; width: {{ $width }}%"
@@ -120,13 +120,13 @@
                     @if ($todayPct !== null)
                         <flux:tooltip :content="__('ui.today_marker_hint', ['date' => $today->translatedFormat(__('formats.date'))])">
                             <div class="absolute -top-1.5 -bottom-1.5 w-2 -ms-1 cursor-help" style="inset-inline-start: {{ $todayPct }}%">
-                                <div class="mx-auto h-full w-px bg-primary"></div>
+                                <div class="mx-auto h-full w-px bg-primary dark:bg-ink"></div>
                             </div>
                         </flux:tooltip>
                     @endif
                 </div>
 
-                <p class="type-meta text-secondary-medium dark:text-secondary-soft @2xl:hidden">
+                <p class="type-meta text-secondary-medium dark:text-ink-muted @2xl:hidden">
                     <bdi>{{ $start?->translatedFormat(__('formats.date')) }} – {{ $end?->translatedFormat(__('formats.date')) }}</bdi>
                 </p>
             </div>

@@ -14,7 +14,7 @@ test('guests are redirected from annual plan detail', function () {
 });
 
 test('annual plan detail shows the plan its program manager and year', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $manager = insertHrEmployee(firstNameEn: 'Layla', lastNameEn: 'Haddad');
     $program = Program::factory()->create(['name' => 'Water Security']);
     $plan = AnnualPlan::factory()->create([
@@ -31,7 +31,7 @@ test('annual plan detail shows the plan its program manager and year', function 
 });
 
 test('annual plan detail lists targets committed in that plan only', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $plan = AnnualPlan::factory()->create();
     $otherPlan = AnnualPlan::factory()->create();
     $result = Result::factory()->create();
@@ -65,7 +65,7 @@ test('annual plan detail lists targets committed in that plan only', function ()
 });
 
 test('annual plan detail renders a plan with no targets', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $plan = AnnualPlan::factory()->create(['year' => 2027]);
 
     $this->actingAs($user)
@@ -75,7 +75,7 @@ test('annual plan detail renders a plan with no targets', function () {
 });
 
 test('a target with no project reads as organisation wide', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $plan = AnnualPlan::factory()->create();
     $indicator = Indicator::factory()->create();
 

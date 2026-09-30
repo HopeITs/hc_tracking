@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\Like;
 use App\Models\Strategy;
 use Flux\Flux;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -7,6 +8,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -22,8 +24,10 @@ new #[Title('titles.strategies')] class extends Component {
     public string $status = '';
 
     public bool $showStrategyModal = false;
+    #[Locked]
     public ?int $editingStrategyId = null;
     public bool $showDeleteModal = false;
+    #[Locked]
     public ?int $deletingStrategyId = null;
     public string $name = '';
     public string $startYear = '';
@@ -57,12 +61,30 @@ new #[Title('titles.strategies')] class extends Component {
     }
 
     /**
-     * Whether the current user may create, edit or delete strategies.
+     * Whether the current user may create strategies (strategies.create).
      */
     #[Computed]
-    public function canManage(): bool
+    public function canCreateStrategies(): bool
     {
-        return Gate::allows('create', Strategy::class);
+        return auth()->user()->can('strategies.create');
+    }
+
+    /**
+     * Whether the current user may edit strategies (strategies.update).
+     */
+    #[Computed]
+    public function canEditStrategies(): bool
+    {
+        return auth()->user()->can('strategies.update');
+    }
+
+    /**
+     * Whether the current user may delete strategies (strategies.delete).
+     */
+    #[Computed]
+    public function canDeleteStrategies(): bool
+    {
+        return auth()->user()->can('strategies.delete');
     }
 
     /**
@@ -70,7 +92,7 @@ new #[Title('titles.strategies')] class extends Component {
      *
      * programs.strategy_id RESTRICTs: a strategy carrying any programs stays.
      */
-    public function canDelete(int $strategyId): bool
+    protected function canDelete(int $strategyId): bool
     {
         $strategy = Strategy::query()->select(['id'])->withCount('programs')->find($strategyId);
 
@@ -210,7 +232,7 @@ new #[Title('titles.strategies')] class extends Component {
         $searchFiltered = Strategy::query()
             ->select(['id', 'name', 'start_year', 'end_year'])
             ->withCount('programs')
-            ->when($search !== '', fn ($query) => $query->where('name', 'like', '%'.$search.'%'))
+            ->when($search !== '', fn ($query) => $query->where('name', 'like', Like::contains($search)))
             ->orderBy('name')
             ->orderBy('id')
             ->get()
@@ -294,9 +316,9 @@ new #[Title('titles.strategies')] class extends Component {
     };
 
     $statusChipClasses = fn (string $status): string => match ($status) {
-        'active' => 'bg-status-good text-white',
-        'upcoming' => 'bg-secondary-dark text-white dark:bg-white dark:text-secondary-dark',
-        default => 'bg-secondary-soft text-secondary-dark dark:bg-secondary-medium dark:text-white',
+        'active' => 'bg-status-good dark:bg-status-good-soft dark:text-status-good text-white',
+        'upcoming' => 'bg-secondary-dark text-white dark:bg-ink dark:text-surface-0',
+        default => 'bg-secondary-soft text-secondary-dark dark:bg-surface-2 dark:text-ink',
     };
 
     $timelineItems = $portfolio['strategies']->map(fn ($strategy) => [
@@ -314,7 +336,7 @@ new #[Title('titles.strategies')] class extends Component {
 @endphp
 
 <section
-    class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white"
+    class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink"
     aria-labelledby="strategies-heading"
 >
     <x-ui.page-header
@@ -341,7 +363,7 @@ new #[Title('titles.strategies')] class extends Component {
             </x-ui.header-filter-select>
         </x-slot:filters>
 
-        @if ($this->canManage)
+        @if ($this->canCreateStrategies)
             <x-slot:actions>
                 <x-ui.button tone="primary" icon="plus" class="min-h-11 touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-strategy-button">
                     {{ __('strategies.add_strategy') }}
@@ -353,19 +375,19 @@ new #[Title('titles.strategies')] class extends Component {
     <div class="flex items-center justify-between gap-3">
         <div class="min-w-0">
             @if ($portfolio['has_records'] && $portfolio['status_counts']['active'] === 0 && ! $portfolio['filters_active'])
-                <div class="inline-flex w-fit items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary" role="status">
+                <div class="inline-flex w-fit items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary dark:text-brand-text" role="status">
                     <flux:icon.clock class="size-4" />
                     {{ __('strategies.no_strategy_currently_covers_year', ['year' => $portfolio['current_year']]) }}
                 </div>
             @elseif ($portfolio['status_counts']['active'] > 0 && ! $portfolio['filters_active'])
-                <p class="type-meta text-secondary-medium dark:text-secondary-soft">
+                <p class="type-meta text-secondary-medium dark:text-ink-muted">
                     {{ trans_choice('strategies.count_current_period', $portfolio['status_counts']['active'], ['count' => $portfolio['status_counts']['active']]) }}
                 </p>
             @endif
         </div>
 
         <div class="flex shrink-0 items-center gap-2">
-            <span wire:loading.delay.flex wire:target="search,filterByStatus,resetFilters" class="hidden items-center gap-1.5 text-xs text-secondary-medium dark:text-secondary-soft"><flux:icon.arrow-path class="size-3.5 animate-spin" /> {{ __('common.updating') }}</span>
+            <span wire:loading.delay.flex wire:target="search,filterByStatus,resetFilters" class="hidden items-center gap-1.5 text-xs text-secondary-medium dark:text-ink-muted"><flux:icon.arrow-path class="size-3.5 animate-spin" /> {{ __('common.updating') }}</span>
             @if ($portfolio['filters_active'])
                 <flux:button size="sm" variant="ghost" wire:click="resetFilters">{{ __('common.reset_filters') }}</flux:button>
             @endif
@@ -401,7 +423,7 @@ new #[Title('titles.strategies')] class extends Component {
                 @foreach ($portfolio['paginated_strategies'] as $strategy)
                     <tr wire:key="strategy-row-{{ $strategy['id'] }}">
                         <x-ui.data-table.cell :label="__('common.strategy')">
-                            <span class="truncate font-semibold text-secondary-dark dark:text-white">{{ $strategy['name'] }}</span>
+                            <span class="truncate font-semibold text-secondary-dark dark:text-ink">{{ $strategy['name'] }}</span>
                         </x-ui.data-table.cell>
                         <x-ui.data-table.cell :label="__('common.period')">
                             <bdi class="tabular-nums">{{ $strategy['start_year'] }}–{{ $strategy['end_year'] }}</bdi>
@@ -421,11 +443,13 @@ new #[Title('titles.strategies')] class extends Component {
                             <div class="flex items-center justify-end gap-1 @3xl:justify-start">
                                 <x-ui.button tone="ghost" size="sm" icon="eye" class="size-9!" :href="route('strategies.show', tap(new Strategy, fn ($s) => $s->id = $strategy['id']))" wire:navigate :aria-label="__('common.view_name', ['name' => $strategy['name']])" />
 
-                                @if ($this->canManage)
-                                    <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $strategy['id'] }})" :aria-label="__('common.edit_name', ['name' => $strategy['name']])" />
+                                @if ($this->canEditStrategies)
+                                    <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $strategy['id'] }})" :aria-label="__('common.edit_name', ['name' => $strategy['name']])" data-test="edit-strategy-button" />
+                                @endif
 
+                                @if ($this->canDeleteStrategies)
                                     @if ($strategy['programs_count'] === 0)
-                                        <x-ui.button tone="ghost" size="sm" icon="trash" class="size-9!" wire:click="confirmDelete({{ $strategy['id'] }})" :aria-label="__('common.delete_name', ['name' => $strategy['name']])" />
+                                        <x-ui.button tone="ghost" size="sm" icon="trash" class="size-9!" wire:click="confirmDelete({{ $strategy['id'] }})" :aria-label="__('common.delete_name', ['name' => $strategy['name']])" data-test="delete-strategy-button" />
                                     @else
                                         <flux:tooltip :content="__('strategies.strategies_with_linked_programs_cannot_be_deleted')">
                                             <span class="inline-flex size-9 cursor-not-allowed items-center justify-center text-secondary-light" aria-disabled="true">
@@ -440,41 +464,40 @@ new #[Title('titles.strategies')] class extends Component {
                 @endforeach
             </x-ui.data-table>
 
-            <flux:pagination :paginator="$portfolio['paginated_strategies']" class="text-secondary-medium! dark:text-secondary-soft!" />
+            <flux:pagination :paginator="$portfolio['paginated_strategies']" class="text-secondary-medium! dark:text-ink-muted!" />
         </div>
     @endif
 
-    @if ($this->canManage)
-        <flux:modal wire:model="showStrategyModal" class="w-full max-w-lg border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-            <form wire:submit="saveStrategy" class="space-y-5">
-                <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                    <flux:heading size="lg">{{ $editingStrategyId === null ? __('strategies.add_strategy') : __('strategies.edit_strategy') }}</flux:heading>
-                </div>
-
-                <x-ui.input wire:model="name" :label="__('strategies.strategy_name')" type="text" maxlength="255" required autofocus />
-
-                <div class="grid gap-4 sm:grid-cols-2">
-                    <x-ui.input wire:model="startYear" :label="__('strategies.period_start')" type="number" min="1900" max="2100" required />
-                    <x-ui.input wire:model="endYear" :label="__('strategies.period_end')" type="number" min="1900" max="2100" required />
-                </div>
-
-                <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                    <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeStrategyModal">{{ __('common.cancel') }}</x-ui.button>
-                    <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-strategy-button">
-                        {{ $editingStrategyId === null ? __('strategies.create_strategy') : __('common.save_changes') }}
-                    </x-ui.button>
-                </div>
-            </form>
-        </flux:modal>
-
-        <flux:modal wire:model="showDeleteModal" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-            <div class="space-y-4">
-                <flux:heading size="lg">{{ __('strategies.delete_this_strategy') }}</flux:heading>
-                <div class="flex justify-end gap-2 border-t border-secondary-soft pt-4 dark:border-secondary-medium">
-                    <x-ui.button type="button" wire:click="$set('showDeleteModal', false)">{{ __('common.cancel') }}</x-ui.button>
-                    <x-ui.button type="button" tone="primary" wire:click="deleteStrategy" data-test="confirm-delete-strategy">{{ __('strategies.delete_strategy') }}</x-ui.button>
-                </div>
+    @if ($this->canCreateStrategies || $this->canEditStrategies)
+        <x-ui.modal
+            wire:model="showStrategyModal"
+            size="md"
+            :title="$editingStrategyId === null ? __('strategies.add_strategy') : __('strategies.edit_strategy')"
+            submit="saveStrategy"
+            close="closeStrategyModal"
+            required-note
+        >
+            <div class="grid grid-cols-2 gap-x-4 gap-y-4">
+                <x-ui.form-input wire:model="name" :label="__('strategies.strategy_name')" maxlength="255" required autofocus class="col-span-2" />
+                <x-ui.form-input wire:model="startYear" :label="__('strategies.period_start')" type="number" min="1900" max="2100" required />
+                <x-ui.form-input wire:model="endYear" :label="__('strategies.period_end')" type="number" min="1900" max="2100" required />
             </div>
-        </flux:modal>
+
+            <x-slot:actions>
+                <x-ui.button type="submit" tone="primary" data-test="save-strategy-button">
+                    {{ $editingStrategyId === null ? __('strategies.create_strategy') : __('common.save_changes') }}
+                </x-ui.button>
+            </x-slot:actions>
+        </x-ui.modal>
+    @endif
+
+    @if ($this->canDeleteStrategies)
+        <x-ui.confirm-modal
+            wire:model="showDeleteModal"
+            :title="__('strategies.delete_this_strategy')"
+            confirm="deleteStrategy"
+            :confirm-label="__('strategies.delete_strategy')"
+            confirm-test="confirm-delete-strategy"
+        />
     @endif
 </section>

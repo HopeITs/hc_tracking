@@ -30,7 +30,7 @@ test('guests are redirected from project detail', function () {
 });
 
 test('project detail shows the project its city program and owner', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $owner = insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Darwish');
     $project = Project::factory()->create(['name' => 'Aleppo Wells', 'user_id' => $owner]);
 
@@ -44,7 +44,7 @@ test('project detail shows the project its city program and owner', function () 
 });
 
 test('project detail preserves lifecycle and disagreement between headline and demographic targets', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create([
         'description' => 'Restores safe household water access.',
         'status' => ProjectStatus::Active,
@@ -69,7 +69,7 @@ test('project detail preserves lifecycle and disagreement between headline and d
 });
 
 test('project detail displays an em dash when no demographic breakdown exists', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create([
         'target_beneficiaries' => 250,
         'target_men' => null,
@@ -85,9 +85,9 @@ test('project detail displays an em dash when no demographic breakdown exists', 
 });
 
 test('project detail renders its milestones as a single delivery timeline', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
-    $responsible = User::factory()->create();
+    $responsible = User::factory()->role('General Manager')->create();
     Milestone::factory()->create([
         'project_id' => $project->id,
         'responsible_user_id' => $responsible->id,
@@ -114,9 +114,9 @@ test('project detail renders its milestones as a single delivery timeline', func
 });
 
 test('project detail shows weighted milestone progress in the header', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
-    $responsible = User::factory()->create();
+    $responsible = User::factory()->role('General Manager')->create();
     Milestone::factory()->create([
         'project_id' => $project->id,
         'responsible_user_id' => $responsible->id,
@@ -138,7 +138,7 @@ test('project detail shows weighted milestone progress in the header', function 
 });
 
 test('project detail shows a not funded empty state with no linked proposals', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
 
     $this->actingAs($user)
@@ -148,7 +148,7 @@ test('project detail shows a not funded empty state with no linked proposals', f
 });
 
 test('project detail shows committed and received funding per currency', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $proposal = Proposal::factory()->create();
     $project->proposals()->attach($proposal->id);
@@ -170,7 +170,7 @@ test('project detail shows committed and received funding per currency', functio
 });
 
 test('project detail shows only its own risks', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $subject = Project::factory()->create();
     $other = Project::factory()->create();
     Risk::factory()->create(['project_id' => $subject->id, 'name' => 'Access restrictions']);
@@ -184,7 +184,7 @@ test('project detail shows only its own risks', function () {
 });
 
 test('project detail tasks tab shows tasks raised directly on the project and on its milestones, but not on other projects', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $milestone = Milestone::factory()->create(['project_id' => $project->id]);
     $otherProject = Project::factory()->create();
@@ -202,7 +202,7 @@ test('project detail tasks tab shows tasks raised directly on the project and on
 });
 
 test('a task can be added from the project show page pre-filled with this project', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $assignee = insertHrEmployee();
     $project = Project::factory()->create();
 
@@ -225,7 +225,7 @@ test('a task can be added from the project show page pre-filled with this projec
 });
 
 test('adding a task from the project show page requires a title and an assignee', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
 
     Livewire::actingAs($user)
@@ -239,7 +239,7 @@ test('adding a task from the project show page requires a title and an assignee'
 });
 
 test('project detail shows targets naming this project', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $indicator = Indicator::factory()->create(['name' => 'People reached']);
     PlanIndicator::factory()->create([
@@ -256,7 +256,7 @@ test('project detail shows targets naming this project', function () {
 });
 
 test('project detail groups targets by result and shows their source, period and reporting status', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $result = Result::factory()->create(['statement' => 'Improved access to safe drinking water.', 'type' => ResultType::Outcome]);
     $indicator = Indicator::factory()->create(['name' => 'People reached', 'result_id' => $result->id]);
@@ -287,7 +287,7 @@ test('project detail groups targets by result and shows their source, period and
 });
 
 test('a proposal can be attached to and detached from a project', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $proposal = Proposal::factory()->create(['name' => 'Emergency WASH Response']);
 
@@ -309,7 +309,7 @@ test('a proposal can be attached to and detached from a project', function () {
 });
 
 test('attaching the same proposal twice does not duplicate the pivot row', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $proposal = Proposal::factory()->create();
     $project->proposals()->attach($proposal->id);
@@ -327,7 +327,7 @@ test('attaching the same proposal twice does not duplicate the pivot row', funct
 });
 
 test('project files list only this projects metadata and download through the authenticated route, never the raw storage path', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $otherProject = Project::factory()->create();
     $media = Media::factory()->inCollection(MediaCollection::Agreement)->create([
@@ -359,7 +359,7 @@ test('project files list only this projects metadata and download through the au
 });
 
 test('project files show a category filter once more than one category is present, and it narrows the grid', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $uploader = User::factory()->create(['name' => 'Nadia Haddad']);
     Media::factory()->inCollection(MediaCollection::Agreement)->create([
@@ -392,7 +392,7 @@ test('project files show a category filter once more than one category is presen
 });
 
 test('project files show no filter chips when every file shares one category', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     Media::factory()->inCollection(MediaCollection::Evidence)->count(2)->create([
         'mediable_type' => 'project',
@@ -407,7 +407,7 @@ test('project files show no filter chips when every file shares one category', f
 });
 
 test('project detail escapes free text and offers no project delete action', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create(['description' => '<script>alert("project")</script>']);
 
     Livewire::actingAs($user)
@@ -419,7 +419,7 @@ test('project detail escapes free text and offers no project delete action', fun
 });
 
 test('project detail renders a project with nothing attached', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create(['name' => 'Bare Project']);
 
     $this->actingAs($user)

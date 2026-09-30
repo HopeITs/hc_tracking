@@ -173,7 +173,14 @@ return [
     |
     */
 
-    'secure' => env('SESSION_SECURE_COOKIE'),
+    // Unset or empty follows APP_URL: Secure on https, so a production login
+    // cookie is never sent over plain http, while local http:// keeps working.
+    // Production is always Secure too, even when APP_URL was copied from a
+    // local http:// .env. env() returns '' (not the default) for a bare
+    // "SESSION_SECURE_COOKIE=".
+    'secure' => in_array(env('SESSION_SECURE_COOKIE'), [null, ''], true)
+        ? str_starts_with((string) env('APP_URL', ''), 'https://') || env('APP_ENV') === 'production'
+        : (bool) env('SESSION_SECURE_COOKIE'),
 
     /*
     |--------------------------------------------------------------------------

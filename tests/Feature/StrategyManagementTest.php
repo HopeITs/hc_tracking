@@ -168,7 +168,7 @@ test('admins can also manage strategies', function () {
     expect(Strategy::query()->where('name', 'Admin Strategy')->exists())->toBeTrue();
 });
 
-test('officers and meal staff cannot manage strategies', function (string $roleName) {
+test('team members and meal staff cannot manage strategies', function (string $roleName) {
     $user = User::factory()->role($roleName)->create();
     $strategy = Strategy::factory()->create();
 
@@ -190,11 +190,11 @@ test('officers and meal staff cannot manage strategies', function (string $roleN
 
     $this->assertModelExists($strategy);
 })->with([
-    'officer' => 'Officer',
+    'team member' => 'Team Member',
     'meal' => 'MEAL',
 ]);
 
-test('the add strategy control is hidden from officers and meal staff', function (string $roleName) {
+test('the add strategy control is hidden from team members and meal staff', function (string $roleName) {
     $user = User::factory()->role($roleName)->create();
 
     $this->actingAs($user)
@@ -202,7 +202,7 @@ test('the add strategy control is hidden from officers and meal staff', function
         ->assertOk()
         ->assertDontSee(__('strategies.add_strategy'));
 })->with([
-    'officer' => 'Officer',
+    'team member' => 'Team Member',
     'meal' => 'MEAL',
 ]);
 
@@ -228,8 +228,28 @@ test('every role can open a strategy through the view icon, not the name', funct
         // ...but the name itself is plain text, not a link.
         ->not->toContain('<a href="'.route('strategies.show', $strategy).'" wire:navigate class="truncate font-semibold');
 })->with([
-    'officer' => 'Officer',
+    'team member' => 'Team Member',
     'meal' => 'MEAL',
     'manager' => 'Managers',
     'admin' => 'Super Admin',
+]);
+
+test('the strategy buttons follow their own permission, not create alone', function (string $permission, array $shown, array $hidden) {
+    Strategy::factory()->create(['name' => 'Button strategy']);
+    Role::create(['name' => 'Strategy Clerk', 'guard_name' => 'web'])->givePermissionTo($permission);
+    $clerk = User::factory()->role('Strategy Clerk')->create();
+
+    $page = Livewire::actingAs($clerk)->test('pages::strategies.index');
+
+    foreach ($shown as $marker) {
+        $page->assertSeeHtml('data-test="'.$marker.'"');
+    }
+
+    foreach ($hidden as $marker) {
+        $page->assertDontSeeHtml('data-test="'.$marker.'"');
+    }
+})->with([
+    'create only' => ['strategies.create', ['create-strategy-button'], ['edit-strategy-button', 'delete-strategy-button']],
+    'update only' => ['strategies.update', ['edit-strategy-button'], ['create-strategy-button', 'delete-strategy-button']],
+    'delete only' => ['strategies.delete', ['delete-strategy-button'], ['create-strategy-button', 'edit-strategy-button']],
 ]);

@@ -451,7 +451,7 @@ new #[Title('titles.executive_summary')] class extends Component {
      * A partial figure never rounds up to 100: a single unplanned program out of
      * a thousand must not report full coverage.
      */
-    public function percentageOf(int $covered, int $total): ?int
+    protected function percentageOf(int $covered, int $total): ?int
     {
         if ($total <= 0) {
             return null;
@@ -467,7 +467,7 @@ new #[Title('titles.executive_summary')] class extends Component {
     /**
      * percentageOf() for money, which is decimal rather than a count.
      */
-    public function shareOfAmount(float $landed, float $scheduled): ?int
+    protected function shareOfAmount(float $landed, float $scheduled): ?int
     {
         if ($scheduled <= 0.0) {
             return null;
@@ -967,7 +967,7 @@ new #[Title('titles.executive_summary')] class extends Component {
         'warn' => 'text-status-warn',
         'critical' => 'text-status-critical',
         'funding' => 'text-funding',
-        'neutral' => 'text-secondary-medium dark:text-secondary-soft',
+        'neutral' => 'text-secondary-medium dark:text-ink-muted',
     ];
 
     $toneFill = [
@@ -978,13 +978,13 @@ new #[Title('titles.executive_summary')] class extends Component {
         'neutral' => 'bg-secondary-light',
     ];
 
-    $hairline = 'border-secondary-soft dark:border-secondary-medium';
-    $muted = 'text-secondary-medium dark:text-secondary-soft';
-    $ink = 'text-secondary-dark dark:text-white';
+    $hairline = 'border-secondary-soft dark:border-line';
+    $muted = 'text-secondary-medium dark:text-ink-muted';
+    $ink = 'text-secondary-dark dark:text-ink';
 @endphp
 
 <section
-    class="exec-ledger admin-directory @container/ledger flex min-h-full w-full flex-1 flex-col gap-9 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white [&_[data-flux-heading]]:text-secondary-dark! [&_[data-flux-label]]:text-secondary-dark! dark:[&_[data-flux-heading]]:text-white! dark:[&_[data-flux-label]]:text-white!"
+    class="exec-ledger admin-directory @container/ledger flex min-h-full w-full flex-1 flex-col gap-9 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink [&_[data-flux-heading]]:text-secondary-dark! [&_[data-flux-label]]:text-secondary-dark! dark:[&_[data-flux-heading]]:text-ink! dark:[&_[data-flux-label]]:text-ink!"
     aria-labelledby="executive-summary-heading"
 >
     <x-ui.page-header heading-id="executive-summary-heading" :title="__('common.executive_summary')">
@@ -1079,7 +1079,7 @@ new #[Title('titles.executive_summary')] class extends Component {
                 @endphp
 
                 <li wire:key="ledger-{{ $row['key'] }}" data-ledger-row="{{ $row['key'] }}">
-                    <div @class(['border-b '.$hairline, 'bg-secondary-soft/20 dark:bg-secondary-medium/15' => $isOpen])>
+                    <div @class(['border-b '.$hairline, 'bg-secondary-soft/20 dark:bg-white/[0.04]' => $isOpen])>
                         <button
                             type="button"
                             wire:click="toggleRow('{{ $row['key'] }}')"
@@ -1169,7 +1169,7 @@ new #[Title('titles.executive_summary')] class extends Component {
 
                     {{-- The gap, decomposed into the records that own it. --}}
                     @if ($isOpen)
-                        <div id="breakdown-{{ $row['key'] }}" class="ledger-reveal border-b bg-secondary-soft/20 px-1 pb-5 {{ $hairline }} dark:bg-secondary-medium/15">
+                        <div id="breakdown-{{ $row['key'] }}" class="ledger-reveal border-b bg-secondary-soft/20 px-1 pb-5 {{ $hairline }} dark:bg-white/[0.04]">
                             @if ($this->breakdown === [])
                                 <p class="py-4 text-center type-meta {{ $muted }}">{{ __('executive_summary.nothing_behind_this_figure') }}</p>
                             @else
@@ -1246,7 +1246,7 @@ new #[Title('titles.executive_summary')] class extends Component {
                             aria-valuemax="100"
                             aria-label="{{ $metric['label'] }}"
                         >
-                            <div class="ledger-fill h-full bg-secondary-dark dark:bg-secondary-soft" style="width: {{ $percentage ?? 0 }}%; --row-order: {{ $loop->index }}"></div>
+                            <div class="ledger-fill h-full bg-secondary-dark dark:bg-ink-muted" style="width: {{ $percentage ?? 0 }}%; --row-order: {{ $loop->index }}"></div>
                         </div>
                         <p class="mt-2 type-meta {{ $muted }}">{{ $metric['description'] }}</p>
                     </dd>

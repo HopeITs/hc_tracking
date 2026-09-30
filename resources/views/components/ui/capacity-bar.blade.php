@@ -15,17 +15,17 @@
 <div {{ $attributes->class('flex flex-col gap-1.5') }}>
     <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
         <div class="flex items-baseline gap-1.5">
-            <span class="type-meta text-secondary-medium dark:text-secondary-soft">{{ __('ui.received') }}</span>
+            <span class="type-meta text-secondary-medium dark:text-ink-muted">{{ __('ui.received') }}</span>
             <x-ui.money :amount="$usedF" :currency="$currency" />
         </div>
         <div class="flex items-baseline gap-1.5">
-            <span class="type-meta text-secondary-medium dark:text-secondary-soft">{{ __('common.committed') }}</span>
+            <span class="type-meta text-secondary-medium dark:text-ink-muted">{{ __('common.committed') }}</span>
             <x-ui.money :amount="$committedF" :currency="$currency" />
         </div>
     </div>
 
     <div
-        class="h-1.5 w-full overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium"
+        class="h-1.5 w-full overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2"
         role="progressbar"
         aria-valuemin="0"
         aria-valuemax="{{ $committedF }}"

@@ -66,23 +66,24 @@
     }"
 >
     <template x-if="!supported">
-        <flux:text>{{ __('ui.passkeys_are_not_supported_in_this_browser') }}</flux:text>
+        <p class="text-sm text-secondary-medium dark:text-ink-muted">{{ __('ui.passkeys_are_not_supported_in_this_browser') }}</p>
     </template>
 
     <template x-if="supported && !showForm">
         <div>
-            <flux:button
-                variant="primary"
+            <x-ui.button
+                size="sm"
                 icon="plus"
                 x-on:click="showForm = true"
+                class="border"
             >
                 {{ __('ui.add_passkey') }}
-            </flux:button>
+            </x-ui.button>
         </div>
     </template>
 
     <template x-if="supported && showForm">
-        <div class="space-y-4 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 p-4">
+        <div class="space-y-4 border-s-2 border-primary ps-4">
             <flux:input
                 label="{{ __('ui.passkey_name') }}"
                 x-model="name"
@@ -91,13 +92,14 @@
                 x-ref="passkeyNameInput"
                 x-init="$nextTick(() => $refs.passkeyNameInput?.focus())"
             />
-            <flux:text class="!mt-1">{{ __('ui.give_this_passkey_a_name_to_help_you_identify_it_later') }}</flux:text>
+            <flux:text class="mt-1!">{{ __('ui.give_this_passkey_a_name_to_help_you_identify_it_later') }}</flux:text>
 
-            <p x-show="error" x-text="error" x-cloak class="text-sm text-red-600 dark:text-red-400"></p>
+            <p x-show="error" x-text="error" x-cloak class="text-sm text-primary dark:text-ink"></p>
 
             <div class="flex gap-2">
                 <flux:button
                     variant="primary"
+                    size="sm"
                     x-on:click="register()"
                     x-bind:disabled="loading || !name.trim()"
                 >
@@ -106,6 +108,7 @@
                 </flux:button>
                 <flux:button
                     variant="ghost"
+                    size="sm"
                     x-on:click="cancel()"
                 >
                     {{ __('common.cancel') }}

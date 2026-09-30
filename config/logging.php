@@ -1,6 +1,9 @@
 <?php
 
+use Illuminate\Support\Str;
+use Monolog\Formatter\SyslogFormatter;
 use Monolog\Handler\NullHandler;
+use Monolog\Handler\SocketHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
 use Monolog\Processor\PsrLogMessageProcessor;
@@ -71,6 +74,58 @@ return [
             'level' => env('LOG_LEVEL', 'debug'),
             'max_files' => env('LOG_DAILY_DAYS', 14),
             'replace_placeholders' => true,
+        ],
+
+        /*
+        | Authentication audit trail (App\Listeners\LogAuthenticationEvent):
+        | sign-ins, failures, lockouts, sign-outs, two-factor and passkey
+        | changes. Kept apart from laravel.log, at info level whatever
+        | LOG_LEVEL says, for 90 days. LOG_AUTH_STACK picks the channels it
+        | writes to; the test suite sets it to "null" so no file is written.
+        */
+        'auth' => [
+            'driver' => 'stack',
+            'channels' => explode(',', env('LOG_AUTH_STACK', 'auth_daily') ?? 'null'),
+            'ignore_exceptions' => false,
+        ],
+
+        'auth_daily' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/auth.log'),
+            'level' => 'info',
+            'max_files' => 90,
+            'replace_placeholders' => true,
+        ],
+
+        /*
+        | Optional off-server copy of the auth audit trail, so someone who gets
+        | onto this server cannot quietly edit or delete the local auth-*.log
+        | files. Sends each line as RFC 5424 syslog over TLS to a remote
+        | collector. Off unless the operator opts in with:
+        |
+        |   LOG_AUTH_STACK=auth_daily,auth_remote
+        |   LOG_AUTH_REMOTE_URL=tls://logs.example.org:6514
+        |
+        | Keep auth_daily first: handlers run in stack order, so the local line
+        | is written before the remote send. Short timeouts keep a dead
+        | collector from stalling a sign-in; a failed send is reported by the
+        | listener and never blocks the sign-in.
+        */
+        'auth_remote' => [
+            'driver' => 'monolog',
+            'level' => 'info',
+            'handler' => SocketHandler::class,
+            'handler_with' => [
+                'connectionString' => (string) env('LOG_AUTH_REMOTE_URL', ''),
+                'connectionTimeout' => 3.0,
+                'timeout' => 2.0,
+                'writingTimeout' => 2.0,
+            ],
+            'formatter' => SyslogFormatter::class,
+            'formatter_with' => [
+                'applicationName' => Str::slug((string) env('APP_NAME', 'laravel')),
+            ],
+            'processors' => [PsrLogMessageProcessor::class],
         ],
 
         'monthly' => [

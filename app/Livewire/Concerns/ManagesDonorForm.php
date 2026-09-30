@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
+use App\Actions\Donors\SaveDonor;
 use App\Enums\DonorType;
 use App\Models\Donor;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 
 /**
  * The donor profile form, shared by the donor directory and the donor page so
@@ -22,6 +24,7 @@ trait ManagesDonorForm
 {
     public bool $showDonorModal = false;
 
+    #[Locked]
     public ?int $editingDonorId = null;
 
     public string $name = '';
@@ -131,22 +134,10 @@ trait ManagesDonorForm
             'nextStepDueOn.required_with' => __('donors.give_the_next_step_a_due_date'),
         ]);
 
-        $donor = $this->editingDonorId === null
-            ? new Donor
-            : Donor::query()->findOrFail($this->editingDonorId);
-
-        $donor->fill([
-            'name' => $validated['name'],
-            'type' => filled($validated['donorType']) ? $validated['donorType'] : null,
-            'contact_person' => filled($validated['contactPerson']) ? $validated['contactPerson'] : null,
-            'email' => filled($validated['email']) ? $validated['email'] : null,
-            'phone' => filled($validated['phone']) ? $validated['phone'] : null,
-            'country' => filled($validated['country']) ? $validated['country'] : null,
-            'notes' => filled($validated['notes']) ? $validated['notes'] : null,
-            'last_contacted_on' => filled($validated['lastContactedOn']) ? $validated['lastContactedOn'] : null,
-            'next_step' => filled($validated['nextStep']) ? $validated['nextStep'] : null,
-            'next_step_due_on' => filled($validated['nextStepDueOn']) ? $validated['nextStepDueOn'] : null,
-        ])->save();
+        $donor = app(SaveDonor::class)->handle(
+            $this->editingDonorId === null ? null : Donor::query()->findOrFail($this->editingDonorId),
+            $validated,
+        );
 
         $isCreate = $donor->wasRecentlyCreated;
 

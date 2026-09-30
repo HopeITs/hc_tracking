@@ -60,8 +60,10 @@ test('a quick action on work already done changes nothing and says so', function
 
 test('a quick action is re-authorised on the server', function () {
     $assignee = userWithRole('Managers', insertHrEmployee());
-    [, $notification] = taskNotificationFor($assignee);
-    $assignee->syncRoles([]); // no tasks.update any more
+    [$task, $notification] = taskNotificationFor($assignee);
+    // No tasks.update any more, and no longer assigned: nothing lets them move it.
+    $assignee->syncRoles([]);
+    Activity::withoutRecording(fn () => $task->taskAssignees()->delete());
 
     $result = app(QuickActions::class)->run($assignee->fresh(), $notification, 'task.mark_done');
 
@@ -75,20 +77,20 @@ test('an action that was never offered cannot be run', function () {
     expect(app(QuickActions::class)->run($assignee, $notification, 'report.approve')['message'])->toBe('notifications.quick.unavailable');
 });
 
-test('meal can mark a draft report reviewed and then approve it', function () {
+test('meal is offered, and can run, the approval of someone else\'s report under review', function () {
+    // Submitting a draft is its author's step only; a second person approves.
     $meal = userWithRole('MEAL');
-    $report = Activity::withoutRecording(fn () => Report::factory()->create(['status' => ReportStatus::Draft]));
+    $report = Activity::withoutRecording(fn () => Report::factory()->create(['status' => ReportStatus::Reviewed, 'submit_date' => today()]));
     $this->actingAs(userWithRole('MEAL'));
     $report->update(['value' => '10']);
     $this->travel(6)->minutes();
     $notification = UserNotification::query()->forUser($meal)->sole();
 
-    expect(array_column($notification->data['actions'], 'type'))->toBe(['report.mark_reviewed']);
+    expect(array_column($notification->data['actions'], 'type'))->toBe(['report.approve']);
 
     $this->actingAs($meal);
-    expect(app(QuickActions::class)->run($meal, $notification, 'report.mark_reviewed')['ok'])->toBeTrue()
-        ->and($report->fresh()->status)->toBe(ReportStatus::Reviewed)
-        ->and($report->fresh()->submit_date)->not->toBeNull();
+    expect(app(QuickActions::class)->run($meal, $notification, 'report.approve')['ok'])->toBeTrue()
+        ->and($report->fresh()->status)->toBe(ReportStatus::Approved);
 });
 
 test('mark received opens the tranche edit form instead of guessing amounts', function () {

@@ -132,6 +132,19 @@ class Proposal extends Model implements TracksActivity
     }
 
     /**
+     * The donors funding this proposal, by name only.
+     *
+     * Unlike donors() it carries no pivot, so a page that shows who funds a
+     * proposal to someone who may not see the money never loads the budget.
+     *
+     * @return BelongsToMany<Donor, $this>
+     */
+    public function donorNames(): BelongsToMany
+    {
+        return $this->belongsToMany(Donor::class, 'donor_proposal');
+    }
+
+    /**
      * The tasks sourced directly from this proposal.
      *
      * Does not include tasks sourced from one of this proposal's funded

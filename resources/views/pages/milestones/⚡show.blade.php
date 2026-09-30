@@ -10,6 +10,7 @@ use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
@@ -136,12 +137,22 @@ new #[Title('titles.milestone')] class extends Component {
             ->get();
     }
 
+    /**
+     * Save the milestone. Editors (milestones.update, or the owner of its
+     * project) change every field; its responsible person only moves its
+     * status, so for them every other field keeps its stored value.
+     */
     public function updateMilestone(): void
     {
         $this->name = trim($this->name);
         $this->description = trim($this->description);
 
         $milestone = Milestone::query()->findOrFail($this->milestoneId);
+        $canEdit = Gate::allows('update', $milestone);
+
+        if (! $canEdit) {
+            Gate::authorize('updateProgress', $milestone);
+        }
 
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -169,7 +180,7 @@ new #[Title('titles.milestone')] class extends Component {
             'weightPercentage.max' => __('milestones.weight_cannot_exceed_100_percent'),
         ]);
 
-        $milestone->fill([
+        $milestone->fill($canEdit ? [
             'name' => $validated['name'],
             'description' => $validated['description'] === '' ? null : $validated['description'],
             'planned_start_date' => $validated['plannedStartDate'],
@@ -180,6 +191,8 @@ new #[Title('titles.milestone')] class extends Component {
             'parent_milestone_id' => $validated['parentMilestoneId'] === '' || $validated['parentMilestoneId'] === null
                 ? null
                 : (int) $validated['parentMilestoneId'],
+        ] : [
+            'status' => $validated['milestoneStatus'],
         ])->save();
 
         unset($this->milestone);
@@ -190,6 +203,8 @@ new #[Title('titles.milestone')] class extends Component {
 
     public function openRelatedModal(): void
     {
+        Gate::authorize('create', [Milestone::class, $this->milestone->project_id]);
+
         $this->resetValidation();
         $this->relatedName = '';
         $this->relatedDescription = '';
@@ -209,6 +224,8 @@ new #[Title('titles.milestone')] class extends Component {
 
     public function saveRelatedMilestone(): void
     {
+        Gate::authorize('create', [Milestone::class, $this->milestone->project_id]);
+
         $this->relatedName = trim($this->relatedName);
         $this->relatedDescription = trim($this->relatedDescription);
 
@@ -261,6 +278,8 @@ new #[Title('titles.milestone')] class extends Component {
 
     public function openAddTaskModal(): void
     {
+        Gate::authorize('create', Task::class);
+
         $this->resetValidation();
         $this->newTaskTitle = '';
         $this->newTaskStatus = TaskStatus::Todo->value;
@@ -277,6 +296,8 @@ new #[Title('titles.milestone')] class extends Component {
 
     public function addTask(): void
     {
+        Gate::authorize('create', Task::class);
+
         $this->newTaskTitle = trim($this->newTaskTitle);
 
         $validated = $this->validate([
@@ -339,20 +360,15 @@ new #[Title('titles.milestone')] class extends Component {
 ?>
 
 @php
-    $dropdownLabelClasses = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-secondary-soft';
+    $dropdownLabelClasses = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-ink-muted';
+    $canEditMilestone = auth()->user()->can('update', $this->milestone);
+    $canMoveMilestone = $canEditMilestone || auth()->user()->can('updateProgress', $this->milestone);
+    $canAddRelated = auth()->user()->can('create', [App\Models\Milestone::class, $this->milestone->project_id]);
     $selectedParentMilestone = $parentMilestoneId === '' ? null : $this->parentOptions->firstWhere('id', (int) $parentMilestoneId);
     $selectedResponsibleOption = $responsibleUserId === '' ? null : $this->userOptions->firstWhere('id', (int) $responsibleUserId);
-    $selectedRelatedParentMilestone = $relatedParentMilestoneId === '' ? null : $this->relatedParentOptions->firstWhere('id', (int) $relatedParentMilestoneId);
-    $selectedRelatedResponsibleOption = $relatedResponsibleUserId === '' ? null : $this->userOptions->firstWhere('id', (int) $relatedResponsibleUserId);
-    $selectedNewTaskAssigneeOptions = $this->userOptions->whereIn('id', collect($newTaskAssignedTo)->map(fn ($id) => (int) $id));
-    $newTaskAssigneeTriggerLabel = match (true) {
-        $selectedNewTaskAssigneeOptions->isEmpty() => __('common.select'),
-        $selectedNewTaskAssigneeOptions->count() <= 2 => $selectedNewTaskAssigneeOptions->pluck('name')->implode(', '),
-        default => __('common.count_selected', ['count' => $selectedNewTaskAssigneeOptions->count()]),
-    };
 @endphp
 
-<section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="milestone-detail-heading">
+<section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="milestone-detail-heading">
     <x-ui.detail-header
         id="milestone-detail-heading"
         :breadcrumbs="[
@@ -384,18 +400,19 @@ new #[Title('titles.milestone')] class extends Component {
         <x-ui.stat-tile :label="__('milestones.sequence')" :value="$this->milestone->sequence" icon="hashtag" />
     </div>
 
+    @if ($canMoveMilestone)
     <x-ui.panel :title="__('milestones.edit_milestone')" :subtitle="__('milestones.edit_milestone_hint')">
         <form wire:submit="updateMilestone" class="flex flex-col gap-5 p-4">
-            <x-ui.input wire:model="name" :label="__('milestones.milestone_name')" type="text" maxlength="255" required autofocus />
+            <x-ui.input wire:model="name" :label="__('milestones.milestone_name')" type="text" maxlength="255" required autofocus :disabled="! $canEditMilestone" />
 
-            <flux:textarea wire:model="description" :label="__('common.description')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!" />
+            <flux:textarea wire:model="description" :label="__('common.description')" rows="3" :disabled="! $canEditMilestone" class="border-secondary-light! bg-white! text-secondary-dark! dark:border-field-line! dark:bg-surface-2! dark:text-ink!" />
 
-            <div class="flex flex-col gap-4 border-t border-secondary-soft pt-5 dark:border-secondary-medium">
-                <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('milestones.schedule_and_status') }}</p>
+            <div class="flex flex-col gap-4 border-t border-secondary-soft pt-5 dark:border-line">
+                <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('milestones.schedule_and_status') }}</p>
 
                 <div class="grid gap-4 sm:grid-cols-2">
-                    <x-ui.input wire:model="plannedStartDate" :label="__('milestones.planned_start_date')" type="date" required />
-                    <x-ui.input wire:model="plannedEndDate" :label="__('milestones.planned_end_date')" type="date" />
+                    <x-ui.input wire:model="plannedStartDate" :label="__('milestones.planned_start_date')" type="date" required :disabled="! $canEditMilestone" />
+                    <x-ui.input wire:model="plannedEndDate" :label="__('milestones.planned_end_date')" type="date" :disabled="! $canEditMilestone" />
                 </div>
 
                 <div class="grid gap-4 sm:grid-cols-2">
@@ -417,12 +434,12 @@ new #[Title('titles.milestone')] class extends Component {
                         <flux:error name="milestoneStatus" class="mt-1.5" />
                     </div>
 
-                    <x-ui.input wire:model="weightPercentage" :label="__('milestones.weight')" type="number" min="0" max="100" step="0.01" required />
+                    <x-ui.input wire:model="weightPercentage" :label="__('milestones.weight')" type="number" min="0" max="100" step="0.01" required :disabled="! $canEditMilestone" />
                 </div>
             </div>
 
-            <div class="flex flex-col gap-4 border-t border-secondary-soft pt-5 dark:border-secondary-medium">
-                <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('milestones.assignment') }}</p>
+            <div class="flex flex-col gap-4 border-t border-secondary-soft pt-5 dark:border-line">
+                <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('milestones.assignment') }}</p>
 
                 <div class="min-w-0">
                     <x-ui.progress-bar :value="(float) $weightPercentage" :max="100" show-value class="mt-2" />
@@ -431,12 +448,12 @@ new #[Title('titles.milestone')] class extends Component {
                 <div class="min-w-0">
                     <label for="milestone-edit-responsible" class="{{ $dropdownLabelClasses }}">{{ __('milestones.responsible') }}</label>
                     <flux:dropdown position="bottom" align="start" class="filter-picker block! w-full!" x-data="{ optionSearch: '' }">
-                        <flux:button id="milestone-edit-responsible" type="button" variant="outline" icon:trailing="chevron-up-down" class="w-full! justify-between!" :aria-label="__('milestones.responsible')">
+                        <flux:button id="milestone-edit-responsible" type="button" variant="outline" icon:trailing="chevron-up-down" class="w-full! justify-between!" :aria-label="__('milestones.responsible')" :disabled="! $canEditMilestone">
                             <span class="truncate">{{ $selectedResponsibleOption ? $selectedResponsibleOption->name.' · '.$selectedResponsibleOption->secondary_name : __('common.select') }}</span>
                         </flux:button>
                         <flux:menu class="filter-menu">
                             @if ($this->userOptions->count() > 6)
-                                <div class="border-b border-secondary-soft p-1.5 dark:border-secondary-medium">
+                                <div class="border-b border-secondary-soft p-1.5 dark:border-line">
                                     <x-ui.input type="search" size="sm" icon="magnifying-glass" x-model="optionSearch" :aria-label="__('milestones.search_responsible')" :placeholder="__('milestones.search_responsible')" />
                                 </div>
                             @endif
@@ -454,12 +471,12 @@ new #[Title('titles.milestone')] class extends Component {
                 <div class="min-w-0 sm:max-w-xs">
                     <label for="milestone-edit-parent" class="{{ $dropdownLabelClasses }}">{{ __('milestones.nest_under') }}</label>
                     <flux:dropdown position="bottom" align="start" class="filter-picker block! w-full!" x-data="{ optionSearch: '' }">
-                        <flux:button id="milestone-edit-parent" type="button" variant="outline" icon:trailing="chevron-up-down" class="w-full! justify-between!" :aria-label="__('milestones.nest_under')">
+                        <flux:button id="milestone-edit-parent" type="button" variant="outline" icon:trailing="chevron-up-down" class="w-full! justify-between!" :aria-label="__('milestones.nest_under')" :disabled="! $canEditMilestone">
                             <span class="truncate">{{ $selectedParentMilestone?->name ?? __('common.top_level') }}</span>
                         </flux:button>
                         <flux:menu class="filter-menu">
                             @if ($this->parentOptions->count() > 6)
-                                <div class="border-b border-secondary-soft p-1.5 dark:border-secondary-medium">
+                                <div class="border-b border-secondary-soft p-1.5 dark:border-line">
                                     <x-ui.input type="search" size="sm" icon="magnifying-glass" x-model="optionSearch" :aria-label="__('milestones.search_milestones')" :placeholder="__('milestones.search_milestones')" />
                                 </div>
                             @endif
@@ -479,30 +496,31 @@ new #[Title('titles.milestone')] class extends Component {
                 </div>
             </div>
 
-            <div class="flex justify-end gap-2 border-t border-secondary-soft pt-4 dark:border-secondary-medium">
+            <div class="flex justify-end gap-2 border-t border-secondary-soft pt-4 dark:border-line">
                 <x-ui.button type="submit" tone="primary" class="min-h-11 touch-manipulation sm:min-h-10" data-test="update-milestone-button">{{ __('common.save_changes') }}</x-ui.button>
             </div>
         </form>
     </x-ui.panel>
+    @endif
 
     <x-ui.panel :title="__('milestones.related_milestones')" :count="$this->relatedMilestones->count()">
         <x-slot:toolbar>
-            <x-ui.button tone="primary" size="sm" icon="plus" wire:click="openRelatedModal" data-test="add-related-milestone-button">{{ __('milestones.add_related_milestone') }}</x-ui.button>
+            @if ($canAddRelated)<x-ui.button tone="primary" size="sm" icon="plus" wire:click="openRelatedModal" data-test="add-related-milestone-button">{{ __('milestones.add_related_milestone') }}</x-ui.button>@endif
         </x-slot:toolbar>
 
         @if ($this->relatedMilestones->isEmpty())
             <x-ui.empty-state icon="flag" :heading="__('milestones.no_related_milestones_yet')" :body="__('milestones.add_a_milestone_nested_under_this_one')">
                 <x-slot:action>
-                    <x-ui.button size="sm" tone="primary" icon="plus" wire:click="openRelatedModal">{{ __('milestones.add_related_milestone') }}</x-ui.button>
+                    @if ($canAddRelated)<x-ui.button size="sm" tone="primary" icon="plus" wire:click="openRelatedModal">{{ __('milestones.add_related_milestone') }}</x-ui.button>@endif
                 </x-slot:action>
             </x-ui.empty-state>
         @else
-            <ul class="divide-y divide-secondary-soft dark:divide-secondary-medium">
+            <ul class="divide-y divide-secondary-soft dark:divide-line">
                 @foreach ($this->relatedMilestones as $related)
                     <li class="flex items-center justify-between gap-3 p-3.5" wire:key="related-milestone-{{ $related->id }}">
                         <a href="{{ route('milestones.show', $related) }}" wire:navigate class="min-w-0 truncate text-sm font-semibold hover:underline">{{ $related->name }}</a>
                         <div class="flex shrink-0 items-center gap-3">
-                            <span class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $related->planned_start_date->translatedFormat(__('formats.date')) }}</span>
+                            <span class="text-xs tabular-nums text-secondary-medium dark:text-ink-muted">{{ $related->planned_start_date->translatedFormat(__('formats.date')) }}</span>
                             <x-ui.enum-badge :case="$related->status" />
                             <x-ui.milestone-flags :milestone="$related" />
                         </div>
@@ -514,17 +532,17 @@ new #[Title('titles.milestone')] class extends Component {
 
     <x-ui.panel :title="__('tasks.related_tasks')" :count="$this->relatedTasks->count()">
         <x-slot:toolbar>
-            <x-ui.button tone="primary" size="sm" icon="plus" wire:click="openAddTaskModal" data-test="add-milestone-task-button">{{ __('tasks.add_task') }}</x-ui.button>
+            @can('create', App\Models\Task::class)<x-ui.button tone="primary" size="sm" icon="plus" wire:click="openAddTaskModal" data-test="add-milestone-task-button">{{ __('tasks.add_task') }}</x-ui.button>@endcan
         </x-slot:toolbar>
 
         @if ($this->relatedTasks->isEmpty())
             <x-ui.empty-state icon="clipboard-document-list" :heading="__('common.no_tasks_yet')" :body="__('milestones.add_a_task_linked_to_this_milestone')">
                 <x-slot:action>
-                    <x-ui.button size="sm" tone="primary" icon="plus" wire:click="openAddTaskModal">{{ __('tasks.add_task') }}</x-ui.button>
+                    @can('create', App\Models\Task::class)<x-ui.button size="sm" tone="primary" icon="plus" wire:click="openAddTaskModal">{{ __('tasks.add_task') }}</x-ui.button>@endcan
                 </x-slot:action>
             </x-ui.empty-state>
         @else
-            <ul class="divide-y divide-secondary-soft dark:divide-secondary-medium">
+            <ul class="divide-y divide-secondary-soft dark:divide-line">
                 @foreach ($this->relatedTasks as $relatedTask)
                     @php $relatedTaskAssignees = $relatedTask->taskAssignees->pluck('employee')->filter(); @endphp
                     <li class="flex flex-wrap items-center justify-between gap-3 p-3.5" wire:key="milestone-related-task-{{ $relatedTask->id }}">
@@ -532,10 +550,10 @@ new #[Title('titles.milestone')] class extends Component {
                             {{ $relatedTask->title }}
                         </a>
                         <div class="flex shrink-0 items-center gap-3">
-                            <span class="w-40 shrink-0 truncate text-xs text-secondary-medium dark:text-secondary-soft">
+                            <span class="w-40 shrink-0 truncate text-xs text-secondary-medium dark:text-ink-muted">
                                 {{ $relatedTaskAssignees->isEmpty() ? __('common.not_assigned') : $relatedTaskAssignees->map->name->implode(', ') }}
                             </span>
-                            <span class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">
+                            <span class="text-xs tabular-nums text-secondary-medium dark:text-ink-muted">
                                 {{ $relatedTask->due_date?->translatedFormat(__('formats.date')) ?? '—' }}
                             </span>
                             <x-ui.enum-badge :case="$relatedTask->status" />
@@ -547,197 +565,62 @@ new #[Title('titles.milestone')] class extends Component {
         @endif
     </x-ui.panel>
 
-    <flux:modal name="milestone-add-task-modal" wire:model="showAddTaskModal" wire:close="closeAddTaskModal" class="w-full max-w-2xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <form wire:submit="addTask" class="flex flex-col gap-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ __('tasks.add_task') }}</flux:heading>
-            </div>
-
-            <x-ui.input wire:model="newTaskTitle" :label="__('tasks.task_title')" type="text" maxlength="255" required autofocus data-test="new-milestone-task-title-input" />
-
-            <div class="grid gap-5 sm:grid-cols-2">
-                <div class="min-w-0">
-                    <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft" id="new-milestone-task-status-label">{{ __('common.status') }}</label>
-                    <div class="grid grid-cols-2 gap-1.5" role="radiogroup" aria-labelledby="new-milestone-task-status-label">
-                        @foreach (TaskStatus::cases() as $statusCase)
-                            @php $isNewTaskStatusSelected = $newTaskStatus === $statusCase->value; @endphp
-                            <button
-                                type="button"
-                                role="radio"
-                                aria-checked="{{ $isNewTaskStatusSelected ? 'true' : 'false' }}"
-                                wire:click="$set('newTaskStatus', '{{ $statusCase->value }}')"
-                                @class([
-                                    'inline-flex min-h-10 cursor-pointer touch-manipulation items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-semibold whitespace-nowrap transition-colors',
-                                    'border-secondary-dark bg-secondary-dark text-white dark:border-white dark:bg-white dark:text-secondary-dark' => $isNewTaskStatusSelected,
-                                    'border-secondary-light text-secondary-medium hover:border-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => ! $isNewTaskStatusSelected,
-                                ])
-                                data-test="new-milestone-task-status-{{ $statusCase->value }}"
-                            >
-                                {{ $statusCase->label() }}
-                            </button>
-                        @endforeach
-                    </div>
-                    <flux:error name="newTaskStatus" class="mt-1.5" />
-                </div>
-
-                <div class="min-w-0">
-                    <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft" id="new-milestone-task-priority-label">{{ __('tasks.priority') }}</label>
-                    <div class="grid grid-cols-3 gap-1.5" role="radiogroup" aria-labelledby="new-milestone-task-priority-label">
-                        @foreach (TaskPriority::cases() as $priorityCase)
-                            @php $isNewTaskPrioritySelected = $newTaskPriority === $priorityCase->value; @endphp
-                            <button
-                                type="button"
-                                role="radio"
-                                aria-checked="{{ $isNewTaskPrioritySelected ? 'true' : 'false' }}"
-                                wire:click="$set('newTaskPriority', '{{ $priorityCase->value }}')"
-                                @class([
-                                    'inline-flex min-h-10 cursor-pointer touch-manipulation items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-semibold whitespace-nowrap transition-colors',
-                                    'border-secondary-dark bg-secondary-dark text-white dark:border-secondary-medium dark:bg-secondary-medium' => $isNewTaskPrioritySelected,
-                                    'border-secondary-light text-secondary-medium hover:border-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => ! $isNewTaskPrioritySelected,
-                                ])
-                                data-test="new-milestone-task-priority-{{ $priorityCase->value }}"
-                            >
-                                {{ $priorityCase->label() }}
-                            </button>
-                        @endforeach
-                    </div>
-                    <flux:error name="newTaskPriority" class="mt-1.5" />
-                </div>
-            </div>
-
-            <div class="min-w-0">
-                <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('tasks.assignees') }}</label>
-                <x-ui.multi-select-popover
-                    :label="__('tasks.assignees')"
-                    in-modal
-                    class="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-secondary-light bg-white px-3 py-2 text-start text-sm dark:border-secondary-light dark:bg-secondary-medium"
-                    data-test="new-milestone-task-assignee-picker"
-                >
-                    <x-slot:trigger>
-                        <span class="min-w-0 truncate">{{ $newTaskAssigneeTriggerLabel }}</span>
-                        <flux:icon.chevron-up-down class="size-4 shrink-0 text-secondary-medium dark:text-secondary-soft" aria-hidden="true" />
-                    </x-slot:trigger>
-
-                    @foreach ($this->userOptions as $userOption)
-                        <label
-                            x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
-                            class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-secondary-soft dark:hover:bg-secondary-medium"
-                        >
-                            <input type="checkbox" wire:model.live="newTaskAssignedTo" value="{{ $userOption->id }}" class="rounded border-secondary-light text-primary focus:ring-primary" data-test="new-milestone-task-assignee-checkbox-{{ $userOption->id }}" />
-                            <span class="min-w-0 truncate">{{ $userOption->name }} · {{ $userOption->secondary_name }}</span>
-                        </label>
-                    @endforeach
-                </x-ui.multi-select-popover>
-                <flux:error name="newTaskAssignedTo" class="mt-1.5" />
-            </div>
-
-            <x-ui.input wire:model="newTaskDueDate" :label="__('tasks.due_date_2')" type="date" />
-
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="closeAddTaskModal">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" data-test="save-new-milestone-task-button">{{ __('tasks.add_task') }}</x-ui.button>
-            </div>
-        </form>
-    </flux:modal>
+    <x-tasks.add-task-modal test-prefix="new-milestone-task" :user-options="$this->userOptions" />
 
     <section aria-labelledby="record-activity-heading" class="grid gap-3" data-record-activity>
         <h2 id="record-activity-heading" class="text-base font-bold">{{ __('activity.title') }}</h2>
         <livewire:activity.timeline :subjects="['milestone' => [$this->milestone->id]]" :key="'milestone-activity-'.$this->milestone->id" />
     </section>
 
-    <flux:modal wire:model="showRelatedModal" wire:close="closeRelatedModal" class="w-full max-w-3xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <form wire:submit="saveRelatedMilestone" class="flex flex-col gap-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ __('milestones.add_related_milestone') }}</flux:heading>
+    <x-ui.modal
+        wire:model="showRelatedModal"
+        size="xl"
+        :title="__('milestones.add_related_milestone')"
+        submit="saveRelatedMilestone"
+        close="closeRelatedModal"
+        required-note
+    >
+        <x-ui.form-section :title="__('common.section_details')" :fields="['relatedName', 'relatedDescription']">
+            <div class="grid gap-y-3">
+                <x-ui.form-input wire:model="relatedName" :label="__('milestones.milestone_name')" maxlength="255" required autofocus />
+                <x-ui.form-textarea wire:model="relatedDescription" :label="__('common.description')" rows="2" />
             </div>
+        </x-ui.form-section>
 
-            <x-ui.input wire:model="relatedName" :label="__('milestones.milestone_name')" type="text" maxlength="255" required autofocus />
+        <x-ui.form-section :title="__('common.section_placement')" :fields="['relatedParentMilestoneId', 'relatedResponsibleUserId']">
+            <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                <x-ui.form-select wire:model="relatedParentMilestoneId" :label="__('milestones.nest_under')" :search-label="__('milestones.search_milestones')">
+                    <flux:select.option value="">{{ __('common.top_level') }}</flux:select.option>
+                    @foreach ($this->relatedParentOptions as $relatedParentOption)
+                        <flux:select.option :value="$relatedParentOption->id">{{ $relatedParentOption->name }}</flux:select.option>
+                    @endforeach
+                </x-ui.form-select>
 
-            <div class="min-w-0">
-                <label for="related-milestone-form-parent" class="{{ $dropdownLabelClasses }}">{{ __('milestones.nest_under') }}</label>
-                <flux:dropdown position="bottom" align="start" class="filter-picker block! w-full!" x-data="{ optionSearch: '' }">
-                    <flux:button id="related-milestone-form-parent" type="button" variant="outline" icon:trailing="chevron-up-down" class="w-full! justify-between!" :aria-label="__('milestones.nest_under')">
-                        <span class="truncate">{{ $selectedRelatedParentMilestone?->name ?? __('common.top_level') }}</span>
-                    </flux:button>
-                    <flux:menu class="filter-menu">
-                        @if ($this->relatedParentOptions->count() > 6)
-                            <div class="border-b border-secondary-soft p-1.5 dark:border-secondary-medium">
-                                <x-ui.input type="search" size="sm" icon="magnifying-glass" x-model="optionSearch" :aria-label="__('milestones.search_milestones')" :placeholder="__('milestones.search_milestones')" />
-                            </div>
-                        @endif
-                        <flux:menu.item wire:click="$set('relatedParentMilestoneId', '')">
-                            {{ __('common.top_level') }}
-                            @if ($relatedParentMilestoneId === '')<flux:icon.check class="ms-auto size-4 text-secondary-medium" />@endif
-                        </flux:menu.item>
-                        @foreach ($this->relatedParentOptions as $relatedParentOption)
-                            <flux:menu.item wire:click="$set('relatedParentMilestoneId', {{ $relatedParentOption->id }})" x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())" :wire:key="'related-milestone-form-parent-option-'.$relatedParentOption->id">
-                                <span class="min-w-0 truncate">{{ $relatedParentOption->name }}</span>
-                                @if ((int) $relatedParentMilestoneId === $relatedParentOption->id)<flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" />@endif
-                            </flux:menu.item>
-                        @endforeach
-                    </flux:menu>
-                </flux:dropdown>
-                <flux:error name="relatedParentMilestoneId" class="mt-1.5" />
+                <x-ui.form-select wire:model="relatedResponsibleUserId" :label="__('milestones.responsible')" :placeholder="__('common.select')" :search-label="__('milestones.search_responsible')">
+                    @foreach ($this->userOptions as $userOption)
+                        <flux:select.option :value="$userOption->id">{{ $userOption->name }} · {{ $userOption->secondary_name }}</flux:select.option>
+                    @endforeach
+                </x-ui.form-select>
             </div>
+        </x-ui.form-section>
 
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.input wire:model="relatedPlannedStartDate" :label="__('milestones.planned_start_date')" type="date" required />
-                <x-ui.input wire:model="relatedPlannedEndDate" :label="__('milestones.planned_end_date')" type="date" />
+        <x-ui.form-section :title="__('common.section_schedule')" :fields="['relatedPlannedStartDate', 'relatedPlannedEndDate', 'relatedStatus', 'relatedWeightPercentage']">
+            <div class="grid grid-cols-2 gap-x-4 gap-y-3 @4xl/modal:grid-cols-4">
+                <x-ui.form-input wire:model="relatedPlannedStartDate" :label="__('milestones.planned_start_date')" type="date" required />
+                <x-ui.form-input wire:model="relatedPlannedEndDate" :label="__('milestones.planned_end_date')" type="date" />
+
+                <x-ui.form-select wire:model="relatedStatus" :label="__('common.status')" required>
+                    @foreach (MilestoneStatus::cases() as $statusCase)
+                        <flux:select.option :value="$statusCase->value">{{ $statusCase->label() }}</flux:select.option>
+                    @endforeach
+                </x-ui.form-select>
+
+                <x-ui.form-input wire:model="relatedWeightPercentage" :label="__('milestones.weight')" type="number" min="0" max="100" step="0.01" suffix="%" required />
             </div>
+        </x-ui.form-section>
 
-            <div class="grid gap-4 sm:grid-cols-2">
-                <div class="min-w-0">
-                    <label for="related-milestone-form-status" class="{{ $dropdownLabelClasses }}">{{ __('common.status') }}</label>
-                    <flux:dropdown position="bottom" align="start" class="filter-picker block! w-full!">
-                        <flux:button id="related-milestone-form-status" type="button" variant="outline" icon:trailing="chevron-up-down" class="w-full! justify-between!" :aria-label="__('common.status')">
-                            <span class="truncate">{{ MilestoneStatus::from($relatedStatus)->label() }}</span>
-                        </flux:button>
-                        <flux:menu class="filter-menu">
-                            @foreach (MilestoneStatus::cases() as $statusCase)
-                                <flux:menu.item wire:click="$set('relatedStatus', '{{ $statusCase->value }}')" :wire:key="'related-milestone-form-status-option-'.$statusCase->value">
-                                    <span class="min-w-0 truncate">{{ $statusCase->label() }}</span>
-                                    @if ($relatedStatus === $statusCase->value)<flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" />@endif
-                                </flux:menu.item>
-                            @endforeach
-                        </flux:menu>
-                    </flux:dropdown>
-                    <flux:error name="relatedStatus" class="mt-1.5" />
-                </div>
-
-                <x-ui.input wire:model="relatedWeightPercentage" :label="__('milestones.weight')" type="number" min="0" max="100" step="0.01" required />
-            </div>
-
-            <div class="grid gap-4 sm:grid-cols-2">
-                <div class="min-w-0">
-                    <label for="related-milestone-form-responsible" class="{{ $dropdownLabelClasses }}">{{ __('milestones.responsible') }}</label>
-                    <flux:dropdown position="bottom" align="start" class="filter-picker block! w-full!" x-data="{ optionSearch: '' }">
-                        <flux:button id="related-milestone-form-responsible" type="button" variant="outline" icon:trailing="chevron-up-down" class="w-full! justify-between!" :aria-label="__('milestones.responsible')">
-                            <span class="truncate">{{ $selectedRelatedResponsibleOption ? $selectedRelatedResponsibleOption->name.' · '.$selectedRelatedResponsibleOption->secondary_name : __('common.select') }}</span>
-                        </flux:button>
-                        <flux:menu class="filter-menu">
-                            @if ($this->userOptions->count() > 6)
-                                <div class="border-b border-secondary-soft p-1.5 dark:border-secondary-medium">
-                                    <x-ui.input type="search" size="sm" icon="magnifying-glass" x-model="optionSearch" :aria-label="__('milestones.search_responsible')" :placeholder="__('milestones.search_responsible')" />
-                                </div>
-                            @endif
-                            @foreach ($this->userOptions as $userOption)
-                                <flux:menu.item wire:click="$set('relatedResponsibleUserId', {{ $userOption->id }})" x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())" :wire:key="'related-milestone-form-responsible-option-'.$userOption->id">
-                                    <span class="min-w-0 truncate">{{ $userOption->name }} · {{ $userOption->secondary_name }}</span>
-                                    @if ((int) $relatedResponsibleUserId === $userOption->id)<flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" />@endif
-                                </flux:menu.item>
-                            @endforeach
-                        </flux:menu>
-                    </flux:dropdown>
-                    <flux:error name="relatedResponsibleUserId" class="mt-1.5" />
-                </div>
-            </div>
-
-            <flux:textarea wire:model="relatedDescription" :label="__('common.description')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!" />
-
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="closeRelatedModal">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" data-test="save-related-milestone-button">{{ __('milestones.create_milestone') }}</x-ui.button>
-            </div>
-        </form>
-    </flux:modal>
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="save-related-milestone-button">{{ __('milestones.create_milestone') }}</x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
 </section>

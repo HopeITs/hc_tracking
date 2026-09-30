@@ -152,6 +152,10 @@ return [
     'timezone' => 'يجب أن يكون حقل :attribute منطقة زمنية صالحة.',
     'unique' => 'قيمة :attribute مستخدمة من قبل.',
     'uploaded' => 'فشل رفع :attribute.',
+    'secure_upload' => [
+        'content_mismatch' => 'الملف :attribute ليس ملفًا حقيقيًا من النوع الذي يدّعيه امتداده.',
+        'active_content' => 'الملف :attribute يحتوي على سكربتات أو وحدات ماكرو غير مسموح بها.',
+    ],
     'uppercase' => 'يجب أن يكون حقل :attribute بأحرف كبيرة.',
     'url' => 'يجب أن يكون حقل :attribute رابطًا صالحًا.',
     'ulid' => 'يجب أن يكون حقل :attribute معرّف ULID صالحًا.',
@@ -186,6 +190,7 @@ return [
         'executiveSummary' => 'الملخص التنفيذي',
         'fees' => 'الرسوم',
         'feesCurrency' => 'عملة الرسوم',
+        'files.*' => 'الملف',
         'frequency' => 'التكرار',
         'hrUserId' => 'حساب الموارد البشرية',
         'impact' => 'الأثر',

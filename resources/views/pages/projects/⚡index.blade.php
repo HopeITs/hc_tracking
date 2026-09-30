@@ -1,5 +1,9 @@
 <?php
 
+use App\Enums\MediaCollection;
+use App\Support\Like;
+use App\Actions\Projects\ArchiveProject;
+use App\Actions\Projects\RestoreProject;
 use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\RagStatus;
@@ -15,8 +19,10 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -68,8 +74,10 @@ new #[Title('titles.projects')] class extends Component {
 
     public bool $showProjectModal = false;
 
+    #[Locked]
     public ?int $editingProjectId = null;
 
+    #[Locked]
     public ?int $archivingProjectId = null;
 
     /**
@@ -231,8 +239,8 @@ new #[Title('titles.projects')] class extends Component {
 
         return [
             'cities' => HrCity::query()
-                ->where('name_en', 'like', '%'.$search.'%')
-                ->orWhere('name_ar', 'like', '%'.$search.'%')
+                ->where('name_en', 'like', Like::contains($search))
+                ->orWhere('name_ar', 'like', Like::contains($search))
                 ->pluck('id')
                 ->all(),
             'owners' => HrEmployee::idsMatchingName($search),
@@ -258,7 +266,7 @@ new #[Title('titles.projects')] class extends Component {
             ->when($search !== '', function (Builder $query) use ($search, $matches): void {
                 $query->where(function (Builder $query) use ($search, $matches): void {
                     $query
-                        ->where('name', 'like', '%'.$search.'%')
+                        ->where('name', 'like', Like::contains($search))
                         ->orWhereIn('city_id', $matches['cities'])
                         ->orWhereIn('program_id', HrProgram::idsMatchingName($search))
                         ->orWhereIn('user_id', $matches['owners']);
@@ -316,6 +324,34 @@ new #[Title('titles.projects')] class extends Component {
         };
     }
 
+    /**
+     * Whether the viewer may see committed budgets and currencies. They are
+     * agreement data, so they need funding-agreements.view; donor and proposal
+     * names stay visible either way.
+     */
+    protected function canViewMoney(): bool
+    {
+        return auth()->user()?->can('funding-agreements.view') ?? false;
+    }
+
+    /**
+     * The file collections this viewer may not count: signed agreements and
+     * MOUs are agreement data, so they need funding-agreements.view.
+     *
+     * @return list<string>
+     */
+    protected function hiddenCollections(): array
+    {
+        if (auth()->user()?->can('funding-agreements.view') ?? false) {
+            return [];
+        }
+
+        return array_values(array_map(
+            fn (MediaCollection $collection): string => $collection->value,
+            array_filter(MediaCollection::cases(), fn (MediaCollection $collection): bool => $collection->isFundingPaper()),
+        ));
+    }
+
     /** @return LengthAwarePaginator<int, Project> */
     #[Computed]
     public function projects(): LengthAwarePaginator
@@ -357,7 +393,7 @@ new #[Title('titles.projects')] class extends Component {
                 'planIndicators',
                 'proposals',
                 'indicators',
-                'media',
+                'media' => fn ($query) => $query->whereNotIn('collection', $this->hiddenCollections()),
                 'risks as materialised_risks_count' => fn ($query) => $query->where('happened', true),
                 'milestones as reached_milestones_count' => fn ($query) => $query->where('status', MilestoneStatus::Reached->value),
             ])
@@ -374,7 +410,7 @@ new #[Title('titles.projects')] class extends Component {
      * Weights that add up to more than 100 are capped rather than rejected:
      * the figure is a reading of the record, not a validation of it.
      */
-    public function progressFor(Project $project): ?float
+    protected function progressFor(Project $project): ?float
     {
         $planned = (float) ($project->planned_weight ?? 0);
 
@@ -455,6 +491,10 @@ new #[Title('titles.projects')] class extends Component {
     #[Computed]
     public function committedFunding(): array
     {
+        if (! $this->canViewMoney()) {
+            return [];
+        }
+
         $projectIds = $this->applyFilters(Project::query())->toBase()->select('projects.id');
 
         return DB::table('donor_proposal')
@@ -496,6 +536,8 @@ new #[Title('titles.projects')] class extends Component {
             return [];
         }
 
+        $canViewMoney = $this->canViewMoney();
+
         $rows = DB::table('project_proposal')
             ->join('donor_proposal', 'donor_proposal.proposal_id', '=', 'project_proposal.proposal_id')
             ->join('donors', 'donors.id', '=', 'donor_proposal.donor_id')
@@ -504,11 +546,13 @@ new #[Title('titles.projects')] class extends Component {
             ->select([
                 'project_proposal.project_id',
                 'project_proposal.proposal_id',
-                'donor_proposal.currency',
-                'donor_proposal.budget',
                 'donors.name as donor_name',
                 'proposals.name as proposal_name',
             ])
+            ->when($canViewMoney, fn ($query) => $query->addSelect([
+                'donor_proposal.currency',
+                'donor_proposal.budget',
+            ]))
             ->selectSub(
                 DB::table('project_proposal as shares')
                     ->selectRaw('count(*)')
@@ -523,7 +567,11 @@ new #[Title('titles.projects')] class extends Component {
             $projectId = (int) $row->project_id;
 
             $funding[$projectId] ??= ['currencies' => [], 'donors' => [], 'proposals' => [], 'shared' => 0];
-            $funding[$projectId]['currencies'][$row->currency] = ($funding[$projectId]['currencies'][$row->currency] ?? 0.0) + (float) $row->budget;
+
+            if ($canViewMoney) {
+                $funding[$projectId]['currencies'][$row->currency] = ($funding[$projectId]['currencies'][$row->currency] ?? 0.0) + (float) $row->budget;
+            }
+
             $funding[$projectId]['shared'] = max($funding[$projectId]['shared'], (int) $row->share_count - 1);
 
             if (! in_array($row->donor_name, $funding[$projectId]['donors'], true)) {
@@ -590,6 +638,8 @@ new #[Title('titles.projects')] class extends Component {
 
     public function openCreateModal(): void
     {
+        Gate::authorize('create', Project::class);
+
         $this->resetProjectForm();
         $this->showProjectModal = true;
     }
@@ -615,6 +665,8 @@ new #[Title('titles.projects')] class extends Component {
             ])
             ->findOrFail($projectId);
 
+        Gate::authorize('update', $project);
+
         $this->resetValidation();
         $this->editingProjectId = $project->id;
         $this->name = $project->name;
@@ -635,6 +687,12 @@ new #[Title('titles.projects')] class extends Component {
 
     public function saveProject(): void
     {
+        if ($this->editingProjectId === null) {
+            Gate::authorize('create', Project::class);
+        } else {
+            Gate::authorize('update', Project::query()->findOrFail($this->editingProjectId));
+        }
+
         $this->name = trim($this->name);
         $this->description = trim($this->description);
 
@@ -671,6 +729,14 @@ new #[Title('titles.projects')] class extends Component {
             ? new Project
             : Project::query()->findOrFail($this->editingProjectId);
 
+        // An owner edits their project but does not move it to another
+        // program or owner, and archiving goes through archiveProject().
+        $mayReassign = ! $project->exists || Gate::allows('reassign', $project);
+
+        if ($project->exists && ProjectStatus::from($validated['projectStatus']) === ProjectStatus::Archived && $project->status !== ProjectStatus::Archived) {
+            Gate::authorize('delete', $project);
+        }
+
         $project->fill([
             'name' => $validated['name'],
             'description' => $validated['description'] === '' ? null : $validated['description'],
@@ -683,8 +749,8 @@ new #[Title('titles.projects')] class extends Component {
             'target_boys' => self::nullableInteger($validated['targetBoys']),
             'target_girls' => self::nullableInteger($validated['targetGirls']),
             'city_id' => (int) $validated['cityId'],
-            'program_id' => (int) $validated['programId'],
-            'user_id' => (int) $validated['userId'],
+            'program_id' => $mayReassign ? (int) $validated['programId'] : $project->program_id,
+            'user_id' => $mayReassign ? (int) $validated['userId'] : $project->user_id,
         ])->save();
 
         $wasRecentlyCreated = $project->wasRecentlyCreated;
@@ -707,6 +773,8 @@ new #[Title('titles.projects')] class extends Component {
 
     public function confirmArchive(int $projectId): void
     {
+        Gate::authorize('delete', Project::query()->findOrFail($projectId));
+
         $this->archivingProjectId = $projectId;
         $this->showArchiveModal = true;
     }
@@ -770,7 +838,7 @@ new #[Title('titles.projects')] class extends Component {
             return;
         }
 
-        $project->update(['status' => ProjectStatus::Archived]);
+        app(ArchiveProject::class)->handle($project);
 
         $this->archivingProjectId = null;
         $this->showArchiveModal = false;
@@ -787,11 +855,10 @@ new #[Title('titles.projects')] class extends Component {
     {
         $project = Project::query()->find($projectId);
 
-        if ($project === null || $project->status !== ProjectStatus::Archived) {
+        if ($project === null || ! app(RestoreProject::class)->handle($project)) {
             return;
         }
 
-        $project->update(['status' => ProjectStatus::Draft]);
         $this->resetPage();
 
         Flux::toast(variant: 'success', text: __('projects.project_restored'));
@@ -843,6 +910,7 @@ new #[Title('titles.projects')] class extends Component {
     $statusCounts = $this->statusCounts;
     $triageCounts = $this->triageCounts;
     $fundingByProject = $this->fundingByProject;
+    $canViewMoney = $this->canViewMoney();
     $projects = $this->projects;
 
     $loadingTargets = 'search, city, program, owner, status, lens, sort, view, toggleStatus, toggleLens, clearFilters, gotoPage, nextPage, previousPage';
@@ -871,20 +939,20 @@ new #[Title('titles.projects')] class extends Component {
 
     /* The fill mirrors the pill, so a verdict never disagrees with its own bar. */
     $progressFillClasses = fn (string $tone): string => match ($tone) {
-        'critical' => 'bg-primary',
+        'critical' => 'bg-primary dark:bg-status-critical',
         'warn' => 'bg-status-warn',
         'good' => 'bg-status-good',
-        default => 'bg-secondary-dark dark:bg-white',
+        default => 'bg-secondary-dark dark:bg-ink-muted',
     };
 
     /* The board card reads the same verdict at full RAG resolution. Critical
        fills solid so white type carries it in both themes; the softer tones
        already flip their own tokens in dark mode. */
     $tonePillClasses = fn (string $tone): string => match ($tone) {
-        'critical' => 'border-primary bg-primary font-semibold text-white',
+        'critical' => 'border-primary bg-primary dark:border-transparent dark:bg-status-critical-soft dark:text-status-critical font-semibold text-white',
         'warn' => 'border-status-warn/40 bg-status-warn-soft font-semibold text-status-warn',
         'good' => 'border-status-good/40 bg-status-good-soft font-semibold text-status-good',
-        default => 'border-board-line text-secondary-medium dark:text-secondary-soft',
+        default => 'border-board-line text-secondary-medium dark:text-ink-muted',
     };
 
     /* How much of a project's own window has passed, as a percentage. */
@@ -961,9 +1029,15 @@ new #[Title('titles.projects')] class extends Component {
         3 => trans_choice('projects.duration_days', 3, ['count' => '__N__']),
         11 => trans_choice('projects.duration_days', 11, ['count' => '__N__']),
     ];
+
+    /* Month names in the reader's language (Syrian names in Arabic), so the
+       project modal's live duration range matches every other date here. */
+    $monthNames = collect(range(1, 12))
+        ->map(fn (int $month): string => CarbonImmutable::create(2000, $month, 1)->translatedFormat(__('formats.month_short')))
+        ->all();
 @endphp
 
-<section class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="project-directory-heading">
+<section class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="project-directory-heading">
     <x-ui.page-header
         heading-id="project-directory-heading"
         :title="__('common.projects')"
@@ -1001,15 +1075,15 @@ new #[Title('titles.projects')] class extends Component {
         </x-slot:filters>
 
         <x-slot:actions>
-            <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-project-button">
+            @can('create', App\Models\Project::class)<x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-project-button">
                 {{ __('projects.add_project') }}
-            </x-ui.button>
+            </x-ui.button>@endcan
         </x-slot:actions>
     </x-ui.page-header>
 
     {{-- The pipeline, which is also the status filter. Six equal segments on
          one baseline; the selected one is the only large red area here. --}}
-    <div role="group" aria-label="{{ __('projects.lifecycle') }}" class="grid grid-flow-col auto-cols-[minmax(7.5rem,1fr)] snap-x gap-px overflow-x-auto rounded-xl border border-secondary-soft bg-secondary-soft dark:border-secondary-medium dark:bg-secondary-medium">
+    <div role="group" aria-label="{{ __('projects.lifecycle') }}" class="grid grid-flow-col auto-cols-[minmax(7.5rem,1fr)] snap-x gap-px overflow-x-auto rounded-xl border border-secondary-soft bg-secondary-soft dark:border-line dark:bg-line">
         @foreach (ProjectStatus::cases() as $case)
             @php
                 $segmentCount = $statusCounts[$case->value] ?? 0;
@@ -1023,12 +1097,12 @@ new #[Title('titles.projects')] class extends Component {
                 data-test="lifecycle-{{ $case->value }}"
                 @class([
                     'flex min-h-16 snap-start cursor-pointer flex-col justify-center gap-1 px-4 py-3 text-start transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary',
-                    'bg-primary text-white' => $isSelected,
-                    'bg-white text-secondary-dark hover:bg-secondary-soft/50 dark:bg-secondary-dark dark:text-white dark:hover:bg-secondary-medium/40' => ! $isSelected,
+                    'bg-primary text-white dark:bg-brand/10 dark:text-ink' => $isSelected,
+                    'bg-white text-secondary-dark hover:bg-secondary-soft/50 dark:bg-surface-1 dark:text-ink dark:hover:bg-surface-2' => ! $isSelected,
                 ])
             >
                 <span class="sr-only">{{ trans_choice('projects.lifecycle_segment', $segmentCount, ['status' => $case->label(), 'count' => $segmentCount]) }}</span>
-                <span aria-hidden="true" class="type-label truncate {{ $isSelected ? 'text-white/80' : 'text-secondary-medium dark:text-secondary-soft' }}">{{ $case->label() }}</span>
+                <span aria-hidden="true" class="type-label truncate {{ $isSelected ? 'text-white/80' : 'text-secondary-medium dark:text-ink-muted' }}">{{ $case->label() }}</span>
                 <span aria-hidden="true" class="text-2xl leading-none font-bold tabular-nums">{{ $segmentCount }}</span>
             </button>
         @endforeach
@@ -1038,11 +1112,16 @@ new #[Title('titles.projects')] class extends Component {
          waiting on it. Kept apart because they answer different questions. --}}
     <div class="grid gap-4 @4xl/directory:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <section aria-labelledby="portfolio-figures-heading">
-            <h2 id="portfolio-figures-heading" class="type-label mb-2 text-secondary-medium dark:text-secondary-soft">{{ __('projects.group_portfolio') }}</h2>
+            <h2 id="portfolio-figures-heading" class="type-label mb-2 text-secondary-medium dark:text-ink-muted">{{ __('projects.group_portfolio') }}</h2>
 
-            <div class="grid min-h-[calc(100%-1.75rem)] grid-cols-2 gap-px overflow-hidden rounded-xl border border-secondary-soft bg-secondary-soft dark:border-secondary-medium dark:bg-secondary-medium">
-                <div class="flex flex-col justify-between gap-2 bg-white p-4 dark:bg-secondary-dark">
-                    <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.tile_committed_funding') }}</p>
+            <div @class([
+                'grid min-h-[calc(100%-1.75rem)] gap-px overflow-hidden rounded-xl border border-secondary-soft bg-secondary-soft dark:border-line dark:bg-line',
+                'grid-cols-2' => $canViewMoney,
+                'grid-cols-1' => ! $canViewMoney,
+            ])>
+                @if ($canViewMoney)
+                <div class="flex flex-col justify-between gap-2 bg-white p-4 dark:bg-surface-1">
+                    <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('projects.tile_committed_funding') }}</p>
                     <div>
                         @forelse ($this->committedFunding as $fundingCurrency => $fundingTotal)
                             <p class="type-figure" wire:key="committed-{{ $fundingCurrency }}">
@@ -1052,21 +1131,22 @@ new #[Title('titles.projects')] class extends Component {
                             <p class="type-figure text-secondary-light">—</p>
                         @endforelse
                     </div>
-                    <p class="type-meta text-secondary-medium dark:text-secondary-soft">{{ __('projects.tile_committed_funding_hint') }}</p>
+                    <p class="type-meta text-secondary-medium dark:text-ink-muted">{{ __('projects.tile_committed_funding_hint') }}</p>
                 </div>
+                @endif
 
-                <div class="flex flex-col justify-between gap-2 bg-white p-4 dark:bg-secondary-dark">
-                    <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.tile_beneficiaries') }}</p>
+                <div class="flex flex-col justify-between gap-2 bg-white p-4 dark:bg-surface-1">
+                    <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('projects.tile_beneficiaries') }}</p>
                     <p class="type-figure">{{ number_format($this->committedBeneficiaries) }}</p>
-                    <p class="type-meta text-secondary-medium dark:text-secondary-soft">{{ __('projects.tile_beneficiaries_hint') }}</p>
+                    <p class="type-meta text-secondary-medium dark:text-ink-muted">{{ __('projects.tile_beneficiaries_hint') }}</p>
                 </div>
             </div>
         </section>
 
         <section aria-labelledby="portfolio-triage-heading">
-            <h2 id="portfolio-triage-heading" class="type-label mb-2 text-secondary-medium dark:text-secondary-soft">{{ __('projects.group_attention') }}</h2>
+            <h2 id="portfolio-triage-heading" class="type-label mb-2 text-secondary-medium dark:text-ink-muted">{{ __('projects.group_attention') }}</h2>
 
-            <div class="grid min-h-[calc(100%-1.75rem)] grid-cols-2 gap-px overflow-hidden rounded-xl border border-secondary-soft bg-secondary-soft @2xl/directory:grid-cols-4 dark:border-secondary-medium dark:bg-secondary-medium">
+            <div class="grid min-h-[calc(100%-1.75rem)] grid-cols-2 gap-px overflow-hidden rounded-xl border border-secondary-soft bg-secondary-soft @2xl/directory:grid-cols-4 dark:border-line dark:bg-line">
                 @foreach ($lensTiles as $lensValue => $lensTile)
                     @php
                         $lensCount = $triageCounts[$lensValue] ?? 0;
@@ -1095,17 +1175,17 @@ new #[Title('titles.projects')] class extends Component {
                         @class([
                             'box-border flex flex-col justify-between gap-2 border-2 p-4 text-start transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary',
                             $lensCornerClasses,
-                            'cursor-pointer border-white bg-white hover:border-secondary-soft/50 hover:bg-secondary-soft/50 dark:border-secondary-dark dark:bg-secondary-dark dark:hover:border-secondary-medium/40 dark:hover:bg-secondary-medium/40' => ! $lensIsQuiet && ! $lensIsActive,
-                            'cursor-pointer border-primary bg-white dark:bg-secondary-dark' => $lensIsActive,
-                            'cursor-default border-white bg-white dark:border-secondary-dark dark:bg-secondary-dark' => $lensIsQuiet,
+                            'cursor-pointer border-white bg-white hover:border-secondary-soft/50 hover:bg-secondary-soft/50 dark:border-surface-1 dark:bg-surface-1 dark:hover:border-surface-2 dark:hover:bg-surface-2' => ! $lensIsQuiet && ! $lensIsActive,
+                            'cursor-pointer border-primary bg-white dark:bg-surface-1' => $lensIsActive,
+                            'cursor-default border-white bg-white dark:border-surface-1 dark:bg-surface-1' => $lensIsQuiet,
                         ])
                     >
-                        <span class="type-label flex items-center gap-1.5 text-secondary-medium dark:text-secondary-soft">
+                        <span class="type-label flex items-center gap-1.5 text-secondary-medium dark:text-ink-muted">
                             <flux:icon :name="$lensTile['icon']" variant="micro" class="size-3.5 shrink-0" aria-hidden="true" />
                             <span class="truncate">{{ $lensTile['label'] }}</span>
                         </span>
-                        <span class="type-figure {{ $lensIsQuiet ? 'text-secondary-light' : 'text-primary' }}">{{ $lensCount }}</span>
-                        <span class="type-meta text-secondary-medium dark:text-secondary-soft">{{ $lensTile['hint'] }}</span>
+                        <span class="type-figure {{ $lensIsQuiet ? 'text-secondary-light' : 'text-primary dark:text-brand-text' }}">{{ $lensCount }}</span>
+                        <span class="type-meta text-secondary-medium dark:text-ink-muted">{{ $lensTile['hint'] }}</span>
                     </button>
                 @endforeach
             </div>
@@ -1114,7 +1194,7 @@ new #[Title('titles.projects')] class extends Component {
 
     {{-- Tabs, exactly as the milestones directory renders them. --}}
     <div class="flex flex-wrap items-center justify-between gap-3">
-        <div class="inline-flex flex-wrap gap-1 rounded-lg border border-secondary-soft bg-secondary-soft/40 p-1 dark:border-secondary-medium dark:bg-secondary-medium/40" role="group" aria-label="{{ __('projects.views') }}">
+        <div class="inline-flex flex-wrap gap-1 rounded-lg border border-secondary-soft bg-secondary-soft/40 p-1 dark:border-line dark:bg-surface-2" role="group" aria-label="{{ __('projects.views') }}">
             @foreach ($viewOptions as $viewValue => $viewMeta)
                 <button
                     type="button"
@@ -1123,8 +1203,8 @@ new #[Title('titles.projects')] class extends Component {
                     data-test="project-view-{{ $viewValue }}"
                     @class([
                         'inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-md px-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
-                        'bg-white text-secondary-dark shadow-sm dark:bg-secondary-dark dark:text-white' => $view === $viewValue,
-                        'text-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => $view !== $viewValue,
+                        'bg-white text-secondary-dark shadow-sm dark:bg-surface-3 dark:shadow-raised dark:text-ink' => $view === $viewValue,
+                        'text-secondary-medium hover:text-secondary-dark dark:text-ink-muted dark:hover:text-ink' => $view !== $viewValue,
                     ])
                 >
                     <flux:icon :name="$viewMeta['icon']" variant="micro" class="size-4" aria-hidden="true" />
@@ -1151,7 +1231,7 @@ new #[Title('titles.projects')] class extends Component {
                     @if ($filtersAreActive)
                         <x-ui.button size="sm" wire:click="clearFilters">{{ __('common.reset_filters') }}</x-ui.button>
                     @else
-                        <x-ui.button size="sm" tone="primary" icon="plus" wire:click="openCreateModal">{{ __('projects.add_project') }}</x-ui.button>
+                        @can('create', App\Models\Project::class)<x-ui.button size="sm" tone="primary" icon="plus" wire:click="openCreateModal">{{ __('projects.add_project') }}</x-ui.button>@endcan
                     @endif
                 </x-slot:action>
             </x-ui.empty-state>
@@ -1212,14 +1292,14 @@ new #[Title('titles.projects')] class extends Component {
                                         <div class="min-w-0">
                                             <div class="flex min-w-0 items-center gap-1.5">
                                                 @if (in_array($project->id, $this->unreadIds, true))
-                                                    <span class="size-2 shrink-0 rounded-full bg-primary" data-unread-dot="project-{{ $project->id }}" title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
+                                                    <span class="size-2 shrink-0 rounded-full bg-primary dark:bg-ink" data-unread-dot="project-{{ $project->id }}" title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
                                                 @endif
-                                                <h3 class="line-clamp-2 min-w-0 text-[15px] leading-snug font-semibold text-secondary-dark dark:text-white" title="{{ $project->name }}">{{ $project->name }}</h3>
+                                                <h3 class="line-clamp-2 min-w-0 text-[15px] leading-snug font-semibold text-secondary-dark dark:text-ink" title="{{ $project->name }}">{{ $project->name }}</h3>
                                             </div>
 
                                             {{-- City, program and strategy as one breadcrumb instead of three label rows. --}}
-                                            <p class="type-meta mt-1 truncate text-secondary-medium dark:text-secondary-soft" title="{{ $pathTitle }}">
-                                                {{ $projectPath[0] }} <span class="text-secondary-soft dark:text-secondary-medium">&middot;</span> {{ $projectPath[1] }} <span class="text-secondary-soft dark:text-secondary-medium">&middot;</span> {{ $projectPath[2] }}
+                                            <p class="type-meta mt-1 truncate text-secondary-medium dark:text-ink-muted" title="{{ $pathTitle }}">
+                                                {{ $projectPath[0] }} <span class="text-secondary-soft dark:text-ink-faint">&middot;</span> {{ $projectPath[1] }} <span class="text-secondary-soft dark:text-ink-faint">&middot;</span> {{ $projectPath[2] }}
                                             </p>
                                         </div>
 
@@ -1227,17 +1307,17 @@ new #[Title('titles.projects')] class extends Component {
                                             <a
                                                 href="{{ route('projects.show', $project) }}"
                                                 wire:navigate
-                                                class="grid size-11 place-items-center rounded-md border-0! bg-transparent! text-secondary-dark! transition-colors hover:bg-secondary-soft! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-white! dark:hover:bg-secondary-medium! @3xl/directory:size-8!"
+                                                class="grid size-11 place-items-center rounded-md border-0! bg-transparent! text-secondary-dark! transition-colors hover:bg-secondary-soft! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink! dark:hover:bg-surface-2! @3xl/directory:size-8!"
                                                 aria-label="{{ __('projects.open_project', ['name' => $project->name]) }}"
                                             >
                                                 <flux:icon.eye class="size-4.5" />
                                             </a>
 
-                                            <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation @3xl/directory:size-8!" wire:click="openEditModal({{ $project->id }})" :aria-label="__('common.edit_name', ['name' => $project->name])" />
+                                            @can('update', $project)<x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation @3xl/directory:size-8!" wire:click="openEditModal({{ $project->id }})" :aria-label="__('common.edit_name', ['name' => $project->name])" />@endcan
                                             @if ($project->status === ProjectStatus::Archived)
-                                                <x-ui.button tone="ghost" size="sm" icon="arrow-uturn-left" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="restoreProject({{ $project->id }})" :aria-label="__('projects.restore_name', ['name' => $project->name])" />
+                                                @can('delete', $project)<x-ui.button tone="ghost" size="sm" icon="arrow-uturn-left" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="restoreProject({{ $project->id }})" :aria-label="__('projects.restore_name', ['name' => $project->name])" />@endcan
                                             @else
-                                                <x-ui.button tone="ghost" size="sm" icon="archive-box" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="confirmArchive({{ $project->id }})" :aria-label="__('projects.archive_name', ['name' => $project->name])" />
+                                                @can('delete', $project)<x-ui.button tone="ghost" size="sm" icon="archive-box" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="confirmArchive({{ $project->id }})" :aria-label="__('projects.archive_name', ['name' => $project->name])" />@endcan
                                             @endif
                                         </div>
                                     </div>
@@ -1249,11 +1329,11 @@ new #[Title('titles.projects')] class extends Component {
                                                 <flux:icon :name="$schedule['icon']" variant="micro" class="size-3.5" aria-hidden="true" />{{ $schedule['label'] }}
                                             </span>
 
-                                            <p class="shrink-0 text-xl leading-none font-bold tracking-tight tabular-nums text-secondary-dark dark:text-white">
+                                            <p class="shrink-0 text-xl leading-none font-bold tracking-tight tabular-nums text-secondary-dark dark:text-ink">
                                                 @if ($progress === null)
-                                                    <span class="text-base font-semibold text-secondary-medium dark:text-secondary-soft">&mdash;</span>
+                                                    <span class="text-base font-semibold text-secondary-medium dark:text-ink-muted">&mdash;</span>
                                                 @else
-                                                    {{ round($progress) }}<span class="text-xs font-semibold text-secondary-medium dark:text-secondary-soft">%</span>
+                                                    {{ round($progress) }}<span class="text-xs font-semibold text-secondary-medium dark:text-ink-muted">%</span>
                                                 @endif
                                             </p>
                                         </div>
@@ -1261,10 +1341,10 @@ new #[Title('titles.projects')] class extends Component {
                                         <x-ui.progress-bar class="mt-2.5" :value="$progress" :tone="$progressTone" :label="__('projects.milestone_progress_for', ['name' => $project->name])" label-hidden />
 
                                         <div class="mt-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                                            <p class="type-meta text-secondary-medium dark:text-secondary-soft">
+                                            <p class="type-meta text-secondary-medium dark:text-ink-muted">
                                                 {{ $progress === null ? __('projects.no_weighted_milestones') : __('projects.milestones_reached', ['reached' => $project->reached_milestones_count, 'total' => $project->milestones_count]) }}
                                             </p>
-                                            <p class="type-meta shrink-0 tabular-nums text-secondary-medium dark:text-secondary-soft">
+                                            <p class="type-meta shrink-0 tabular-nums text-secondary-medium dark:text-ink-muted">
                                                 {{ $project->start_date?->translatedFormat(__('formats.date')) ?? '—' }}
                                                 <flux:icon.arrow-long-right variant="micro" class="inline size-3.5 rtl:-scale-x-100" aria-hidden="true" />
                                                 {{ $project->end_date?->translatedFormat(__('formats.date')) ?? '—' }}
@@ -1274,39 +1354,39 @@ new #[Title('titles.projects')] class extends Component {
 
                                     {{-- Money and people: the two commitments, on one shared baseline. --}}
                                     <div class="mt-4 grid grid-cols-2 gap-x-4 gap-y-1 border-t border-board-line pt-3.5">
-                                        <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.funding_envelope') }}</p>
-                                        <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.col_beneficiaries') }}</p>
+                                        <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('projects.funding_envelope') }}</p>
+                                        <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('projects.col_beneficiaries') }}</p>
 
                                         <div class="min-w-0">
                                             @if ($funding === null)
-                                                <p class="text-base font-semibold text-secondary-medium dark:text-secondary-soft">{{ $project->proposals_count === 0 ? __('projects.not_funded_yet') : '—' }}</p>
+                                                <p class="text-base font-semibold text-secondary-medium dark:text-ink-muted">{{ $project->proposals_count === 0 ? __('projects.not_funded_yet') : '—' }}</p>
                                             @else
                                                 @foreach ($funding['currencies'] as $cardCurrency => $cardTotal)
-                                                    <p class="text-base text-secondary-dark dark:text-white" wire:key="funding-{{ $project->id }}-{{ $cardCurrency }}">
+                                                    <p class="text-base text-secondary-dark dark:text-ink" wire:key="funding-{{ $project->id }}-{{ $cardCurrency }}">
                                                         <x-ui.money :amount="$cardTotal" :currency="$cardCurrency" />
                                                     </p>
                                                 @endforeach
-                                                <p class="type-meta mt-0.5 truncate text-secondary-medium dark:text-secondary-soft" title="{{ implode(' · ', $funding['donors']) }}">{{ implode(' · ', $funding['donors']) }}</p>
-                                                <p class="type-meta truncate text-secondary-medium dark:text-secondary-soft" title="{{ implode(' · ', $funding['proposals']) }}">{{ implode(' · ', $funding['proposals']) }}</p>
+                                                <p class="type-meta mt-0.5 truncate text-secondary-medium dark:text-ink-muted" title="{{ implode(' · ', $funding['donors']) }}">{{ implode(' · ', $funding['donors']) }}</p>
+                                                <p class="type-meta truncate text-secondary-medium dark:text-ink-muted" title="{{ implode(' · ', $funding['proposals']) }}">{{ implode(' · ', $funding['proposals']) }}</p>
                                             @endif
                                         </div>
 
                                         <div class="min-w-0">
-                                            <p class="text-base font-semibold tabular-nums text-secondary-dark dark:text-white">{{ $project->target_beneficiaries === null ? '—' : number_format($project->target_beneficiaries) }}</p>
+                                            <p class="text-base font-semibold tabular-nums text-secondary-dark dark:text-ink">{{ $project->target_beneficiaries === null ? '—' : number_format($project->target_beneficiaries) }}</p>
                                             @if ($demographics !== [])
-                                                <p class="type-meta mt-0.5 truncate tabular-nums text-secondary-medium dark:text-secondary-soft" title="{{ $demographicsTitle }}">
+                                                <p class="type-meta mt-0.5 truncate tabular-nums text-secondary-medium dark:text-ink-muted" title="{{ $demographicsTitle }}">
                                                     @foreach ($demographics as $demographicLabel => $demographicValue)
-                                                        {{ $demographicLabel }} {{ number_format($demographicValue) }}@if (! $loop->last) <span class="text-secondary-soft dark:text-secondary-medium">&middot;</span> @endif
+                                                        {{ $demographicLabel }} {{ number_format($demographicValue) }}@if (! $loop->last) <span class="text-secondary-soft dark:text-ink-faint">&middot;</span> @endif
                                                     @endforeach
                                                 </p>
                                             @endif
                                             @if ($breakdown !== null && $breakdown !== $project->target_beneficiaries)
-                                                <p class="type-meta tabular-nums text-secondary-medium dark:text-secondary-soft">{{ __('projects.breakdown_count', ['count' => number_format($breakdown)]) }}</p>
+                                                <p class="type-meta tabular-nums text-secondary-medium dark:text-ink-muted">{{ __('projects.breakdown_count', ['count' => number_format($breakdown)]) }}</p>
                                             @endif
                                         </div>
 
                                         @if ($funding !== null && $funding['shared'] > 0)
-                                            <span class="type-meta col-span-2 mt-1.5 inline-flex w-fit items-center gap-1 rounded-full border border-board-line px-2 py-0.5 text-secondary-medium dark:text-secondary-soft">
+                                            <span class="type-meta col-span-2 mt-1.5 inline-flex w-fit items-center gap-1 rounded-full border border-board-line px-2 py-0.5 text-secondary-medium dark:text-ink-muted">
                                                 <flux:icon.arrows-right-left variant="micro" class="size-3.5 shrink-0" aria-hidden="true" />
                                                 {{ trans_choice('projects.shared_with_other_projects', $funding['shared'], ['count' => $funding['shared']]) }}
                                             </span>
@@ -1322,8 +1402,8 @@ new #[Title('titles.projects')] class extends Component {
                                                         <span
                                                             @class([
                                                                 'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs tabular-nums',
-                                                                'border-primary bg-primary font-semibold text-white' => $connection['alert'],
-                                                                'border-board-line text-secondary-medium dark:text-secondary-soft' => ! $connection['alert'],
+                                                                'border-primary bg-primary dark:border-transparent dark:bg-status-critical-soft dark:text-status-critical font-semibold text-white' => $connection['alert'],
+                                                                'border-board-line text-secondary-medium dark:text-ink-muted' => ! $connection['alert'],
                                                             ])
                                                             title="{{ $connection['label'] }}"
                                                         >
@@ -1334,7 +1414,7 @@ new #[Title('titles.projects')] class extends Component {
                                                     @endforeach
                                                 </div>
                                             @else
-                                                <p class="type-meta text-secondary-medium dark:text-secondary-soft">{{ __('projects.no_connections_yet') }}</p>
+                                                <p class="type-meta text-secondary-medium dark:text-ink-muted">{{ __('projects.no_connections_yet') }}</p>
                                             @endif
 
                                             <x-ui.employee-chip :employee="$project->user" compact class="shrink-0 justify-end" />
@@ -1371,8 +1451,8 @@ new #[Title('titles.projects')] class extends Component {
 
                         <tr wire:key="project-{{ $project->id }}">
                             <x-ui.data-table.cell :label="__('projects.col_scheduled')">
-                                <span class="block text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $project->start_date?->translatedFormat(__('formats.date')) ?? '—' }}</span>
-                                <span class="block text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">
+                                <span class="block text-xs tabular-nums text-secondary-medium dark:text-ink-muted">{{ $project->start_date?->translatedFormat(__('formats.date')) ?? '—' }}</span>
+                                <span class="block text-xs tabular-nums text-secondary-medium dark:text-ink-muted">
                                     <flux:icon.arrow-long-right variant="micro" class="inline size-3.5 rtl:-scale-x-100" aria-hidden="true" />
                                     {{ $project->end_date?->translatedFormat(__('formats.date')) ?? '—' }}
                                 </span>
@@ -1381,23 +1461,23 @@ new #[Title('titles.projects')] class extends Component {
                             <x-ui.data-table.cell>
                                 <span class="flex min-w-0 items-center gap-1.5">
                                     @if (in_array($project->id, $this->unreadIds, true))
-                                        <span class="size-2 shrink-0 rounded-full bg-primary" data-unread-dot="project-{{ $project->id }}" title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
+                                        <span class="size-2 shrink-0 rounded-full bg-primary dark:bg-ink" data-unread-dot="project-{{ $project->id }}" title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
                                     @endif
                                     <span class="line-clamp-2 min-w-0 text-sm font-semibold" title="{{ $project->name }}">{{ $project->name }}</span>
                                 </span>
-                                <span class="block truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $project->city?->name ?? __('common.unknown_city') }} · {{ $project->program->name }}</span>
-                                <span class="block truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $project->program->strategy?->name ?? __('common.strategy_not_assigned') }}</span>
-                                <span class="hidden truncate text-xs tabular-nums text-secondary-medium @max-6xl:block @max-3xl:hidden! dark:text-secondary-soft">
+                                <span class="block truncate text-xs text-secondary-medium dark:text-ink-muted">{{ $project->city?->name ?? __('common.unknown_city') }} · {{ $project->program->name }}</span>
+                                <span class="block truncate text-xs text-secondary-medium dark:text-ink-muted">{{ $project->program->strategy?->name ?? __('common.strategy_not_assigned') }}</span>
+                                <span class="hidden truncate text-xs tabular-nums text-secondary-medium @max-6xl:block @max-3xl:hidden! dark:text-ink-muted">
                                     {{ $project->target_beneficiaries === null ? '—' : number_format($project->target_beneficiaries) }}
                                     @foreach ($connections as $connection)
-                                        <span aria-hidden="true"> · </span><span aria-label="{{ $connection['label'] }}" class="{{ $connection['alert'] ? 'font-semibold text-primary' : '' }}">{{ $connection['count'] }}</span>
+                                        <span aria-hidden="true"> · </span><span aria-label="{{ $connection['label'] }}" class="{{ $connection['alert'] ? 'font-semibold text-primary dark:text-brand-text' : '' }}">{{ $connection['count'] }}</span>
                                     @endforeach
                                 </span>
                             </x-ui.data-table.cell>
 
                             <x-ui.data-table.cell :label="__('projects.col_progress')">
                                 <x-ui.progress-bar :value="$progress" :tone="$schedule['tone']" :label="__('projects.milestone_progress_for', ['name' => $project->name])" label-hidden :show-value="$progress !== null" />
-                                <span class="mt-1 block text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">
+                                <span class="mt-1 block text-xs tabular-nums text-secondary-medium dark:text-ink-muted">
                                     {{ $progress === null ? __('projects.no_weighted_milestones') : __('projects.milestones_reached', ['reached' => $project->reached_milestones_count, 'total' => $project->milestones_count]) }}
                                 </span>
                             </x-ui.data-table.cell>
@@ -1405,7 +1485,7 @@ new #[Title('titles.projects')] class extends Component {
                             <x-ui.data-table.cell :label="__('projects.col_beneficiaries')" numeric class="@max-6xl:hidden @max-3xl:flex!">
                                 <span class="block font-semibold">{{ $project->target_beneficiaries === null ? '—' : number_format($project->target_beneficiaries) }}</span>
                                 @if ($breakdown !== null && $breakdown !== $project->target_beneficiaries)
-                                    <span class="block text-xs text-secondary-medium dark:text-secondary-soft">{{ __('projects.breakdown_count', ['count' => number_format($breakdown)]) }}</span>
+                                    <span class="block text-xs text-secondary-medium dark:text-ink-muted">{{ __('projects.breakdown_count', ['count' => number_format($breakdown)]) }}</span>
                                 @endif
                             </x-ui.data-table.cell>
 
@@ -1418,9 +1498,9 @@ new #[Title('titles.projects')] class extends Component {
                                             <x-ui.money :amount="$rowTotal" :currency="$rowCurrency" />
                                         </span>
                                     @endforeach
-                                    <span class="block truncate text-xs text-secondary-medium dark:text-secondary-soft" title="{{ implode(' · ', $funding['donors']) }}">{{ implode(' · ', $funding['donors']) }}</span>
+                                    <span class="block truncate text-xs text-secondary-medium dark:text-ink-muted" title="{{ implode(' · ', $funding['donors']) }}">{{ implode(' · ', $funding['donors']) }}</span>
                                     @if ($funding['shared'] > 0)
-                                        <span class="block text-xs text-secondary-medium dark:text-secondary-soft">{{ trans_choice('projects.shared_with_other_projects', $funding['shared'], ['count' => $funding['shared']]) }}</span>
+                                        <span class="block text-xs text-secondary-medium dark:text-ink-muted">{{ trans_choice('projects.shared_with_other_projects', $funding['shared'], ['count' => $funding['shared']]) }}</span>
                                     @endif
                                 @endif
                             </x-ui.data-table.cell>
@@ -1431,8 +1511,8 @@ new #[Title('titles.projects')] class extends Component {
                                         <span
                                             @class([
                                                 'inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs tabular-nums',
-                                                'border-primary bg-primary font-semibold text-white' => $connection['alert'],
-                                                'border-board-line text-secondary-medium dark:text-secondary-soft' => ! $connection['alert'],
+                                                'border-primary bg-primary dark:border-transparent dark:bg-status-critical-soft dark:text-status-critical font-semibold text-white' => $connection['alert'],
+                                                'border-board-line text-secondary-medium dark:text-ink-muted' => ! $connection['alert'],
                                             ])
                                             title="{{ $connection['label'] }}"
                                             aria-label="{{ $connection['label'] }}"
@@ -1462,16 +1542,16 @@ new #[Title('titles.projects')] class extends Component {
                                     <a
                                         href="{{ route('projects.show', $project) }}"
                                         wire:navigate
-                                        class="grid size-11 shrink-0 place-items-center rounded-md border-0! bg-transparent! text-secondary-dark! transition-colors hover:bg-secondary-soft! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-white! dark:hover:bg-secondary-medium! @3xl/directory:size-8!"
+                                        class="grid size-11 shrink-0 place-items-center rounded-md border-0! bg-transparent! text-secondary-dark! transition-colors hover:bg-secondary-soft! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink! dark:hover:bg-surface-2! @3xl/directory:size-8!"
                                         aria-label="{{ __('projects.open_project', ['name' => $project->name]) }}"
                                     >
                                         <flux:icon.eye class="size-4.5" />
                                     </a>
-                                    <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="openEditModal({{ $project->id }})" :aria-label="__('common.edit_name', ['name' => $project->name])" />
+                                    @can('update', $project)<x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="openEditModal({{ $project->id }})" :aria-label="__('common.edit_name', ['name' => $project->name])" />@endcan
                                     @if ($project->status === ProjectStatus::Archived)
-                                        <x-ui.button tone="ghost" size="sm" icon="arrow-uturn-left" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="restoreProject({{ $project->id }})" :aria-label="__('projects.restore_name', ['name' => $project->name])" />
+                                        @can('delete', $project)<x-ui.button tone="ghost" size="sm" icon="arrow-uturn-left" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="restoreProject({{ $project->id }})" :aria-label="__('projects.restore_name', ['name' => $project->name])" />@endcan
                                     @else
-                                        <x-ui.button tone="ghost" size="sm" icon="archive-box" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="confirmArchive({{ $project->id }})" :aria-label="__('projects.archive_name', ['name' => $project->name])" />
+                                        @can('delete', $project)<x-ui.button tone="ghost" size="sm" icon="archive-box" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="confirmArchive({{ $project->id }})" :aria-label="__('projects.archive_name', ['name' => $project->name])" />@endcan
                                     @endif
                                 </div>
                             </x-ui.data-table.cell>
@@ -1501,29 +1581,29 @@ new #[Title('titles.projects')] class extends Component {
 
                 <x-ui.panel>
                     {{-- Same legend grammar as the milestones timeline. --}}
-                    <div class="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-secondary-soft px-4 py-3 text-xs text-secondary-medium dark:border-secondary-medium dark:text-secondary-soft" aria-hidden="true">
-                        <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-secondary-dark bg-secondary-dark dark:border-white dark:bg-white"></span>{{ MilestoneStatus::Reached->label() }}</span>
-                        <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-secondary-dark bg-white dark:border-white dark:bg-secondary-dark"></span>{{ MilestoneStatus::Planned->label() }}</span>
-                        <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-primary bg-white dark:bg-secondary-dark"></span>{{ __('programs.timeline_overdue') }}</span>
-                        <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-primary bg-primary"></span>{{ __('milestones.missed') }}</span>
-                        <span class="inline-flex items-center gap-1.5"><span class="h-3.5 w-0.5 bg-primary"></span>{{ __('programs.timeline_today') }}</span>
+                    <div class="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-secondary-soft px-4 py-3 text-xs text-secondary-medium dark:border-line dark:text-ink-muted" aria-hidden="true">
+                        <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-secondary-dark bg-secondary-dark dark:border-ink-muted dark:bg-ink-muted"></span>{{ MilestoneStatus::Reached->label() }}</span>
+                        <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-secondary-dark bg-white dark:border-ink-muted dark:bg-surface-1"></span>{{ MilestoneStatus::Planned->label() }}</span>
+                        <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-primary bg-white dark:bg-surface-1"></span>{{ __('programs.timeline_overdue') }}</span>
+                        <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-primary bg-primary dark:bg-status-critical dark:border-status-critical"></span>{{ __('milestones.missed') }}</span>
+                        <span class="inline-flex items-center gap-1.5"><span class="h-3.5 w-0.5 bg-primary dark:bg-ink"></span>{{ __('programs.timeline_today') }}</span>
                     </div>
 
                     @if ($window !== null)
-                        <div class="hidden gap-6 border-b border-secondary-soft px-4 {{ $timelineColumns }} @4xl/directory:grid dark:border-secondary-medium">
+                        <div class="hidden gap-6 border-b border-secondary-soft px-4 {{ $timelineColumns }} @4xl/directory:grid dark:border-line">
                             <span></span>
                             <div class="relative h-9">
                                 @foreach ($ticks as $tick)
                                     @continue($tick['nearToday'])
-                                    <span class="absolute bottom-2 -translate-x-1/2 text-xs whitespace-nowrap tabular-nums text-secondary-light rtl:translate-x-1/2 dark:text-secondary-medium" style="inset-inline-start: {{ $tick['at'] }}%">{{ $tick['label'] }}</span>
+                                    <span class="absolute bottom-2 -translate-x-1/2 text-xs whitespace-nowrap tabular-nums text-secondary-light rtl:translate-x-1/2 dark:text-ink-faint" style="inset-inline-start: {{ $tick['at'] }}%">{{ $tick['label'] }}</span>
                                 @endforeach
-                                <span class="absolute bottom-1.5 -translate-x-1/2 rounded-full bg-primary px-2 py-0.5 text-[0.6875rem] font-bold whitespace-nowrap text-white rtl:translate-x-1/2" style="inset-inline-start: {{ $todayAt }}%">{{ __('programs.timeline_today') }}</span>
+                                <span class="absolute bottom-1.5 -translate-x-1/2 rounded-full bg-primary dark:bg-ink dark:text-surface-0 px-2 py-0.5 text-[0.6875rem] font-bold whitespace-nowrap text-white rtl:translate-x-1/2" style="inset-inline-start: {{ $todayAt }}%">{{ __('programs.timeline_today') }}</span>
                             </div>
                             <span></span>
                         </div>
                     @endif
 
-                    <ol class="divide-y divide-secondary-soft dark:divide-secondary-medium">
+                    <ol class="divide-y divide-secondary-soft dark:divide-line">
                         @foreach ($projects as $project)
                             @php
                                 $progress = $this->progressFor($project);
@@ -1541,7 +1621,7 @@ new #[Title('titles.projects')] class extends Component {
                                     .($elapsed === null ? '' : ' · '.__('programs.timeline_expected', ['percent' => (int) round($elapsed)]));
                             @endphp
 
-                            <li class="bg-white transition-colors hover:bg-secondary-soft/30 dark:bg-secondary-dark dark:hover:bg-secondary-medium/30" wire:key="project-timeline-{{ $project->id }}">
+                            <li class="bg-white transition-colors hover:bg-secondary-soft/30 dark:bg-surface-1 dark:hover:bg-surface-2" wire:key="project-timeline-{{ $project->id }}">
                                 <div class="grid gap-4 px-4 py-4 {{ $timelineColumns }} @4xl/directory:items-center @4xl/directory:gap-6">
                                     <div class="min-w-0">
                                         <div class="flex items-start justify-between gap-2">
@@ -1551,22 +1631,22 @@ new #[Title('titles.projects')] class extends Component {
                                                 <a
                                                 href="{{ route('projects.show', $project) }}"
                                                 wire:navigate
-                                                class="grid size-11 place-items-center rounded-md border-0! bg-transparent! text-secondary-dark! transition-colors hover:bg-secondary-soft! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-white! dark:hover:bg-secondary-medium! @3xl/directory:size-8!"
+                                                class="grid size-11 place-items-center rounded-md border-0! bg-transparent! text-secondary-dark! transition-colors hover:bg-secondary-soft! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink! dark:hover:bg-surface-2! @3xl/directory:size-8!"
                                                 aria-label="{{ __('projects.open_project', ['name' => $project->name]) }}"
                                             >
                                                 <flux:icon.eye class="size-4.5" />
                                             </a>
-                                            <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="openEditModal({{ $project->id }})" :aria-label="__('common.edit_name', ['name' => $project->name])" />
+                                            @can('update', $project)<x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="openEditModal({{ $project->id }})" :aria-label="__('common.edit_name', ['name' => $project->name])" />@endcan
                                                 @if ($project->status === ProjectStatus::Archived)
-                                                    <x-ui.button tone="ghost" size="sm" icon="arrow-uturn-left" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="restoreProject({{ $project->id }})" :aria-label="__('projects.restore_name', ['name' => $project->name])" />
+                                                    @can('delete', $project)<x-ui.button tone="ghost" size="sm" icon="arrow-uturn-left" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="restoreProject({{ $project->id }})" :aria-label="__('projects.restore_name', ['name' => $project->name])" />@endcan
                                                 @else
-                                                    <x-ui.button tone="ghost" size="sm" icon="archive-box" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="confirmArchive({{ $project->id }})" :aria-label="__('projects.archive_name', ['name' => $project->name])" />
+                                                    @can('delete', $project)<x-ui.button tone="ghost" size="sm" icon="archive-box" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="confirmArchive({{ $project->id }})" :aria-label="__('projects.archive_name', ['name' => $project->name])" />@endcan
                                                 @endif
                                             </div>
                                         </div>
 
-                                        <p class="mt-1 truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $project->city?->name ?? __('common.unknown_city') }} · {{ $project->program->name }}</p>
-                                        <p class="truncate text-xs text-secondary-medium dark:text-secondary-soft">{{ $project->program->strategy?->name ?? __('common.strategy_not_assigned') }}</p>
+                                        <p class="mt-1 truncate text-xs text-secondary-medium dark:text-ink-muted">{{ $project->city?->name ?? __('common.unknown_city') }} · {{ $project->program->name }}</p>
+                                        <p class="truncate text-xs text-secondary-medium dark:text-ink-muted">{{ $project->program->strategy?->name ?? __('common.strategy_not_assigned') }}</p>
 
                                         <div class="mt-2 flex flex-wrap items-center gap-1.5">
                                             <x-ui.enum-badge :case="$project->status" />
@@ -1578,9 +1658,9 @@ new #[Title('titles.projects')] class extends Component {
                                                 <span
                                                     @class([
                                                         'inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs tabular-nums',
-                                                        'border-primary/30 bg-primary/10 font-semibold text-primary' => $connection['alert'],
-                                                        'border-secondary-soft text-secondary-medium dark:border-secondary-medium dark:text-secondary-soft' => ! $connection['alert'] && $connection['count'] > 0,
-                                                        'border-secondary-soft text-secondary-light dark:border-secondary-medium' => ! $connection['alert'] && $connection['count'] === 0,
+                                                        'border-primary/30 bg-primary/10 font-semibold text-primary dark:text-brand-text' => $connection['alert'],
+                                                        'border-secondary-soft text-secondary-medium dark:border-line dark:text-ink-muted' => ! $connection['alert'] && $connection['count'] > 0,
+                                                        'border-secondary-soft text-secondary-light dark:border-line' => ! $connection['alert'] && $connection['count'] === 0,
                                                     ])
                                                     aria-label="{{ $connection['label'] }}"
                                                 >
@@ -1594,14 +1674,14 @@ new #[Title('titles.projects')] class extends Component {
                                         <div class="relative h-11">
                                             @if ($window !== null)
                                                 @foreach ($ticks as $tick)
-                                                    <span aria-hidden="true" class="absolute inset-y-0 hidden w-px bg-secondary-soft @4xl/directory:block dark:bg-secondary-medium" style="inset-inline-start: {{ $tick['at'] }}%"></span>
+                                                    <span aria-hidden="true" class="absolute inset-y-0 hidden w-px bg-secondary-soft @4xl/directory:block dark:bg-line" style="inset-inline-start: {{ $tick['at'] }}%"></span>
                                                 @endforeach
-                                                <span aria-hidden="true" class="absolute inset-y-0 z-10 w-0.5 -translate-x-1/2 bg-primary rtl:translate-x-1/2" style="inset-inline-start: {{ $todayAt }}%"></span>
+                                                <span aria-hidden="true" class="absolute inset-y-0 z-10 w-0.5 -translate-x-1/2 bg-primary dark:bg-ink rtl:translate-x-1/2" style="inset-inline-start: {{ $todayAt }}%"></span>
                                             @endif
 
                                             @if ($hasWindow)
                                                 <div
-                                                    class="absolute top-1/2 h-6 -translate-y-1/2 overflow-hidden rounded-full border {{ $isFinished ? 'border-secondary-light bg-secondary-soft/60 dark:bg-secondary-medium/40' : ($isLive ? 'border-secondary-light bg-secondary-soft dark:bg-secondary-medium' : 'border-dashed border-secondary-light bg-white dark:bg-secondary-dark') }}"
+                                                    class="absolute top-1/2 h-6 -translate-y-1/2 overflow-hidden rounded-full border {{ $isFinished ? 'border-secondary-light bg-secondary-soft/60 dark:bg-white/10' : ($isLive ? 'border-secondary-light bg-secondary-soft dark:bg-surface-2' : 'border-dashed border-secondary-light bg-white dark:bg-surface-1') }}"
                                                     style="inset-inline-start: {{ $barStart }}%; width: {{ $barWidth }}%"
                                                     role="img"
                                                     aria-label="{{ $barLabel }}"
@@ -1617,9 +1697,9 @@ new #[Title('titles.projects')] class extends Component {
                                                     @php
                                                         $isMissedMarker = $milestone->isMissed();
                                                         $markerTone = match (true) {
-                                                            $milestone->status === MilestoneStatus::Reached => 'border-secondary-dark bg-secondary-dark dark:border-white dark:bg-white',
-                                                            $isMissedMarker || $milestone->isOverdue() => 'border-primary bg-primary',
-                                                            default => 'border-secondary-dark bg-white dark:border-white dark:bg-secondary-dark',
+                                                            $milestone->status === MilestoneStatus::Reached => 'border-secondary-dark bg-secondary-dark dark:border-ink-muted dark:bg-ink-muted',
+                                                            $isMissedMarker || $milestone->isOverdue() => 'border-primary bg-primary dark:bg-status-critical dark:border-status-critical',
+                                                            default => 'border-secondary-dark bg-white dark:border-ink-muted dark:bg-surface-1',
                                                         };
                                                         $markerLabel = __('programs.timeline_marker', [
                                                             'name' => $milestone->name,
@@ -1629,7 +1709,7 @@ new #[Title('titles.projects')] class extends Component {
                                                     @endphp
 
                                                     <span
-                                                        class="absolute top-1/2 z-20 block size-3 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[2px] border-2 shadow-sm ring-2 ring-white rtl:translate-x-1/2 dark:ring-secondary-dark {{ $markerTone }}"
+                                                        class="absolute top-1/2 z-20 block size-3 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[2px] border-2 shadow-sm ring-2 ring-white rtl:translate-x-1/2 dark:ring-surface-1 {{ $markerTone }}"
                                                         style="inset-inline-start: {{ $position($milestone->planned_start_date) }}%"
                                                         role="img"
                                                         aria-label="{{ $markerLabel }}"
@@ -1637,11 +1717,11 @@ new #[Title('titles.projects')] class extends Component {
                                                     ></span>
                                                 @endforeach
                                             @else
-                                                <span class="absolute inset-x-0 top-1/2 flex h-7 -translate-y-1/2 items-center justify-center rounded-full border border-dashed border-secondary-light bg-white text-xs text-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft">{{ __('projects.unscheduled') }}</span>
+                                                <span class="absolute inset-x-0 top-1/2 flex h-7 -translate-y-1/2 items-center justify-center rounded-full border border-dashed border-secondary-light bg-white text-xs text-secondary-medium dark:bg-surface-1 dark:text-ink-muted">{{ __('projects.unscheduled') }}</span>
                                             @endif
                                         </div>
 
-                                        <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">
+                                        <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs tabular-nums text-secondary-medium dark:text-ink-muted">
                                             <span>
                                                 {{ $project->start_date?->translatedFormat(__('formats.date')) ?? '—' }}
                                                 <flux:icon.arrow-long-right variant="micro" class="inline size-3.5 rtl:-scale-x-100" aria-hidden="true" />
@@ -1664,7 +1744,7 @@ new #[Title('titles.projects')] class extends Component {
                                         </span>
                                         <div class="text-end">
                                             <p class="type-figure">{{ $progress === null ? '—' : $progress.'%' }}</p>
-                                            <p class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">
+                                            <p class="text-xs tabular-nums text-secondary-medium dark:text-ink-muted">
                                                 {{ $progress === null ? __('projects.no_weighted_milestones') : __('projects.milestones_reached', ['reached' => $project->reached_milestones_count, 'total' => $project->milestones_count]) }}
                                             </p>
                                         </div>
@@ -1678,171 +1758,176 @@ new #[Title('titles.projects')] class extends Component {
 
             @if ($projects->hasPages())
                 <x-ui.panel class="px-4 py-3">
-                    <flux:pagination :paginator="$projects" class="text-secondary-medium! dark:text-secondary-soft!" scroll-to="#project-directory-heading" />
+                    <flux:pagination :paginator="$projects" class="text-secondary-medium! dark:text-ink-muted!" scroll-to="#project-directory-heading" />
                 </x-ui.panel>
             @endif
         </div>
     @endif
 
-    <flux:modal wire:model="showProjectModal" class="w-full max-w-4xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <form wire:submit="saveProject" class="flex flex-col gap-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ $editingProjectId === null ? __('projects.add_project') : __('projects.edit_project') }}</flux:heading>
-                <flux:subheading>{{ __('projects.define_delivery_ownership_lifecycle_schedule_and_beneficiary') }}</flux:subheading>
-            </div>
+    <x-ui.modal
+        wire:model="showProjectModal"
+        size="xl"
+        :title="$editingProjectId === null ? __('projects.add_project') : __('projects.edit_project')"
+        :description="__('projects.define_delivery_ownership_lifecycle_schedule_and_beneficiary')"
+        submit="saveProject"
+        close="closeProjectModal"
+        required-note
+    >
+        {{-- One Alpine scope for the live figures: the duration under Details and the breakdown beside Beneficiaries. --}}
+        <div
+            class="contents"
+            x-data="{
+                forms: @js($durationForms),
+                months: @js($monthNames),
+                breakdownTemplate: @js(e(__('projects.broken_down_of_headline', ['breakdown' => '__BREAKDOWN__', 'headline' => '__HEADLINE__']))),
+                get durationDays() {
+                    const start = Date.parse($wire.startDate);
+                    const end = Date.parse($wire.endDate);
 
-            <fieldset class="flex flex-col gap-4 border-t border-secondary-soft pt-4 dark:border-secondary-medium">
-                <legend class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.section_identity') }}</legend>
+                    if (Number.isNaN(start) || Number.isNaN(end)) {
+                        return 0;
+                    }
 
-                <div class="grid gap-4 @2xl/directory:grid-cols-2">
-                    <x-ui.input wire:model="name" :label="__('projects.project_name')" type="text" maxlength="255" required autofocus />
+                    return Math.max(0, Math.floor((end - start) / 86400000) + 1);
+                },
+                get durationLabel() {
+                    const days = this.durationDays;
 
-                    <x-ui.select wire:model="projectStatus" :label="__('common.status')" required>
+                    if (days < 1) {
+                        return '';
+                    }
+
+                    const form = days <= 3 ? this.forms[days] : (days <= 10 ? this.forms[3] : this.forms[11]);
+
+                    return form.replace('__N__', days.toLocaleString());
+                },
+                get durationRange() {
+                    if (this.durationDays < 1) {
+                        return '';
+                    }
+
+                    const [startYear, startMonth] = $wire.startDate.split('-').map(Number);
+                    const [endYear, endMonth] = $wire.endDate.split('-').map(Number);
+                    const start = this.months[startMonth - 1];
+                    const end = this.months[endMonth - 1];
+
+                    if (startYear !== endYear) {
+                        return `${start} ${startYear} – ${end} ${endYear}`;
+                    }
+
+                    return startMonth === endMonth ? `${start} ${startYear}` : `${start} – ${end} ${startYear}`;
+                },
+                get breakdownHint() {
+                    const breakdown = [$wire.targetMen, $wire.targetWomen, $wire.targetBoys, $wire.targetGirls]
+                        .reduce((total, value) => total + (Number(value) || 0), 0);
+                    const headline = Number($wire.targetBeneficiaries) || 0;
+
+                    if (breakdown === 0 && headline === 0) {
+                        return '';
+                    }
+
+                    return this.breakdownTemplate
+                        .replace('__BREAKDOWN__', `<b class='form-section-figure'>${breakdown.toLocaleString()}</b>`)
+                        .replace('__HEADLINE__', headline.toLocaleString());
+                },
+            }"
+        >
+            <x-ui.form-section
+                :title="__('projects.section_details')"
+                :hint="__('projects.section_details_hint')"
+                :fields="['name', 'projectStatus', 'startDate', 'endDate', 'description']"
+            >
+                <div class="grid grid-cols-2 gap-x-4 gap-y-3 @4xl/modal:grid-cols-3">
+                    <x-ui.form-input wire:model="name" :label="__('projects.project_name')" maxlength="255" required autofocus class="col-span-2" />
+
+                    <x-ui.form-select wire:model="projectStatus" :label="__('common.status')" required class="col-span-2 @4xl/modal:col-span-1">
                         @foreach (ProjectStatus::cases() as $statusOption)
-                            <flux:select.option :value="$statusOption->value" :wire:key="'project-status-'.$statusOption->value">{{ $statusOption->label() }}</flux:select.option>
+                            <flux:select.option :value="$statusOption->value">{{ $statusOption->label() }}</flux:select.option>
                         @endforeach
-                    </x-ui.select>
+                    </x-ui.form-select>
+
+                    <x-ui.form-input wire:model="startDate" :label="__('common.start_date')" type="date" />
+                    <x-ui.form-input wire:model="endDate" :label="__('projects.end_date')" type="date" />
+
+                    <div class="col-span-2 min-w-0 @4xl/modal:col-span-1">
+                        <span class="form-label">{{ __('projects.duration') }}</span>
+                        <p class="flex min-h-11 flex-wrap items-center gap-x-2 tabular-nums">
+                            <span class="text-lg font-bold text-secondary-dark dark:text-ink" x-text="durationLabel || '—'">—</span>
+                            <span class="text-xs font-medium text-secondary-medium dark:text-ink-muted" x-text="durationRange"></span>
+                        </p>
+                    </div>
+
+                    <x-ui.form-textarea wire:model="description" :label="__('common.description')" rows="2" class="col-span-2 @4xl/modal:col-span-3" />
                 </div>
+            </x-ui.form-section>
 
-                <flux:textarea wire:model="description" :label="__('common.description')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:border-secondary-light! dark:bg-secondary-medium! dark:text-white!" />
-            </fieldset>
-
-            <fieldset class="flex flex-col gap-4 border-t border-secondary-soft pt-4 dark:border-secondary-medium">
-                <legend class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.section_placement') }}</legend>
-
-                <div class="grid gap-4 @2xl/directory:grid-cols-3">
-                    <x-ui.select wire:model="cityId" :label="__('common.city')" required>
-                        <flux:select.option value="">{{ __('projects.select_a_city') }}</flux:select.option>
+            <x-ui.form-section :title="__('projects.section_placement')" :fields="['cityId', 'programId', 'userId']">
+                <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-3">
+                    <x-ui.form-select wire:model="cityId" :label="__('common.city')" :placeholder="__('projects.select_a_city')" required>
                         @foreach ($this->cityOptions as $cityOption)
-                            <flux:select.option :value="$cityOption->id" :wire:key="'city-option-'.$cityOption->id">{{ $cityOption->name }} · {{ $cityOption->secondary_name }}</flux:select.option>
+                            <flux:select.option :value="$cityOption->id">{{ $cityOption->name }} · {{ $cityOption->secondary_name }}</flux:select.option>
                         @endforeach
-                    </x-ui.select>
+                    </x-ui.form-select>
 
-                    <x-ui.select wire:model="programId" :label="__('common.program')" required>
-                        <flux:select.option value="">{{ __('projects.select_a_program') }}</flux:select.option>
+                    <x-ui.form-select wire:model="programId" :label="__('common.program')" :placeholder="__('projects.select_a_program')" required>
                         @foreach ($this->programOptions as $programOption)
-                            <flux:select.option :value="$programOption->id" :wire:key="'program-option-'.$programOption->id">{{ $programOption->name }}</flux:select.option>
+                            <flux:select.option :value="$programOption->id">{{ $programOption->name }}</flux:select.option>
                         @endforeach
-                    </x-ui.select>
+                    </x-ui.form-select>
 
-                    <x-ui.select wire:model="userId" :label="__('projects.owner')" required>
-                        <flux:select.option value="">{{ __('projects.select_an_owner') }}</flux:select.option>
+                    <x-ui.form-select wire:model="userId" :label="__('projects.owner')" :placeholder="__('projects.select_an_owner')" required>
                         @foreach ($this->userOptions as $userOption)
-                            <flux:select.option :value="$userOption->id" :wire:key="'owner-option-'.$userOption->id">{{ $userOption->name }} · {{ $userOption->secondary_name }}</flux:select.option>
+                            <flux:select.option :value="$userOption->id">{{ $userOption->name }} · {{ $userOption->secondary_name }}</flux:select.option>
                         @endforeach
-                    </x-ui.select>
+                    </x-ui.form-select>
                 </div>
-            </fieldset>
+            </x-ui.form-section>
 
-            <fieldset
-                class="flex flex-col gap-4 border-t border-secondary-soft pt-4 dark:border-secondary-medium"
-                x-data="{
-                    forms: @js($durationForms),
-                    get durationLabel() {
-                        const start = Date.parse($wire.startDate);
-                        const end = Date.parse($wire.endDate);
-
-                        if (Number.isNaN(start) || Number.isNaN(end)) {
-                            return '';
-                        }
-
-                        const days = Math.floor((end - start) / 86400000) + 1;
-
-                        if (days < 1) {
-                            return '';
-                        }
-
-                        const form = days <= 3 ? this.forms[days] : (days <= 10 ? this.forms[3] : this.forms[11]);
-
-                        return form.replace('__N__', days.toLocaleString());
-                    },
-                }"
+            <x-ui.form-section
+                :title="__('projects.section_beneficiaries')"
+                :fields="['targetBeneficiaries', 'targetMen', 'targetWomen', 'targetBoys', 'targetGirls']"
             >
-                <legend class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.section_schedule') }}</legend>
+                <x-slot:hint>
+                    <span x-show="breakdownHint !== ''" x-html="breakdownHint" style="display: none"></span>
+                </x-slot:hint>
 
-                <div class="grid gap-4 @2xl/directory:grid-cols-2">
-                    <x-ui.input wire:model="startDate" :label="__('common.start_date')" type="date" />
-                    <x-ui.input wire:model="endDate" :label="__('projects.end_date')" type="date" />
+                <div class="grid grid-cols-2 gap-3 @2xl/modal:grid-cols-5">
+                    <x-ui.form-input wire:model="targetBeneficiaries" :label="__('projects.headline_total')" type="number" min="0" step="1" class="col-span-2 @2xl/modal:col-span-1" />
+                    <x-ui.form-input wire:model="targetMen" :label="__('projects.men')" type="number" min="0" step="1" />
+                    <x-ui.form-input wire:model="targetWomen" :label="__('projects.women')" type="number" min="0" step="1" />
+                    <x-ui.form-input wire:model="targetBoys" :label="__('projects.boys')" type="number" min="0" step="1" />
+                    <x-ui.form-input wire:model="targetGirls" :label="__('projects.girls')" type="number" min="0" step="1" />
                 </div>
+            </x-ui.form-section>
+        </div>
 
-                <p class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft" x-show="durationLabel !== ''" x-text="durationLabel" style="display: none"></p>
-            </fieldset>
-
-            <fieldset
-                class="flex flex-col gap-4 border-t border-secondary-soft pt-4 dark:border-secondary-medium"
-                x-data="{
-                    template: @js(__('projects.breakdown_adds_up', ['breakdown' => '__BREAKDOWN__', 'headline' => '__HEADLINE__'])),
-                    get breakdownLabel() {
-                        const parts = [$wire.targetMen, $wire.targetWomen, $wire.targetBoys, $wire.targetGirls]
-                            .map((value) => Number(value) || 0);
-                        const breakdown = parts.reduce((total, value) => total + value, 0);
-                        const headline = Number($wire.targetBeneficiaries) || 0;
-
-                        if (breakdown === 0 && headline === 0) {
-                            return '';
-                        }
-
-                        return this.template
-                            .replace('__BREAKDOWN__', breakdown.toLocaleString())
-                            .replace('__HEADLINE__', headline.toLocaleString());
-                    },
-                }"
-            >
-                <div>
-                    <legend class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.beneficiary_targets') }}</legend>
-                    <p class="text-xs text-secondary-medium dark:text-secondary-soft">{{ __('projects.the_headline_commitment_and_demographic_breakdown_are_record') }}</p>
-                </div>
-
-                <div class="grid gap-4 @2xl/directory:grid-cols-5">
-                    <x-ui.input wire:model="targetBeneficiaries" :label="__('projects.headline_total')" type="number" min="0" step="1" />
-                    <x-ui.input wire:model="targetMen" :label="__('projects.men')" type="number" min="0" step="1" />
-                    <x-ui.input wire:model="targetWomen" :label="__('projects.women')" type="number" min="0" step="1" />
-                    <x-ui.input wire:model="targetBoys" :label="__('projects.boys')" type="number" min="0" step="1" />
-                    <x-ui.input wire:model="targetGirls" :label="__('projects.girls')" type="number" min="0" step="1" />
-                </div>
-
-                <p class="text-xs tabular-nums text-secondary-medium dark:text-secondary-soft" x-show="breakdownLabel !== ''" x-text="breakdownLabel" style="display: none"></p>
-            </fieldset>
-
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="closeProjectModal">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" data-test="save-project-button">
-                    {{ $editingProjectId === null ? __('projects.create_project') : __('common.save_changes') }}
-                </x-ui.button>
-            </div>
-        </form>
-    </flux:modal>
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="save-project-button">
+                {{ $editingProjectId === null ? __('projects.create_project') : __('common.save_changes') }}
+            </x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
 
     {{-- Archiving is reversible, so the dialog explains where the work goes, not what is lost. --}}
-    <flux:modal wire:model="showArchiveModal" wire:close="cancelArchive" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        @php
-            $pendingArchive = $this->archivingProject;
-        @endphp
-
-        <div class="flex flex-col gap-4">
-            <flux:heading size="lg">{{ __('projects.archive_this_project') }}</flux:heading>
-
-            @if ($pendingArchive !== null)
-                <flux:subheading>
-                    {{ __('projects.archiving_keeps_everything', ['name' => $pendingArchive['project']->name]) }}
-                </flux:subheading>
-
-                @if ($pendingArchive['carries'] !== [])
-                    <div class="rounded-lg border border-board-line bg-board-head p-3">
-                        <p class="type-label text-secondary-medium dark:text-secondary-soft">{{ __('projects.kept_with_the_project') }}</p>
-                        <ul class="mt-1.5 flex flex-col gap-0.5">
-                            @foreach ($pendingArchive['carries'] as $carriedLabel => $carriedCount)
-                                <li class="text-sm tabular-nums text-secondary-dark dark:text-white" wire:key="carried-{{ $loop->index }}">{{ $carriedCount }} {{ $carriedLabel }}</li>
-                            @endforeach
-                        </ul>
-                    </div>
-                @endif
-            @endif
-
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="cancelArchive">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="button" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="archiveProject" data-test="confirm-archive-project">{{ __('projects.archive_project') }}</x-ui.button>
+    <x-ui.confirm-modal
+        wire:model="showArchiveModal"
+        close="cancelArchive"
+        tone="neutral"
+        :title="__('projects.archive_this_project')"
+        :message="$this->archivingProject !== null ? __('projects.archiving_keeps_everything', ['name' => $this->archivingProject['project']->name]) : null"
+        confirm="archiveProject"
+        :confirm-label="__('projects.archive_project')"
+        confirm-test="confirm-archive-project"
+    >
+        @if ($this->archivingProject !== null && $this->archivingProject['carries'] !== [])
+            <div class="rounded-lg border border-board-line bg-board-head p-3">
+                <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('projects.kept_with_the_project') }}</p>
+                <ul class="mt-1.5 flex flex-col gap-0.5">
+                    @foreach ($this->archivingProject['carries'] as $carriedLabel => $carriedCount)
+                        <li class="text-sm tabular-nums text-secondary-dark dark:text-ink" wire:key="carried-{{ $loop->index }}">{{ $carriedCount }} {{ $carriedLabel }}</li>
+                    @endforeach
+                </ul>
             </div>
-        </div>
-    </flux:modal>
+        @endif
+    </x-ui.confirm-modal>
 </section>

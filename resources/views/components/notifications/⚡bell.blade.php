@@ -113,7 +113,7 @@ new class extends Component {
     x-on:keydown.escape.window="close(true)"
     x-on:click.outside="close(false)"
     x-on:inbox-undoable.window="showUndo($event.detail)"
-    class="relative"
+    class="relative flex"
     data-notification-bell
 >
     <button
@@ -123,20 +123,21 @@ new class extends Component {
         x-bind:aria-expanded="open.toString()"
         aria-haspopup="dialog"
         aria-label="{{ trans_choice('notifications.bell_label', $total, ['count' => $total]) }}"
-        x-bind:class="open && 'bg-secondary-soft text-secondary-dark dark:bg-white/10 dark:text-white'"
-        class="relative inline-flex size-9 cursor-pointer touch-manipulation items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark max-lg:size-11 dark:text-secondary-soft dark:hover:bg-white/10 dark:hover:text-white"
+        x-bind:class="open && 'bg-white text-secondary-dark shadow-sm dark:bg-surface-3 dark:text-ink dark:shadow-raised'"
+        class="relative inline-flex size-8 cursor-pointer touch-manipulation items-center justify-center rounded-full text-secondary-medium transition-colors hover:bg-white hover:text-secondary-dark hover:shadow-sm max-lg:size-11 dark:text-ink-muted dark:hover:bg-surface-3 dark:hover:text-ink dark:hover:shadow-raised"
+        data-top-bar-action
         data-test="notification-bell-button"
     >
         <span x-bind:class="pulse && 'notification-bell-ring'" class="inline-flex">
-            <flux:icon.bell variant="mini" />
+            <flux:icon.bell variant="outline" class="size-4.5!" />
         </span>
 
         @if ($total > 0)
             <span
                 @class([
-                    'absolute -end-0.5 -top-0.5 inline-flex min-w-[1.125rem] items-center justify-center rounded-full px-1 text-[10px] font-bold leading-[1.125rem] tabular-nums text-white ring-2 ring-white dark:ring-secondary-dark',
-                    'bg-primary' => $critical > 0,
-                    'bg-secondary-dark dark:bg-secondary-medium' => $critical === 0,
+                    'absolute -end-0.5 -top-0.5 inline-flex min-w-[1.125rem] items-center justify-center rounded-full px-1 text-[10px] font-bold leading-[1.125rem] tabular-nums text-white ring-2 ring-white dark:ring-surface-1',
+                    'bg-primary dark:bg-status-critical dark:text-surface-0' => $critical > 0,
+                    'bg-secondary-dark dark:bg-ink dark:text-surface-0' => $critical === 0,
                 ])
                 data-unread-count
                 @if ($critical > 0) data-critical-unread @endif
@@ -160,13 +161,13 @@ new class extends Component {
         x-transition:leave-end="opacity-0 scale-[0.98]"
         role="dialog"
         aria-label="{{ __('notifications.inbox') }}"
-        class="fixed inset-x-3 top-16 z-50 flex max-h-[calc(100dvh-5rem)] origin-top-right flex-col overflow-hidden rounded-2xl bg-white text-secondary-dark shadow-[0_24px_48px_-12px_rgba(16,24,40,0.22),0_4px_10px_rgba(16,24,40,0.08)] ring-1 ring-secondary-soft/70 focus:outline-none sm:absolute sm:inset-x-auto sm:end-0 sm:top-full sm:mt-2 sm:w-[26rem] rtl:origin-top-left dark:bg-secondary-dark dark:text-white dark:ring-secondary-medium"
+        class="fixed inset-x-3 top-16 z-50 flex max-h-[calc(100dvh-5rem)] origin-top-right flex-col overflow-hidden rounded-2xl bg-white text-secondary-dark shadow-[0_24px_48px_-12px_rgba(16,24,40,0.22),0_4px_10px_rgba(16,24,40,0.08)] ring-1 ring-secondary-soft/70 focus:outline-none sm:absolute sm:inset-x-auto sm:end-0 sm:top-full sm:mt-2 sm:w-[26rem] rtl:origin-top-left dark:bg-surface-3 dark:shadow-raised dark:text-ink dark:ring-line"
         data-notification-panel
     >
         <div class="flex items-start justify-between gap-3 px-5 pt-5">
             <div class="min-w-0">
                 <p class="text-lg leading-tight font-bold">{{ __('notifications.inbox') }}</p>
-                <p class="mt-0.5 text-xs font-semibold text-secondary-medium dark:text-secondary-soft">
+                <p class="mt-0.5 text-xs font-semibold text-secondary-medium dark:text-ink-muted">
                     @if ($total > 0)
                         <span class="tabular-nums">{{ __('notifications.unread_count', ['count' => $total]) }}</span>
                         @if ($critical > 0)
@@ -179,10 +180,10 @@ new class extends Component {
                 </p>
             </div>
             <div class="-me-1.5 flex items-center gap-0.5">
-                <a href="{{ route('notifications.index') }}" wire:navigate class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-secondary-soft dark:hover:bg-white/10 dark:hover:text-white" aria-label="{{ __('notifications.full_page') }}" title="{{ __('notifications.full_page') }}">
+                <a href="{{ route('notifications.index') }}" wire:navigate class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-ink-muted dark:hover:bg-white/10 dark:hover:text-ink" aria-label="{{ __('notifications.full_page') }}" title="{{ __('notifications.full_page') }}">
                     <flux:icon.arrows-pointing-out variant="mini" class="size-4" />
                 </a>
-                <a href="{{ route('notification-settings.edit') }}" wire:navigate class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-secondary-soft dark:hover:bg-white/10 dark:hover:text-white" aria-label="{{ __('notifications.settings_link') }}" title="{{ __('notifications.settings_link') }}">
+                <a href="{{ route('notification-settings.edit') }}" wire:navigate class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-ink-muted dark:hover:bg-white/10 dark:hover:text-ink" aria-label="{{ __('notifications.settings_link') }}" title="{{ __('notifications.settings_link') }}">
                     <flux:icon.cog-6-tooth variant="mini" class="size-4" />
                 </a>
             </div>
@@ -199,16 +200,16 @@ new class extends Component {
                         aria-controls="notification-panel-{{ $this->getId() }}"
                         @class([
                             'inline-flex min-h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-2 font-semibold transition-[background-color,color,box-shadow] duration-200',
-                            'bg-white text-secondary-dark shadow-[0_1px_3px_rgba(16,24,40,0.12)] dark:bg-secondary-medium dark:text-white' => $tab === $key,
-                            'text-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => $tab !== $key,
+                            'bg-white text-secondary-dark shadow-[0_1px_3px_rgba(16,24,40,0.12)] dark:bg-surface-2 dark:text-ink' => $tab === $key,
+                            'text-secondary-medium hover:text-secondary-dark dark:text-ink-muted dark:hover:text-ink' => $tab !== $key,
                         ])
                     >
                         {{ __("notifications.tabs.{$key}") }}
                         @if ($key === 'unread' && $total > 0)
                             <span @class([
                                 'inline-flex min-w-4.5 items-center justify-center rounded-full px-1 text-[0.625rem] leading-4.5 font-bold tabular-nums',
-                                'bg-primary text-white' => $critical > 0,
-                                'bg-secondary-dark text-white dark:bg-white dark:text-secondary-dark' => $critical === 0,
+                                'bg-primary dark:bg-status-critical dark:text-surface-0 text-white' => $critical > 0,
+                                'bg-secondary-dark text-white dark:bg-ink dark:text-surface-0' => $critical === 0,
                             ])>{{ $total > 99 ? '99+' : $total }}</span>
                         @endif
                     </button>
@@ -227,8 +228,8 @@ new class extends Component {
                             aria-pressed="{{ $module === $chip ? 'true' : 'false' }}"
                             @class([
                                 'inline-flex min-h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border ps-2.5 pe-3 text-xs font-semibold whitespace-nowrap transition-colors',
-                                'border-secondary-dark bg-secondary-dark text-white dark:border-white dark:bg-white dark:text-secondary-dark' => $module === $chip,
-                                'border-secondary-soft text-secondary-dark hover:border-secondary-light dark:border-secondary-medium dark:text-white dark:hover:border-secondary-light' => $module !== $chip,
+                                'border-secondary-dark bg-secondary-dark text-white dark:border-ink dark:bg-ink dark:text-surface-0' => $module === $chip,
+                                'border-secondary-soft text-secondary-dark hover:border-secondary-light dark:border-line dark:text-ink dark:hover:border-field-line' => $module !== $chip,
                             ])
                             data-bell-module="{{ $chip }}"
                         >
@@ -262,7 +263,7 @@ new class extends Component {
                     @if ($section === 'pinned')
                         <div class="mt-2 rounded-xl bg-status-critical-soft/60 p-1 pt-2.5 dark:bg-primary/12" data-bell-pinned>
                             <p class="flex items-center gap-2 px-2.5 pb-0.5 text-xs font-bold text-status-critical">
-                                <span class="notification-beacon relative size-1.5 rounded-full bg-primary text-primary" aria-hidden="true"></span>
+                                <span class="notification-beacon relative size-1.5 rounded-full bg-primary dark:bg-status-critical text-primary dark:text-brand-text" aria-hidden="true"></span>
                                 {{ __("notifications.sections.{$section}") }}
                             </p>
                             <ol class="notification-thread">
@@ -272,7 +273,7 @@ new class extends Component {
                             </ol>
                         </div>
                     @else
-                        <p class="type-label px-2.5 pt-4 pb-1 text-secondary-medium dark:text-secondary-soft">{{ __("notifications.sections.{$section}") }}</p>
+                        <p class="type-label px-2.5 pt-4 pb-1 text-secondary-medium dark:text-ink-muted">{{ __("notifications.sections.{$section}") }}</p>
                         <ol class="notification-thread">
                             @foreach ($rows as $notification)
                                 <x-notifications.row :notification="$notification" :compact="true" wire:key="bell-{{ $notification->id }}" style="--row-order: {{ $loop->index }}" />
@@ -281,7 +282,7 @@ new class extends Component {
                     @endif
                 @empty
                     <div class="flex flex-col items-center px-6 py-12 text-center" data-bell-empty>
-                        <svg viewBox="0 0 160 64" class="h-14 w-36 text-secondary-soft dark:text-secondary-medium" fill="none" aria-hidden="true">
+                        <svg viewBox="0 0 160 64" class="h-14 w-36 text-secondary-soft dark:text-ink-faint" fill="none" aria-hidden="true">
                             <path d="M8 32H62M98 32H152" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="1 7" />
                             <circle cx="20" cy="32" r="4" fill="currentColor" />
                             <circle cx="140" cy="32" r="4" fill="currentColor" />
@@ -289,14 +290,14 @@ new class extends Component {
                             <path d="M72.5 32.5L77.5 37.5L88 27" class="stroke-status-good" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" />
                         </svg>
                         <p class="mt-4 text-base font-bold">{{ __('notifications.empty') }}</p>
-                        <p class="mt-1 max-w-60 text-xs text-pretty text-secondary-medium dark:text-secondary-soft">{{ __('notifications.empty_body') }}</p>
+                        <p class="mt-1 max-w-60 text-xs text-pretty text-secondary-medium dark:text-ink-muted">{{ __('notifications.empty_body') }}</p>
                     </div>
                 @endforelse
             @endif
         </div>
 
-        <div class="relative flex items-center justify-between gap-3 border-t border-secondary-soft/80 px-5 py-3 text-sm dark:border-secondary-medium">
-            <button type="button" wire:click="markAllRead" @disabled($total === 0) class="inline-flex cursor-pointer items-center gap-1.5 font-semibold text-secondary-medium transition-colors hover:text-secondary-dark disabled:cursor-default disabled:opacity-40 dark:text-secondary-soft dark:hover:text-white">
+        <div class="relative flex items-center justify-between gap-3 border-t border-secondary-soft/80 px-5 py-3 text-sm dark:border-line">
+            <button type="button" wire:click="markAllRead" @disabled($total === 0) class="inline-flex cursor-pointer items-center gap-1.5 font-semibold text-secondary-medium transition-colors hover:text-secondary-dark disabled:cursor-default disabled:opacity-40 dark:text-ink-muted dark:hover:text-ink">
                 <flux:icon.check-circle variant="micro" />
                 {{ __('notifications.mark_all_read') }}
             </button>
@@ -309,12 +310,12 @@ new class extends Component {
                 <div
                     x-transition:enter="transition duration-200 ease-out"
                     x-transition:enter-start="opacity-0 translate-y-1"
-                    class="absolute inset-0 flex items-center justify-between gap-3 bg-secondary-dark px-5 text-white dark:bg-white dark:text-secondary-dark"
+                    class="absolute inset-0 flex items-center justify-between gap-3 bg-secondary-dark px-5 text-white dark:bg-surface-3 dark:text-ink"
                     aria-live="polite"
                     data-bell-undo
                 >
                     <span x-text="undo.message" class="truncate font-semibold"></span>
-                    <button type="button" x-on:click="undoNow()" class="inline-flex min-h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-full bg-white/15 px-3 font-bold hover:bg-white/25 dark:bg-secondary-dark/10 dark:hover:bg-secondary-dark/20">
+                    <button type="button" x-on:click="undoNow()" class="inline-flex min-h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-full bg-white/15 px-3 font-bold hover:bg-white/25 dark:bg-white/10 dark:hover:bg-white/15">
                         <flux:icon.arrow-uturn-left variant="micro" class="size-3.5" />
                         {{ __('notifications.undo.action') }}
                     </button>

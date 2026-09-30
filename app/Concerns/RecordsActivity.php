@@ -91,6 +91,17 @@ trait RecordsActivity
     }
 
     /**
+     * Columns never written to the activity log, on top of the hidden ones:
+     * values that must stay out of the log but are still serialized.
+     *
+     * @return list<string>
+     */
+    protected function activityExcludedFields(): array
+    {
+        return [];
+    }
+
+    /**
      * @return list<string>
      */
     public function activityEmployeeFields(): array
@@ -176,14 +187,14 @@ trait RecordsActivity
     }
 
     /**
-     * Raw old/new values of every changed column, minus timestamps and hidden
-     * columns (secrets never reach the log).
+     * Raw old/new values of every changed column, minus timestamps, hidden
+     * columns and excluded fields (secrets never reach the log).
      *
      * @return array<string, array{0: mixed, 1: mixed}>
      */
     protected function activityChanges(): array
     {
-        $skipped = [$this->getCreatedAtColumn(), $this->getUpdatedAtColumn(), ...$this->getHidden()];
+        $skipped = [$this->getCreatedAtColumn(), $this->getUpdatedAtColumn(), ...$this->getHidden(), ...$this->activityExcludedFields()];
         $changes = [];
 
         foreach (array_keys($this->getChanges()) as $field) {

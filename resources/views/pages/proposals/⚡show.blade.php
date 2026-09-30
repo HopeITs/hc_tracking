@@ -1,5 +1,8 @@
 <?php
 
+use App\Actions\Proposals\ChangeProposalStatus;
+use App\Actions\Proposals\DeleteProposalFile;
+use App\Actions\Proposals\SaveProposalFile;
 use App\Enums\ArStatus;
 use App\Enums\FileType;
 use App\Enums\MediaCollection;
@@ -23,6 +26,7 @@ use App\Models\ProposalStatusNote;
 use App\Models\Report;
 use App\Models\Task;
 use App\Models\TransfersTracking;
+use App\Rules\SecureUpload;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
@@ -36,6 +40,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -47,6 +52,7 @@ new #[Title('titles.proposal')] class extends Component
     use ManagesTransferForm;
     use WithFileUploads;
 
+    #[Locked]
     public int $proposalId;
 
     /** The tabs this page offers, in strip order. */
@@ -93,14 +99,17 @@ new #[Title('titles.proposal')] class extends Component
 
     public bool $showUnlinkModal = false;
 
+    #[Locked]
     public ?int $unlinkingProjectId = null;
 
     public bool $showFileModal = false;
 
     public bool $confirmingFileDelete = false;
 
+    #[Locked]
     public ?int $editingFileId = null;
 
+    #[Locked]
     public ?int $deletingFileId = null;
 
     public $newFile = null;
@@ -111,6 +120,7 @@ new #[Title('titles.proposal')] class extends Component
 
     public bool $showPreviewModal = false;
 
+    #[Locked]
     public ?int $previewingFileId = null;
 
     public bool $showAddTaskModal = false;
@@ -134,9 +144,25 @@ new #[Title('titles.proposal')] class extends Component
 
     public function updatedTab(): void
     {
-        if (! in_array($this->tab, self::TABS, true)) {
+        if (! in_array($this->tab, self::TABS, true) || ($this->tab === 'funding' && ! $this->canViewAgreements())) {
             $this->tab = 'status';
         }
+    }
+
+    /**
+     * Whether the viewer may see funding agreements and the budgets on them.
+     */
+    protected function canViewAgreements(): bool
+    {
+        return auth()->user()?->can('funding-agreements.view') ?? false;
+    }
+
+    /**
+     * Whether the viewer may see transfers and the amounts sent and received.
+     */
+    protected function canViewTransfers(): bool
+    {
+        return auth()->user()?->can('transfers.view') ?? false;
     }
 
     /**
@@ -153,7 +179,7 @@ new #[Title('titles.proposal')] class extends Component
         return [
             ['key' => 'status', 'label' => __('proposals.status_history'), 'count' => $this->statusNotes->count()],
             ['key' => 'deadlines', 'label' => __('proposals.deadlines'), 'count' => count($this->deadlines)],
-            ['key' => 'funding', 'label' => __('common.funding'), 'count' => $this->agreements->count()],
+            ...($this->canViewAgreements() ? [['key' => 'funding', 'label' => __('common.funding'), 'count' => $this->agreements->count()]] : []),
             ['key' => 'projects', 'label' => __('common.projects'), 'count' => $this->projects->count()],
             ['key' => 'tasks', 'label' => __('common.tasks'), 'count' => $this->tasks->count()],
             ['key' => 'targets', 'label' => __('common.targets'), 'count' => $this->targets->count()],
@@ -189,15 +215,29 @@ new #[Title('titles.proposal')] class extends Component
      * built by belongsToMany carries no casts, so its currency arrives as a raw
      * string while this relation's arrives as a Currency case.
      *
+     * Empty for a viewer without funding-agreements.view, and every money
+     * reading below is derived from it, so none of them is ever computed.
+     * A viewer without transfers.view gets the agreements with no tranches.
+     *
      * @return Collection<int, DonorProposal>
      */
     #[Computed]
     public function agreements(): Collection
     {
+        if (! $this->canViewAgreements()) {
+            return new Collection;
+        }
+
+        $canViewTransfers = $this->canViewTransfers();
+
         return DonorProposal::query()
             ->select(['id', 'donor_id', 'budget', 'currency', 'project_num', 'proposal_id'])
             ->where('proposal_id', $this->proposalId)
-            ->with(['donor:id,name', 'transfers.account:id,account_name'])
+            ->with([
+                'donor:id,name',
+                'transfers' => fn ($query) => $query->when(! $canViewTransfers, fn ($query) => $query->whereRaw('1 = 0')),
+                'transfers.account:id,account_name',
+            ])
             ->orderBy('id')
             ->get();
     }
@@ -266,7 +306,7 @@ new #[Title('titles.proposal')] class extends Component
      * every funding page shares: money the donor has already sent is in
      * transit, never overdue, and due today is not yet late.
      */
-    public function transferIsOverdue(TransfersTracking $transfer): bool
+    protected function transferIsOverdue(TransfersTracking $transfer): bool
     {
         return $transfer->state() === 'late';
     }
@@ -394,6 +434,8 @@ new #[Title('titles.proposal')] class extends Component
 
     public function openAddTaskModal(): void
     {
+        Gate::authorize('create', Task::class);
+
         $this->resetValidation();
         $this->newTaskTitle = '';
         $this->newTaskStatus = TaskStatus::Todo->value;
@@ -415,6 +457,8 @@ new #[Title('titles.proposal')] class extends Component
      */
     public function addTask(): void
     {
+        Gate::authorize('create', Task::class);
+
         $this->newTaskTitle = trim($this->newTaskTitle);
 
         $validated = $this->validate([
@@ -520,6 +564,10 @@ new #[Title('titles.proposal')] class extends Component
     #[Computed]
     public function donorReports(): Collection
     {
+        if ($this->agreements->isEmpty()) {
+            return new Collection;
+        }
+
         return DonorReport::query()
             ->select(['id', 'donor_proposal_id', 'title', 'type', 'due_on', 'submitted_on'])
             ->whereIn('donor_proposal_id', $this->agreements->modelKeys())
@@ -532,9 +580,40 @@ new #[Title('titles.proposal')] class extends Component
     /**
      * Whether a report is still owed: drafted but never submitted for review.
      */
-    public function reportIsOwed(Report $report): bool
+    protected function reportIsOwed(Report $report): bool
     {
         return $report->status === ReportStatus::Draft && $report->submit_date === null;
+    }
+
+    /**
+     * The file collections this viewer may not see: signed agreements and
+     * MOUs are agreement data, so they need funding-agreements.view.
+     *
+     * @return list<string>
+     */
+    protected function hiddenCollections(): array
+    {
+        if ($this->canViewAgreements()) {
+            return [];
+        }
+
+        return array_values(array_map(
+            fn (MediaCollection $collection): string => $collection->value,
+            array_filter(MediaCollection::cases(), fn (MediaCollection $collection): bool => $collection->isFundingPaper()),
+        ));
+    }
+
+    /**
+     * The grant paperwork categories this viewer may see on funded projects.
+     *
+     * @return list<MediaCollection>
+     */
+    protected function visibleGrantPaper(): array
+    {
+        return array_values(array_filter(
+            self::GRANT_PAPER,
+            fn (MediaCollection $collection): bool => ! in_array($collection->value, $this->hiddenCollections(), true),
+        ));
     }
 
     /**
@@ -549,6 +628,7 @@ new #[Title('titles.proposal')] class extends Component
             ->select(['id', 'mediable_type', 'mediable_id', 'collection', 'disk', 'path', 'original_name', 'type', 'size', 'uploaded_at', 'uploaded_by'])
             ->where('mediable_type', 'proposal')
             ->where('mediable_id', $this->proposalId)
+            ->whereNotIn('collection', $this->hiddenCollections())
             ->with('uploader:id,hr_user_id')
             ->orderByDesc('uploaded_at')
             ->orderByDesc('id')
@@ -577,7 +657,7 @@ new #[Title('titles.proposal')] class extends Component
             ->select(['id', 'mediable_type', 'mediable_id', 'collection', 'disk', 'path', 'original_name', 'type', 'size', 'uploaded_at', 'uploaded_by'])
             ->where('mediable_type', 'project')
             ->whereIn('mediable_id', $projectIds)
-            ->whereIn('collection', array_map(fn (MediaCollection $collection): string => $collection->value, self::GRANT_PAPER))
+            ->whereIn('collection', array_map(fn (MediaCollection $collection): string => $collection->value, $this->visibleGrantPaper()))
             ->with('uploader:id,hr_user_id')
             ->orderByDesc('uploaded_at')
             ->orderByDesc('id')
@@ -708,7 +788,7 @@ new #[Title('titles.proposal')] class extends Component
         $grantEnd = $this->proposal->actual_date_end ?? $this->proposal->planned_date_end;
 
         if ($grantEnd !== null && $this->proposal->actual_date_end === null && ! in_array($this->proposal->status, [ProposalStatus::Completed, ProposalStatus::Rejected], true)) {
-            $push('grant-end', 'grant', $grantEnd, __('proposals.grant_term_ends'), $this->proposal->name, null, 'funding');
+            $push('grant-end', 'grant', $grantEnd, __('proposals.grant_term_ends'), $this->proposal->name, null, $this->canViewAgreements() ? 'funding' : 'status');
         }
 
         usort($items, fn (array $a, array $b): int => [$a['date'], $a['key']] <=> [$b['date'], $b['key']]);
@@ -849,7 +929,7 @@ new #[Title('titles.proposal')] class extends Component
             ];
         }
 
-        if ($this->agreements->isEmpty() && in_array($this->proposal->phase, [ProposalPhase::Implementation, ProposalPhase::Monitoring, ProposalPhase::Closure], true)) {
+        if ($this->canViewAgreements() && $this->agreements->isEmpty() && in_array($this->proposal->phase, [ProposalPhase::Implementation, ProposalPhase::Monitoring, ProposalPhase::Closure], true)) {
             $warnings[] = [
                 'key' => 'no-agreement',
                 'text' => __('proposals.warning_no_agreement'),
@@ -876,7 +956,7 @@ new #[Title('titles.proposal')] class extends Component
     public function vitals(): array
     {
         return [
-            $this->moneyVital(),
+            ...($this->canViewAgreements() ? [$this->moneyVital()] : []),
             $this->workVital(),
             $this->timeVital(),
             $this->promisesVital(),
@@ -960,7 +1040,7 @@ new #[Title('titles.proposal')] class extends Component
                 : trans_choice('proposals.tasks_across_count_projects', $projectCount, ['count' => $projectCount]),
             'alarm' => $total > 0 && $done < $total && $this->term['state'] === 'over',
             'segments' => [
-                ['width' => $total > 0 ? round($done / $total * 100, 2) : 0.0, 'class' => 'bg-secondary-dark dark:bg-white'],
+                ['width' => $total > 0 ? round($done / $total * 100, 2) : 0.0, 'class' => 'bg-secondary-dark dark:bg-ink-muted'],
             ],
         ];
     }
@@ -985,7 +1065,7 @@ new #[Title('titles.proposal')] class extends Component
             'caption' => $caption,
             'alarm' => $term['state'] === 'over' && $this->proposal->status !== ProposalStatus::Completed,
             'segments' => [
-                ['width' => $term['percent'], 'class' => 'bg-secondary-medium dark:bg-secondary-soft'],
+                ['width' => $term['percent'], 'class' => 'bg-secondary-medium dark:bg-ink-muted'],
             ],
         ];
     }
@@ -1360,17 +1440,12 @@ new #[Title('titles.proposal')] class extends Component
             'statusDate.required' => __('proposals.set_the_date_this_change_took_effect'),
         ]);
 
-        DB::transaction(function () use ($validated): void {
-            $proposal = Proposal::query()->findOrFail($this->proposalId);
-            $proposal->fill(['status' => $validated['newStatus']])->save();
-
-            ProposalStatusNote::query()->create([
-                'proposal_id' => $this->proposalId,
-                'status' => $validated['newStatus'],
-                'context' => $validated['statusContext'],
-                'date' => $validated['statusDate'],
-            ]);
-        });
+        app(ChangeProposalStatus::class)->handle(
+            Proposal::query()->findOrFail($this->proposalId),
+            $validated['newStatus'],
+            $validated['statusContext'],
+            $validated['statusDate'],
+        );
 
         $this->showStatusModal = false;
         $this->statusContext = '';
@@ -1505,25 +1580,14 @@ new #[Title('titles.proposal')] class extends Component
      */
     private function proposalFile(int $mediaId): Media
     {
-        return Media::query()
+        $media = Media::query()
             ->where('mediable_type', 'proposal')
             ->where('mediable_id', $this->proposalId)
             ->findOrFail($mediaId);
-    }
 
-    /**
-     * A typed display name, guaranteed to carry the file's real extension so
-     * the downloaded copy still opens.
-     */
-    private function displayNameWithExtension(string $displayName, FileType $type): string
-    {
-        $displayName = trim($displayName);
+        abort_if(in_array($media->collection->value, $this->hiddenCollections(), true), 403);
 
-        if (Str::lower(pathinfo($displayName, PATHINFO_EXTENSION)) === $type->value) {
-            return $displayName;
-        }
-
-        return $displayName.'.'.$type->value;
+        return $media;
     }
 
     public function openCreateFileModal(): void
@@ -1568,7 +1632,7 @@ new #[Title('titles.proposal')] class extends Component
         $allowedTypes = implode(',', FileType::values());
 
         $validated = $this->validate([
-            'newFile' => [$isCreate ? 'required' : 'nullable', 'file', 'max:5120', 'mimes:'.$allowedTypes, 'extensions:'.$allowedTypes],
+            'newFile' => [$isCreate ? 'required' : 'nullable', 'bail', 'file', 'max:5120', 'mimes:'.$allowedTypes, 'extensions:'.$allowedTypes, new SecureUpload],
             'fileCategory' => ['required', Rule::enum(MediaCollection::class)],
             'fileDisplayName' => [$isCreate ? 'nullable' : 'required', 'string', 'max:255'],
         ], [
@@ -1577,40 +1641,14 @@ new #[Title('titles.proposal')] class extends Component
             'fileDisplayName.required' => __('proposals.enter_a_file_name'),
         ]);
 
-        $media = $isCreate
-            ? new Media(['mediable_type' => 'proposal', 'mediable_id' => $this->proposalId, 'disk' => 'local'])
-            : $this->proposalFile($this->editingFileId);
+        abort_if(in_array($validated['fileCategory'], $this->hiddenCollections(), true), 403);
 
-        $replaced = null;
-
-        if ($this->newFile !== null) {
-            if (! $isCreate) {
-                $replaced = ['disk' => $media->disk, 'path' => $media->path];
-            }
-
-            $media->fill([
-                'disk' => 'local',
-                'path' => $this->newFile->store('media/proposals/'.$this->proposalId, 'local'),
-                'type' => FileType::from(Str::lower($this->newFile->getClientOriginalExtension())),
-                'mime_type' => $this->newFile->getMimeType(),
-                'size' => $this->newFile->getSize(),
-                'uploaded_at' => now(),
-                'uploaded_by' => auth()->id(),
-            ]);
-        }
-
-        $displayName = trim((string) ($validated['fileDisplayName'] ?? ''));
-
-        $media->fill([
-            'collection' => $validated['fileCategory'],
-            'original_name' => $displayName !== ''
-                ? $this->displayNameWithExtension($displayName, $media->type)
-                : $this->newFile->getClientOriginalName(),
-        ])->save();
-
-        if ($replaced !== null) {
-            $this->removeFromDisk($media->id, $replaced['disk'], $replaced['path']);
-        }
+        app(SaveProposalFile::class)->handle(
+            $this->proposal,
+            $isCreate ? null : $this->proposalFile($this->editingFileId),
+            $this->newFile,
+            $validated,
+        );
 
         $this->closeFileModal();
         unset($this->proposalFiles, $this->documents, $this->tabs);
@@ -1640,32 +1678,13 @@ new #[Title('titles.proposal')] class extends Component
             return;
         }
 
-        $media = $this->proposalFile($this->deletingFileId);
-        $media->delete();
-        $this->removeFromDisk($media->id, $media->disk, $media->path);
+        app(DeleteProposalFile::class)->handle($this->proposal, $this->proposalFile($this->deletingFileId));
 
         $this->confirmingFileDelete = false;
         $this->deletingFileId = null;
         unset($this->proposalFiles, $this->documents, $this->tabs);
 
         Flux::toast(variant: 'success', text: __('proposals.file_deleted'));
-    }
-
-    /**
-     * Remove a stored document, logging rather than surfacing a storage
-     * failure so a disk hiccup never leaves a row stuck in the UI.
-     */
-    private function removeFromDisk(int $mediaId, string $disk, string $path): void
-    {
-        try {
-            Storage::disk($disk)->delete($path);
-        } catch (\Throwable $exception) {
-            Log::warning('Failed to delete proposal file from disk.', [
-                'media_id' => $mediaId,
-                'path' => $path,
-                'exception' => $exception->getMessage(),
-            ]);
-        }
     }
 
     /**
@@ -1716,7 +1735,7 @@ new #[Title('titles.proposal')] class extends Component
      * Where a document downloads from: its own proposal route, or the route
      * of the project it is filed on.
      */
-    public function documentDownloadUrl(Media $media): string
+    protected function documentDownloadUrl(Media $media): string
     {
         return $media->mediable_type === 'proposal'
             ? route('proposals.files.download', [$this->proposal, $media])
@@ -1781,16 +1800,16 @@ new #[Title('titles.proposal')] class extends Component
 ?>
 
 @php
-    $mutedText = 'text-secondary-medium dark:text-secondary-soft';
-    $inkText = 'text-secondary-dark dark:text-white';
-    $hairline = 'border-secondary-soft dark:border-secondary-medium';
+    $mutedText = 'text-secondary-medium dark:text-ink-muted';
+    $inkText = 'text-secondary-dark dark:text-ink';
+    $hairline = 'border-secondary-soft dark:border-line';
     $amount = fn (float $value): string => number_format($value, 2);
     $term = $this->term;
     $chronology = $this->chronology;
     $arrivals = $this->arrivals;
 @endphp
 
-<section class="dossier @container/detail flex min-h-full w-full flex-1 flex-col bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white">
+<section class="dossier @container/detail flex min-h-full w-full flex-1 flex-col bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink">
     <x-ui.detail-header
         :breadcrumbs="[
             ['label' => __('common.proposals'), 'url' => route('proposals.index')],
@@ -1810,7 +1829,7 @@ new #[Title('titles.proposal')] class extends Component
         <x-slot:actions>
             <div class="flex flex-wrap items-center gap-2 @3xl/detail:shrink-0 @3xl/detail:flex-nowrap">
                 <x-ui.enum-badge :case="$this->proposal->status" />
-                <span class="rounded-md border border-secondary-light px-2 py-0.5 text-[11px] font-semibold text-secondary-medium dark:text-secondary-soft">
+                <span class="rounded-md border border-secondary-light px-2 py-0.5 text-[11px] font-semibold text-secondary-medium dark:text-ink-muted">
                     {{ $this->proposal->phase->label() }}
                 </span>
                 @can('update', $this->proposal)
@@ -1846,17 +1865,17 @@ new #[Title('titles.proposal')] class extends Component
                     @if (! $loop->first)
                         <span @class([
                             'absolute end-1/2 top-[0.3125rem] h-0.5 w-full -translate-y-1/2',
-                            'bg-secondary-dark dark:bg-white' => in_array($stop['state'], ['past', 'current'], true),
-                            'bg-primary' => $stop['state'] === 'rejected',
-                            'bg-secondary-soft dark:bg-secondary-medium' => $stop['state'] === 'ahead',
+                            'bg-secondary-dark dark:bg-ink-muted' => in_array($stop['state'], ['past', 'current'], true),
+                            'bg-primary dark:bg-status-critical' => $stop['state'] === 'rejected',
+                            'bg-secondary-soft dark:bg-line-strong' => $stop['state'] === 'ahead',
                         ]) aria-hidden="true"></span>
                     @endif
 
                     <span @class([
                         'relative z-10 size-2.5 rounded-full',
-                        'bg-primary ring-4 ring-primary/20' => in_array($stop['state'], ['current', 'rejected'], true),
-                        'bg-secondary-dark dark:bg-white' => $stop['state'] === 'past',
-                        'border-2 border-secondary-soft bg-white dark:border-secondary-medium dark:bg-secondary-dark' => $stop['state'] === 'ahead',
+                        'bg-primary dark:bg-brand ring-4 ring-primary/20' => in_array($stop['state'], ['current', 'rejected'], true),
+                        'bg-secondary-dark dark:bg-ink-muted' => $stop['state'] === 'past',
+                        'border-2 border-secondary-soft bg-white dark:border-line-strong dark:bg-surface-1' => $stop['state'] === 'ahead',
                     ]) aria-hidden="true"></span>
 
                     <span @class([
@@ -1888,7 +1907,7 @@ new #[Title('titles.proposal')] class extends Component
                         @if ($loop->index >= 3) x-show="expanded" x-cloak @endif
                     >
                         <button type="button" wire:click="$set('tab', '{{ $warning['tab'] }}')" aria-controls="tab-panel" class="group flex min-h-8 w-full touch-manipulation items-start gap-2.5 text-start text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
-                            <span @class(['mt-1.5 size-2 shrink-0 rounded-full', 'bg-primary' => $warning['critical'], 'border-2 border-status-warn' => ! $warning['critical']]) aria-hidden="true"></span>
+                            <span @class(['mt-1.5 size-2 shrink-0 rounded-full', 'bg-primary dark:bg-status-critical' => $warning['critical'], 'border-2 border-status-warn' => ! $warning['critical']]) aria-hidden="true"></span>
                             <span class="min-w-0 flex-1 underline-offset-4 group-hover:underline {{ $warning['critical'] ? 'font-semibold '.$inkText : $inkText }}">{{ $warning['text'] }}</span>
                             <flux:icon.arrow-right variant="micro" class="mt-0.5 size-4 shrink-0 {{ $mutedText }} rtl:rotate-180" aria-hidden="true" />
                         </button>
@@ -1906,7 +1925,7 @@ new #[Title('titles.proposal')] class extends Component
 
     {{-- The bench: four readings of this grant's condition; each opens the tab holding its evidence. --}}
     <div
-        class="mt-7 grid grid-cols-2 gap-x-6 gap-y-7 @3xl/detail:grid-cols-4"
+        @class(['mt-7 grid grid-cols-2 gap-x-6 gap-y-7', '@3xl/detail:grid-cols-4' => count($this->vitals) === 4, '@3xl/detail:grid-cols-3' => count($this->vitals) !== 4])
         role="group"
         aria-label="{{ __('proposals.the_grant_s_vital_signs') }}"
         data-bench
@@ -1945,7 +1964,7 @@ new #[Title('titles.proposal')] class extends Component
                     ]) data-test="vital-money-{{ $other['currency'] }}">{{ $other['text'] }}</span>
                 @endforeach
 
-                <span class="mt-3 flex h-[3px] w-full gap-px overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium" aria-hidden="true">
+                <span class="mt-3 flex h-[3px] w-full gap-px overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2" aria-hidden="true">
                     @foreach ($reading['segments'] as $segment)
                         <span class="money-grow h-full first:rounded-s-full {{ $segment['class'] }}" style="width: {{ $segment['width'] }}%"></span>
                     @endforeach
@@ -2000,7 +2019,7 @@ new #[Title('titles.proposal')] class extends Component
                                 </div>
                             </div>
 
-                            <div class="mt-3 flex h-2 w-full gap-0.5 overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium" role="img" aria-label="{{ __('proposals.money_bar_label', ['currency' => $currency, 'received' => $amount($agreementReceived), 'pending' => $amount($agreementPending), 'committed' => $amount($budget)]) }}">
+                            <div class="mt-3 flex h-2 w-full gap-0.5 overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2" role="img" aria-label="{{ __('proposals.money_bar_label', ['currency' => $currency, 'received' => $amount($agreementReceived), 'pending' => $amount($agreementPending), 'committed' => $amount($budget)]) }}">
                                 <span class="money-grow h-full rounded-s-full bg-funding" style="width: {{ $budget > 0 ? min(100, round($agreementReceived / $budget * 100, 2)) : 0 }}%"></span>
                                 <span class="money-grow money-pending h-full" style="width: {{ $budget > 0 ? min(100, round($agreementPending / $budget * 100, 2)) : 0 }}%"></span>
                             </div>
@@ -2009,6 +2028,7 @@ new #[Title('titles.proposal')] class extends Component
                                 <p class="mt-2 text-xs {{ $mutedText }}" data-foreign-tranches>{{ trans_choice('proposals.count_tranches_in_another_currency', $money['foreignCount'], ['count' => $money['foreignCount'], 'currency' => $currency]) }}</p>
                             @endif
 
+                            @can('transfers.view')
                             @if ($agreement->transfers->isEmpty())
                                 <p class="mt-3 text-sm {{ $mutedText }}">{{ __('proposals.committed_with_no_transfer_yet') }}</p>
                             @else
@@ -2028,13 +2048,13 @@ new #[Title('titles.proposal')] class extends Component
                                         <li class="relative flex min-w-0 gap-3 pb-4 last:pb-0" wire:key="transfer-{{ $transfer->id }}" data-transfer="{{ $transfer->id }}">
                                             <span class="relative flex w-3 shrink-0 justify-center" aria-hidden="true">
                                                 @unless ($loop->last)
-                                                    <span class="absolute top-3 bottom-[-1rem] w-px bg-secondary-soft dark:bg-secondary-medium"></span>
+                                                    <span class="absolute top-3 bottom-[-1rem] w-px bg-secondary-soft dark:bg-line-strong"></span>
                                                 @endunless
                                                 <span @class([
                                                     'relative z-10 mt-1.5 size-2.5 rounded-full',
                                                     'bg-funding' => $isReceived,
-                                                    'bg-primary' => ! $isReceived && ($isOverdue || $transfer->ar_status === ArStatus::Failed),
-                                                    'border-2 border-status-warn bg-white dark:bg-secondary-dark' => ! $isReceived && ! $isOverdue && $transfer->ar_status !== ArStatus::Failed,
+                                                    'bg-primary dark:bg-status-critical' => ! $isReceived && ($isOverdue || $transfer->ar_status === ArStatus::Failed),
+                                                    'border-2 border-status-warn bg-white dark:bg-surface-1' => ! $isReceived && ! $isOverdue && $transfer->ar_status !== ArStatus::Failed,
                                                 ])></span>
                                             </span>
 
@@ -2080,6 +2100,7 @@ new #[Title('titles.proposal')] class extends Component
                                     @endforeach
                                 </ol>
                             @endif
+                            @endcan
                         </article>
                     @endforeach
                 </div>
@@ -2117,8 +2138,8 @@ new #[Title('titles.proposal')] class extends Component
 
                     <div class="relative mt-6 pt-5">
                         @if ($chronology['todayPercent'] !== null)
-                            <span class="pointer-events-none absolute inset-y-0 z-20 w-px bg-primary" style="inset-inline-start: {{ $chronology['todayPercent'] }}%" aria-hidden="true"></span>
-                            <span class="absolute top-0 z-20 -translate-x-1/2 text-[10px] font-bold tracking-wide text-status-critical uppercase rtl:translate-x-1/2" style="inset-inline-start: {{ $chronology['todayPercent'] }}%">{{ __('common.today') }}</span>
+                            <span class="pointer-events-none absolute inset-y-0 z-20 w-px bg-primary dark:bg-ink" style="inset-inline-start: {{ $chronology['todayPercent'] }}%" aria-hidden="true"></span>
+                            <span class="absolute top-0 z-20 -translate-x-1/2 text-[10px] font-bold tracking-wide text-status-critical dark:text-ink uppercase rtl:translate-x-1/2" style="inset-inline-start: {{ $chronology['todayPercent'] }}%">{{ __('common.today') }}</span>
                         @endif
 
                         {{-- The scrubbing cursor, drawn over every lane at once. --}}
@@ -2169,8 +2190,8 @@ new #[Title('titles.proposal')] class extends Component
                                             <span @class([
                                                 'size-2.5 shrink-0 rounded-full',
                                                 'bg-funding' => $event['state'] === 'received',
-                                                'bg-primary' => in_array($event['state'], ['overdue', 'failed'], true),
-                                                'border-2 border-status-warn bg-white dark:bg-secondary-dark' => $event['state'] === 'pending',
+                                                'bg-primary dark:bg-status-critical' => in_array($event['state'], ['overdue', 'failed'], true),
+                                                'border-2 border-status-warn bg-white dark:bg-surface-1' => $event['state'] === 'pending',
                                             ]) aria-hidden="true"></span>
                                         </span>
                                     </li>
@@ -2201,15 +2222,15 @@ new #[Title('titles.proposal')] class extends Component
                             x-on:keydown="scrubKey($event)"
                             x-on:blur="scrubbing = false"
                         >
-                            <div class="relative h-2 w-full rounded-full bg-secondary-soft dark:bg-secondary-medium">
+                            <div class="relative h-2 w-full rounded-full bg-secondary-soft dark:bg-surface-2">
                                 <span
-                                    class="absolute inset-y-0 rounded-full bg-secondary-dark dark:bg-white"
+                                    class="absolute inset-y-0 rounded-full bg-secondary-dark dark:bg-ink-muted"
                                     style="inset-inline-start: {{ $chronology['termStart'] }}%; width: {{ $chronology['termWidth'] }}%"
                                     role="img"
                                     aria-label="{{ __('proposals.grant_term_from_to', ['from' => $term['start']->translatedFormat(__('formats.date')), 'to' => $term['end']->translatedFormat(__('formats.date'))]) }}"
                                 ></span>
                                 <span
-                                    class="chrono-handle absolute top-1/2 size-3.5 rounded-full border-2 border-white bg-secondary-dark opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 dark:border-secondary-dark dark:bg-white"
+                                    class="chrono-handle absolute top-1/2 size-3.5 rounded-full border-2 border-white bg-secondary-dark opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 dark:border-surface-1 dark:bg-ink"
                                     :class="scrubbing && 'opacity-100!'"
                                     :style="`inset-inline-start: ${percent}%`"
                                     aria-hidden="true"
@@ -2224,7 +2245,7 @@ new #[Title('titles.proposal')] class extends Component
                                     <a
                                         href="{{ route('projects.show', tap(new Project, fn ($project) => $project->id = $bar['id'])) }}"
                                         wire:navigate
-                                        class="absolute top-0 flex h-7 min-w-0 items-center rounded-sm bg-funding-soft px-2 text-[11px] font-semibold text-funding transition-colors hover:bg-funding hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-white"
+                                        class="absolute top-0 flex h-7 min-w-0 items-center rounded-sm bg-funding-soft px-2 text-[11px] font-semibold text-funding transition-colors hover:bg-funding hover:text-white dark:hover:text-surface-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink"
                                         style="inset-inline-start: {{ $bar['start'] }}%; width: {{ $bar['width'] }}%"
                                     >
                                         <span class="truncate">{{ $bar['name'] }}</span>
@@ -2245,7 +2266,7 @@ new #[Title('titles.proposal')] class extends Component
                                         '-translate-x-full rtl:translate-x-full' => $move['anchor'] === 'end',
                                     ]) style="inset-inline-start: {{ $move['at'] }}%" wire:key="chrono-move-{{ $loop->index }}" data-lane="{{ $move['lane'] }}">
                                         <span @class(['flex flex-col gap-1', 'items-center' => $move['anchor'] === 'center', 'items-start' => $move['anchor'] === 'start', 'items-end' => $move['anchor'] === 'end'])>
-                                            <span class="size-2 shrink-0 rounded-full bg-secondary-medium dark:bg-secondary-soft" aria-hidden="true"></span>
+                                            <span class="size-2 shrink-0 rounded-full bg-secondary-medium dark:bg-ink-muted" aria-hidden="true"></span>
                                             @if ($move['lane'] > 0)
                                                 <span class="-my-1 w-px bg-secondary-light {{ $move['anchor'] === 'start' ? 'ms-1' : ($move['anchor'] === 'end' ? 'me-1' : '') }}" style="height: {{ $move['lane'] * 1.25 }}rem" aria-hidden="true"></span>
                                             @endif
@@ -2341,11 +2362,11 @@ new #[Title('titles.proposal')] class extends Component
                         @endphp
                         <article class="relative min-w-0 ps-6" wire:key="project-{{ $project->id }}" data-project="{{ $project->id }}">
                             {{-- The thread: one mark per funded project, filled once its milestones are all reached. --}}
-                            <span class="absolute start-[0.1875rem] top-5 bottom-0 w-px bg-secondary-soft dark:bg-secondary-medium" aria-hidden="true"></span>
+                            <span class="absolute start-[0.1875rem] top-5 bottom-0 w-px bg-secondary-soft dark:bg-line-strong" aria-hidden="true"></span>
                             <span @class([
                                 'absolute start-0 top-1.5 size-2.5 rounded-full',
-                                'bg-secondary-dark dark:bg-white' => $project->milestones_count > 0 && $project->reached_milestones_count >= $project->milestones_count,
-                                'border-2 border-secondary-dark bg-white dark:border-white dark:bg-secondary-dark' => $project->milestones_count === 0 || $project->reached_milestones_count < $project->milestones_count,
+                                'bg-secondary-dark dark:bg-ink-muted' => $project->milestones_count > 0 && $project->reached_milestones_count >= $project->milestones_count,
+                                'border-2 border-secondary-dark bg-white dark:border-ink-muted dark:bg-surface-1' => $project->milestones_count === 0 || $project->reached_milestones_count < $project->milestones_count,
                             ]) aria-hidden="true"></span>
 
                             <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -2402,7 +2423,7 @@ new #[Title('titles.proposal')] class extends Component
                                         @endphp
                                         <div class="mt-1.5 flex h-1.5 w-full gap-0.5" aria-hidden="true">
                                             @for ($slot = 0; $slot < $slots; $slot++)
-                                                <span @class(['h-full flex-1 rounded-full', 'bg-status-good' => $slot < $filled, 'bg-secondary-soft dark:bg-secondary-medium' => $slot >= $filled])></span>
+                                                <span @class(['h-full flex-1 rounded-full', 'bg-status-good' => $slot < $filled, 'bg-secondary-soft dark:bg-line-strong' => $slot >= $filled])></span>
                                             @endfor
                                         </div>
                                     </div>
@@ -2414,13 +2435,13 @@ new #[Title('titles.proposal')] class extends Component
             @endif
         @elseif ($tab === 'tasks')
             <div class="mb-6 flex flex-wrap items-center justify-end gap-2">
-                <x-ui.button tone="primary" size="sm" icon="plus" class="min-h-10 touch-manipulation" wire:click="openAddTaskModal" data-test="add-proposal-task-button">{{ __('tasks.add_task') }}</x-ui.button>
+                @can('create', App\Models\Task::class)<x-ui.button tone="primary" size="sm" icon="plus" class="min-h-10 touch-manipulation" wire:click="openAddTaskModal" data-test="add-proposal-task-button">{{ __('tasks.add_task') }}</x-ui.button>@endcan
             </div>
 
             @if ($this->tasks->isEmpty())
                 <x-ui.empty-state icon="clipboard-document-list" :heading="__('common.no_tasks_yet')" :body="__('proposals.tasks_delivering_against_this_proposal_will_appear_here')">
                     <x-slot:action>
-                        <x-ui.button size="sm" tone="primary" icon="plus" wire:click="openAddTaskModal">{{ __('tasks.add_task') }}</x-ui.button>
+                        @can('create', App\Models\Task::class)<x-ui.button size="sm" tone="primary" icon="plus" wire:click="openAddTaskModal">{{ __('tasks.add_task') }}</x-ui.button>@endcan
                     </x-slot:action>
                 </x-ui.empty-state>
             @else
@@ -2450,10 +2471,10 @@ new #[Title('titles.proposal')] class extends Component
                     $unassignedCount = $this->tasks->filter(fn (Task $task): bool => $task->taskAssignees->isEmpty())->count();
                     $undatedCount = $this->tasks->whereNull('due_date')->count();
                     $statusTone = [
-                        TaskStatus::Done->value => 'bg-secondary-dark dark:bg-white',
-                        TaskStatus::UnderReview->value => 'bg-secondary-medium dark:bg-secondary-soft',
+                        TaskStatus::Done->value => 'bg-secondary-dark dark:bg-ink',
+                        TaskStatus::UnderReview->value => 'bg-secondary-medium dark:bg-ink-muted',
                         TaskStatus::InProgress->value => 'bg-secondary-light',
-                        TaskStatus::Todo->value => 'bg-secondary-soft dark:bg-secondary-medium',
+                        TaskStatus::Todo->value => 'bg-secondary-soft dark:bg-line-strong',
                     ];
                 @endphp
 
@@ -2515,8 +2536,8 @@ new #[Title('titles.proposal')] class extends Component
                             <header class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b pt-4 pb-3 {{ $hairline }}">
                                 <a href="{{ route('projects.show', $group['project']) }}" wire:navigate class="min-w-0 truncate text-base font-bold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary {{ $inkText }}">{{ $group['project']->name }}</a>
                                 <span class="flex shrink-0 items-center gap-3 text-xs {{ $mutedText }}">
-                                    <span class="h-1 w-24 overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium" aria-hidden="true">
-                                        <span class="block h-full rounded-full bg-secondary-dark dark:bg-white" style="width: {{ round($groupDone / $groupTotal * 100, 2) }}%"></span>
+                                    <span class="h-1 w-24 overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2" aria-hidden="true">
+                                        <span class="block h-full rounded-full bg-secondary-dark dark:bg-ink-muted" style="width: {{ round($groupDone / $groupTotal * 100, 2) }}%"></span>
                                     </span>
                                     <span class="tabular-nums">{{ __('proposals.done_of_total', ['done' => $groupDone, 'total' => $groupTotal]) }}</span>
                                 </span>
@@ -2583,7 +2604,7 @@ new #[Title('titles.proposal')] class extends Component
                                 </div>
                             </div>
 
-                            <div class="mt-3 flex h-2 w-full gap-0.5 overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium" role="img" aria-label="{{ __('proposals.reported_of_target', ['reported' => number_format($achieved, 2), 'target' => number_format($targetValue, 2)]) }}">
+                            <div class="mt-3 flex h-2 w-full gap-0.5 overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2" role="img" aria-label="{{ __('proposals.reported_of_target', ['reported' => number_format($achieved, 2), 'target' => number_format($targetValue, 2)]) }}">
                                 <span class="money-grow h-full rounded-s-full bg-funding" style="width: {{ $achievedPercent }}%"></span>
                                 <span class="money-grow money-pending h-full" style="width: {{ $pendingPercent }}%"></span>
                             </div>
@@ -2635,13 +2656,13 @@ new #[Title('titles.proposal')] class extends Component
                                     <li class="relative flex min-w-0 gap-3 pb-4 last:pb-0" wire:key="deadline-{{ $item['key'] }}" data-deadline="{{ $item['key'] }}">
                                         <span class="relative flex w-3 shrink-0 justify-center" aria-hidden="true">
                                             @unless ($loop->last)
-                                                <span class="absolute top-3 bottom-[-1rem] w-px bg-secondary-soft dark:bg-secondary-medium"></span>
+                                                <span class="absolute top-3 bottom-[-1rem] w-px bg-secondary-soft dark:bg-line-strong"></span>
                                             @endunless
                                             <span @class([
                                                 'relative z-10 mt-1.5 size-2.5 rounded-full',
-                                                'bg-primary' => $state === 'overdue',
-                                                'border-2 border-status-warn bg-white dark:bg-secondary-dark' => $state === 'soon',
-                                                'border-2 border-secondary-light bg-white dark:bg-secondary-dark' => $state === 'later',
+                                                'bg-primary dark:bg-status-critical' => $state === 'overdue',
+                                                'border-2 border-status-warn bg-white dark:bg-surface-1' => $state === 'soon',
+                                                'border-2 border-secondary-light bg-white dark:bg-surface-1' => $state === 'later',
                                             ])></span>
                                         </span>
                                         <div class="flex min-w-0 flex-1 flex-col gap-1 @xl/detail:flex-row @xl/detail:items-baseline @xl/detail:gap-4">
@@ -2678,7 +2699,7 @@ new #[Title('titles.proposal')] class extends Component
             <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
                 <p class="max-w-prose text-xs {{ $mutedText }}">{{ __('proposals.reports_filed_against_the_targets_this_proposal_commits') }}</p>
                 @if ($this->targets->isNotEmpty())
-                    <a href="{{ route('reports.index', ['create' => 1]) }}" wire:navigate class="inline-flex min-h-10 touch-manipulation items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-white hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" data-test="record-report">
+                    <a href="{{ route('reports.index', ['create' => 1]) }}" wire:navigate class="inline-flex min-h-10 touch-manipulation items-center gap-1.5 rounded-lg bg-primary dark:bg-brand dark:hover:bg-brand-hover px-3 text-sm font-semibold text-white hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" data-test="record-report">
                         <flux:icon.plus variant="micro" class="size-4" aria-hidden="true" />
                         {{ __('proposals.record_a_report') }}
                     </a>
@@ -2796,9 +2817,9 @@ new #[Title('titles.proposal')] class extends Component
                                 <li class="relative flex min-w-0 gap-3 pb-5 last:pb-0" wire:key="status-note-{{ $note->id }}">
                                     <span class="relative flex w-3 shrink-0 justify-center" aria-hidden="true">
                                         @unless ($loop->last)
-                                            <span class="absolute top-3 bottom-[-1.25rem] w-px bg-secondary-soft dark:bg-secondary-medium"></span>
+                                            <span class="absolute top-3 bottom-[-1.25rem] w-px bg-secondary-soft dark:bg-line-strong"></span>
                                         @endunless
-                                        <span @class(['relative z-10 mt-1.5 size-2.5 rounded-full', 'bg-primary' => $loop->first, 'bg-secondary-light' => ! $loop->first])></span>
+                                        <span @class(['relative z-10 mt-1.5 size-2.5 rounded-full', 'bg-primary dark:bg-brand' => $loop->first, 'bg-secondary-light' => ! $loop->first])></span>
                                     </span>
 
                                     <div class="min-w-0 flex-1">
@@ -2834,56 +2855,59 @@ new #[Title('titles.proposal')] class extends Component
         <livewire:activity.timeline :subjects="['proposal' => [$this->proposal->id]]" :key="'proposal-activity-'.$this->proposal->id" />
     </section>
 
-    <flux:modal wire:model="showStatusModal" class="w-full max-w-xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <form wire:submit="changeStatus" class="space-y-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ __('proposals.change_status') }}</flux:heading>
-                <flux:subheading>{{ __('proposals.the_new_status_and_your_reason_are_recorded_together_as_one') }}</flux:subheading>
-            </div>
-
-            <x-ui.select wire:model="newStatus" :label="__('proposals.new_status')" required>
+    <x-ui.modal
+        wire:model="showStatusModal"
+        size="md"
+        :title="__('proposals.change_status')"
+        :description="__('proposals.the_new_status_and_your_reason_are_recorded_together_as_one')"
+        submit="changeStatus"
+        required-note
+    >
+        <div class="grid grid-cols-2 gap-x-4 gap-y-4">
+            <x-ui.form-select wire:model="newStatus" :label="__('proposals.new_status')" required autofocus>
                 @foreach (ProposalStatus::cases() as $statusCase)
-                    <flux:select.option :value="$statusCase->value" :wire:key="'change-status-'.$statusCase->value">
-                        {{ $statusCase->label() }} — {{ $statusCase->phase()->label() }}
-                    </flux:select.option>
+                    <flux:select.option :value="$statusCase->value">{{ $statusCase->label() }} — {{ $statusCase->phase()->label() }}</flux:select.option>
                 @endforeach
-            </x-ui.select>
+            </x-ui.form-select>
 
-            <flux:textarea wire:model="statusContext" :label="__('proposals.why_did_it_change')" rows="3" required class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
+            <x-ui.form-input wire:model="statusDate" :label="__('proposals.effective_date')" type="date" required />
 
-            <x-ui.input wire:model="statusDate" :label="__('proposals.effective_date')" type="date" required />
+            <x-ui.form-textarea wire:model="statusContext" :label="__('proposals.why_did_it_change')" required class="col-span-2" />
+        </div>
 
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="$set('showStatusModal', false)">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-status-button">{{ __('proposals.record_change') }}</x-ui.button>
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="save-status-button">{{ __('proposals.record_change') }}</x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
+
+    <x-ui.modal
+        wire:model="showDetailsModal"
+        size="xl"
+        :title="__('proposals.edit_details')"
+        :description="__('proposals.status_moves_through_change_status_so_it_is_always_recorded')"
+        submit="saveDetails"
+        required-note
+    >
+        <x-ui.form-section :title="__('common.section_details')" :fields="['detailsName', 'detailsNotes']">
+            <div class="grid gap-y-3">
+                <x-ui.form-input wire:model="detailsName" :label="__('proposals.proposal_name')" maxlength="255" required autofocus />
+                <x-ui.form-textarea wire:model="detailsNotes" :label="__('common.notes')" />
             </div>
-        </form>
-    </flux:modal>
+        </x-ui.form-section>
 
-    <flux:modal wire:model="showDetailsModal" class="w-full max-w-2xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <form wire:submit="saveDetails" class="space-y-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ __('proposals.edit_details') }}</flux:heading>
-                <flux:subheading>{{ __('proposals.status_moves_through_change_status_so_it_is_always_recorded') }}</flux:subheading>
+        <x-ui.form-section :title="__('common.section_schedule')" :fields="['detailsPlannedBegin', 'detailsPlannedEnd', 'detailsActualBegin', 'detailsActualEnd']">
+            <div class="grid grid-cols-2 gap-x-4 gap-y-3 @4xl/modal:grid-cols-4">
+                <x-ui.form-input wire:model="detailsPlannedBegin" :label="__('proposals.planned_start')" type="date" required />
+                <x-ui.form-input wire:model="detailsPlannedEnd" :label="__('proposals.planned_end')" type="date" required />
+                <x-ui.form-input wire:model="detailsActualBegin" :label="__('proposals.actual_start')" type="date" />
+                <x-ui.form-input wire:model="detailsActualEnd" :label="__('proposals.actual_end')" type="date" />
             </div>
+        </x-ui.form-section>
 
-            <x-ui.input wire:model="detailsName" :label="__('proposals.proposal_name')" type="text" maxlength="255" required />
-
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.input wire:model="detailsPlannedBegin" :label="__('proposals.planned_start')" type="date" required />
-                <x-ui.input wire:model="detailsPlannedEnd" :label="__('proposals.planned_end')" type="date" required />
-                <x-ui.input wire:model="detailsActualBegin" :label="__('proposals.actual_start')" type="date" />
-                <x-ui.input wire:model="detailsActualEnd" :label="__('proposals.actual_end')" type="date" />
-            </div>
-
-            <flux:textarea wire:model="detailsNotes" :label="__('common.notes')" rows="4" class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
-
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="$set('showDetailsModal', false)">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-details-button">{{ __('common.save_changes') }}</x-ui.button>
-            </div>
-        </form>
-    </flux:modal>
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="save-details-button">{{ __('common.save_changes') }}</x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
 
     <x-funding.agreement-modal
         :editing="$editingAgreementId !== null"
@@ -2895,285 +2919,177 @@ new #[Title('titles.proposal')] class extends Component
         :locked-proposal-name="$this->proposal->name"
     />
 
-    <x-funding.transfer-modal
-        :editing="$editingTransferId !== null"
-        :agreement-options="$showTransferModal ? $this->agreementOptions : []"
-        :account-options="$showTransferModal ? $this->accountOptions : []"
-        :confirming-delete="$confirmingTransferDelete"
+    @canany(['transfers.create', 'transfers.update'])
+        <x-funding.transfer-modal
+            :editing="$editingTransferId !== null"
+            :agreement-options="$showTransferModal ? $this->agreementOptions : []"
+            :account-options="$showTransferModal ? $this->accountOptions : []"
+            :confirming-delete="$confirmingTransferDelete"
+        />
+    @endcanany
+
+    <x-ui.confirm-modal
+        wire:model="showUnlinkModal"
+        tone="neutral"
+        :title="__('proposals.stop_funding_this_project')"
+        :message="$unlinkingProjectId !== null && ($unlinking = $this->projects->firstWhere('id', $unlinkingProjectId)) !== null ? __('proposals.unlink_project_consequence', ['name' => $unlinking->name]) : null"
+        confirm="unlinkProject"
+        :confirm-label="__('proposals.unlink_project')"
+        confirm-test="confirm-unlink-project"
     />
 
-    <flux:modal wire:model="showUnlinkModal" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <div class="flex flex-col gap-4">
-            <flux:heading size="lg">{{ __('proposals.stop_funding_this_project') }}</flux:heading>
-            @if ($unlinkingProjectId !== null && ($unlinking = $this->projects->firstWhere('id', $unlinkingProjectId)) !== null)
-                <flux:subheading>{{ __('proposals.unlink_project_consequence', ['name' => $unlinking->name]) }}</flux:subheading>
-            @endif
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="$set('showUnlinkModal', false)">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="button" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="unlinkProject" data-test="confirm-unlink-project">{{ __('proposals.unlink_project') }}</x-ui.button>
-            </div>
-        </div>
-    </flux:modal>
-
-    <flux:modal wire:model="showFileModal" wire:close="closeFileModal" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
+    <x-ui.modal
+        wire:model="showFileModal"
+        size="md"
+        :title="$editingFileId === null ? __('proposals.upload_file') : __('proposals.edit_file')"
+        :description="__('reports.allowed_file_types_and_size', ['types' => \Illuminate\Support\Str::upper(implode(', ', FileType::values())), 'size' => '5 MB'])"
+        submit="saveFile"
+        close="closeFileModal"
+        required-note
+    >
         @if ($showFileModal)
-            <form wire:submit="saveFile" class="space-y-5">
-                <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                    <flux:heading size="lg">{{ $editingFileId === null ? __('proposals.upload_file') : __('proposals.edit_file') }}</flux:heading>
-                    <flux:subheading>{{ __('reports.allowed_file_types_and_size', ['types' => \Illuminate\Support\Str::upper(implode(', ', FileType::values())), 'size' => '5 MB']) }}</flux:subheading>
+            <div class="grid gap-y-4">
+                <x-ui.form-file
+                    wire:model="newFile"
+                    :label="$editingFileId === null ? __('proposals.choose_a_file') : __('reports.replace_file_optional')"
+                    :accept="collect(FileType::values())->map(fn ($extension) => '.'.$extension)->implode(',')"
+                    :required="$editingFileId === null"
+                />
+
+                <div class="grid grid-cols-2 gap-x-4 gap-y-4">
+                    <x-ui.form-select wire:model="fileCategory" :label="__('proposals.file_category')" :placeholder="__('common.select')" required>
+                        @foreach (MediaCollection::cases() as $collectionOption)
+                            @continue(in_array($collectionOption->value, $this->hiddenCollections(), true))
+                            <flux:select.option :value="$collectionOption->value">{{ $collectionOption->label() }}</flux:select.option>
+                        @endforeach
+                    </x-ui.form-select>
+
+                    <x-ui.form-input wire:model="fileDisplayName" :label="__('proposals.file_display_name')" :placeholder="$editingFileId === null ? __('reports.defaults_to_the_uploaded_file_name') : null" :required="$editingFileId !== null" />
                 </div>
-
-                <div>
-                    <x-ui.input
-                        type="file"
-                        wire:model="newFile"
-                        :label="$editingFileId === null ? __('proposals.choose_a_file') : __('reports.replace_file_optional')"
-                        accept="{{ collect(FileType::values())->map(fn ($extension) => '.'.$extension)->implode(',') }}"
-                        :required="$editingFileId === null"
-                    />
-                    <p wire:loading wire:target="newFile" class="mt-1.5 text-xs text-secondary-medium dark:text-secondary-soft">{{ __('reports.uploading') }}</p>
-                </div>
-
-                <x-ui.select wire:model="fileCategory" :label="__('proposals.file_category')" required>
-                    <flux:select.option value="">{{ __('common.select') }}</flux:select.option>
-                    @foreach (MediaCollection::cases() as $collectionOption)
-                        <flux:select.option :value="$collectionOption->value" :wire:key="'file-category-option-'.$collectionOption->value">{{ $collectionOption->label() }}</flux:select.option>
-                    @endforeach
-                </x-ui.select>
-
-                <x-ui.input wire:model="fileDisplayName" :label="__('proposals.file_display_name')" :placeholder="$editingFileId === null ? __('reports.defaults_to_the_uploaded_file_name') : null" :required="$editingFileId !== null" />
-
-                <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                    <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="closeFileModal">{{ __('common.cancel') }}</x-ui.button>
-                    <x-ui.button type="submit" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:loading.attr="disabled" wire:target="newFile,saveFile" data-test="save-proposal-file-button">
-                        {{ $editingFileId === null ? __('proposals.upload_file') : __('common.save_changes') }}
-                    </x-ui.button>
-                </div>
-            </form>
+            </div>
         @endif
-    </flux:modal>
 
-    <flux:modal wire:model="showPreviewModal" wire:close="closePreview" class="w-full max-w-5xl border border-secondary-light! bg-white! p-0! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        @if ($showPreviewModal && ($previewFile = $this->documents->firstWhere('id', $previewingFileId)) !== null)
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" wire:loading.attr="disabled" wire:target="newFile,saveFile" data-test="save-proposal-file-button">
+                {{ $editingFileId === null ? __('proposals.upload_file') : __('common.save_changes') }}
+            </x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
+
+    @php
+        $previewFile = $showPreviewModal ? $this->documents->firstWhere('id', $previewingFileId) : null;
+        $previewMeta = $previewFile === null ? null : collect([
+            \Illuminate\Support\Str::upper($previewFile->type->value),
+            $previewFile->collection->label(),
+            $previewFile->mediable_type === 'project' && $previewFile->mediable !== null ? $previewFile->mediable->name : null,
+            $previewFile->size !== null ? \Illuminate\Support\Number::fileSize($previewFile->size, precision: 1) : null,
+            $this->documents->count() > 1 ? __('reports.preview_position', [
+                'position' => $this->documents->search(fn ($candidate) => $candidate->id === $previewFile->id) + 1,
+                'total' => $this->documents->count(),
+            ]) : null,
+        ])->filter()->implode(' · ');
+    @endphp
+
+    <x-ui.modal
+        wire:model="showPreviewModal"
+        size="xl"
+        :title="$previewFile?->original_name ?? ''"
+        :description="$previewMeta"
+        close="closePreview"
+        :cancel-label="__('common.close')"
+        flush
+    >
+        @if ($previewFile !== null)
             @php
                 $previewName = $previewFile->original_name;
                 $previewUrl = route('proposals.files.preview', [$this->proposal, $previewFile]);
                 $previewDownloadUrl = $this->documentDownloadUrl($previewFile);
-                $previewPosition = $this->documents->search(fn ($candidate) => $candidate->id === $previewFile->id) + 1;
             @endphp
+
+            <x-slot:headerActions>
+                @if ($this->documents->count() > 1)
+                    <x-ui.button tone="ghost" size="sm" icon="chevron-left" class="size-9! touch-manipulation rtl:[&_svg]:-scale-x-100" wire:click="previewAdjacent(-1)" :aria-label="__('reports.previous_file')" />
+                    <x-ui.button tone="ghost" size="sm" icon="chevron-right" class="size-9! touch-manipulation rtl:[&_svg]:-scale-x-100" wire:click="previewAdjacent(1)" :aria-label="__('reports.next_file')" />
+                @endif
+                @if ($previewFile->isPreviewable())
+                    <a href="{{ $previewUrl }}" target="_blank" rel="noopener" class="inline-flex size-9 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-ink-muted dark:hover:bg-surface-2 dark:hover:text-ink" aria-label="{{ __('reports.open_in_new_tab') }}">
+                        <flux:icon name="arrow-top-right-on-square" variant="micro" class="size-4" />
+                    </a>
+                @endif
+                <a href="{{ $previewDownloadUrl }}" class="inline-flex size-9 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-ink-muted dark:hover:bg-surface-2 dark:hover:text-ink" aria-label="{{ __('common.download_name', ['name' => $previewName]) }}">
+                    <flux:icon name="arrow-down-tray" variant="micro" class="size-4" />
+                </a>
+            </x-slot:headerActions>
+
             <div
-                class="flex max-h-[90dvh] flex-col"
+                class="bg-board-head dark:bg-surface-2"
                 wire:key="preview-{{ $previewFile->id }}"
                 x-data
                 x-on:keydown.left.window="$wire.previewAdjacent(document.dir === 'rtl' ? 1 : -1)"
                 x-on:keydown.right.window="$wire.previewAdjacent(document.dir === 'rtl' ? -1 : 1)"
                 data-preview
             >
-                <div class="flex flex-wrap items-center gap-3 border-b border-secondary-soft py-3 ps-5 pe-14 dark:border-secondary-medium">
-                    <div class="min-w-0 flex-1">
-                        <flux:heading size="lg" class="truncate" title="{{ $previewName }}">{{ $previewName }}</flux:heading>
-                        <p class="flex flex-wrap items-center gap-x-1.5 text-xs tabular-nums text-secondary-medium dark:text-secondary-soft">
-                            <span class="font-bold">{{ \Illuminate\Support\Str::upper($previewFile->type->value) }}</span>
-                            <span aria-hidden="true">&middot;</span>
-                            <span>{{ $previewFile->collection->label() }}</span>
-                            @if ($previewFile->mediable_type === 'project' && $previewFile->mediable !== null)
-                                <span aria-hidden="true">&middot;</span>
-                                <span>{{ $previewFile->mediable->name }}</span>
-                            @endif
-                            @if ($previewFile->size !== null)
-                                <span aria-hidden="true">&middot;</span>
-                                <span>{{ \Illuminate\Support\Number::fileSize($previewFile->size, precision: 1) }}</span>
-                            @endif
-                            @if ($this->documents->count() > 1)
-                                <span aria-hidden="true">&middot;</span>
-                                <span>{{ __('reports.preview_position', ['position' => $previewPosition, 'total' => $this->documents->count()]) }}</span>
-                            @endif
-                        </p>
+                @if (! $previewFile->isStored())
+                    <x-ui.empty-state icon="eye-slash" :heading="__('reports.preview_not_available')" :body="__('reports.this_record_has_no_stored_file')" />
+                @elseif ($previewFile->type === FileType::Pdf)
+                    <iframe src="{{ $previewUrl }}#view=FitH" title="{{ $previewName }}" class="h-[75dvh] w-full border-0 bg-white" data-test="pdf-preview"></iframe>
+                @elseif ($previewFile->isPreviewable())
+                    <div class="flex min-h-[50dvh] items-center justify-center p-4">
+                        <img src="{{ $previewUrl }}" alt="{{ $previewName }}" class="max-h-[75dvh] max-w-full rounded-lg object-contain shadow-sm" data-test="image-preview" data-no-dim />
                     </div>
+                @else
+                    {{-- Word/Excel: rendered client-side by resources/js/file-preview.js from the authenticated download route. --}}
+                    <div
+                        wire:ignore
+                        x-data="officePreview(@js(['url' => $previewDownloadUrl, 'type' => $previewFile->type->value]))"
+                        class="flex h-[75dvh] flex-col"
+                        data-test="office-preview"
+                    >
+                        <div x-show="sheets.length > 1" class="flex shrink-0 gap-1 overflow-x-auto border-b border-secondary-soft bg-white px-3 py-2 dark:border-line dark:bg-surface-1">
+                            <template x-for="(sheetName, index) in sheets" :key="index">
+                                <button
+                                    type="button"
+                                    x-on:click="showSheet(index)"
+                                    x-text="sheetName"
+                                    class="shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold whitespace-nowrap"
+                                    :class="index === activeSheet ? 'bg-primary dark:bg-ink dark:text-surface-0 text-white' : 'text-secondary-medium hover:bg-secondary-soft dark:text-ink-muted dark:hover:bg-surface-2'"
+                                ></button>
+                            </template>
+                        </div>
 
-                    <div class="flex shrink-0 items-center gap-1">
-                        @if ($this->documents->count() > 1)
-                            <x-ui.button tone="ghost" size="sm" icon="chevron-left" class="size-9! touch-manipulation rtl:[&_svg]:-scale-x-100" wire:click="previewAdjacent(-1)" :aria-label="__('reports.previous_file')" />
-                            <x-ui.button tone="ghost" size="sm" icon="chevron-right" class="size-9! touch-manipulation rtl:[&_svg]:-scale-x-100" wire:click="previewAdjacent(1)" :aria-label="__('reports.next_file')" />
-                        @endif
-                        @if ($previewFile->isPreviewable())
-                            <a href="{{ $previewUrl }}" target="_blank" rel="noopener" class="inline-flex size-9 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-secondary-soft dark:hover:bg-secondary-medium dark:hover:text-white" aria-label="{{ __('reports.open_in_new_tab') }}">
-                                <flux:icon name="arrow-top-right-on-square" variant="micro" class="size-4" />
-                            </a>
-                        @endif
-                        <a href="{{ $previewDownloadUrl }}" class="inline-flex size-9 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-secondary-soft dark:hover:bg-secondary-medium dark:hover:text-white" aria-label="{{ __('common.download_name', ['name' => $previewName]) }}">
-                            <flux:icon name="arrow-down-tray" variant="micro" class="size-4" />
-                        </a>
+                        <div x-show="status === 'loading'" class="flex flex-1 items-center justify-center gap-2 text-sm text-secondary-medium dark:text-ink-muted">
+                            <flux:icon.loading class="size-5" />
+                            {{ __('reports.loading_preview') }}
+                        </div>
+
+                        <div x-show="status === 'error'" x-cloak class="flex-1">
+                            <x-ui.empty-state icon="exclamation-triangle" :heading="__('reports.preview_not_available')" :body="__('reports.this_file_could_not_be_previewed')">
+                                <x-slot:action>
+                                    <a href="{{ $previewDownloadUrl }}" class="inline-flex items-center gap-1.5 rounded-lg bg-primary dark:bg-brand dark:hover:bg-brand-hover px-3 py-2 text-sm font-semibold text-white hover:opacity-90">
+                                        <flux:icon name="arrow-down-tray" variant="micro" class="size-4" />
+                                        {{ __('common.download_name', ['name' => $previewName]) }}
+                                    </a>
+                                </x-slot:action>
+                            </x-ui.empty-state>
+                        </div>
+
+                        <div x-show="status === 'ready'" x-cloak x-ref="canvas" class="min-h-0 flex-1 overflow-auto"></div>
+
+                        <p x-show="truncated" x-cloak class="shrink-0 border-t border-secondary-soft bg-white px-3 py-2 text-xs text-secondary-medium dark:border-line dark:bg-surface-1 dark:text-ink-muted">{{ __('reports.sheet_preview_truncated', ['rows' => 500]) }}</p>
                     </div>
-                </div>
-
-                <div class="min-h-0 flex-1 overflow-auto bg-board-head dark:bg-secondary-medium/20">
-                    @if (! $previewFile->isStored())
-                        <x-ui.empty-state icon="eye-slash" :heading="__('reports.preview_not_available')" :body="__('reports.this_record_has_no_stored_file')" />
-                    @elseif ($previewFile->type === FileType::Pdf)
-                        <iframe src="{{ $previewUrl }}#view=FitH" title="{{ $previewName }}" class="h-[75dvh] w-full border-0 bg-white" data-test="pdf-preview"></iframe>
-                    @elseif ($previewFile->isPreviewable())
-                        <div class="flex min-h-[50dvh] items-center justify-center p-4">
-                            <img src="{{ $previewUrl }}" alt="{{ $previewName }}" class="max-h-[75dvh] max-w-full rounded-lg object-contain shadow-sm" data-test="image-preview" />
-                        </div>
-                    @else
-                        {{-- Word/Excel: rendered client-side by resources/js/file-preview.js from the authenticated download route. --}}
-                        <div
-                            wire:ignore
-                            x-data="officePreview(@js(['url' => $previewDownloadUrl, 'type' => $previewFile->type->value]))"
-                            class="flex h-[75dvh] flex-col"
-                            data-test="office-preview"
-                        >
-                            <div x-show="sheets.length > 1" class="flex shrink-0 gap-1 overflow-x-auto border-b border-secondary-soft bg-white px-3 py-2 dark:border-secondary-medium dark:bg-secondary-dark">
-                                <template x-for="(sheetName, index) in sheets" :key="index">
-                                    <button
-                                        type="button"
-                                        x-on:click="showSheet(index)"
-                                        x-text="sheetName"
-                                        class="shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold whitespace-nowrap"
-                                        :class="index === activeSheet ? 'bg-primary text-white' : 'text-secondary-medium hover:bg-secondary-soft dark:text-secondary-soft dark:hover:bg-secondary-medium'"
-                                    ></button>
-                                </template>
-                            </div>
-
-                            <div x-show="status === 'loading'" class="flex flex-1 items-center justify-center gap-2 text-sm text-secondary-medium dark:text-secondary-soft">
-                                <flux:icon.loading class="size-5" />
-                                {{ __('reports.loading_preview') }}
-                            </div>
-
-                            <div x-show="status === 'error'" x-cloak class="flex-1">
-                                <x-ui.empty-state icon="exclamation-triangle" :heading="__('reports.preview_not_available')" :body="__('reports.this_file_could_not_be_previewed')">
-                                    <x-slot:action>
-                                        <a href="{{ $previewDownloadUrl }}" class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:opacity-90">
-                                            <flux:icon name="arrow-down-tray" variant="micro" class="size-4" />
-                                            {{ __('common.download_name', ['name' => $previewName]) }}
-                                        </a>
-                                    </x-slot:action>
-                                </x-ui.empty-state>
-                            </div>
-
-                            <div x-show="status === 'ready'" x-cloak x-ref="canvas" class="min-h-0 flex-1 overflow-auto"></div>
-
-                            <p x-show="truncated" x-cloak class="shrink-0 border-t border-secondary-soft bg-white px-3 py-2 text-xs text-secondary-medium dark:border-secondary-medium dark:bg-secondary-dark dark:text-secondary-soft">{{ __('reports.sheet_preview_truncated', ['rows' => 500]) }}</p>
-                        </div>
-                    @endif
-                </div>
+                @endif
             </div>
         @endif
-    </flux:modal>
+    </x-ui.modal>
 
-    <flux:modal wire:model="confirmingFileDelete" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <div class="flex flex-col gap-4">
-            <flux:heading size="lg">{{ __('proposals.delete_this_file') }}</flux:heading>
-            @if ($deletingFileId !== null && ($deletingMedia = $this->proposalFiles->firstWhere('id', $deletingFileId)) !== null)
-                <flux:subheading>{{ __('proposals.deleting_the_file_also_removes_it_from_storage', ['name' => $deletingMedia->original_name]) }}</flux:subheading>
-            @endif
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="$set('confirmingFileDelete', false)">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="button" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="deleteFile" data-test="confirm-delete-proposal-file">{{ __('proposals.delete_this_file') }}</x-ui.button>
-            </div>
-        </div>
-    </flux:modal>
+    <x-ui.confirm-modal
+        wire:model="confirmingFileDelete"
+        :title="__('proposals.delete_this_file')"
+        :message="$deletingFileId !== null && ($deletingMedia = $this->proposalFiles->firstWhere('id', $deletingFileId)) !== null ? __('proposals.deleting_the_file_also_removes_it_from_storage', ['name' => $deletingMedia->original_name]) : null"
+        confirm="deleteFile"
+        :confirm-label="__('proposals.delete_this_file')"
+        confirm-test="confirm-delete-proposal-file"
+    />
 
-    @php
-        $selectedNewTaskAssigneeOptions = $this->userOptions->whereIn('id', collect($newTaskAssignedTo)->map(fn ($id) => (int) $id));
-        $newTaskAssigneeTriggerLabel = match (true) {
-            $selectedNewTaskAssigneeOptions->isEmpty() => __('common.select'),
-            $selectedNewTaskAssigneeOptions->count() <= 2 => $selectedNewTaskAssigneeOptions->pluck('name')->implode(', '),
-            default => __('common.count_selected', ['count' => $selectedNewTaskAssigneeOptions->count()]),
-        };
-    @endphp
-
-    <flux:modal name="proposal-add-task-modal" wire:model="showAddTaskModal" wire:close="closeAddTaskModal" class="w-full max-w-2xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <form wire:submit="addTask" class="flex flex-col gap-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ __('tasks.add_task') }}</flux:heading>
-            </div>
-
-            <x-ui.input wire:model="newTaskTitle" :label="__('tasks.task_title')" type="text" maxlength="255" required autofocus data-test="new-proposal-task-title-input" />
-
-            <div class="grid gap-5 sm:grid-cols-2">
-                <div class="min-w-0">
-                    <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft" id="new-proposal-task-status-label">{{ __('common.status') }}</label>
-                    <div class="grid grid-cols-2 gap-1.5" role="radiogroup" aria-labelledby="new-proposal-task-status-label">
-                        @foreach (TaskStatus::cases() as $statusCase)
-                            @php $isNewTaskStatusSelected = $newTaskStatus === $statusCase->value; @endphp
-                            <button
-                                type="button"
-                                role="radio"
-                                aria-checked="{{ $isNewTaskStatusSelected ? 'true' : 'false' }}"
-                                wire:click="$set('newTaskStatus', '{{ $statusCase->value }}')"
-                                @class([
-                                    'inline-flex min-h-10 cursor-pointer touch-manipulation items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-semibold whitespace-nowrap transition-colors',
-                                    'border-secondary-dark bg-secondary-dark text-white dark:border-white dark:bg-white dark:text-secondary-dark' => $isNewTaskStatusSelected,
-                                    'border-secondary-light text-secondary-medium hover:border-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => ! $isNewTaskStatusSelected,
-                                ])
-                                data-test="new-proposal-task-status-{{ $statusCase->value }}"
-                            >
-                                {{ $statusCase->label() }}
-                            </button>
-                        @endforeach
-                    </div>
-                    <flux:error name="newTaskStatus" class="mt-1.5" />
-                </div>
-
-                <div class="min-w-0">
-                    <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft" id="new-proposal-task-priority-label">{{ __('tasks.priority') }}</label>
-                    <div class="grid grid-cols-3 gap-1.5" role="radiogroup" aria-labelledby="new-proposal-task-priority-label">
-                        @foreach (TaskPriority::cases() as $priorityCase)
-                            @php $isNewTaskPrioritySelected = $newTaskPriority === $priorityCase->value; @endphp
-                            <button
-                                type="button"
-                                role="radio"
-                                aria-checked="{{ $isNewTaskPrioritySelected ? 'true' : 'false' }}"
-                                wire:click="$set('newTaskPriority', '{{ $priorityCase->value }}')"
-                                @class([
-                                    'inline-flex min-h-10 cursor-pointer touch-manipulation items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-semibold whitespace-nowrap transition-colors',
-                                    'border-secondary-dark bg-secondary-dark text-white dark:border-secondary-medium dark:bg-secondary-medium' => $isNewTaskPrioritySelected,
-                                    'border-secondary-light text-secondary-medium hover:border-secondary-medium hover:text-secondary-dark dark:text-secondary-soft dark:hover:text-white' => ! $isNewTaskPrioritySelected,
-                                ])
-                                data-test="new-proposal-task-priority-{{ $priorityCase->value }}"
-                            >
-                                {{ $priorityCase->label() }}
-                            </button>
-                        @endforeach
-                    </div>
-                    <flux:error name="newTaskPriority" class="mt-1.5" />
-                </div>
-            </div>
-
-            <div class="min-w-0">
-                <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-secondary-soft">{{ __('tasks.assignees') }}</label>
-                <x-ui.multi-select-popover
-                    :label="__('tasks.assignees')"
-                    in-modal
-                    class="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-secondary-light bg-white px-3 py-2 text-start text-sm dark:border-secondary-light dark:bg-secondary-medium"
-                    data-test="new-proposal-task-assignee-picker"
-                >
-                    <x-slot:trigger>
-                        <span class="min-w-0 truncate">{{ $newTaskAssigneeTriggerLabel }}</span>
-                        <flux:icon.chevron-up-down class="size-4 shrink-0 text-secondary-medium dark:text-secondary-soft" aria-hidden="true" />
-                    </x-slot:trigger>
-
-                    @foreach ($this->userOptions as $userOption)
-                        <label
-                            x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
-                            class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-secondary-soft dark:hover:bg-secondary-medium"
-                        >
-                            <input type="checkbox" wire:model.live="newTaskAssignedTo" value="{{ $userOption->id }}" class="rounded border-secondary-light text-primary focus:ring-primary" data-test="new-proposal-task-assignee-checkbox-{{ $userOption->id }}" />
-                            <span class="min-w-0 truncate">{{ $userOption->name }} · {{ $userOption->secondary_name }}</span>
-                        </label>
-                    @endforeach
-                </x-ui.multi-select-popover>
-                <flux:error name="newTaskAssignedTo" class="mt-1.5" />
-            </div>
-
-            <x-ui.input wire:model="newTaskDueDate" :label="__('tasks.due_date_2')" type="date" />
-
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" wire:click="closeAddTaskModal">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" data-test="save-new-proposal-task-button">{{ __('tasks.add_task') }}</x-ui.button>
-            </div>
-        </form>
-    </flux:modal>
+    <x-tasks.add-task-modal test-prefix="new-proposal-task" :user-options="$this->userOptions" />
 </section>

@@ -9,30 +9,18 @@ test('the permission catalog config drives permission names', function () {
 });
 
 test('creating the Super Admin role grants it every permission that exists', function () {
-    // A "Super Admin" row may already exist from the data migration that
-    // assigns it to known accounts (2026_09_18_154600_...); delete it first
-    // so this test observes a genuine `created` event, not a no-op findOrCreate.
+    // The seeded catalog already has a "Super Admin" row; delete it so this
+    // test observes a genuine `created` event, not a no-op findOrCreate.
     Role::query()->where('name', 'Super Admin')->delete();
-
-    Permission::query()->create(['name' => 'programs.view', 'guard_name' => 'web']);
-    Permission::query()->create(['name' => 'programs.delete', 'guard_name' => 'web']);
 
     $role = Role::query()->create(['name' => 'Super Admin', 'guard_name' => 'web']);
 
     expect($role->fresh()->permissions->pluck('name')->all())
-        ->toEqualCanonicalizing(['programs.view', 'programs.delete']);
+        ->toEqualCanonicalizing(Permission::query()->pluck('name')->all());
 });
 
 test('creating a configured role grants exactly its baseline', function () {
-    Permission::query()->create(['name' => 'reports.view', 'guard_name' => 'web']);
-    Permission::query()->create(['name' => 'reports.create', 'guard_name' => 'web']);
-    Permission::query()->create(['name' => 'reports.update', 'guard_name' => 'web']);
-    Permission::query()->create(['name' => 'programs.view', 'guard_name' => 'web']);
-    Permission::query()->create(['name' => 'projects.view', 'guard_name' => 'web']);
-    Permission::query()->create(['name' => 'calendar.view', 'guard_name' => 'web']);
-    Permission::query()->create(['name' => 'tasks.view', 'guard_name' => 'web']);
-    Permission::query()->create(['name' => 'tasks.create', 'guard_name' => 'web']);
-    Permission::query()->create(['name' => 'tasks.update', 'guard_name' => 'web']);
+    Role::query()->where('name', 'Media Team')->delete();
 
     $role = Role::query()->create(['name' => 'Media Team', 'guard_name' => 'web']);
 

@@ -95,10 +95,10 @@
             x-bind:style="bottom === null ? `top: ${top}px; left: ${left}px;` : `bottom: ${bottom}px; left: ${left}px;`"
             role="listbox"
             aria-multiselectable="true"
-            class="fixed inset-auto m-0 w-64 overflow-visible rounded-lg border border-secondary-soft bg-white p-1 text-inherit shadow-lg transition-opacity duration-100 starting:open:opacity-0 dark:border-secondary-medium dark:bg-secondary-dark"
+            class="fixed inset-auto m-0 w-64 overflow-visible rounded-lg border border-secondary-soft bg-white p-1 text-inherit shadow-lg transition-opacity duration-100 starting:open:opacity-0 dark:border-line dark:bg-surface-3 dark:shadow-raised"
         >
             @if ($searchable)
-                <div class="border-b border-secondary-soft p-1.5 dark:border-secondary-medium">
+                <div class="border-b border-secondary-soft p-1.5 dark:border-line">
                     <x-ui.input type="search" size="sm" icon="magnifying-glass" x-ref="search" x-model="optionSearch" x-on:keydown.enter.prevent :aria-label="$label" :placeholder="$label" />
                 </div>
             @endif
@@ -116,10 +116,10 @@
                 x-bind:style="`top: ${top}px; left: ${left}px;`"
                 role="listbox"
                 aria-multiselectable="true"
-                class="fixed z-50 w-64 rounded-lg border border-secondary-soft bg-white p-1 shadow-lg dark:border-secondary-medium dark:bg-secondary-dark"
+                class="fixed z-50 w-64 rounded-lg border border-secondary-soft bg-white p-1 shadow-lg dark:border-line dark:bg-surface-3 dark:shadow-raised"
             >
                 @if ($searchable)
-                    <div class="border-b border-secondary-soft p-1.5 dark:border-secondary-medium">
+                    <div class="border-b border-secondary-soft p-1.5 dark:border-line">
                         <x-ui.input type="search" size="sm" icon="magnifying-glass" x-ref="search" x-model="optionSearch" :aria-label="$label" :placeholder="$label" />
                     </div>
                 @endif

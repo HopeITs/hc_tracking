@@ -44,7 +44,7 @@ test('every page links the manifest and title bar colours matching the header', 
         ->get(route('dashboard'))
         ->assertSeeHtml('rel="manifest"')
         ->assertSeeHtml('<meta name="theme-color" content="#dcddde" media="(prefers-color-scheme: light)" data-theme-color="light">')
-        ->assertSeeHtml('<meta name="theme-color" content="#58595b" media="(prefers-color-scheme: dark)" data-theme-color="dark">')
+        ->assertSeeHtml('<meta name="theme-color" content="#1c1d20" media="(prefers-color-scheme: dark)" data-theme-color="dark">')
         ->assertSeeHtml('data-notification-toasts')
         ->assertSeeHtml('id="hc-notification-labels"');
 });
@@ -90,12 +90,72 @@ test('a pushed notification carries the link that marks it read', function () {
         ->toBe(route('notifications.read', $notification->id));
 });
 
-test('the settings page offers the desktop app install', function () {
-    $this->actingAs(Activity::withoutRecording(fn () => User::factory()->create()))
-        ->get(route('notification-settings.edit'))
-        ->assertSeeText(__('notifications.app.heading'))
-        ->assertSeeHtml('data-test="install-app-button"')
-        ->assertSeeHtml('data-app-install-hint');
+function desktopAppPage(string $routeName): DOMXPath
+{
+    $response = test()->actingAs(Activity::withoutRecording(fn () => User::factory()->create()))
+        ->get(route($routeName))
+        ->assertOk();
+
+    $document = new DOMDocument;
+    $document->loadHTML($response->getContent(), LIBXML_NOERROR | LIBXML_NOWARNING);
+
+    return new DOMXPath($document);
+}
+
+test('the settings page offers the desktop app install through the install modal', function () {
+    $xpath = desktopAppPage('notification-settings.edit');
+
+    $installButton = $xpath->query('//*[@data-test="install-app-button"]')->item(0);
+
+    expect(trim($xpath->query('//*[@id="desktop-app-heading"]')->item(0)->textContent))->toBe(__('notifications.app.heading'))
+        ->and($xpath->query('//*[@data-app-install-hint]')->length)->toBe(1)
+        ->and($installButton->getAttribute('x-on:click'))->toBe("\$flux.modal('install-app').show()");
+});
+
+test('both top headers offer the desktop app install as an icon with a tooltip, right before the notification bell', function () {
+    $xpath = desktopAppPage('dashboard');
+
+    $installButtons = $xpath->query('//*[@data-test="header-install-app-button"]');
+
+    expect($installButtons->length)->toBe(2);
+
+    foreach ($installButtons as $installButton) {
+        $tooltip = $xpath->query('ancestor::*[@data-flux-tooltip][1]', $installButton)->item(0);
+
+        expect(trim($installButton->textContent))->toBe('')
+            ->and($installButton->getAttribute('aria-label'))->toBe(__('notifications.app.tooltip'))
+            ->and($installButton->getAttribute('x-on:click'))->toBe("\$flux.modal('install-app').show()");
+
+        expect(trim($xpath->query('.//*[@data-flux-tooltip-content]', $tooltip)->item(0)->textContent))->toBe(__('notifications.app.tooltip'))
+            ->and($tooltip->getAttribute('x-show'))->toBe("state === 'available'")
+            ->and($xpath->query('following-sibling::*[1][@data-notification-bell]', $tooltip)->length)->toBe(1);
+    }
+});
+
+test('signed-in pages carry one install modal that explains the app before the browser confirms', function () {
+    $xpath = desktopAppPage('dashboard');
+
+    $modals = $xpath->query('//dialog[@data-modal="install-app"]');
+
+    expect($modals->length)->toBe(1);
+
+    $modal = $modals->item(0);
+
+    expect(preg_replace('/\s+/', ' ', $modal->textContent))->toContain(
+        __('notifications.app.install'),
+        __('notifications.app.description'),
+        __('notifications.app.window_title'),
+        __('notifications.app.window_text'),
+        __('notifications.app.alerts_title'),
+        __('notifications.app.alerts_text'),
+        __('notifications.app.live_title'),
+        __('notifications.app.live_text'),
+        __('notifications.app.confirm_next'),
+        __('notifications.app.not_now'),
+    );
+
+    expect($xpath->query('.//*[@data-install-reason]', $modal)->length)->toBe(3)
+        ->and($xpath->query('.//*[@data-test="install-app-confirm"]', $modal)->item(0)->getAttribute('x-on:click'))->toBe('install()');
 });
 
 test('every module has a desktop icon for both popup urgencies', function () {

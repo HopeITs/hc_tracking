@@ -14,7 +14,14 @@ export default defineConfig({
         }),
         tailwindcss(),
     ]),
+    build: {
+        // apexcharts and xlsx are single vendor libraries, already split into their own lazy chunks.
+        chunkSizeWarningLimit: 600,
+    },
     server: {
+        // An IPv4 host: browsers cannot match an IPv6 literal such as [::1] in
+        // a Content-Security-Policy, so the dev server would be blocked.
+        host: '127.0.0.1',
         cors: true,
         watch: {
             ignored: [

@@ -81,7 +81,14 @@ class NotificationDemoSeeder extends Seeder
         $employeeId = (int) $recipient->employee_id;
         $now = CarbonImmutable::now();
 
-        $task = Task::query()->whereNull('parent_task_id')->inRandomOrder()->first();
+        // Only a task these updates really change: an already-high or
+        // under-review task would make them no-ops and leave no burst to group.
+        $task = Task::query()
+            ->whereNull('parent_task_id')
+            ->where('priority', '!=', TaskPriority::High->value)
+            ->where('status', '!=', TaskStatus::UnderReview->value)
+            ->inRandomOrder()
+            ->first();
 
         if ($task !== null) {
             $this->at($now->subDays(9), fn () => $task->taskAssignees()->firstOrCreate(['employee_id' => $employeeId]));

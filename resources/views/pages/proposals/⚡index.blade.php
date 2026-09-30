@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\Like;
 use App\Enums\ArStatus;
 use App\Enums\ProposalPhase;
 use App\Enums\ProposalStatus;
@@ -9,6 +10,7 @@ use App\Models\DonorProposal;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalStatusNote;
+use App\Models\Scopes\TaskVisibilityScope;
 use App\Models\TransfersTracking;
 use App\Notifications\UnreadSubjects;
 use Flux\Flux;
@@ -19,6 +21,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -40,12 +43,15 @@ new #[Title('titles.proposals')] class extends Component {
     public string $donor = '';
 
     public bool $showProposalModal = false;
+    #[Locked]
     public ?int $editingProposalId = null;
 
     public bool $showDeleteModal = false;
+    #[Locked]
     public ?int $deletingProposalId = null;
 
     public bool $showStageModal = false;
+    #[Locked]
     public ?int $stageProposalId = null;
     public string $newStatus = '';
     public string $statusContext = '';
@@ -97,8 +103,28 @@ new #[Title('titles.proposals')] class extends Component {
      */
     public function toggleDonor(int $donorId): void
     {
+        if (! $this->canViewAgreements()) {
+            return;
+        }
+
         $this->donor = $this->donor === (string) $donorId ? '' : (string) $donorId;
         $this->resetPage();
+    }
+
+    /**
+     * Whether the viewer may see funding agreements and the budgets on them.
+     */
+    protected function canViewAgreements(): bool
+    {
+        return auth()->user()?->can('funding-agreements.view') ?? false;
+    }
+
+    /**
+     * Whether the viewer may see transfers and the amounts sent and received.
+     */
+    protected function canViewTransfers(): bool
+    {
+        return auth()->user()?->can('transfers.view') ?? false;
     }
 
     /**
@@ -112,12 +138,13 @@ new #[Title('titles.proposals')] class extends Component {
     protected function filteredQuery(bool $withPhase = true): Builder
     {
         $search = trim($this->search);
-        $donorId = (int) $this->donor;
+        // The donor filter narrows by funding agreements, so it only applies to a viewer who may see them.
+        $donorId = $this->canViewAgreements() ? (int) $this->donor : 0;
 
         return Proposal::query()
             ->when($search !== '', function (Builder $query) use ($search): void {
                 $query->where(function (Builder $query) use ($search): void {
-                    $query->where('name', 'like', '%'.$search.'%')->orWhere('notes', 'like', '%'.$search.'%');
+                    $query->where('name', 'like', Like::contains($search))->orWhere('notes', 'like', Like::contains($search));
                 });
             })
             ->when(ProposalStatus::tryFrom($this->status), fn (Builder $query, ProposalStatus $status) => $query->where('status', $status))
@@ -146,20 +173,31 @@ new #[Title('titles.proposals')] class extends Component {
     public function proposals(): LengthAwarePaginator
     {
         $today = now()->toDateString();
+        $canTransfers = $this->canViewTransfers();
+
+        $relations = [
+            'projects' => fn ($query) => $query->select(['projects.id', 'projects.name', 'projects.status'])->orderBy('projects.name'),
+            'statusNotes' => fn ($query) => $query->select(['id', 'proposal_id', 'status', 'context', 'date'])->orderByDesc('date')->orderByDesc('id')->limit(1),
+        ];
+
+        // Agreements, and the tranches behind them, load only for a viewer who may see them.
+        if ($this->canViewAgreements()) {
+            $relations['donorProposals'] = fn ($query) => $query->select(['id', 'proposal_id', 'donor_id', 'budget', 'currency', 'project_num'])->orderBy('id');
+            $relations['donorProposals.donor'] = fn ($query) => $query->select(['id', 'name']);
+            $relations['donorProposals.transfers'] = fn ($query) => $query
+                ->select(['id', 'donor_proposal_id', 'ar_status', 'payment_amount', 'amount_transfered_currency', 'net_amount_received', 'amount_received_currency', 'scheduled_date', 'transfer_date'])
+                ->when(! $canTransfers, fn ($query) => $query->whereRaw('1 = 0'));
+        }
 
         return $this->filteredQuery()
             ->select(['id', 'name', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end', 'status', 'updated_at'])
-            ->with([
-                'donorProposals' => fn ($query) => $query->select(['id', 'proposal_id', 'donor_id', 'budget', 'currency', 'project_num'])->orderBy('id'),
-                'donorProposals.donor:id,name',
-                'donorProposals.transfers:id,donor_proposal_id,ar_status,payment_amount,amount_transfered_currency,net_amount_received,amount_received_currency,scheduled_date,transfer_date',
-                'projects' => fn ($query) => $query->select(['projects.id', 'projects.name', 'projects.status'])->orderBy('projects.name'),
-                'statusNotes' => fn ($query) => $query->select(['id', 'proposal_id', 'status', 'context', 'date'])->orderByDesc('date')->orderByDesc('id')->limit(1),
-            ])
+            ->with($relations)
+            // Task progress is organisation-wide: every viewer sees the same figures.
             ->withCount([
-                'tasks',
-                'tasks as done_tasks_count' => fn ($query) => $query->where('status', TaskStatus::Done),
-                'tasks as overdue_tasks_count' => fn ($query) => $query->where('status', '!=', TaskStatus::Done)->whereDate('due_date', '<', $today),
+                'donorProposals',
+                'tasks' => fn ($query) => $query->withoutGlobalScope(TaskVisibilityScope::class),
+                'tasks as done_tasks_count' => fn ($query) => $query->withoutGlobalScope(TaskVisibilityScope::class)->where('status', TaskStatus::Done),
+                'tasks as overdue_tasks_count' => fn ($query) => $query->withoutGlobalScope(TaskVisibilityScope::class)->where('status', '!=', TaskStatus::Done)->whereDate('due_date', '<', $today),
                 'statusNotes',
                 'planIndicators',
             ])
@@ -188,7 +226,12 @@ new #[Title('titles.proposals')] class extends Component {
     #[Computed]
     public function fundingPosition(): Collection
     {
+        if (! $this->canViewAgreements()) {
+            return new Collection;
+        }
+
         $ids = $this->filteredProposalIds;
+        $canTransfers = $this->canViewTransfers();
 
         $committed = DonorProposal::query()
             ->whereIn('proposal_id', $ids)
@@ -199,13 +242,13 @@ new #[Title('titles.proposals')] class extends Component {
         $transfers = fn () => TransfersTracking::query()
             ->whereHas('donorProposal', fn (Builder $query) => $query->whereIn('proposal_id', $ids));
 
-        $received = $transfers()
+        $received = ! $canTransfers ? collect() : $transfers()
             ->where('ar_status', ArStatus::Received)
             ->selectRaw('amount_received_currency as currency, sum(net_amount_received) as total')
             ->groupBy('amount_received_currency')
             ->pluck('total', 'currency');
 
-        $pending = $transfers()
+        $pending = ! $canTransfers ? collect() : $transfers()
             ->where('ar_status', ArStatus::Pending)
             ->selectRaw('amount_transfered_currency as currency, sum(payment_amount) as total, count(*) as transfers')
             ->groupBy('amount_transfered_currency')
@@ -215,7 +258,7 @@ new #[Title('titles.proposals')] class extends Component {
         // What the tranches sent in each agreement's own currency already
         // cover of its budget, whatever became of them: fees, a missing net
         // amount or a failed transfer never turn money back into unscheduled.
-        $scheduled = TransfersTracking::query()
+        $scheduled = ! $canTransfers ? collect() : TransfersTracking::query()
             ->join('donor_proposal', 'donor_proposal.id', '=', 'transfers_tracking.donor_proposal_id')
             ->whereIn('donor_proposal.proposal_id', $ids)
             ->whereColumn('transfers_tracking.amount_transfered_currency', 'donor_proposal.currency')
@@ -256,7 +299,7 @@ new #[Title('titles.proposals')] class extends Component {
     #[Computed]
     public function pipeline(): array
     {
-        $rows = $this->filteredQuery(withPhase: false)
+        $rows = ! $this->canViewAgreements() ? collect() : $this->filteredQuery(withPhase: false)
             ->leftJoin('donor_proposal', 'donor_proposal.proposal_id', '=', 'proposals.id')
             ->selectRaw('proposals.status, donor_proposal.currency, count(distinct proposals.id) as proposals, sum(donor_proposal.budget) as budget')
             ->groupBy('proposals.status', 'donor_proposal.currency')
@@ -299,6 +342,10 @@ new #[Title('titles.proposals')] class extends Component {
     #[Computed]
     public function flow(): array
     {
+        if (! $this->canViewAgreements()) {
+            return ['currencies' => [], 'unfunded' => []];
+        }
+
         $proposals = Proposal::query()
             ->whereIn('id', $this->filteredProposalIds)
             ->select(['id', 'name', 'status', 'planned_date_begin'])
@@ -407,7 +454,7 @@ new #[Title('titles.proposals')] class extends Component {
     #[Computed]
     public function donorFilterName(): ?string
     {
-        $donorId = (int) $this->donor;
+        $donorId = $this->canViewAgreements() ? (int) $this->donor : 0;
 
         return $donorId > 0 ? Donor::query()->whereKey($donorId)->value('name') : null;
     }
@@ -420,7 +467,7 @@ new #[Title('titles.proposals')] class extends Component {
      *
      * @return array{received: float, pending: float, unscheduled: float, share: int, otherCurrencies: array<string, float>, nextDue: ?\Carbon\CarbonImmutable}
      */
-    public function agreementMoney(DonorProposal $agreement): array
+    protected function agreementMoney(DonorProposal $agreement): array
     {
         $currency = $agreement->currency->value;
         $received = $agreement->transfers->where('ar_status', ArStatus::Received);
@@ -457,7 +504,7 @@ new #[Title('titles.proposals')] class extends Component {
      * transfers_tracking and erase every record of money received. The UI
      * refuses first so the user gets a reason instead of a query exception.
      */
-    public function canDelete(int $proposalId): bool
+    protected function canDelete(int $proposalId): bool
     {
         $proposal = Proposal::query()
             ->select(['id'])
@@ -698,20 +745,21 @@ new #[Title('titles.proposals')] class extends Component {
     $filtersAreActive = $search !== '' || $status !== '' || $phase !== '' || $donor !== '';
     $hasAnyProposal = $filtersAreActive || $this->proposals->total() > 0;
     $lifecycle = ProposalStatus::lifecycle();
-    $mutedText = 'text-secondary-medium dark:text-secondary-soft';
-    $inkText = 'text-secondary-dark dark:text-white';
+    $mutedText = 'text-secondary-medium dark:text-ink-muted';
+    $inkText = 'text-secondary-dark dark:text-ink';
     $receivedText = 'text-funding';
-    $hairline = 'border-secondary-soft dark:border-secondary-medium';
+    $hairline = 'border-secondary-soft dark:border-line';
     $amount = fn (float $value): string => Number::format($value, maxPrecision: 0);
     $shortAmount = fn (float $value): string => Number::abbreviate($value, maxPrecision: 1);
     $matchingCount = $this->filteredProposalIds->count();
+    $canAgreements = $this->canViewAgreements();
     // The flow names every matching proposal but the list below shows one page
     // of them: a proposal on this page is scrolled to, any other one opened.
     $pageProposalIds = $this->proposals->getCollection()->modelKeys();
     $proposalHref = fn (int $id): string => in_array($id, $pageProposalIds, true) ? '#proposal-'.$id : route('proposals.show', tap(new Proposal, fn ($proposal) => $proposal->id = $id));
 @endphp
 
-<section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-secondary-dark dark:text-white" aria-labelledby="proposal-pipeline-heading">
+<section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="proposal-pipeline-heading">
     <x-ui.page-header
         heading-id="proposal-pipeline-heading"
         :title="__('common.proposals')"
@@ -748,12 +796,12 @@ new #[Title('titles.proposals')] class extends Component {
         <div class="flex flex-wrap items-center gap-2 text-sm" data-active-filters>
             <span class="{{ $mutedText }}">{{ trans_choice('proposals.count_matching_proposal', $matchingCount, ['count' => $matchingCount]) }}</span>
             @if ($this->donorFilterName !== null)
-                <button type="button" wire:click="toggleDonor({{ (int) $donor }})" class="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-funding-soft ps-3 pe-2 text-xs font-semibold text-funding transition-colors hover:bg-funding hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-white" aria-label="{{ __('proposals.remove_donor_filter', ['name' => $this->donorFilterName]) }}" data-donor-chip>
+                <button type="button" wire:click="toggleDonor({{ (int) $donor }})" class="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-funding-soft ps-3 pe-2 text-xs font-semibold text-funding transition-colors hover:bg-funding hover:text-white dark:hover:text-surface-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink" aria-label="{{ __('proposals.remove_donor_filter', ['name' => $this->donorFilterName]) }}" data-donor-chip>
                     {{ __('proposals.funded_by', ['name' => $this->donorFilterName]) }}
                     <flux:icon.x-mark variant="micro" class="size-3.5" />
                 </button>
             @endif
-            <flux:button size="sm" variant="ghost" class="text-secondary-medium! dark:text-secondary-soft!" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
+            <flux:button size="sm" variant="ghost" class="text-secondary-medium! dark:text-ink-muted!" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
         </div>
     @endif
 
@@ -761,6 +809,7 @@ new #[Title('titles.proposals')] class extends Component {
         <x-ui.empty-state icon="document-text" :heading="__('proposals.no_proposals_yet')" :body="__('proposals.add_the_first_proposal_to_open_the_pipeline')" />
     @else
         {{-- Where the money stands: one line per currency, never summed across them. --}}
+        @if ($canAgreements)
         <section aria-labelledby="money-heading" class="pt-3" data-funding-position>
             <div class="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
                 <h2 id="money-heading" class="text-lg font-bold {{ $inkText }}">{{ __('proposals.where_the_money_stands') }}</h2>
@@ -793,7 +842,7 @@ new #[Title('titles.proposals')] class extends Component {
                         @endforeach
                     </div>
 
-                    <div class="mt-6 flex h-3 w-full gap-0.5 overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium @4xl/directory:ms-[calc(3.5rem+1.5rem)] @4xl/directory:w-[calc(100%-5rem)]" role="img" aria-label="{{ __('proposals.money_bar_label', ['currency' => $line['currency'], 'received' => $amount($line['received']), 'pending' => $amount($line['pending']), 'committed' => $amount($line['committed'])]) }}">
+                    <div class="mt-6 flex h-3 w-full gap-0.5 overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2 @4xl/directory:ms-[calc(3.5rem+1.5rem)] @4xl/directory:w-[calc(100%-5rem)]" role="img" aria-label="{{ __('proposals.money_bar_label', ['currency' => $line['currency'], 'received' => $amount($line['received']), 'pending' => $amount($line['pending']), 'committed' => $amount($line['committed'])]) }}">
                         <span class="money-grow h-full rounded-s-full bg-funding" style="width: {{ round($line['received'] / $barBase * 100, 2) }}%"></span>
                         <span class="money-grow money-pending h-full" style="width: {{ round($line['pending'] / $barBase * 100, 2) }}%"></span>
                     </div>
@@ -802,11 +851,12 @@ new #[Title('titles.proposals')] class extends Component {
                 <p class="mt-4 border-t pt-4 text-sm {{ $hairline }} {{ $mutedText }}">{{ __('proposals.no_money_committed_to_these_proposals_yet') }}</p>
             @endforelse
         </section>
+        @endif
 
         {{-- The pipeline rail: five phases on one thread; a stop filters the page. --}}
-        <nav aria-label="{{ __('proposals.pipeline_phases') }}" class="border-t pt-6 {{ $hairline }}" data-pipeline>
+        <nav aria-label="{{ __('proposals.pipeline_phases') }}" @class(['pt-6', 'border-t '.$hairline => $canAgreements]) data-pipeline>
             <ol class="relative grid grid-cols-5 gap-1">
-                <span class="absolute inset-x-[10%] top-[0.4375rem] h-px bg-secondary-soft dark:bg-secondary-medium" aria-hidden="true"></span>
+                <span class="absolute inset-x-[10%] top-[0.4375rem] h-px bg-secondary-soft dark:bg-line-strong" aria-hidden="true"></span>
                 @foreach ($this->pipeline as $stop)
                     @php
                         $isSelected = $phase === $stop['phase']->value;
@@ -822,18 +872,18 @@ new #[Title('titles.proposals')] class extends Component {
                         >
                             <span @class([
                                 'relative z-10 size-3.5 rounded-full border-2 transition-transform duration-200 ease-out group-hover:scale-125',
-                                'border-primary bg-primary ring-4 ring-primary/15' => $isSelected,
-                                'border-secondary-dark bg-secondary-dark dark:border-white dark:bg-white' => ! $isSelected && ! $isEmpty,
-                                'border-secondary-light bg-white dark:bg-secondary-dark' => ! $isSelected && $isEmpty,
+                                'border-primary bg-primary dark:bg-brand dark:border-brand ring-4 ring-primary/15' => $isSelected,
+                                'border-secondary-dark bg-secondary-dark dark:border-ink-muted dark:bg-ink-muted' => ! $isSelected && ! $isEmpty,
+                                'border-secondary-light bg-white dark:bg-surface-1' => ! $isSelected && $isEmpty,
                             ]) aria-hidden="true"></span>
-                            <span title="{{ $stop['phase']->label() }}" @class(['mt-1 w-full truncate text-[11px] font-bold @xl/directory:text-xs @3xl/directory:text-sm', 'text-primary' => $isSelected, $inkText => ! $isSelected && ! $isEmpty, $mutedText => ! $isSelected && $isEmpty])>{{ $stop['phase']->label() }}</span>
+                            <span title="{{ $stop['phase']->label() }}" @class(['mt-1 w-full truncate text-[11px] font-bold @xl/directory:text-xs @3xl/directory:text-sm', 'text-primary dark:text-brand-text' => $isSelected, $inkText => ! $isSelected && ! $isEmpty, $mutedText => ! $isSelected && $isEmpty])>{{ $stop['phase']->label() }}</span>
                             <span @class(['text-2xl leading-none font-extrabold tabular-nums @3xl/directory:text-3xl', 'text-secondary-light' => $isEmpty, $inkText => ! $isEmpty])>{{ $stop['count'] }}</span>
                             <span class="flex min-h-4 flex-col items-center gap-0.5 text-[11px] font-medium tabular-nums {{ $mutedText }}">
                                 @foreach ($stop['money'] as $currency => $total)
                                     <span>{{ $currency }} {{ $shortAmount($total) }}</span>
                                 @endforeach
                                 @if ($stop['rejected'] > 0)
-                                    <span class="font-semibold text-primary">{{ trans_choice('proposals.count_rejected', $stop['rejected'], ['count' => $stop['rejected']]) }}</span>
+                                    <span class="font-semibold text-primary dark:text-brand-text">{{ trans_choice('proposals.count_rejected', $stop['rejected'], ['count' => $stop['rejected']]) }}</span>
                                 @endif
                             </span>
                         </button>
@@ -853,7 +903,7 @@ new #[Title('titles.proposals')] class extends Component {
                     @if (count($this->flow['currencies']) > 1)
                         <div class="inline-flex rounded-lg bg-board-head p-1 dark:bg-white/5" role="group" aria-label="{{ __('proposals.currency') }}">
                             @foreach ($this->flow['currencies'] as $graph)
-                                <button type="button" x-on:click="currency = @js($graph['currency'])" :aria-pressed="(currency === @js($graph['currency'])).toString()" class="min-h-8 rounded-md px-3 text-xs font-bold tabular-nums transition-colors {{ $mutedText }} aria-pressed:bg-white aria-pressed:text-secondary-dark aria-pressed:shadow-sm dark:aria-pressed:bg-secondary-medium dark:aria-pressed:text-white" wire:key="flow-tab-{{ $graph['currency'] }}">{{ $graph['currency'] }}</button>
+                                <button type="button" x-on:click="currency = @js($graph['currency'])" :aria-pressed="(currency === @js($graph['currency'])).toString()" class="min-h-8 rounded-md px-3 text-xs font-bold tabular-nums transition-colors {{ $mutedText }} aria-pressed:bg-white aria-pressed:text-secondary-dark aria-pressed:shadow-sm dark:aria-pressed:bg-surface-2 dark:aria-pressed:text-ink" wire:key="flow-tab-{{ $graph['currency'] }}">{{ $graph['currency'] }}</button>
                             @endforeach
                         </div>
                     @endif
@@ -900,10 +950,10 @@ new #[Title('titles.proposals')] class extends Component {
                                                 data-flow-node="{{ $node['key'] }}"
                                             >
                                                 <span class="flex min-w-0 flex-col justify-center">
-                                                    <span @class(['truncate text-sm font-bold underline-offset-4 group-hover:underline', 'text-primary' => $isFiltered, $inkText => ! $isFiltered])>{{ $node['name'] }}</span>
+                                                    <span @class(['truncate text-sm font-bold underline-offset-4 group-hover:underline', 'text-primary dark:text-brand-text' => $isFiltered, $inkText => ! $isFiltered])>{{ $node['name'] }}</span>
                                                     <span class="truncate text-xs tabular-nums {{ $mutedText }}">{{ $amount($node['total']) }} · {{ trans_choice('common.count_agreement', $node['agreements'], ['count' => $node['agreements']]) }}</span>
                                                 </span>
-                                                <span data-flow-out="{{ $node['key'] }}" @class(['w-2 shrink-0 rounded-full', 'bg-primary' => $isFiltered, 'bg-funding' => ! $isFiltered])></span>
+                                                <span data-flow-out="{{ $node['key'] }}" @class(['w-2 shrink-0 rounded-full', 'bg-primary dark:bg-ink' => $isFiltered, 'bg-funding' => ! $isFiltered])></span>
                                             </button>
                                         </li>
                                     @endforeach
@@ -925,7 +975,7 @@ new #[Title('titles.proposals')] class extends Component {
                                                 class="group flex w-full items-stretch gap-3 rounded-sm transition-opacity duration-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
                                                 data-flow-node="{{ $node['key'] }}"
                                             >
-                                                <span data-flow-in="{{ $node['key'] }}" class="w-2 shrink-0 rounded-full bg-secondary-dark dark:bg-white"></span>
+                                                <span data-flow-in="{{ $node['key'] }}" class="w-2 shrink-0 rounded-full bg-secondary-dark dark:bg-ink-muted"></span>
                                                 <span class="flex min-w-0 flex-1 flex-col justify-center">
                                                     <span class="line-clamp-2 text-sm leading-snug font-bold underline-offset-4 group-hover:underline {{ $inkText }}">{{ $node['name'] }}</span>
                                                     <span class="flex min-w-0 items-center gap-1.5 text-xs tabular-nums {{ $mutedText }}">
@@ -957,7 +1007,7 @@ new #[Title('titles.proposals')] class extends Component {
                                                 class="group flex min-h-8 items-center gap-2.5 rounded-sm transition-opacity duration-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
                                                 data-flow-node="{{ $node['key'] }}"
                                             >
-                                                <span data-flow-in="{{ $node['key'] }}" class="size-2.5 shrink-0 rounded-full border-2 border-secondary-dark bg-white dark:border-white dark:bg-secondary-dark"></span>
+                                                <span data-flow-in="{{ $node['key'] }}" class="size-2.5 shrink-0 rounded-full border-2 border-secondary-dark bg-white dark:border-ink-muted dark:bg-surface-1"></span>
                                                 <span class="line-clamp-2 text-sm leading-snug font-semibold underline-offset-4 group-hover:underline {{ $inkText }}">{{ $node['name'] }}</span>
                                             </a>
                                         </li>
@@ -1001,7 +1051,7 @@ new #[Title('titles.proposals')] class extends Component {
                         <span class="font-semibold">{{ __('proposals.not_yet_funded') }}</span>
                         @foreach ($this->flow['unfunded'] as $unfunded)
                             <a href="{{ $proposalHref($unfunded['id']) }}" class="inline-flex min-h-8 items-center gap-1.5 font-semibold hover:underline {{ $inkText }}" wire:key="unfunded-{{ $unfunded['id'] }}">
-                                <span class="size-2 rounded-full border border-dashed border-secondary-medium dark:border-secondary-soft" aria-hidden="true"></span>
+                                <span class="size-2 rounded-full border border-dashed border-secondary-medium dark:border-ink-faint" aria-hidden="true"></span>
                                 {{ $unfunded['name'] }}
                             </a>
                         @endforeach
@@ -1038,7 +1088,7 @@ new #[Title('titles.proposals')] class extends Component {
                             x-on:mouseenter="$store.proposalFlow.focus = '{{ $flowKey }}'"
                             x-on:mouseleave="$store.proposalFlow.focus = null"
                             :class="$store.proposalFlow.isLit('{{ $flowKey }}') ? 'bg-board-head dark:bg-white/[0.04]' : ($store.proposalFlow.isRowDimmed('{{ $flowKey }}') ? 'opacity-45' : '')"
-                            class="logframe-reveal relative scroll-mt-24 rounded-xl px-3 py-7 transition-[background-color,opacity] duration-200 not-first:before:absolute not-first:before:inset-x-3 not-first:before:top-0 not-first:before:h-px not-first:before:bg-secondary-soft target:bg-board-head dark:not-first:before:bg-secondary-medium"
+                            class="logframe-reveal relative scroll-mt-24 rounded-xl px-3 py-7 transition-[background-color,opacity] duration-200 not-first:before:absolute not-first:before:inset-x-3 not-first:before:top-0 not-first:before:h-px not-first:before:bg-secondary-soft target:bg-board-head dark:not-first:before:bg-line"
                             style="--logframe-order: {{ $loop->index }}"
                             data-proposal-row
                         >
@@ -1047,7 +1097,7 @@ new #[Title('titles.proposals')] class extends Component {
                                 <div class="min-w-0 flex-1">
                                     <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
                                         @if (in_array($proposal->id, $this->unreadIds, true))
-                                            <span class="size-2 shrink-0 rounded-full bg-primary" data-unread-dot="proposal-{{ $proposal->id }}" title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
+                                            <span class="size-2 shrink-0 rounded-full bg-primary dark:bg-ink" data-unread-dot="proposal-{{ $proposal->id }}" title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
                                         @endif
                                         <span class="text-lg leading-tight font-bold {{ $inkText }}">{{ $proposal->name }}</span>
                                         <x-ui.enum-badge :case="$proposal->status" />
@@ -1078,7 +1128,7 @@ new #[Title('titles.proposals')] class extends Component {
                                     <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-10! touch-manipulation" wire:click="openEditModal({{ $proposal->id }})" :aria-label="__('common.edit_name', ['name' => $proposal->name])" />
                                     @endcan
                                     @can('delete', $proposal)
-                                    @if ($proposal->donorProposals->isEmpty())
+                                    @if ($proposal->donor_proposals_count === 0)
                                         <x-ui.button tone="ghost" size="sm" icon="trash" class="size-10! touch-manipulation" wire:click="confirmDelete({{ $proposal->id }})" :aria-label="__('common.delete_name', ['name' => $proposal->name])" />
                                     @else
                                         <flux:tooltip :content="__('proposals.funded_proposals_cannot_be_deleted_remove_the_funding_agreem')">
@@ -1104,20 +1154,20 @@ new #[Title('titles.proposals')] class extends Component {
                                         @if (! $loop->first)
                                             <span @class([
                                                 'absolute end-1/2 top-[0.3125rem] h-0.5 w-full -translate-y-1/2',
-                                                'bg-secondary-dark dark:bg-white' => $isPast || $isCurrent,
-                                                'bg-primary' => $isRejectionPoint,
-                                                'bg-secondary-soft dark:bg-secondary-medium' => $isAhead,
+                                                'bg-secondary-dark dark:bg-ink-muted' => $isPast || $isCurrent,
+                                                'bg-primary dark:bg-status-critical' => $isRejectionPoint,
+                                                'bg-secondary-soft dark:bg-line-strong' => $isAhead,
                                             ]) aria-hidden="true"></span>
                                         @endif
                                         <span @class([
                                             'relative z-10 size-2.5 rounded-full',
-                                            'bg-primary ring-4 ring-primary/20' => $isCurrent || $isRejectionPoint,
-                                            'bg-secondary-dark dark:bg-white' => $isPast,
-                                            'border-2 border-secondary-soft bg-white dark:border-secondary-medium dark:bg-secondary-dark' => $isAhead,
+                                            'bg-primary dark:bg-brand ring-4 ring-primary/20' => $isCurrent || $isRejectionPoint,
+                                            'bg-secondary-dark dark:bg-ink-muted' => $isPast,
+                                            'border-2 border-secondary-soft bg-white dark:border-line-strong dark:bg-surface-1' => $isAhead,
                                         ]) aria-hidden="true"></span>
                                         <span @class([
                                             'px-0.5 text-center text-[11px] leading-tight',
-                                            'font-bold text-primary' => $isCurrent || $isRejectionPoint,
+                                            'font-bold text-primary dark:text-brand-text' => $isCurrent || $isRejectionPoint,
                                             'hidden font-medium @4xl/directory:block '.$inkText => $isPast,
                                             'hidden font-medium text-secondary-light @4xl/directory:block' => $isAhead,
                                         ])>{{ $isRejectionPoint ? ProposalStatus::Rejected->label() : $step->label() }}</span>
@@ -1126,8 +1176,9 @@ new #[Title('titles.proposals')] class extends Component {
                             </ol>
 
                             {{-- Connections --}}
-                            <div class="mt-6 grid gap-x-10 gap-y-6 @4xl/directory:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                            <div @class(['mt-6 grid gap-x-10 gap-y-6', '@4xl/directory:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)]' => $canAgreements, '@4xl/directory:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]' => ! $canAgreements])>
                                 {{-- Funding --}}
+                                @if ($canAgreements)
                                 <div class="min-w-0" data-connection="funding">
                                     <p class="type-label {{ $mutedText }}">{{ __('common.funding') }}</p>
                                     @forelse ($proposal->donorProposals as $agreement)
@@ -1143,7 +1194,7 @@ new #[Title('titles.proposals')] class extends Component {
                                                 </p>
                                                 <p class="text-xl font-extrabold tracking-tight tabular-nums {{ $inkText }}">{{ $amount($budget) }} <span class="text-xs font-semibold tracking-normal {{ $mutedText }}">{{ $agreement->currency->value }}</span></p>
                                             </div>
-                                            <div class="mt-2 flex h-2 w-full gap-0.5 overflow-hidden rounded-full bg-secondary-soft dark:bg-secondary-medium" role="img" aria-label="{{ __('proposals.money_bar_label', ['currency' => $agreement->currency->value, 'received' => $amount($money['received']), 'pending' => $amount($money['pending']), 'committed' => $amount($budget)]) }}">
+                                            <div class="mt-2 flex h-2 w-full gap-0.5 overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2" role="img" aria-label="{{ __('proposals.money_bar_label', ['currency' => $agreement->currency->value, 'received' => $amount($money['received']), 'pending' => $amount($money['pending']), 'committed' => $amount($budget)]) }}">
                                                 <span class="money-grow h-full rounded-s-full bg-funding" style="width: {{ $budget > 0 ? min(100, round($money['received'] / $budget * 100, 2)) : 0 }}%"></span>
                                                 <span class="money-grow money-pending h-full" style="width: {{ $budget > 0 ? min(100, round($money['pending'] / $budget * 100, 2)) : 0 }}%"></span>
                                             </div>
@@ -1151,7 +1202,7 @@ new #[Title('titles.proposals')] class extends Component {
                                                 <span><span class="font-bold {{ $receivedText }}">{{ $amount($money['received']) }}</span> {{ __('proposals.received_percent', ['percent' => App\Models\DonorProposal::percentLabel($money['received'], $budget)]) }}</span>
                                                 <span><span class="font-bold text-status-warn">{{ $amount($money['pending']) }}</span> {{ __('proposals.pending_lower') }}</span>
                                                 @if ($money['nextDue'] !== null)
-                                                    <span @class(['font-semibold text-primary' => $money['nextDue']->lt(today())])>{{ __('proposals.next_transfer_on', ['date' => $money['nextDue']->translatedFormat(__('formats.date'))]) }}</span>
+                                                    <span @class(['font-semibold text-primary dark:text-brand-text' => $money['nextDue']->lt(today())])>{{ __('proposals.next_transfer_on', ['date' => $money['nextDue']->translatedFormat(__('formats.date'))]) }}</span>
                                                 @endif
                                                 @foreach ($money['otherCurrencies'] as $otherCurrency => $otherAmount)
                                                     <span>{{ __('proposals.also_received_in', ['amount' => $amount($otherAmount), 'currency' => $otherCurrency]) }}</span>
@@ -1162,6 +1213,7 @@ new #[Title('titles.proposals')] class extends Component {
                                         <p class="mt-2 text-sm {{ $mutedText }}">{{ __('proposals.no_funding_agreements') }}</p>
                                     @endforelse
                                 </div>
+                                @endif
 
                                 {{-- Projects --}}
                                 <div class="min-w-0" data-connection="projects">
@@ -1170,10 +1222,10 @@ new #[Title('titles.proposals')] class extends Component {
                                         <p class="mt-2 text-sm {{ $mutedText }}">{{ __('proposals.no_projects_linked') }}</p>
                                     @else
                                         <ul class="relative mt-1 flex flex-col" role="list">
-                                            <span class="absolute start-[0.1875rem] top-4 bottom-4 w-px bg-secondary-soft dark:bg-secondary-medium" aria-hidden="true"></span>
+                                            <span class="absolute start-[0.1875rem] top-4 bottom-4 w-px bg-secondary-soft dark:bg-line-strong" aria-hidden="true"></span>
                                             @foreach ($proposal->projects as $project)
                                                 <li class="relative flex min-h-9 items-center gap-x-2.5 gap-y-0.5 py-1 ps-5" wire:key="proposal-{{ $proposal->id }}-project-{{ $project->id }}">
-                                                    <span class="absolute start-0 size-2 rounded-full border-2 border-secondary-dark bg-white dark:border-white dark:bg-secondary-dark" aria-hidden="true"></span>
+                                                    <span class="absolute start-0 size-2 rounded-full border-2 border-secondary-dark bg-white dark:border-ink-muted dark:bg-surface-1" aria-hidden="true"></span>
                                                     <a href="{{ route('projects.show', $project) }}" wire:navigate class="min-w-0 text-sm leading-snug font-semibold underline-offset-4 hover:underline {{ $inkText }}">{{ $project->name }}</a>
                                                     <span class="shrink-0 text-[11px] {{ $mutedText }}">{{ $project->status->label() }}</span>
                                                 </li>
@@ -1195,14 +1247,14 @@ new #[Title('titles.proposals')] class extends Component {
                                                     @else
                                                         {{ __('proposals.tasks_done_of', ['done' => $proposal->done_tasks_count, 'total' => $proposal->tasks_count]) }}
                                                         @if ($proposal->overdue_tasks_count > 0)
-                                                            <span class="ms-1 font-bold text-primary">{{ trans_choice('proposals.count_overdue', $proposal->overdue_tasks_count, ['count' => $proposal->overdue_tasks_count]) }}</span>
+                                                            <span class="ms-1 font-bold text-primary dark:text-brand-text">{{ trans_choice('proposals.count_overdue', $proposal->overdue_tasks_count, ['count' => $proposal->overdue_tasks_count]) }}</span>
                                                         @endif
                                                     @endif
                                                 </p>
                                                 @if ($taskSlots > 0)
                                                     <div class="mt-2 flex h-1.5 w-full gap-0.5" aria-hidden="true">
                                                         @for ($slot = 0; $slot < $taskSlots; $slot++)
-                                                            <span @class(['h-full flex-1 rounded-full', 'bg-status-good' => $slot < $doneSlots, 'bg-secondary-soft dark:bg-secondary-medium' => $slot >= $doneSlots])></span>
+                                                            <span @class(['h-full flex-1 rounded-full', 'bg-status-good' => $slot < $doneSlots, 'bg-secondary-soft dark:bg-line-strong' => $slot >= $doneSlots])></span>
                                                         @endfor
                                                     </div>
                                                 @endif
@@ -1230,89 +1282,89 @@ new #[Title('titles.proposals')] class extends Component {
             @endif
 
             <div class="mt-2 border-t pt-4 {{ $hairline }}">
-                <flux:pagination :paginator="$this->proposals" class="text-secondary-medium! dark:text-secondary-soft!" scroll-to="#proposal-pipeline-heading" />
+                <flux:pagination :paginator="$this->proposals" class="text-secondary-medium! dark:text-ink-muted!" scroll-to="#proposal-pipeline-heading" />
             </div>
         </section>
     @endif
 
-    <flux:modal wire:model="showProposalModal" class="w-full max-w-3xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <form wire:submit="saveProposal" class="space-y-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ $editingProposalId === null ? __('proposals.add_proposal') : __('proposals.edit_proposal') }}</flux:heading>
-                <flux:subheading>{{ __('proposals.phase_follows_automatically_from_the_status_you_choose') }}</flux:subheading>
+    <x-ui.modal
+        wire:model="showProposalModal"
+        size="xl"
+        :title="$editingProposalId === null ? __('proposals.add_proposal') : __('proposals.edit_proposal')"
+        :description="__('proposals.phase_follows_automatically_from_the_status_you_choose')"
+        submit="saveProposal"
+        close="closeProposalModal"
+        required-note
+    >
+        <x-ui.form-section
+            :title="__('common.section_details')"
+            :hint="$editingProposalId === null ? __('proposals.the_starting_status_opens_the_status_history') : __('proposals.status_moves_only_through_change_status')"
+            :fields="['name', 'proposalStatus', 'notes']"
+        >
+            <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                <x-ui.form-input wire:model="name" :label="__('proposals.proposal_name')" maxlength="255" required autofocus :class="$editingProposalId !== null ? '@2xl/modal:col-span-2' : null" />
+
+                @if ($editingProposalId === null)
+                    <x-ui.form-select wire:model="proposalStatus" :label="__('proposals.starting_status')" required>
+                        @foreach (ProposalStatus::cases() as $statusCase)
+                            <flux:select.option :value="$statusCase->value">{{ $statusCase->label() }} — {{ $statusCase->phase()->label() }}</flux:select.option>
+                        @endforeach
+                    </x-ui.form-select>
+                @endif
+
+                <x-ui.form-textarea wire:model="notes" :label="__('common.notes')" rows="2" class="@2xl/modal:col-span-2" />
             </div>
+        </x-ui.form-section>
 
-            <x-ui.input wire:model="name" :label="__('proposals.proposal_name')" type="text" maxlength="255" required autofocus />
-
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.input wire:model="plannedDateBegin" :label="__('proposals.planned_start')" type="date" required />
-                <x-ui.input wire:model="plannedDateEnd" :label="__('proposals.planned_end')" type="date" required />
-                <x-ui.input wire:model="actualDateBegin" :label="__('proposals.actual_start')" type="date" />
-                <x-ui.input wire:model="actualDateEnd" :label="__('proposals.actual_end')" type="date" />
+        <x-ui.form-section :title="__('common.section_schedule')" :fields="['plannedDateBegin', 'plannedDateEnd', 'actualDateBegin', 'actualDateEnd']">
+            <div class="grid grid-cols-2 gap-x-4 gap-y-3 @4xl/modal:grid-cols-4">
+                <x-ui.form-input wire:model="plannedDateBegin" :label="__('proposals.planned_start')" type="date" required />
+                <x-ui.form-input wire:model="plannedDateEnd" :label="__('proposals.planned_end')" type="date" required />
+                <x-ui.form-input wire:model="actualDateBegin" :label="__('proposals.actual_start')" type="date" />
+                <x-ui.form-input wire:model="actualDateEnd" :label="__('proposals.actual_end')" type="date" />
             </div>
+        </x-ui.form-section>
 
-            @if ($editingProposalId === null)
-            <x-ui.select wire:model="proposalStatus" :label="__('proposals.starting_status')" required>
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="save-proposal-button">
+                {{ $editingProposalId === null ? __('proposals.create_proposal') : __('common.save_changes') }}
+            </x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
+
+    <x-ui.modal
+        wire:model="showStageModal"
+        size="md"
+        :title="__('proposals.change_status')"
+        :description="__('proposals.the_new_status_and_your_reason_are_recorded_together_as_one')"
+        submit="recordStageChange"
+        close="closeStageModal"
+        required-note
+    >
+        <div class="grid grid-cols-2 gap-x-4 gap-y-4">
+            <x-ui.form-select wire:model="newStatus" :label="__('proposals.new_status')" required autofocus>
                 @foreach (ProposalStatus::cases() as $statusCase)
-                    <flux:select.option :value="$statusCase->value" :wire:key="'proposal-status-option-'.$statusCase->value">
-                        {{ $statusCase->label() }} — {{ $statusCase->phase()->label() }}
-                    </flux:select.option>
+                    <flux:select.option :value="$statusCase->value">{{ $statusCase->label() }} — {{ $statusCase->phase()->label() }}</flux:select.option>
                 @endforeach
-            </x-ui.select>
-            @endif
+            </x-ui.form-select>
 
-            <flux:textarea wire:model="notes" :label="__('common.notes')" rows="3" class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
+            <x-ui.form-input wire:model="statusDate" :label="__('proposals.effective_date')" type="date" required />
 
-            <div class="rounded-lg border border-secondary-soft bg-secondary-soft/50 p-3 text-sm text-secondary-medium dark:border-secondary-medium dark:bg-secondary-medium/50 dark:text-secondary-soft">
-                <div class="flex items-start gap-2.5">
-                    <flux:icon.information-circle class="mt-0.5 size-4 shrink-0" />
-                    <p>{{ $editingProposalId === null ? __('proposals.the_starting_status_opens_the_status_history') : __('proposals.status_moves_only_through_change_status') }}</p>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeProposalModal">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-proposal-button">
-                    {{ $editingProposalId === null ? __('proposals.create_proposal') : __('common.save_changes') }}
-                </x-ui.button>
-            </div>
-        </form>
-    </flux:modal>
-
-    <flux:modal wire:model="showStageModal" wire:close="closeStageModal" class="w-full max-w-xl border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <form wire:submit="recordStageChange" class="space-y-5">
-            <div class="border-b border-secondary-soft pb-4 dark:border-secondary-medium">
-                <flux:heading size="lg">{{ __('proposals.change_status') }}</flux:heading>
-                <flux:subheading>{{ __('proposals.the_new_status_and_your_reason_are_recorded_together_as_one') }}</flux:subheading>
-            </div>
-
-            <x-ui.select wire:model="newStatus" :label="__('proposals.new_status')" required>
-                @foreach (ProposalStatus::cases() as $statusCase)
-                    <flux:select.option :value="$statusCase->value" :wire:key="'stage-status-'.$statusCase->value">
-                        {{ $statusCase->label() }} — {{ $statusCase->phase()->label() }}
-                    </flux:select.option>
-                @endforeach
-            </x-ui.select>
-
-            <flux:textarea wire:model="statusContext" :label="__('proposals.why_did_it_change')" rows="3" required class="border-secondary-light! bg-white! text-secondary-dark! dark:bg-secondary-medium! dark:text-white!" />
-
-            <x-ui.input wire:model="statusDate" :label="__('proposals.effective_date')" type="date" required />
-
-            <div class="grid grid-cols-2 gap-2 border-t border-secondary-soft pt-4 sm:flex sm:justify-end dark:border-secondary-medium">
-                <x-ui.button type="button" class="min-h-11 w-full sm:min-h-10 sm:w-auto" wire:click="closeStageModal">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="submit" tone="primary" class="min-h-11 w-full sm:min-h-10 sm:w-auto" data-test="save-stage-button">{{ __('proposals.record_change') }}</x-ui.button>
-            </div>
-        </form>
-    </flux:modal>
-
-    <flux:modal wire:model="showDeleteModal" wire:close="cancelDelete" class="w-full max-w-md border border-secondary-light! bg-white! text-secondary-dark! shadow-none! ring-0! dark:border-secondary-light! dark:bg-secondary-dark! dark:text-white!">
-        <div class="space-y-4">
-            <flux:heading size="lg">{{ __('proposals.delete_this_proposal') }}</flux:heading>
-            <flux:subheading>{{ __('proposals.its_tasks_project_links_and_status_history_are_removed_with') }}</flux:subheading>
-            <div class="flex justify-end gap-2 border-t border-secondary-soft pt-4 dark:border-secondary-medium">
-                <x-ui.button type="button" wire:click="cancelDelete">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="button" tone="primary" wire:click="deleteProposal" data-test="confirm-delete-proposal">{{ __('proposals.delete_proposal') }}</x-ui.button>
-            </div>
+            <x-ui.form-textarea wire:model="statusContext" :label="__('proposals.why_did_it_change')" required class="col-span-2" />
         </div>
-    </flux:modal>
+
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="save-stage-button">{{ __('proposals.record_change') }}</x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
+
+    <x-ui.confirm-modal
+        wire:model="showDeleteModal"
+        close="cancelDelete"
+        :title="__('proposals.delete_this_proposal')"
+        :message="__('proposals.its_tasks_project_links_and_status_history_are_removed_with')"
+        confirm="deleteProposal"
+        :confirm-label="__('proposals.delete_proposal')"
+        confirm-test="confirm-delete-proposal"
+    />
 </section>

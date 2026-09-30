@@ -79,6 +79,10 @@
                         @enderror
                     </div>
 
+                    <div class="flex justify-center">
+                        <flux:checkbox name="remember_device" value="1" checked :label="__('authentication.trust_this_device')" data-test="trust-device" />
+                    </div>
+
                     <flux:button
                         variant="primary"
                         type="submit"

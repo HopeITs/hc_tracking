@@ -44,6 +44,7 @@ return [
     'log_a_reading_for_name' => 'Log a reading for :name',
     'log_reading' => 'Log reading',
     'measure' => 'Measure',
+    'section_measurement' => 'Measurement',
     'measuring_count_of_total_results' => 'Measuring :count of :total results',
     'needs_a_reading' => 'Needs a reading',
     'never_measured' => 'Never measured',

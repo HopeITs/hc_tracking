@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
+use App\Actions\Reports\DeleteReport;
 use App\Enums\IndicatorMeasure;
 use App\Models\AnnualPlan;
 use App\Models\PlanIndicator;
@@ -12,10 +13,10 @@ use App\Models\Report;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 
 /**
  * The report form and draft deletion, shared by the report directory and the
@@ -30,6 +31,7 @@ trait ManagesReportForm
 {
     public bool $showReportModal = false;
 
+    #[Locked]
     public ?int $editingReportId = null;
 
     public string $reportTargetId = '';
@@ -56,6 +58,7 @@ trait ManagesReportForm
 
     public bool $showDeleteReportModal = false;
 
+    #[Locked]
     public ?int $deletingReportId = null;
 
     /**
@@ -169,7 +172,7 @@ trait ManagesReportForm
      *
      * @return array{0: CarbonImmutable, 1: CarbonImmutable}|null
      */
-    public function formWindow(): ?array
+    protected function formWindow(): ?array
     {
         return $this->coverableWindow($this->formTarget);
     }
@@ -181,6 +184,8 @@ trait ManagesReportForm
 
     public function openCreateModal(?int $targetId = null): void
     {
+        Gate::authorize('create', Report::class);
+
         $this->resetReportForm();
 
         if ($targetId !== null && PlanIndicator::query()->whereKey($targetId)->exists()) {
@@ -194,7 +199,7 @@ trait ManagesReportForm
     {
         $report = Report::query()
             ->select([
-                'id', 'status', 'plan_indicator_id', 'planned_date', 'period_start', 'period_end', 'value',
+                'id', 'user_id', 'status', 'plan_indicator_id', 'planned_date', 'period_start', 'period_end', 'value',
                 'narrative_report_notes', 'executive_summary', 'key_achievements', 'challenges',
                 'lessons_learned', 'next_period_plans',
             ])
@@ -208,6 +213,8 @@ trait ManagesReportForm
 
             return;
         }
+
+        Gate::authorize('update', $report);
 
         $this->resetReportForm();
         $this->editingReportId = $report->id;
@@ -233,6 +240,10 @@ trait ManagesReportForm
 
         $isCreate = $this->editingReportId === null;
 
+        if ($isCreate) {
+            Gate::authorize('create', Report::class);
+        }
+
         $report = $isCreate
             ? new Report
             : Report::query()->select(['id', 'status', 'user_id'])->findOrFail($this->editingReportId);
@@ -246,6 +257,10 @@ trait ManagesReportForm
             );
 
             return;
+        }
+
+        if (! $isCreate) {
+            Gate::authorize('update', $report);
         }
 
         unset($this->formTarget);
@@ -365,6 +380,12 @@ trait ManagesReportForm
 
     public function confirmDeleteReport(int $reportId): void
     {
+        $report = Report::query()->findOrFail($reportId);
+
+        if ($report->isEditable()) {
+            Gate::authorize('delete', $report);
+        }
+
         $this->deletingReportId = $reportId;
         $this->showDeleteReportModal = true;
     }
@@ -382,7 +403,7 @@ trait ManagesReportForm
      * report_files rows cascade in the database, but their files on disk do
      * not, so those are removed here after the rows are gone.
      */
-    public function deleteReport(): void
+    public function deleteReport(DeleteReport $delete): void
     {
         if ($this->deletingReportId === null) {
             return;
@@ -390,20 +411,12 @@ trait ManagesReportForm
 
         $report = Report::query()->with('files:id,report_id,disk,path,original_name')->findOrFail($this->deletingReportId);
 
-        if (! $report->isEditable()) {
+        if (! $delete->handle($report)) {
             $this->cancelDeleteReport();
 
             Flux::toast(variant: 'danger', text: __('reports.only_draft_reports_can_be_deleted'));
 
             return;
-        }
-
-        $stored = $report->files->filter(fn ($file): bool => $file->original_name !== null);
-
-        DB::transaction(fn () => $report->delete());
-
-        foreach ($stored as $file) {
-            rescue(fn () => Storage::disk($file->disk)->delete($file->path), report: true);
         }
 
         $this->cancelDeleteReport();

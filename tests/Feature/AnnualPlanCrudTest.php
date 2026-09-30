@@ -20,7 +20,7 @@ function crudProgram(string $name): Program
 }
 
 test('a plan is created from the matrix', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = crudProgram('Water Security');
     $manager = insertHrEmployee(firstNameEn: 'Layla', lastNameEn: 'Haddad');
 
@@ -40,7 +40,7 @@ test('a plan is created from the matrix', function () {
 });
 
 test('clicking an empty cell carries its program and fiscal year into the form', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $water = crudProgram('Water Security');
     $shelter = crudProgram('Safe Shelter');
 
@@ -55,7 +55,7 @@ test('clicking an empty cell carries its program and fiscal year into the form',
 });
 
 test('a program cannot hold two plans for the same fiscal year', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = crudProgram('Water Security');
     $manager = insertHrEmployee();
 
@@ -74,7 +74,7 @@ test('a program cannot hold two plans for the same fiscal year', function () {
 });
 
 test('a plan keeps its own year when it is edited', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = crudProgram('Water Security');
     $plan = AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2025]);
     $replacement = insertHrEmployee(firstNameEn: 'Nour', lastNameEn: 'Saleh');
@@ -93,7 +93,7 @@ test('a plan keeps its own year when it is edited', function () {
 });
 
 test('the program and the manager are both required', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
         ->test('pages::annual-plans.index')
@@ -104,7 +104,7 @@ test('the program and the manager are both required', function () {
 });
 
 test('deleting a plan from the matrix takes the targets committed in it', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = crudProgram('Water Security');
     $plan = AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2025]);
 
@@ -127,7 +127,7 @@ test('deleting a plan from the matrix takes the targets committed in it', functi
 });
 
 test('dismissing the delete confirmation leaves the plan alone', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = crudProgram('Water Security');
     $plan = AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2025]);
 
@@ -142,7 +142,7 @@ test('dismissing the delete confirmation leaves the plan alone', function () {
 });
 
 test('the matrix redraws itself after a write in the same request', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = crudProgram('Water Security');
     $manager = insertHrEmployee(firstNameEn: 'Layla', lastNameEn: 'Haddad');
 
@@ -160,7 +160,7 @@ test('the matrix redraws itself after a write in the same request', function () 
 });
 
 test('the fiscal year list reaches next year without a plan existing for it', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
         ->test('pages::annual-plans.index')
@@ -169,7 +169,7 @@ test('the fiscal year list reaches next year without a plan existing for it', fu
 });
 
 test('the plan detail page edits the manager and the fiscal year', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = crudProgram('Water Security');
     $plan = AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2025]);
     $replacement = insertHrEmployee(firstNameEn: 'Nour', lastNameEn: 'Saleh');
@@ -189,7 +189,7 @@ test('the plan detail page edits the manager and the fiscal year', function () {
 });
 
 test('the plan detail page refuses a fiscal year the program already covers', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = crudProgram('Water Security');
     $plan = AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2025]);
     AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2026]);
@@ -205,7 +205,7 @@ test('the plan detail page refuses a fiscal year the program already covers', fu
 });
 
 test('deleting a plan from its detail page returns to the matrix', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = crudProgram('Water Security');
     $plan = AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2025]);
 
@@ -218,7 +218,7 @@ test('deleting a plan from its detail page returns to the matrix', function () {
 });
 
 test('the create and delete controls cost the matrix no extra read of annual_plans', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     foreach (['Water Security', 'Safe Shelter'] as $name) {
         $program = crudProgram($name);
@@ -245,7 +245,7 @@ test('the create and delete controls cost the matrix no extra read of annual_pla
 });
 
 test('editing a plan keeps the reader on the page of programs they were reading', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     foreach (range(1, 20) as $index) {
         crudProgram(sprintf('Program %02d', $index));
@@ -266,7 +266,7 @@ test('editing a plan keeps the reader on the page of programs they were reading'
 });
 
 test('a plan written outside the visible span opens the year window onto it', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = crudProgram('Water Security');
     $manager = insertHrEmployee();
 
@@ -290,7 +290,7 @@ test('a plan written outside the visible span opens the year window onto it', fu
 });
 
 test('a plan written inside the visible span leaves the filters untouched', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $program = crudProgram('Water Security');
     $other = crudProgram('Safe Shelter');
     $manager = insertHrEmployee();

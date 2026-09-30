@@ -5,7 +5,7 @@ use App\Models\Report;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
-test('every hr account gets a tracking user with no role, listed admins as super admin', function () {
+test('every hr account gets a Team Member tracking user, listed admins as super admin', function () {
     config(['auth.hr_admin_emails' => ['admin@example.org']]);
     $ranaId = insertHrUser(insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Darwish'), 'rana@example.org');
     $adminId = insertHrUser(insertHrEmployee(), 'admin@example.org');
@@ -14,7 +14,7 @@ test('every hr account gets a tracking user with no role, listed admins as super
     $this->artisan('hr:sync-users')->assertSuccessful();
 
     expect(User::query()->where('hr_user_id', $ranaId)->sole())
-        ->roles->toBeEmpty()
+        ->roles->pluck('name')->all()->toBe(['Team Member'])
         ->name->toBe('Rana Darwish')
         ->email->toBe('rana@example.org')
         ->and(User::query()->where('hr_user_id', $adminId)->sole()->roles->first()?->name)->toBe('Super Admin')

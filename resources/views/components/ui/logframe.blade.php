@@ -4,7 +4,7 @@
     use App\Enums\ResultType;
 
     $levelMarks = [
-        ResultType::Impact->value => 'bg-secondary-dark ring-secondary-dark dark:bg-white dark:ring-white',
+        ResultType::Impact->value => 'bg-secondary-dark ring-secondary-dark dark:bg-ink dark:ring-ink',
         ResultType::Outcome->value => 'bg-primary ring-primary',
         ResultType::Output->value => 'bg-board ring-secondary-light',
     ];
@@ -14,7 +14,7 @@
     <header class="flex flex-col gap-5 border-b border-board-line bg-board-head px-5 py-5 @4xl/detail:flex-row @4xl/detail:items-end @4xl/detail:justify-between">
         <div class="max-w-xl">
             <h2 id="program-results-heading" class="text-xl font-bold text-balance">{{ __('programs.results_logframe') }}</h2>
-            <p class="mt-1 text-sm text-secondary-medium dark:text-secondary-soft">{{ __('common.impact_outcome_and_output_statements_nested_as_recorded') }}</p>
+            <p class="mt-1 text-sm text-secondary-medium dark:text-ink-muted">{{ __('common.impact_outcome_and_output_statements_nested_as_recorded') }}</p>
         </div>
 
         <div class="flex flex-col gap-2 @4xl/detail:items-end">
@@ -24,7 +24,7 @@
                         <span class="flex items-center gap-2 rounded-full border border-board-line bg-board py-1 ps-2 pe-3">
                             <span aria-hidden="true" class="size-2.5 rounded-full ring-2 ring-inset {{ $levelMarks[$type->value] }}"></span>
                             <span class="text-sm font-semibold">{{ $type->label() }}</span>
-                            <span class="text-sm font-bold tabular-nums text-secondary-medium dark:text-secondary-soft">{{ $summary['levels'][$type->value] }}</span>
+                            <span class="text-sm font-bold tabular-nums text-secondary-medium dark:text-ink-muted">{{ $summary['levels'][$type->value] }}</span>
                         </span>
                         @unless ($loop->last)
                             <flux:icon.arrow-long-right variant="micro" class="size-4 text-secondary-light rtl:rotate-180" aria-hidden="true" />
@@ -33,7 +33,7 @@
                 @endforeach
             </ol>
             @if ($roots->isNotEmpty())
-                <p class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-secondary-medium dark:text-secondary-soft">
+                <p class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-secondary-medium dark:text-ink-muted">
                     <span class="inline-flex items-center gap-1"><flux:icon.chart-bar variant="micro" class="size-3.5" aria-hidden="true" />{{ trans_choice('programs.logframe_count_indicators', $summary['indicators'], ['count' => $summary['indicators']]) }}</span>
                     <span @class(['inline-flex items-center gap-1', 'text-status-warn' => $summary['unmeasured'] > 0, 'text-status-good' => $summary['unmeasured'] === 0])>
                         <flux:icon :name="$summary['unmeasured'] > 0 ? 'exclamation-triangle' : 'check-circle'" variant="micro" class="size-3.5" aria-hidden="true" />{{ trans_choice('programs.logframe_count_unmeasured', $summary['unmeasured'], ['count' => $summary['unmeasured']]) }}
@@ -54,7 +54,7 @@
                     </div>
 
                     @if ($root->childrenRecursive->isEmpty())
-                        <p class="mx-auto mt-4 max-w-3xl rounded-md border border-dashed border-secondary-light px-4 py-3 text-center text-sm text-secondary-medium dark:text-secondary-soft">{{ __('programs.logframe_no_contributing_results') }}</p>
+                        <p class="mx-auto mt-4 max-w-3xl rounded-md border border-dashed border-secondary-light px-4 py-3 text-center text-sm text-secondary-medium dark:text-ink-muted">{{ __('programs.logframe_no_contributing_results') }}</p>
                     @else
                         <div aria-hidden="true" class="mx-auto hidden h-8 w-px bg-secondary-light @3xl/detail:block"></div>
 
@@ -108,7 +108,7 @@
                                     x-on:click="step({{ $direction }})"
                                     aria-label="{{ __($edge === 'start' ? 'programs.logframe_scroll_back' : 'programs.logframe_scroll_forward') }}"
                                     @class([
-                                        'absolute top-16 z-10 hidden size-9 cursor-pointer items-center justify-center rounded-full border border-board-line bg-board text-secondary-dark shadow-md hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary @3xl/detail:flex dark:text-white',
+                                        'absolute top-16 z-10 hidden size-9 cursor-pointer items-center justify-center rounded-full border border-board-line bg-board text-secondary-dark shadow-md hover:border-primary hover:text-primary dark:hover:text-brand-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary @3xl/detail:flex dark:text-ink',
                                         '-start-3' => $edge === 'start',
                                         '-end-3' => $edge === 'end',
                                     ])

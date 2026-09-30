@@ -5,7 +5,8 @@ import { toIso } from './timescale';
  *
  * - CSV opens straight in Excel (UTF-8 BOM, so Arabic names survive) with
  *   every column MS Project exports: WBS, dates, duration, % complete,
- *   predecessors, float, critical, baseline and variance.
+ *   predecessors, float, critical, baseline, variance and the amount a
+ *   proposal or transfer carries (one figure per currency).
  * - Print lays the whole chart (every row, no virtualization) on landscape
  *   pages; the browser's "Save as PDF" makes the PDF.
  */
@@ -34,6 +35,7 @@ export function exportCsv(chart, filename) {
         labels.baselineStart ?? 'Baseline start',
         labels.baselineFinish ?? 'Baseline finish',
         labels.variance ?? 'Finish variance',
+        labels.money ?? 'Amount',
     ];
 
     const lines = [header.map(csvCell).join(',')];
@@ -55,6 +57,7 @@ export function exportCsv(chart, filename) {
             row.baselineStartDay === null ? '' : toIso(row.baselineStartDay),
             row.baselineEndDay === null ? '' : toIso(row.baselineEndDay),
             chart.variance(row) ?? '',
+            row.money ?? '',
         ].map(csvCell).join(','));
     }
 

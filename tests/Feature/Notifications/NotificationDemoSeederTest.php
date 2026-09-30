@@ -2,6 +2,7 @@
 
 use App\Enums\NotificationPriority;
 use App\Models\Activity;
+use App\Models\User;
 use App\Models\UserNotification;
 use Database\Seeders\NotificationDemoSeeder;
 
@@ -27,6 +28,7 @@ test('the demo seeder fills every role holder inbox with real, partly read notif
 
 test('the demo seeder does nothing when nobody can receive notifications', function () {
     $this->seed();
+    Activity::withoutRecording(fn () => User::query()->each(fn (User $user) => $user->syncRoles([])));
 
     $this->seed(NotificationDemoSeeder::class);
 

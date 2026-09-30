@@ -17,13 +17,13 @@ test('guests are redirected from task detail', function () {
 });
 
 test('missing tasks return not found from task detail', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
 
     $this->actingAs($user)->get(route('tasks.show', 999999))->assertNotFound();
 });
 
 test('task detail shows the task milestone project assignees and creator', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $assignee = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
     $creator = User::factory()->create(['name' => 'Bob Rahman']);
     $project = Project::factory()->create(['name' => 'Winter Support']);
@@ -56,7 +56,7 @@ test('task detail shows the task milestone project assignees and creator', funct
 });
 
 test('task detail shows the task proposal as its source when it is not raised against a milestone', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $proposal = Proposal::factory()->create(['name' => 'Emergency Response']);
     $task = Task::factory()->create([
         'source_type' => 'proposal',
@@ -71,7 +71,7 @@ test('task detail shows the task proposal as its source when it is not raised ag
 });
 
 test('task detail lists every assignee when a task has more than one', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $alice = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
     $bob = insertHrEmployee(firstNameEn: 'Bob', lastNameEn: 'Karam');
     $task = Task::factory()->create();
@@ -86,7 +86,7 @@ test('task detail lists every assignee when a task has more than one', function 
 });
 
 test('attachments are listed as metadata without exposing storage or controls', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $task = Task::factory()->create();
     $otherTask = Task::factory()->create();
     TaskAttachment::factory()->create([
@@ -114,7 +114,7 @@ test('attachments are listed as metadata without exposing storage or controls', 
 });
 
 test('task detail escapes all user controlled content', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $assignee = insertHrEmployee(firstNameEn: '<script>assignee()</script>', lastNameEn: '');
     $creator = User::factory()->create(['name' => '<img src=x onerror=creator()>']);
     $proposal = Proposal::factory()->create(['name' => '<svg onload=proposal()>']);
@@ -149,7 +149,7 @@ test('task detail escapes all user controlled content', function () {
 });
 
 test('task detail renders a task with no attachments and no project link when the source is not a milestone', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $task = Task::factory()->create(['source_type' => 'proposal', 'source_id' => Proposal::factory()->create()->id, 'description' => null]);
 
     $this->actingAs($user)
@@ -159,7 +159,7 @@ test('task detail renders a task with no attachments and no project link when th
 });
 
 test('a subtask can be added from the task detail page via the add subtask modal and inherits the parent source', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $milestone = Milestone::factory()->create();
     $assignee = insertHrEmployee();
     $parent = Task::factory()->create(['source_type' => 'milestone', 'source_id' => $milestone->id]);
@@ -190,7 +190,7 @@ test('a subtask can be added from the task detail page via the add subtask modal
 });
 
 test('adding a subtask with a blank title is rejected', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $parent = Task::factory()->create();
 
     Livewire::actingAs($user)
@@ -204,7 +204,7 @@ test('adding a subtask with a blank title is rejected', function () {
 });
 
 test('adding a subtask without an assignee is rejected', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $parent = Task::factory()->create();
 
     Livewire::actingAs($user)
@@ -219,7 +219,7 @@ test('adding a subtask without an assignee is rejected', function () {
 });
 
 test('subtasks persist and remain visible after navigating back to the task', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $parent = Task::factory()->create();
     Task::factory()->subtaskOf($parent)->create(['title' => 'Existing subtask']);
 
@@ -235,7 +235,7 @@ test('subtasks persist and remain visible after navigating back to the task', fu
 });
 
 test('the related tasks panel lists a subtask without inline editing controls', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $parent = Task::factory()->create();
     $subtask = Task::factory()->subtaskOf($parent)->create([
         'title' => 'Confirm the delivery window',
@@ -251,7 +251,7 @@ test('the related tasks panel lists a subtask without inline editing controls', 
 });
 
 test('a subtask panel does not appear on a subtask s own detail page', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $parent = Task::factory()->create();
     $subtask = Task::factory()->subtaskOf($parent)->create();
 
@@ -262,7 +262,7 @@ test('a subtask panel does not appear on a subtask s own detail page', function 
 });
 
 test('a task can be edited from its own detail page', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $newAssignee = insertHrEmployee(firstNameEn: 'Nadia', lastNameEn: 'Younes');
     $task = Task::factory()->create([
         'title' => 'Draft distribution plan',
@@ -287,7 +287,7 @@ test('a task can be edited from its own detail page', function () {
 });
 
 test('editing a task without an assignee is rejected', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $task = Task::factory()->create();
 
     Livewire::actingAs($user)
@@ -298,7 +298,7 @@ test('editing a task without an assignee is rejected', function () {
 });
 
 test('a subtask is edited from its own detail page, not from the parent', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
     $newAssignee = insertHrEmployee(firstNameEn: 'Omar', lastNameEn: 'Saleh');
     $parent = Task::factory()->create();
     $subtask = Task::factory()->subtaskOf($parent)->create([

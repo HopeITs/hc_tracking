@@ -3,7 +3,7 @@
         :name="auth()->user()->name"
         :initials="auth()->user()->initials()"
         circle
-        class="touch-manipulation text-secondary-dark! hover:bg-secondary-soft/70! dark:text-white! dark:hover:bg-white/10!"
+        class="touch-manipulation text-secondary-dark! hover:bg-secondary-soft/70! dark:text-ink! dark:hover:bg-white/10!"
         data-test="sidebar-menu-button"
     />
 
@@ -19,6 +19,9 @@
             </div>
         </div>
         <flux:menu.separator />
+        <flux:menu.item :href="route('security.edit')" icon="shield-check" class="touch-manipulation" data-test="security-menu-item">
+            {{ __('common.security') }}
+        </flux:menu.item>
         <form method="POST" action="{{ route('logout') }}" class="w-full">
             @csrf
             <flux:menu.item
