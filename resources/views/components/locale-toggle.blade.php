@@ -11,7 +11,9 @@
 >
     @csrf
     @foreach (\App\Enums\Locale::cases() as $case)
-        @php($isCurrent = $case === $current)
+        @php
+            $isCurrent = $case === $current;
+        @endphp
         <button
             type="submit"
             name="locale" value="{{ $case->value }}"

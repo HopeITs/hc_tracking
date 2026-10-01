@@ -101,7 +101,7 @@ return [
     'tranche_point_label' => ':state — :amount :currency on :date, :proposal',
     'today' => 'Today',
     'agreements_and_what_they_fund' => 'Agreements and what they fund',
-    'agreement_ref' => 'Agreement :number',
+    'agreement_ref' => 'External no. :number',
     'view_agreement' => 'View agreement',
     'due_lower' => 'due',
     'overdue_lower' => 'overdue',

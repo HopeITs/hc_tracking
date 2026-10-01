@@ -101,7 +101,7 @@ return [
     'tranche_point_label' => ':state — :amount :currency في :date، :proposal',
     'today' => 'اليوم',
     'agreements_and_what_they_fund' => 'الاتفاقيات وما تموله',
-    'agreement_ref' => 'الاتفاقية :number',
+    'agreement_ref' => 'رقم خارجي :number',
     'view_agreement' => 'عرض الاتفاقية',
     'due_lower' => 'مستحق',
     'overdue_lower' => 'متأخر',

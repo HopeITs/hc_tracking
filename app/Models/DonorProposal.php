@@ -20,19 +20,19 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * A funding agreement between one donor and one proposal.
  *
  * Despite the singular, pivot-style table name this is an entity: it carries a
- * budget, a currency and the project number the donor files it under.
+ * budget, a currency and the external project number the donor files it under.
  *
  * @property int $id
  * @property string $slug
  * @property int $donor_id
  * @property string $budget
  * @property Currency $currency
- * @property string|null $project_num
+ * @property string|null $external_project_number
  * @property int $proposal_id
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['donor_id', 'budget', 'currency', 'project_num', 'proposal_id'])]
+#[Fillable(['donor_id', 'budget', 'currency', 'external_project_number', 'proposal_id'])]
 class DonorProposal extends Model implements TracksActivity
 {
     /** @use HasFactory<DonorProposalFactory> */
@@ -145,7 +145,7 @@ class DonorProposal extends Model implements TracksActivity
      */
     public function activityEvents(): array
     {
-        return ['budget' => 'updated', 'currency' => 'updated', 'project_num' => 'updated'];
+        return ['budget' => 'updated', 'currency' => 'updated', 'external_project_number' => 'updated'];
     }
 
     /**

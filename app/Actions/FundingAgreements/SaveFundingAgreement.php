@@ -27,7 +27,7 @@ class SaveFundingAgreement
             'proposal_id' => (int) $validated['agreementProposalId'],
             'budget' => $validated['budget'],
             'currency' => $validated['agreementCurrency'],
-            'project_num' => $validated['projectNum'] === '' ? null : $validated['projectNum'],
+            'external_project_number' => $validated['externalProjectNumber'] === '' ? null : $validated['externalProjectNumber'],
         ])->save();
 
         return $agreement;

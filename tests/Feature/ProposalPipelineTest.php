@@ -3,6 +3,7 @@
 use App\Enums\ProposalPhase;
 use App\Enums\ProposalStatus;
 use App\Enums\TaskStatus;
+use App\Models\Activity;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\Project;
@@ -68,6 +69,7 @@ test('a proposal can be created with a trimmed name', function () {
         ->test('pages::proposals.index')
         ->call('openCreateModal')
         ->set('name', '  Rapid Response Fund  ')
+        ->set('internalProjectNumber', 'HC-2026-041')
         ->set('proposalStatus', ProposalStatus::ConceptNote->value)
         ->set('plannedDateBegin', '2026-01-01')
         ->set('plannedDateEnd', '2026-12-31')
@@ -87,6 +89,7 @@ test('a proposal end date cannot fall before its begin date', function () {
         ->test('pages::proposals.index')
         ->call('openCreateModal')
         ->set('name', 'Backwards Proposal')
+        ->set('internalProjectNumber', 'HC-2026-042')
         ->set('proposalStatus', ProposalStatus::ConceptNote->value)
         ->set('plannedDateBegin', '2026-12-31')
         ->set('plannedDateEnd', '2026-01-01')
@@ -310,11 +313,201 @@ test('a user without proposal permissions sees no edit controls and cannot creat
         ->assertDontSeeHtml('data-test="advance-proposal-'.$proposal->id.'"');
 
     $fresh()->call('openCreateModal')->assertForbidden();
-    $fresh()->set('name', 'Sneaked in')->set('plannedDateBegin', '2026-01-01')->set('plannedDateEnd', '2026-12-31')->set('proposalStatus', 'concept note')->call('saveProposal')->assertForbidden();
+    $fresh()->set('name', 'Sneaked in')->set('internalProjectNumber', 'HC-2026-043')->set('plannedDateBegin', '2026-01-01')->set('plannedDateEnd', '2026-12-31')->set('proposalStatus', 'concept note')->call('saveProposal')->assertForbidden();
     $fresh()->call('openStageModal', $proposal->id)->assertForbidden();
     $fresh()->call('confirmDelete', $proposal->id)->assertForbidden();
     expect(fn () => $fresh()->set('deletingProposalId', $proposal->id))->toThrow(CannotUpdateLockedPropertyException::class);
 
     expect(DB::table('proposals')->where('name', 'Sneaked in')->exists())->toBeFalse()
         ->and(DB::table('proposals')->find($proposal->id))->not->toBeNull();
+});
+
+test('a proposal cannot be created without an internal project number', function () {
+    $user = User::factory()->role('Financial')->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::proposals.index')
+        ->call('openCreateModal')
+        ->set('name', 'Rapid Response Fund')
+        ->set('internalProjectNumber', '   ')
+        ->set('proposalStatus', ProposalStatus::ConceptNote->value)
+        ->set('plannedDateBegin', '2026-01-01')
+        ->set('plannedDateEnd', '2026-12-31')
+        ->call('saveProposal')
+        ->assertHasErrors(['internalProjectNumber' => 'required']);
+
+    expect(DB::table('proposals')->where('name', 'Rapid Response Fund')->exists())->toBeFalse();
+});
+
+test('a new proposal cannot reuse another proposal\'s internal number, whatever its case', function () {
+    $user = User::factory()->role('Financial')->create();
+    Proposal::factory()->create(['internal_project_number' => 'HC-2026-044']);
+
+    Livewire::actingAs($user)
+        ->test('pages::proposals.index')
+        ->call('openCreateModal')
+        ->set('name', 'Rapid Response Fund')
+        ->set('internalProjectNumber', 'hc-2026-044')
+        ->set('proposalStatus', ProposalStatus::ConceptNote->value)
+        ->set('plannedDateBegin', '2026-01-01')
+        ->set('plannedDateEnd', '2026-12-31')
+        ->call('saveProposal')
+        ->assertHasErrors(['internalProjectNumber' => 'unique'])
+        ->assertSee('The internal project number has already been taken.');
+
+    expect(DB::table('proposals')->where('name', 'Rapid Response Fund')->exists())->toBeFalse();
+});
+
+test('the internal project number is trimmed and limited to 50 characters', function () {
+    $user = User::factory()->role('Financial')->create();
+
+    $component = Livewire::actingAs($user)
+        ->test('pages::proposals.index')
+        ->call('openCreateModal')
+        ->set('name', 'Rapid Response Fund')
+        ->set('proposalStatus', ProposalStatus::ConceptNote->value)
+        ->set('plannedDateBegin', '2026-01-01')
+        ->set('plannedDateEnd', '2026-12-31')
+        ->set('internalProjectNumber', str_repeat('A', 51))
+        ->call('saveProposal')
+        ->assertHasErrors(['internalProjectNumber' => 'max']);
+
+    $component->set('internalProjectNumber', '  HC-2026-045  ')
+        ->call('saveProposal')
+        ->assertHasNoErrors();
+
+    expect(DB::table('proposals')->where('name', 'Rapid Response Fund')->value('internal_project_number'))->toBe('HC-2026-045');
+});
+
+test('a new internal number cannot use the reserved placeholder prefix', function (string $number) {
+    $user = User::factory()->role('Financial')->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::proposals.index')
+        ->call('openCreateModal')
+        ->set('name', 'Rapid Response Fund')
+        ->set('internalProjectNumber', $number)
+        ->set('proposalStatus', ProposalStatus::ConceptNote->value)
+        ->set('plannedDateBegin', '2026-01-01')
+        ->set('plannedDateEnd', '2026-12-31')
+        ->call('saveProposal')
+        ->assertHasErrors('internalProjectNumber')
+        ->assertSee(__('proposals.internal_project_number_prefix_reserved'));
+
+    expect(DB::table('proposals')->where('name', 'Rapid Response Fund')->exists())->toBeFalse();
+})->with(['TEMP-0099', 'temp-0099']);
+
+test('a proposal still holding its placeholder saves while the number is left alone, but not with another placeholder', function () {
+    $user = User::factory()->role('Financial')->create();
+    $proposal = Proposal::factory()->create(['internal_project_number' => 'TEMP-0007']);
+
+    $component = Livewire::actingAs($user)
+        ->test('pages::proposals.index')
+        ->call('openEditModal', $proposal->id)
+        ->assertSet('internalProjectNumber', 'TEMP-0007')
+        ->set('internalProjectNumber', 'TEMP-0008')
+        ->call('saveProposal')
+        ->assertHasErrors('internalProjectNumber');
+
+    $component->set('internalProjectNumber', 'TEMP-0007')
+        ->set('name', 'Renamed proposal')
+        ->call('saveProposal')
+        ->assertHasNoErrors();
+
+    $stored = DB::table('proposals')->find($proposal->id);
+
+    expect($stored->name)->toBe('Renamed proposal')
+        ->and($stored->internal_project_number)->toBe('TEMP-0007');
+});
+
+test('saving a proposal with its own internal number raises no duplicate error', function () {
+    $user = User::factory()->role('Financial')->create();
+    $proposal = Proposal::factory()->create(['internal_project_number' => 'HC-2026-046']);
+
+    Livewire::actingAs($user)
+        ->test('pages::proposals.index')
+        ->call('openEditModal', $proposal->id)
+        ->set('notes', 'Checked against the donor letter')
+        ->call('saveProposal')
+        ->assertHasNoErrors();
+
+    expect(DB::table('proposals')->find($proposal->id)->notes)->toBe('Checked against the donor letter');
+});
+
+test('changing the internal number is recorded in the activity log and notifies', function () {
+    $user = User::factory()->role('Financial')->create();
+    $proposal = Activity::withoutRecording(fn () => Proposal::factory()->create(['internal_project_number' => 'TEMP-0003']));
+
+    Livewire::actingAs($user)
+        ->test('pages::proposals.index')
+        ->call('openEditModal', $proposal->id)
+        ->set('internalProjectNumber', 'HC-2026-047')
+        ->call('saveProposal')
+        ->assertHasNoErrors();
+
+    $activity = Activity::query()->where('subject_type', 'proposal')->where('subject_id', $proposal->id)->sole();
+
+    expect($activity->event)->toBe('proposal.updated')
+        ->and($activity->changes['internal_project_number'])->toBe(['TEMP-0003', 'HC-2026-047'])
+        ->and($activity->shouldNotify())->toBeTrue();
+});
+
+test('a duplicate that slips past validation shows the duplicate error instead of failing', function () {
+    $user = User::factory()->role('Financial')->create();
+    Proposal::factory()->create(['internal_project_number' => 'HC-2026-048']);
+
+    // Stands in for a colleague saving the same number between this form's
+    // validation and its insert: validation saw a free number, the database
+    // does not.
+    Proposal::creating(function (Proposal $proposal): void {
+        $proposal->internal_project_number = 'HC-2026-048';
+    });
+
+    Livewire::actingAs($user)
+        ->test('pages::proposals.index')
+        ->call('openCreateModal')
+        ->set('name', 'Rapid Response Fund')
+        ->set('internalProjectNumber', 'HC-2026-049')
+        ->set('proposalStatus', ProposalStatus::ConceptNote->value)
+        ->set('plannedDateBegin', '2026-01-01')
+        ->set('plannedDateEnd', '2026-12-31')
+        ->call('saveProposal')
+        ->assertHasErrors('internalProjectNumber')
+        ->assertSee('The internal project number has already been taken.')
+        ->assertSet('showProposalModal', true);
+
+    expect(DB::table('proposals')->where('name', 'Rapid Response Fund')->exists())->toBeFalse();
+});
+
+test('the proposals list finds a proposal by its internal number', function () {
+    $user = User::factory()->role('Financial')->create();
+    Proposal::factory()->create(['name' => 'Winter Shelter Kit', 'internal_project_number' => 'HC-2026-061']);
+    Proposal::factory()->create(['name' => 'Cash for Work', 'internal_project_number' => 'HC-2026-062']);
+
+    Livewire::actingAs($user)
+        ->test('pages::proposals.index')
+        ->set('search', '2026-061')
+        ->assertSee('Winter Shelter Kit')
+        ->assertDontSee('Cash for Work');
+});
+
+test('a placeholder internal number carries the replace chip and a real one does not', function () {
+    $user = User::factory()->role('Financial')->create();
+    Proposal::factory()->create(['internal_project_number' => 'TEMP-0063']);
+    Proposal::factory()->create(['internal_project_number' => 'HC-2026-063']);
+
+    Livewire::actingAs($user)
+        ->test('pages::proposals.index')
+        ->assertSeeHtml('<bdi dir="ltr" class="font-semibold tabular-nums">HC-2026-063</bdi>')
+        ->assertSeeHtml('data-placeholder-chip="TEMP-0063"')
+        ->assertDontSeeHtml('data-placeholder-chip="HC-2026-063"')
+        ->assertSee('Placeholder — replace');
+});
+
+test('the proposals search hint says it also matches the internal number', function () {
+    $user = User::factory()->role('Financial')->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::proposals.index')
+        ->assertSeeHtml('placeholder="Name, number or notes"');
 });

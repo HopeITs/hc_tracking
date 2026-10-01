@@ -241,11 +241,11 @@ test('an agreement can be created with a budget and currency', function () {
         ->set('agreementProposalId', (string) $proposal->id)
         ->set('budget', '750000.00')
         ->set('agreementCurrency', Currency::Usd->value)
-        ->set('projectNum', 'SYR-2026-014')
+        ->set('externalProjectNumber', 'SYR-2026-014')
         ->call('saveAgreement')
         ->assertHasNoErrors();
 
-    $agreement = DonorProposal::query()->where('project_num', 'SYR-2026-014')->sole();
+    $agreement = DonorProposal::query()->where('external_project_number', 'SYR-2026-014')->sole();
 
     expect($agreement->currency)->toBe(Currency::Usd)
         ->and((float) $agreement->budget)->toBe(750000.0);
@@ -793,4 +793,68 @@ test('agreement detail shows the gross amount received beside what landed', func
         ->test('pages::funding-agreements.show', ['donorProposal' => $agreement])
         ->assertSeeText('gross 990.00')
         ->assertSeeText('985.00 USD landed');
+});
+
+test('the agreement picker names each proposal with its internal number', function () {
+    $user = User::factory()->role('Financial')->create();
+    Proposal::factory()->create(['name' => 'Winter Shelter Kit', 'internal_project_number' => 'HC-2026-071']);
+
+    Livewire::actingAs($user)
+        ->test('pages::funding-agreements.index')
+        ->call('openCreateModal')
+        ->assertSee('Winter Shelter Kit · HC-2026-071');
+});
+
+test('the agreements list finds an agreement by its external number or its proposal\'s internal number', function () {
+    $user = User::factory()->role('Financial')->create();
+    DonorProposal::factory()->create([
+        'proposal_id' => Proposal::factory()->create(['name' => 'Winter Shelter Kit', 'internal_project_number' => 'HC-2026-081'])->id,
+        'external_project_number' => 'ECHO/SYR/2026/7',
+    ]);
+    DonorProposal::factory()->create([
+        'proposal_id' => Proposal::factory()->create(['name' => 'Cash for Work', 'internal_project_number' => 'HC-2026-082'])->id,
+        'external_project_number' => 'UNICEF-55',
+    ]);
+
+    Livewire::actingAs($user)
+        ->test('pages::funding-agreements.index')
+        ->set('search', 'ECHO/SYR')
+        ->assertSee('Winter Shelter Kit')
+        ->assertDontSee('Cash for Work')
+        ->set('search', 'HC-2026-082')
+        ->assertSee('Cash for Work')
+        ->assertDontSee('Winter Shelter Kit');
+});
+
+test('an agreement card shows its proposal\'s internal number beside its external number', function () {
+    $user = User::factory()->role('Financial')->create();
+    DonorProposal::factory()->create([
+        'proposal_id' => Proposal::factory()->create(['internal_project_number' => 'HC-2026-083'])->id,
+        'external_project_number' => 'ECHO-83',
+    ]);
+
+    Livewire::actingAs($user)
+        ->test('pages::funding-agreements.index')
+        ->assertSeeInOrder(['Internal project number', 'HC-2026-083', 'External project number', 'ECHO-83']);
+});
+
+test('the agreement page shows both project numbers', function () {
+    $user = User::factory()->role('Financial')->create();
+    $agreement = DonorProposal::factory()->create([
+        'proposal_id' => Proposal::factory()->create(['internal_project_number' => 'HC-2026-084'])->id,
+        'external_project_number' => 'ECHO-84',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('funding-agreements.show', $agreement))
+        ->assertOk()
+        ->assertSeeInOrder(['Internal project number', 'HC-2026-084', 'External project number', 'ECHO-84']);
+});
+
+test('the agreements search hint names the project number', function () {
+    $user = User::factory()->role('Financial')->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::funding-agreements.index')
+        ->assertSeeHtml('placeholder="Project number, donor, or proposal"');
 });

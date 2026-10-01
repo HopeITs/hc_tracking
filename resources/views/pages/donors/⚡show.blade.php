@@ -60,10 +60,10 @@ new #[Title('titles.donor')] class extends Component {
         $canViewTransfers = (bool) auth()->user()->can('transfers.view');
 
         return DonorProposal::query()
-            ->select(['id', 'donor_id', 'proposal_id', 'budget', 'currency', 'project_num'])
+            ->select(['id', 'donor_id', 'proposal_id', 'budget', 'currency', 'external_project_number'])
             ->where('donor_id', $this->donorId)
             ->with([
-                'proposal:id,name,status',
+                'proposal:id,name,internal_project_number,status',
                 'proposal.projects:id,name,status',
                 'transfers' => fn ($query) => $query
                     ->select(['id', 'donor_proposal_id', 'account_id', 'payment_amount', 'amount_transfered_currency', 'scheduled_date', 'transfer_date', 'fees', 'fees_currency', 'amount_received', 'exchange_rate', 'net_amount_received', 'amount_received_currency', 'receive_date', 'ar_status'])
@@ -625,12 +625,17 @@ new #[Title('titles.donor')] class extends Component {
                 <p class="mt-4 text-sm {{ $mutedText }}">{{ __('donors.no_dated_tranches') }}</p>
             @else
                 <div class="mt-5 overflow-x-auto pb-2">
-                    <div class="min-w-[44rem]">
+                    <div class="min-w-[48rem]">
                         @foreach ($this->calendar['lanes'] as $lane)
-                            <div class="grid grid-cols-[11rem_minmax(0,1fr)] items-center gap-4 border-b {{ $hairline }}" wire:key="lane-{{ $lane['agreement']->id }}" data-lane="{{ $lane['agreement']->id }}">
+                            <div class="grid grid-cols-[15rem_minmax(0,1fr)] items-center gap-4 border-b {{ $hairline }}" wire:key="lane-{{ $lane['agreement']->id }}" data-lane="{{ $lane['agreement']->id }}">
                                 <a href="{{ route('funding-agreements.show', $lane['agreement']) }}" wire:navigate class="min-w-0 py-3 text-xs underline-offset-4 hover:underline">
                                     <span class="block truncate font-semibold {{ $inkText }}">{{ $lane['agreement']->proposal->name }}</span>
-                                    <span class="block truncate {{ $mutedText }}">{{ $lane['agreement']->project_num ?? __('common.no_donor_reference') }}</span>
+                                    <span class="mt-0.5 block {{ $mutedText }}">
+                                        <x-ui.project-number :number="$lane['agreement']->proposal->internal_project_number" kind="internal" />
+                                    </span>
+                                    <span class="mt-0.5 block truncate {{ $mutedText }}" data-lane-external>
+                                        <x-ui.project-number :number="$lane['agreement']->external_project_number" kind="external" />
+                                    </span>
                                 </a>
                                 <div class="relative h-14">
                                     <span class="absolute inset-x-0 top-1/2 h-px bg-secondary-soft dark:bg-line" aria-hidden="true"></span>
@@ -662,7 +667,7 @@ new #[Title('titles.donor')] class extends Component {
                             </div>
                         @endforeach
 
-                        <div class="grid grid-cols-[11rem_minmax(0,1fr)] gap-4">
+                        <div class="grid grid-cols-[15rem_minmax(0,1fr)] gap-4">
                             <span></span>
                             <div class="relative h-12" aria-hidden="true">
                                 @foreach ($this->calendar['ticks'] as $tick)
@@ -699,8 +704,9 @@ new #[Title('titles.donor')] class extends Component {
                                 <a href="{{ route('proposals.show', $agreement->proposal) }}" wire:navigate class="text-base font-bold underline-offset-4 hover:underline @3xl/detail:text-lg {{ $inkText }}">{{ $agreement->proposal->name }}</a>
                                 <x-ui.enum-badge :case="$agreement->proposal->status" />
                             </div>
-                            <a href="{{ route('funding-agreements.show', $agreement) }}" wire:navigate class="mt-1 inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline {{ $mutedText }}">
-                                {{ filled($agreement->project_num) ? __('donors.agreement_ref', ['number' => $agreement->project_num]) : __('donors.view_agreement') }}
+                            <a href="{{ route('funding-agreements.show', $agreement) }}" wire:navigate class="mt-1 inline-flex flex-wrap items-center gap-1 text-xs underline-offset-4 hover:underline {{ $mutedText }}">
+                                <x-ui.project-number :number="$agreement->proposal->internal_project_number" kind="internal" />
+                                · {{ filled($agreement->external_project_number) ? __('donors.agreement_ref', ['number' => $agreement->external_project_number]) : __('donors.view_agreement') }}
                                 · {{ trans_choice('common.count_tranche', $agreement->transfers->count(), ['count' => $agreement->transfers->count()]) }}
                                 <flux:icon.arrow-up-right variant="micro" class="size-3.5 rtl:-scale-x-100" aria-hidden="true" />
                             </a>

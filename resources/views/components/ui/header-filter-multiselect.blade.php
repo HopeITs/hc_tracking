@@ -125,7 +125,9 @@
             </button>
 
             @foreach ($options as $option)
-                @php($isSelected = in_array($option['value'], $selectedValues, true))
+                @php
+                    $isSelected = in_array($option['value'], $selectedValues, true);
+                @endphp
                 <button
                     type="button"
                     data-flux-menu-item

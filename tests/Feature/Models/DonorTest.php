@@ -21,7 +21,7 @@ test('a donor reaches its proposals through the donor_proposal table', function 
         'donor_id' => $donor->id,
         'proposal_id' => $proposal->id,
         'budget' => '750000.00',
-        'project_num' => 'PRJ-0001',
+        'external_project_number' => 'PRJ-0001',
     ]);
 
     $linked = $donor->proposals()->sole();
@@ -29,5 +29,5 @@ test('a donor reaches its proposals through the donor_proposal table', function 
     expect($linked->id)->toBe($proposal->id)
         ->and($linked->pivot->budget)->toBe('750000.00')
         ->and($linked->pivot->currency)->toBe('USD')
-        ->and($linked->pivot->project_num)->toBe('PRJ-0001');
+        ->and($linked->pivot->external_project_number)->toBe('PRJ-0001');
 });

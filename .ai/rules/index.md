@@ -49,6 +49,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/views/pages/** | .ai/rules/pages.md |
 | {config/access-control.php,app/Policies/UserPolicy.php} | .ai/rules/policies.md |
 | resources/views/pages/proposals/** | .ai/rules/proposals.md |
+| {app/Models/Proposal.php,app/Models/DonorProposal.php,resources/views/pages/{proposals,funding-agreements,transfers,donors}/**} | .ai/rules/proposalsfunding-agreementstransfersdonors.md |
 | app/Providers/** | .ai/rules/providers.md |
 | app/Notifications/Recipients/** | .ai/rules/recipients.md |
 | {app/Livewire/Concerns/ManagesReportForm.php,resources/views/pages/reports/**,resources/views/components/reports/**} | .ai/rules/reports.md |

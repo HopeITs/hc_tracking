@@ -124,7 +124,7 @@ new #[Title('titles.transfers')] class extends Component {
         $agreementId = (int) $this->agreement;
 
         return $agreementId > 0
-            ? DonorProposal::query()->with(['donor:id,name', 'proposal:id,name'])->find($agreementId, ['id', 'donor_id', 'proposal_id', 'project_num'])
+            ? DonorProposal::query()->with(['donor:id,name', 'proposal:id,name'])->find($agreementId, ['id', 'donor_id', 'proposal_id', 'external_project_number'])
             : null;
     }
 
@@ -196,9 +196,11 @@ new #[Title('titles.transfers')] class extends Component {
             ->when($search !== '', function (Builder $query) use ($search): void {
                 $query->whereHas('donorProposal', function (Builder $query) use ($search): void {
                     $query
-                        ->where('project_num', 'like', Like::contains($search))
+                        ->where('external_project_number', 'like', Like::contains($search))
                         ->orWhereHas('donor', fn (Builder $query) => $query->where('name', 'like', Like::contains($search)))
-                        ->orWhereHas('proposal', fn (Builder $query) => $query->where('name', 'like', Like::contains($search)));
+                        ->orWhereHas('proposal', fn (Builder $query) => $query->where(fn (Builder $query) => $query
+                            ->where('name', 'like', Like::contains($search))
+                            ->orWhere('internal_project_number', 'like', Like::contains($search))));
                 });
             })
             ->when($this->arStatus !== '', fn (Builder $query) => $query->where('ar_status', $this->arStatus))
@@ -255,9 +257,9 @@ new #[Title('titles.transfers')] class extends Component {
                 'exchange_rate', 'net_amount_received', 'amount_received_currency', 'receive_date', 'ar_status',
             ])
             ->with([
-                'donorProposal:id,donor_id,proposal_id,project_num',
+                'donorProposal:id,donor_id,proposal_id,external_project_number',
                 'donorProposal.donor:id,name',
-                'donorProposal.proposal:id,name',
+                'donorProposal.proposal:id,name,internal_project_number',
                 // Nullable: a tranche may be scheduled before an account exists.
                 'account:id,account_name,is_active',
             ]);
@@ -942,7 +944,9 @@ new #[Title('titles.transfers')] class extends Component {
                                         <p class="flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs text-secondary-medium dark:text-ink-muted">
                                             <a href="{{ route('proposals.show', $transfer->donorProposal->proposal) }}" wire:navigate class="truncate underline-offset-2 hover:underline">{{ $transfer->donorProposal->proposal->name }}</a>
                                             <span aria-hidden="true">·</span>
-                                            <a href="{{ route('funding-agreements.show', $transfer->donorProposal) }}" wire:navigate class="shrink-0 underline-offset-2 hover:underline" data-agreement-link>{{ filled($transfer->donorProposal->project_num) ? __('proposals.agreement_number', ['number' => $transfer->donorProposal->project_num]) : __('proposals.view_agreement') }}</a>
+                                            <x-ui.project-number :number="$transfer->donorProposal->proposal->internal_project_number" kind="internal" class="shrink-0" />
+                                            <span aria-hidden="true">·</span>
+                                            <a href="{{ route('funding-agreements.show', $transfer->donorProposal) }}" wire:navigate class="shrink-0 underline-offset-2 hover:underline" data-agreement-link>{{ filled($transfer->donorProposal->external_project_number) ? __('proposals.agreement_number', ['number' => $transfer->donorProposal->external_project_number]) : __('proposals.view_agreement') }}</a>
                                         </p>
                                     </div>
                                 </div>
@@ -1120,7 +1124,15 @@ new #[Title('titles.transfers')] class extends Component {
                                         @else
                                             {{ __('transfers.nothing_has_left_the_donor_yet') }}
                                         @endif
-                                        <span class="{{ $inkText }}">{{ __('transfers.reference_num', ['reference' => $transfer->donorProposal->project_num]) }}</span>
+                                        <span class="inline-flex flex-wrap items-center gap-x-1.5 {{ $inkText }}">
+                                            <x-ui.project-number :number="$transfer->donorProposal->proposal->internal_project_number" kind="internal" />
+                                            <span aria-hidden="true">·</span>
+                                            @if (filled($transfer->donorProposal->external_project_number))
+                                                <span>{{ __('transfers.reference_num', ['reference' => $transfer->donorProposal->external_project_number]) }}</span>
+                                            @else
+                                                <span class="{{ $mutedText }}">{{ __('common.no_external_project_number') }}</span>
+                                            @endif
+                                        </span>
                                     </p>
                                 </div>
                             </div>

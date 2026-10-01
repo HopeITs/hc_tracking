@@ -115,34 +115,41 @@ class CoreDataSeeder extends Seeder
 
         // Real proposals recorded from grant paperwork, not yet linked to a
         // program or project. The donor and budget only exist as free text in
-        // `notes` here, because the source data gives no project_num to key a
-        // donor_proposal row on — raise that with the user before inventing one.
+        // `notes` here, because the source data gives no external_project_number
+        // to key a donor_proposal row on — raise that with the user before
+        // inventing one. Each internal number matches RealProposalsSeeder's for
+        // the same proposal, so seeding both never assigns two numbers.
         $proposals = [
             'Family to Family - CP' => [
+                'internal_project_number' => 'HC-2026-001',
                 'planned_date_begin' => '2026-01-01',
                 'planned_date_end' => '2026-12-31',
                 'status' => ProposalStatus::Approved,
                 'notes' => 'Donor: CP, Budget: €854,470.00',
             ],
             'Micro Projects - CP' => [
+                'internal_project_number' => 'HC-2026-002',
                 'planned_date_begin' => '2026-01-01',
                 'planned_date_end' => '2026-12-31',
                 'status' => ProposalStatus::Approved,
                 'notes' => 'Donor: CP, Budget: €817,032.00',
             ],
             'Leadership Aleppo - MCC' => [
+                'internal_project_number' => 'HC-2026-005',
                 'planned_date_begin' => '2026-04-01',
                 'planned_date_end' => '2027-03-31',
                 'status' => ProposalStatus::Approved,
                 'notes' => 'Donor: MCC, Budget: $50,010.00',
             ],
             'Study Zone Syria - CDCS' => [
+                'internal_project_number' => 'HC-2026-011',
                 'planned_date_begin' => '2025-11-01',
                 'planned_date_end' => '2026-12-31',
                 'status' => ProposalStatus::Approved,
                 'notes' => 'Donor: CDCS, Budget: €322,180.00',
             ],
             'Children University - Missio Munich' => [
+                'internal_project_number' => 'HC-2026-012',
                 'planned_date_begin' => '2026-01-01',
                 'planned_date_end' => '2026-12-31',
                 'status' => ProposalStatus::Approved,
@@ -154,6 +161,7 @@ class CoreDataSeeder extends Seeder
             Proposal::firstOrCreate(
                 ['name' => $name],
                 [
+                    'internal_project_number' => $profile['internal_project_number'],
                     'planned_date_begin' => $profile['planned_date_begin'],
                     'planned_date_end' => $profile['planned_date_end'],
                     'actual_date_begin' => $profile['actual_date_begin'] ?? null,

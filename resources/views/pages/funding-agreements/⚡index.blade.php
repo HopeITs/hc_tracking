@@ -91,9 +91,11 @@ new #[Title('titles.funding_agreements')] class extends Component {
             ->when($search !== '', function (Builder $query) use ($search): void {
                 $query->where(function (Builder $query) use ($search): void {
                     $query
-                        ->where('project_num', 'like', Like::contains($search))
+                        ->where('external_project_number', 'like', Like::contains($search))
                         ->orWhereHas('donor', fn (Builder $query) => $query->where('name', 'like', Like::contains($search)))
-                        ->orWhereHas('proposal', fn (Builder $query) => $query->where('name', 'like', Like::contains($search)));
+                        ->orWhereHas('proposal', fn (Builder $query) => $query->where(fn (Builder $query) => $query
+                            ->where('name', 'like', Like::contains($search))
+                            ->orWhere('internal_project_number', 'like', Like::contains($search))));
                 });
             })
             ->when($this->donor !== '', fn (Builder $query) => $query->where('donor_id', (int) $this->donor))
@@ -147,7 +149,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
         $today = CarbonImmutable::today()->toDateString();
 
         return $this->filteredQuery()
-            ->select(['id', 'donor_id', 'proposal_id', 'budget', 'currency', 'project_num', 'updated_at'])
+            ->select(['id', 'donor_id', 'proposal_id', 'budget', 'currency', 'external_project_number', 'updated_at'])
             ->addSelect(['next_due' => TransfersTracking::query()
                 ->select('scheduled_date')
                 ->whereColumn('transfers_tracking.donor_proposal_id', 'donor_proposal.id')
@@ -159,7 +161,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
             ])
             ->with([
                 'donor:id,name',
-                'proposal:id,name,status',
+                'proposal:id,name,internal_project_number,status',
                 'proposal.projects' => fn ($query) => $query->select(['projects.id', 'projects.name'])->orderBy('projects.name'),
                 'transfers' => fn ($query) => $query
                     ->select(['id', 'donor_proposal_id', 'account_id', 'payment_amount', 'amount_transfered_currency', 'scheduled_date', 'transfer_date', 'fees', 'fees_currency', 'amount_received', 'net_amount_received', 'amount_received_currency', 'receive_date', 'ar_status'])
@@ -1235,9 +1237,15 @@ new #[Title('titles.funding_agreements')] class extends Component {
                                                             <x-ui.enum-badge :case="$agreement->proposal->status" />
                                                         </dd>
                                                     </div>
-                                                    <div>
-                                                        <dt class="font-semibold {{ $mutedText }}">{{ __('funding_agreements.donor_reference') }}</dt>
-                                                        <dd class="mt-1 font-bold tabular-nums {{ $inkText }}">{{ $agreement->project_num ?? __('common.no_donor_reference') }}</dd>
+                                                    <div class="grid grid-cols-2 gap-3">
+                                                        <div>
+                                                            <dt class="font-semibold {{ $mutedText }}">{{ __('common.internal_project_number') }}</dt>
+                                                            <dd class="mt-1 font-bold {{ $inkText }}"><x-ui.project-number :number="$agreement->proposal->internal_project_number" kind="internal" /></dd>
+                                                        </div>
+                                                        <div>
+                                                            <dt class="font-semibold {{ $mutedText }}">{{ __('funding_agreements.external_project_number') }}</dt>
+                                                            <dd class="mt-1 font-bold {{ $inkText }}"><x-ui.project-number :number="$agreement->external_project_number" kind="external" /></dd>
+                                                        </div>
                                                     </div>
                                                     <div>
                                                         <dt class="font-semibold {{ $mutedText }}">{{ __('funding_agreements.projects_funded') }}</dt>

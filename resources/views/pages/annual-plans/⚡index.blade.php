@@ -1039,7 +1039,9 @@ new #[Title('titles.annual_plans')] class extends Component {
                     {{-- The year axis: the real controls, restated in full for assistive tech via each button's label. --}}
                     <div class="relative mt-2 h-16">
                         @foreach ($arcPoints as $point)
-                            @php($rail = $point['rail'])
+                            @php
+                                $rail = $point['rail'];
+                            @endphp
                             <div class="absolute top-0 flex -translate-x-1/2 flex-col items-center gap-1.5" style="left: {{ $point['xPct'] }}%" wire:key="rail-{{ $rail['year'] }}">
                                 <button
                                     type="button"
@@ -1184,7 +1186,9 @@ new #[Title('titles.annual_plans')] class extends Component {
                 {{-- Narrow layout: one card per program, its planned years listed. --}}
                 <div class="divide-y divide-board-line @4xl/matrix:hidden">
                     @foreach ($this->programRows as $program)
-                        @php($rowPlans = collect($yearColumns)->map(fn (int $year) => $this->planFor($program->id, $year))->filter())
+                        @php
+                            $rowPlans = collect($yearColumns)->map(fn (int $year) => $this->planFor($program->id, $year))->filter();
+                        @endphp
                         <article
                             @class([
                                 'flex flex-col gap-3 px-4 py-4',
@@ -1211,8 +1215,12 @@ new #[Title('titles.annual_plans')] class extends Component {
                             {{-- One full-width row per fiscal year: each carries its own edit and delete controls, which a two-column grid leaves no room for at phone widths. --}}
                             <ul class="grid gap-2">
                                 @foreach ($yearColumns as $year)
-                                    @php($plan = $this->planFor($program->id, $year))
-                                    @php($stats = $plan === null ? null : ($delivery[$plan->id] ?? ['targets' => 0, 'attributed' => 0, 'reports' => 0, 'approved' => 0]))
+                                    @php
+                                        $plan = $this->planFor($program->id, $year);
+                                    @endphp
+                                    @php
+                                        $stats = $plan === null ? null : ($delivery[$plan->id] ?? ['targets' => 0, 'attributed' => 0, 'reports' => 0, 'approved' => 0]);
+                                    @endphp
                                     <li wire:key="mobile-cell-{{ $program->id }}-{{ $year }}">
                                         @if ($plan === null)
                                             @can('create', App\Models\AnnualPlan::class)<button
@@ -1318,8 +1326,12 @@ new #[Title('titles.annual_plans')] class extends Component {
                         </div>
 
                         @foreach ($this->programRows as $program)
-                            @php($rowPlans = collect($yearColumns)->map(fn (int $year) => $this->planFor($program->id, $year))->filter())
-                            @php($rowTargets = $rowPlans->sum(fn (\App\Models\AnnualPlan $plan): int => $delivery[$plan->id]['targets'] ?? 0))
+                            @php
+                                $rowPlans = collect($yearColumns)->map(fn (int $year) => $this->planFor($program->id, $year))->filter();
+                            @endphp
+                            @php
+                                $rowTargets = $rowPlans->sum(fn (\App\Models\AnnualPlan $plan): int => $delivery[$plan->id]['targets'] ?? 0);
+                            @endphp
                             <div
                                 role="row"
                                 @class([
@@ -1362,8 +1374,12 @@ new #[Title('titles.annual_plans')] class extends Component {
                                 </div>
 
                                 @foreach ($yearColumns as $year)
-                                    @php($plan = $this->planFor($program->id, $year))
-                                    @php($stats = $plan === null ? null : ($delivery[$plan->id] ?? ['targets' => 0, 'attributed' => 0, 'reports' => 0, 'approved' => 0]))
+                                    @php
+                                        $plan = $this->planFor($program->id, $year);
+                                    @endphp
+                                    @php
+                                        $stats = $plan === null ? null : ($delivery[$plan->id] ?? ['targets' => 0, 'attributed' => 0, 'reports' => 0, 'approved' => 0]);
+                                    @endphp
                                     <div
                                         role="cell"
                                         class="group/cell relative p-1.5 transition-colors"
@@ -1390,7 +1406,9 @@ new #[Title('titles.annual_plans')] class extends Component {
                                                 <flux:icon.plus aria-hidden="true" class="hidden size-4 text-primary dark:text-brand-text group-hover/gap:block" />
                                             </button>@endcan
                                         @else
-                                            @php($reportShare = $stats['reports'] > 0 ? (int) round($stats['approved'] / $stats['reports'] * 100) : 0)
+                                            @php
+                                                $reportShare = $stats['reports'] > 0 ? (int) round($stats['approved'] / $stats['reports'] * 100) : 0;
+                                            @endphp
                                             <a
                                                 href="{{ route('annual-plans.show', $plan) }}"
                                                 wire:navigate

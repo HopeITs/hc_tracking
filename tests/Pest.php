@@ -160,7 +160,7 @@ function insertDonor(string $name = 'UNICEF'): int
  *
  * Leaving $currency null exercises the column default rather than setting it.
  */
-function insertDonorProposal(int $donorId, int $proposalId, string $budget = '500000.00', ?Currency $currency = null, ?string $projectNum = null): int
+function insertDonorProposal(int $donorId, int $proposalId, string $budget = '500000.00', ?Currency $currency = null, ?string $externalProjectNumber = null): int
 {
     $agreement = [
         'donor_id' => $donorId,
@@ -172,8 +172,8 @@ function insertDonorProposal(int $donorId, int $proposalId, string $budget = '50
         $agreement['currency'] = $currency;
     }
 
-    if ($projectNum !== null) {
-        $agreement['project_num'] = $projectNum;
+    if ($externalProjectNumber !== null) {
+        $agreement['external_project_number'] = $externalProjectNumber;
     }
 
     return DonorProposal::factory()->create($agreement)->id;

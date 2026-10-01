@@ -466,3 +466,49 @@ test('donor detail lists each tranche in full and each report against its target
         ->assertSeeText('Children enrolled')
         ->assertSeeHtml('href="'.route('reports.show', $report).'"');
 });
+
+test('the donor page shows each agreement\'s internal number beside its external number', function () {
+    $user = User::factory()->role('Financial')->create();
+    $donor = Donor::factory()->create();
+    $agreement = DonorProposal::factory()->create([
+        'donor_id' => $donor->id,
+        'proposal_id' => Proposal::factory()->create(['internal_project_number' => 'HC-2026-085'])->id,
+        'external_project_number' => 'MCC-85',
+    ]);
+    TransfersTracking::factory()->create([
+        'donor_proposal_id' => $agreement->id,
+        'scheduled_date' => now()->addMonth()->toDateString(),
+    ]);
+
+    Livewire::actingAs($user)
+        ->test('pages::donors.show', ['donor' => $donor])
+        ->assertSeeHtmlInOrder([
+            'data-lane="'.$agreement->id.'"', 'HC-2026-085', 'MCC-85',
+            'data-agreement="'.$agreement->id.'"', 'HC-2026-085', 'External no. MCC-85',
+        ]);
+});
+
+test('a money calendar lane puts the internal number and the external number on their own lines', function () {
+    $user = User::factory()->role('Financial')->create();
+    $donor = Donor::factory()->create();
+    $agreement = DonorProposal::factory()->create([
+        'donor_id' => $donor->id,
+        'proposal_id' => Proposal::factory()->create(['internal_project_number' => 'TEMP-0086'])->id,
+        'external_project_number' => 'MCC-86',
+    ]);
+    TransfersTracking::factory()->create([
+        'donor_proposal_id' => $agreement->id,
+        'scheduled_date' => now()->addMonth()->toDateString(),
+    ]);
+
+    $html = Livewire::actingAs($user)->test('pages::donors.show', ['donor' => $donor])->html();
+    $lane = str($html)->after('data-lane="'.$agreement->id.'"')->before('relative h-14')->toString();
+
+    // 15rem fits a placeholder number and its chip on one line in English and
+    // in Arabic, whose chip text is longer (11rem and 14rem did not).
+    expect(substr_count($html, 'grid-cols-[15rem_minmax(0,1fr)]'))->toBe(2)
+        ->and($lane)->toContain('data-placeholder-chip="TEMP-0086"')
+        ->and($lane)->toContain('data-lane-external')
+        ->and($lane)->toContain('MCC-86')
+        ->and($lane)->not->toContain('<span aria-hidden="true">·</span>');
+});

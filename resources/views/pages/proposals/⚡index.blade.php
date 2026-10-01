@@ -16,9 +16,11 @@ use App\Notifications\UnreadSubjects;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
@@ -58,6 +60,8 @@ new #[Title('titles.proposals')] class extends Component {
     public string $statusDate = '';
 
     public string $name = '';
+
+    public string $internalProjectNumber = '';
     public string $plannedDateBegin = '';
     public string $plannedDateEnd = '';
     public string $actualDateBegin = '';
@@ -144,7 +148,9 @@ new #[Title('titles.proposals')] class extends Component {
         return Proposal::query()
             ->when($search !== '', function (Builder $query) use ($search): void {
                 $query->where(function (Builder $query) use ($search): void {
-                    $query->where('name', 'like', Like::contains($search))->orWhere('notes', 'like', Like::contains($search));
+                    $query->where('name', 'like', Like::contains($search))
+                        ->orWhere('internal_project_number', 'like', Like::contains($search))
+                        ->orWhere('notes', 'like', Like::contains($search));
                 });
             })
             ->when(ProposalStatus::tryFrom($this->status), fn (Builder $query, ProposalStatus $status) => $query->where('status', $status))
@@ -182,7 +188,7 @@ new #[Title('titles.proposals')] class extends Component {
 
         // Agreements, and the tranches behind them, load only for a viewer who may see them.
         if ($this->canViewAgreements()) {
-            $relations['donorProposals'] = fn ($query) => $query->select(['id', 'proposal_id', 'donor_id', 'budget', 'currency', 'project_num'])->orderBy('id');
+            $relations['donorProposals'] = fn ($query) => $query->select(['id', 'proposal_id', 'donor_id', 'budget', 'currency', 'external_project_number'])->orderBy('id');
             $relations['donorProposals.donor'] = fn ($query) => $query->select(['id', 'name']);
             $relations['donorProposals.transfers'] = fn ($query) => $query
                 ->select(['id', 'donor_proposal_id', 'ar_status', 'payment_amount', 'amount_transfered_currency', 'net_amount_received', 'amount_received_currency', 'scheduled_date', 'transfer_date'])
@@ -190,7 +196,7 @@ new #[Title('titles.proposals')] class extends Component {
         }
 
         return $this->filteredQuery()
-            ->select(['id', 'name', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end', 'status', 'updated_at'])
+            ->select(['id', 'name', 'internal_project_number', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end', 'status', 'updated_at'])
             ->with($relations)
             // Task progress is organisation-wide: every viewer sees the same figures.
             ->withCount([
@@ -525,7 +531,7 @@ new #[Title('titles.proposals')] class extends Component {
     public function openEditModal(int $proposalId): void
     {
         $proposal = Proposal::query()
-            ->select(['id', 'name', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end', 'notes'])
+            ->select(['id', 'name', 'internal_project_number', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end', 'notes'])
             ->findOrFail($proposalId);
 
         Gate::authorize('update', $proposal);
@@ -533,6 +539,7 @@ new #[Title('titles.proposals')] class extends Component {
         $this->resetValidation();
         $this->editingProposalId = $proposal->id;
         $this->name = $proposal->name;
+        $this->internalProjectNumber = $proposal->internal_project_number;
         $this->plannedDateBegin = $proposal->planned_date_begin?->toDateString() ?? '';
         $this->plannedDateEnd = $proposal->planned_date_end?->toDateString() ?? '';
         $this->actualDateBegin = $proposal->actual_date_begin?->toDateString() ?? '';
@@ -544,10 +551,28 @@ new #[Title('titles.proposals')] class extends Component {
     public function saveProposal(): void
     {
         $this->name = trim($this->name);
+        $this->internalProjectNumber = trim($this->internalProjectNumber);
         $this->notes = trim($this->notes);
+
+        $storedNumber = $this->editingProposalId === null
+            ? null
+            : Proposal::query()->whereKey($this->editingProposalId)->value('internal_project_number');
 
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:255'],
+            'internalProjectNumber' => [
+                'required',
+                'string',
+                'max:50',
+                Rule::unique('proposals', 'internal_project_number')->ignore($this->editingProposalId),
+                // TEMP- marks the placeholders the migration wrote. A proposal
+                // still holding one saves unchanged, but nobody types a new one.
+                function (string $attribute, mixed $value, Closure $fail) use ($storedNumber): void {
+                    if (Proposal::isPlaceholderNumber((string) $value) && $value !== $storedNumber) {
+                        $fail(__('proposals.internal_project_number_prefix_reserved'));
+                    }
+                },
+            ],
             'plannedDateBegin' => ['required', 'date'],
             'plannedDateEnd' => ['required', 'date', 'after_or_equal:plannedDateBegin'],
             'actualDateBegin' => ['nullable', 'date'],
@@ -571,31 +596,44 @@ new #[Title('titles.proposals')] class extends Component {
         // Status is only chosen when the proposal is first recorded. After that
         // it moves through recordStageChange(), which writes the audit note
         // alongside it, so the edit form never touches it.
-        DB::transaction(function () use ($proposal, $validated): void {
-            $proposal->fill([
-                'name' => $validated['name'],
-                'planned_date_begin' => $validated['plannedDateBegin'],
-                'planned_date_end' => $validated['plannedDateEnd'],
-                'actual_date_begin' => $validated['actualDateBegin'] === '' ? null : $validated['actualDateBegin'],
-                'actual_date_end' => $validated['actualDateEnd'] === '' ? null : $validated['actualDateEnd'],
-                'notes' => $validated['notes'] === '' ? null : $validated['notes'],
-            ]);
-
-            if (! $proposal->exists) {
-                $proposal->status = ProposalStatus::from($validated['proposalStatus']);
-            }
-
-            $proposal->save();
-
-            if ($proposal->wasRecentlyCreated) {
-                ProposalStatusNote::query()->create([
-                    'proposal_id' => $proposal->id,
-                    'status' => $proposal->status,
-                    'context' => __('proposals.proposal_recorded_note'),
-                    'date' => now()->toDateString(),
+        try {
+            DB::transaction(function () use ($proposal, $validated): void {
+                $proposal->fill([
+                    'name' => $validated['name'],
+                    'internal_project_number' => $validated['internalProjectNumber'],
+                    'planned_date_begin' => $validated['plannedDateBegin'],
+                    'planned_date_end' => $validated['plannedDateEnd'],
+                    'actual_date_begin' => $validated['actualDateBegin'] === '' ? null : $validated['actualDateBegin'],
+                    'actual_date_end' => $validated['actualDateEnd'] === '' ? null : $validated['actualDateEnd'],
+                    'notes' => $validated['notes'] === '' ? null : $validated['notes'],
                 ]);
+
+                if (! $proposal->exists) {
+                    $proposal->status = ProposalStatus::from($validated['proposalStatus']);
+                }
+
+                $proposal->save();
+
+                if ($proposal->wasRecentlyCreated) {
+                    ProposalStatusNote::query()->create([
+                        'proposal_id' => $proposal->id,
+                        'status' => $proposal->status,
+                        'context' => __('proposals.proposal_recorded_note'),
+                        'date' => now()->toDateString(),
+                    ]);
+                }
+            });
+        } catch (UniqueConstraintViolationException $exception) {
+            // Two people saved the same new number at the same moment: both
+            // passed validation and the unique index refused the second.
+            if (! str_contains($exception->getMessage(), 'proposals_internal_project_number_unique')) {
+                throw $exception;
             }
-        });
+
+            $this->addError('internalProjectNumber', __('validation.unique', ['attribute' => __('validation.attributes.internalProjectNumber')]));
+
+            return;
+        }
 
         $wasRecentlyCreated = $proposal->wasRecentlyCreated;
 
@@ -731,6 +769,7 @@ new #[Title('titles.proposals')] class extends Component {
         $this->resetValidation();
         $this->editingProposalId = null;
         $this->name = '';
+        $this->internalProjectNumber = '';
         $this->plannedDateBegin = '';
         $this->plannedDateEnd = '';
         $this->actualDateBegin = '';
@@ -1100,6 +1139,7 @@ new #[Title('titles.proposals')] class extends Component {
                                             <span class="size-2 shrink-0 rounded-full bg-primary dark:bg-ink" data-unread-dot="proposal-{{ $proposal->id }}" title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
                                         @endif
                                         <span class="text-lg leading-tight font-bold {{ $inkText }}">{{ $proposal->name }}</span>
+                                        <x-ui.project-number :number="$proposal->internal_project_number" kind="internal" class="text-xs {{ $mutedText }}" />
                                         <x-ui.enum-badge :case="$proposal->status" />
                                         {{-- phase is a read-only accessor over status->phase(), not a column. --}}
                                         <span class="text-xs font-semibold {{ $mutedText }}">{{ $proposal->phase->label() }}</span>
@@ -1190,7 +1230,7 @@ new #[Title('titles.proposals')] class extends Component {
                                             <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
                                                 <p class="min-w-0 text-sm">
                                                     <a href="{{ route('donors.show', $agreement->donor) }}" wire:navigate class="font-bold underline-offset-4 hover:underline {{ $inkText }}">{{ $agreement->donor->name }}</a>
-                                                    <a href="{{ route('funding-agreements.show', $agreement) }}" wire:navigate class="ms-1.5 text-xs underline-offset-4 hover:underline {{ $mutedText }}">{{ filled($agreement->project_num) ? __('proposals.agreement_number', ['number' => $agreement->project_num]) : __('proposals.view_agreement') }}</a>
+                                                    <a href="{{ route('funding-agreements.show', $agreement) }}" wire:navigate class="ms-1.5 text-xs underline-offset-4 hover:underline {{ $mutedText }}">{{ filled($agreement->external_project_number) ? __('proposals.agreement_number', ['number' => $agreement->external_project_number]) : __('proposals.view_agreement') }}</a>
                                                 </p>
                                                 <p class="text-xl font-extrabold tracking-tight tabular-nums {{ $inkText }}">{{ $amount($budget) }} <span class="text-xs font-semibold tracking-normal {{ $mutedText }}">{{ $agreement->currency->value }}</span></p>
                                             </div>
@@ -1299,7 +1339,7 @@ new #[Title('titles.proposals')] class extends Component {
         <x-ui.form-section
             :title="__('common.section_details')"
             :hint="$editingProposalId === null ? __('proposals.the_starting_status_opens_the_status_history') : __('proposals.status_moves_only_through_change_status')"
-            :fields="['name', 'proposalStatus', 'notes']"
+            :fields="['name', 'internalProjectNumber', 'proposalStatus', 'notes']"
         >
             <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
                 <x-ui.form-input wire:model="name" :label="__('proposals.proposal_name')" maxlength="255" required autofocus :class="$editingProposalId !== null ? '@2xl/modal:col-span-2' : null" />
@@ -1311,6 +1351,8 @@ new #[Title('titles.proposals')] class extends Component {
                         @endforeach
                     </x-ui.form-select>
                 @endif
+
+                <x-ui.form-input wire:model="internalProjectNumber" :label="__('common.internal_project_number')" maxlength="50" dir="ltr" required class="@2xl/modal:col-span-2" />
 
                 <x-ui.form-textarea wire:model="notes" :label="__('common.notes')" rows="2" class="@2xl/modal:col-span-2" />
             </div>

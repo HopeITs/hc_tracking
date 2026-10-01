@@ -56,14 +56,14 @@
             @else
                 <x-ui.form-select wire:model.live="agreementProposalId" :label="__('common.proposal')" :placeholder="__('common.select_a_proposal')" required>
                     @foreach ($proposalOptions as $proposalOption)
-                        <option value="{{ $proposalOption->id }}">{{ $proposalOption->name }}</option>
+                        <option value="{{ $proposalOption->id }}">{{ $proposalOption->name }} · {{ $proposalOption->internal_project_number }}</option>
                     @endforeach
                 </x-ui.form-select>
             @endif
         </div>
     </x-ui.form-section>
 
-    <x-ui.form-section :title="__('funding_agreements.section_amount')" :fields="['budget', 'agreementCurrency', 'projectNum']">
+    <x-ui.form-section :title="__('funding_agreements.section_amount')" :fields="['budget', 'agreementCurrency', 'externalProjectNumber']">
         <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-3">
             <x-ui.form-input wire:model="budget" :label="__('funding_agreements.agreed_budget')" type="number" step="0.01" min="0" required />
 
@@ -83,7 +83,7 @@
                 />
             @endif
 
-            <x-ui.form-input wire:model="projectNum" :label="__('funding_agreements.donor_reference')" maxlength="50" />
+            <x-ui.form-input wire:model="externalProjectNumber" :label="__('funding_agreements.external_project_number')" maxlength="50" />
         </div>
     </x-ui.form-section>
 

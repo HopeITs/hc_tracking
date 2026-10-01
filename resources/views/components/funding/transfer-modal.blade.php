@@ -28,7 +28,7 @@
         <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
             <x-ui.form-select wire:model.live="transferAgreementId" :label="__('transfers.funding_agreement')" :placeholder="__('transfers.select_an_agreement')" required autofocus class="@2xl/modal:col-span-2">
                 @foreach ($agreementOptions as $agreementOption)
-                    <option value="{{ $agreementOption->id }}">{{ $agreementOption->donor->name }} · {{ $agreementOption->proposal->name }}@if (filled($agreementOption->project_num)) · {{ $agreementOption->project_num }}@endif · {{ number_format((float) $agreementOption->budget, 0) }} {{ $agreementOption->currency->value }}</option>
+                    <option value="{{ $agreementOption->id }}">{{ $agreementOption->donor->name }} · {{ $agreementOption->proposal->name }} · {{ $agreementOption->proposal->internal_project_number }}@if (filled($agreementOption->external_project_number)) · {{ $agreementOption->external_project_number }}@endif · {{ number_format((float) $agreementOption->budget, 0) }} {{ $agreementOption->currency->value }}</option>
                 @endforeach
             </x-ui.form-select>
 

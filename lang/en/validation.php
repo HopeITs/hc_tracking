@@ -202,7 +202,9 @@ return [
     */
 
     'attributes' => [
+        'externalProjectNumber' => 'external project number',
         'files.*' => 'file',
+        'internalProjectNumber' => 'internal project number',
     ],
 
 ];

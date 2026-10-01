@@ -120,6 +120,7 @@ test('a new proposal opens its status history, and editing it never changes the 
     $component = Livewire::actingAs($user)->test('pages::proposals.index')
         ->call('openCreateModal')
         ->set('name', 'Winter response')
+        ->set('internalProjectNumber', 'HC-2026-051')
         ->set('plannedDateBegin', '2026-01-01')
         ->set('plannedDateEnd', '2026-12-31')
         ->set('proposalStatus', ProposalStatus::Submitted->value)

@@ -74,13 +74,13 @@ test('one donor may fund the same proposal under several agreements', function (
 test('an agreement may be recorded before the donor issues a project number', function () {
     $id = insertDonorProposal(insertDonor(), insertProposal());
 
-    expect(DB::table('donor_proposal')->find($id)->project_num)->toBeNull();
+    expect(DB::table('donor_proposal')->find($id)->external_project_number)->toBeNull();
 });
 
 test('an agreement stores the donor project reference verbatim', function () {
     $id = insertDonorProposal(insertDonor(), insertProposal(), '500000.00', Currency::Eur, 'ECHO/SYR/BUD/2026/91008');
 
-    expect(DB::table('donor_proposal')->find($id)->project_num)->toBe('ECHO/SYR/BUD/2026/91008');
+    expect(DB::table('donor_proposal')->find($id)->external_project_number)->toBe('ECHO/SYR/BUD/2026/91008');
 });
 
 test('two agreements may carry the same project number', function () {
@@ -89,5 +89,5 @@ test('two agreements may carry the same project number', function () {
     insertDonorProposal(insertDonor(), $proposalId, '500000.00', Currency::Usd, 'SYR-2026-014');
     insertDonorProposal(insertDonor('WFP'), $proposalId, '120000.00', Currency::Usd, 'SYR-2026-014');
 
-    expect(DB::table('donor_proposal')->where('project_num', 'SYR-2026-014')->count())->toBe(2);
+    expect(DB::table('donor_proposal')->where('external_project_number', 'SYR-2026-014')->count())->toBe(2);
 });

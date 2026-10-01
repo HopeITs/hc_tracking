@@ -45,7 +45,7 @@ return [
     'received_on' => 'تاريخ الاستلام',
     'record_the_first_tranche_against_a_funding_agreement' => 'سجّل أول دفعة ضمن اتفاقية تمويل.',
     'record_transfer' => 'تسجيل تحويل',
-    'reference_num' => 'المرجع :reference',
+    'reference_num' => 'رقم خارجي :reference',
     'scheduled' => 'مجدول',
     'search_transfers' => 'البحث في التحويلات',
     'select_an_agreement' => 'اختر اتفاقية',

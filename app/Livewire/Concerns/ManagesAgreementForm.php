@@ -49,7 +49,7 @@ trait ManagesAgreementForm
 
     public string $agreementCurrency = 'USD';
 
-    public string $projectNum = '';
+    public string $externalProjectNumber = '';
 
     /**
      * Called after an agreement is recorded or edited.
@@ -91,7 +91,7 @@ trait ManagesAgreementForm
     #[Computed]
     public function proposalOptions(): Collection
     {
-        return Proposal::query()->select(['id', 'name', 'status'])->orderBy('name')->orderBy('id')->get();
+        return Proposal::query()->select(['id', 'name', 'internal_project_number', 'status'])->orderBy('name')->orderBy('id')->get();
     }
 
     /**
@@ -175,7 +175,7 @@ trait ManagesAgreementForm
         $this->agreementProposalId = (string) $agreement->proposal_id;
         $this->budget = (string) $agreement->budget;
         $this->agreementCurrency = $agreement->currency->value;
-        $this->projectNum = $agreement->project_num ?? '';
+        $this->externalProjectNumber = $agreement->external_project_number ?? '';
         $this->showAgreementModal = true;
     }
 
@@ -183,7 +183,7 @@ trait ManagesAgreementForm
     {
         Gate::authorize($this->editingAgreementId === null ? 'funding-agreements.create' : 'funding-agreements.update');
 
-        $this->projectNum = trim($this->projectNum);
+        $this->externalProjectNumber = trim($this->externalProjectNumber);
 
         if ($this->agreementProposalScope() !== null) {
             $this->agreementProposalId = (string) $this->agreementProposalScope();
@@ -210,7 +210,7 @@ trait ManagesAgreementForm
                     }
                 },
             ],
-            'projectNum' => ['nullable', 'string', 'max:50'],
+            'externalProjectNumber' => ['nullable', 'string', 'max:50'],
         ], [
             'agreementDonorId.required' => __('funding_agreements.select_the_donor'),
             'agreementProposalId.required' => __('funding_agreements.select_the_proposal_being_funded'),
@@ -309,7 +309,7 @@ trait ManagesAgreementForm
         $this->agreementProposalId = $this->agreementProposalScope() === null ? '' : (string) $this->agreementProposalScope();
         $this->budget = '';
         $this->agreementCurrency = 'USD';
-        $this->projectNum = '';
+        $this->externalProjectNumber = '';
         unset($this->agreementDeleteBlocker, $this->agreementProposalWarning, $this->agreementCurrencyLocked);
     }
 }

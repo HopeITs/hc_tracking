@@ -192,7 +192,7 @@ new #[Title('titles.proposal')] class extends Component
     public function proposal(): Proposal
     {
         return Proposal::query()
-            ->select(['id', 'name', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end', 'status', 'notes', 'updated_at'])
+            ->select(['id', 'name', 'internal_project_number', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end', 'status', 'notes', 'updated_at'])
             ->findOrFail($this->proposalId);
     }
 
@@ -231,7 +231,7 @@ new #[Title('titles.proposal')] class extends Component
         $canViewTransfers = $this->canViewTransfers();
 
         return DonorProposal::query()
-            ->select(['id', 'donor_id', 'budget', 'currency', 'project_num', 'proposal_id'])
+            ->select(['id', 'donor_id', 'budget', 'currency', 'external_project_number', 'proposal_id'])
             ->where('proposal_id', $this->proposalId)
             ->with([
                 'donor:id,name',
@@ -1820,6 +1820,7 @@ new #[Title('titles.proposal')] class extends Component
         title-class="text-3xl! font-bold! leading-none! tracking-tight! @3xl/detail:text-[2.5rem]!"
     >
         <x-slot:meta>
+            <x-ui.project-number :number="$this->proposal->internal_project_number" kind="internal" label />
             <span class="tabular-nums">{{ __('proposals.planned_range', ['begin' => $this->proposal->planned_date_begin?->translatedFormat(__('formats.date')), 'end' => $this->proposal->planned_date_end?->translatedFormat(__('formats.date'))]) }}</span>
             @if ($this->proposal->actual_date_begin !== null)
                 <span class="tabular-nums">{{ __('proposals.actual_begin', ['begin' => $this->proposal->actual_date_begin->translatedFormat(__('formats.date'))]) }}</span>
@@ -2006,7 +2007,7 @@ new #[Title('titles.proposal')] class extends Component
                             <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                                 <p class="min-w-0 text-sm">
                                     <a href="{{ route('donors.show', $agreement->donor) }}" wire:navigate class="text-base font-bold underline-offset-4 hover:underline {{ $inkText }}">{{ $agreement->donor->name }}</a>
-                                    <a href="{{ route('funding-agreements.show', $agreement) }}" wire:navigate class="ms-2 text-xs underline-offset-4 hover:underline {{ $mutedText }}">{{ filled($agreement->project_num) ? __('proposals.agreement_number', ['number' => $agreement->project_num]) : __('proposals.view_agreement') }}</a>
+                                    <a href="{{ route('funding-agreements.show', $agreement) }}" wire:navigate class="ms-2 text-xs underline-offset-4 hover:underline {{ $mutedText }}">{{ filled($agreement->external_project_number) ? __('proposals.agreement_number', ['number' => $agreement->external_project_number]) : __('proposals.view_agreement') }}</a>
                                 </p>
                                 <div class="flex items-center gap-1">
                                     <p class="me-2 text-2xl font-extrabold tracking-tight tabular-nums {{ $inkText }}">{{ $amount($budget) }} <span class="text-xs font-semibold tracking-normal {{ $mutedText }}">{{ $currency }}</span></p>
@@ -2916,7 +2917,7 @@ new #[Title('titles.proposal')] class extends Component
         :delete-blocker="$showAgreementModal ? $this->agreementDeleteBlocker : null"
         :locked-currency="$showAgreementModal && $this->agreementCurrencyLocked ? $agreementCurrency : null"
         :confirming-delete="$confirmingAgreementDelete"
-        :locked-proposal-name="$this->proposal->name"
+        :locked-proposal-name="$this->proposal->name.' · '.$this->proposal->internal_project_number"
     />
 
     @canany(['transfers.create', 'transfers.update'])

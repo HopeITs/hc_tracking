@@ -763,7 +763,7 @@ new #[Title('titles.executive_summary')] class extends Component {
         $year = $this->fiscalYear;
 
         return TransfersTracking::query()
-            ->with(['donorProposal:id,donor_id,proposal_id,project_num', 'donorProposal.donor:id,name', 'donorProposal.proposal:id,name'])
+            ->with(['donorProposal:id,donor_id,proposal_id,external_project_number', 'donorProposal.donor:id,name', 'donorProposal.proposal:id,name,internal_project_number'])
             ->where(function (Builder $query) use ($code, $year): void {
                 $query
                     ->where(fn (Builder $scheduled) => $scheduled->where('amount_transfered_currency', $code)->whereYear('scheduled_date', $year))
@@ -788,7 +788,7 @@ new #[Title('titles.executive_summary')] class extends Component {
                 return [
                     'key' => 'agreement-'.($agreement?->id ?? 0),
                     'name' => $agreement?->donor?->name ?? __('executive_summary.unassigned_agreement'),
-                    'context' => $agreement?->proposal?->name ?? '—',
+                    'context' => $agreement?->proposal === null ? '—' : $agreement->proposal->name.' · '.$agreement->proposal->internal_project_number,
                     'committed' => $scheduled,
                     'delivered' => $landed,
                     'share' => $share,

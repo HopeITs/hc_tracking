@@ -27,6 +27,7 @@ use Illuminate\Support\Facades\DB;
  * @property int $id
  * @property string $name
  * @property string $slug
+ * @property string $internal_project_number
  * @property CarbonImmutable $planned_date_begin
  * @property CarbonImmutable $planned_date_end
  * @property CarbonImmutable|null $actual_date_begin
@@ -39,6 +40,7 @@ use Illuminate\Support\Facades\DB;
  */
 #[Fillable([
     'name',
+    'internal_project_number',
     'planned_date_begin',
     'planned_date_end',
     'actual_date_begin',
@@ -52,9 +54,32 @@ class Proposal extends Model implements TracksActivity
     /** @use HasFactory<ProposalFactory> */
     use HasFactory, HasSlug, RecordsActivity;
 
+    /**
+     * Marks the internal numbers the migration wrote for proposals that had
+     * none. Reserved: nobody may type a new number starting with it.
+     */
+    public const PLACEHOLDER_NUMBER_PREFIX = 'TEMP-';
+
     protected function slugSource(): string
     {
         return $this->name;
+    }
+
+    /**
+     * Whether an internal project number is a migration placeholder still
+     * waiting for the real number, compared case-insensitively.
+     */
+    public static function isPlaceholderNumber(?string $number): bool
+    {
+        return $number !== null && str_starts_with(mb_strtoupper($number), self::PLACEHOLDER_NUMBER_PREFIX);
+    }
+
+    /**
+     * Whether this proposal still holds its migration placeholder number.
+     */
+    public function hasPlaceholderInternalNumber(): bool
+    {
+        return static::isPlaceholderNumber($this->internal_project_number);
     }
 
     /**
@@ -127,7 +152,7 @@ class Proposal extends Model implements TracksActivity
     public function donors(): BelongsToMany
     {
         return $this->belongsToMany(Donor::class, 'donor_proposal')
-            ->withPivot(['budget', 'currency', 'project_num'])
+            ->withPivot(['budget', 'currency', 'external_project_number'])
             ->withTimestamps();
     }
 
@@ -244,6 +269,6 @@ class Proposal extends Model implements TracksActivity
      */
     public function activityEvents(): array
     {
-        return ['status' => 'status_changed', 'name' => 'updated', 'planned_date_begin' => 'updated', 'planned_date_end' => 'updated'];
+        return ['status' => 'status_changed', 'name' => 'updated', 'internal_project_number' => 'updated', 'planned_date_begin' => 'updated', 'planned_date_end' => 'updated'];
     }
 }

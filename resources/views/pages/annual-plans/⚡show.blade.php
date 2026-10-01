@@ -528,7 +528,9 @@ new #[Title('titles.annual_plan')] class extends Component {
 
             <div class="divide-y divide-board-line">
                 @foreach ($resultGroups as $group)
-                    @php($result = $group['result'])
+                    @php
+                        $result = $group['result'];
+                    @endphp
                     <div wire:key="result-group-{{ $result->id }}">
                         <div class="flex flex-wrap items-start gap-x-2.5 gap-y-1.5 bg-board-head px-4 py-2.5">
                             <x-ui.enum-badge :case="$result->type" />
@@ -542,7 +544,9 @@ new #[Title('titles.annual_plan')] class extends Component {
 
                         <div class="divide-y divide-board-line">
                             @foreach ($group['targets'] as $target)
-                                @php($targetHref = $target->project !== null ? route('projects.show', ['project' => $target->project, 'tab' => 'targets']) : (Route::has('indicators.index') ? route('indicators.index', ['result' => $result->id]) : null))
+                                @php
+                                    $targetHref = $target->project !== null ? route('projects.show', ['project' => $target->project, 'tab' => 'targets']) : (Route::has('indicators.index') ? route('indicators.index', ['result' => $result->id]) : null);
+                                @endphp
                                 <a
                                     @if ($targetHref) href="{{ $targetHref }}" wire:navigate @endif
                                     class="grid grid-cols-1 gap-x-4 gap-y-1.5 px-4 py-3 transition-colors @2xl/detail:grid-cols-[minmax(0,1fr)_7rem_8rem_6rem] @2xl/detail:items-center hover:bg-board-head focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
@@ -675,7 +679,9 @@ new #[Title('titles.annual_plan')] class extends Component {
             @else
                 <ol class="min-h-0 flex-1 divide-y divide-board-line overflow-y-auto">
                     @foreach ($recentReports as $report)
-                        @php($indicator = $report->planIndicator->indicator)
+                        @php
+                            $indicator = $report->planIndicator->indicator;
+                        @endphp
                         <li wire:key="activity-{{ $report->id }}">
                             <a
                                 @if (Route::has('reports.show')) href="{{ route('reports.show', $report) }}" wire:navigate @endif

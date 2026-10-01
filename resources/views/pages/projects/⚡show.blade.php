@@ -655,7 +655,7 @@ new #[Title('titles.project')] class extends Component {
         $canViewMoney = $this->canViewMoney();
 
         return $this->project->proposals()
-            ->select(['proposals.id', 'proposals.name', 'proposals.status', 'proposals.planned_date_begin', 'proposals.planned_date_end'])
+            ->select(['proposals.id', 'proposals.name', 'proposals.internal_project_number', 'proposals.status', 'proposals.planned_date_begin', 'proposals.planned_date_end'])
             ->with('donorNames:id,name')
             ->when($canViewMoney, fn ($query) => $query->with(['donorProposals' => fn ($query) => $query
                 ->select(['id', 'proposal_id', 'donor_id', 'currency', 'budget'])
@@ -718,7 +718,7 @@ new #[Title('titles.project')] class extends Component {
     public function attachableProposals(): Collection
     {
         return Proposal::query()
-            ->select(['id', 'name', 'status'])
+            ->select(['id', 'name', 'internal_project_number', 'status'])
             ->whereDoesntHave('projects', fn ($query) => $query->whereKey($this->projectId))
             ->orderBy('name')
             ->orderBy('id')
@@ -1095,7 +1095,7 @@ new #[Title('titles.project')] class extends Component {
                     <x-ui.select :label="__('projects.link_a_proposal')" wire:model="proposalToAttach" class="min-w-56">
                         <flux:select.option value="">{{ __('common.select_a_proposal') }}</flux:select.option>
                         @foreach ($this->attachableProposals as $proposalOption)
-                            <flux:select.option :value="$proposalOption->id" :wire:key="'attachable-'.$proposalOption->id">{{ $proposalOption->name }}</flux:select.option>
+                            <flux:select.option :value="$proposalOption->id" :wire:key="'attachable-'.$proposalOption->id">{{ $proposalOption->name }} · {{ $proposalOption->internal_project_number }}</flux:select.option>
                         @endforeach
                     </x-ui.select>
                     <x-ui.button tone="primary" size="sm" icon="link" class="min-h-10" wire:click="attachProposal">{{ __('projects.link') }}</x-ui.button>
@@ -1128,6 +1128,7 @@ new #[Title('titles.project')] class extends Component {
                                     @else
                                         <p class="truncate text-base font-bold text-secondary-dark dark:text-ink">{{ $proposal->name }}</p>
                                     @endif
+                                    <x-ui.project-number :number="$proposal->internal_project_number" kind="internal" class="mt-1 text-xs text-secondary-medium dark:text-ink-muted" />
                                     <p class="mt-1 flex items-center gap-1.5 text-xs text-secondary-medium dark:text-ink-muted">
                                         <flux:icon name="calendar-days" variant="micro" class="size-3.5 shrink-0" />
                                         <span class="tabular-nums">{{ $proposal->planned_date_begin?->translatedFormat(__('formats.date')) }} – {{ $proposal->planned_date_end?->translatedFormat(__('formats.date')) }}</span>

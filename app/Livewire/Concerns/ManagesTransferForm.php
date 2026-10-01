@@ -127,8 +127,8 @@ trait ManagesTransferForm
         }
 
         return $this->scopedAgreements()
-            ->select(['id', 'donor_id', 'proposal_id', 'project_num', 'currency', 'budget'])
-            ->with(['donor:id,name', 'proposal:id,name'])
+            ->select(['id', 'donor_id', 'proposal_id', 'external_project_number', 'currency', 'budget'])
+            ->with(['donor:id,name', 'proposal:id,name,internal_project_number'])
             ->orderBy('id')
             ->get();
     }

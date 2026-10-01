@@ -71,6 +71,7 @@ class ProgrammeSeeder extends Seeder
 
             $proposal = Proposal::factory()->running()->create([
                 'name' => $name.' Emergency Response',
+                'internal_project_number' => 'HC-2026-'.(901 + $index),
                 'planned_date_begin' => $strategy->start_year.'-01-01',
                 'planned_date_end' => $strategy->start_year.'-12-31',
             ]);
@@ -80,7 +81,7 @@ class ProgrammeSeeder extends Seeder
             DonorProposal::factory()->create([
                 'donor_id' => $donors->random()->id,
                 'proposal_id' => $proposal->id,
-                'project_num' => 'PRJ-'.str_pad((string) ($index + 1), 4, '0', STR_PAD_LEFT),
+                'external_project_number' => 'PRJ-'.str_pad((string) ($index + 1), 4, '0', STR_PAD_LEFT),
             ]);
         }
     }

@@ -18,6 +18,10 @@ class ProposalFactory extends Factory
      * `status` and the actual dates are left to the column defaults so a fresh
      * proposal starts as an unstarted concept note.
      *
+     * `internal_project_number` is NOT NULL with no default, so it is always
+     * set. Factory numbers use 100–899: real proposals use 001–034 and demo
+     * proposals 901+, so the three never collide.
+     *
      * @return array<string, mixed>
      */
     public function definition(): array
@@ -26,6 +30,7 @@ class ProposalFactory extends Factory
 
         return [
             'name' => fake()->randomElement(['Emergency WASH Response', 'Winterization Support', 'Rapid Shelter Repair']),
+            'internal_project_number' => 'HC-2026-'.fake()->unique()->numberBetween(100, 899),
             'planned_date_begin' => $begin->format('Y-m-d'),
             'planned_date_end' => fn (array $attributes): string => CarbonImmutable::parse($attributes['planned_date_begin'])
                 ->addYear()->toDateString(),

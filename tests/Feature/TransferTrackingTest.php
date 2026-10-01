@@ -3,7 +3,9 @@
 use App\Enums\ArStatus;
 use App\Enums\Currency;
 use App\Models\Account;
+use App\Models\Donor;
 use App\Models\DonorProposal;
+use App\Models\Proposal;
 use App\Models\TransfersTracking;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -566,4 +568,71 @@ test('landed in full is never claimed while money is still outstanding', functio
     Livewire::actingAs($user)
         ->test('pages::transfers.index')
         ->assertSee('Settled money landed in full');
+});
+
+test('the transfers ledger finds a tranche by either project number', function () {
+    $user = User::factory()->role('Financial')->create();
+    $echo = TransfersTracking::factory()->create(['donor_proposal_id' => DonorProposal::factory()->create([
+        'proposal_id' => Proposal::factory()->create(['internal_project_number' => 'HC-2026-086'])->id,
+        'external_project_number' => 'ECHO-86',
+    ])->id]);
+    $unicef = TransfersTracking::factory()->create(['donor_proposal_id' => DonorProposal::factory()->create([
+        'proposal_id' => Proposal::factory()->create(['internal_project_number' => 'HC-2026-087'])->id,
+        'external_project_number' => 'UNICEF-87',
+    ])->id]);
+
+    Livewire::actingAs($user)
+        ->test('pages::transfers.index')
+        ->set('search', 'ECHO-86')
+        ->assertSeeHtml('wire:key="transfer-'.$echo->id.'"')
+        ->assertDontSeeHtml('wire:key="transfer-'.$unicef->id.'"')
+        ->set('search', 'HC-2026-087')
+        ->assertSeeHtml('wire:key="transfer-'.$unicef->id.'"')
+        ->assertDontSeeHtml('wire:key="transfer-'.$echo->id.'"');
+});
+
+test('each tranche shows its proposal\'s internal number beside the external one', function () {
+    $user = User::factory()->role('Financial')->create();
+    TransfersTracking::factory()->create(['donor_proposal_id' => DonorProposal::factory()->create([
+        'proposal_id' => Proposal::factory()->create(['internal_project_number' => 'HC-2026-088'])->id,
+        'external_project_number' => 'ECHO-88',
+    ])->id]);
+    TransfersTracking::factory()->create(['donor_proposal_id' => DonorProposal::factory()->create([
+        'proposal_id' => Proposal::factory()->create(['internal_project_number' => 'HC-2026-089'])->id,
+    ])->id]);
+
+    Livewire::actingAs($user)
+        ->test('pages::transfers.index')
+        ->assertSeeInOrder(['HC-2026-088', 'External no. ECHO-88'])
+        ->assertSee('HC-2026-089')
+        ->assertSee('No external project number');
+});
+
+test('the transfer picker names each agreement by both project numbers', function () {
+    $user = User::factory()->role('Financial')->create();
+    DonorProposal::factory()->create([
+        'donor_id' => Donor::factory()->create(['name' => 'ECHO'])->id,
+        'proposal_id' => Proposal::factory()->create(['name' => 'Winter Shelter Kit', 'internal_project_number' => 'HC-2026-090'])->id,
+        'external_project_number' => 'ECHO-90',
+        'budget' => '2000.00',
+    ]);
+    DonorProposal::factory()->create([
+        'donor_id' => Donor::factory()->create(['name' => 'UNICEF'])->id,
+        'proposal_id' => Proposal::factory()->create(['name' => 'Cash for Work', 'internal_project_number' => 'HC-2026-091'])->id,
+        'budget' => '1000.00',
+    ]);
+
+    Livewire::actingAs($user)
+        ->test('pages::transfers.index')
+        ->call('openTransferCreate')
+        ->assertSee('ECHO · Winter Shelter Kit · HC-2026-090 · ECHO-90 · 2,000 USD')
+        ->assertSee('UNICEF · Cash for Work · HC-2026-091 · 1,000 USD');
+});
+
+test('the transfers search hint names the project number', function () {
+    $user = User::factory()->role('Financial')->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::transfers.index')
+        ->assertSeeHtml('placeholder="Project number, donor, or proposal"');
 });

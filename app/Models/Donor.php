@@ -64,7 +64,7 @@ class Donor extends Model implements TracksActivity
     public function proposals(): BelongsToMany
     {
         return $this->belongsToMany(Proposal::class, 'donor_proposal')
-            ->withPivot(['budget', 'currency', 'project_num'])
+            ->withPivot(['budget', 'currency', 'external_project_number'])
             ->withTimestamps();
     }
 

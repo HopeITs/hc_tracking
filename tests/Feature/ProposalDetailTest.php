@@ -626,3 +626,15 @@ test('a finished task waiting under review is not flagged as a lagging status', 
         ->set('tab', 'tasks')
         ->assertDontSeeHtml('data-status-lags');
 });
+
+test('the proposal header shows its internal number and the agreement form names it', function () {
+    $user = User::factory()->role('Financial')->create();
+    $proposal = Proposal::factory()->create(['name' => 'Winter Shelter Kit', 'internal_project_number' => 'TEMP-0012']);
+
+    Livewire::actingAs($user)
+        ->test('pages::proposals.show', ['proposal' => $proposal])
+        ->assertSee('Internal project number')
+        ->assertSeeHtml('data-placeholder-chip="TEMP-0012"')
+        ->call('openAgreementCreate')
+        ->assertSee('Winter Shelter Kit · TEMP-0012');
+});

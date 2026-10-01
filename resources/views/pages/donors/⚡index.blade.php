@@ -146,7 +146,7 @@ new #[Title('titles.donors')] class extends Component {
         // Without the agreements permission the proposal names still load, but never the budget behind them.
         $relations = [
             'donorProposals' => fn ($query) => $canAgreements
-                ? $query->select(['id', 'donor_id', 'proposal_id', 'budget', 'currency', 'project_num'])->orderByDesc('budget')
+                ? $query->select(['id', 'donor_id', 'proposal_id', 'budget', 'currency', 'external_project_number'])->orderByDesc('budget')
                 : $query->select(['id', 'donor_id', 'proposal_id'])->orderBy('id'),
             'donorProposals.proposal' => fn ($query) => $query->select(['id', 'name', 'status']),
             'donorProposals.proposal.projects' => fn ($query) => $query->select(['projects.id', 'projects.name']),

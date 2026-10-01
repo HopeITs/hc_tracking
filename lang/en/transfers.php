@@ -45,7 +45,7 @@ return [
     'received_on' => 'Received on',
     'record_the_first_tranche_against_a_funding_agreement' => 'Record the first tranche against a funding agreement.',
     'record_transfer' => 'Record transfer',
-    'reference_num' => 'Ref :reference',
+    'reference_num' => 'External no. :reference',
     'scheduled' => 'Scheduled',
     'search_transfers' => 'Search transfers',
     'select_an_agreement' => 'Select an agreement',

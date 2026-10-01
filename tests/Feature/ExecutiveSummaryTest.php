@@ -11,6 +11,7 @@ use App\Models\Milestone;
 use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
+use App\Models\Proposal;
 use App\Models\Report;
 use App\Models\Result;
 use App\Models\TransfersTracking;
@@ -516,4 +517,25 @@ test('a portfolio with no beneficiary targets says so rather than drawing an emp
     Livewire::actingAs($user)
         ->test('pages::executive-summary.index')
         ->assertSee('No beneficiary targets recorded');
+});
+
+test('an agreement line in the money breakdown names its proposal and internal number', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $agreement = DonorProposal::factory()->create([
+        'currency' => Currency::Usd,
+        'proposal_id' => Proposal::factory()->create(['name' => 'Winter Shelter Kit', 'internal_project_number' => 'HC-2026-092'])->id,
+    ]);
+
+    TransfersTracking::factory()->create([
+        'donor_proposal_id' => $agreement->id,
+        'payment_amount' => '1000.00',
+        'amount_transfered_currency' => Currency::Usd,
+        'scheduled_date' => currentFiscalYear().'-02-01',
+    ]);
+
+    $row = collect(
+        Livewire::actingAs($user)->test('pages::executive-summary.index')->call('toggleRow', 'money-USD')->instance()->breakdown
+    )->firstWhere('key', 'agreement-'.$agreement->id);
+
+    expect($row['context'])->toBe('Winter Shelter Kit · HC-2026-092');
 });

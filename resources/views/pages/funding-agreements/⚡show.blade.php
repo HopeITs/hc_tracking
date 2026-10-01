@@ -85,10 +85,10 @@ new #[Title('titles.funding_agreement')] class extends Component {
     public function agreement(): DonorProposal
     {
         return DonorProposal::query()
-            ->select(['id', 'donor_id', 'proposal_id', 'budget', 'currency', 'project_num', 'created_at', 'updated_at'])
+            ->select(['id', 'donor_id', 'proposal_id', 'budget', 'currency', 'external_project_number', 'created_at', 'updated_at'])
             ->with([
                 'donor:id,name,type,contact_person,email,phone,country,last_contacted_on,next_step,next_step_due_on',
-                'proposal:id,name,status,planned_date_begin,planned_date_end,actual_date_begin,actual_date_end',
+                'proposal:id,name,internal_project_number,status,planned_date_begin,planned_date_end,actual_date_begin,actual_date_end',
             ])
             ->findOrFail($this->agreementId);
     }
@@ -632,7 +632,7 @@ new #[Title('titles.funding_agreement')] class extends Component {
     public function relatedAgreements(): Collection
     {
         return DonorProposal::query()
-            ->select(['id', 'donor_id', 'proposal_id', 'budget', 'currency', 'project_num'])
+            ->select(['id', 'donor_id', 'proposal_id', 'budget', 'currency', 'external_project_number'])
             ->whereKeyNot($this->agreementId)
             ->where(fn (Builder $query) => $query
                 ->where('donor_id', $this->agreement->donor_id)
@@ -978,7 +978,9 @@ new #[Title('titles.funding_agreement')] class extends Component {
         title-class="text-3xl! font-bold! leading-tight! tracking-tight! text-balance @3xl/detail:text-[2.5rem]!"
     >
         <x-slot:meta>
-            <span class="font-semibold tabular-nums {{ $inkText }}">{{ $agreement->project_num ?? __('common.no_donor_reference') }}</span>
+            <x-ui.project-number :number="$proposal->internal_project_number" kind="internal" label class="{{ $inkText }}" />
+            <span aria-hidden="true">·</span>
+            <x-ui.project-number :number="$agreement->external_project_number" kind="external" label class="{{ $inkText }}" />
             <span aria-hidden="true">·</span>
             <span>{{ __('funding_agreements.signed_in_currency', ['currency' => $currency]) }}</span>
             @if ($agreement->updated_at !== null)

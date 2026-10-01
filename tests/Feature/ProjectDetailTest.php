@@ -428,3 +428,17 @@ test('project detail renders a project with nothing attached', function () {
         ->assertSeeText('Bare Project')
         ->assertSeeText('No milestones yet');
 });
+
+test('the project page shows a linked proposal\'s internal number and lists attachable ones by number', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $project = Project::factory()->create();
+    $linked = Proposal::factory()->create(['name' => 'Winter Shelter Kit', 'internal_project_number' => 'TEMP-0021']);
+    $project->proposals()->attach($linked->id);
+    Proposal::factory()->create(['name' => 'Cash for Work', 'internal_project_number' => 'HC-2026-093']);
+
+    Livewire::actingAs($user)
+        ->test('pages::projects.show', ['project' => $project])
+        ->set('tab', 'proposals')
+        ->assertSeeHtml('data-placeholder-chip="TEMP-0021"')
+        ->assertSee('Cash for Work · HC-2026-093');
+});
