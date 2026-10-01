@@ -14,6 +14,7 @@ use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Livewire\Concerns\ManagesAgreementForm;
 use App\Livewire\Concerns\ManagesTransferForm;
+use App\Livewire\Concerns\SwitchesFundingView;
 use App\Models\DonorProposal;
 use App\Models\DonorReport;
 use App\Models\HrEmployee;
@@ -27,6 +28,7 @@ use App\Models\Report;
 use App\Models\Task;
 use App\Models\TransfersTracking;
 use App\Rules\SecureUpload;
+use App\Support\AgreementMoney;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
@@ -50,6 +52,7 @@ new #[Title('titles.proposal')] class extends Component
 {
     use ManagesAgreementForm;
     use ManagesTransferForm;
+    use SwitchesFundingView;
     use WithFileUploads;
 
     #[Locked]
@@ -231,15 +234,70 @@ new #[Title('titles.proposal')] class extends Component
         $canViewTransfers = $this->canViewTransfers();
 
         return DonorProposal::query()
-            ->select(['id', 'donor_id', 'budget', 'currency', 'external_project_number', 'proposal_id'])
+            ->select(['id', 'slug', 'donor_id', 'budget', 'currency', 'external_project_number', 'proposal_id'])
             ->where('proposal_id', $this->proposalId)
             ->with([
-                'donor:id,name',
+                'donor:id,slug,name',
                 'transfers' => fn ($query) => $query->when(! $canViewTransfers, fn ($query) => $query->whereRaw('1 = 0')),
                 'transfers.account:id,account_name',
             ])
             ->orderBy('id')
             ->get();
+    }
+
+    /**
+     * The same agreements as table rows: each with its money read by the one
+     * SQL definition every agreement table shares, and its donor reports
+     * counted. Empty for a viewer without funding-agreements.view; without
+     * transfers.view the money is not queried at all and the rows carry the
+     * budget only.
+     *
+     * @return Collection<int, DonorProposal>
+     */
+    #[Computed]
+    public function agreementRows(): Collection
+    {
+        if (! $this->canViewAgreements()) {
+            return new Collection;
+        }
+
+        $today = CarbonImmutable::today()->toDateString();
+
+        return DonorProposal::query()
+            ->select('donor_proposal.*')
+            ->where('donor_proposal.proposal_id', $this->proposalId)
+            ->when($this->canViewTransfers(), fn (Builder $query) => $query->withMoney())
+            ->with(['donor:id,slug,name'])
+            ->withCount(['reports as overdue_reports_count' => fn (Builder $query) => $query
+                ->whereNull('submitted_on')
+                ->whereDate('due_on', '<', $today)])
+            ->withMin(['reports as next_report_due' => fn (Builder $query) => $query
+                ->whereNull('submitted_on')
+                ->whereDate('due_on', '>=', $today)], 'due_on')
+            ->orderBy('donor_proposal.id')
+            ->get();
+    }
+
+    /**
+     * Every tranche of every agreement on this proposal, in schedule order
+     * with undated ones last, each knowing the agreement it belongs to. Empty
+     * without transfers.view, because agreements() loads no tranche then.
+     *
+     * @return Collection<int, TransfersTracking>
+     */
+    #[Computed]
+    public function fundingTranches(): Collection
+    {
+        return new Collection($this->agreements
+            ->flatMap(fn (DonorProposal $agreement) => $agreement->transfers
+                ->each(fn (TransfersTracking $transfer) => $transfer->setRelation('donorProposal', $agreement)))
+            ->sortBy([
+                fn (TransfersTracking $a, TransfersTracking $b): int => ($a->scheduled_date === null) <=> ($b->scheduled_date === null),
+                fn (TransfersTracking $a, TransfersTracking $b): int => $a->scheduled_date <=> $b->scheduled_date,
+                fn (TransfersTracking $a, TransfersTracking $b): int => $a->id <=> $b->id,
+            ])
+            ->values()
+            ->all());
     }
 
     /**
@@ -1790,7 +1848,7 @@ new #[Title('titles.proposal')] class extends Component
     private function forgetReadings(): void
     {
         unset(
-            $this->proposal, $this->statusNotes, $this->agreements, $this->donorReports, $this->agreementMoney, $this->moneyByCurrency,
+            $this->proposal, $this->statusNotes, $this->agreements, $this->agreementRows, $this->fundingTranches, $this->donorReports, $this->agreementMoney, $this->moneyByCurrency,
             $this->projects, $this->linkableProjects, $this->tasks, $this->targets, $this->reports,
             $this->projectFiles, $this->documents, $this->deadlines, $this->warnings, $this->lifecycle, $this->chronology,
             $this->arrivals, $this->vitals, $this->term, $this->tabs,
@@ -1979,6 +2037,16 @@ new #[Title('titles.proposal')] class extends Component
     <div id="tab-panel" class="mt-6 min-w-0" wire:key="tab-{{ $tab }}" data-tab-panel="{{ $tab }}">
         @if ($tab === 'funding')
             <div class="mb-6 flex flex-wrap items-center justify-end gap-2">
+                <x-ui.view-toggle
+                    class="me-auto"
+                    :label="__('finance_tables.view_label')"
+                    wire-model="view"
+                    :active="$this->view"
+                    :options="[
+                        ['key' => 'table', 'label' => __('finance_tables.view_table'), 'icon' => 'table-cells'],
+                        ['key' => 'overview', 'label' => __('finance_tables.view_overview'), 'icon' => 'chart-bar'],
+                    ]"
+                />
                 @can('transfers.create')
                 <x-ui.button size="sm" icon="calendar-days" class="min-h-10 touch-manipulation" wire:click="openTransferCreate" :disabled="$this->agreements->isEmpty()" data-test="schedule-tranche">{{ __('proposals.schedule_tranche') }}</x-ui.button>
                 @endcan
@@ -1987,6 +2055,7 @@ new #[Title('titles.proposal')] class extends Component
                 @endcan
             </div>
 
+            @if ($this->view === 'overview')
             @if ($this->agreements->isEmpty())
                 <x-ui.empty-state icon="banknotes" :heading="__('proposals.no_funding_agreements')" :body="__('proposals.agreements_signed_against_this_proposal_will_appear_here')" />
             @else
@@ -2333,6 +2402,89 @@ new #[Title('titles.proposal')] class extends Component
                     </dl>
                 </div>
             </div>
+            @elseif ($this->agreements->isEmpty())
+                <x-ui.empty-state icon="banknotes" :heading="__('proposals.no_funding_agreements')" :body="__('proposals.agreements_signed_against_this_proposal_will_appear_here')" />
+            @else
+                @php
+                    $canTransfers = $this->canViewTransfers();
+                    $agreementRows = $this->agreementRows;
+                    $fundingColumns = AgreementMoney::columns(withTransfers: $canTransfers);
+                    $fundingFootLines = AgreementMoney::totals($agreementRows);
+
+                    $fundingTotalLines = collect($this->moneyByCurrency)->map(fn (array $line, string $lineCurrency): array => [
+                        'currency' => $lineCurrency,
+                        'caption' => null,
+                        'figures' => array_values(array_filter([
+                            ['key' => 'committed', 'label' => __('proposals.committed'), 'value' => $line['committed']],
+                            $canTransfers ? ['key' => 'received', 'label' => __('proposals.received'), 'value' => $line['received'], 'tone' => 'good', 'note' => DonorProposal::percentLabel($line['received'], $line['committed']).'%'] : null,
+                            $canTransfers ? ['key' => 'pending', 'label' => __('proposals.pending'), 'value' => $line['pending'], 'tone' => $line['pending'] > 0 ? 'warn' : null] : null,
+                            $canTransfers ? ['key' => 'overdue', 'label' => __('finance_tables.overdue'), 'value' => $line['overdue'], 'tone' => $line['overdue'] > 0 ? 'critical' : null] : null,
+                            $canTransfers ? ['key' => 'unscheduled', 'label' => __('proposals.not_yet_scheduled'), 'value' => $line['unscheduled'], 'tone' => 'muted'] : null,
+                        ])),
+                        'notes' => [],
+                    ])->values()->all();
+                @endphp
+
+                <x-funding.totals :lines="$fundingTotalLines" />
+
+                {{-- Every agreement on this proposal, one row each. --}}
+                <x-funding.register class="mt-6" :size="$canTransfers ? 'xl' : 'sm'" :caption="__('common.funding_agreements_2')">
+                    <x-slot:head>
+                        <x-funding.register.th>{{ __('funding_agreements.donor') }}</x-funding.register.th>
+                        <x-funding.agreement-head :columns="$fundingColumns" />
+                    </x-slot:head>
+
+                    @foreach ($agreementRows as $agreementRow)
+                        <x-funding.agreement-row :agreement="$agreementRow" :columns="$fundingColumns">
+                            <x-slot:lead>
+                                <td data-label="{{ __('funding_agreements.donor') }}" data-wide>
+                                    @can('donors.view')
+                                        <a href="{{ route('donors.show', $agreementRow->donor) }}" wire:navigate class="font-semibold underline-offset-2 hover:underline">{{ $agreementRow->donor->name }}</a>
+                                    @else
+                                        <span class="font-semibold">{{ $agreementRow->donor->name }}</span>
+                                    @endcan
+                                    <span class="sub">{{ $agreementRow->external_project_number ?? __('common.no_external_project_number') }}</span>
+                                </td>
+                            </x-slot:lead>
+
+                            <x-slot:actions>
+                                <td>
+                                    <span class="flex items-center justify-end">
+                                        <x-ui.button tone="ghost" size="sm" icon="eye" class="size-8!" :href="route('funding-agreements.show', $agreementRow)" wire:navigate :aria-label="__('proposals.view_agreement')" />
+                                        @can('transfers.create')
+                                            <x-ui.button tone="ghost" size="sm" icon="plus" class="size-8!" wire:click="openTransferCreate({{ $agreementRow->id }})" :aria-label="__('proposals.schedule_tranche_for', ['donor' => $agreementRow->donor->name])" data-test="schedule-tranche-{{ $agreementRow->id }}" />
+                                        @endcan
+                                        @can('funding-agreements.update')
+                                            <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-8!" wire:click="openAgreementEdit({{ $agreementRow->id }})" :aria-label="__('common.edit_name', ['name' => $agreementRow->donor->name])" data-test="edit-agreement-{{ $agreementRow->id }}" />
+                                        @endcan
+                                    </span>
+                                </td>
+                            </x-slot:actions>
+                        </x-funding.agreement-row>
+                    @endforeach
+
+                    <x-slot:foot>
+                        <x-funding.agreement-foot :lines="$fundingFootLines" :columns="$fundingColumns" :lead="1" />
+                    </x-slot:foot>
+                </x-funding.register>
+
+                {{-- Every tranche, in full. --}}
+                @if ($canTransfers)
+                    <section class="mt-10 min-w-0 border-t pt-8 {{ $hairline }}" aria-labelledby="funding-tranches-heading" data-funding-tranches>
+                        <h2 id="funding-tranches-heading" class="text-lg font-bold {{ $inkText }}">
+                            {{ __('finance_tables.all_tranches') }}
+                            <span class="ms-1 text-base font-semibold tabular-nums {{ $mutedText }}">{{ $this->fundingTranches->count() }}</span>
+                        </h2>
+
+                        @if ($this->fundingTranches->isEmpty())
+                            <p class="mt-4 text-sm {{ $mutedText }}">{{ __('proposals.committed_with_no_transfer_yet') }}</p>
+                        @else
+                            <x-funding.tranche-table class="mt-4" size="xl" :transfers="$this->fundingTranches" :caption="__('finance_tables.all_tranches')" party="donor" editable />
+                        @endif
+                    </section>
+                @endif
+            @endif
+
         @elseif ($tab === 'projects')
             @can('update', $this->proposal)
             <form wire:submit="linkProject" class="mb-6 flex flex-col gap-2 @xl/detail:flex-row @xl/detail:items-end" data-link-project>

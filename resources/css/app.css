@@ -4018,3 +4018,130 @@ ui-toast-group[position='center'] {
         animation: none;
     }
 }
+
+/*
+ * Finance registers (x-funding.register): the tables of the Funding pages.
+ * .register is a size container. Table min-width per size; while the
+ * container is at least that wide nothing scrolls sideways and the heading
+ * row sticks under the app bar (sticky cannot work inside an overflow box);
+ * narrower, the table scrolls inside .register-scroll with its first column
+ * pinned; under 48rem each row stacks as labelled pairs.
+ */
+@layer components {
+    .register {
+        container-type: inline-size;
+        --register-ground: var(--color-white);
+        --register-ink: var(--color-secondary-dark);
+        --register-muted: var(--color-secondary-medium);
+        --register-sticky-top: 4rem;
+        color: var(--register-ink);
+    }
+
+    .dark .register {
+        --register-ground: var(--color-surface-0);
+        --register-ink: var(--color-ink);
+        --register-muted: var(--color-ink-muted);
+    }
+
+    .register-scroll {
+        position: relative;
+        overflow-x: auto;
+        border-block: 1px solid var(--color-board-line);
+    }
+
+    .register table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        font-size: 0.875rem;
+    }
+
+    .register-sm table { min-width: 56rem; }
+    .register-md table { min-width: 68rem; }
+    .register-lg table { min-width: 80rem; }
+    .register-xl table { min-width: 92rem; }
+    .register-2xl table { min-width: 104rem; }
+
+    .register th,
+    .register td {
+        padding: 0.625rem 0.75rem;
+        text-align: start;
+        vertical-align: top;
+        border-bottom: 1px solid var(--color-board-line);
+        background: var(--register-ground);
+    }
+
+    .register thead th {
+        background: var(--color-board-head);
+        color: var(--register-muted);
+        font-size: 0.75rem;
+        font-weight: 600;
+        white-space: nowrap;
+        vertical-align: bottom;
+    }
+
+    .register tbody tr:hover td { background: var(--color-board-head); }
+
+    .register th:first-child,
+    .register td:first-child {
+        position: sticky;
+        inset-inline-start: 0;
+        z-index: 1;
+        min-width: 14rem;
+    }
+
+    .register .num { text-align: end; white-space: nowrap; }
+    .register .date { white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .register .fig { display: inline-block; direction: ltr; unicode-bidi: isolate; font-variant-numeric: tabular-nums; }
+    .register .sub { display: block; margin-top: 0.125rem; font-size: 0.75rem; font-weight: 400; color: var(--register-muted); }
+    .register .fig.block { display: block; }
+
+    .register-sort {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        font: inherit;
+        color: inherit;
+        cursor: pointer;
+    }
+
+    .register th.num .register-sort { flex-direction: row-reverse; }
+    .register th[aria-sort] { color: var(--register-ink); }
+
+    .register tr.register-group td {
+        background: var(--color-board-head);
+        font-weight: 700;
+        border-top: 1px solid var(--color-board-line);
+    }
+
+    .register tfoot td {
+        background: var(--color-board-head);
+        font-weight: 700;
+        border-top: 2px solid var(--color-board-line);
+    }
+
+    @container (min-width: 56rem) { .register-sm > .register-scroll { overflow: visible; } .register-sm thead th { position: sticky; top: var(--register-sticky-top); z-index: 2; } }
+    @container (min-width: 68rem) { .register-md > .register-scroll { overflow: visible; } .register-md thead th { position: sticky; top: var(--register-sticky-top); z-index: 2; } }
+    @container (min-width: 80rem) { .register-lg > .register-scroll { overflow: visible; } .register-lg thead th { position: sticky; top: var(--register-sticky-top); z-index: 2; } }
+    @container (min-width: 92rem) { .register-xl > .register-scroll { overflow: visible; } .register-xl thead th { position: sticky; top: var(--register-sticky-top); z-index: 2; } }
+    @container (min-width: 104rem) { .register-2xl > .register-scroll { overflow: visible; } .register-2xl thead th { position: sticky; top: var(--register-sticky-top); z-index: 2; } }
+
+    @container (max-width: 47.99rem) {
+        .register .register-scroll { overflow: visible; border: 0; }
+        .register table { min-width: 0; }
+        .register table,
+        .register tbody,
+        .register tfoot,
+        .register tr,
+        .register td { display: block; width: 100%; }
+        .register thead { display: none; }
+        .register tr { padding: 0.75rem 0; border-bottom: 1px solid var(--color-board-line); }
+        .register td { position: static; display: block; padding: 0.25rem 0; border: 0; text-align: start; background: transparent; }
+        .register td[data-label]:not([data-wide]) { display: grid; grid-template-columns: minmax(6rem, auto) minmax(0, 1fr); column-gap: 1rem; align-items: start; padding: 0.25rem 0; border: 0; text-align: end; }
+        .register td[data-label]:not([data-wide]) > * { grid-column: 2; justify-self: end; min-inline-size: 0; max-inline-size: 100%; text-align: end; overflow-wrap: anywhere; }
+        .register td:empty { display: none; }
+        .register td[data-label]:not([data-wide])::before { content: attr(data-label); color: var(--register-muted); font-size: 0.75rem; font-weight: 600; text-align: start; grid-column: 1; grid-row: 1 / span 20; }
+        .register td[data-wide] { display: block; text-align: start; font-size: 1rem; }
+        .register td[data-wide]::before { content: none; }
+    }
+}

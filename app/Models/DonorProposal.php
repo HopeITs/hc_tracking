@@ -8,9 +8,12 @@ use App\Concerns\HasSlug;
 use App\Concerns\RecordsActivity;
 use App\Enums\Currency;
 use App\Notifications\TracksActivity;
+use App\Support\AgreementMoney;
 use Carbon\CarbonImmutable;
 use Database\Factories\DonorProposalFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -92,6 +95,32 @@ class DonorProposal extends Model implements TracksActivity
     public function reports(): HasMany
     {
         return $this->hasMany(DonorReport::class);
+    }
+
+    /**
+     * Left-join every agreement's money, aliased `money` (see AgreementMoney).
+     *
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function joinMoney(Builder $query, ?int $year = null, bool $yearOnly = false): void
+    {
+        $query->leftJoinSub(AgreementMoney::perAgreement($year, $yearOnly), 'money', 'money.donor_proposal_id', '=', 'donor_proposal.id');
+    }
+
+    /**
+     * Join the money and select it as `money_*` attributes.
+     *
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function withMoney(Builder $query, ?int $year = null, bool $yearOnly = false): void
+    {
+        if ($query->getQuery()->columns === null) {
+            $query->select('donor_proposal.*');
+        }
+
+        $query->joinMoney($year, $yearOnly)->selectRaw(AgreementMoney::agreementColumns());
     }
 
     /**

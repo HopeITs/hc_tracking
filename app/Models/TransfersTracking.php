@@ -11,9 +11,12 @@ use App\Notifications\TracksActivity;
 use Carbon\CarbonImmutable;
 use Database\Factories\TransfersTrackingFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use InvalidArgumentException;
 
 /**
  * One payment tranche scheduled against a funding agreement.
@@ -65,6 +68,20 @@ class TransfersTracking extends Model implements TracksActivity
     protected $table = 'transfers_tracking';
 
     /**
+     * The states every funding page shares, in the vocabulary of state().
+     *
+     * @var list<string>
+     */
+    public const STATES = ['received', 'failed', 'transit', 'late', 'upcoming'];
+
+    /**
+     * The date column each date basis of a filter reads.
+     *
+     * @var array<string, string>
+     */
+    public const DATE_COLUMNS = ['scheduled' => 'scheduled_date', 'sent' => 'transfer_date', 'received' => 'receive_date'];
+
+    /**
      * The funding agreement this tranche is drawn from.
      *
      * @return BelongsTo<DonorProposal, $this>
@@ -111,6 +128,147 @@ class TransfersTracking extends Model implements TracksActivity
     public function isMissingNetAmount(): bool
     {
         return $this->ar_status === ArStatus::Received && $this->net_amount_received === null;
+    }
+
+    /**
+     * Received, with its net recorded, and landed in the currency it was sent
+     * in: the only tranche whose two ends can honestly be compared.
+     */
+    public function isSettled(): bool
+    {
+        return $this->ar_status === ArStatus::Received
+            && $this->net_amount_received !== null
+            && $this->amount_received_currency === $this->amount_transfered_currency;
+    }
+
+    /**
+     * Received in a currency other than the one it was sent in.
+     */
+    public function landedInAnotherCurrency(): bool
+    {
+        return $this->ar_status === ArStatus::Received && $this->amount_received_currency !== $this->amount_transfered_currency;
+    }
+
+    /**
+     * What landed minus what was sent, for a settled tranche only: two
+     * currencies are never subtracted.
+     */
+    public function difference(): ?float
+    {
+        return $this->isSettled() ? round((float) $this->net_amount_received - (float) $this->payment_amount, 2) : null;
+    }
+
+    /**
+     * state() as an SQL condition, so a filter, a count and a sum read a
+     * tranche exactly as its row does.
+     */
+    public static function stateSql(string $state): string
+    {
+        $table = 'transfers_tracking';
+        $today = CarbonImmutable::today()->toDateString();
+        $pending = "{$table}.ar_status = '".ArStatus::Pending->value."'";
+
+        return match ($state) {
+            'received' => "({$table}.ar_status = '".ArStatus::Received->value."')",
+            'failed' => "({$table}.ar_status = '".ArStatus::Failed->value."')",
+            'transit' => "({$pending} and {$table}.transfer_date is not null)",
+            'late' => "({$pending} and {$table}.transfer_date is null and {$table}.scheduled_date is not null and {$table}.scheduled_date < '{$today}')",
+            'upcoming' => "({$pending} and {$table}.transfer_date is null and ({$table}.scheduled_date is null or {$table}.scheduled_date >= '{$today}'))",
+            default => throw new InvalidArgumentException("Unknown tranche state [{$state}]."),
+        };
+    }
+
+    /**
+     * isSettled() as an SQL condition.
+     */
+    public static function settledSql(): string
+    {
+        return '('.self::stateSql('received').' and transfers_tracking.net_amount_received is not null and transfers_tracking.amount_received_currency = transfers_tracking.amount_transfered_currency)';
+    }
+
+    /**
+     * A settled tranche that landed with less than was sent.
+     */
+    public static function landedShortSql(): string
+    {
+        return '('.self::settledSql().' and transfers_tracking.net_amount_received < transfers_tracking.payment_amount)';
+    }
+
+    /**
+     * isMissingNetAmount() as an SQL condition.
+     */
+    public static function missingNetSql(): string
+    {
+        return '('.self::stateSql('received').' and transfers_tracking.net_amount_received is null)';
+    }
+
+    /**
+     * landedInAnotherCurrency() as an SQL condition.
+     */
+    public static function convertedSql(): string
+    {
+        return '('.self::stateSql('received').' and transfers_tracking.amount_received_currency <> transfers_tracking.amount_transfered_currency)';
+    }
+
+    /**
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function inState(Builder $query, string $state): void
+    {
+        $query->whereRaw(self::stateSql($state));
+    }
+
+    /**
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function settled(Builder $query): void
+    {
+        $query->whereRaw(self::settledSql());
+    }
+
+    /**
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function landedShort(Builder $query): void
+    {
+        $query->whereRaw(self::landedShortSql());
+    }
+
+    /**
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function missingNet(Builder $query): void
+    {
+        $query->whereRaw(self::missingNetSql());
+    }
+
+    /**
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function converted(Builder $query): void
+    {
+        $query->whereRaw(self::convertedSql());
+    }
+
+    /**
+     * Tranches whose chosen date falls inside the range. An unknown basis
+     * reads the scheduled date; a tranche without that date is left out.
+     *
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function datedWithin(Builder $query, string $basis, ?string $from, ?string $to): void
+    {
+        $column = 'transfers_tracking.'.(self::DATE_COLUMNS[$basis] ?? 'scheduled_date');
+
+        $query->when($from !== null, fn (Builder $query) => $query->where($column, '>=', $from))
+            ->when($to !== null, fn (Builder $query) => $query->where($column, '<=', $to))
+            ->when($from === null && $to === null, fn (Builder $query) => $query->whereNotNull($column));
     }
 
     /**

@@ -50,7 +50,7 @@ A pure move: the page looks and behaves exactly as before when this task ends.
 - Create: `resources/views/pages/proposals/_overview.blade.php`
 - Modify: `resources/views/pages/proposals/⚡index.blade.php` (lines 811–1287)
 
-- [ ] **Step 1: Confirm the block boundaries**
+- [x] **Step 1: Confirm the block boundaries**
 
 ```bash
 cd /c/xampp/htdocs/hc-tracking && sed -n '808p;810p;811p;1287p;1288p' "resources/views/pages/proposals/⚡index.blade.php"
@@ -66,7 +66,7 @@ Expected output, exactly:
     @endif
 ```
 
-- [ ] **Step 2: Build the partial**
+- [x] **Step 2: Build the partial**
 
 The partial defines the four values only it needs, so the table view never pays for the queries behind them.
 
@@ -93,7 +93,7 @@ BLADE
 } > resources/views/pages/proposals/_overview.blade.php
 ```
 
-- [ ] **Step 3: Qualify the class references the partial can no longer import**
+- [x] **Step 3: Qualify the class references the partial can no longer import**
 
 In `resources/views/pages/proposals/_overview.blade.php`, below the header block:
 
@@ -109,7 +109,7 @@ cd /c/xampp/htdocs/hc-tracking && grep -n -E "new (Project|Proposal)\b|(^|[^\\\\
 
 Expected: no output.
 
-- [ ] **Step 4: Replace the block in the page with the include**
+- [x] **Step 4: Replace the block in the page with the include**
 
 In `resources/views/pages/proposals/⚡index.blade.php` delete lines 811–1287 and put this single line in their place:
 
@@ -117,7 +117,7 @@ In `resources/views/pages/proposals/⚡index.blade.php` delete lines 811–1287 
         @include('pages.proposals._overview')
 ```
 
-- [ ] **Step 5: Prove nothing changed**
+- [x] **Step 5: Prove nothing changed**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/ProposalPipelineTest.php tests/Feature/AccessControl/FundraisingPagesMoneyTest.php tests/Feature/FundingWorkflowTest.php`
 Expected: PASS, the same counts as before.
@@ -136,7 +136,7 @@ Expected: PASS, the same counts as before.
 - Consumes (Phase 0): trait `FiltersFinanceRegister`; `AgreementMoney::perOwner('proposal_id', ?int $year, bool $yearOnly, bool $withTransfers)`, `::ownerSelect()`, `::ownerTotalsSelect(string $ownerKey)`, `::yearBounds()`; `TransfersTracking` scope `inState()`; `CsvExport`; the register components; `downloadedCsv()`.
 - Produces: public properties `search`, `status`, `phase`, `donor`, `currency`, `flag`; computed `rows`, `totals`, `proposalCount`, `filterDonors`, `hasAnyProposal`; actions `toggleFlag`, `exportCsv`; file name `proposals-{Y-m-d}.csv`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `tests/Feature/ProposalRegisterTest.php`:
 
@@ -455,12 +455,12 @@ test('exporting needs the proposals view permission', function () {
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/ProposalRegisterTest.php`
 Expected: FAIL — `Property [$view] not found on component`.
 
-- [ ] **Step 3: Extend the component class**
+- [x] **Step 3: Extend the component class**
 
 All edits are in the PHP block of `resources/views/pages/proposals/⚡index.blade.php`.
 
@@ -908,7 +908,7 @@ The existing `pipeline()` method builds on `filteredQuery(withPhase: false)` and
 
 Everything else in the class (`togglePhase`, `toggleDonor`, the two permission helpers, `unreadIds`, `proposals`, `filteredProposalIds`, `fundingPosition`, `pipeline`, `flow`, `donorFilterName`, `agreementMoney`, `canDelete`, and the proposal, stage and delete forms) stays exactly as it is.
 
-- [ ] **Step 4: Replace the head of the template**
+- [x] **Step 4: Replace the head of the template**
 
 The template now runs: an `@php` block, the `<section>` with its header, the active-filters strip, the `@if (! $hasAnyProposal) … @else @include … @endif` block, then three modals. Replace everything from the `@php` line directly after the closing `?>` up to, but not including, the first modal (`<x-ui.modal` with `wire:model="showProposalModal"`) with:
 
@@ -1293,7 +1293,7 @@ The three modals and the closing `</section>` that follow stay exactly as they a
 
 The template reads `DonorProposal::percentLabel`, `Currency::cases()`, `ProposalStatus::cases()` and `Number::` by their short names; all four are imported in the file's PHP block.
 
-- [ ] **Step 5: Run the new tests**
+- [x] **Step 5: Run the new tests**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/ProposalRegisterTest.php`
 Expected: PASS, 12 tests.
@@ -1304,7 +1304,7 @@ Common failures and their cause:
 - The Public Relations export has more than 6 columns — headings and rows must be built from the same two flags.
 - `Call to a member function phase() on null` — the row select must include `proposals.status`: `phase` is derived from it (`.ai/rules` on `Proposal::$appends`).
 
-- [ ] **Step 6: Point the old visual assertions at the Overview view**
+- [x] **Step 6: Point the old visual assertions at the Overview view**
 
 In `tests/Feature/ProposalPipelineTest.php` insert `->set('view', 'overview')` on the line directly after `->test('pages::proposals.index')` in these tests only:
 
@@ -1323,12 +1323,12 @@ That test asserts `data-funding-position` and `data-connection="funding"`, which
 
 Every other test passes unchanged. In particular `selecting a donor shows only the proposals it funds, and selecting it again clears the filter` still finds "Funded by ECHO" — the chip now sits in the header's filter rows.
 
-- [ ] **Step 7: Run every test that touches this page**
+- [x] **Step 7: Run every test that touches this page**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/ProposalPipelineTest.php tests/Feature/ProposalRegisterTest.php tests/Feature/AccessControl/FundraisingPagesMoneyTest.php tests/Feature/AccessControl/BrowserCallableMethodsTest.php tests/Feature/FundingWorkflowTest.php tests/Feature/LocalizationTest.php`
 Expected: PASS.
 
-- [ ] **Step 8: Checkpoint**
+- [x] **Step 8: Checkpoint**
 
 Run: `.\php.cmd vendor/bin/pint --dirty --format agent`. Do not commit.
 
@@ -1341,7 +1341,7 @@ Run: `.\php.cmd vendor/bin/pint --dirty --format agent`. Do not commit.
 **Files:**
 - Modify: `tests/Feature/FundingWorkflowTest.php`
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 Append to `tests/Feature/FundingWorkflowTest.php`:
 
@@ -1395,14 +1395,14 @@ test('the agreements, donors and proposals tables print the same received, outst
 
 Outstanding is 1,000 minus the payment amounts of the three received tranches (400 + 100 + 50): what the donor has still to send, whatever the journey took from what was sent.
 
-- [ ] **Step 2: Run it**
+- [x] **Step 2: Run it**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/FundingWorkflowTest.php`
 Expected: PASS, 15 tests.
 
 If the three readings disagree, the fault is in `AgreementMoney` (Phase 0), not in a page: fix it there, then re-run the Phase 0 `AgreementMoneyTest` as well.
 
-- [ ] **Step 3: Checkpoint**
+- [x] **Step 3: Checkpoint**
 
 Run: `.\php.cmd vendor/bin/pint --dirty --format agent`. Do not commit.
 
@@ -1412,9 +1412,9 @@ Run: `.\php.cmd vendor/bin/pint --dirty --format agent`. Do not commit.
 
 **Files:** none changed unless a defect is found.
 
-- [ ] **Step 1: Render the page** as in Phase 1, Task 5 for `/proposals`, `/proposals?year=2026`, `/proposals?view=overview`, once as a `Financial` user and once as a `Public Relations Manager`.
+- [x] **Step 1: Render the page** as in Phase 1, Task 5 for `/proposals`, `/proposals?year=2026`, `/proposals?view=overview`, once as a `Financial` user and once as a `Public Relations Manager`.
 
-- [ ] **Step 2: Check each of these and fix what fails**
+- [x] **Step 2: Check each of these and fix what fails**
 
 | Check | Expected |
 | --- | --- |
@@ -1425,4 +1425,4 @@ Run: `.\php.cmd vendor/bin/pint --dirty --format agent`. Do not commit.
 | Overview view | Funding position, pipeline rail, flow and dossiers as before. |
 | Dark mode, Arabic, 390px | As in Phase 1. |
 
-- [ ] **Step 3: Delete the preview file and checkpoint.** Do not commit.
+- [x] **Step 3: Delete the preview file and checkpoint.** Do not commit.

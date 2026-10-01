@@ -193,6 +193,7 @@ test('the funding agreement page shows the agreement on one gantt', function () 
 
     $component = Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::funding-agreements.show', ['donorProposal' => $agreement])
+        ->set('view', 'overview')
         ->assertSeeHtml('data-agreement-timeline')
         ->assertSeeHtml('data-gantt');
     $rows = timelineRows($component->instance()->ganttPayload);

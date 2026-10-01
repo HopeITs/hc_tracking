@@ -58,14 +58,14 @@ test('a tranche due today is not overdue, and one due yesterday is, everywhere o
     $page = proposalPage();
     expect($page->instance()->moneyByCurrency['USD']['overdueCount'])->toBe(0)
         ->and(collect($page->instance()->warnings)->pluck('key'))->not->toContain('overdue-money-USD');
-    $page->set('tab', 'funding')->assertDontSeeText('Overdue');
+    $page->set('tab', 'funding')->set('view', 'overview')->assertDontSeeText('Overdue');
 
     $this->travelTo('2026-06-16');
 
     $page = proposalPage();
     expect($page->instance()->moneyByCurrency['USD']['overdueCount'])->toBe(1)
         ->and(collect($page->instance()->warnings)->pluck('key'))->toContain('overdue-money-USD');
-    $page->set('tab', 'funding')->assertSeeText('Overdue');
+    $page->set('tab', 'funding')->set('view', 'overview')->assertSeeText('Overdue');
 });
 
 test('a tranche received in another currency is left out of the agreement money and named instead', function () {
@@ -78,7 +78,7 @@ test('a tranche received in another currency is left out of the agreement money 
     expect($page->instance()->agreementMoney[$agreement->id])
         ->received->toBe(400.0)
         ->foreignCount->toBe(1);
-    $page->set('tab', 'funding')->assertSeeHtml('data-foreign-tranches');
+    $page->set('tab', 'funding')->set('view', 'overview')->assertSeeHtml('data-foreign-tranches');
 });
 
 test('the details form edits name, dates and notes but never the status', function () {

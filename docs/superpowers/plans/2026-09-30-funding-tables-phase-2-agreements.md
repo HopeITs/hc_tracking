@@ -62,7 +62,7 @@
   - `<x-funding.agreement-row :agreement="$a" :columns="$columns" :year-only="bool">` with optional slots `lead` and `actions`. Prints `<tr wire:key="agreement-{id}" data-agreement-row="{id}">`. When the `reports` column is present the model must carry `overdue_reports_count` and `next_report_due`.
   - `<x-funding.agreement-foot :lines="$lines" :columns="$columns" :lead="int" :year-only="bool" :actions="bool" />` where a line is `array{currency: string, agreements: int, tranches: int, budget: float, scheduled: float, received: float, in_transit: float, overdue: float, failed: float, unscheduled: float, outstanding: float, due_in_year: float, received_in_year: float}` (the shape `AgreementMoney::line()` returns).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `tests/Feature/AgreementComponentsTest.php`:
 
@@ -183,12 +183,12 @@ test('the foot prints one row per currency with its own percentage', function ()
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/AgreementComponentsTest.php`
 Expected: FAIL — `Unable to locate a class or view for component [funding.agreement-row]`.
 
-- [ ] **Step 3: Create the head component**
+- [x] **Step 3: Create the head component**
 
 Create `resources/views/components/funding/agreement-head.blade.php`:
 
@@ -215,7 +215,7 @@ Create `resources/views/components/funding/agreement-head.blade.php`:
 @endif
 ```
 
-- [ ] **Step 4: Create the row component**
+- [x] **Step 4: Create the row component**
 
 Create `resources/views/components/funding/agreement-row.blade.php`:
 
@@ -323,7 +323,7 @@ Create `resources/views/components/funding/agreement-row.blade.php`:
 </tr>
 ```
 
-- [ ] **Step 5: Create the foot component**
+- [x] **Step 5: Create the foot component**
 
 Create `resources/views/components/funding/agreement-foot.blade.php`:
 
@@ -380,14 +380,14 @@ Create `resources/views/components/funding/agreement-foot.blade.php`:
 @endforeach
 ```
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [x] **Step 6: Run the tests to verify they pass**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/AgreementComponentsTest.php`
 Expected: PASS, 8 tests (one of them with five data sets).
 
 If the cell-count test fails for one data set, the three components disagree about that column: each must print exactly one cell per entry of `$columns`.
 
-- [ ] **Step 7: Checkpoint**
+- [x] **Step 7: Checkpoint**
 
 Run: `.\php.cmd vendor/bin/pint --dirty --format agent`. Do not commit.
 
@@ -401,7 +401,7 @@ A pure move: the page looks and behaves exactly as before when this task ends.
 - Create: `resources/views/pages/funding-agreements/_overview.blade.php`
 - Modify: `resources/views/pages/funding-agreements/⚡index.blade.php` (lines 631–1339)
 
-- [ ] **Step 1: Confirm the block boundaries**
+- [x] **Step 1: Confirm the block boundaries**
 
 ```bash
 cd /c/xampp/htdocs/hc-tracking && sed -n '549p;592p;631p;1339p;1340p' "resources/views/pages/funding-agreements/⚡index.blade.php"
@@ -417,7 +417,7 @@ Expected output, exactly:
     @endif
 ```
 
-- [ ] **Step 2: Build the partial**
+- [x] **Step 2: Build the partial**
 
 The partial carries its own copy of the formatting variables (lines 549–592), so it needs nothing from the page but `$this` and `$stage`.
 
@@ -435,7 +435,7 @@ cd /c/xampp/htdocs/hc-tracking && {
 } > resources/views/pages/funding-agreements/_overview.blade.php
 ```
 
-- [ ] **Step 3: Fix what a partial cannot import**
+- [x] **Step 3: Fix what a partial cannot import**
 
 In `resources/views/pages/funding-agreements/_overview.blade.php`:
 
@@ -450,7 +450,7 @@ cd /c/xampp/htdocs/hc-tracking && grep -n -E "(^|[^\\\\A-Za-z])(ArStatus|Currenc
 
 Expected: no output.
 
-- [ ] **Step 4: Replace the block in the page with the include**
+- [x] **Step 4: Replace the block in the page with the include**
 
 In `resources/views/pages/funding-agreements/⚡index.blade.php` delete lines 631–1339 and put this single line in their place:
 
@@ -460,7 +460,7 @@ In `resources/views/pages/funding-agreements/⚡index.blade.php` delete lines 63
 
 Leave the page's own `@php` block (lines 546–593) as it is for now; Task 3 rewrites it.
 
-- [ ] **Step 5: Prove nothing changed**
+- [x] **Step 5: Prove nothing changed**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/FundingAgreementTest.php tests/Feature/FundingWorkflowTest.php`
 Expected: PASS, the same counts as before (33 and 14 tests).
@@ -480,7 +480,7 @@ Expected: PASS, the same counts as before (33 and 14 tests).
 - Consumes (Task 1): `x-funding.agreement-head`, `x-funding.agreement-row`, `x-funding.agreement-foot`.
 - Produces: public properties `search`, `donor`, `currency`, `stage`, `flag`, `min`, `max`; computed `rows`, `totals`, `hasAnyAgreement`; actions `toggleFlag`, `exportCsv`; file name `funding-agreements-{Y-m-d}.csv`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `tests/Feature/FundingAgreementRegisterTest.php`:
 
@@ -807,12 +807,12 @@ test('exporting needs the funding agreements view permission', function () {
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/FundingAgreementRegisterTest.php`
 Expected: FAIL — `Property [$view] not found on component`.
 
-- [ ] **Step 3: Extend the component class**
+- [x] **Step 3: Extend the component class**
 
 All edits are in the PHP block of `resources/views/pages/funding-agreements/⚡index.blade.php`.
 
@@ -1203,7 +1203,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 Everything else in the class (`toggleStage`, `applyStage`, `agreements`, `ledger`, `stageCounts`, `calendar`, `quarterKey`, `monthOffset`, `trancheState`, `percentLabel`, `agreementMoney`, the four form callbacks) stays exactly as it is.
 
-- [ ] **Step 4: Replace the template**
+- [x] **Step 4: Replace the template**
 
 Replace everything after the closing `?>` with:
 
@@ -1452,7 +1452,7 @@ Replace everything after the closing `?>` with:
 
 Before saving, compare the `<x-funding.agreement-modal … />` tag above with the one that was at the bottom of the file (lines 1342–1351) and keep the original's attributes if they differ: the modal is out of scope and must not change.
 
-- [ ] **Step 5: Drop the duplicate Reset button from the Overview chips**
+- [x] **Step 5: Drop the duplicate Reset button from the Overview chips**
 
 The header now carries `Reset filters` for both views. In `resources/views/pages/funding-agreements/_overview.blade.php`, inside the `<nav … data-stage-chips>` element, delete this block:
 
@@ -1463,7 +1463,7 @@ The header now carries `Reset filters` for both views. In `resources/views/pages
                 @endif
 ```
 
-- [ ] **Step 6: Run the new tests**
+- [x] **Step 6: Run the new tests**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/FundingAgreementRegisterTest.php`
 Expected: PASS, 13 tests.
@@ -1473,7 +1473,7 @@ Common failures and their cause:
 - `Unknown column 'money.m_…'` in `totals` — `joinMoney()` was not applied before `toBase()`.
 - The default-order test fails with the EUR agreement first — `next_due` must put `money.m_next_due is null` before the date.
 
-- [ ] **Step 7: Point four old visual assertions at the Overview view**
+- [x] **Step 7: Point four old visual assertions at the Overview view**
 
 In `tests/Feature/FundingAgreementTest.php` insert `->set('view', 'overview')` on the line directly after `->test('pages::funding-agreements.index')` in these tests only:
 
@@ -1501,12 +1501,12 @@ In the fourth, change the `$index = …` chain to:
 
 Every other test in the file passes unchanged: the ones that filter and then assert a proposal name work on the table rows, and `the index flags agreements with an overdue donor report` finds `data-report-overdue` and "1 donor report overdue" in the table's Donor reports column.
 
-- [ ] **Step 8: Run every test that touches this page**
+- [x] **Step 8: Run every test that touches this page**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/FundingAgreementTest.php tests/Feature/FundingAgreementRegisterTest.php tests/Feature/AgreementComponentsTest.php tests/Feature/FundingWorkflowTest.php tests/Feature/LocalizationTest.php`
 Expected: PASS.
 
-- [ ] **Step 9: Checkpoint**
+- [x] **Step 9: Checkpoint**
 
 Run: `.\php.cmd vendor/bin/pint --dirty --format agent`. Do not commit.
 
@@ -1516,9 +1516,9 @@ Run: `.\php.cmd vendor/bin/pint --dirty --format agent`. Do not commit.
 
 **Files:** none changed unless a defect is found.
 
-- [ ] **Step 1: Render the page** as in Phase 1, Task 5 (`.ai/rules/pages.md` → "Preview an auth-gated page in a browser without signing in") for `/funding-agreements`, `/funding-agreements?year=2026`, `/funding-agreements?year=2026&figures=year`, `/funding-agreements?view=overview`.
+- [x] **Step 1: Render the page** as in Phase 1, Task 5 (`.ai/rules/pages.md` → "Preview an auth-gated page in a browser without signing in") for `/funding-agreements`, `/funding-agreements?year=2026`, `/funding-agreements?year=2026&figures=year`, `/funding-agreements?view=overview`.
 
-- [ ] **Step 2: Check each of these and fix what fails**
+- [x] **Step 2: Check each of these and fix what fails**
 
 | Check | Expected |
 | --- | --- |
@@ -1531,4 +1531,4 @@ Run: `.\php.cmd vendor/bin/pint --dirty --format agent`. Do not commit.
 | Overview view | Identical to the page before this phase, minus the Reset button in the chips row. |
 | Dark mode, Arabic, 390px | As in Phase 1. |
 
-- [ ] **Step 3: Delete the preview file and checkpoint.** Do not commit.
+- [x] **Step 3: Delete the preview file and checkpoint.** Do not commit.

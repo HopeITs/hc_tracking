@@ -55,3 +55,13 @@ test('other pages never start the tour by themselves', function () {
         ->get(route('programs.index'))
         ->assertDontSee(str_replace('/', '\/', route('tour.seen')), false);
 });
+
+test('the tour on funding pages includes finance table filter and totals steps', function () {
+    $user = User::factory()->role('Financial')->create();
+
+    $this->actingAs($user)
+        ->get(route('transfers.index'))
+        ->assertOk()
+        ->assertSee('Filter the table')
+        ->assertSee('Narrow the table: pick a year, a status, a currency or a flag');
+});

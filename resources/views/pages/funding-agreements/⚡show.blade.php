@@ -10,12 +10,15 @@ use App\Enums\MilestoneStatus;
 use App\Livewire\Concerns\BuildsPortfolioGantt;
 use App\Livewire\Concerns\ManagesAgreementForm;
 use App\Livewire\Concerns\ManagesTransferForm;
+use App\Livewire\Concerns\SwitchesFundingView;
 use App\Models\DonorProposal;
 use App\Models\DonorReport;
 use App\Models\Media;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\TransfersTracking;
+use App\Support\CsvExport;
+use App\Support\Tranches;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
@@ -26,10 +29,12 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Component;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 new #[Title('titles.funding_agreement')] class extends Component {
     use BuildsPortfolioGantt;
     use ManagesAgreementForm;
+    use SwitchesFundingView;
     use ManagesTransferForm {
         saveTransfer as private saveTransferForAgreement;
     }
@@ -717,6 +722,26 @@ new #[Title('titles.funding_agreement')] class extends Component {
     }
 
     /**
+     * Every tranche of this agreement as a CSV file, in schedule order.
+     */
+    public function exportTranchesCsv(): StreamedResponse
+    {
+        Gate::authorize('funding-agreements.view');
+
+        $agreement = $this->agreement;
+
+        $rows = $this->transfers->map(fn (TransfersTracking $transfer): array => Tranches::csvRow(
+            $transfer,
+            $agreement->donor->name,
+            $agreement->proposal->name,
+            $agreement->external_project_number,
+            $transfer->account?->account_name,
+        ));
+
+        return CsvExport::download('agreement-tranches-'.CarbonImmutable::today()->toDateString().'.csv', Tranches::csvHeadings(), $rows);
+    }
+
+    /**
      * Nobody has spoken to the donor in a while, or ever.
      */
     protected function donorContactIsStale(): bool
@@ -992,6 +1017,15 @@ new #[Title('titles.funding_agreement')] class extends Component {
         <x-slot:actions>
             <div class="flex flex-wrap items-center gap-2 @3xl/detail:shrink-0 @3xl/detail:flex-nowrap">
                 <x-ui.enum-badge :case="$proposal->status" />
+                <x-ui.view-toggle
+                    :label="__('finance_tables.view_label')"
+                    wire-model="view"
+                    :active="$this->view"
+                    :options="[
+                        ['key' => 'table', 'label' => __('finance_tables.view_table'), 'icon' => 'table-cells'],
+                        ['key' => 'overview', 'label' => __('finance_tables.view_overview'), 'icon' => 'chart-bar'],
+                    ]"
+                />
                 @can('funding-agreements.update')
                 <x-ui.button size="sm" icon="pencil-square" class="min-h-10 touch-manipulation" wire:click="openAgreementEdit({{ $agreement->id }})" data-test="edit-agreement">{{ __('funding_agreements.edit_agreement') }}</x-ui.button>
                 @endcan
@@ -1002,157 +1036,51 @@ new #[Title('titles.funding_agreement')] class extends Component {
         </x-slot:actions>
     </x-ui.detail-header>
 
-    {{-- The promise: the dial on the start side, its readings on the end side. --}}
-    <div class="grid gap-x-12 gap-y-10 pt-8 @4xl/detail:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] @6xl/detail:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]" data-promise>
-        <figure class="relative mx-auto aspect-square w-full max-w-[22rem] @6xl/detail:max-w-[26rem]" data-dial>
-            <svg viewBox="0 0 200 200" class="size-full -rotate-90 overflow-visible" role="img" aria-labelledby="dial-title">
-                <title id="dial-title">{{ __('funding_agreements.dial_label', ['percent' => $money['percentLabel'], 'budget' => $amount($money['budget']), 'currency' => $currency, 'owed' => $amount($money['stillToCome'])]) }}</title>
-                <defs>
-                    <pattern id="dial-stripes-warn" patternUnits="userSpaceOnUse" width="5" height="5" patternTransform="rotate(45)">
-                        <rect width="5" height="5" class="fill-status-warn/25" />
-                        <rect width="2" height="5" class="fill-status-warn" />
-                    </pattern>
-                    <pattern id="dial-stripes-critical" patternUnits="userSpaceOnUse" width="5" height="5" patternTransform="rotate(45)">
-                        <rect width="5" height="5" class="fill-primary/20" />
-                        <rect width="2" height="5" class="fill-primary" />
-                    </pattern>
-                    <pattern id="dial-stripes-funding" patternUnits="userSpaceOnUse" width="5" height="5" patternTransform="rotate(45)">
-                        <rect width="5" height="5" class="fill-funding/15" />
-                        <rect width="1.5" height="5" class="fill-funding" />
-                    </pattern>
-                </defs>
+    @if ($this->view === 'overview')
+        @include('pages.funding-agreements._show-overview')
+    @else
+        @php
+            $totalLines = [[
+                'currency' => $currency,
+                'caption' => trans_choice('common.count_tranche', count($journeys), ['count' => count($journeys)]),
+                'figures' => array_values(array_filter([
+                    ['key' => 'budget', 'label' => __('finance_tables.budget'), 'value' => $money['budget']],
+                    // Every tranche sent in this currency, whatever became of it: failed money was scheduled too.
+                    ['key' => 'scheduled', 'label' => __('finance_tables.scheduled'), 'value' => $money['scheduled'] + $money['failed']],
+                    ['key' => 'received', 'label' => __('finance_tables.received'), 'value' => $money['landed'], 'tone' => 'good', 'note' => $money['percentLabel'].'%'],
+                    ['key' => 'lost', 'label' => __('funding_agreements.fees_and_exchange'), 'value' => $money['lost'], 'prefix' => $money['lost'] > 0 ? '−' : ''],
+                    ['key' => 'in_transit', 'label' => __('finance_tables.in_transit'), 'value' => $money['transit'], 'tone' => $money['transit'] > 0 ? 'warn' : null],
+                    ['key' => 'overdue', 'label' => __('finance_tables.overdue'), 'value' => $money['late'], 'tone' => $money['late'] > 0 ? 'critical' : null],
+                    $money['failed'] > 0 ? ['key' => 'failed', 'label' => __('finance_tables.failed'), 'value' => $money['failed'], 'tone' => 'critical'] : null,
+                    ['key' => 'unscheduled', 'label' => __('finance_tables.not_scheduled'), 'value' => $money['unscheduled'], 'tone' => 'muted'],
+                    ['key' => 'outstanding', 'label' => __('finance_tables.outstanding'), 'value' => $money['stillToCome']],
+                ])),
+                'notes' => array_values(array_filter([
+                    ...collect($money['foreignLandings'])->map(fn (float $foreignTotal, string $foreignCode): string => __('funding_agreements.also_landed_in', ['amount' => $amount($foreignTotal), 'currency' => $foreignCode]))->values()->all(),
+                    $money['foreignCount'] > 0 ? trans_choice('funding_agreements.count_tranches_sent_in_another_currency', $money['foreignCount'], ['count' => $money['foreignCount']]) : null,
+                ])),
+            ]];
+        @endphp
 
-                {{-- The whole promise as a track; whatever no tranche covers stays visible as this ground. --}}
-                <circle cx="100" cy="100" r="84" fill="none" stroke-width="16" class="stroke-secondary-soft/70 dark:stroke-surface-2" />
-                <circle cx="100" cy="100" r="72" fill="none" stroke-width="0.75" stroke-dasharray="1 2.4" class="stroke-secondary-light" />
-
-                @foreach ($this->arcs as $arc)
-                    <a href="#tranche-{{ $arc['id'] }}" class="dial-arc outline-none" style="--dial-order: {{ $loop->index }}" x-on:mouseenter="lit = {{ $arc['id'] }}" x-on:mouseleave="lit = null" x-on:focus="lit = {{ $arc['id'] }}" x-on:blur="lit = null" x-bind:data-state="lit === null ? null : (lit === {{ $arc['id'] }} ? 'lit' : 'dim')" data-arc="{{ $arc['id'] }}" data-arc-state="{{ $arc['state'] }}" aria-label="{{ $arc['label'] }}">
-                        <circle cx="100" cy="100" r="84" fill="none" stroke-width="16" pathLength="100"
-                            class="dial-stroke {{ $arcStroke[$arc['state']] }}"
-                            style="stroke-dasharray: {{ $arc['net'] }} 100; stroke-dashoffset: {{ -$arc['start'] }};" />
-                        @if ($arc['net'] < $arc['length'])
-                            {{-- What fees and exchange took from a received tranche: the same arc, paler. --}}
-                            <circle cx="100" cy="100" r="84" fill="none" stroke-width="16" pathLength="100"
-                                class="dial-stroke stroke-funding/35"
-                                style="stroke-dasharray: {{ round($arc['length'] - $arc['net'], 3) }} 100; stroke-dashoffset: {{ -round($arc['start'] + $arc['net'], 3) }};" />
-                        @endif
-                    </a>
-                @endforeach
-            </svg>
-
-            {{-- The answer in the centre; hovering an arc swaps it for that tranche. --}}
-            <figcaption class="pointer-events-none absolute inset-[22%] flex flex-col items-center justify-center text-center">
-                <div x-show="lit === null" class="flex flex-col items-center">
-                    <span class="text-[3.5rem] leading-none font-extrabold tracking-tight tabular-nums text-funding @6xl/detail:text-[4.25rem]" data-test="dial-percent">{{ $money['percentLabel'] }}<span class="text-3xl font-bold">%</span></span>
-                    <span class="type-label mt-2 {{ $mutedText }}">{{ __('funding_agreements.landed') }}</span>
-                    <span class="mt-3 text-sm font-semibold tabular-nums {{ $inkText }}">{{ $amount($money['stillToCome']) }} <span class="text-xs font-medium {{ $mutedText }}">{{ $currency }}</span></span>
-                    <span class="text-xs {{ $mutedText }}">{{ __('funding_agreements.still_to_come') }}</span>
-                </div>
-                <div x-show="lit !== null" x-cloak class="flex flex-col items-center">
-                    <span class="type-label {{ $mutedText }}" x-text="lit !== null ? tranches[lit].label : ''"></span>
-                    <span class="mt-2 text-xl leading-tight font-extrabold tracking-tight tabular-nums {{ $inkText }}" x-text="lit !== null ? tranches[lit].amount : ''"></span>
-                    <span class="mt-1 text-sm font-semibold" x-bind:class="lit !== null && tranches[lit].alarm ? 'text-status-critical' : '{{ $mutedText }}'" x-text="lit !== null ? tranches[lit].state : ''"></span>
-                </div>
-            </figcaption>
-        </figure>
-
-        <div class="flex min-w-0 flex-col justify-center">
-            {{-- Readings: the parts that add back up to the promise. --}}
-            <dl class="grid grid-cols-2 gap-x-8 gap-y-6 @2xl/detail:grid-cols-3" data-readings>
-                <div class="col-span-2 border-b pb-5 @2xl/detail:col-span-3 {{ $hairline }}">
-                    <dt class="type-label {{ $mutedText }}">{{ __('common.committed') }}</dt>
-                    <dd class="mt-1.5 flex flex-wrap items-baseline gap-x-2 text-4xl leading-none font-extrabold tracking-tight tabular-nums @5xl/detail:text-5xl {{ $inkText }}" data-test="reading-committed">
-                        {{ $amount($money['budget']) }}
-                        <span class="text-base font-bold tracking-normal {{ $mutedText }}">{{ $currency }}</span>
-                    </dd>
-                </div>
-
-                @php
-                    $readings = [
-                        ['key' => 'landed', 'label' => __('funding_agreements.landed'), 'value' => $money['landed'], 'swatch' => 'bg-funding', 'figure' => 'text-funding', 'note' => __('funding_agreements.percent_of_committed', ['percent' => $money['percentLabel']])],
-                        ['key' => 'lost', 'label' => __('funding_agreements.fees_and_exchange'), 'value' => $money['lost'], 'swatch' => 'bg-funding/35', 'figure' => $inkText, 'note' => $money['gained'] > 0.0 ? __('funding_agreements.exchange_gained_amount', ['amount' => $amount($money['gained'])]) : __('funding_agreements.taken_on_the_way')],
-                        ['key' => 'unrecorded', 'label' => __('funding_agreements.received_net_not_recorded'), 'value' => $money['unrecorded'], 'swatch' => 'money-unrecorded', 'figure' => 'text-status-warn', 'note' => trans_choice('funding_agreements.count_tranches', $money['unrecordedCount'], ['count' => $money['unrecordedCount']])],
-                        ['key' => 'on-its-way', 'label' => __('funding_agreements.on_its_way'), 'value' => $money['upcoming'] + $money['transit'], 'swatch' => 'money-pending', 'figure' => $inkText, 'note' => $money['nextDue'] !== null ? __('funding_agreements.next_due_on', ['date' => $money['nextDue']->translatedFormat(__('formats.date'))]) : __('funding_agreements.nothing_on_its_way')],
-                        ['key' => 'late', 'label' => __('funding_agreements.late'), 'value' => $money['late'], 'swatch' => 'bg-primary dark:bg-status-critical', 'figure' => $money['late'] > 0 ? 'text-status-critical' : $inkText, 'note' => $money['lateSince'] !== null ? __('funding_agreements.due_since', ['date' => $money['lateSince']->translatedFormat(__('formats.date'))]) : __('funding_agreements.nothing_late')],
-                        ['key' => 'failed', 'label' => __('funding_agreements.stage_failed'), 'value' => $money['failed'], 'swatch' => 'money-failed', 'figure' => 'text-status-critical', 'note' => __('funding_agreements.still_owed')],
-                        ['key' => 'unscheduled', 'label' => __('funding_agreements.not_scheduled_yet'), 'value' => $money['unscheduled'], 'swatch' => 'bg-secondary-soft dark:bg-line-strong', 'figure' => $mutedText, 'note' => __('funding_agreements.no_date_agreed')],
-                    ];
-                    // Unrecorded and failed money only get a reading when there is some.
-                    $readings = array_values(array_filter($readings, fn (array $reading): bool => ! in_array($reading['key'], ['unrecorded', 'failed'], true) || $reading['value'] > 0.0));
-                @endphp
-
-                @foreach ($readings as $reading)
-                    <div class="logframe-reveal min-w-0" style="--logframe-order: {{ $loop->index }}" data-reading="{{ $reading['key'] }}">
-                        <dt class="flex items-center gap-2">
-                            <span class="size-2.5 shrink-0 rounded-full {{ $reading['swatch'] }}" aria-hidden="true"></span>
-                            <span class="type-label truncate {{ $mutedText }}">{{ $reading['label'] }}</span>
-                        </dt>
-                        <dd class="mt-1.5 truncate text-2xl leading-none font-extrabold tracking-tight tabular-nums @5xl/detail:text-[1.75rem] {{ $reading['figure'] }}">{{ $amount($reading['value']) }}</dd>
-                        <dd class="mt-1.5 truncate text-xs {{ $mutedText }}">{{ $reading['note'] }}</dd>
-                    </div>
-                @endforeach
-            </dl>
-
-            @if ($money['foreignLandings'] !== [] || $money['foreignCount'] > 0)
-                <div class="mt-5 flex flex-col gap-1 text-xs {{ $mutedText }}" data-foreign>
-                    @foreach ($money['foreignLandings'] as $foreignCode => $foreignTotal)
-                        <p class="font-semibold tabular-nums text-funding">{{ __('funding_agreements.also_landed_in', ['amount' => $amount($foreignTotal), 'currency' => $foreignCode]) }}</p>
-                    @endforeach
-                    @if ($money['foreignCount'] > 0)
-                        <p>{{ trans_choice('funding_agreements.count_tranches_sent_in_another_currency', $money['foreignCount'], ['count' => $money['foreignCount']]) }}</p>
-                    @endif
-                </div>
-            @endif
-
-            @if ($this->attention !== [])
-                <section class="mt-7 border-t pt-5 {{ $hairline }}" aria-labelledby="attention-heading" data-attention>
-                    <h2 id="attention-heading" class="type-label {{ $inkText }}">{{ trans_choice('funding_agreements.count_things_need_attention', count($this->attention), ['count' => count($this->attention)]) }}</h2>
-                    <ul class="mt-3 flex flex-col gap-2">
-                        @foreach ($this->attention as $item)
-                            <li class="flex items-start gap-2.5 text-sm" wire:key="attention-{{ $item['key'] }}" data-attention-item="{{ $item['key'] }}">
-                                <span @class(['mt-1.5 size-2 shrink-0 rounded-full', 'bg-primary dark:bg-status-critical' => $item['critical'], 'border-2 border-status-warn' => ! $item['critical']]) aria-hidden="true"></span>
-                                <span @class(['min-w-0', 'font-semibold text-status-critical' => $item['critical'], $inkText => ! $item['critical']])>{{ $item['text'] }}</span>
-                            </li>
-                        @endforeach
-                    </ul>
-                </section>
-            @endif
+        <div class="pt-8">
+            <x-funding.totals :lines="$totalLines" />
         </div>
-    </div>
 
-    {{-- The whole agreement in time: proposal, funded delivery, tranches and reports. --}}
-    <section class="mt-14 border-t pt-8 {{ $hairline }}" aria-labelledby="agreement-timeline-heading" data-agreement-timeline x-data="{ open: true }">
-        <button type="button" x-on:click="open = ! open" x-bind:aria-expanded="open.toString()" class="flex w-full flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-start">
-            <span>
-                <span id="agreement-timeline-heading" class="block text-xl font-bold tracking-tight {{ $inkText }}">{{ __('gantt.timeline') }}</span>
-                <span class="block text-sm {{ $mutedText }}">{{ __('gantt.timeline_subtitle') }}</span>
-            </span>
-            <flux:icon.chevron-down variant="micro" class="size-4 shrink-0 transition-transform {{ $mutedText }}" x-bind:class="open && 'rotate-180'" />
-        </button>
-        <div x-show="open" x-collapse class="mt-5 overflow-hidden rounded-xl border {{ $hairline }}">
-            @if ($this->ganttPayload['rows'] === [])
-                <x-ui.empty-state icon="chart-bar" :heading="__('gantt.nothing_to_plan')" :body="__('gantt.nothing_to_plan_body')" />
-            @else
-                <x-ui.gantt :payload="$this->ganttPayload" :scope="'agreement-'.$this->agreementId" height="h-[min(60vh,32rem)]" wire:ignore wire:key="agreement-gantt-{{ $this->agreementId }}" />
-            @endif
-        </div>
-    </section>
+        @include('pages.funding-agreements._show-attention')
 
-    {{-- Below the promise: each tranche's journey beside the records this money is tied to. --}}
-    <div class="mt-14 grid gap-x-12 gap-y-14 border-t pt-8 @5xl/detail:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] {{ $hairline }}">
-        <section class="min-w-0" aria-labelledby="tranches-heading" data-tranches>
-            <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        {{-- Every tranche, with every figure of its journey in its own column. --}}
+        <section class="mt-10 min-w-0" aria-labelledby="tranches-heading" data-tranches>
+            <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
                 <h2 id="tranches-heading" class="text-xl font-bold tracking-tight {{ $inkText }}">
                     {{ __('funding_agreements.tranches') }}
                     <span class="ms-1 text-base font-semibold tabular-nums {{ $mutedText }}">{{ count($journeys) }}</span>
                 </h2>
-                <p class="flex flex-wrap items-baseline gap-x-3 text-xs {{ $mutedText }}">
-                    <span>{{ __('funding_agreements.from_schedule_to_account') }}</span>
-                    @if ($journeys !== [])
-                        <a href="{{ route('transfers.index', ['agreement' => $agreement->id]) }}" wire:navigate class="font-semibold underline-offset-4 hover:underline {{ $inkText }}" data-transfers-ledger-link>{{ __('funding_agreements.open_in_transfers_ledger') }}</a>
-                    @endif
-                </p>
+                @if ($journeys !== [])
+                    <div class="flex flex-wrap items-center gap-3">
+                        <a href="{{ route('transfers.index', ['agreement' => $agreement->id]) }}" wire:navigate class="text-xs font-semibold underline-offset-4 hover:underline {{ $inkText }}" data-transfers-ledger-link>{{ __('funding_agreements.open_in_transfers_ledger') }}</a>
+                        <x-ui.button size="sm" icon="arrow-down-tray" class="min-h-10 touch-manipulation" wire:click="exportTranchesCsv" wire:loading.attr="disabled" wire:target="exportTranchesCsv" data-test="export-csv">{{ __('finance_tables.export_csv') }}</x-ui.button>
+                    </div>
+                @endif
             </div>
 
             @if ($journeys === [])
@@ -1160,368 +1088,95 @@ new #[Title('titles.funding_agreement')] class extends Component {
                     <x-ui.empty-state class="rtl:[&_svg]:-scale-x-100" icon="arrow-right-circle" :heading="__('funding_agreements.no_tranches_scheduled')" :body="__('funding_agreements.payments_scheduled_under_this_agreement_will_appear_here')" />
                 </div>
             @else
-                <ol class="mt-4 flex flex-col">
-                    @foreach ($journeys as $journey)
-                        @php
-                            $transfer = $journey['transfer'];
-                            $state = $journey['state'];
-                            $isReceived = $state === 'received';
-                            $feesShown = (float) $transfer->fees > 0.0;
-                            $rate = rtrim(rtrim((string) $transfer->exchange_rate, '0'), '.');
-                        @endphp
-                        <li
-                            id="tranche-{{ $transfer->id }}"
-                            class="tranche-row -mx-3 scroll-mt-24 border-b px-3 py-5 last:border-b-0 {{ $hairline }}"
-                            x-on:mouseenter="lit = {{ $transfer->id }}"
-                            x-on:mouseleave="lit = null"
-                            x-on:focusin="lit = {{ $transfer->id }}"
-                            x-on:focusout="lit = null"
-                            x-bind:data-state="lit === {{ $transfer->id }} ? 'lit' : null"
-                            wire:key="agreement-transfer-{{ $transfer->id }}"
-                            data-transfer="{{ $transfer->id }}"
-                            data-tranche-state="{{ $state }}"
-                        >
-                            <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
-                                <div class="min-w-0">
-                                    <p class="type-label flex items-center gap-2 {{ $mutedText }}">
-                                        <span class="size-2 rounded-full {{ $dotClass[$state] }}" aria-hidden="true"></span>
-                                        {{ __('funding_agreements.tranche_number', ['number' => $journey['number'], 'total' => count($journeys)]) }}
-                                    </p>
-                                    <p class="mt-1.5 text-2xl leading-none font-extrabold tracking-tight tabular-nums {{ $inkText }}">
-                                        {{ $amount((float) $transfer->payment_amount) }}
-                                        <span class="text-sm font-bold tracking-normal {{ $mutedText }}">{{ $transfer->amount_transfered_currency->value }}</span>
-                                    </p>
-                                    @if ($journey['timing'] !== null)
-                                        <p @class(['mt-1.5 text-xs', 'font-bold text-status-critical' => $journey['timingAlarm'], $mutedText => ! $journey['timingAlarm']])>{{ $journey['timing'] }}</p>
-                                    @endif
-                                </div>
-
-                                <div class="flex shrink-0 items-center gap-1">
-                                    <x-ui.enum-badge :case="$transfer->ar_status" />
-                                    @can('transfers.update')
-                                    <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9! touch-manipulation" wire:click="openTransferEdit({{ $transfer->id }})" :aria-label="__('funding_agreements.edit_tranche_number', ['number' => $journey['number']])" data-test="edit-transfer-{{ $transfer->id }}" />
-                                    @endcan
-                                </div>
-                            </div>
-
-                            {{-- The journey: four stops from the promise of a date to money in an account. --}}
-                            <ol class="mt-5 grid grid-cols-4" aria-label="{{ __('funding_agreements.journey_of_tranche', ['number' => $journey['number']]) }}">
-                                @foreach ($journey['stops'] as $stop)
-                                    <li class="relative flex min-w-0 flex-col gap-1 pe-2" data-stop="{{ $stop['key'] }}" data-stop-state="{{ $stop['state'] }}">
-                                        <span class="relative flex h-3 items-center" aria-hidden="true">
-                                            @unless ($loop->last)
-                                                <span @class([
-                                                    'absolute start-2.5 end-0 h-0.5',
-                                                    'bg-funding' => $isReceived && $journey['stops'][$loop->index + 1]['state'] === 'done',
-                                                    'bg-secondary-dark dark:bg-ink-muted' => ! $isReceived && $stop['state'] === 'done' && $journey['stops'][$loop->index + 1]['state'] === 'done',
-                                                    'bg-primary dark:bg-status-critical' => in_array($journey['stops'][$loop->index + 1]['state'], ['late', 'failed'], true),
-                                                    'bg-secondary-soft dark:bg-line-strong' => ! ($stop['state'] === 'done' && $journey['stops'][$loop->index + 1]['state'] === 'done') && ! in_array($journey['stops'][$loop->index + 1]['state'], ['late', 'failed'], true),
-                                                ])></span>
-                                            @endunless
-                                            <span @class([
-                                                'relative z-10 size-3 rounded-full',
-                                                'bg-funding' => $stop['state'] === 'done' && $isReceived,
-                                                'bg-secondary-dark dark:bg-ink-muted' => $stop['state'] === 'done' && ! $isReceived,
-                                                'bg-primary dark:bg-status-critical ring-4 ring-primary/20' => in_array($stop['state'], ['late', 'failed'], true),
-                                                'border-2 border-secondary-soft bg-white dark:border-line-strong dark:bg-surface-1' => $stop['state'] === 'ahead',
-                                            ])></span>
-                                        </span>
-                                        <span @class([
-                                            'mt-1 truncate text-[11px] leading-tight font-semibold',
-                                            'text-status-critical' => in_array($stop['state'], ['late', 'failed'], true),
-                                            $inkText => $stop['state'] === 'done',
-                                            $mutedText => $stop['state'] === 'ahead',
-                                        ])>{{ $stop['label'] }}</span>
-                                        <span class="truncate text-[11px] leading-tight tabular-nums {{ $mutedText }}">
-                                            @if ($stop['detail'] !== null)
-                                                {{ $stop['detail'] }}
-                                            @elseif ($stop['key'] === 'account')
-                                                <span class="italic">{{ __('funding_agreements.no_account_assigned') }}</span>
-                                            @elseif ($stop['state'] === 'late')
-                                                {{ __('funding_agreements.not_yet') }}
-                                            @elseif ($stop['state'] === 'failed')
-                                                {{ __('funding_agreements.tranche_state_failed') }}
-                                            @else
-                                                —
-                                            @endif
-                                        </span>
-                                    </li>
-                                @endforeach
-                            </ol>
-
-                            {{-- The money traced: what was sent, what the way cost, what landed, and what is left of the promise. --}}
-                            <div class="mt-5 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 text-xs tabular-nums {{ $mutedText }}">
-                                <p class="flex flex-wrap items-baseline gap-x-2 gap-y-1" data-trace>
-                                    <span>{{ __('funding_agreements.sent') }} <span class="font-semibold {{ $inkText }}">{{ $amount((float) $transfer->payment_amount) }}</span></span>
-                                    @if ($feesShown)
-                                        <span aria-hidden="true">−</span>
-                                        <span>{{ __('funding_agreements.fees_amount', ['amount' => $amount((float) $transfer->fees), 'currency' => $transfer->fees_currency->value]) }}</span>
-                                    @endif
-                                    @if ($rate !== '1')
-                                        <span aria-hidden="true">×</span>
-                                        <span>{{ __('funding_agreements.rate_rate', ['rate' => $rate]) }}</span>
-                                    @endif
-                                    <span aria-hidden="true">=</span>
-                                    @if ($isReceived && $transfer->net_amount_received !== null)
-                                        <span class="font-bold text-funding">{{ __('funding_agreements.net_amount_landed', ['amount' => $amount((float) $transfer->net_amount_received), 'currency' => $transfer->amount_received_currency->value]) }}</span>
-                                        @if ($transfer->amount_received !== null)
-                                            <span data-gross>({{ __('funding_agreements.gross_amount', ['amount' => $amount((float) $transfer->amount_received)]) }})</span>
-                                        @endif
-                                    @elseif ($transfer->isMissingNetAmount())
-                                        <span class="font-semibold text-status-warn" data-net-missing>{{ __('funding_agreements.net_not_recorded') }}</span>
-                                    @else
-                                        <span class="italic">{{ __('funding_agreements.nothing_landed_yet') }}</span>
-                                    @endif
-                                </p>
-                                @if ($journey['left'] !== null)
-                                    <p data-left>{{ __('funding_agreements.left_of_the_promise') }} <span class="font-semibold {{ $inkText }}">{{ $amount(max(0.0, $journey['left'])) }}</span></p>
-                                @endif
-                            </div>
-                        </li>
-                    @endforeach
-
-                    @if ($money['unscheduled'] > 0.0)
-                        <li class="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 py-5" data-unscheduled-line>
-                            <p class="flex items-center gap-2 text-sm {{ $mutedText }}">
-                                <span class="size-2 rounded-full border-2 border-dashed border-secondary-light" aria-hidden="true"></span>
-                                {{ __('funding_agreements.not_scheduled_yet') }}
-                                <span class="font-bold tabular-nums {{ $inkText }}">{{ $amount($money['unscheduled']) }} {{ $currency }}</span>
-                            </p>
-                            @can('transfers.create')
-                            <button type="button" wire:click="openTransferCreate({{ $agreement->id }})" class="min-h-9 touch-manipulation text-xs font-semibold underline underline-offset-4 {{ $inkText }}">{{ __('funding_agreements.schedule_the_rest') }}</button>
-                            @endcan
-                        </li>
-                    @endif
-                </ol>
+                <x-funding.tranche-table class="mt-4" :transfers="$this->transfers" :caption="__('funding_agreements.tranches_of_name', ['name' => $donor->name.' · '.$proposal->name])" editable />
             @endif
 
-            {{-- What the donor is owed back: every report, by when, and whether it went out. --}}
-            <section class="mt-12 border-t pt-8 {{ $hairline }}" aria-labelledby="reports-heading" data-donor-reports>
-                <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
-                    <h2 id="reports-heading" class="text-xl font-bold tracking-tight {{ $inkText }}">
-                        {{ __('funding_agreements.donor_reports') }}
-                        <span class="ms-1 text-base font-semibold tabular-nums {{ $mutedText }}">{{ $this->reports->count() }}</span>
-                    </h2>
-                    @can('funding-agreements.update')
-                    <x-ui.button size="sm" icon="plus" class="min-h-10 touch-manipulation" wire:click="openReportCreate" data-test="add-donor-report">{{ __('funding_agreements.add_report') }}</x-ui.button>
+            @if ($money['unscheduled'] > 0.0)
+                <div class="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 py-4" data-unscheduled-line>
+                    <p class="flex items-center gap-2 text-sm {{ $mutedText }}">
+                        <span class="size-2 rounded-full border-2 border-dashed border-secondary-light" aria-hidden="true"></span>
+                        {{ __('funding_agreements.not_scheduled_yet') }}
+                        <span class="font-bold tabular-nums {{ $inkText }}">{{ $amount($money['unscheduled']) }} {{ $currency }}</span>
+                    </p>
+                    @can('transfers.create')
+                    <button type="button" wire:click="openTransferCreate({{ $agreement->id }})" class="min-h-9 touch-manipulation text-xs font-semibold underline underline-offset-4 {{ $inkText }}">{{ __('funding_agreements.schedule_the_rest') }}</button>
                     @endcan
                 </div>
-
-                @if ($this->reports->isEmpty())
-                    <p class="mt-4 text-sm {{ $mutedText }}">{{ __('funding_agreements.no_donor_reports_yet') }}</p>
-                @else
-                    <ol class="mt-4 flex flex-col">
-                        @foreach ($this->reports as $report)
-                            @php
-                                $reportDays = (int) \Carbon\CarbonImmutable::today()->diffInDays($report->due_on, false);
-                                $reportOverdue = $report->isOverdue();
-                            @endphp
-                            <li class="flex flex-wrap items-start justify-between gap-x-6 gap-y-2 border-b py-4 last:border-b-0 {{ $hairline }}" wire:key="donor-report-{{ $report->id }}" data-donor-report="{{ $report->id }}">
-                                <div class="flex min-w-0 items-start gap-3">
-                                    <span @class([
-                                        'mt-1.5 size-2.5 shrink-0 rounded-full',
-                                        'bg-funding' => $report->isSubmitted(),
-                                        'bg-primary dark:bg-status-critical' => $reportOverdue,
-                                        'border-2 border-status-warn' => ! $report->isSubmitted() && ! $reportOverdue,
-                                    ]) aria-hidden="true"></span>
-                                    <div class="min-w-0">
-                                        <p class="text-sm font-bold break-words {{ $inkText }}">{{ $report->title }}</p>
-                                        <p class="mt-0.5 text-xs tabular-nums {{ $mutedText }}">
-                                            {{ $report->type->label() }} · {{ __('funding_agreements.due_date', ['date' => $report->due_on->translatedFormat(__('formats.date'))]) }}
-                                        </p>
-                                        <p @class([
-                                            'mt-1 text-xs tabular-nums',
-                                            'text-funding' => $report->isSubmitted(),
-                                            'font-bold text-status-critical' => $reportOverdue,
-                                            $mutedText => ! $report->isSubmitted() && ! $reportOverdue,
-                                        ]) data-report-status>
-                                            @if ($report->isSubmitted())
-                                                {{ __('funding_agreements.submitted_on', ['date' => $report->submitted_on->translatedFormat(__('formats.date'))]) }}
-                                            @elseif ($reportOverdue)
-                                                {{ trans_choice('funding_agreements.count_days_overdue', -$reportDays, ['count' => -$reportDays]) }}
-                                            @else
-                                                {{ trans_choice('funding_agreements.due_in_days', $reportDays, ['count' => $reportDays]) }}
-                                            @endif
-                                        </p>
-                                    </div>
-                                </div>
-                                @can('funding-agreements.update')
-                                <div class="flex shrink-0 items-center gap-1">
-                                    @unless ($report->isSubmitted())
-                                        <x-ui.button size="sm" icon="check" class="min-h-9 touch-manipulation" wire:click="markReportSubmitted({{ $report->id }})" data-test="submit-report-{{ $report->id }}">{{ __('funding_agreements.mark_submitted') }}</x-ui.button>
-                                    @endunless
-                                    <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9! touch-manipulation" wire:click="openReportEdit({{ $report->id }})" :aria-label="__('common.edit_name', ['name' => $report->title])" />
-                                    <x-ui.button tone="ghost" size="sm" icon="trash" class="size-9! touch-manipulation" wire:click="confirmReportDelete({{ $report->id }})" :aria-label="__('funding_agreements.delete_report_name', ['name' => $report->title])" data-test="delete-report-{{ $report->id }}" />
-                                </div>
-                                @endcan
-                            </li>
-                        @endforeach
-                    </ol>
-                @endif
-            </section>
+            @endif
         </section>
 
-        {{-- The thread: every record this money is tied to, each one link away. --}}
-        <aside class="min-w-0" aria-labelledby="connections-heading" data-connections>
-            <h2 id="connections-heading" class="text-xl font-bold tracking-tight {{ $inkText }}">{{ __('funding_agreements.connected_records') }}</h2>
+        {{-- What the donor is owed back: every report, by when, and whether it went out. --}}
+        <section class="mt-10 min-w-0 border-t pt-8 {{ $hairline }}" aria-labelledby="reports-heading" data-donor-reports>
+            <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
+                <h2 id="reports-heading" class="text-xl font-bold tracking-tight {{ $inkText }}">
+                    {{ __('funding_agreements.donor_reports') }}
+                    <span class="ms-1 text-base font-semibold tabular-nums {{ $mutedText }}">{{ $this->reports->count() }}</span>
+                </h2>
+                @can('funding-agreements.update')
+                <x-ui.button size="sm" icon="plus" class="min-h-10 touch-manipulation" wire:click="openReportCreate" data-test="add-donor-report">{{ __('funding_agreements.add_report') }}</x-ui.button>
+                @endcan
+            </div>
 
-            <ol class="connection-thread mt-5 flex flex-col">
-                {{-- Donor --}}
-                <li class="relative ps-7 pb-8" data-connection="donor">
-                    <span class="absolute start-0 top-1 size-3 rounded-full border-2 border-secondary-dark bg-white dark:border-ink-muted dark:bg-surface-1" aria-hidden="true"></span>
-                    <p class="type-label {{ $mutedText }}">{{ __('funding_agreements.donor') }}</p>
-                    <a href="{{ route('donors.show', $donor) }}" wire:navigate class="mt-1 inline-block text-base font-bold underline-offset-4 hover:underline {{ $inkText }}">{{ $donor->name }}</a>
-                    @if ($donor->type !== null || filled($donor->country))
-                        <p class="text-xs {{ $mutedText }}">{{ collect([$donor->type?->label(), $donor->country])->filter()->implode(' · ') }}</p>
-                    @endif
-                    @if (filled($donor->contact_person) || filled($donor->email) || filled($donor->phone))
-                        <p class="mt-2 text-xs {{ $inkText }}">{{ $donor->contact_person }}</p>
-                        <p class="flex flex-wrap gap-x-3 text-xs {{ $mutedText }}">
-                            @if (filled($donor->email))
-                                <a href="mailto:{{ $donor->email }}" class="underline-offset-4 hover:underline">{{ $donor->email }}</a>
-                            @endif
-                            @if (filled($donor->phone))
-                                <a href="tel:{{ $donor->phone }}" class="tabular-nums underline-offset-4 hover:underline" dir="ltr">{{ $donor->phone }}</a>
-                            @endif
-                        </p>
-                    @endif
-                    <p @class(['mt-2 text-xs', 'font-semibold text-status-critical' => $donor->isFollowUpOverdue(), $mutedText => ! $donor->isFollowUpOverdue()])>
-                        @if (filled($donor->next_step))
-                            {{ $donor->next_step_due_on !== null
-                                ? __('funding_agreements.next_step_due', ['step' => $donor->next_step, 'date' => $donor->next_step_due_on->translatedFormat(__('formats.date'))])
-                                : $donor->next_step }}
-                        @else
-                            {{ __('funding_agreements.no_next_step_planned') }}
-                        @endif
-                    </p>
-                    <p @class(['text-xs tabular-nums', 'font-semibold text-status-warn' => $this->donorContactIsStale(), $mutedText => ! $this->donorContactIsStale()]) data-last-contacted>
-                        {{ $donor->last_contacted_on !== null ? __('donors.last_contacted', ['date' => $donor->last_contacted_on->translatedFormat(__('formats.date'))]) : __('donors.never_contacted') }}
-                    </p>
+            @if ($this->reports->isEmpty())
+                <p class="mt-4 text-sm {{ $mutedText }}">{{ __('funding_agreements.no_donor_reports_yet') }}</p>
+            @else
+                <x-funding.register class="mt-4" size="sm" :caption="__('funding_agreements.donor_reports')">
+                    <x-slot:head>
+                        <x-funding.register.th>{{ __('funding_agreements.report_title') }}</x-funding.register.th>
+                        <x-funding.register.th>{{ __('common.type') }}</x-funding.register.th>
+                        <x-funding.register.th>{{ __('funding_agreements.due') }}</x-funding.register.th>
+                        <x-funding.register.th>{{ __('funding_agreements.submitted') }}</x-funding.register.th>
+                        <x-funding.register.th>{{ __('common.state') }}</x-funding.register.th>
+                        <th scope="col"><span class="sr-only">{{ __('common.actions') }}</span></th>
+                    </x-slot:head>
 
-                    @if ($donorAgreements->isNotEmpty())
-                        <p class="type-label mt-4 {{ $mutedText }}">{{ __('funding_agreements.also_from_donor', ['donor' => $donor->name]) }}</p>
-                        <ul class="mt-1.5 flex flex-col gap-1.5">
-                            @foreach ($donorAgreements as $sibling)
-                                <li class="flex items-baseline justify-between gap-3 text-xs" wire:key="donor-agreement-{{ $sibling->id }}">
-                                    <a href="{{ route('funding-agreements.show', $sibling) }}" wire:navigate class="min-w-0 truncate underline-offset-4 hover:underline {{ $inkText }}">{{ $sibling->proposal->name }}</a>
-                                    <span class="shrink-0 text-end tabular-nums {{ $mutedText }}">{{ __('funding_agreements.landed_of_budget', ['landed' => $amount((float) $sibling->landed), 'budget' => $amount((float) $sibling->budget), 'currency' => $sibling->currency->value]) }}</span>
-                                </li>
-                            @endforeach
-                        </ul>
-                    @endif
-                </li>
-
-                {{-- Proposal --}}
-                <li class="relative ps-7 pb-8" data-connection="proposal">
-                    <span class="absolute start-0 top-1 size-3 rounded-full border-2 border-secondary-dark bg-white dark:border-ink-muted dark:bg-surface-1" aria-hidden="true"></span>
-                    <p class="type-label {{ $mutedText }}">{{ __('common.proposal') }}</p>
-                    <a href="{{ route('proposals.show', $proposal) }}" wire:navigate class="mt-1 inline-block text-base font-bold underline-offset-4 hover:underline {{ $inkText }}">{{ $proposal->name }}</a>
-                    <p class="mt-1 flex flex-wrap items-center gap-2 text-xs {{ $mutedText }}">
-                        <span>{{ $proposal->status->label() }}</span>
-                        <span aria-hidden="true">·</span>
-                        <span>{{ $proposal->phase->label() }}</span>
-                    </p>
-
-                    @if ($term['phase'] !== 'unknown')
-                        <div class="mt-3" data-term>
-                            <div class="flex items-baseline justify-between gap-3 text-[11px] tabular-nums {{ $mutedText }}">
-                                <span>{{ $term['begin']->translatedFormat(__('formats.date_short')) }}</span>
-                                <span class="font-semibold {{ $inkText }}">
-                                    @if ($term['phase'] === 'ahead')
-                                        {{ __('funding_agreements.term_starts', ['date' => $term['begin']->translatedFormat(__('formats.date'))]) }}
-                                    @elseif ($term['phase'] === 'ended')
-                                        {{ __('funding_agreements.term_ended') }}
+                    @foreach ($this->reports as $report)
+                        @php
+                            $reportDays = (int) \Carbon\CarbonImmutable::today()->diffInDays($report->due_on, false);
+                            $reportOverdue = $report->isOverdue();
+                        @endphp
+                        <tr wire:key="donor-report-{{ $report->id }}" data-donor-report="{{ $report->id }}">
+                            <td data-label="{{ __('funding_agreements.report_title') }}" data-wide><span class="font-semibold">{{ $report->title }}</span></td>
+                            <td data-label="{{ __('common.type') }}">{{ $report->type->label() }}</td>
+                            <td class="date" data-label="{{ __('funding_agreements.due') }}">{{ $report->due_on->translatedFormat(__('formats.date')) }}</td>
+                            <td class="date" data-label="{{ __('funding_agreements.submitted') }}">{{ $report->submitted_on?->translatedFormat(__('formats.date')) ?? '—' }}</td>
+                            <td data-label="{{ __('common.state') }}" data-report-status>
+                                <span @class([
+                                    'text-xs font-semibold',
+                                    'text-funding' => $report->isSubmitted(),
+                                    'text-status-critical' => $reportOverdue,
+                                    $mutedText => ! $report->isSubmitted() && ! $reportOverdue,
+                                ])>
+                                    @if ($report->isSubmitted())
+                                        {{ __('funding_agreements.submitted') }}
+                                    @elseif ($reportOverdue)
+                                        {{ trans_choice('funding_agreements.count_days_overdue', -$reportDays, ['count' => -$reportDays]) }}
                                     @else
-                                        {{ __('funding_agreements.term_day', ['day' => $term['day'], 'days' => $term['days']]) }}
+                                        {{ trans_choice('funding_agreements.due_in_days', $reportDays, ['count' => $reportDays]) }}
                                     @endif
                                 </span>
-                                <span>{{ $term['end']->translatedFormat(__('formats.date_short')) }}</span>
-                            </div>
-                            <div class="relative mt-1.5 h-1 rounded-full bg-secondary-soft dark:bg-surface-2" role="img" aria-label="{{ __('funding_agreements.term_day', ['day' => $term['day'], 'days' => $term['days']]) }}">
-                                <span class="money-grow absolute inset-y-0 start-0 rounded-full bg-secondary-dark dark:bg-ink-muted" style="width: {{ $term['percent'] }}%"></span>
-                            </div>
-                        </div>
-                    @endif
-
-                    @if ($coFunders->isNotEmpty())
-                        <p class="type-label mt-4 {{ $mutedText }}">{{ __('funding_agreements.co_funders') }}</p>
-                        <ul class="mt-1.5 flex flex-col gap-1.5">
-                            @foreach ($coFunders as $coFunder)
-                                <li class="flex items-baseline justify-between gap-3 text-xs" wire:key="co-funder-{{ $coFunder->id }}">
-                                    <a href="{{ route('funding-agreements.show', $coFunder) }}" wire:navigate class="min-w-0 truncate underline-offset-4 hover:underline {{ $inkText }}">{{ $coFunder->donor->name }}</a>
-                                    <span class="shrink-0 text-end tabular-nums {{ $mutedText }}">{{ __('funding_agreements.landed_of_budget', ['landed' => $amount((float) $coFunder->landed), 'budget' => $amount((float) $coFunder->budget), 'currency' => $coFunder->currency->value]) }}</span>
-                                </li>
-                            @endforeach
-                        </ul>
-                    @else
-                        <p class="mt-3 text-xs {{ $mutedText }}">{{ __('funding_agreements.sole_funder') }}</p>
-                    @endif
-                </li>
-
-                {{-- Projects --}}
-                <li class="relative ps-7 pb-8" data-connection="projects">
-                    <span class="absolute start-0 top-1 size-3 rounded-full border-2 border-secondary-dark bg-white dark:border-ink-muted dark:bg-surface-1" aria-hidden="true"></span>
-                    <p class="type-label {{ $mutedText }}">{{ __('funding_agreements.projects_funded') }} <span class="tabular-nums">{{ $this->projects->count() }}</span></p>
-                    @forelse ($this->projects as $project)
-                        <div class="mt-2.5 min-w-0" wire:key="project-{{ $project->id }}" data-project="{{ $project->id }}">
-                            <div class="flex items-baseline justify-between gap-3">
-                                <a href="{{ route('projects.show', $project) }}" wire:navigate class="min-w-0 truncate text-sm font-semibold underline-offset-4 hover:underline {{ $inkText }}">{{ $project->name }}</a>
-                                <span class="shrink-0 text-[11px] {{ $mutedText }}">{{ $project->status->label() }}</span>
-                            </div>
-                            <p class="truncate text-xs {{ $mutedText }}">{{ collect([$project->program?->name, $project->city?->name ?? __('common.unknown_city')])->filter()->implode(' · ') }}</p>
-                            @if ($project->milestones_count > 0)
-                                <div class="mt-1.5 flex items-center gap-2">
-                                    <span class="flex h-1 flex-1 overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2" aria-hidden="true">
-                                        <span class="money-grow h-full rounded-full bg-secondary-dark dark:bg-ink-muted" style="width: {{ round($project->reached_milestones_count / $project->milestones_count * 100, 2) }}%"></span>
+                            </td>
+                            <td>
+                                @can('funding-agreements.update')
+                                    <span class="flex items-center justify-end gap-1">
+                                        @unless ($report->isSubmitted())
+                                            <x-ui.button size="sm" icon="check" class="min-h-8 touch-manipulation" wire:click="markReportSubmitted({{ $report->id }})" data-test="submit-report-{{ $report->id }}">{{ __('funding_agreements.mark_submitted') }}</x-ui.button>
+                                        @endunless
+                                        <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-8!" wire:click="openReportEdit({{ $report->id }})" :aria-label="__('common.edit_name', ['name' => $report->title])" />
+                                        <x-ui.button tone="ghost" size="sm" icon="trash" class="size-8!" wire:click="confirmReportDelete({{ $report->id }})" :aria-label="__('funding_agreements.delete_report_name', ['name' => $report->title])" data-test="delete-report-{{ $report->id }}" />
                                     </span>
-                                    <span class="shrink-0 text-[11px] tabular-nums {{ $mutedText }}">{{ __('funding_agreements.milestones_reached', ['reached' => $project->reached_milestones_count, 'total' => $project->milestones_count]) }}</span>
-                                </div>
-                            @endif
-                        </div>
-                    @empty
-                        <p class="mt-1.5 text-xs {{ $mutedText }}">{{ __('funding_agreements.no_projects_linked_yet') }}</p>
-                    @endforelse
-                </li>
+                                @endcan
+                            </td>
+                        </tr>
+                    @endforeach
+                </x-funding.register>
+            @endif
+        </section>
 
-                {{-- Accounts --}}
-                <li class="relative ps-7 pb-8" data-connection="accounts">
-                    <span class="absolute start-0 top-1 size-3 rounded-full border-2 border-secondary-dark bg-white dark:border-ink-muted dark:bg-surface-1" aria-hidden="true"></span>
-                    <p class="type-label {{ $mutedText }}">{{ __('funding_agreements.accounts') }}</p>
-                    @forelse ($this->accounts as $account)
-                        <div class="mt-2 flex items-baseline justify-between gap-3 text-xs" wire:key="account-{{ $loop->index }}">
-                            <span class="min-w-0 truncate font-semibold {{ $inkText }}">{{ $account['name'] }}@unless ($account['active']) <span class="font-normal {{ $mutedText }}">· {{ __('common.closed') }}</span>@endunless</span>
-                            <span class="shrink-0 text-end tabular-nums {{ $mutedText }}">
-                                @forelse ($account['landed'] as $landedCode => $landedTotal)
-                                    <span class="block font-semibold text-funding">{{ $amount($landedTotal) }} {{ $landedCode }}</span>
-                                @empty
-                                    {{ trans_choice('funding_agreements.count_tranches', $account['tranches'], ['count' => $account['tranches']]) }}
-                                @endforelse
-                            </span>
-                        </div>
-                    @empty
-                        <p class="mt-1.5 text-xs {{ $mutedText }}">{{ __('funding_agreements.no_account_assigned') }}</p>
-                    @endforelse
-                </li>
-
-                {{-- Paperwork --}}
-                <li class="relative ps-7" data-connection="paperwork">
-                    <span class="absolute start-0 top-1 size-3 rounded-full border-2 border-secondary-dark bg-white dark:border-ink-muted dark:bg-surface-1" aria-hidden="true"></span>
-                    <p class="type-label {{ $mutedText }}">{{ __('funding_agreements.paperwork') }}</p>
-                    @forelse ($this->paperwork as $file)
-                        <a href="{{ $this->paperworkUrl($file) }}" class="group mt-2 flex items-start gap-2 text-xs" wire:key="paper-{{ $file->id }}" aria-label="{{ __('common.download_name', ['name' => $file->original_name]) }}">
-                            <flux:icon.document-text variant="micro" class="mt-0.5 size-4 shrink-0 {{ $mutedText }}" aria-hidden="true" />
-                            <span class="min-w-0">
-                                <span class="block truncate font-semibold underline-offset-4 group-hover:underline {{ $inkText }}">{{ $file->original_name }}</span>
-                                <span class="block truncate {{ $mutedText }}">{{ $file->collection->label() }}@if ($file->mediable !== null) · {{ $file->mediable->name }}@endif</span>
-                            </span>
-                        </a>
-                    @empty
-                        <p class="mt-1.5 text-xs {{ $mutedText }}">{{ __('funding_agreements.no_paperwork_filed') }}</p>
-                    @endforelse
-                </li>
-            </ol>
-        </aside>
-    </div>
+        <div class="mt-10 border-t pt-8 {{ $hairline }}">
+            @include('pages.funding-agreements._show-connections', ['connectionsAsColumns' => true])
+        </div>
+    @endif
 
     <section aria-labelledby="record-activity-heading" class="grid gap-3 mt-14" data-record-activity>
         <h2 id="record-activity-heading" class="text-base font-bold">{{ __('activity.title') }}</h2>

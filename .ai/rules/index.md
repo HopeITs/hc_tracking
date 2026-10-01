@@ -5,12 +5,15 @@ Before planning or editing, find the row whose globs match the file's path and r
 | Applies to | Rule file |
 | --- | --- |
 | app/Actions/Fortify/AuthenticateWithHrAccount.php | .ai/rules/actions-fortify.md |
+| {resources/views/pages/transfers/**,resources/views/pages/funding-agreements/**,resources/views/pages/donors/**,resources/views/pages/proposals/**,resources/views/pages/admin/⚡accounts.blade.php} | .ai/rules/admin.md |
 | app/Notifications/Alerts/** | .ai/rules/alerts.md |
 | resources/views/pages/annual-plans/** | .ai/rules/annual-plans.md |
+| app/Livewire/Concerns/FiltersFinanceRegister.php | .ai/rules/app-livewire-concerns.md |
 | resources/views/{components/navigation/**,layouts/app/sidebar.blade.php}, resources/views/{components/navigation/sidebar.blade.php,components/desktop-user-menu.blade.php,layouts/app/sidebar.blade.php} | .ai/rules/app.md |
 | resources/views/pages/auth/login.blade.php | .ai/rules/auth.md |
 | {app/Actions/Fortify/**,app/Console/Commands/**,config/auth.php,database/seeders/**} | .ai/rules/commands-seeders.md |
 | {app/Actions/Fortify/**,app/Console/Commands/**,config/fortify.php} | .ai/rules/commands.md |
+| resources/views/components/funding/** | .ai/rules/components-funding.md |
 | resources/views/components/navigation/sidebar.blade.php | .ai/rules/components-navigation.md |
 | {public/sw.js,public/manifest.webmanifest,resources/js/notifications.js,resources/views/components/notifications/toasts.blade.php} | .ai/rules/components-notifications.md |
 | resources/views/components/ui/**, resources/views/components/ui/{logframe-node.blade.php,logframe.blade.php,target-lineage.blade.php}, resources/views/components/ui/framework-node.blade.php, resources/views/components/ui/multi-select-popover.blade.php | .ai/rules/components-ui.md |
@@ -59,6 +62,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | routes/web.php | .ai/rules/routes.md |
 | {database/factories/**,database/seeders/**,tests/Pest.php} | .ai/rules/seeders.md |
 | resources/views/pages/strategies/⚡show.blade.php, resources/views/pages/strategies/⚡index.blade.php | .ai/rules/strategies.md |
+| {app/Support/AgreementMoney.php,app/Support/Tranches.php,app/Models/TransfersTracking.php} | .ai/rules/support-models.md |
 | resources/views/pages/tasks/**, resources/views/pages/tasks/_list-group.blade.php | .ai/rules/tasks.md |
 | tests/** | .ai/rules/tests.md |
 | resources/views/pages/transfers/** | .ai/rules/transfers.md |

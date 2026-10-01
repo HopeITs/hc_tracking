@@ -73,6 +73,7 @@ test('the collection ledger splits each currency from committed to net without m
 
     $ledger = Livewire::actingAs($user)
         ->test('pages::funding-agreements.index')
+        ->set('view', 'overview')
         ->assertSeeText('Cash-flow calendar')
         ->instance()
         ->ledger
@@ -158,6 +159,7 @@ test('the cash-flow calendar pads an empty schedule around today', function () {
 
     $calendar = Livewire::actingAs($user)
         ->test('pages::funding-agreements.index')
+        ->set('view', 'overview')
         ->assertSeeText('No tranches scheduled yet')
         ->instance()
         ->calendar;
@@ -561,7 +563,7 @@ test('failed transfers are their own stage, apart from upcoming and in transit',
         ]);
     }
 
-    $component = Livewire::actingAs($user)->test('pages::funding-agreements.index');
+    $component = Livewire::actingAs($user)->test('pages::funding-agreements.index')->set('view', 'overview');
 
     expect($component->instance()->ledger->first())->toMatchArray([
         'failed' => 300.0,
@@ -603,6 +605,7 @@ test('a received tranche with no net recorded counts as nothing landed on both p
 
     $index = Livewire::actingAs($user)
         ->test('pages::funding-agreements.index')
+        ->set('view', 'overview')
         ->assertSeeHtml('data-ledger-net-missing');
 
     expect($index->instance()->ledger->first())->toMatchArray([
@@ -668,6 +671,7 @@ test('a sliver of money landed reads as under one percent, not zero', function (
 
     Livewire::actingAs($user)
         ->test('pages::funding-agreements.show', ['donorProposal' => $agreement])
+        ->set('view', 'overview')
         ->assertSeeHtml('data-test="dial-percent">&lt;1<');
 });
 
@@ -791,6 +795,7 @@ test('agreement detail shows the gross amount received beside what landed', func
 
     Livewire::actingAs($user)
         ->test('pages::funding-agreements.show', ['donorProposal' => $agreement])
+        ->set('view', 'overview')
         ->assertSeeText('gross 990.00')
         ->assertSeeText('985.00 USD landed');
 });
@@ -835,6 +840,7 @@ test('an agreement card shows its proposal\'s internal number beside its externa
 
     Livewire::actingAs($user)
         ->test('pages::funding-agreements.index')
+        ->set('view', 'overview')
         ->assertSeeInOrder(['Internal project number', 'HC-2026-083', 'External project number', 'ECHO-83']);
 });
 

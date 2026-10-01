@@ -30,6 +30,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Livewire\Features\SupportTesting\Testable;
 use Tests\TestCase;
 
 /*
@@ -588,4 +589,26 @@ function validUpload(string $name, int $kilobytes = 10): UploadedFile
     };
 
     return UploadedFile::fake()->createWithContent($name, $content);
+}
+
+/**
+ * The rows of the CSV file a Livewire action just sent, heading row first.
+ *
+ * @return list<list<string>>
+ */
+function downloadedCsv(Testable $component): array
+{
+    $content = (string) base64_decode((string) data_get($component->effects, 'download.content'));
+    $stream = fopen('php://memory', 'w+b');
+    fwrite($stream, preg_replace('/^\xEF\xBB\xBF/', '', $content));
+    rewind($stream);
+
+    $rows = [];
+    while (($row = fgetcsv($stream, null, ',', '"', '')) !== false) {
+        $rows[] = $row;
+    }
+
+    fclose($stream);
+
+    return $rows;
 }

@@ -276,6 +276,7 @@ test('the funding flow draws one graph per currency and lists unfunded proposals
 
     $flow = Livewire::actingAs($user)
         ->test('pages::proposals.index')
+        ->set('view', 'overview')
         ->assertSee('Water Network Expansion')
         ->instance()
         ->flow;
@@ -299,6 +300,7 @@ test('each proposal row shows its task progress and overdue work', function () {
 
     Livewire::actingAs($user)
         ->test('pages::proposals.index')
+        ->set('view', 'overview')
         ->assertSee('1 of 3 tasks done')
         ->assertSee('1 overdue');
 });
@@ -498,6 +500,7 @@ test('a placeholder internal number carries the replace chip and a real one does
 
     Livewire::actingAs($user)
         ->test('pages::proposals.index')
+        ->set('view', 'overview')
         ->assertSeeHtml('<bdi dir="ltr" class="font-semibold tabular-nums">HC-2026-063</bdi>')
         ->assertSeeHtml('data-placeholder-chip="TEMP-0063"')
         ->assertDontSeeHtml('data-placeholder-chip="HC-2026-063"')

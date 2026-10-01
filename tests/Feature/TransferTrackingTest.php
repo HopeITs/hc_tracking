@@ -19,7 +19,7 @@ test('guests are redirected from transfer tracking', function () {
     $this->get(route('transfers.index'))->assertRedirect(route('login'));
 });
 
-test('transfers can be filtered by receipt status and account', function () {
+test('transfers can be filtered by stage and account', function () {
     $user = User::factory()->role('Financial')->create();
     $operations = Account::factory()->create(['account_name' => 'Operations USD']);
     $reserve = Account::factory()->create(['account_name' => 'Reserve EUR']);
@@ -39,9 +39,9 @@ test('transfers can be filtered by receipt status and account', function () {
         ->test('pages::transfers.index')
         ->assertSee('111,111.00')
         ->assertSee('222,222.00')
-        ->set('arStatus', ArStatus::Pending->value)
-        ->assertDontSee('111,111.00')
-        ->assertSee('222,222.00')
+        ->call('toggleStage', 'received')
+        ->assertSee('111,111.00')
+        ->assertDontSee('222,222.00')
         ->call('clearFilters')
         ->set('account', (string) $operations->id)
         ->assertSee('111,111.00')
@@ -369,6 +369,7 @@ test('the default ladder order leads with money that is overdue', function () {
 
     Livewire::actingAs($user)
         ->test('pages::transfers.index')
+        ->set('view', 'overview')
         ->assertSet('sort', 'attention')
         ->assertSeeHtmlInOrder([$overdueRow, $upcomingRow])
         // Largest amount reverses the pair, so the order is the sort's doing
@@ -429,6 +430,7 @@ test('a tranche marked received with no net amount is not reported as landed', f
     // "Sent 100,000.00 USD · Landed" while nothing had been recorded.
     Livewire::actingAs($user)
         ->test('pages::transfers.index')
+        ->set('view', 'overview')
         ->assertSeeHtml('aria-label="Sent 100,000.00 USD · Not recorded yet"')
         ->assertDontSeeHtml('aria-label="Sent 100,000.00 USD · Landed"');
 });
@@ -447,6 +449,7 @@ test('an exchange rate of zero is shown as zero rather than an empty cell', func
     // Trimming the raw decimal:6 string turned "0.000000" into "".
     Livewire::actingAs($user)
         ->test('pages::transfers.index')
+        ->set('view', 'overview')
         ->assertSeeHtml('<dd class="mt-0.5 font-semibold tabular-nums">0</dd>');
 });
 
@@ -468,6 +471,7 @@ test('a receive date before the transfer date never reports a negative transit t
     // It falls back to the plain state rather than reporting the typo as a fact.
     Livewire::actingAs($user)
         ->test('pages::transfers.index')
+        ->set('view', 'overview')
         ->assertDontSee('-3 day')
         ->assertDontSee('−3 day')
         ->assertSeeHtml('aria-label="Sent 1,000.00 USD, landed 1,000.00 USD"');
@@ -525,6 +529,7 @@ test('a small fee is never reported as a zero percent shortfall', function () {
 
     Livewire::actingAs($user)
         ->test('pages::transfers.index')
+        ->set('view', 'overview')
         ->assertDontSee('−0%')
         ->assertDontSee('-0%')
         ->assertSee('<0.1%');
@@ -551,6 +556,7 @@ test('landed in full is never claimed while money is still outstanding', functio
 
     Livewire::actingAs($user)
         ->test('pages::transfers.index')
+        ->set('view', 'overview')
         ->assertSee('Landed in full')
         ->assertDontSee('Settled money landed in full');
 
@@ -567,6 +573,7 @@ test('landed in full is never claimed while money is still outstanding', functio
     // the currency-wide headline that must no longer make the claim.
     Livewire::actingAs($user)
         ->test('pages::transfers.index')
+        ->set('view', 'overview')
         ->assertSee('Settled money landed in full');
 });
 
@@ -603,6 +610,7 @@ test('each tranche shows its proposal\'s internal number beside the external one
 
     Livewire::actingAs($user)
         ->test('pages::transfers.index')
+        ->set('view', 'overview')
         ->assertSeeInOrder(['HC-2026-088', 'External no. ECHO-88'])
         ->assertSee('HC-2026-089')
         ->assertSee('No external project number');

@@ -49,7 +49,7 @@ A pure move: the page looks and behaves exactly as before when this task ends.
 - Create: `resources/views/pages/donors/_overview.blade.php`
 - Modify: `resources/views/pages/donors/⚡index.blade.php` (lines 565–942)
 
-- [ ] **Step 1: Confirm the block boundaries**
+- [x] **Step 1: Confirm the block boundaries**
 
 ```bash
 cd /c/xampp/htdocs/hc-tracking && sed -n '562p;564p;565p;942p;943p' "resources/views/pages/donors/⚡index.blade.php"
@@ -65,7 +65,7 @@ Expected output, exactly:
     @endif
 ```
 
-- [ ] **Step 2: Build the partial**
+- [x] **Step 2: Build the partial**
 
 The partial defines the two values that cost a query and that only it needs, so the table view never pays for them.
 
@@ -86,7 +86,7 @@ cd /c/xampp/htdocs/hc-tracking && {
 } > resources/views/pages/donors/_overview.blade.php
 ```
 
-- [ ] **Step 3: Qualify the three class references the partial can no longer import**
+- [x] **Step 3: Qualify the three class references the partial can no longer import**
 
 In `resources/views/pages/donors/_overview.blade.php`:
 
@@ -101,7 +101,7 @@ cd /c/xampp/htdocs/hc-tracking && grep -n -E "new (Donor|DonorProposal)\b|(^|[^\
 
 Expected: no output. (`App\Models\DonorProposal::percentLabel` is already written with its namespace.)
 
-- [ ] **Step 4: Replace the block in the page with the include**
+- [x] **Step 4: Replace the block in the page with the include**
 
 In `resources/views/pages/donors/⚡index.blade.php` delete lines 565–942 and put this single line in their place:
 
@@ -109,7 +109,7 @@ In `resources/views/pages/donors/⚡index.blade.php` delete lines 565–942 and 
         @include('pages.donors._overview')
 ```
 
-- [ ] **Step 5: Prove nothing changed**
+- [x] **Step 5: Prove nothing changed**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/DonorDirectoryTest.php tests/Feature/AccessControl/FundraisingPagesMoneyTest.php tests/Feature/FundingWorkflowTest.php tests/Feature/SearchWildcardTest.php`
 Expected: PASS, the same counts as before.
@@ -128,7 +128,7 @@ Expected: PASS, the same counts as before.
 - Consumes (Phase 0): trait `FiltersFinanceRegister`; `AgreementMoney::perOwner(string $owner, ?int $year = null, bool $yearOnly = false, bool $withTransfers = true): Illuminate\Database\Query\Builder` (one row per `owner_id` and `currency` with `o_agreements`, `o_committed`, `o_tranches`, `o_received`, `o_outstanding`, `o_overdue`, `o_overdue_count`, `o_next_due`, `o_last_received`, `o_due_in_year`, `o_received_in_year`); `AgreementMoney::ownerSelect(): string` (the matching `money_currency`, `money_agreements`, `money_committed`, `money_tranches`, `money_received`, `money_outstanding`, `money_overdue`, `money_overdue_count`, `money_next_due`, `money_last_received`, `money_due_in_year`, `money_received_in_year`); `AgreementMoney::ownerTotalsSelect(string $ownerKey): string`; `AgreementMoney::yearBounds()`; `TransfersTracking` scope `inState()`; `CsvExport`; the register components; `downloadedCsv()`.
 - Produces: public properties `search`, `type`, `relationship`, `sort`, `countryFilter` (URL key `country`), `currency`, `flag`; computed `rows`, `totals`, `donorCount`, `nextTransfers`, `countryOptions`, `hasAnyDonor`; actions `toggleFlag`, `exportCsv`; file name `donors-{Y-m-d}.csv`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `tests/Feature/DonorRegisterTest.php`:
 
@@ -433,12 +433,12 @@ test('exporting needs the donors view permission', function () {
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/DonorRegisterTest.php`
 Expected: FAIL — `Property [$view] not found on component`.
 
-- [ ] **Step 3: Extend the component class**
+- [x] **Step 3: Extend the component class**
 
 All edits are in the PHP block of `resources/views/pages/donors/⚡index.blade.php`.
 
@@ -910,7 +910,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 Everything else in the class (`toggleType`, `canViewAgreements`, `canViewTransfers`, `donors`, `filteredDonorIds`, `pulse`, `wallet`, `typeRail`, `overviewRows`, `upcomingTransfers`, `donorMoney`, `canDelete`, `donorSaved`, the delete flow) stays exactly as it is.
 
-- [ ] **Step 4: Replace the template**
+- [x] **Step 4: Replace the template**
 
 Replace everything after the closing `?>` with:
 
@@ -1317,7 +1317,7 @@ Replace everything after the closing `?>` with:
 
 The template reads `DonorProposal::percentLabel` and `Currency::cases()` by their short names; both are imported in the file's PHP block.
 
-- [ ] **Step 5: Run the new tests**
+- [x] **Step 5: Run the new tests**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/DonorRegisterTest.php`
 Expected: PASS, 12 tests.
@@ -1327,7 +1327,7 @@ Common failures and their cause:
 - The Public Relations export has more than 9 columns — the heading and row arrays must be built from the same `$canAgreements` / `$canTransfers` flags.
 - `toggleType('')` throws — the existing method treats an unknown value as "clear", which is what the `All` pill relies on; do not change it.
 
-- [ ] **Step 6: Point the old visual assertions at the Overview view**
+- [x] **Step 6: Point the old visual assertions at the Overview view**
 
 In `tests/Feature/DonorDirectoryTest.php` insert `->set('view', 'overview')` on the line directly after `->test('pages::donors.index')` in these tests only:
 
@@ -1354,14 +1354,14 @@ That test asserts the wallet, the transfers-ahead rail and the abbreviated `123.
 
 Every other test passes unchanged. In particular `someone who may see agreements but not transfers gets budgets without tranches` asserts `731,942` and the absence of `123.5K` and of `data-upcoming-transfers` on the donors page — all true of the table.
 
-- [ ] **Step 7: Run every test that touches this page**
+- [x] **Step 7: Run every test that touches this page**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/DonorDirectoryTest.php tests/Feature/DonorRegisterTest.php tests/Feature/AccessControl/FundraisingPagesMoneyTest.php tests/Feature/AccessControl/FinanceAuthorizationTest.php tests/Feature/AccessControl/BrowserCallableMethodsTest.php tests/Feature/FundingWorkflowTest.php tests/Feature/SearchWildcardTest.php tests/Feature/LocalizationTest.php`
 Expected: PASS.
 
 `BrowserCallableMethodsTest` checks that `donorMoney` cannot be called from the browser. The helpers this phase adds (`joinedQuery`, `applyYear`, `normaliseFilters`, `registerSorts`, `registerDefaultSort`) are `protected` for the same reason; keep them so.
 
-- [ ] **Step 8: Checkpoint**
+- [x] **Step 8: Checkpoint**
 
 Run: `.\php.cmd vendor/bin/pint --dirty --format agent`. Do not commit.
 
@@ -1371,9 +1371,9 @@ Run: `.\php.cmd vendor/bin/pint --dirty --format agent`. Do not commit.
 
 **Files:** none changed unless a defect is found.
 
-- [ ] **Step 1: Render the page** as in Phase 1, Task 5 for `/donors`, `/donors?year=2026`, `/donors?view=overview`, once as a `Financial` user and once as a `Public Relations Manager`.
+- [x] **Step 1: Render the page** as in Phase 1, Task 5 for `/donors`, `/donors?year=2026`, `/donors?view=overview`, once as a `Financial` user and once as a `Public Relations Manager`.
 
-- [ ] **Step 2: Check each of these and fix what fails**
+- [x] **Step 2: Check each of these and fix what fails**
 
 | Check | Expected |
 | --- | --- |
@@ -1384,4 +1384,4 @@ Run: `.\php.cmd vendor/bin/pint --dirty --format agent`. Do not commit.
 | Overview view | The pulse strip, wallet, rail and donor list as before, with an "Order" pill row replacing the old Sort select. |
 | Dark mode, Arabic, 390px | As in Phase 1. |
 
-- [ ] **Step 3: Delete the preview file and checkpoint.** Do not commit.
+- [x] **Step 3: Delete the preview file and checkpoint.** Do not commit.

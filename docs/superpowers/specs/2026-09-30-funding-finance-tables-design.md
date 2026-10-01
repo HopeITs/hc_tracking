@@ -297,3 +297,17 @@ Each phase ends with its pages working, its tests green and nothing committed un
 | 5 | Proposals |
 | 6 | Agreement detail, donor detail, proposal Funding tab |
 | 7 | Pass over all eight pages: light / dark, English / Arabic, phone width, keyboard, query counts; record the new rules with `record-rule`. |
+
+## Decisions made while writing the plans (2026-09-30)
+
+These refine the sections above; where they differ, these win.
+
+1. **Outstanding** = budget − the payment amounts of tranches already received (fees are not owed again). Never below zero.
+2. **Scheduled** counts every tranche sent in the agreement's currency, failed ones included; **Not scheduled** = budget − scheduled.
+3. Transfers keeps its Overview order (`sort`) separately from the table's column sort (`sortBy`/`sortDir`); the identity column (donor / agreement) comes first.
+4. Agreements header pickers are search and donor only (no proposal picker: it would list every proposal name on the page).
+5. Accounts gains an Overdue column and the same year mode switch as the other registers.
+6. New strings live in the `finance_tables` lang group (a group named `register` would collide on case-insensitive file systems).
+7. The register trait does not own `currency`; each page keeps its own.
+8. The tranche "converted" filter scope is `converted()`; `landedInAnotherCurrency()` is the model method.
+9. Filters carry `data-finance-filters` (not `data-register-…`), because Overview tests assert `data-register` is absent.

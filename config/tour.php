@@ -22,6 +22,8 @@ return [
         ['id' => 'chart', 'targets' => ['[data-chart]']],
         ['id' => 'table', 'targets' => ['[data-data-table]']],
         ['id' => 'record', 'targets' => ['[data-record-activity]']],
+        ['id' => 'finance_filters', 'targets' => ['[data-finance-filters]']],
+        ['id' => 'finance_totals', 'targets' => ['[data-register-totals]']],
     ],
 
     'pages' => [

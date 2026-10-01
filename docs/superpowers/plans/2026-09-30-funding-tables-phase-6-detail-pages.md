@@ -58,7 +58,7 @@
   - Each tranche needs its `account` relation loaded; with `party`, also `donorProposal` and that agreement's `donor` or `proposal`.
   - `editable` adds a last column whose button calls `openTransferEdit({id})` and carries `data-test="edit-transfer-{id}"`, shown only to holders of `transfers.update`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/Feature/TrancheComponentsTest.php`:
 
@@ -87,12 +87,12 @@ test('the tranche table prints every tranche, an identity column when asked, and
 });
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/TrancheComponentsTest.php --filter="tranche table"`
 Expected: FAIL — `Unable to locate a class or view for component [funding.tranche-table]`.
 
-- [ ] **Step 3: Create the component**
+- [x] **Step 3: Create the component**
 
 Create `resources/views/components/funding/tranche-table.blade.php`:
 
@@ -167,7 +167,7 @@ Create `resources/views/components/funding/tranche-table.blade.php`:
 </x-funding.register>
 ```
 
-- [ ] **Step 4: Run it to verify it passes**
+- [x] **Step 4: Run it to verify it passes**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/TrancheComponentsTest.php`
 Expected: PASS, 8 tests.
@@ -189,7 +189,7 @@ Expected: PASS, 8 tests.
 - Consumes (Phase 0): trait `App\Livewire\Concerns\SwitchesFundingView` (public `$view`, URL-bound, `table` by default); `Tranches::csvHeadings()`, `Tranches::csvRow()`; `CsvExport::download()`; `downloadedCsv()`.
 - Produces: public action `exportTranchesCsv(): StreamedResponse`, file name `agreement-tranches-{Y-m-d}.csv`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `tests/Feature/FundingDetailTablesTest.php`:
 
@@ -345,12 +345,12 @@ test('the agreement page exports its tranches', function () {
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/FundingDetailTablesTest.php`
 Expected: FAIL — `Property [$view] not found on component`.
 
-- [ ] **Step 3: Confirm the block boundaries**
+- [x] **Step 3: Confirm the block boundaries**
 
 ```bash
 cd /c/xampp/htdocs/hc-tracking && sed -n '1003p;1106p;1118p;1120p;1363p;1366p;1521p;1522p' "resources/views/pages/funding-agreements/⚡show.blade.php"
@@ -369,7 +369,7 @@ Expected output, exactly:
     </div>
 ```
 
-- [ ] **Step 4: Build the three partials from the current file**
+- [x] **Step 4: Build the three partials from the current file**
 
 Run all three before editing the page, so the line numbers stay valid.
 
@@ -406,7 +406,7 @@ cd /c/xampp/htdocs/hc-tracking && page="resources/views/pages/funding-agreements
 } > "$dir/_show-overview.blade.php"
 ```
 
-- [ ] **Step 5: Let the connections lay out in columns**
+- [x] **Step 5: Let the connections lay out in columns**
 
 In `resources/views/pages/funding-agreements/_show-connections.blade.php` replace the line:
 
@@ -428,7 +428,7 @@ cd /c/xampp/htdocs/hc-tracking && grep -n -E "(^|[^\\\\A-Za-z])(ArStatus|DonorRe
 
 Expected: no output (the one date call is already written `\Carbon\CarbonImmutable::today()`).
 
-- [ ] **Step 6: Add the trait and the export to the class**
+- [x] **Step 6: Add the trait and the export to the class**
 
 In the PHP block of `resources/views/pages/funding-agreements/⚡show.blade.php`:
 
@@ -480,7 +480,7 @@ Directly after the `reports()` method add:
     }
 ```
 
-- [ ] **Step 7: Replace the body of the template with the two views**
+- [x] **Step 7: Replace the body of the template with the two views**
 
 In the template of `resources/views/pages/funding-agreements/⚡show.blade.php`:
 
@@ -663,14 +663,14 @@ cd /c/xampp/htdocs/hc-tracking && grep -n "'tranches_of_name'" lang/en/funding_a
 
 Expected: one line in each file.
 
-- [ ] **Step 8: Run the new tests**
+- [x] **Step 8: Run the new tests**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/FundingDetailTablesTest.php`
 Expected: PASS, 4 tests.
 
 Expected figures, for debugging: scheduled 700 (400 + 200 + 100), received 390, fees and exchange 10, outstanding 600 (1,000 − the 400 received), and a difference of −10.00 on the received row.
 
-- [ ] **Step 9: Point three old visual assertions at the Overview view**
+- [x] **Step 9: Point three old visual assertions at the Overview view**
 
 In `tests/Feature/FundingAgreementTest.php`:
 
@@ -701,7 +701,7 @@ Every other agreement-page test passes unchanged. The reasons, so a failure can 
 - `reports owed to the donor can be added, submitted and deleted on the agreement` reads the title and "5 days overdue" from the reports table.
 - `agreement detail links the donor, proposal, co-funders …` reads its links from the connections, shown in both views.
 
-- [ ] **Step 10: Run every test that touches this page**
+- [x] **Step 10: Run every test that touches this page**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/FundingAgreementTest.php tests/Feature/FundingDetailTablesTest.php tests/Feature/GanttTimelineTest.php tests/Feature/Notifications/ActivityTimelineTest.php tests/Feature/TrancheComponentsTest.php tests/Feature/LocalizationTest.php`
 Expected: PASS.
@@ -725,7 +725,7 @@ Run: `.\php.cmd vendor/bin/pint --dirty --format agent`. Do not commit.
 - Consumes: `SwitchesFundingView`; `DonorProposal::withMoney()`; `AgreementMoney::columns()`, `AgreementMoney::totals(iterable $agreements): list<array>`; `x-funding.agreement-head|row|foot`; `x-funding.tranche-table`; `Tranches::csvHeadings()`, `::csvRow()`; `CsvExport`.
 - Produces: computed `agreementRows`, `allTranches`; action `exportTranchesCsv()`, file name `donor-tranches-{Y-m-d}.csv`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `tests/Feature/FundingDetailTablesTest.php`:
 
@@ -813,12 +813,12 @@ test('the donor page exports every tranche of the donor', function () {
 });
 ```
 
-- [ ] **Step 2: Run them to verify they fail**
+- [x] **Step 2: Run them to verify they fail**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/FundingDetailTablesTest.php --filter="donor page"`
 Expected: FAIL — `Property [$view] not found on component`.
 
-- [ ] **Step 3: Confirm the block boundaries and build the partial**
+- [x] **Step 3: Confirm the block boundaries and build the partial**
 
 ```bash
 cd /c/xampp/htdocs/hc-tracking && sed -n '499p;516p;518p;854p;855p' "resources/views/pages/donors/⚡show.blade.php"
@@ -856,7 +856,7 @@ cd /c/xampp/htdocs/hc-tracking && grep -n -E "(^|[^\\\\A-Za-z])(ArStatus|Transfe
 
 Expected: no output.
 
-- [ ] **Step 4: Extend the class**
+- [x] **Step 4: Extend the class**
 
 In the PHP block of `resources/views/pages/donors/⚡show.blade.php`:
 
@@ -996,7 +996,7 @@ with:
         unset($this->donor, $this->agreements, $this->agreementRows, $this->allTranches, $this->moneyByCurrency,
 ```
 
-- [ ] **Step 5: Add the switch and the table view to the template**
+- [x] **Step 5: Add the switch and the table view to the template**
 
 **5a.** In the header's `<x-slot:actions>`, directly before the `@can('donors.update')` line, insert:
 
@@ -1165,7 +1165,7 @@ The lines that follow (`@endif`, `@endcan`, the two modals, `</section>`) stay e
 
 `common.funding_agreements_2` is the existing sentence-case "Funding agreements" key.
 
-- [ ] **Step 6: Run the new tests**
+- [x] **Step 6: Run the new tests**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/FundingDetailTablesTest.php`
 Expected: PASS, 8 tests.
@@ -1175,7 +1175,7 @@ Common failures and their cause:
 - `AgreementMoney::totals()` fails on the same viewer — it must read each figure with a default of zero when the attribute is absent (Phase 0).
 - "1,500.00" appears — a footer added two currencies; `AgreementMoney::totals()` returns one line per currency.
 
-- [ ] **Step 7: Point the old visual assertions at the Overview view**
+- [x] **Step 7: Point the old visual assertions at the Overview view**
 
 In `tests/Feature/DonorDirectoryTest.php`:
 
@@ -1199,12 +1199,12 @@ It asserts `data-money-river` for the finance role. The table view's guarantee f
 
 Every other donor-page test passes unchanged: the HTTP tests read budgets and received amounts the tables print; `the donor page lists reports still owed to the donor …` (in `FundingWorkflowTest`) finds `data-owed-donor-report` on the owed-reports table.
 
-- [ ] **Step 8: Run every test that touches this page**
+- [x] **Step 8: Run every test that touches this page**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/DonorDirectoryTest.php tests/Feature/FundingDetailTablesTest.php tests/Feature/AccessControl/FundraisingPagesMoneyTest.php tests/Feature/FundingWorkflowTest.php tests/Feature/LocalizationTest.php`
 Expected: PASS.
 
-- [ ] **Step 9: Checkpoint**
+- [x] **Step 9: Checkpoint**
 
 Run: `.\php.cmd vendor/bin/pint --dirty --format agent`. Do not commit.
 
@@ -1223,7 +1223,7 @@ The proposal page is 3,000 lines. Only its Funding tab changes, and the old mark
 - Consumes: `SwitchesFundingView`; `DonorProposal::withMoney()`; `AgreementMoney::columns()`, `::totals()`; `x-funding.agreement-head|row|foot`; `x-funding.tranche-table`.
 - Produces: computed `agreementRows`, `fundingTranches`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `tests/Feature/FundingDetailTablesTest.php`:
 
@@ -1281,12 +1281,12 @@ test('the proposal funding tab shows budgets without tranches to someone who may
 });
 ```
 
-- [ ] **Step 2: Run them to verify they fail**
+- [x] **Step 2: Run them to verify they fail**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/FundingDetailTablesTest.php --filter="proposal funding tab"`
 Expected: FAIL — `Property [$view] not found on component`.
 
-- [ ] **Step 3: Extend the class**
+- [x] **Step 3: Extend the class**
 
 In the PHP block of `resources/views/pages/proposals/⚡show.blade.php`:
 
@@ -1403,7 +1403,7 @@ with:
             $this->proposal, $this->statusNotes, $this->agreements, $this->agreementRows, $this->fundingTranches, $this->donorReports, $this->agreementMoney, $this->moneyByCurrency,
 ```
 
-- [ ] **Step 4: Confirm the tab's boundaries**
+- [x] **Step 4: Confirm the tab's boundaries**
 
 ```bash
 cd /c/xampp/htdocs/hc-tracking && grep -n "@if (\$tab === 'funding')\|@elseif (\$tab === 'projects')" "resources/views/pages/proposals/⚡show.blade.php"
@@ -1411,7 +1411,7 @@ cd /c/xampp/htdocs/hc-tracking && grep -n "@if (\$tab === 'funding')\|@elseif (\
 
 Expected: two lines. Between them sits the Funding tab: first a `<div class="mb-6 flex flex-wrap items-center justify-end gap-2">` holding the two action buttons, then `@if ($this->agreements->isEmpty())` …, and last the `<div class="mt-10 border-t pt-6 …">` that holds the chronology.
 
-- [ ] **Step 5: Add the switch and wrap the old markup**
+- [x] **Step 5: Add the switch and wrap the old markup**
 
 **5a.** In the Funding tab's action row, replace:
 
@@ -1534,14 +1534,14 @@ The `@if ($this->view === 'overview')` of 5b now opens a block whose first state
 
 The template reads `AgreementMoney::` and `DonorProposal::` by their short names; both are imported in the file's PHP block.
 
-- [ ] **Step 6: Run the new tests**
+- [x] **Step 6: Run the new tests**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/FundingDetailTablesTest.php`
 Expected: PASS, 11 tests.
 
 If the page fails to compile with `unexpected token "elseif"` or `"endif"`, the insertions of 5b and 5c are not balanced: 5b must sit outside the old `@if ($this->agreements->isEmpty())`, not inside it.
 
-- [ ] **Step 7: Point two old visual assertions at the Overview view**
+- [x] **Step 7: Point two old visual assertions at the Overview view**
 
 In `tests/Feature/ProposalDetailActionsTest.php`:
 
@@ -1567,7 +1567,7 @@ The table view always prints "Overdue" as a column heading, so the word's absenc
 
 Every other proposal-page test passes unchanged: the ones that open the Funding tab read donor names, budgets, tranche amounts and the `record-agreement` / `edit-agreement-{id}` hooks, all of which the tables print.
 
-- [ ] **Step 8: Run every test that touches this page**
+- [x] **Step 8: Run every test that touches this page**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/ProposalDetailTest.php tests/Feature/ProposalDetailActionsTest.php tests/Feature/ProposalFundedProjectsTest.php tests/Feature/FundingDetailTablesTest.php tests/Feature/AccessControl/FundraisingPagesMoneyTest.php tests/Feature/FundingWorkflowTest.php tests/Feature/LocalizationTest.php`
 Expected: PASS.
@@ -1582,9 +1582,9 @@ Run: `.\php.cmd vendor/bin/pint --dirty --format agent`. Do not commit.
 
 **Files:** none changed unless a defect is found.
 
-- [ ] **Step 1: Render each page** as in Phase 1, Task 5. Pick one agreement, its donor and its proposal from the seeded data and open each in both views (`?view=overview`), and the proposal with `?tab=funding`.
+- [x] **Step 1: Render each page** as in Phase 1, Task 5. Pick one agreement, its donor and its proposal from the seeded data and open each in both views (`?view=overview`), and the proposal with `?tab=funding`.
 
-- [ ] **Step 2: Check each of these and fix what fails**
+- [x] **Step 2: Check each of these and fix what fails**
 
 | Check | Expected |
 | --- | --- |
@@ -1597,4 +1597,4 @@ Run: `.\php.cmd vendor/bin/pint --dirty --format agent`. Do not commit.
 
 If the Gantt does not draw after switching views, give its wrapper a `wire:key` that includes the view (`wire:key="agreement-gantt-{{ $this->agreementId }}-{{ $this->view }}"`) so Livewire mounts it fresh.
 
-- [ ] **Step 3: Delete the preview file and checkpoint.** Do not commit.
+- [x] **Step 3: Delete the preview file and checkpoint.** Do not commit.

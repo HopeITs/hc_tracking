@@ -251,3 +251,49 @@ test('the transfers ledger narrowed to one agreement opens a new tranche on it',
         ->assertSet('transferAgreementId', (string) $agreement->id)
         ->assertSet('transferredCurrency', 'EUR');
 });
+
+test('the agreements, donors and proposals tables print the same received, outstanding, overdue and share for the same money', function () {
+    $this->travelTo('2026-06-15 09:00:00');
+
+    $user = User::factory()->role('Financial')->create();
+    $agreement = DonorProposal::factory()->create(['currency' => Currency::Usd, 'budget' => '1000.00']);
+    $tranche = fn (array $attributes) => TransfersTracking::factory()->create([
+        'donor_proposal_id' => $agreement->id,
+        'amount_transfered_currency' => Currency::Usd,
+        'amount_received_currency' => Currency::Usd,
+        'transfer_date' => null,
+        'receive_date' => null,
+        'ar_status' => ArStatus::Pending,
+        ...$attributes,
+    ]);
+
+    // 400 sent, 380 landed: the 20 the journey took is not owed again.
+    $tranche(['payment_amount' => '400.00', 'net_amount_received' => '380.00', 'ar_status' => ArStatus::Received, 'scheduled_date' => '2026-05-01', 'transfer_date' => '2026-05-02', 'receive_date' => '2026-05-06']);
+    // Received, but nobody recorded what landed: nothing counts as received.
+    $tranche(['payment_amount' => '100.00', 'net_amount_received' => null, 'ar_status' => ArStatus::Received, 'scheduled_date' => '2026-05-10', 'receive_date' => '2026-05-12']);
+    // Landed in another currency: never set against the budget.
+    $tranche(['payment_amount' => '50.00', 'net_amount_received' => '45.00', 'amount_received_currency' => Currency::Eur, 'ar_status' => ArStatus::Received, 'scheduled_date' => '2026-05-15', 'receive_date' => '2026-05-16']);
+    $tranche(['payment_amount' => '200.00', 'scheduled_date' => '2026-06-05']);
+    $tranche(['payment_amount' => '150.00', 'ar_status' => ArStatus::Failed, 'scheduled_date' => '2026-06-01']);
+
+    $agreementRow = Livewire::actingAs($user)->test('pages::funding-agreements.index')->instance()->rows->sole();
+    $donorRow = Livewire::actingAs($user)->test('pages::donors.index')->instance()->rows->getCollection()->sole();
+    $proposalRow = Livewire::actingAs($user)->test('pages::proposals.index')->instance()->rows->getCollection()->sole();
+
+    $reading = fn (object $row, string $committed): array => [
+        'committed' => (float) $row->{$committed},
+        'received' => (float) $row->money_received,
+        'outstanding' => (float) $row->money_outstanding,
+        'overdue' => (float) $row->money_overdue,
+        'share' => DonorProposal::percentLabel((float) $row->money_received, (float) $row->{$committed}),
+    ];
+
+    $expected = ['committed' => 1000.0, 'received' => 380.0, 'outstanding' => 450.0, 'overdue' => 200.0, 'share' => '38'];
+
+    expect($reading($agreementRow, 'budget'))->toBe($expected)
+        ->and($reading($donorRow, 'money_committed'))->toBe($expected)
+        ->and($reading($proposalRow, 'money_committed'))->toBe($expected)
+        // Failed and unrecorded money was scheduled, so it is never "not scheduled".
+        ->and((float) $agreementRow->money_unscheduled)->toBe(100.0)
+        ->and((int) $agreementRow->money_net_missing)->toBe(1);
+});

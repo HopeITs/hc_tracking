@@ -54,7 +54,7 @@
   - `AccountMoney::select(): string` — the `money_*` select list for a query that joined `perAccount()` as `money`: `money_transfers`, `money_received`, `money_in_transit`, `money_upcoming`, `money_overdue`, `money_other_currency`, `money_last_receipt`, `money_received_in_year`.
   - `AccountMoney::totalsSelect(): string` — the grouped totals list: `currency`, `accounts`, `open_accounts`, `transfers`, `received`, `in_transit`, `upcoming`, `overdue`, `received_in_year`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `tests/Feature/AccountMoneyTest.php`:
 
@@ -167,12 +167,12 @@ test('totals group by the account currency', function () {
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/AccountMoneyTest.php`
 Expected: FAIL — `Class "App\Support\AccountMoney" not found`.
 
-- [ ] **Step 3: Write the class**
+- [x] **Step 3: Write the class**
 
 Run: `.\php.cmd artisan make:class Support/AccountMoney --no-interaction`
 
@@ -295,12 +295,12 @@ final class AccountMoney
 
 The year bounds are interpolated, not bound: they come from `AgreementMoney::yearBounds()`, which builds them from an integer the register trait has already validated — the same approach `TransfersTracking::stateSql()` takes with today's date.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/AccountMoneyTest.php`
 Expected: PASS, 4 tests.
 
-- [ ] **Step 5: Checkpoint**
+- [x] **Step 5: Checkpoint**
 
 Run: `.\php.cmd vendor/bin/pint --dirty --format agent`. Do not commit.
 
@@ -314,7 +314,7 @@ A pure move: the page looks and behaves exactly as before when this task ends.
 - Create: `resources/views/pages/admin/_accounts-overview.blade.php`
 - Modify: `resources/views/pages/admin/⚡accounts.blade.php`
 
-- [ ] **Step 1: Confirm the block boundaries**
+- [x] **Step 1: Confirm the block boundaries**
 
 ```bash
 cd /c/xampp/htdocs/hc-tracking && sed -n '361p;381p;414p;415p;462p;463p;466p;565p' "resources/views/pages/admin/⚡accounts.blade.php"
@@ -333,7 +333,7 @@ Expected output, exactly:
     @endif
 ```
 
-- [ ] **Step 2: Build the partial**
+- [x] **Step 2: Build the partial**
 
 Three pieces, in this order: the variables the visual needs (lines 361–381), the summary band (415–462), and the card grid with its pagination (466–565).
 
@@ -354,7 +354,7 @@ cd /c/xampp/htdocs/hc-tracking && {
 
 The file name carries the page's name because this directory holds the partials of every admin page.
 
-- [ ] **Step 3: Check the partial imports nothing**
+- [x] **Step 3: Check the partial imports nothing**
 
 ```bash
 cd /c/xampp/htdocs/hc-tracking && grep -n -E "(^|[^\\\\A-Za-z])(ArStatus|Currency|CarbonImmutable|Number|TransfersTracking|Account|Collection)::" resources/views/pages/admin/_accounts-overview.blade.php
@@ -362,7 +362,7 @@ cd /c/xampp/htdocs/hc-tracking && grep -n -E "(^|[^\\\\A-Za-z])(ArStatus|Currenc
 
 Expected: no output (the one date parse in the cards is already written `\Carbon\CarbonImmutable::parse`).
 
-- [ ] **Step 4: Replace the blocks in the page**
+- [x] **Step 4: Replace the blocks in the page**
 
 In `resources/views/pages/admin/⚡accounts.blade.php`, working from the bottom up so the line numbers above stay valid:
 
@@ -377,7 +377,7 @@ In `resources/views/pages/admin/⚡accounts.blade.php`, working from the bottom 
 
 The band of tiles used to sit inside the header's `summary` slot and now sits directly under the header. That is the only visual difference, and it is one line of vertical rhythm: the section is a `flex-col gap-6`, the same spacing the slot had.
 
-- [ ] **Step 5: Prove nothing else changed**
+- [x] **Step 5: Prove nothing else changed**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/Admin/AccountDirectoryTest.php tests/Feature/AccessControl/FinanceAuthorizationTest.php`
 Expected: PASS, the same counts as before (10 and 6 tests).
@@ -395,7 +395,7 @@ Expected: PASS, the same counts as before (10 and 6 tests).
 - Consumes (Task 1): `AccountMoney`.
 - Produces: public properties `search`, `state`, `currencyFilter`, `countryFilter` (URL key `country`), `flag`; computed `rows`, `totals`, `countryOptions`, `hasAnyAccount`; actions `toggleFlag`, `exportCsv`; file name `accounts-{Y-m-d}.csv`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `tests/Feature/Admin/AccountRegisterTest.php`:
 
@@ -655,12 +655,12 @@ test('exporting needs the accounts view permission', function () {
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/Admin/AccountRegisterTest.php`
 Expected: FAIL — `Property [$view] not found on component`.
 
-- [ ] **Step 3: Extend the component class**
+- [x] **Step 3: Extend the component class**
 
 All edits are in the PHP block of `resources/views/pages/admin/⚡accounts.blade.php`.
 
@@ -1025,7 +1025,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 Everything else in the class (`showsFullAccountNumbers`, `accountMoneyStats`, `summary`, `fundsByCurrency`, the account form and the close flow) stays exactly as it is.
 
-- [ ] **Step 4: Replace the header and body of the template**
+- [x] **Step 4: Replace the header and body of the template**
 
 After Task 2 the template runs from `<section class="admin-directory …">` to `</section>`. Replace everything from that opening `<section …>` line up to, but not including, the first modal (`<x-ui.modal wire:model="showAccountModal"`) with:
 
@@ -1298,7 +1298,7 @@ After Task 2 the template runs from `<section class="admin-directory …">` to `
 
 The two modals and the closing `</section>` that follow stay exactly as they are.
 
-- [ ] **Step 5: Run the new tests**
+- [x] **Step 5: Run the new tests**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/Admin/AccountRegisterTest.php`
 Expected: PASS, 12 tests.
@@ -1308,12 +1308,12 @@ Common failures and their cause:
 - `MissingAttributeException [account_number]` — the `rows` select must include `accounts.account_number`; it is encrypted and decrypted by the model's cast.
 - The masked-number assertion fails with a full number — the row cell must use `$showsFullNumbers`, not `@can('accounts.view')`.
 
-- [ ] **Step 6: Run every test that touches this page**
+- [x] **Step 6: Run every test that touches this page**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/Admin/AccountDirectoryTest.php tests/Feature/Admin/AccountRegisterTest.php tests/Feature/AccountMoneyTest.php tests/Feature/AccessControl/FinanceAuthorizationTest.php tests/Feature/AccountTest.php tests/Feature/LocalizationTest.php`
 Expected: PASS. None of the existing account tests needs a change: they assert account names, the masked number, the absence of delete controls and the form, all of which the table prints the same way.
 
-- [ ] **Step 7: Checkpoint**
+- [x] **Step 7: Checkpoint**
 
 Run: `.\php.cmd vendor/bin/pint --dirty --format agent`. Do not commit.
 
@@ -1323,9 +1323,9 @@ Run: `.\php.cmd vendor/bin/pint --dirty --format agent`. Do not commit.
 
 **Files:** none changed unless a defect is found.
 
-- [ ] **Step 1: Render the page** as in Phase 1, Task 5 for `/admin/accounts` (confirm the path with `.\php.cmd artisan route:list --name=admin.accounts`), the same with `?year=2026`, and with `?view=overview`.
+- [x] **Step 1: Render the page** as in Phase 1, Task 5 for `/admin/accounts` (confirm the path with `.\php.cmd artisan route:list --name=admin.accounts`), the same with `?year=2026`, and with `?view=overview`.
 
-- [ ] **Step 2: Check each of these and fix what fails**
+- [x] **Step 2: Check each of these and fix what fails**
 
 | Check | Expected |
 | --- | --- |
@@ -1336,4 +1336,4 @@ Run: `.\php.cmd vendor/bin/pint --dirty --format agent`. Do not commit.
 | Overview view | The tiles, donut and cards as before. |
 | Dark mode, Arabic, 390px | As in Phase 1. |
 
-- [ ] **Step 3: Delete the preview file and checkpoint.** Do not commit.
+- [x] **Step 3: Delete the preview file and checkpoint.** Do not commit.

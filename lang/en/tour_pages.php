@@ -10,6 +10,8 @@ return [
         'chart' => ['title' => 'The picture', 'body' => 'A chart that summarises this data. Hover over any part of it for the exact figure.'],
         'table' => ['title' => 'The records', 'body' => 'One row per record. Open a name to see the full detail; headings that show an arrow sort the list.'],
         'record' => ['title' => 'Activity history', 'body' => 'Who changed what, and when, is kept here for this record — handy when something looks different from yesterday.'],
+        'finance_filters' => ['title' => 'Filter the table', 'body' => 'Narrow the table: pick a year, a status, a currency or a flag. Choose the same pill again to clear it.'],
+        'finance_totals' => ['title' => 'Subtotals', 'body' => 'Totals for exactly the rows shown, one line per currency. Currencies are never added together.'],
     ],
 
     'pages' => [

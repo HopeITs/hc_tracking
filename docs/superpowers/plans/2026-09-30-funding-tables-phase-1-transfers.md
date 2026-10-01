@@ -64,7 +64,7 @@
   - `<x-funding.tranche-group :label="string" :lines="$lines" :lead="int" :actions="bool" :group="string" />` — one `<tr class="register-group" data-group="{group}">`.
   - `$lines` everywhere is `list<array{currency: string, tranches: int, sent: float, fees: float, gross: float, net: float, shortfall: float, overage: float}>`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `tests/Feature/TrancheComponentsTest.php`:
 
@@ -214,12 +214,12 @@ test('the head offers a sort button per sortable column only when asked', functi
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/TrancheComponentsTest.php`
 Expected: FAIL — `Unable to locate a class or view for component [funding.tranche-row]`.
 
-- [ ] **Step 3: Create the state component**
+- [x] **Step 3: Create the state component**
 
 Create `resources/views/components/funding/state.blade.php`:
 
@@ -254,7 +254,7 @@ Create `resources/views/components/funding/state.blade.php`:
 </span>
 ```
 
-- [ ] **Step 4: Create the head component**
+- [x] **Step 4: Create the head component**
 
 Create `resources/views/components/funding/tranche-head.blade.php`:
 
@@ -292,7 +292,7 @@ Create `resources/views/components/funding/tranche-head.blade.php`:
 @endif
 ```
 
-- [ ] **Step 5: Create the row component**
+- [x] **Step 5: Create the row component**
 
 Create `resources/views/components/funding/tranche-row.blade.php`:
 
@@ -399,7 +399,7 @@ Create `resources/views/components/funding/tranche-row.blade.php`:
 </tr>
 ```
 
-- [ ] **Step 6: Create the foot component**
+- [x] **Step 6: Create the foot component**
 
 Create `resources/views/components/funding/tranche-foot.blade.php`:
 
@@ -449,7 +449,7 @@ Create `resources/views/components/funding/tranche-foot.blade.php`:
 @endforeach
 ```
 
-- [ ] **Step 7: Create the group component**
+- [x] **Step 7: Create the group component**
 
 Create `resources/views/components/funding/tranche-group.blade.php`:
 
@@ -520,14 +520,14 @@ Create `resources/views/components/funding/tranche-group.blade.php`:
 </tr>
 ```
 
-- [ ] **Step 8: Run the tests to verify they pass**
+- [x] **Step 8: Run the tests to verify they pass**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/TrancheComponentsTest.php`
 Expected: PASS, 7 tests.
 
 If "Landed in 5 days" fails, check that Phase 0's `Tranches::timing()` uses `transfers.landed_in_count_days` with the days between `transfer_date` and `receive_date`.
 
-- [ ] **Step 9: Checkpoint**
+- [x] **Step 9: Checkpoint**
 
 Run: `.\php.cmd vendor/bin/pint --dirty --format agent`
 Run: `.\php.cmd artisan test --compact tests/Feature/TrancheComponentsTest.php tests/Feature/LocalizationTest.php`
@@ -546,7 +546,7 @@ A pure move. The page must look and behave exactly as before when this task ends
 **Interfaces:**
 - Produces: `@include('pages.transfers._overview')`. The partial reads these variables from the including view: `$stage`, `$sort`, `$filtersAreActive`, `$mutedText`, `$inkText`, `$hairline`, `$amount`, `$exact`, `$percent`, `$amountAtLeast`, `$rate`, `$sortOptions`, and `$this`.
 
-- [ ] **Step 1: Confirm the block boundaries**
+- [x] **Step 1: Confirm the block boundaries**
 
 Run (Bash tool):
 
@@ -565,13 +565,13 @@ Expected output, exactly these four lines:
 
 If they differ, stop and find the block by those lines instead: it starts at the `{{-- The ledger: …` comment and ends at the `@endif` that closes `@if ($this->transfers->isEmpty())`.
 
-- [ ] **Step 2: Create the partial from that block**
+- [x] **Step 2: Create the partial from that block**
 
 ```bash
 cd /c/xampp/htdocs/hc-tracking && sed -n '516,1133p' "resources/views/pages/transfers/⚡index.blade.php" > resources/views/pages/transfers/_overview.blade.php
 ```
 
-- [ ] **Step 3: Qualify the two class references the partial can no longer import**
+- [x] **Step 3: Qualify the two class references the partial can no longer import**
 
 A partial has no `use` statements. In `resources/views/pages/transfers/_overview.blade.php` replace both occurrences of:
 
@@ -593,7 +593,7 @@ cd /c/xampp/htdocs/hc-tracking && grep -n -E "(^|[^\\\\A-Za-z])(ArStatus|Currenc
 
 Expected: no output.
 
-- [ ] **Step 4: Put a header comment on the partial**
+- [x] **Step 4: Put a header comment on the partial**
 
 Insert as the first lines of `resources/views/pages/transfers/_overview.blade.php`:
 
@@ -606,7 +606,7 @@ Insert as the first lines of `resources/views/pages/transfers/_overview.blade.ph
 --}}
 ```
 
-- [ ] **Step 5: Replace the block in the page with the include**
+- [x] **Step 5: Replace the block in the page with the include**
 
 In `resources/views/pages/transfers/⚡index.blade.php`, delete lines 516–1133 and put this single line in their place:
 
@@ -629,12 +629,12 @@ The surrounding code now reads:
     @endif
 ```
 
-- [ ] **Step 6: Run the existing tests to prove nothing changed**
+- [x] **Step 6: Run the existing tests to prove nothing changed**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/TransferTrackingTest.php tests/Feature/FundingWorkflowTest.php`
 Expected: PASS, the same counts as before this task (24 and 14 tests).
 
-- [ ] **Step 7: Checkpoint**
+- [x] **Step 7: Checkpoint**
 
 Do not commit.
 
@@ -653,7 +653,7 @@ Do not commit.
 - Produces (used by Phases 3 and 6 as link targets): the page accepts `?account={id}`, `?agreement={id}`, `?edit={id}`, `?view=overview`.
 - Produces: public properties `search`, `donor`, `account`, `currency`, `stage`, `flag`, `dateBasis`, `from`, `to`, `min`, `max`, `group`, `sort`, `agreement`; computed `rows`, `totals`, `stageCounts`, `groupTotals`, `ledger`, `transfers`, `filterDonors`, `filterAccounts`; actions `toggleStage`, `toggleFlag`, `toggleAttentionOrder`, `setSort`, `clearFilters`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `tests/Feature/TransferRegisterTest.php`:
 
@@ -1066,12 +1066,12 @@ test('a row links to its donor, proposal and agreement only for people who may o
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/TransferRegisterTest.php`
 Expected: FAIL — the first failure is `Failed asserting that an array has the key 'view'` or `Property [$view] not found on component`.
 
-- [ ] **Step 3: Replace the component class**
+- [x] **Step 3: Replace the component class**
 
 In `resources/views/pages/transfers/⚡index.blade.php` replace everything from the opening `<?php` through the closing `?>` (the whole PHP block) with:
 
@@ -1945,7 +1945,7 @@ Notes for the implementer:
 - `self::MAX_AMOUNT` comes from `ManagesTransferForm`.
 - The SQL the Overview ledger runs is the same text as before, except that stage and settled conditions now come from the model with their columns qualified.
 
-- [ ] **Step 4: Replace the template**
+- [x] **Step 4: Replace the template**
 
 In the same file, replace everything after the closing `?>` with:
 
@@ -2293,7 +2293,7 @@ In the same file, replace everything after the closing `?>` with:
 </section>
 ```
 
-- [ ] **Step 5: Drop the agreement chip and the "Reset filters" button from the Overview toolbar**
+- [x] **Step 5: Drop the agreement chip and the "Reset filters" button from the Overview toolbar**
 
 The filter rows in the header now carry both, for both views. In `resources/views/pages/transfers/_overview.blade.php` find this block (it sits inside the `{{-- How the ladder is ranked, and what is currently narrowing it. --}}` toolbar):
 
@@ -2322,7 +2322,7 @@ and replace it with:
             </span>
 ```
 
-- [ ] **Step 6: Run the new tests**
+- [x] **Step 6: Run the new tests**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/TransferRegisterTest.php`
 Expected: PASS, 20 tests.
@@ -2332,7 +2332,7 @@ Common failures and their cause:
 - `Column 'id' in order clause is ambiguous` — an `orderBy('id')` reached the joined query; every order in `registerSorts()` must be qualified with `transfers_tracking.`.
 - `Class "DateTimeImmutable" not found` cannot happen in a namespace-less file; if it does, the file gained a `namespace` line — remove it.
 
-- [ ] **Step 7: Point the old visual assertions at the Overview view**
+- [x] **Step 7: Point the old visual assertions at the Overview view**
 
 In `tests/Feature/TransferTrackingTest.php` make exactly these changes.
 
@@ -2396,14 +2396,14 @@ For example, the first becomes:
 
 No other test in that file changes: the ones that read `->instance()->ledger` or `->instance()->transfers` do not depend on the view, and `wire:key="transfer-{id}"` is printed by the table rows too.
 
-- [ ] **Step 8: Run every test that touches this page**
+- [x] **Step 8: Run every test that touches this page**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/TransferTrackingTest.php tests/Feature/TransferRegisterTest.php tests/Feature/FundingWorkflowTest.php tests/Feature/FundingAgreementTest.php tests/Feature/Notifications/QuickActionsTest.php tests/Feature/LocalizationTest.php`
 Expected: PASS.
 
 `FundingAgreementTest` contains `the agreement page links to its tranches in the transfers ledger`, which asserts `data-agreement-chip` on this page: the chip now renders in the header's filter rows.
 
-- [ ] **Step 9: Checkpoint**
+- [x] **Step 9: Checkpoint**
 
 Run: `.\php.cmd vendor/bin/pint --dirty --format agent`
 Do not commit.
@@ -2420,7 +2420,7 @@ Do not commit.
 - Consumes (Phase 0): `App\Support\CsvExport::download(string $filename, array $headings, iterable $rows): StreamedResponse`; `App\Support\Tranches::csvHeadings(): list<string>` and `::csvRow(TransfersTracking $transfer, string $donor, string $proposal, ?string $reference, ?string $account): list<mixed>`; test helper `downloadedCsv(Testable $component): list<list<string>>` from `tests/Pest.php`.
 - Produces: public action `exportCsv(): StreamedResponse`, file name `transfers-{Y-m-d}.csv`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `tests/Feature/TransferRegisterTest.php`:
 
@@ -2490,12 +2490,12 @@ test('exporting needs the transfers view permission', function () {
 });
 ```
 
-- [ ] **Step 2: Run them to verify they fail**
+- [x] **Step 2: Run them to verify they fail**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/TransferRegisterTest.php --filter=export`
 Expected: FAIL — `Unable to call component method. Public method [exportCsv] not found`.
 
-- [ ] **Step 3: Add the export action**
+- [x] **Step 3: Add the export action**
 
 In `resources/views/pages/transfers/⚡index.blade.php` add these imports to the `use` list at the top (keep the list alphabetical):
 
@@ -2546,7 +2546,7 @@ and add this method directly after `groupTotals()`:
     }
 ```
 
-- [ ] **Step 4: Add the Export button**
+- [x] **Step 4: Add the Export button**
 
 In the template's `<x-slot:actions>`, insert this between the `<x-ui.view-toggle … />` and the `@can('transfers.create')` line:
 
@@ -2558,12 +2558,12 @@ In the template's `<x-slot:actions>`, insert this between the `<x-ui.view-toggle
                 @endif
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `.\php.cmd artisan test --compact tests/Feature/TransferRegisterTest.php`
 Expected: PASS, 23 tests.
 
-- [ ] **Step 6: Checkpoint**
+- [x] **Step 6: Checkpoint**
 
 Run: `.\php.cmd vendor/bin/pint --dirty --format agent`
 Run: `.\php.cmd artisan test --compact tests/Feature/TransferTrackingTest.php tests/Feature/TransferRegisterTest.php tests/Feature/TrancheComponentsTest.php tests/Feature/LocalizationTest.php`
@@ -2577,15 +2577,15 @@ The tests prove the numbers. This task proves the page reads well, which is what
 
 **Files:** none changed unless a defect is found.
 
-- [ ] **Step 1: Make sure the assets are current**
+- [x] **Step 1: Make sure the assets are current**
 
 Ask the user whether `composer run dev` (or `npm run dev`) is running. If not, ask them to start it; the register CSS from Phase 0 must be compiled.
 
-- [ ] **Step 2: Render the page without signing in**
+- [x] **Step 2: Render the page without signing in**
 
 Follow `.ai/rules/pages.md` → "Preview an auth-gated page in a browser without signing in": boot the HTTP kernel in a scratch script run with `C:\php85\php.exe`, log in the first `Financial` user, handle `Request::create('/transfers')`, write the HTML to `public/__preview.html`, rewrite the APP_URL and Vite hosts to the running ports, and open it in the Browser pane. Repeat with `/transfers?view=overview`, `/transfers?group=donor`, `/transfers?stage=overdue&currency=USD`.
 
-- [ ] **Step 3: Check each of these and fix what fails**
+- [x] **Step 3: Check each of these and fix what fails**
 
 | Check | Expected |
 | --- | --- |
@@ -2599,10 +2599,10 @@ Follow `.ai/rules/pages.md` → "Preview an auth-gated page in a browser without
 | Arabic (render with a user whose `locale` is `ar`) | Columns mirrored; amounts still read left to right with the minus sign in front. |
 | 390px wide | Each row is a block of labelled pairs; nothing overflows. |
 
-- [ ] **Step 4: Delete the preview file**
+- [x] **Step 4: Delete the preview file**
 
 Remove `public/__preview.html` and the scratch script.
 
-- [ ] **Step 5: Checkpoint**
+- [x] **Step 5: Checkpoint**
 
 Show the user two screenshots (table view, grouped view) and stop. This is the review point the spec names: Phases 2–6 copy this page's pattern, so any change to the look is cheapest now.

@@ -208,7 +208,7 @@ test('donor detail counts only received tranches as money in and flags overdue o
         'ar_status' => ArStatus::Pending,
     ]);
 
-    $component = Livewire::actingAs($user)->test('pages::donors.show', ['donor' => $donor]);
+    $component = Livewire::actingAs($user)->test('pages::donors.show', ['donor' => $donor])->set('view', 'overview');
 
     expect($component->instance()->moneyByCurrency['USD'])->toMatchArray([
         'committed' => 1000.0,
@@ -302,6 +302,7 @@ test('sorting by next transfer due puts the soonest scheduled donor first', func
 
     Livewire::actingAs($user)
         ->test('pages::donors.index')
+        ->set('view', 'overview')
         ->assertSeeInOrder(['Alpha Donor', 'Zulu Donor'])
         ->set('sort', 'next_due')
         ->assertSeeInOrder(['Zulu Donor', 'Alpha Donor']);
@@ -312,7 +313,7 @@ test('the overview sizes itself to the funders on screen', function () {
     $donor = Donor::factory()->create(['type' => DonorType::Bilateral]);
     DonorProposal::factory()->create(['donor_id' => $donor->id, 'proposal_id' => Proposal::factory()->create()->id, 'currency' => Currency::Usd]);
 
-    $component = Livewire::actingAs($user)->test('pages::donors.index');
+    $component = Livewire::actingAs($user)->test('pages::donors.index')->set('view', 'overview');
 
     expect($component->instance()->overviewRows)->toBe(3);
     $component->assertSeeText('None yet: Foundation, Individual, Corporate, Not classified');
@@ -340,6 +341,7 @@ test('a pending tranche with no scheduled date does not break the transfers ahea
 
     Livewire::actingAs($user)
         ->test('pages::donors.index')
+        ->set('view', 'overview')
         ->assertOk()
         ->assertSeeText(__('donors.no_transfer_scheduled_ahead'));
 });
@@ -407,6 +409,7 @@ test('overdue follow-ups are counted and sort first', function () {
 
     Livewire::actingAs($user)
         ->test('pages::donors.index')
+        ->set('view', 'overview')
         ->assertSeeHtml('data-follow-ups-due')
         ->assertSeeText('1 follow-up due')
         ->set('sort', 'follow_up')
@@ -459,6 +462,7 @@ test('donor detail lists each tranche in full and each report against its target
 
     Livewire::actingAs($user)
         ->test('pages::donors.show', ['donor' => $donor])
+        ->set('view', 'overview')
         ->assertSeeHtml('data-tranche-row="failed"')
         ->assertSeeHtml('data-point="failed"')
         ->assertSeeText('12.50 USD')
@@ -482,6 +486,7 @@ test('the donor page shows each agreement\'s internal number beside its external
 
     Livewire::actingAs($user)
         ->test('pages::donors.show', ['donor' => $donor])
+        ->set('view', 'overview')
         ->assertSeeHtmlInOrder([
             'data-lane="'.$agreement->id.'"', 'HC-2026-085', 'MCC-85',
             'data-agreement="'.$agreement->id.'"', 'HC-2026-085', 'External no. MCC-85',
@@ -501,7 +506,7 @@ test('a money calendar lane puts the internal number and the external number on 
         'scheduled_date' => now()->addMonth()->toDateString(),
     ]);
 
-    $html = Livewire::actingAs($user)->test('pages::donors.show', ['donor' => $donor])->html();
+    $html = Livewire::actingAs($user)->test('pages::donors.show', ['donor' => $donor])->set('view', 'overview')->html();
     $lane = str($html)->after('data-lane="'.$agreement->id.'"')->before('relative h-14')->toString();
 
     // 15rem fits a placeholder number and its chip on one line in English and

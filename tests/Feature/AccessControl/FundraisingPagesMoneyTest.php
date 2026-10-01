@@ -40,7 +40,7 @@ function seedMoneyPagesFixture(): array
 
 test('Public Relations Manager sees donor names on the donor directory but no money', function () {
     seedMoneyPagesFixture();
-    $page = fn (string $role) => Livewire::actingAs(userWithRole($role))->test('pages::donors.index');
+    $page = fn (string $role) => Livewire::actingAs(userWithRole($role))->test('pages::donors.index')->set('view', 'overview');
 
     $page('Public Relations Manager')->assertOk()
         ->assertSee('Aurora Foundation')
@@ -63,7 +63,7 @@ test('Public Relations Manager sees donor names on the donor directory but no mo
 
 test('Public Relations Manager sees the donor page without agreements, budgets or tranches', function () {
     ['donor' => $donor] = seedMoneyPagesFixture();
-    $page = fn (string $role) => Livewire::actingAs(userWithRole($role))->test('pages::donors.show', ['donor' => $donor]);
+    $page = fn (string $role) => Livewire::actingAs(userWithRole($role))->test('pages::donors.show', ['donor' => $donor])->set('view', 'overview');
 
     $publicRelations = $page('Public Relations Manager');
     $publicRelations->assertOk()
@@ -92,7 +92,7 @@ test('Public Relations Manager sees the donor page without agreements, budgets o
 
 test('Public Relations Manager sees proposal names on the proposal directory but no money', function () {
     seedMoneyPagesFixture();
-    $page = fn (string $role) => Livewire::actingAs(userWithRole($role))->test('pages::proposals.index');
+    $page = fn (string $role) => Livewire::actingAs(userWithRole($role))->test('pages::proposals.index')->set('view', 'overview');
 
     $publicRelations = $page('Public Relations Manager');
     $publicRelations->assertOk()

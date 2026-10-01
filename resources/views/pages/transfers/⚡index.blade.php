@@ -1,61 +1,112 @@
 <?php
 
-use App\Support\Like;
-use App\Enums\ArStatus;
 use App\Enums\Currency;
+use App\Livewire\Concerns\FiltersFinanceRegister;
 use App\Livewire\Concerns\ManagesTransferForm;
+use App\Models\Account;
+use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\TransfersTracking;
+use App\Support\CsvExport;
+use App\Support\Like;
+use App\Support\Tranches;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Number;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 new #[Title('titles.transfers')] class extends Component {
+    use FiltersFinanceRegister;
     use ManagesTransferForm;
     use WithPagination;
 
     /**
-     * How the ladder may be ranked. `attention` leads with money that has
-     * misbehaved, which is the job this page exists for.
+     * How the Overview ladder may be ranked. `attention` leads with money that
+     * has misbehaved.
      *
      * @var list<string>
      */
     public const SORTS = ['attention', 'shortfall', 'date', 'amount'];
 
     /**
-     * Where a tranche's money can be stuck, in the vocabulary the funding
-     * pages share, plus the two conditions only this page can see: money that
-     * landed short of what was sent, and money recorded as received without
-     * anyone saying what actually arrived.
+     * Where a tranche's money can be: the five states every funding page
+     * shares (overdue is the model's `late`), plus the two conditions only a
+     * received tranche can be in — landed short of what was sent, and received
+     * without anyone saying what arrived.
      *
      * @var list<string>
      */
-    public const STAGES = ['overdue', 'transit', 'upcoming', 'failed', 'short', 'unrecorded'];
+    public const STAGES = ['overdue', 'transit', 'upcoming', 'received', 'failed', 'short', 'unrecorded'];
+
+    /** @var list<string> */
+    public const FLAGS = ['converted', 'no_account'];
+
+    /** @var list<string> */
+    public const GROUPS = ['agreement', 'donor', 'account', 'month'];
+
+    /** @var list<string> */
+    public const DATE_BASES = ['scheduled', 'sent', 'received'];
+
+    /**
+     * Every property a filter control writes. A change to any of them is
+     * normalised and sends the table back to its first page.
+     *
+     * @var list<string>
+     */
+    private const FILTERS = ['search', 'donor', 'account', 'currency', 'stage', 'flag', 'dateBasis', 'from', 'to', 'min', 'max', 'group', 'agreement', 'year'];
 
     #[Url(except: '')]
     public string $search = '';
 
     #[Url(except: '')]
-    public string $arStatus = '';
+    public string $donor = '';
 
     #[Url(except: '')]
     public string $account = '';
 
     #[Url(except: '')]
+    public string $currency = '';
+
+    #[Url(except: '')]
     public string $stage = '';
 
+    #[Url(except: '')]
+    public string $flag = '';
+
+    /** Which of a tranche's three dates the date range and the month grouping read. */
+    #[Url(except: 'scheduled')]
+    public string $dateBasis = 'scheduled';
+
+    #[Url(except: '')]
+    public string $from = '';
+
+    #[Url(except: '')]
+    public string $to = '';
+
+    #[Url(except: '')]
+    public string $min = '';
+
+    #[Url(except: '')]
+    public string $max = '';
+
+    #[Url(except: '')]
+    public string $group = '';
+
+    /** The Overview ladder's order. The table sorts by its column headings instead. */
     #[Url(except: 'attention')]
     public string $sort = 'attention';
 
     /**
-     * One funding agreement to narrow the ledger to, set by the "see in the
+     * One funding agreement to narrow the page to, set by the "see in the
      * transfers ledger" link on an agreement page.
      */
     #[Url(except: '')]
@@ -69,11 +120,45 @@ new #[Title('titles.transfers')] class extends Component {
     public string $editTransfer = '';
 
     /**
-     * `sort` and `stage` arrive from the URL, so a hand-typed value would
-     * otherwise leave the page sorted by `attention` with no pill pressed, or
-     * showing "Reset filters" with nothing filtered. Normalise on the way in.
+     * Everything here arrives from the URL, so a hand-typed value would
+     * otherwise leave a filter applied with no control showing it. Normalise
+     * on the way in.
      */
     public function mount(): void
+    {
+        // A bookmark from before the status pills: ?arStatus=received|failed.
+        $legacyStatus = (string) request()->query('arStatus', '');
+
+        if ($this->stage === '' && in_array($legacyStatus, ['received', 'failed'], true)) {
+            $this->stage = $legacyStatus;
+        }
+
+        $this->normaliseFilters();
+        $this->syncRangeWithYear();
+
+        if (ctype_digit($this->editTransfer)) {
+            $this->openTransferEdit((int) $this->editTransfer);
+        }
+
+        $this->editTransfer = '';
+    }
+
+    public function updated(string $property): void
+    {
+        if (! in_array($property, self::FILTERS, true)) {
+            return;
+        }
+
+        if ($property === 'year') {
+            [$this->from, $this->to] = $this->yearBounds($this->year) ?? ['', ''];
+        }
+
+        $this->normaliseFilters();
+        $this->syncRangeWithYear();
+        $this->resetPage();
+    }
+
+    protected function normaliseFilters(): void
     {
         if (! in_array($this->sort, self::SORTS, true)) {
             $this->sort = 'attention';
@@ -83,40 +168,95 @@ new #[Title('titles.transfers')] class extends Component {
             $this->stage = '';
         }
 
-        if (ctype_digit($this->editTransfer)) {
-            $this->openTransferEdit((int) $this->editTransfer);
+        if (! in_array($this->flag, self::FLAGS, true)) {
+            $this->flag = '';
         }
 
-        $this->editTransfer = '';
+        if (! in_array($this->group, self::GROUPS, true)) {
+            $this->group = '';
+        }
+
+        if (! in_array($this->dateBasis, self::DATE_BASES, true)) {
+            $this->dateBasis = 'scheduled';
+        }
+
+        if (Currency::tryFrom($this->currency) === null) {
+            $this->currency = '';
+        }
+
+        foreach (['donor', 'account', 'agreement'] as $idFilter) {
+            if (! ctype_digit($this->{$idFilter})) {
+                $this->{$idFilter} = '';
+            }
+        }
+
+        $this->from = $this->cleanDate($this->from);
+        $this->to = $this->cleanDate($this->to);
+        $this->min = $this->cleanAmount($this->min);
+        $this->max = $this->cleanAmount($this->max);
     }
 
-    public function updatedSearch(): void
+    /**
+     * On this page a year is a shortcut for a date range, not a filter of its
+     * own: choosing one fills the range, and a range that is no longer that
+     * whole year lets go of it.
+     */
+    protected function syncRangeWithYear(): void
     {
-        $this->resetPage();
+        $bounds = $this->yearBounds($this->year);
+
+        if ($bounds === null) {
+            $this->year = '';
+
+            return;
+        }
+
+        if ($this->from === '' && $this->to === '') {
+            [$this->from, $this->to] = $bounds;
+
+            return;
+        }
+
+        if ([$this->from, $this->to] !== $bounds) {
+            $this->year = '';
+        }
     }
 
-    public function updatedArStatus(): void
+    /**
+     * @return array{0: string, 1: string}|null
+     */
+    protected function yearBounds(string $year): ?array
     {
-        $this->resetPage();
+        return preg_match('/^(19|20|21)\d{2}$/', $year) === 1 ? ["{$year}-01-01", "{$year}-12-31"] : null;
     }
 
-    public function updatedAccount(): void
+    /**
+     * A real calendar date in Y-m-d, or nothing.
+     */
+    protected function cleanDate(string $value): string
     {
-        $this->resetPage();
+        $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+
+        return $date !== false && $date->format('Y-m-d') === $value ? $value : '';
+    }
+
+    /**
+     * An amount the payment column can hold, or nothing.
+     */
+    protected function cleanAmount(string $value): string
+    {
+        return is_numeric($value) && (float) $value >= 0 && (float) $value <= self::MAX_AMOUNT ? $value : '';
     }
 
     public function clearFilters(): void
     {
-        $this->search = '';
-        $this->arStatus = '';
-        $this->account = '';
-        $this->stage = '';
-        $this->agreement = '';
+        $this->reset(['search', 'donor', 'account', 'currency', 'stage', 'flag', 'dateBasis', 'from', 'to', 'min', 'max', 'agreement']);
+        $this->resetRegisterFilters();
         $this->resetPage();
     }
 
     /**
-     * The agreement the ledger is narrowed to, for the filter chip.
+     * The agreement the page is narrowed to, for the filter chip.
      */
     #[Computed]
     public function agreementFilter(): ?DonorProposal
@@ -129,7 +269,30 @@ new #[Title('titles.transfers')] class extends Component {
     }
 
     /**
-     * Narrow the ladder to one stage, or clear it by choosing it again.
+     * The donors that hold an agreement, for the donor picker.
+     *
+     * @return EloquentCollection<int, Donor>
+     */
+    #[Computed]
+    public function filterDonors(): EloquentCollection
+    {
+        return Donor::query()->has('donorProposals')->orderBy('name')->orderBy('id')->get(['id', 'name']);
+    }
+
+    /**
+     * Every account, open or closed, for the account picker. The rows already
+     * name the account each tranche lands in, so the list shows nothing new.
+     *
+     * @return EloquentCollection<int, Account>
+     */
+    #[Computed]
+    public function filterAccounts(): EloquentCollection
+    {
+        return Account::query()->orderBy('account_name')->orderBy('id')->get(['id', 'account_name', 'is_active']);
+    }
+
+    /**
+     * Narrow to one stage, or clear it by choosing it again.
      */
     public function toggleStage(string $stage): void
     {
@@ -137,6 +300,18 @@ new #[Title('titles.transfers')] class extends Component {
         $this->resetPage();
     }
 
+    /**
+     * Narrow to one flag, or clear it by choosing it again.
+     */
+    public function toggleFlag(string $flag): void
+    {
+        $this->flag = $this->flag === $flag || ! in_array($flag, self::FLAGS, true) ? '' : $flag;
+        $this->resetPage();
+    }
+
+    /**
+     * The Overview ladder's order.
+     */
     public function setSort(string $sort): void
     {
         $this->sort = in_array($sort, self::SORTS, true) ? $sort : 'attention';
@@ -144,46 +319,50 @@ new #[Title('titles.transfers')] class extends Component {
     }
 
     /**
-     * A tranche whose journey has finished and whose two ends can honestly be
-     * compared: received, with a net amount recorded, in the same currency it
-     * was sent in. Anything else has no shortfall, because subtracting a
-     * figure in one currency from a figure in another is not arithmetic.
+     * Rank the table by what needs chasing, or go back to its default order.
      */
-    protected function settledSql(): string
+    public function toggleAttentionOrder(): void
     {
-        return "(ar_status = 'received' and net_amount_received is not null and amount_received_currency = amount_transfered_currency)";
+        [$this->sortBy, $this->sortDir] = $this->activeSort() === 'attention' ? ['', ''] : ['attention', 'asc'];
+        $this->resetPage();
     }
 
     /**
-     * Stage conditions as SQL, keyed by stage.
-     *
-     * `$today` is produced here, never by a visitor, so it interpolates safely
-     * — the same approach the agreements ledger takes.
+     * A tranche whose journey has finished and whose two ends can honestly be
+     * compared. One definition, on the model, for every page.
+     */
+    protected function settledSql(): string
+    {
+        return TransfersTracking::settledSql();
+    }
+
+    /**
+     * Stage conditions as SQL, keyed by stage. Each one is the model's own
+     * definition, so a filter, a count and a total read a tranche the same way
+     * its row does.
      *
      * @return array<string, string>
      */
     protected function stageSql(): array
     {
-        $today = CarbonImmutable::today()->toDateString();
-        $settled = $this->settledSql();
-
         return [
-            'overdue' => "(ar_status = 'pending' and transfer_date is null and scheduled_date is not null and scheduled_date < '{$today}')",
-            'transit' => "(ar_status = 'pending' and transfer_date is not null)",
-            'upcoming' => "(ar_status = 'pending' and transfer_date is null and (scheduled_date is null or scheduled_date >= '{$today}'))",
-            'failed' => "(ar_status = 'failed')",
-            'short' => "({$settled} and payment_amount > 0 and net_amount_received < payment_amount)",
-            'unrecorded' => "(ar_status = 'received' and net_amount_received is null)",
+            'overdue' => TransfersTracking::stateSql('late'),
+            'transit' => TransfersTracking::stateSql('transit'),
+            'upcoming' => TransfersTracking::stateSql('upcoming'),
+            'received' => TransfersTracking::stateSql('received'),
+            'failed' => TransfersTracking::stateSql('failed'),
+            'short' => TransfersTracking::landedShortSql(),
+            'unrecorded' => TransfersTracking::missingNetSql(),
         ];
     }
 
     /**
      * Tranches matching every active filter, with no ordering and no eager
-     * loads, so both the ledger aggregate and the paginated ladder can build
-     * on it.
+     * loads, so the table, its totals, the Overview ledger and the export all
+     * build on it.
      *
-     * The ledger passes $withStage false so its figures keep describing the
-     * whole filtered set while a stage narrows only the ladder beneath it.
+     * The Overview ledger and the status counts pass $withStage false so they
+     * keep describing the whole filtered set while a stage narrows the rows.
      *
      * @return Builder<TransfersTracking>
      */
@@ -203,9 +382,15 @@ new #[Title('titles.transfers')] class extends Component {
                             ->orWhere('internal_project_number', 'like', Like::contains($search))));
                 });
             })
-            ->when($this->arStatus !== '', fn (Builder $query) => $query->where('ar_status', $this->arStatus))
-            ->when($this->account !== '', fn (Builder $query) => $query->where('account_id', (int) $this->account))
-            ->when((int) $this->agreement > 0, fn (Builder $query) => $query->where('donor_proposal_id', (int) $this->agreement))
+            ->when($this->donor !== '', fn (Builder $query) => $query->whereHas('donorProposal', fn (Builder $query) => $query->where('donor_id', (int) $this->donor)))
+            ->when($this->account !== '', fn (Builder $query) => $query->where('transfers_tracking.account_id', (int) $this->account))
+            ->when((int) $this->agreement > 0, fn (Builder $query) => $query->where('transfers_tracking.donor_proposal_id', (int) $this->agreement))
+            ->when($this->currency !== '', fn (Builder $query) => $query->where('transfers_tracking.amount_transfered_currency', $this->currency))
+            ->when($this->from !== '' || $this->to !== '', fn (Builder $query) => $query->datedWithin($this->dateBasis, $this->from ?: null, $this->to ?: null))
+            ->when($this->min !== '', fn (Builder $query) => $query->where('transfers_tracking.payment_amount', '>=', (float) $this->min))
+            ->when($this->max !== '', fn (Builder $query) => $query->where('transfers_tracking.payment_amount', '<=', (float) $this->max))
+            ->when($this->flag === 'converted', fn (Builder $query) => $query->converted())
+            ->when($this->flag === 'no_account', fn (Builder $query) => $query->whereNull('transfers_tracking.account_id'))
             ->when(
                 $withStage && array_key_exists($this->stage, $stages),
                 fn (Builder $query) => $query->whereRaw($stages[$this->stage]),
@@ -213,6 +398,172 @@ new #[Title('titles.transfers')] class extends Component {
     }
 
     /**
+     * The filtered tranches joined to the records their rows name, so the
+     * table can be sorted and grouped by donor, proposal and account.
+     *
+     * @return Builder<TransfersTracking>
+     */
+    protected function registerQuery(): Builder
+    {
+        return $this->filteredQuery()
+            ->join('donor_proposal', 'donor_proposal.id', '=', 'transfers_tracking.donor_proposal_id')
+            ->join('donors', 'donors.id', '=', 'donor_proposal.donor_id')
+            ->join('proposals', 'proposals.id', '=', 'donor_proposal.proposal_id')
+            ->leftJoin('accounts', 'accounts.id', '=', 'transfers_tracking.account_id');
+    }
+
+    /**
+     * What each column heading sorts by. Dates always put a missing date last;
+     * amounts sort inside their currency, so figures in different currencies
+     * are never ranked against each other.
+     *
+     * @return array<string, array{dir: 'asc'|'desc', order: list<string>}>
+     */
+    protected function registerSorts(): array
+    {
+        $table = 'transfers_tracking';
+        $stages = $this->stageSql();
+        $settled = $this->settledSql();
+        $lastById = "{$table}.id desc";
+
+        $byDate = fn (string $column): array => ["{$table}.{$column} is null", "{$table}.{$column} {dir}", $lastById];
+        $byAmount = fn (string $currency, string $amount): array => ["{$table}.{$amount} is null", "{$table}.{$currency} asc", "{$table}.{$amount} {dir}", $lastById];
+
+        return [
+            'scheduled' => ['dir' => 'desc', 'order' => $byDate('scheduled_date')],
+            'sent' => ['dir' => 'desc', 'order' => $byDate('transfer_date')],
+            'received' => ['dir' => 'desc', 'order' => $byDate('receive_date')],
+            'donor' => ['dir' => 'asc', 'order' => ['donors.name {dir}', 'proposals.name {dir}', $lastById]],
+            'account' => ['dir' => 'asc', 'order' => ['accounts.account_name is null', 'accounts.account_name {dir}', $lastById]],
+            'status' => ['dir' => 'asc', 'order' => [
+                "case when {$stages['overdue']} then 0 when {$stages['failed']} then 1 when {$stages['transit']} then 2 when {$stages['upcoming']} then 3 else 4 end {dir}",
+                "{$table}.scheduled_date is null",
+                "{$table}.scheduled_date asc",
+                $lastById,
+            ]],
+            'amount' => ['dir' => 'desc', 'order' => $byAmount('amount_transfered_currency', 'payment_amount')],
+            'fees' => ['dir' => 'desc', 'order' => $byAmount('fees_currency', 'fees')],
+            'rate' => ['dir' => 'desc', 'order' => ["{$table}.exchange_rate {dir}", $lastById]],
+            'gross' => ['dir' => 'desc', 'order' => $byAmount('amount_received_currency', 'amount_received')],
+            'net' => ['dir' => 'desc', 'order' => $byAmount('amount_received_currency', 'net_amount_received')],
+            // Largest loss first. A tranche with no comparable ends sorts last
+            // rather than passing for one that lost nothing.
+            'difference' => ['dir' => 'asc', 'order' => [
+                "case when {$settled} then 0 else 1 end",
+                "{$table}.amount_transfered_currency asc",
+                "({$table}.net_amount_received - {$table}.payment_amount) {dir}",
+                $lastById,
+            ]],
+            // Overdue first and oldest-overdue first inside it, then outright
+            // failures, then money that landed short, then money still moving.
+            'attention' => ['dir' => 'asc', 'order' => [
+                "case when {$stages['overdue']} then 0 when {$stages['failed']} then 1 when {$stages['short']} then 2 when {$stages['unrecorded']} then 3 when {$stages['transit']} then 4 else 5 end {dir}",
+                "{$table}.scheduled_date is null",
+                "{$table}.scheduled_date asc",
+                $lastById,
+            ]],
+        ];
+    }
+
+    protected function registerDefaultSort(): string
+    {
+        return 'scheduled';
+    }
+
+    /**
+     * The date column the date range and the month grouping read.
+     */
+    protected function dateColumn(): string
+    {
+        return 'transfers_tracking.'.TransfersTracking::DATE_COLUMNS[$this->dateBasis];
+    }
+
+    /**
+     * The SQL expression whose value a group shares, or null when the table is
+     * not grouped.
+     */
+    protected function groupKeySql(): ?string
+    {
+        return match ($this->group) {
+            'agreement' => 'transfers_tracking.donor_proposal_id',
+            'donor' => 'donor_proposal.donor_id',
+            'account' => 'coalesce(transfers_tracking.account_id, 0)',
+            'month' => "coalesce(date_format({$this->dateColumn()}, '%Y-%m'), '')",
+            default => null,
+        };
+    }
+
+    /**
+     * Keep each group's rows together, ahead of the chosen sort.
+     *
+     * @param  Builder<TransfersTracking>  $query
+     * @return Builder<TransfersTracking>
+     */
+    protected function groupOrder(Builder $query): Builder
+    {
+        return match ($this->group) {
+            'agreement' => $query->orderBy('donors.name')->orderBy('proposals.name')->orderBy('transfers_tracking.donor_proposal_id'),
+            'donor' => $query->orderBy('donors.name')->orderBy('donor_proposal.donor_id'),
+            'account' => $query->orderByRaw('accounts.account_name is null')->orderBy('accounts.account_name')->orderBy('transfers_tracking.account_id'),
+            'month' => $query->orderByRaw("{$this->dateColumn()} is null")->orderByRaw("date_format({$this->dateColumn()}, '%Y-%m') desc"),
+            default => $query,
+        };
+    }
+
+    /**
+     * The group a row belongs to: the same value groupKeySql() gives it.
+     */
+    protected function groupKeyOf(TransfersTracking $transfer): string
+    {
+        return match ($this->group) {
+            'agreement' => (string) $transfer->donor_proposal_id,
+            'donor' => (string) $transfer->donorProposal->donor_id,
+            'account' => (string) ($transfer->account_id ?? 0),
+            'month' => $transfer->{TransfersTracking::DATE_COLUMNS[$this->dateBasis]}?->format('Y-m') ?? '',
+            default => '',
+        };
+    }
+
+    /**
+     * What a group's header row calls it.
+     */
+    protected function groupLabelOf(TransfersTracking $transfer): string
+    {
+        $agreement = $transfer->donorProposal;
+
+        return match ($this->group) {
+            'agreement' => collect([$agreement->donor->name, $agreement->proposal->name, $agreement->external_project_number])->filter()->implode(' · '),
+            'donor' => $agreement->donor->name,
+            'account' => $transfer->account?->account_name ?? __('transfers.no_account'),
+            'month' => $transfer->{TransfersTracking::DATE_COLUMNS[$this->dateBasis]}?->translatedFormat(__('formats.month_year')) ?? __('finance_tables.no_date'),
+            default => '',
+        };
+    }
+
+    /**
+     * The table's visible page.
+     *
+     * @return LengthAwarePaginator<int, TransfersTracking>
+     */
+    #[Computed]
+    public function rows(): LengthAwarePaginator
+    {
+        $query = $this->registerQuery()
+            ->select('transfers_tracking.*')
+            ->with([
+                'donorProposal:id,slug,donor_id,proposal_id,external_project_number',
+                'donorProposal.donor:id,slug,name',
+                'donorProposal.proposal:id,slug,name',
+                // Nullable: a tranche may be scheduled before an account exists.
+                'account:id,account_name',
+            ]);
+
+        return $this->applyRegisterSort($this->groupOrder($query))->paginate($this->registerPerPage());
+    }
+
+    /**
+     * The Overview ladder's order.
+     *
      * @param  Builder<TransfersTracking>  $query
      * @return Builder<TransfersTracking>
      */
@@ -246,7 +597,11 @@ new #[Title('titles.transfers')] class extends Component {
         return $sorted->orderByDesc('id');
     }
 
-    /** @return LengthAwarePaginator<int, TransfersTracking> */
+    /**
+     * The Overview ladder's visible page.
+     *
+     * @return LengthAwarePaginator<int, TransfersTracking>
+     */
     #[Computed]
     public function transfers(): LengthAwarePaginator
     {
@@ -268,8 +623,8 @@ new #[Title('titles.transfers')] class extends Component {
     }
 
     /**
-     * One ledger line per currency money was sent in: what left the donor,
-     * what actually landed, and what the journey took out of it.
+     * One line per currency money was sent in: what left the donor, what
+     * actually landed, and what the journey took out of it.
      *
      * Every figure is a grouped aggregate so the line costs one query however
      * many tranches exist. Currencies are grouped, never added: a USD line and
@@ -287,8 +642,7 @@ new #[Title('titles.transfers')] class extends Component {
      *
      * @return Collection<int, array<string, mixed>>
      */
-    #[Computed]
-    public function ledger(): Collection
+    protected function ledgerLines(bool $withStage): Collection
     {
         $settled = $this->settledSql();
         $stages = $this->stageSql();
@@ -304,7 +658,7 @@ new #[Title('titles.transfers')] class extends Component {
             when fees < payment_amount - net_amount_received then fees
             else payment_amount - net_amount_received end)";
 
-        return $this->filteredQuery(withStage: false)
+        return $this->filteredQuery($withStage)
             ->selectRaw("
                 amount_transfered_currency as currency,
                 count(*) as tranches,
@@ -327,7 +681,10 @@ new #[Title('titles.transfers')] class extends Component {
                 coalesce(sum(case when {$stages['unrecorded']} then payment_amount else 0 end), 0) as unrecorded_amount,
                 sum(case when ar_status = 'received' and amount_received_currency <> amount_transfered_currency then 1 else 0 end) as converted_count,
                 coalesce(sum(case when ar_status = 'received' and amount_received_currency <> amount_transfered_currency then payment_amount else 0 end), 0) as converted_amount,
-                coalesce(sum(case when transfer_date is not null then payment_amount else 0 end), 0) as actually_sent
+                coalesce(sum(case when transfer_date is not null then payment_amount else 0 end), 0) as actually_sent,
+                coalesce(sum(case when ar_status = 'received' and amount_received_currency = amount_transfered_currency then coalesce(amount_received, 0) else 0 end), 0) as gross,
+                coalesce(sum(case when fees_currency = amount_transfered_currency then fees else 0 end), 0) as recorded_fees,
+                sum(case when fees > 0 and fees_currency <> amount_transfered_currency then 1 else 0 end) as fees_elsewhere_count
             ")
             ->groupBy('amount_transfered_currency')
             ->orderByRaw('sum(payment_amount) desc')
@@ -374,8 +731,138 @@ new #[Title('titles.transfers')] class extends Component {
                     'unrecordedAmount' => (float) $row->getAttribute('unrecorded_amount'),
                     'convertedCount' => (int) $row->getAttribute('converted_count'),
                     'convertedAmount' => (float) $row->getAttribute('converted_amount'),
+                    // The table's own columns: what the bank credited before its
+                    // charges, and every fee recorded in the currency sent.
+                    'gross' => (float) $row->getAttribute('gross'),
+                    'recordedFees' => (float) $row->getAttribute('recorded_fees'),
+                    'feesElsewhereCount' => (int) $row->getAttribute('fees_elsewhere_count'),
                 ];
             });
+    }
+
+    /**
+     * The Overview ledger. It deliberately ignores the stage filter, so its
+     * figures keep describing the whole filtered set while a stage narrows
+     * only the ladder beneath it.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    #[Computed]
+    public function ledger(): Collection
+    {
+        return $this->ledgerLines(withStage: false);
+    }
+
+    /**
+     * The table's totals. They respect every filter, status included, so the
+     * totals line and the footer always add up to the rows shown.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    #[Computed]
+    public function totals(): Collection
+    {
+        return $this->ledgerLines(withStage: true);
+    }
+
+    /**
+     * How many tranches sit at each stage under every other filter, for the
+     * status pills.
+     *
+     * @return array<string, int>
+     */
+    #[Computed]
+    public function stageCounts(): array
+    {
+        $stages = $this->stageSql();
+
+        $counts = $this->filteredQuery(withStage: false)
+            ->toBase()
+            ->selectRaw(
+                'count(*) as n_all, '.collect($stages)
+                    ->map(fn (string $condition, string $stage): string => "coalesce(sum(case when {$condition} then 1 else 0 end), 0) as n_{$stage}")
+                    ->implode(', ')
+            )
+            ->first();
+
+        return collect(['all', ...array_keys($stages)])
+            ->mapWithKeys(fn (string $stage): array => [$stage => (int) ($counts->{'n_'.$stage} ?? 0)])
+            ->all();
+    }
+
+    /**
+     * Each group's subtotals per currency, over every filtered tranche and not
+     * only the visible page, so a group split across two pages shows its true
+     * subtotal on both. Keyed by the group's key.
+     *
+     * @return Collection<string, Collection<int, object>>
+     */
+    #[Computed]
+    public function groupTotals(): Collection
+    {
+        $key = $this->groupKeySql();
+
+        if ($key === null) {
+            return new Collection;
+        }
+
+        $settled = $this->settledSql();
+        $table = 'transfers_tracking';
+
+        return $this->filteredQuery()
+            ->join('donor_proposal', 'donor_proposal.id', '=', 'transfers_tracking.donor_proposal_id')
+            ->toBase()
+            ->selectRaw("
+                {$key} as group_key,
+                {$table}.amount_transfered_currency as currency,
+                count(*) as tranches,
+                coalesce(sum({$table}.payment_amount), 0) as sent,
+                coalesce(sum(case when {$table}.fees_currency = {$table}.amount_transfered_currency then {$table}.fees else 0 end), 0) as fees,
+                coalesce(sum(case when {$table}.ar_status = 'received' and {$table}.amount_received_currency = {$table}.amount_transfered_currency then coalesce({$table}.amount_received, 0) else 0 end), 0) as gross,
+                coalesce(sum(case when {$settled} then {$table}.net_amount_received else 0 end), 0) as net,
+                coalesce(sum(case when {$settled} and {$table}.net_amount_received < {$table}.payment_amount then {$table}.payment_amount - {$table}.net_amount_received else 0 end), 0) as shortfall,
+                coalesce(sum(case when {$settled} and {$table}.net_amount_received > {$table}.payment_amount then {$table}.net_amount_received - {$table}.payment_amount else 0 end), 0) as overage
+            ")
+            ->groupByRaw("{$key}, {$table}.amount_transfered_currency")
+            ->orderBy('currency')
+            ->get()
+            ->groupBy(fn (object $row): string => (string) $row->group_key);
+    }
+
+    /**
+     * Every tranche the filters match, in the table's order, as a CSV file.
+     *
+     * The rows are read lazily and name their donor, proposal and account from
+     * the joined columns, so a large export holds one tranche in memory at a
+     * time.
+     */
+    public function exportCsv(): StreamedResponse
+    {
+        Gate::authorize('transfers.view');
+
+        $transfers = $this->applyRegisterSort($this->groupOrder($this->registerQuery()))
+            ->select([
+                'transfers_tracking.*',
+                'donors.name as donor_name',
+                'proposals.name as proposal_name',
+                'donor_proposal.external_project_number as agreement_reference',
+                'accounts.account_name as landing_account',
+            ])
+            ->cursor();
+
+        $rows = (function () use ($transfers) {
+            foreach ($transfers as $transfer) {
+                yield Tranches::csvRow(
+                    $transfer,
+                    (string) $transfer->getAttribute('donor_name'),
+                    (string) $transfer->getAttribute('proposal_name'),
+                    $transfer->getAttribute('agreement_reference'),
+                    $transfer->getAttribute('landing_account'),
+                );
+            }
+        })();
+
+        return CsvExport::download('transfers-'.CarbonImmutable::today()->toDateString().'.csv', Tranches::csvHeadings(), $rows);
     }
 
     /**
@@ -389,7 +876,7 @@ new #[Title('titles.transfers')] class extends Component {
     }
 
     /**
-     * A ledger narrowed to one agreement opens the new tranche on it, with its
+     * A page narrowed to one agreement opens the new tranche on it, with its
      * currency, as recording one from the agreement page would.
      */
     public function openCreateModal(): void
@@ -417,12 +904,16 @@ new #[Title('titles.transfers')] class extends Component {
 ?>
 
 @php
-    $filtersAreActive = $search !== '' || $arStatus !== '' || $account !== '' || $stage !== '' || $agreement !== '';
+    $showsOverview = $this->view === 'overview';
+    $filtersAreActive = collect([$this->search, $this->donor, $this->account, $this->currency, $this->stage, $this->flag, $this->from, $this->to, $this->min, $this->max, $this->agreement])
+        ->contains(fn (string $value): bool => $value !== '');
+    $total = $showsOverview ? $this->transfers->total() : $this->rows->total();
 
     $mutedText = 'text-secondary-medium dark:text-ink-muted';
     $inkText = 'text-secondary-dark dark:text-ink';
     $hairline = 'border-secondary-soft dark:border-line';
 
+    /* The closures below format the Overview view (_overview.blade.php). The table prints exact amounts itself. */
     $amount = fn (float $value): string => Number::format($value, maxPrecision: 0);
     $exact = fn (float $value): string => number_format($value, 2);
     /**
@@ -467,6 +958,72 @@ new #[Title('titles.transfers')] class extends Component {
         'date' => __('transfers.sort_date'),
         'amount' => __('transfers.sort_amount'),
     ];
+
+    /* Filter pills. `$chosen` is read instead of the properties so a loop variable can never shadow one. */
+    $chosen = [
+        'year' => $this->year,
+        'dateBasis' => $this->dateBasis,
+        'currency' => $this->currency,
+        'stage' => $this->stage,
+        'flag' => $this->flag,
+        'group' => $this->group,
+    ];
+    $sortKey = $this->activeSort();
+    $sortDirection = $this->activeSortDir();
+    $counts = $this->hasAnyTransfer ? $this->stageCounts : [];
+
+    $setPill = fn (string $property, string $value, string $label): array => [
+        'label' => $label,
+        'click' => "\$set('{$property}', '".($chosen[$property] === $value ? '' : $value)."')",
+        'active' => $chosen[$property] === $value,
+    ];
+    $stagePill = fn (string $value, string $label, ?string $tone = null): array => [
+        'label' => $label,
+        'click' => "toggleStage('{$value}')",
+        'active' => $chosen['stage'] === $value,
+        'count' => $counts[$value] ?? 0,
+        'tone' => ($counts[$value] ?? 0) > 0 ? $tone : null,
+        'test' => 'stage-'.$value,
+    ];
+
+    $yearPills = [
+        ['label' => __('finance_tables.all_years'), 'click' => "\$set('year', '')", 'active' => $chosen['year'] === ''],
+        ...array_map(fn (int $option): array => $setPill('year', (string) $option, (string) $option), $this->yearOptions),
+    ];
+    $basisPills = [
+        $setPill('dateBasis', 'scheduled', __('finance_tables.basis_scheduled')),
+        $setPill('dateBasis', 'sent', __('finance_tables.basis_sent')),
+        $setPill('dateBasis', 'received', __('finance_tables.basis_received')),
+    ];
+    $statusPills = [
+        ['label' => __('finance_tables.all'), 'click' => "toggleStage('')", 'active' => $chosen['stage'] === '', 'count' => $counts['all'] ?? 0, 'test' => 'stage-all'],
+        $stagePill('upcoming', __('finance_tables.state_upcoming')),
+        $stagePill('overdue', __('finance_tables.state_late'), 'critical'),
+        $stagePill('transit', __('finance_tables.state_transit'), 'warn'),
+        $stagePill('received', __('finance_tables.state_received')),
+        $stagePill('failed', __('finance_tables.state_failed'), 'critical'),
+    ];
+    $currencyPills = [
+        ['label' => __('finance_tables.all'), 'click' => "\$set('currency', '')", 'active' => $chosen['currency'] === ''],
+        ...array_map(fn (Currency $case): array => $setPill('currency', $case->value, $case->value), Currency::cases()),
+    ];
+    /* Landed short and net-not-recorded are stages of a received tranche, so they share the status property. */
+    $flagPills = [
+        $stagePill('short', __('finance_tables.flag_short'), 'critical'),
+        $stagePill('unrecorded', __('finance_tables.flag_unrecorded'), 'warn'),
+        ['label' => __('finance_tables.flag_converted'), 'click' => "toggleFlag('converted')", 'active' => $chosen['flag'] === 'converted', 'test' => 'flag-converted'],
+        ['label' => __('finance_tables.flag_no_account'), 'click' => "toggleFlag('no_account')", 'active' => $chosen['flag'] === 'no_account', 'test' => 'flag-no-account'],
+    ];
+    $groupPills = [
+        ['label' => __('finance_tables.group_none'), 'click' => "\$set('group', '')", 'active' => $chosen['group'] === ''],
+        $setPill('group', 'agreement', __('finance_tables.group_agreement')),
+        $setPill('group', 'donor', __('finance_tables.group_donor')),
+        $setPill('group', 'account', __('finance_tables.group_account')),
+        $setPill('group', 'month', __('finance_tables.group_month')),
+    ];
+    $orderPills = [
+        ['label' => __('finance_tables.needs_attention_first'), 'click' => 'toggleAttentionOrder', 'active' => $sortKey === 'attention', 'test' => 'order-attention'],
+    ];
 @endphp
 
 <section
@@ -476,35 +1033,92 @@ new #[Title('titles.transfers')] class extends Component {
     <x-ui.page-header
         heading-id="transfer-ladder-heading"
         :title="__('common.transfers')"
-        :count="$this->transfers->total()"
+        :count="$total"
     >
         <x-slot:filters>
             <x-ui.input type="search" icon="magnifying-glass" :label="__('transfers.search_transfers')" :placeholder="__('common.reference_donor_or_proposal')" wire:model.live.debounce.300ms="search" clearable />
 
-            <x-ui.header-filter-select :label="__('transfers.receipt_status')" wire:model.live="arStatus" :value="$arStatus">
-                <option value="">{{ __('common.all_statuses') }}</option>
-                @foreach (ArStatus::cases() as $statusCase)
-                    <option value="{{ $statusCase->value }}">{{ $statusCase->label() }}</option>
+            <x-ui.header-filter-select :label="__('funding_agreements.donor')" wire:model.live="donor" :value="$this->donor">
+                <flux:select.option value="">{{ __('funding_agreements.all_donors') }}</flux:select.option>
+                @foreach ($this->filterDonors as $donorOption)
+                    <flux:select.option :value="$donorOption->id" :wire:key="'tr-donor-'.$donorOption->id">{{ $donorOption->name }}</flux:select.option>
                 @endforeach
             </x-ui.header-filter-select>
 
-            <x-ui.header-filter-select :label="__('transfers.account')" wire:model.live="account" :value="$account">
-                <option value="">{{ __('common.all_accounts') }}</option>
-                @foreach ($this->accountOptions as $accountOption)
-                    <option value="{{ $accountOption->id }}">
+            <x-ui.header-filter-select :label="__('transfers.account')" wire:model.live="account" :value="$this->account">
+                <flux:select.option value="">{{ __('common.all_accounts') }}</flux:select.option>
+                @foreach ($this->filterAccounts as $accountOption)
+                    <flux:select.option :value="$accountOption->id" :wire:key="'tr-account-'.$accountOption->id">
                         {{ $accountOption->account_name }}@unless ($accountOption->is_active) · {{ __('common.closed') }}@endunless
-                    </option>
+                    </flux:select.option>
                 @endforeach
             </x-ui.header-filter-select>
         </x-slot:filters>
 
         <x-slot:actions>
-            @can('transfers.create')
-            <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/ladder:min-h-10" wire:click="openCreateModal" data-test="create-transfer-button">
-                {{ __('transfers.record_transfer') }}
-            </x-ui.button>
-            @endcan
+            <div class="flex flex-wrap items-center justify-end gap-2">
+                <x-ui.view-toggle
+                    :label="__('finance_tables.view_label')"
+                    wire-model="view"
+                    :active="$this->view"
+                    :options="[
+                        ['key' => 'table', 'label' => __('finance_tables.view_table'), 'icon' => 'table-cells'],
+                        ['key' => 'overview', 'label' => __('finance_tables.view_overview'), 'icon' => 'chart-bar'],
+                    ]"
+                />
+
+                @if ($this->hasAnyTransfer)
+                    <x-ui.button icon="arrow-down-tray" class="min-h-11 touch-manipulation @sm/ladder:min-h-10" wire:click="exportCsv" wire:loading.attr="disabled" wire:target="exportCsv" data-test="export-csv">
+                        {{ __('finance_tables.export_csv') }}
+                    </x-ui.button>
+                @endif
+
+                @can('transfers.create')
+                <x-ui.button tone="primary" icon="plus" class="min-h-11 touch-manipulation @sm/ladder:min-h-10" wire:click="openCreateModal" data-test="create-transfer-button">
+                    {{ __('transfers.record_transfer') }}
+                </x-ui.button>
+                @endcan
+            </div>
         </x-slot:actions>
+
+        @if ($this->hasAnyTransfer)
+            <x-slot:summary>
+                <x-funding.filters :active="$filtersAreActive">
+                    <x-funding.pills :label="__('finance_tables.year')" :pills="$yearPills" />
+
+                    <x-funding.pills :label="__('finance_tables.date_is')" :pills="$basisPills">
+                        <span class="ms-1 text-xs font-semibold {{ $mutedText }}">{{ __('finance_tables.from') }}</span>
+                        <x-ui.input type="date" size="sm" class="w-40" wire:model.live="from" :aria-label="__('finance_tables.from')" />
+                        <span class="text-xs font-semibold {{ $mutedText }}">{{ __('finance_tables.to') }}</span>
+                        <x-ui.input type="date" size="sm" class="w-40" wire:model.live="to" :aria-label="__('finance_tables.to')" />
+                    </x-funding.pills>
+
+                    <x-funding.pills :label="__('common.status')" :pills="$statusPills" />
+                    <x-funding.pills :label="__('common.currency')" :pills="$currencyPills" />
+                    <x-funding.pills :label="__('finance_tables.flags')" :pills="$flagPills" />
+
+                    <x-funding.filter-row :label="__('finance_tables.amount')">
+                        <x-ui.input type="number" inputmode="decimal" min="0" step="0.01" size="sm" class="w-36" wire:model.live.debounce.400ms="min" :placeholder="__('finance_tables.minimum')" :aria-label="__('finance_tables.minimum')" />
+                        <span class="text-xs font-semibold {{ $mutedText }}">{{ __('finance_tables.to') }}</span>
+                        <x-ui.input type="number" inputmode="decimal" min="0" step="0.01" size="sm" class="w-36" wire:model.live.debounce.400ms="max" :placeholder="__('finance_tables.maximum')" :aria-label="__('finance_tables.maximum')" />
+                    </x-funding.filter-row>
+
+                    @unless ($showsOverview)
+                        <x-funding.pills :label="__('finance_tables.group_by')" :pills="$groupPills" />
+                        <x-funding.pills :label="__('finance_tables.order')" :pills="$orderPills" />
+                    @endunless
+
+                    @if ($this->agreementFilter !== null)
+                        <x-funding.filter-row :label="__('finance_tables.group_agreement')">
+                            <button type="button" wire:click="$set('agreement', '')" class="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-funding-soft ps-3 pe-2 text-xs font-semibold text-funding transition-colors hover:bg-funding hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink dark:hover:text-surface-0" data-agreement-chip>
+                                {{ __('transfers.agreement_filter_chip', ['donor' => $this->agreementFilter->donor->name, 'proposal' => $this->agreementFilter->proposal->name]) }}
+                                <flux:icon.x-mark variant="micro" class="size-3.5" />
+                            </button>
+                        </x-funding.filter-row>
+                    @endif
+                </x-funding.filters>
+            </x-slot:summary>
+        @endif
     </x-ui.page-header>
 
     @if (! $this->hasAnyTransfer)
@@ -514,635 +1128,118 @@ new #[Title('titles.transfers')] class extends Component {
             :heading="__('transfers.no_transfers_recorded')"
             :body="__('transfers.record_the_first_tranche_against_a_funding_agreement')"
         />
+    @elseif ($showsOverview)
+        @include('pages.transfers._overview')
+    @elseif ($this->rows->isEmpty())
+        <x-ui.empty-state
+            class="rtl:[&_svg]:-scale-x-100"
+            icon="arrow-right-circle"
+            :heading="__('transfers.no_matching_transfers')"
+            :body="__('common.change_the_search_or_filters_and_try_again')"
+        />
     @else
-        {{-- The ledger: per currency, what left the donor against what actually arrived. --}}
-        <section aria-labelledby="ledger-heading" class="@container/ledger" data-ledger>
-            <h2 id="ledger-heading" class="sr-only">{{ __('transfers.what_was_sent_against_what_landed') }}</h2>
+        @php
+            $totalLines = $this->totals->map(fn (array $line): array => [
+                'currency' => $line['currency'],
+                'caption' => trans_choice('transfers.count_tranches', $line['tranches'], ['count' => $line['tranches']]),
+                'figures' => array_values(array_filter([
+                    ['key' => 'expected', 'label' => __('transfers.expected'), 'value' => $line['expected']],
+                    ['key' => 'sent', 'label' => __('transfers.sent'), 'value' => $line['sent']],
+                    ['key' => 'received', 'label' => __('finance_tables.received_net'), 'value' => $line['landed'], 'tone' => 'good'],
+                    ['key' => 'fees', 'label' => __('transfers.fees'), 'value' => $line['recordedFees']],
+                    ['key' => 'shortfall', 'label' => __('transfers.shortfall'), 'value' => $line['shrink'], 'prefix' => $line['shrink'] > 0 ? '−' : '', 'tone' => $line['shrink'] > 0 ? 'critical' : null],
+                    $line['overage'] > 0 ? ['key' => 'overage', 'label' => __('transfers.arrived_over'), 'value' => $line['overage'], 'prefix' => '+', 'tone' => 'good'] : null,
+                    ['key' => 'outstanding', 'label' => __('finance_tables.outstanding'), 'value' => $line['inFlight']],
+                ])),
+                'notes' => array_values(array_filter([
+                    $line['convertedCount'] > 0 ? trans_choice('transfers.count_tranches_landed_in_another_currency', $line['convertedCount'], ['count' => $line['convertedCount'], 'amount' => number_format($line['convertedAmount'], 2).' '.$line['currency']]) : null,
+                    $line['unrecordedCount'] > 0 ? trans_choice('transfers.count_tranches_missing_net', $line['unrecordedCount'], ['count' => $line['unrecordedCount'], 'amount' => number_format($line['unrecordedAmount'], 2).' '.$line['currency']]) : null,
+                    $line['feesElsewhereCount'] > 0 ? trans_choice('finance_tables.count_fees_in_another_currency', $line['feesElsewhereCount'], ['count' => $line['feesElsewhereCount']]) : null,
+                ])),
+            ])->all();
 
-            @forelse ($this->ledger as $line)
+            $footLines = $this->totals->map(fn (array $line): array => [
+                'currency' => $line['currency'],
+                'tranches' => $line['tranches'],
+                'sent' => $line['expected'],
+                'fees' => $line['recordedFees'],
+                'gross' => $line['gross'],
+                'net' => $line['landed'],
+                'shortfall' => $line['shrink'],
+                'overage' => $line['overage'],
+            ])->all();
+
+            $isGrouped = $this->group !== '';
+            $previousGroup = null;
+        @endphp
+
+        <x-funding.totals :lines="$totalLines" />
+
+        <x-funding.register size="xl" :caption="__('finance_tables.transfers_caption')">
+            <x-slot:head>
+                <x-funding.register.th sort="donor" :active="$sortKey" :dir="$sortDirection">{{ __('finance_tables.donor_agreement') }}</x-funding.register.th>
+                <x-funding.tranche-head sortable :active="$sortKey" :dir="$sortDirection" />
+            </x-slot:head>
+
+            @foreach ($this->rows as $transfer)
                 @php
-                    // The shrink hairline is drawn against everything sent, so
-                    // money still travelling occupies its share as a ghost
-                    // rather than silently making the loss look larger. A
-                    // tranche that arrived over pushes the total past what was
-                    // sent, so the scale takes whichever is larger.
-                    $scale = max($line['expected'], $line['landed'] + $line['shrink'] + $line['inFlight'], 0.01);
-                    $shortfallPercent = $percent($line['shrink'], $line['settledSent']);
-                    // "Landed in full" may only be said when nothing is still
-                    // outstanding. Otherwise it is the same lie the per-row
-                    // netting produced, reached by a different route.
-                    $everythingSettled = $line['inFlight'] <= 0;
-
-                    $figures = [
-                        [
-                            'stage' => null,
-                            'value' => $line['overage'],
-                            'label' => __('transfers.arrived_over'),
-                            'dot' => 'bg-funding',
-                            'tone' => 'text-funding',
-                            'note' => __('transfers.more_than_was_sent'),
-                            'count' => $line['overage'] > 0 ? 1 : 0,
-                        ],
-                        // Fees and the exchange gap are two halves of the
-                        // shortfall, not two places money is stuck. Filtering
-                        // both to `short` made four controls that all did the
-                        // same thing and lit up together. The shortfall figure
-                        // itself is the control now; these two only report.
-                        [
-                            'stage' => null,
-                            'value' => $line['fees'],
-                            'label' => __('transfers.fees'),
-                            'dot' => 'money-fees',
-                            'tone' => 'text-status-warn',
-                            'note' => __('transfers.percent_of_settled', ['percent' => $percent($line['fees'], $line['settledSent'])]),
-                            'count' => $line['shortCount'],
-                        ],
-                        [
-                            'stage' => null,
-                            'value' => $line['exchangeGap'],
-                            'label' => __('transfers.exchange_gap'),
-                            'dot' => 'money-gap',
-                            'tone' => $inkText,
-                            'note' => __('transfers.percent_of_settled', ['percent' => $percent($line['exchangeGap'], $line['settledSent'])]),
-                            'count' => $line['shortCount'],
-                        ],
-                        [
-                            'stage' => 'overdue',
-                            'value' => $line['overdue'],
-                            'label' => __('transfers.stage_overdue'),
-                            'dot' => 'bg-primary dark:bg-status-critical',
-                            'tone' => 'text-status-critical',
-                            'note' => trans_choice('transfers.count_tranches', $line['overdueCount'], ['count' => $line['overdueCount']]),
-                            'count' => $line['overdueCount'],
-                        ],
-                        [
-                            'stage' => 'transit',
-                            'value' => $line['transit'],
-                            'label' => __('transfers.stage_in_transit'),
-                            'dot' => 'bg-status-warn',
-                            'tone' => 'text-status-warn',
-                            'note' => trans_choice('transfers.count_tranches', $line['transitCount'], ['count' => $line['transitCount']]),
-                            'count' => $line['transitCount'],
-                        ],
-                        [
-                            'stage' => 'upcoming',
-                            'value' => $line['upcoming'],
-                            'label' => __('transfers.stage_upcoming'),
-                            'dot' => 'money-pending',
-                            'tone' => $inkText,
-                            'note' => trans_choice('transfers.count_tranches', $line['upcomingCount'], ['count' => $line['upcomingCount']]),
-                            'count' => $line['upcomingCount'],
-                        ],
-                        [
-                            'stage' => 'failed',
-                            'value' => $line['failed'],
-                            'label' => __('transfers.stage_failed'),
-                            'dot' => 'money-failed',
-                            'tone' => 'text-status-critical',
-                            'note' => trans_choice('transfers.count_tranches', $line['failedCount'], ['count' => $line['failedCount']]),
-                            'count' => $line['failedCount'],
-                        ],
-                    ];
-
-                    // A figure earns its place when it has money behind it, or
-                    // while it is the active filter. Nothing is shown at zero
-                    // just to keep the row a tidy width.
-                    $figures = array_values(array_filter(
-                        $figures,
-                        fn (array $figure): bool => $figure['value'] > 0 || $stage === $figure['stage'],
-                    ));
-
-                    $segments = [
-                        ['key' => 'landed', 'stage' => null, 'value' => $line['landed'], 'fill' => 'bg-funding', 'label' => __('transfers.landed')],
-                        ['key' => 'fees', 'stage' => 'short', 'value' => $line['fees'], 'fill' => 'money-fees', 'label' => __('transfers.fees')],
-                        ['key' => 'gap', 'stage' => 'short', 'value' => $line['exchangeGap'], 'fill' => 'money-gap', 'label' => __('transfers.exchange_gap')],
-                        ['key' => 'transit', 'stage' => 'transit', 'value' => $line['transit'], 'fill' => 'bg-status-warn', 'label' => __('transfers.stage_in_transit')],
-                        ['key' => 'overdue', 'stage' => 'overdue', 'value' => $line['overdue'], 'fill' => 'bg-primary dark:bg-status-critical', 'label' => __('transfers.stage_overdue')],
-                        ['key' => 'upcoming', 'stage' => 'upcoming', 'value' => $line['upcoming'], 'fill' => 'money-pending', 'label' => __('transfers.stage_upcoming')],
-                        ['key' => 'failed', 'stage' => 'failed', 'value' => $line['failed'], 'fill' => 'money-failed', 'label' => __('transfers.stage_failed')],
-                    ];
+                    $rowAgreement = $transfer->donorProposal;
+                    $groupKey = $isGrouped ? $this->groupKeyOf($transfer) : null;
                 @endphp
 
-                <div
-                    @class(['grid gap-y-5', 'mt-8 border-t pt-8 '.$hairline => ! $loop->first])
-                    wire:key="ledger-{{ $line['currency'] }}"
-                    data-ledger-currency="{{ $line['currency'] }}"
-                >
-                    {{-- Every figure is a label line, a number, then an optional note.
-                         Aligned to the start, not the end: "Expected" carries a third
-                         line, and bottom-aligning pushed its number above the two
-                         beside it. Start-aligned, all the labels share one line and
-                         all the figures share one baseline. --}}
-                    <div class="grid gap-x-10 gap-y-6 @6xl/ledger:grid-cols-[auto_minmax(0,1fr)] @6xl/ledger:items-start">
-                        <div class="flex flex-wrap items-start gap-x-7 gap-y-4 @xl/ledger:gap-x-10">
-                            {{-- "Expected", not "Sent": most of this may not have left
-                                 the donor yet, and the rows below say so themselves. --}}
-                            <div class="min-w-0">
-                                <p class="flex h-5 items-center text-xs font-semibold {{ $mutedText }}">
-                                    {{ __('transfers.expected') }} · {{ trans_choice('transfers.count_tranches', $line['tranches'], ['count' => $line['tranches']]) }}
-                                </p>
-                                <p class="mt-1.5 text-3xl leading-none font-extrabold tracking-tight tabular-nums @sm/ledger:text-4xl @xl/ledger:text-5xl {{ $inkText }}">
-                                    <span x-data="countUp({{ (int) round($line['expected']) }})" x-text="new Intl.NumberFormat('en-US').format(display)">{{ $amount($line['expected']) }}</span><span class="ms-2 align-top text-sm font-bold tracking-normal {{ $mutedText }}">{{ $line['currency'] }}</span>
-                                </p>
-                                <p class="mt-1 text-[11px] tabular-nums {{ $mutedText }}">
-                                    {{ __('transfers.of_which_sent', ['amount' => $amount($line['sent'])]) }}
-                                </p>
-                            </div>
-
-                            <div class="min-w-0">
-                                <p class="flex h-5 items-center gap-1.5 text-xs font-semibold {{ $mutedText }}">
-                                    <span class="size-2 rounded-full bg-funding" aria-hidden="true"></span>{{ __('transfers.landed') }}
-                                </p>
-                                <p class="mt-1.5 flex items-baseline gap-2.5 text-3xl leading-none font-extrabold tracking-tight tabular-nums text-funding @sm/ledger:text-4xl @xl/ledger:text-5xl" data-ledger-landed>
-                                    <span x-data="countUp({{ (int) round($line['landed']) }})" x-text="new Intl.NumberFormat('en-US').format(display)">{{ $amount($line['landed']) }}</span>
-                                </p>
-                            </div>
-
-                            {{-- The one figure this page exists to show, and the
-                                 control that narrows the ladder to the tranches
-                                 that produced it. --}}
-                            @if ($line['settledSent'] > 0)
-                                @php
-                                    $shortfallIsActive = $stage === 'short';
-                                @endphp
-                                <div class="min-w-0">
-                                    <button
-                                        type="button"
-                                        wire:click="toggleStage('short')"
-                                        aria-pressed="{{ $shortfallIsActive ? 'true' : 'false' }}"
-                                        @disabled($line['shrink'] <= 0)
-                                        data-ledger-figure="short"
-                                        @class([
-                                            'group -m-2 rounded-lg p-2 text-start transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-primary enabled:hover:bg-board-head disabled:cursor-default dark:enabled:hover:bg-white/5',
-                                            'bg-board-head ring-1 ring-secondary-dark dark:bg-white/5 dark:ring-ink' => $shortfallIsActive,
-                                        ])
-                                    >
-                                        <span class="flex h-5 items-center text-xs font-semibold {{ $mutedText }} group-enabled:group-hover:underline group-aria-pressed:underline">{{ __('transfers.shortfall') }}</span>
-                                        <span @class([
-                                            'mt-1.5 flex items-baseline gap-2 text-3xl leading-none font-extrabold tracking-tight tabular-nums @sm/ledger:text-4xl @xl/ledger:text-5xl',
-                                            'text-status-critical' => $line['shrink'] > 0,
-                                            'text-funding' => $line['shrink'] <= 0,
-                                        ]) data-ledger-shortfall>
-                                            @if ($line['shrink'] > 0)
-                                                −{{ $amountAtLeast($line['shrink']) }}<span class="text-lg font-bold tracking-normal">{{ $shortfallPercent }}%</span>
-                                            @elseif ($everythingSettled)
-                                                <span class="text-2xl @xl/ledger:text-3xl">{{ __('transfers.landed_in_full') }}</span>
-                                            @else
-                                                {{-- Nothing lost so far, but money is still out there. --}}
-                                                <span class="text-2xl @xl/ledger:text-3xl">{{ __('transfers.settled_money_landed_in_full') }}</span>
-                                            @endif
-                                        </span>
-                                    </button>
-                                </div>
-                            @endif
-                        </div>
-
-                        {{-- Where the rest of it is. Each figure narrows the ladder below. --}}
-                        @if ($figures !== [])
-                            {{-- Wrapping rather than a fixed column count: a seven-digit
-                                 figure in a sixth of the row overlaps its neighbour. --}}
-                            <ul class="flex flex-wrap items-start gap-x-8 gap-y-4 @6xl/ledger:justify-end">
-                                @foreach ($figures as $figure)
-                                    @php
-                                        $isActive = $figure['stage'] !== null && $stage === $figure['stage'];
-                                        $isEmpty = $figure['count'] <= 0;
-                                    @endphp
-                                    <li class="min-w-0">
-                                        @if ($figure['stage'] === null)
-                                            {{-- Not a place money can be stuck, so not a filter. --}}
-                                            <div class="p-2 -m-2">
-                                                <span class="flex h-5 items-center gap-1.5 text-xs font-semibold {{ $mutedText }}">
-                                                    <span class="size-2 shrink-0 rounded-full {{ $figure['dot'] }}" aria-hidden="true"></span>{{ $figure['label'] }}
-                                                </span>
-                                                <span class="mt-1.5 block text-xl leading-none font-extrabold tracking-tight tabular-nums @sm/ledger:text-2xl {{ $figure['tone'] }}">{{ $amountAtLeast($figure['value']) }}</span>
-                                                <span class="mt-1 block text-[11px] tabular-nums {{ $mutedText }}">{{ $figure['note'] }}</span>
-                                            </div>
-                                        @else
-                                            <button
-                                                type="button"
-                                                wire:click="toggleStage('{{ $figure['stage'] }}')"
-                                                aria-pressed="{{ $isActive ? 'true' : 'false' }}"
-                                                @disabled($isEmpty && ! $isActive)
-                                                @class([
-                                                    'group -m-2 w-full rounded-lg p-2 text-start transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-primary enabled:hover:bg-board-head disabled:cursor-default dark:enabled:hover:bg-white/5',
-                                                    'bg-board-head ring-1 ring-secondary-dark dark:bg-white/5 dark:ring-ink' => $isActive,
-                                                ])
-                                                data-ledger-figure="{{ $figure['stage'] }}"
-                                            >
-                                                <span class="flex h-5 items-center gap-1.5 text-xs font-semibold {{ $mutedText }}">
-                                                    <span class="size-2 shrink-0 rounded-full {{ $figure['dot'] }}" aria-hidden="true"></span>{{ $figure['label'] }}
-                                                </span>
-                                                <span @class(['mt-1.5 block text-xl leading-none font-extrabold tracking-tight tabular-nums @sm/ledger:text-2xl', $figure['tone'] => $figure['value'] > 0, $mutedText.' opacity-60' => $figure['value'] <= 0])>{{ $amountAtLeast($figure['value']) }}</span>
-                                                <span class="mt-1 block text-[11px] tabular-nums {{ $mutedText }} group-enabled:group-hover:underline group-aria-pressed:underline">{{ $figure['note'] }}</span>
-                                            </button>
-                                        @endif
-                                    </li>
-                                @endforeach
-                            </ul>
-                        @endif
-                    </div>
-
-                    {{-- The shrink line: everything sent, split by what became of it. --}}
-                    <div>
-                        <div class="measure-track flex h-4 w-full gap-[3px] overflow-hidden rounded-[3px]" role="group" aria-label="{{ __('transfers.shrink_line_label', ['currency' => $line['currency']]) }}">
-                            @foreach ($segments as $segment)
-                                @continue($segment['value'] <= 0)
-                                @php
-                                    $segmentTitle = $segment['label'].' · '.$exact($segment['value']).' '.$line['currency'];
-                                    $isActive = $segment['stage'] !== null && $stage === $segment['stage'];
-                                @endphp
-                                @if ($segment['stage'] === null)
-                                    <span
-                                        class="ledger-segment h-full min-w-1.5 rounded-[2px] {{ $segment['fill'] }}"
-                                        style="width: {{ round($segment['value'] / $scale * 100, 3) }}%"
-                                        title="{{ $segmentTitle }}"
-                                    ><span class="sr-only">{{ $segmentTitle }}</span></span>
-                                @else
-                                    <button
-                                        type="button"
-                                        wire:click="toggleStage('{{ $segment['stage'] }}')"
-                                        @class(['ledger-segment h-full min-w-1.5 rounded-[2px] transition-opacity duration-150 hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary', $segment['fill'], 'ring-1 ring-secondary-dark dark:ring-ink' => $isActive])
-                                        style="width: {{ round($segment['value'] / $scale * 100, 3) }}%"
-                                        title="{{ $segmentTitle }}"
-                                        aria-pressed="{{ $isActive ? 'true' : 'false' }}"
-                                    ><span class="sr-only">{{ $segmentTitle }}</span></button>
-                                @endif
-                            @endforeach
-                        </div>
-
-                        {{-- Money with no segment on the line above. Naming the
-                             amount, not just the count, so the unfilled remainder
-                             is accounted for rather than left as a silent gap. --}}
-                        @if ($line['convertedCount'] > 0 || $line['unrecordedCount'] > 0)
-                            <p class="mt-2 text-xs {{ $mutedText }}">
-                                @if ($line['convertedCount'] > 0)
-                                    {{ trans_choice('transfers.count_tranches_landed_in_another_currency', $line['convertedCount'], ['count' => $line['convertedCount'], 'amount' => $exact($line['convertedAmount']).' '.$line['currency']]) }}
-                                @endif
-                                @if ($line['unrecordedCount'] > 0)
-                                    {{ trans_choice('transfers.count_tranches_missing_net', $line['unrecordedCount'], ['count' => $line['unrecordedCount'], 'amount' => $exact($line['unrecordedAmount']).' '.$line['currency']]) }}
-                                @endif
-                            </p>
-                        @endif
-                    </div>
-                </div>
-            @empty
-                <p class="text-sm {{ $mutedText }}">{{ __('transfers.no_matching_transfers') }}</p>
-            @endforelse
-        </section>
-
-        {{-- How the ladder is ranked, and what is currently narrowing it. --}}
-        <div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t pt-5 {{ $hairline }}">
-            <div class="flex flex-wrap items-center gap-x-1 gap-y-2">
-                <span class="me-2 text-xs font-semibold {{ $mutedText }}">{{ __('transfers.sort_by') }}</span>
-                @foreach ($sortOptions as $sortKey => $sortLabel)
-                    <button
-                        type="button"
-                        wire:click="setSort('{{ $sortKey }}')"
-                        aria-pressed="{{ $sort === $sortKey ? 'true' : 'false' }}"
-                        @class([
-                            'rounded-full px-3 py-1.5 text-xs font-semibold transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
-                            'bg-secondary-dark text-white dark:bg-ink dark:text-surface-0' => $sort === $sortKey,
-                            'text-secondary-medium hover:bg-board-head dark:text-ink-muted dark:hover:bg-white/5' => $sort !== $sortKey,
-                        ])
-                        data-sort="{{ $sortKey }}"
-                    >{{ $sortLabel }}</button>
-                @endforeach
-            </div>
-
-            <div class="flex flex-wrap items-center gap-3">
-                <span class="text-xs tabular-nums {{ $mutedText }}">
-                    {{ trans_choice('transfers.count_matching_transfer', $this->transfers->total(), ['count' => $this->transfers->total()]) }}
-                </span>
-                @if ($this->agreementFilter !== null)
-                    <button type="button" wire:click="$set('agreement', '')" class="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-funding-soft ps-3 pe-2 text-xs font-semibold text-funding transition-colors hover:bg-funding hover:text-white dark:hover:text-surface-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink" data-agreement-chip>
-                        {{ __('transfers.agreement_filter_chip', ['donor' => $this->agreementFilter->donor->name, 'proposal' => $this->agreementFilter->proposal->name]) }}
-                        <flux:icon.x-mark variant="micro" class="size-3.5" />
-                    </button>
-                @endif
-                @if ($filtersAreActive)
-                    <flux:button size="sm" variant="ghost" class="text-secondary-medium! dark:text-ink-muted!" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
-                @endif
-            </div>
-        </div>
-
-        {{-- The ladder. --}}
-        @if ($this->transfers->isEmpty())
-            <x-ui.empty-state
-                class="rtl:[&_svg]:-scale-x-100"
-                icon="arrow-right-circle"
-                :heading="__('transfers.no_matching_transfers')"
-                :body="__('common.change_the_search_or_filters_and_try_again')"
-            />
-        @else
-            <ul class="divide-y divide-secondary-soft dark:divide-line">
-                @foreach ($this->transfers as $transfer)
+                @if ($isGrouped && $groupKey !== $previousGroup)
+                    <x-funding.tranche-group
+                        :label="$this->groupLabelOf($transfer)"
+                        :group="$groupKey"
+                        :lines="$this->groupTotals->get($groupKey, [])"
+                        :lead="1"
+                    />
                     @php
-                        $sentCurrency = $transfer->amount_transfered_currency;
-                        $promised = (float) $transfer->payment_amount;
-                        $transferState = $transfer->state();
-                        $landedHere = $transfer->amount_received_currency === $sentCurrency;
-                        $netLanded = $transfer->net_amount_received === null ? null : (float) $transfer->net_amount_received;
-
-                        // A measure is only drawn against the promise when both
-                        // ends of the journey are in the same currency. A
-                        // converted tranche gets its own reading instead.
-                        $isComparable = $transferState === 'received' && $netLanded !== null && $landedHere;
-                        // Money that did arrive, in a currency the promise cannot be
-                        // measured against. It landed; it just cannot be subtracted.
-                        $landedElsewhere = $transferState === 'received' && $netLanded !== null && ! $landedHere;
-                        $feesHere = $transfer->fees_currency === $sentCurrency;
-                        $feesAmount = (float) $transfer->fees;
-
-                        $shrink = $isComparable ? max(0.0, $promised - $netLanded) : 0.0;
-                        $feesTaken = $isComparable && $feesHere ? min($shrink, $feesAmount) : 0.0;
-                        $gapTaken = $shrink - $feesTaken;
-                        $overage = $isComparable ? max(0.0, $netLanded - $promised) : 0.0;
-
-                        // The bar is scaled to whichever is larger, so a tranche
-                        // that arrived fuller than it left still fits and the
-                        // promise tick shows it overshot.
-                        $rowScale = max($promised, $netLanded ?? 0.0, 0.01);
-                        $promisedTick = round($promised / $rowScale * 100, 3);
-
-                        $daysLate = $transferState === 'late' && $transfer->scheduled_date !== null
-                            ? (int) round($transfer->scheduled_date->diffInDays(CarbonImmutable::today()))
-                            : null;
-                        // Only when the money landed after it was sent, and only
-                        // when it landed at all. A receive date before the transfer
-                        // date is a typo, and "landed in −3 days" reports the typo
-                        // as a fact; a failed tranche never "landed" in any days.
-                        $daysInTransit = $transferState === 'received'
-                            && $transfer->transfer_date !== null
-                            && $transfer->receive_date !== null
-                            && $transfer->receive_date->gte($transfer->transfer_date)
-                                ? (int) round($transfer->transfer_date->diffInDays($transfer->receive_date))
-                                : null;
-
-                        // Money the donor has sent that has not arrived. Without
-                        // this the page is blind to the case it exists for: a wire
-                        // sent months ago that the account never saw is only ever
-                        // labelled "In transit", with no age and no urgency.
-                        $daysInFlight = $transferState === 'transit' && $transfer->transfer_date !== null
-                            ? (int) round($transfer->transfer_date->diffInDays(CarbonImmutable::today()))
-                            : null;
-
-                        $rowTone = match ($transferState) {
-                            'late', 'failed' => 'text-status-critical',
-                            'transit' => 'text-status-warn',
-                            default => $mutedText,
-                        };
-
-                        $stateLabel = match (true) {
-                            // Marked received with nothing recorded is not "landed".
-                            $transfer->isMissingNetAmount() => __('transfers.not_recorded_yet'),
-                            $transferState === 'received' => __('transfers.landed'),
-                            $transferState === 'failed' => __('transfers.stage_failed'),
-                            $transferState === 'transit' => __('transfers.stage_in_transit'),
-                            $transferState === 'late' => __('transfers.stage_overdue'),
-                            default => __('transfers.stage_upcoming'),
-                        };
-
-                        // The three nodes of the journey. An empty node is still
-                        // drawn: a date nobody has filled in is information.
-                        $thread = [
-                            ['label' => __('transfers.scheduled'), 'date' => $transfer->scheduled_date, 'done' => $transfer->scheduled_date !== null],
-                            ['label' => __('transfers.sent_on'), 'date' => $transfer->transfer_date, 'done' => $transfer->transfer_date !== null],
-                            ['label' => __('transfers.received_on'), 'date' => $transfer->receive_date, 'done' => $transfer->receive_date !== null],
-                        ];
-
-                        $measureLabel = $isComparable || $landedElsewhere
-                            ? __('transfers.measure_label_landed', [
-                                'sent' => $exact($promised).' '.$sentCurrency->value,
-                                'landed' => $exact($netLanded).' '.$transfer->amount_received_currency->value,
-                            ])
-                            : __('transfers.measure_label_pending', [
-                                'sent' => $exact($promised).' '.$sentCurrency->value,
-                                'state' => $stateLabel,
-                            ]);
+                        $previousGroup = $groupKey;
                     @endphp
+                @endif
 
-                    <li wire:key="transfer-{{ $transfer->id }}" data-transfer-state="{{ $transferState }}">
-                        <div
-                            x-data="{ open: false }"
-                            class="grid gap-x-8 gap-y-4 py-5 @4xl/ladder:grid-cols-[minmax(14rem,.85fr)_minmax(0,1.15fr)] @4xl/ladder:items-center"
-                        >
-                            {{-- Who owes it, and the journey its dates describe. --}}
-                            <div class="min-w-0">
-                                <div class="flex items-start gap-2">
-                                    <span @class(['mt-1.5 size-2 shrink-0 rounded-full', match ($transferState) {
-                                        'received' => 'bg-funding',
-                                        'failed', 'late' => 'bg-primary dark:bg-status-critical',
-                                        'transit' => 'bg-status-warn',
-                                        default => 'money-pending',
-                                    }]) aria-hidden="true"></span>
-                                    <div class="min-w-0">
-                                        <a
-                                            href="{{ route('donors.show', $transfer->donorProposal->donor) }}"
-                                            wire:navigate
-                                            class="block truncate text-sm font-semibold underline-offset-2 hover:underline {{ $inkText }}"
-                                        >{{ $transfer->donorProposal->donor->name }}</a>
-                                        <p class="flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs text-secondary-medium dark:text-ink-muted">
-                                            <a href="{{ route('proposals.show', $transfer->donorProposal->proposal) }}" wire:navigate class="truncate underline-offset-2 hover:underline">{{ $transfer->donorProposal->proposal->name }}</a>
-                                            <span aria-hidden="true">·</span>
-                                            <x-ui.project-number :number="$transfer->donorProposal->proposal->internal_project_number" kind="internal" class="shrink-0" />
-                                            <span aria-hidden="true">·</span>
-                                            <a href="{{ route('funding-agreements.show', $transfer->donorProposal) }}" wire:navigate class="shrink-0 underline-offset-2 hover:underline" data-agreement-link>{{ filled($transfer->donorProposal->external_project_number) ? __('proposals.agreement_number', ['number' => $transfer->donorProposal->external_project_number]) : __('proposals.view_agreement') }}</a>
-                                        </p>
-                                    </div>
-                                </div>
+                <x-funding.tranche-row :transfer="$transfer">
+                    <x-slot:lead>
+                        <td data-label="{{ __('finance_tables.donor_agreement') }}" data-wide>
+                            @can('donors.view')
+                                <a href="{{ route('donors.show', $rowAgreement->donor) }}" wire:navigate class="font-semibold underline-offset-2 hover:underline">{{ $rowAgreement->donor->name }}</a>
+                            @else
+                                <span class="font-semibold">{{ $rowAgreement->donor->name }}</span>
+                            @endcan
+                            <span class="sub">
+                                @can('proposals.view')
+                                    <a href="{{ route('proposals.show', $rowAgreement->proposal) }}" wire:navigate class="underline-offset-2 hover:underline">{{ $rowAgreement->proposal->name }}</a>
+                                @else
+                                    {{ $rowAgreement->proposal->name }}
+                                @endcan
+                                ·
+                                @can('funding-agreements.view')
+                                    <a href="{{ route('funding-agreements.show', $rowAgreement) }}" wire:navigate class="underline-offset-2 hover:underline" data-agreement-link>{{ filled($rowAgreement->external_project_number) ? $rowAgreement->external_project_number : __('proposals.view_agreement') }}</a>
+                                @else
+                                    {{ $rowAgreement->external_project_number ?? __('common.no_external_project_number') }}
+                                @endcan
+                            </span>
+                        </td>
+                    </x-slot:lead>
 
-                                {{-- Scheduled, sent, landed — three nodes on one thread. --}}
-                                <ol class="mt-3 flex items-center gap-0 ps-4">
-                                    @foreach ($thread as $node)
-                                        @if (! $loop->first)
-                                            <li aria-hidden="true" @class(['h-px w-4 shrink-0 @xl/ladder:w-7', $node['done'] ? 'bg-secondary-light' : 'bg-secondary-soft dark:bg-line-strong'])></li>
-                                        @endif
-                                        <li class="flex items-center gap-1.5">
-                                            <span @class([
-                                                'size-1.5 shrink-0 rounded-full',
-                                                'bg-secondary-dark dark:bg-ink-muted' => $node['done'],
-                                                'ring-1 ring-secondary-light' => ! $node['done'],
-                                            ]) aria-hidden="true"></span>
-                                            {{-- secondary-light is 2.69:1 on white. The
-                                                 "not yet" signal is the hollow dot, not a
-                                                 colour nobody can read. --}}
-                                            <span class="text-[11px] tabular-nums whitespace-nowrap {{ $mutedText }}">
-                                                <span class="sr-only">{{ $node['label'] }}: </span>
-                                                @if ($node['date'] === null)
-                                                    <span class="sr-only">{{ __('transfers.not_yet_assigned') }}</span>
-                                                    <span aria-hidden="true">—</span>
-                                                @else
-                                                    {{ $node['date']->translatedFormat(__('formats.date_short')) }}
-                                                @endif
-                                            </span>
-                                        </li>
-                                    @endforeach
-                                </ol>
+                    <x-slot:actions>
+                        <td>
+                            @can('transfers.update')
+                                {{-- Deleting a tranche happens inside its edit form. --}}
+                                <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-8!" wire:click="openEditModal({{ $transfer->id }})" :aria-label="__('transfers.edit_transfer')" data-test="edit-transfer-{{ $transfer->id }}" />
+                            @endcan
+                        </td>
+                    </x-slot:actions>
+                </x-funding.tranche-row>
+            @endforeach
 
-                                <p class="mt-2 ps-4 text-xs font-semibold {{ $rowTone }}">
-                                    @if ($daysLate !== null)
-                                        {{ trans_choice('transfers.count_days_overdue', $daysLate, ['count' => $daysLate]) }}
-                                    @elseif ($daysInFlight !== null)
-                                        {{ trans_choice('transfers.in_transit_for_count_days', $daysInFlight, ['count' => $daysInFlight]) }}
-                                    @elseif ($daysInTransit !== null)
-                                        {{ trans_choice('transfers.landed_in_count_days', $daysInTransit, ['count' => $daysInTransit]) }}
-                                    @else
-                                        {{ $stateLabel }}
-                                    @endif
-                                    <span class="{{ $mutedText }}">
-                                        ·
-                                        @if ($transfer->account === null)
-                                            <span class="italic">{{ __('transfers.no_account') }}</span>
-                                        @else
-                                            {{ $transfer->account->account_name }}
-                                        @endif
-                                    </span>
-                                </p>
-                            </div>
+            <x-slot:foot>
+                <x-funding.tranche-foot :lines="$footLines" :lead="1" />
+            </x-slot:foot>
+        </x-funding.register>
 
-                            {{-- The measure: the promise at full length, and what is left of it. --}}
-                            <div class="min-w-0">
-                                <div class="flex items-end justify-between gap-4">
-                                    <p class="text-2xl leading-none font-extrabold tracking-tight tabular-nums {{ $inkText }}">
-                                        {{ $amount($promised) }}<span class="ms-1.5 text-[11px] font-bold tracking-normal {{ $mutedText }}">{{ $sentCurrency->value }}</span>
-                                    </p>
-
-                                    <div class="flex items-center gap-1.5">
-                                        @if ($isComparable && $shrink > 0)
-                                            <p class="text-sm leading-none font-bold tabular-nums text-status-critical" data-row-shortfall>
-                                                −{{ $percent($shrink, $promised) }}%
-                                            </p>
-                                        @elseif ($isComparable && $overage > 0)
-                                            <p class="text-sm leading-none font-bold tabular-nums text-funding">
-                                                +{{ $percent($overage, $promised) }}%
-                                            </p>
-                                        @elseif ($isComparable)
-                                            <p class="text-sm leading-none font-bold tabular-nums text-funding">{{ __('transfers.landed_in_full') }}</p>
-                                        @else
-                                            <x-ui.enum-badge :case="$transfer->ar_status" />
-                                        @endif
-
-                                        <button
-                                            type="button"
-                                            x-on:click="open = ! open"
-                                            {{-- Static default so the control is still described
-                                                 correctly before Alpine takes over the binding. --}}
-                                            aria-expanded="false"
-                                            x-bind:aria-expanded="open ? 'true' : 'false'"
-                                            aria-controls="transfer-detail-{{ $transfer->id }}"
-                                            class="-me-1 flex size-8 items-center justify-center rounded-md text-secondary-medium transition-colors duration-150 hover:bg-board-head focus-visible:outline-2 focus-visible:outline-primary dark:text-ink-muted dark:hover:bg-white/5"
-                                            aria-label="{{ __('transfers.show_the_arithmetic') }}"
-                                        >
-                                            <flux:icon name="chevron-down" class="size-4 transition-transform duration-200" x-bind:class="open && 'rotate-180'" />
-                                        </button>
-
-                                        @can('transfers.update')
-                                        {{-- No delete: a money record never disappears. --}}
-                                        <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-8!" wire:click="openEditModal({{ $transfer->id }})" :aria-label="__('transfers.edit_transfer')" />
-                                        @endcan
-                                    </div>
-                                </div>
-
-                                {{-- The bar is the promise, drawn at full length. What landed is solid;
-                                     what the journey took is cut out of it. --}}
-                                <div class="relative mt-2.5 h-4" role="img" aria-label="{{ $measureLabel }}">
-                                    <div class="measure-track absolute inset-0 flex gap-[2px] overflow-hidden rounded-[3px]">
-                                        @if ($isComparable)
-                                            <span class="measure-fill h-full bg-funding" style="width: {{ round(($netLanded ?? 0) / $rowScale * 100, 3) }}%" title="{{ __('transfers.landed') }} · {{ $exact($netLanded) }} {{ $sentCurrency->value }}"></span>
-                                            @if ($feesTaken > 0)
-                                                <span class="measure-fill money-fees h-full" style="width: {{ round($feesTaken / $rowScale * 100, 3) }}%" title="{{ __('transfers.fees') }} · {{ $exact($feesTaken) }} {{ $sentCurrency->value }}"></span>
-                                            @endif
-                                            @if ($gapTaken > 0)
-                                                <span class="measure-fill money-gap h-full" style="width: {{ round($gapTaken / $rowScale * 100, 3) }}%" title="{{ __('transfers.exchange_gap') }} · {{ $exact($gapTaken) }} {{ $sentCurrency->value }}"></span>
-                                            @endif
-                                        @else
-                                            {{-- Nothing has landed. The measure is drawn empty rather than
-                                                 omitted: an unlit slot is information, a blank row is not. --}}
-                                            <span @class(['measure-fill h-full w-full', match (true) {
-                                                // It arrived, just not in a currency the promise
-                                                // can be measured against — so it reads as landed,
-                                                // never as money nobody recorded.
-                                                $landedElsewhere => 'bg-funding',
-                                                $transferState === 'failed' => 'money-failed',
-                                                $transferState === 'late' => 'money-overdue',
-                                                $transferState === 'transit' => 'money-transit',
-                                                $transferState === 'received' => 'money-unrecorded',
-                                                default => 'money-pending',
-                                            }]) title="{{ $measureLabel }}"></span>
-                                        @endif
-                                    </div>
-
-                                    {{-- Where the promise sat, so an overshoot is visible as an overshoot. --}}
-                                    @if ($isComparable && $overage > 0)
-                                        <span class="absolute inset-y-0 w-px bg-secondary-dark dark:bg-ink" style="inset-inline-start: {{ $promisedTick }}%" aria-hidden="true"></span>
-                                    @endif
-                                </div>
-
-                                {{-- The arithmetic that produced the gap. --}}
-                                <div
-                                    id="transfer-detail-{{ $transfer->id }}"
-                                    x-show="open"
-                                    x-collapse
-                                    {{-- Hidden before Alpine boots too: twenty panels flashing open
-                                         and collapsing on load is a worse first paint than none. --}}
-                                    style="display: none"
-                                    class="mt-3 border-t pt-3 {{ $hairline }}"
-                                >
-                                    <dl class="grid grid-cols-2 gap-x-6 gap-y-2.5 text-xs @xl/ladder:grid-cols-4">
-                                        <div>
-                                            <dt class="{{ $mutedText }}">{{ __('transfers.sent') }}</dt>
-                                            <dd class="mt-0.5"><x-ui.money :amount="$transfer->payment_amount" :currency="$transfer->amount_transfered_currency" /></dd>
-                                        </div>
-                                        <div>
-                                            <dt class="{{ $mutedText }}">{{ __('transfers.fees') }}</dt>
-                                            <dd class="mt-0.5"><x-ui.money :amount="$transfer->fees" :currency="$transfer->fees_currency" /></dd>
-                                        </div>
-                                        <div>
-                                            <dt class="{{ $mutedText }}">{{ __('transfers.exchange_rate') }}</dt>
-                                            <dd class="mt-0.5 font-semibold tabular-nums">{{ $rate($transfer->exchange_rate) }}</dd>
-                                        </div>
-                                        <div>
-                                            <dt class="{{ $mutedText }}">{{ __('common.net_received') }}</dt>
-                                            <dd class="mt-0.5">
-                                                @if ($transfer->net_amount_received === null)
-                                                    <span class="text-status-critical">{{ __('transfers.not_recorded_yet') }}</span>
-                                                @else
-                                                    <x-ui.money :amount="$transfer->net_amount_received" :currency="$transfer->amount_received_currency" />
-                                                @endif
-                                            </dd>
-                                        </div>
-                                    </dl>
-
-                                    <p class="mt-3 text-xs {{ $mutedText }}">
-                                        @if ($isComparable && $shrink > 0)
-                                            <span class="font-semibold text-status-critical">−{{ $exact($shrink) }} {{ $sentCurrency->value }}</span>
-                                            {{ __('transfers.never_reached_the_account') }}
-                                        @elseif (! $landedHere && $transfer->net_amount_received !== null)
-                                            {{ __('transfers.sent_in_currency_landed_in_currency', ['sent' => $sentCurrency->value, 'landed' => $transfer->amount_received_currency->value]) }}
-                                        @elseif ($transfer->isMissingNetAmount())
-                                            {{ __('transfers.received_but_no_net_amount_recorded') }}
-                                        @else
-                                            {{ __('transfers.nothing_has_left_the_donor_yet') }}
-                                        @endif
-                                        <span class="inline-flex flex-wrap items-center gap-x-1.5 {{ $inkText }}">
-                                            <x-ui.project-number :number="$transfer->donorProposal->proposal->internal_project_number" kind="internal" />
-                                            <span aria-hidden="true">·</span>
-                                            @if (filled($transfer->donorProposal->external_project_number))
-                                                <span>{{ __('transfers.reference_num', ['reference' => $transfer->donorProposal->external_project_number]) }}</span>
-                                            @else
-                                                <span class="{{ $mutedText }}">{{ __('common.no_external_project_number') }}</span>
-                                            @endif
-                                        </span>
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </li>
-                @endforeach
-            </ul>
-
-            <flux:pagination :paginator="$this->transfers" class="text-secondary-medium! dark:text-ink-muted!" scroll-to="#transfer-ladder-heading" />
-        @endif
+        <x-funding.pager :paginator="$this->rows" :per-page="$this->perPage" scroll-to="#transfer-ladder-heading" />
     @endif
 
     <x-funding.transfer-modal
