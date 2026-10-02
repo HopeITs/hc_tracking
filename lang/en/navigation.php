@@ -8,6 +8,7 @@ return [
     'documentation' => 'Documentation',
     'group_funding_finance' => 'Funding & Finance',
     'group_monitoring_evaluation' => 'Monitoring & Evaluation',
+    'group_overview' => 'Overview',
     'group_projects_delivery' => 'Projects & Delivery',
     'group_strategy_planning' => 'Strategy & Planning',
     'group_workspace' => 'My Workspace',

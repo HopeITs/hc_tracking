@@ -8,6 +8,7 @@ return [
     'documentation' => 'التوثيق',
     'group_funding_finance' => 'التمويل والمالية',
     'group_monitoring_evaluation' => 'المتابعة والتقييم',
+    'group_overview' => 'نظرة عامة',
     'group_projects_delivery' => 'المشاريع والتنفيذ',
     'group_strategy_planning' => 'الاستراتيجية والتخطيط',
     'group_workspace' => 'مساحة عملي',

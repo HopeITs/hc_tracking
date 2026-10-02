@@ -76,7 +76,7 @@
         x-on:resize.window.debounce.150ms="$el.closest('[data-navigation-sidebar]').style.setProperty('--sidebar-scrollbar', ($el.offsetWidth - $el.clientWidth) + 'px')"
     >
         <flux:sidebar.group
-            :heading="__('navigation.group_workspace')"
+            :heading="__('navigation.group_overview')"
             :class="$navigationGroupClasses"
         >
             <flux:sidebar.item
@@ -88,34 +88,6 @@
             >
                 {{ __('common.dashboard') }}
             </flux:sidebar.item>
-
-            {{-- Daily work first: tasks sit here, not under Delivery, because every role opens them most. --}}
-            @can('tasks.view')
-                <flux:sidebar.item
-                    icon="clipboard-document-check"
-                    :href="route('tasks.index')"
-                    :current="request()->routeIs('tasks.*')"
-                    :class="$navigationItemClasses"
-                    wire:navigate.hover
-                >
-                    {{ __('common.tasks') }}
-                    <x-slot:icon-trailing>
-                        <x-notifications.module-badge module="tasks" :count="$moduleCounts['tasks'] ?? 0" />
-                    </x-slot:icon-trailing>
-                </flux:sidebar.item>
-            @endcan
-
-            @can('calendar.view')
-                <flux:sidebar.item
-                    icon="calendar"
-                    :href="route('calendar.index')"
-                    :current="request()->routeIs('calendar.*')"
-                    :class="$navigationItemClasses"
-                    wire:navigate.hover
-                >
-                    {{ __('common.my_calendar') }}
-                </flux:sidebar.item>
-            @endcan
 
             @can('executive-summary.view')
                 <flux:sidebar.item
@@ -391,6 +363,41 @@
                         <x-slot:icon-trailing>
                             <x-notifications.module-badge module="accounts" :count="$moduleCounts['accounts'] ?? 0" />
                         </x-slot:icon-trailing>
+                    </flux:sidebar.item>
+                @endcan
+            </flux:sidebar.group>
+        @endcanany
+
+        {{-- Last on purpose: the manager walkthrough runs overview, strategy, delivery, results, funding, then "this is what your team sees". --}}
+        @canany(['tasks.view', 'calendar.view'])
+            <flux:sidebar.group
+                :heading="__('navigation.group_workspace')"
+                :class="$navigationGroupClasses"
+            >
+                            @can('tasks.view')
+                    <flux:sidebar.item
+                        icon="clipboard-document-check"
+                        :href="route('tasks.index')"
+                        :current="request()->routeIs('tasks.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate.hover
+                    >
+                        {{ __('common.tasks') }}
+                        <x-slot:icon-trailing>
+                            <x-notifications.module-badge module="tasks" :count="$moduleCounts['tasks'] ?? 0" />
+                        </x-slot:icon-trailing>
+                    </flux:sidebar.item>
+                @endcan
+
+                @can('calendar.view')
+                    <flux:sidebar.item
+                        icon="calendar"
+                        :href="route('calendar.index')"
+                        :current="request()->routeIs('calendar.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate.hover
+                    >
+                        {{ __('common.my_calendar') }}
                     </flux:sidebar.item>
                 @endcan
             </flux:sidebar.group>
