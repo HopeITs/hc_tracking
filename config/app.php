@@ -60,7 +60,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | Seconds browsers must keep using HTTPS for this host, sent by
-    | App\Http\Middleware\AddSecurityHeaders on HTTPS responses in production
+    | App\Http\Middleware\SecurityHeaders on HTTPS responses in production
     | only. Starts at one day; raise it to 31536000 (one year) once HTTPS has
     | run cleanly for a while. 0 makes browsers forget it (the rollback).
     |

@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\DeniedAccessRecorder;
-use App\Http\Middleware\AddSecurityHeaders;
 use App\Http\Middleware\EnsureHrAccountIsActive;
 use App\Http\Middleware\EnsureRequestCameThroughTrustedProxy;
 use App\Http\Middleware\EnsureTwoFactorIsEnabled;
@@ -29,7 +28,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ])
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->prepend([
-            AddSecurityHeaders::class,
+            SecurityHeaders::class,
             EnsureRequestCameThroughTrustedProxy::class,
         ]);
 
@@ -46,7 +45,6 @@ return Application::configure(basePath: dirname(__DIR__))
         // `throttle:guest` limits signed-out requests that do carry a session.
         $middleware->web(append: [
             'throttle:guest',
-            SecurityHeaders::class,
             SetLocale::class,
             SyncProgramsFromHr::class,
             EnsureHrAccountIsActive::class,

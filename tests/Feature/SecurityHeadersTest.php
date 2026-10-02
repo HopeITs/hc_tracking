@@ -5,8 +5,7 @@ use Illuminate\Support\Facades\Vite;
 
 /*
 | Every response carries the browser hardening headers from
-| App\Http\Middleware\AddSecurityHeaders (global, outermost) and
-| App\Http\Middleware\SecurityHeaders (web group, full CSP). Framing stays
+| App\Http\Middleware\SecurityHeaders (global, outermost). Framing stays
 | same-origin (not DENY) because the proposal, report and task pages embed PDF
 | previews.
 */
@@ -36,7 +35,8 @@ test('a request refused by the origin lockdown still carries the headers', funct
 
     $this->get(route('login'))
         ->assertForbidden()
-        ->assertHeader('X-Frame-Options', 'SAMEORIGIN');
+        ->assertHeader('X-Frame-Options', 'SAMEORIGIN')
+        ->assertHeader('Cross-Origin-Opener-Policy', 'same-origin');
 });
 
 test('a header the response already set is kept and x-powered-by is stripped', function () {

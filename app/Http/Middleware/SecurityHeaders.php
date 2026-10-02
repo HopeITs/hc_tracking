@@ -11,9 +11,10 @@ use Illuminate\Support\Facades\Vite;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Adds the browser-hardening response headers to every web response.
+ * Adds the browser-hardening response headers to every response.
  *
- * Headers a controller already set (the file previews send their own
+ * Prepended to the global stack ahead of the origin lockdown, so even a
+ * refused request's 403 carries the headers. Headers a controller already set (the file previews send their own
  * `Content-Security-Policy: sandbox`) are left untouched. The CSP keeps
  * 'unsafe-inline' and 'unsafe-eval' for scripts because Livewire, Alpine and
  * the inline toast/preloader scripts need them; everything else is locked to
@@ -21,8 +22,9 @@ use Symfony\Component\HttpFoundation\Response;
  * hijacking, and any request to a third-party host. The one exception is
  * the login page while Turnstile is on, which may load Cloudflare's widget.
  *
- * HSTS is not sent here: AddSecurityHeaders owns it (production over HTTPS,
- * max-age from config('app.hsts_max_age')).
+ * HSTS is sent only over HTTPS in production, so a local http:// copy can
+ * never be locked out. Its max-age comes from config('app.hsts_max_age');
+ * 0 tells browsers to forget an earlier HSTS answer, which is the rollback.
  */
 class SecurityHeaders
 {
@@ -54,6 +56,17 @@ class SecurityHeaders
             if (! $response->headers->has($name)) {
                 $response->headers->set($name, $value);
             }
+        }
+
+        if ($request->isSecure() && app()->isProduction()) {
+            $response->headers->set('Strict-Transport-Security', 'max-age='.max(0, (int) config('app.hsts_max_age')));
+        }
+
+        // PHP adds X-Powered-By itself (expose_php), outside the response object.
+        $response->headers->remove('X-Powered-By');
+
+        if (! headers_sent()) {
+            header_remove('X-Powered-By');
         }
 
         return $response;
