@@ -1,8 +1,8 @@
 <?php
 
 return [
-    'activity_log' => 'Activity log',
-    'notification_settings' => 'Notification rules',
+    'activity_log' => 'Activity Log',
+    'notification_settings' => 'Notification Rules',
     'administration' => 'Administration',
     'application_navigation' => 'Application navigation',
     'documentation' => 'Documentation',
@@ -20,6 +20,6 @@ return [
     'switch_language' => 'Switch language',
     'toggle_sidebar' => 'Collapse or expand the sidebar',
     'report_a_problem' => 'Report a problem or bug',
-    'roles_and_permissions' => 'Roles & permissions',
-    'user_directory' => 'User directory',
+    'roles_and_permissions' => 'Roles & Permissions',
+    'user_directory' => 'User Directory',
 ];

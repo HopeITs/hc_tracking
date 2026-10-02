@@ -50,7 +50,7 @@ test('administrators see the user directory in the application navigation', func
     $this->actingAs($admin)
         ->get(route('admin.users.index'))
         ->assertOk()
-        ->assertSeeText('User directory')
+        ->assertSeeText('User Directory')
         ->assertSee(route('admin.users.index'), false);
 });
 

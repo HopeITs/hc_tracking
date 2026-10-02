@@ -78,7 +78,7 @@ return [
     'popups_unsupported' => 'This browser does not support desktop popups.',
     'has_unread' => 'Has unread notifications',
     'app' => [
-        'heading' => 'HC Tracking desktop app',
+        'heading' => 'HC Tracking Desktop App',
         'help' => 'Install HC Tracking on this computer: it opens in its own window from the Start menu and taskbar, and its notifications carry the HC Tracking name and logo.',
         'install' => 'Install HC Tracking',
         'installed' => 'Installed on this computer. Open it from the Start menu or taskbar.',
@@ -178,7 +178,7 @@ return [
     ],
 
     'admin' => [
-        'title' => 'Notification rules',
+        'title' => 'Notification Rules',
         'save' => 'Save rules',
         'saved' => 'Notification rules saved.',
         'discard' => 'Discard',
