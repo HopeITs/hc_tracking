@@ -22,6 +22,29 @@ test('syncing mirrors every hr program under its hr id, inactive ones included',
     ])->and(Program::query()->whereNotNull('strategy_id')->orWhereNotNull('manager_id')->count())->toBe(0);
 });
 
+test('syncing mirrors the hr program manager, including a change of holder or a vacated seat', function () {
+    $department = insertHrDepartment();
+    $changedId = insertHrProgram('Study Zone');
+    $vacatedId = insertHrProgram('Sha8er');
+    $untouchedId = insertHrProgram('Hope Center');
+    $newManager = insertHrEmployee();
+    $oldManager = insertHrEmployee(firstNameEn: 'Lina');
+    $local = insertHrEmployee(firstNameEn: 'Omar');
+    insertHrContract($newManager, insertHrPosition($department, 'Program Manager', $changedId));
+    insertHrPosition($department, 'Program Manager', $vacatedId);
+    foreach ([$changedId => $oldManager, $vacatedId => $oldManager, $untouchedId => $local] as $id => $manager) {
+        DB::table('programs')->insert(['id' => $id, 'manager_id' => $manager, 'created_at' => now(), 'updated_at' => now()]);
+    }
+
+    Program::syncFromHr();
+
+    expect(Program::query()->pluck('manager_id', 'id')->all())->toEqual([
+        $changedId => $newManager,
+        $vacatedId => null,
+        $untouchedId => $local,
+    ]);
+});
+
 test('syncing refreshes a renamed program but keeps its strategy and manager', function () {
     $program = Activity::withoutRecording(fn (): Program => Program::factory()->create(['name' => 'Hope Center']));
     $strategyId = $program->strategy_id;

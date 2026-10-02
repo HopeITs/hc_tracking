@@ -67,12 +67,16 @@ test('the real data seeder runs every real seeder in dependency order with activ
     expect($runs->getArrayCopy())->toBe(array_map(fn (string $seeder): array => [$seeder, false], realSeedersInDependencyOrder()));
 });
 
-test('the database seeder loads no real records and no demo notifications', function () {
+test('the database seeder loads the real records quietly, before the demo notifications', function () {
+    insertHrSeedReferenceData();
     $runs = recordSeederRuns([...realSeedersInDependencyOrder(), NotificationDemoSeeder::class]);
 
     $this->seed();
 
-    expect($runs->getArrayCopy())->toBe([]);
+    expect($runs->getArrayCopy())->toBe([
+        ...array_map(fn (string $seeder): array => [$seeder, false], realSeedersInDependencyOrder()),
+        [NotificationDemoSeeder::class, true],
+    ]);
 });
 
 test('the real accounts seeder stores each account once when run again', function () {

@@ -18,7 +18,7 @@ use Illuminate\Support\Collection;
 /**
  * The delivery layer: risks, milestones, tasks, task updates and attachments.
  *
- * Depends on ProgrammeSeeder.
+ * Depends on DemoDeliverySeeder.
  */
 class DeliverySeeder extends Seeder
 {

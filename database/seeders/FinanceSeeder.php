@@ -16,7 +16,7 @@ use Illuminate\Database\Seeder;
  * The finance layer: bank accounts, payment tranches, the reports owed to
  * donors and the proposal status audit trail.
  *
- * Depends on ProgrammeSeeder.
+ * Depends on DemoDeliverySeeder.
  */
 class FinanceSeeder extends Seeder
 {

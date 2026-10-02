@@ -6,6 +6,8 @@ use App\Models\User;
 use App\Models\UserNotification;
 use Database\Seeders\NotificationDemoSeeder;
 
+beforeEach(fn () => insertHrSeedReferenceData());
+
 test('the demo seeder fills every role holder inbox with real, partly read notifications', function () {
     $this->seed();
     $first = userWithRole('Super Admin', insertHrEmployee());
@@ -30,8 +32,11 @@ test('the demo seeder does nothing when nobody can receive notifications', funct
     $this->seed();
     Activity::withoutRecording(fn () => User::query()->each(fn (User $user) => $user->syncRoles([])));
 
+    $activities = Activity::query()->count();
+    $notifications = UserNotification::query()->count();
+
     $this->seed(NotificationDemoSeeder::class);
 
-    expect(Activity::query()->count())->toBe(0)
-        ->and(UserNotification::query()->count())->toBe(0);
+    expect(Activity::query()->count())->toBe($activities)
+        ->and(UserNotification::query()->count())->toBe($notifications);
 });
