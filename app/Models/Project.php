@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Concerns\HasAssignments;
 use App\Concerns\HasSlug;
 use App\Concerns\RecordsActivity;
+use App\Enums\AssignmentStatus;
 use App\Enums\ProjectStatus;
 use App\Notifications\TracksActivity;
 use App\Observers\MediaOwnerObserver;
@@ -21,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 /**
  * @property int $id
@@ -62,7 +65,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 class Project extends Model implements TracksActivity
 {
     /** @use HasFactory<ProjectFactory> */
-    use HasFactory, HasSlug, RecordsActivity;
+    use HasAssignments, HasFactory, HasSlug, RecordsActivity;
 
     protected function slugSource(): string
     {
@@ -270,6 +273,39 @@ class Project extends Model implements TracksActivity
     public function activityEmployeeFields(): array
     {
         return ['user_id'];
+    }
+
+    /**
+     * The owner is asked to acknowledge or reject being put in charge.
+     *
+     * @return list<string>
+     */
+    public function assignmentFields(): array
+    {
+        return ['user_id'];
+    }
+
+    /**
+     * The owner assignment that stands right now, loadable for a whole list
+     * (a rejected one locks the project, see ProjectPolicy).
+     *
+     * @return MorphOne<Assignment, $this>
+     */
+    public function ownerAssignment(): MorphOne
+    {
+        return $this->morphOne(Assignment::class, 'assignable')->ofMany(
+            ['id' => 'max'],
+            fn (Builder $query) => $query->where('field', 'user_id')->where('status', '!=', AssignmentStatus::Superseded->value),
+        );
+    }
+
+    /**
+     * Whether the owner rejected being put in charge: nothing more can be
+     * done on the project (it can only be archived).
+     */
+    public function isOwnerRejected(): bool
+    {
+        return $this->ownerAssignment?->status === AssignmentStatus::Rejected;
     }
 
     /**

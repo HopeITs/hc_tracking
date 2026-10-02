@@ -7,6 +7,7 @@ namespace App\Notifications;
 use App\Enums\ArStatus;
 use App\Enums\ReportStatus;
 use App\Enums\TaskStatus;
+use App\Models\Assignment;
 use App\Models\Report;
 use App\Models\Scopes\TaskVisibilityScope;
 use App\Models\Task;
@@ -38,12 +39,28 @@ final class QuickActions
         $types = match ($subjectType) {
             'task' => $this->taskActions($subjectId, $user),
             'report' => $this->reportActions($subjectId, $user),
+            'project' => $this->assignmentActions($subjectType, $subjectId, $user),
             'transfer' => $user->can('transfers.update') && TransfersTracking::query()->whereKey($subjectId)->toBase()->value('ar_status') === ArStatus::Pending->value
                 ? ['transfer.mark_received'] : [],
             default => [],
         };
 
         return array_map(fn (string $type): array => ['type' => $type], $types);
+    }
+
+    /**
+     * Acknowledge / reject, offered to the person an assignment on the record
+     * is still waiting on.
+     *
+     * @return list<string>
+     */
+    private function assignmentActions(string $subjectType, int $subjectId, User $user): array
+    {
+        $assignment = Assignment::pendingFor($user, $subjectType, $subjectId);
+
+        return $assignment !== null && Gate::forUser($user)->allows('respond', $assignment)
+            ? ['assignment.acknowledge', 'assignment.reject']
+            : [];
     }
 
     /**
@@ -104,9 +121,41 @@ final class QuickActions
             'transfer.mark_received' => $user->can('transfers.update')
                 ? ['ok' => true, 'message' => 'notifications.quick.opening', 'redirect' => route('transfers.index', ['edit' => $id])]
                 : $this->result(false, 'forbidden'),
+            'assignment.acknowledge', 'assignment.reject' => $this->runAssignment($user, $notification, $type),
             'alert.snooze' => $this->snooze($user, $notification),
             default => $this->result(false, 'unavailable'),
         };
+    }
+
+    /**
+     * Acknowledging is one click; rejecting needs a reason, so it opens the
+     * record where the reason is written.
+     *
+     * @return array{ok: bool, message: string, redirect: string|null}
+     */
+    private function runAssignment(User $user, UserNotification $notification, string $type): array
+    {
+        $assignment = Assignment::pendingFor($user, (string) $notification->subject_type, (int) $notification->subject_id);
+
+        if ($assignment === null) {
+            return $this->result(false, 'already_done');
+        }
+
+        if (! Gate::forUser($user)->allows('respond', $assignment)) {
+            return $this->result(false, 'forbidden');
+        }
+
+        if ($type === 'assignment.reject') {
+            $url = app(SubjectLinks::class)->routeFor((string) $notification->subject_type, (int) $notification->subject_id);
+
+            return $url === null
+                ? $this->result(false, 'missing')
+                : ['ok' => true, 'message' => 'notifications.quick.opening_record', 'redirect' => $url.'?respond=reject'];
+        }
+
+        $assignment->acknowledge($user);
+
+        return $this->result(true, 'done');
     }
 
     /**

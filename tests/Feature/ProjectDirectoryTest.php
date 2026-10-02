@@ -84,15 +84,15 @@ test('the status URL filter selects projects by lifecycle state', function () {
 test('a project can be created with lifecycle dates and independent beneficiary targets', function () {
     $user = User::factory()->role('General Manager')->create();
     $city = insertHrCity();
-    $program = Program::factory()->create();
     $owner = insertHrEmployee();
+    $program = Program::factory()->create(['manager_id' => $owner]);
 
     Livewire::actingAs($user)
         ->test('pages::projects.index')
         ->call('openCreateModal')
         ->set('name', '  Idlib Water Network  ')
         ->set('description', '  Restores reliable household water access.  ')
-        ->set('projectStatus', ProjectStatus::Approved->value)
+        ->set('projectStatus', ProjectStatus::Approved->value) // read-only in the form: ignored on create
         ->set('startDate', '2026-09-01')
         ->set('endDate', '2027-08-31')
         ->set('targetBeneficiaries', '1000')
@@ -110,7 +110,7 @@ test('a project can be created with lifecycle dates and independent beneficiary 
     $project = Project::query()->where('name', 'Idlib Water Network')->sole();
 
     expect($project->description)->toBe('Restores reliable household water access.')
-        ->and($project->status)->toBe(ProjectStatus::Approved)
+        ->and($project->status)->toBe(ProjectStatus::Draft)
         ->and($project->start_date?->toDateString())->toBe('2026-09-01')
         ->and($project->end_date?->toDateString())->toBe('2027-08-31')
         ->and($project->target_beneficiaries)->toBe(1000)
@@ -123,8 +123,8 @@ test('a project can be created with lifecycle dates and independent beneficiary 
 test('nullable project details are normalized before saving', function () {
     $user = User::factory()->role('General Manager')->create();
     $city = insertHrCity();
-    $program = Program::factory()->create();
     $owner = insertHrEmployee();
+    $program = Program::factory()->create(['manager_id' => $owner]);
 
     Livewire::actingAs($user)
         ->test('pages::projects.index')
@@ -181,8 +181,8 @@ test('a project cannot be placed in a city that does not exist in hr', function 
 test('project lifecycle dates and targets reject invalid values', function () {
     $user = User::factory()->role('General Manager')->create();
     $city = insertHrCity();
-    $program = Program::factory()->create();
     $owner = insertHrEmployee();
+    $program = Program::factory()->create(['manager_id' => $owner]);
 
     Livewire::actingAs($user)
         ->test('pages::projects.index')
@@ -191,7 +191,6 @@ test('project lifecycle dates and targets reject invalid values', function () {
         ->set('cityId', (string) $city)
         ->set('programId', (string) $program->id)
         ->set('userId', (string) $owner)
-        ->set('projectStatus', 'ACTIVE')
         ->set('startDate', '2026-09-10')
         ->set('endDate', '2026-09-09')
         ->set('targetBeneficiaries', '-1')
@@ -200,9 +199,21 @@ test('project lifecycle dates and targets reject invalid values', function () {
         ->set('targetBoys', 'not-a-number')
         ->set('targetGirls', '-3')
         ->call('saveProject')
-        ->assertHasErrors(['projectStatus', 'endDate', 'targetBeneficiaries', 'targetMen', 'targetWomen', 'targetBoys', 'targetGirls']);
+        ->assertHasErrors(['endDate', 'targetBeneficiaries', 'targetMen', 'targetWomen', 'targetBoys', 'targetGirls']);
 
     expect(Project::query()->count())->toBe(0);
+});
+
+test('an unknown status is rejected when editing a project past draft', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $project = Project::factory()->status(ProjectStatus::Active)->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::projects.index')
+        ->call('openEditModal', $project->id)
+        ->set('projectStatus', 'ACTIVE')
+        ->call('saveProject')
+        ->assertHasErrors(['projectStatus']);
 });
 
 test('a project can be renamed relocated and moved through its lifecycle', function () {
@@ -510,7 +521,8 @@ test('the project directory renders within its query budget', function () {
 
     Livewire::actingAs($user)->test('pages::projects.index');
 
-    expect($queries)->toBeLessThanOrEqual(17);
+    // 17 + one query that loads every owner assignment for the Rejected badge.
+    expect($queries)->toBeLessThanOrEqual(18);
 });
 
 test('a board card hides relations it has none of and keeps a materialised risk', function () {

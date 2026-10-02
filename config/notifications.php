@@ -78,6 +78,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Top-level position
+    |--------------------------------------------------------------------------
+    |
+    | English title of the HR position (with no direct manager) whose holder is
+    | above the program managers. They hear about a project-owner assignment
+    | only when a program manager rejects it.
+    */
+    'top_level_position_title' => 'Chief Executive Officer',
+
+    /*
+    |--------------------------------------------------------------------------
     | Grouping window
     |--------------------------------------------------------------------------
     |

@@ -41,20 +41,26 @@ class ProjectPolicy
     }
 
     /**
-     * Determine whether the user can edit the project.
+     * Determine whether the user can edit the project. Nobody can once its
+     * owner has rejected the assignment.
      */
     public function update(User $user, Project $project): bool
     {
+        if ($project->isOwnerRejected()) {
+            return false;
+        }
+
         return $user->can('projects.update') || in_array($project->id, $user->ownedProjectIds(), true);
     }
 
     /**
      * Determine whether the user can move the project to another program or
-     * owner: a management decision, not an owner's.
+     * owner: a management decision, not an owner's. Locked for everyone once
+     * the owner has rejected the assignment.
      */
     public function reassign(User $user, Project $project): bool
     {
-        return $user->can('projects.update');
+        return ! $project->isOwnerRejected() && $user->can('projects.update');
     }
 
     /**

@@ -47,6 +47,12 @@ return [
         'semi_annual' => 'نصف سنوي',
         'annual' => 'سنوي',
     ],
+    'assignment_status' => [
+        'pending' => 'قيد الانتظار',
+        'acknowledged' => 'تم التأكيد',
+        'rejected' => 'مرفوض',
+        'superseded' => 'مستبدل',
+    ],
     'project_status' => [
         'draft' => 'مسودة',
         'submitted' => 'مقدَّم',
