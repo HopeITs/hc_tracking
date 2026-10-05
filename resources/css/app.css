@@ -10,7 +10,7 @@
 
 @font-face {
     font-family: 'Somar Sans';
-    src: url('../fonts/somar-sans/SomarSans-Light.otf') format('opentype');
+    src: url('../fonts/somar-sans/SomarSans-Light.woff2') format('woff2');
     font-weight: 300;
     font-style: normal;
     font-display: swap;
@@ -18,7 +18,7 @@
 
 @font-face {
     font-family: 'Somar Sans';
-    src: url('../fonts/somar-sans/SomarSans-Regular.otf') format('opentype');
+    src: url('../fonts/somar-sans/SomarSans-Regular.woff2') format('woff2');
     font-weight: 400;
     font-style: normal;
     font-display: swap;
@@ -26,7 +26,7 @@
 
 @font-face {
     font-family: 'Somar Sans';
-    src: url('../fonts/somar-sans/SomarSans-Medium.otf') format('opentype');
+    src: url('../fonts/somar-sans/SomarSans-Medium.woff2') format('woff2');
     font-weight: 500;
     font-style: normal;
     font-display: swap;
@@ -34,7 +34,7 @@
 
 @font-face {
     font-family: 'Somar Sans';
-    src: url('../fonts/somar-sans/SomarSans-SemiBold.otf') format('opentype');
+    src: url('../fonts/somar-sans/SomarSans-SemiBold.woff2') format('woff2');
     font-weight: 600;
     font-style: normal;
     font-display: swap;
@@ -42,7 +42,7 @@
 
 @font-face {
     font-family: 'Somar Sans';
-    src: url('../fonts/somar-sans/SomarSans-Bold.otf') format('opentype');
+    src: url('../fonts/somar-sans/SomarSans-Bold.woff2') format('woff2');
     font-weight: 700;
     font-style: normal;
     font-display: swap;
@@ -50,7 +50,7 @@
 
 @font-face {
     font-family: 'Somar Sans';
-    src: url('../fonts/somar-sans/SomarSans-ExtraBold.otf') format('opentype');
+    src: url('../fonts/somar-sans/SomarSans-ExtraBold.woff2') format('woff2');
     font-weight: 800;
     font-style: normal;
     font-display: swap;
