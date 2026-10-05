@@ -3,6 +3,7 @@
 @endphp
 
 <div class="@container" x-data="{ subtasksOpen: {} }">
+    @if ($this->listLayout !== 'narrow')
     <table class="hidden w-full table-fixed border-collapse text-start text-sm @3xl:table">
         <thead class="bg-secondary-soft/40 dark:bg-surface-2">
             <tr class="[&>th]:px-3.5 [&>th]:py-2.5 [&>th]:text-start [&>th]:text-[11px] [&>th]:font-bold [&>th]:tracking-wider [&>th]:text-secondary-medium [&>th]:uppercase [&>th]:dark:text-ink-faint">
@@ -30,8 +31,10 @@
             @endcan
         </tbody>
     </table>
+    @endif
 
     {{-- Mobile / tablet fallback: stacked cards instead of a squeezed table. --}}
+    @if ($this->listLayout !== 'wide')
     <div class="divide-y divide-secondary-soft @3xl:hidden dark:divide-line">
         @foreach ($groupTasks as $task)
             @include('pages.tasks._list-card', ['task' => $task, 'today' => $today, 'priorityIconClasses' => $priorityIconClasses, 'isSubtask' => false])
@@ -46,4 +49,5 @@
             @include('pages.tasks._list-task-composer-mobile', ['group' => $group, 'groupKeyString' => $groupKeyString])
         @endcan
     </div>
+    @endif
 </div>

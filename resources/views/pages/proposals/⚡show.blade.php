@@ -425,13 +425,6 @@ new #[Title('titles.proposal')] class extends Component
             ->get();
     }
 
-    /** @return Collection<int, HrEmployee> */
-    #[Computed]
-    public function userOptions(): Collection
-    {
-        return HrEmployee::pickerOptions();
-    }
-
     public function openAddTaskModal(): void
     {
         Gate::authorize('create', Task::class);
@@ -3091,5 +3084,5 @@ new #[Title('titles.proposal')] class extends Component
         confirm-test="confirm-delete-proposal-file"
     />
 
-    <x-tasks.add-task-modal test-prefix="new-proposal-task" :user-options="$this->userOptions" />
+    <x-tasks.add-task-modal test-prefix="new-proposal-task" />
 </section>

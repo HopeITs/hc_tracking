@@ -424,13 +424,6 @@ new #[Title('titles.calendar')] class extends Component {
         return Project::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get();
     }
 
-    /** @return Collection<int, HrEmployee> */
-    #[Computed]
-    public function userOptions(): Collection
-    {
-        return HrEmployee::pickerOptions();
-    }
-
     /** @return Collection<int, Milestone> */
     #[Computed]
     public function parentOptions(): Collection
@@ -1617,7 +1610,7 @@ new #[Title('titles.calendar')] class extends Component {
 
     $focusedType = $this->focusedType();
 
-    $selectedFilterEmployees = $filterEmployeeIds === [] ? new \Illuminate\Support\Collection : $this->userOptions->whereIn('id', array_map('intval', $filterEmployeeIds))->values();
+    $selectedFilterCount = count($filterEmployeeIds);
 
     $periodHeading = match ($viewMode) {
         'month' => $calendar['month']->translatedFormat(__('formats.month_year')),
@@ -1735,8 +1728,8 @@ new #[Title('titles.calendar')] class extends Component {
                 <x-slot:trigger>
                     <flux:icon.user variant="micro" class="size-4" />
                     <span class="hidden text-sm sm:inline">{{ __('calendar.filter_by_responsible') }}</span>
-                    @if ($selectedFilterEmployees->isNotEmpty())
-                        <span class="inline-flex min-w-4 items-center justify-center rounded-full bg-primary dark:bg-white/10 dark:text-ink px-1 text-[10px] font-semibold text-white" data-test="calendar-responsible-filter-count">{{ $selectedFilterEmployees->count() }}</span>
+                    @if ($selectedFilterCount > 0)
+                        <span class="inline-flex min-w-4 items-center justify-center rounded-full bg-primary dark:bg-white/10 dark:text-ink px-1 text-[10px] font-semibold text-white" data-test="calendar-responsible-filter-count">{{ $selectedFilterCount }}</span>
                     @endif
                 </x-slot:trigger>
 
@@ -1745,16 +1738,18 @@ new #[Title('titles.calendar')] class extends Component {
                     @if ($filterEmployeeIds === [])<flux:icon.check class="ms-auto size-4 shrink-0 text-primary dark:text-brand-text" />@endif
                 </button>
                 <div class="my-1 border-t border-secondary-soft dark:border-line"></div>
-                @foreach ($this->userOptions as $userOption)
-                    <label
-                        x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
-                        class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-secondary-soft dark:hover:bg-white/[0.06]"
-                        data-test="calendar-responsible-filter-option-{{ $userOption->id }}"
-                    >
-                        <input type="checkbox" wire:model.live="filterEmployeeIds" value="{{ $userOption->id }}" class="rounded border-secondary-light text-primary dark:text-brand-text focus:ring-primary" />
-                        <span class="min-w-0 truncate">{{ $userOption->name }} · {{ $userOption->secondary_name }}</span>
-                    </label>
-                @endforeach
+                <div
+                    wire:ignore
+                    x-data="employeeCheckList"
+                    x-effect="paint(optionSearch, touched)"
+                    x-on:click="pick($event)"
+                    class="contents"
+                    data-employees-url="{{ route('employees.picker-options', ['l' => app()->getLocale()]) }}"
+                    data-model="filterEmployeeIds"
+                    data-role="option"
+                    data-item-class="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm hover:bg-secondary-soft dark:hover:bg-white/[0.06]"
+                    data-check-class="ms-auto size-4 shrink-0 text-primary dark:text-brand-text"
+                ></div>
             </x-ui.multi-select-popover>
             </div>
 
@@ -2099,11 +2094,7 @@ new #[Title('titles.calendar')] class extends Component {
                     @endforeach
                 </x-ui.form-select>
 
-                <x-ui.form-select wire:model="responsibleUserId" :label="__('milestones.responsible')" :placeholder="__('common.select')" :search-label="__('milestones.search_responsible')">
-                    @foreach ($this->userOptions as $userOption)
-                        <option value="{{ $userOption->id }}">{{ $userOption->name }} · {{ $userOption->secondary_name }}</option>
-                    @endforeach
-                </x-ui.form-select>
+                <x-ui.form-select wire:model="responsibleUserId" :label="__('milestones.responsible')" :placeholder="__('common.select')" :search-label="__('milestones.search_responsible')" employees />
             </div>
         </x-ui.form-section>
 
@@ -2197,11 +2188,7 @@ new #[Title('titles.calendar')] class extends Component {
 
                 <x-ui.form-input wire:model="progressPercentage" :label="__('tasks.progress_2')" type="number" min="0" max="100" suffix="%" required />
 
-                <x-ui.form-multiselect wire:model="assignedTo" :label="__('tasks.assignees')" :placeholder="__('common.select')" class="col-span-2" data-test="task-assignee-picker">
-                    @foreach ($this->userOptions as $userOption)
-                        <option value="{{ $userOption->id }}">{{ $userOption->name }} · {{ $userOption->secondary_name }}</option>
-                    @endforeach
-                </x-ui.form-multiselect>
+                <x-ui.form-multiselect wire:model="assignedTo" :label="__('tasks.assignees')" :placeholder="__('common.select')" class="col-span-2" data-test="task-assignee-picker" employees />
             </div>
         </x-ui.form-section>
 

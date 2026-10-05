@@ -167,13 +167,6 @@ new #[Title('titles.programs')] class extends Component {
             ->get();
     }
 
-    /** @return Collection<int, HrEmployee> */
-    #[Computed]
-    public function managerOptions(): Collection
-    {
-        return HrEmployee::pickerOptions();
-    }
-
     public function openEditModal(int $programId): void
     {
         $program = Program::query()
@@ -259,13 +252,8 @@ new #[Title('titles.programs')] class extends Component {
                 @endforeach
             </x-ui.header-filter-select>
 
-            <x-ui.header-filter-select id="program-manager" :label="__('programs.manager')" :search-label="__('programs.search_managers')" wire:model.live="manager" :value="$manager">
+            <x-ui.header-filter-select id="program-manager" :label="__('programs.manager')" :search-label="__('programs.search_managers')" wire:model.live="manager" :value="$manager" employees>
                 <option value="">{{ __('common.all_managers') }}</option>
-                @foreach ($this->managerOptions as $managerOption)
-                    <option value="{{ $managerOption->id }}">
-                        {{ $managerOption->name }}
-                    </option>
-                @endforeach
             </x-ui.header-filter-select>
         </x-slot:filters>
     </x-ui.page-header>
@@ -312,11 +300,8 @@ new #[Title('titles.programs')] class extends Component {
                 @endforeach
             </x-ui.form-select>
 
-            <x-ui.form-select wire:model="managerId" :label="__('programs.direct_manager')" :help="__('programs.the_assigned_manager_is_the_hr_employee_directly_accountable')">
+            <x-ui.form-select wire:model="managerId" :label="__('programs.direct_manager')" :help="__('programs.the_assigned_manager_is_the_hr_employee_directly_accountable')" employees>
                 <option value="">{{ __('common.not_assigned') }}</option>
-                @foreach ($this->managerOptions as $managerOption)
-                    <option value="{{ $managerOption->id }}">{{ $managerOption->name }} · {{ $managerOption->secondary_name }}</option>
-                @endforeach
             </x-ui.form-select>
         </div>
 

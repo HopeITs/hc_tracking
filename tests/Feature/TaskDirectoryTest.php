@@ -8,6 +8,7 @@ use App\Models\Task;
 use App\Models\TaskAttachment;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Renderless;
 use Livewire\Livewire;
 
 use function Livewire\invade;
@@ -360,7 +361,7 @@ test('toggleAssignee refuses to remove the last remaining assignee', function ()
     expect($task->refresh()->taskAssignees->pluck('employee_id')->all())->toBe([$alice]);
 });
 
-test('the list row assignee trigger opens a shared multi select popover of every employee', function () {
+test('the list row assignee trigger opens a shared popover fed by the employee list', function () {
     $user = User::factory()->role('General Manager')->create();
     $alice = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
     $bob = insertHrEmployee(firstNameEn: 'Bob', lastNameEn: 'Rahman');
@@ -368,19 +369,24 @@ test('the list row assignee trigger opens a shared multi select popover of every
     $task->taskAssignees()->delete();
     $task->taskAssignees()->create(['employee_id' => $alice]);
 
-    // The employee option list is rendered once, shared by every row via the
-    // assigneePicker Alpine store, instead of once per row — see
-    // resources/js/assignee-picker.js.
+    // The popover draws its options in the browser from the shared
+    // employeeOptions store, so the page carries no per-employee markup.
     Livewire::actingAs($user)
         ->test('pages::tasks.index')
         ->set('view', 'list')
         ->assertSee('data-test="task-assignee-trigger-'.$task->id.'"', false)
-        ->assertSee('data-test="assignee-popover-option-'.$alice.'"', false)
-        ->assertSee('data-test="assignee-popover-option-'.$bob.'"', false)
+        ->assertSee('x-data="assigneePopover"', false)
+        ->assertDontSee('assignee-popover-option-'.$alice, false)
         ->assertSee('$store.assigneePicker.openFor('.$task->id.',', false);
+
+    $this->actingAs($user)
+        ->getJson(route('employees.picker-options'))
+        ->assertOk()
+        ->assertJsonFragment(['value' => (string) $alice])
+        ->assertJsonFragment(['value' => (string) $bob]);
 });
 
-test('every tasks view renders the employee option list only once', function (string $view) {
+test('no tasks view renders the employee option list', function (string $view) {
     $user = User::factory()->role('General Manager')->create();
     $alice = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
     $tasks = Task::factory()->count(3)->create(['due_date' => today()]);
@@ -392,14 +398,16 @@ test('every tasks view renders the employee option list only once', function (st
 
     // Each board card, "add task" row and "add subtask" row used to loop
     // every employee into its own hidden popover: 45 board cards put 32 MB
-    // of HTML on /tasks. They now all open the one shared popover.
+    // of HTML on /tasks. They all open the one shared popover, which the
+    // browser fills from the employee list endpoint.
     $html = Livewire::actingAs($user)
         ->test('pages::tasks.index')
         ->set('view', $view)
         ->html();
 
     expect(substr_count($html, 'assignee-option-'))->toBe(0)
-        ->and(substr_count($html, 'data-test="assignee-popover-option-'.$alice.'"'))->toBe(1);
+        ->and(substr_count($html, 'assignee-popover-option-'.$alice))->toBe(0)
+        ->and(substr_count($html, 'Alice Nadir'))->toBeLessThanOrEqual(10);
 })->with(['list', 'board', 'calendar']);
 
 test('a task can be deleted and takes only its own attachments with it', function () {
@@ -1066,7 +1074,7 @@ test('the board view offers an inline priority flag dropdown for subtasks, like 
         ->test('pages::tasks.index')
         ->set('view', 'board')
         ->assertSee('data-test="task-board-subtask-priority-trigger-'.$subtask->id.'"', false)
-        ->assertSee('quickSetPriority('.$subtask->id.', \''.TaskPriority::High->value.'\')', false)
+        ->assertSee("\$store.taskMenu.openFor('priority', 'board-sub-priority-".$subtask->id."'", false)
         ->call('quickSetPriority', $subtask->id, TaskPriority::High->value)
         ->assertHasNoErrors();
 
@@ -1286,4 +1294,137 @@ test('rescheduleTask refuses to change the due date for anyone but the task crea
         ->assertDispatched('toast-show');
 
     expect($task->refresh()->due_date?->toDateString())->toBe('2026-05-01');
+});
+
+test('the popover toggle actions skip the list re-render and still save', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $alice = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
+    $bob = insertHrEmployee(firstNameEn: 'Bob', lastNameEn: 'Rahman');
+    $task = Task::factory()->create();
+    $task->taskAssignees()->delete();
+    $task->taskAssignees()->create(['employee_id' => $alice]);
+
+    // Re-rendering the whole list for each click made picking assignees feel
+    // slow; the popover refreshes the list once, when it closes.
+    $component = Livewire::actingAs($user)->test('pages::tasks.index')->set('view', 'list');
+    $class = get_class($component->instance());
+
+    foreach (['togglePickedAssignee', 'toggleTaskDraftAssignee', 'toggleSubtaskDraftAssignee'] as $method) {
+        expect((new ReflectionMethod($class, $method))->getAttributes(Renderless::class))->toHaveCount(1);
+    }
+
+    // The avatar "x" calls toggleAssignee directly and must keep re-rendering the row.
+    expect((new ReflectionMethod($class, 'toggleAssignee'))->getAttributes(Renderless::class))->toHaveCount(0);
+
+    $component->call('togglePickedAssignee', $task->id, $bob);
+
+    expect($task->refresh()->taskAssignees->pluck('employee_id')->sort()->values()->all())->toBe(collect([$alice, $bob])->sort()->values()->all());
+});
+
+test('the list renders only the layout the browser reported', function (?string $layout, bool $table, bool $cards) {
+    $user = User::factory()->role('General Manager')->create();
+    $task = Task::factory()->create();
+
+    // Rendering every task as a table row and a mobile card cost ~40% of the
+    // list's server time; the browser reports its width and gets one layout.
+    $html = Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->set('view', 'list')
+        ->set('listLayout', $layout)
+        ->html();
+
+    expect(str_contains($html, 'data-test="task-row-'.$task->id.'"'))->toBe($table)
+        ->and(str_contains($html, 'data-test="task-subtasks-toggle-mobile-'.$task->id.'"'))->toBe($cards);
+})->with([
+    'not reported yet renders both' => [null, true, true],
+    'wide renders the table' => ['wide', true, false],
+    'narrow renders the cards' => ['narrow', false, true],
+]);
+
+test('only wide and narrow are accepted as a reported list layout', function () {
+    $user = User::factory()->role('General Manager')->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->call('setListLayout', 'narrow')
+        ->assertSet('listLayout', 'narrow')
+        ->call('setListLayout', 'sideways')
+        ->assertSet('listLayout', null);
+});
+
+test('status and priority menus render once per page, not once per row', function () {
+    $user = User::factory()->role('General Manager')->create();
+    Task::factory()->count(3)->create();
+
+    $html = Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->set('view', 'list')
+        ->set('listLayout', 'wide')
+        ->html();
+
+    // Rows hold a trigger that opens the shared menu in _task-option-menu.
+    expect(substr_count($html, "\$store.taskMenu.openFor('status'"))->toBeGreaterThanOrEqual(3)
+        ->and(substr_count($html, 'data-test="task-status-option-todo"'))->toBe(1)
+        ->and(substr_count($html, 'data-test="task-priority-option-high"'))->toBe(1);
+});
+
+test('the board opens the shared menu for priority instead of a dropdown per card', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $tasks = Task::factory()->count(3)->create();
+
+    $html = Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->set('view', 'board')
+        ->html();
+
+    foreach ($tasks as $task) {
+        expect($html)->toContain("\$store.taskMenu.openFor('priority', 'board-priority-".$task->id."'");
+    }
+
+    expect(substr_count($html, 'data-test="task-priority-option-high"'))->toBe(1);
+});
+
+test('quick actions stay silent on the board, except moving a card, and still toast in the list', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $alice = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
+    $bob = insertHrEmployee(firstNameEn: 'Bob', lastNameEn: 'Rahman');
+    $task = Task::factory()->create(['status' => TaskStatus::Todo, 'priority' => TaskPriority::Low]);
+    $task->taskAssignees()->delete();
+    $task->taskAssignees()->create(['employee_id' => $alice]);
+
+    // A toast per pick piles up when the board is worked in bursts.
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->set('view', 'board')
+        ->call('quickSetPriority', $task->id, TaskPriority::High->value)
+        ->call('toggleAssignee', $task->id, $bob)
+        ->assertNotDispatched('toast-show')
+        ->call('quickSetStatus', $task->id, TaskStatus::InProgress->value)
+        ->assertDispatched('toast-show');
+
+    expect($task->refresh()->status)->toBe(TaskStatus::InProgress)
+        ->and($task->priority)->toBe(TaskPriority::High)
+        ->and($task->taskAssignees()->count())->toBe(2);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->set('view', 'list')
+        ->call('quickSetPriority', $task->id, TaskPriority::Low->value)
+        ->assertDispatched('toast-show');
+});
+
+test('a refused quick action still explains itself on the board', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $alice = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
+    $task = Task::factory()->create();
+    $task->taskAssignees()->delete();
+    $task->taskAssignees()->create(['employee_id' => $alice]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->set('view', 'board')
+        ->call('toggleAssignee', $task->id, $alice)
+        ->assertDispatched('toast-show');
+
+    expect($task->taskAssignees()->count())->toBe(1);
 });

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\EmailTwoFactorController;
+use App\Http\Controllers\EmployeePickerOptionsController;
 use App\Http\Controllers\MarkNotificationReadController;
 use App\Http\Controllers\MarkTourSeenController;
 use App\Http\Controllers\OpenNotificationController;
@@ -29,6 +30,7 @@ Route::middleware('guest')->controller(EmailTwoFactorController::class)->group(f
 });
 
 Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () {
+    Route::get('employees/picker-options', EmployeePickerOptionsController::class)->name('employees.picker-options');
     Route::post('tour/seen', MarkTourSeenController::class)->middleware('throttle:locale')->name('tour.seen');
 
     Route::livewire('home', 'pages::dashboard.index')->name('dashboard');

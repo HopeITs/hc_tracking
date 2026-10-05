@@ -371,13 +371,6 @@ new #[Title('titles.project')] class extends Component {
             ->get();
     }
 
-    /** @return Collection<int, HrEmployee> */
-    #[Computed]
-    public function userOptions(): Collection
-    {
-        return HrEmployee::pickerOptions();
-    }
-
     public function openAddTaskModal(): void
     {
         Gate::authorize('create', Task::class);
@@ -1403,5 +1396,5 @@ new #[Title('titles.project')] class extends Component {
         confirm-test="confirm-delete-project-file"
     />
 
-    <x-tasks.add-task-modal test-prefix="new-project-task" :user-options="$this->userOptions" />
+    <x-tasks.add-task-modal test-prefix="new-project-task" />
 </section>

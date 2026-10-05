@@ -1,6 +1,7 @@
 @php
     use App\Enums\TaskPriority;
     use App\Enums\TaskStatus;
+    use App\Support\FluxMarkup;
 
     /**
      * The mobile/tablet card fallback for one task row — reused as-is for a
@@ -44,7 +45,7 @@
             class="inline-flex size-9 shrink-0 cursor-pointer touch-manipulation items-center justify-center rounded-full text-secondary-medium hover:bg-secondary-soft disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent dark:text-ink-muted dark:hover:bg-surface-2"
             aria-label="{{ __('tasks.mark_complete') }}"
         >
-            <flux:icon.check-circle :variant="$isDone ? 'solid' : 'outline'" class="size-5 {{ $isDone ? 'text-status-good' : '' }}" />
+            {{ FluxMarkup::icon('check-circle', $isDone ? 'solid' : 'outline', 'size-5 '.($isDone ? 'text-status-good' : '')) }}
         </button>
         <div class="min-w-0 flex-1">
             <div class="flex min-w-0 items-center gap-1.5">
@@ -59,8 +60,8 @@
         </div>
     </div>
     <div class="flex flex-wrap items-center gap-2 ps-12">
-        <x-ui.status-pill :case="$task->status" />
-        <flux:icon.flag :variant="$task->priority === TaskPriority::Low ? 'outline' : 'solid'" class="size-4 {{ $priorityIconClasses($task->priority) }}" />
+        {{ FluxMarkup::statusPill($task->status) }}
+        {{ FluxMarkup::priorityFlag($task->priority) }}
         @if (! $isSubtask)
             <button
                 type="button"
@@ -70,7 +71,7 @@
                 :aria-label="subtasksOpen[{{ $task->id }}] ? {{ Illuminate\Support\Js::from(__('tasks.hide_subtasks')) }} : {{ Illuminate\Support\Js::from(__('tasks.show_subtasks')) }}"
                 data-test="task-subtasks-toggle-mobile-{{ $task->id }}"
             >
-                <flux:icon.rectangle-stack variant="micro" class="size-3.5" aria-hidden="true" />
+                {{ FluxMarkup::icon('rectangle-stack', 'micro', 'size-3.5') }}
                 {{ $task->subtasks_count }}
             </button>
         @endif
@@ -92,21 +93,13 @@
     </div>
     <div class="flex items-center justify-end gap-1 ps-12">
         @if (! $isSubtask && $canCreate)
-            <x-ui.button
-                tone="ghost"
-                size="sm"
-                icon="plus"
-                class="size-11! touch-manipulation"
-                x-on:click="subtasksOpen[{{ $task->id }}] = true; $nextTick(() => $refs['subtaskAddInputMobile{{ $task->id }}']?.focus())"
-                :aria-label="__('tasks.add_subtask')"
-                data-test="task-add-subtask-mobile-{{ $task->id }}"
-            />
+            {{ FluxMarkup::ghostIconButton('plus', __('tasks.add_subtask'), 'x-on:click="subtasksOpen['.$task->id.'] = true; $nextTick(() => $refs[\'subtaskAddInputMobile'.$task->id.'\']?.focus())" data-test="task-add-subtask-mobile-'.$task->id.'"', 'size-11! touch-manipulation') }}
         @endif
         @if ($canUpdate)
-            <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation" wire:click="openEditDrawer({{ $task->id }})" :aria-label="__('tasks.edit_title', ['title' => $task->title])" />
+            {{ FluxMarkup::ghostIconButton('pencil-square', __('tasks.edit_title', ['title' => $task->title]), 'wire:click="openEditDrawer('.$task->id.')"', 'size-11! touch-manipulation') }}
         @endif
         @if ($canDelete)
-            <x-ui.button tone="ghost" size="sm" icon="trash" class="size-11! touch-manipulation" wire:click="confirmDelete({{ $task->id }})" :aria-label="__('tasks.delete_title', ['title' => $task->title])" />
+            {{ FluxMarkup::ghostIconButton('trash', __('tasks.delete_title', ['title' => $task->title]), 'wire:click="confirmDelete('.$task->id.')"', 'size-11! touch-manipulation') }}
         @endif
     </div>
 </article>

@@ -10,9 +10,12 @@
     'searchLabel' => null,
     'value' => null,
     'multiple' => false,
+    'employees' => false,
 ])
 
 @php
+    use App\Models\HrEmployee;
+
     /*
      * A form dropdown that is the header filter picker by construction: the
      * same flux:dropdown / flux:menu markup inside the same .filter-picker
@@ -44,6 +47,14 @@
 
     $options = [];
 
+    /*
+     * `employees` dropdowns draw their options from the shared employeeOptions
+     * store (see form-fields.js) instead of the server rendering every
+     * employee here. Only the picked employees' labels are rendered, so the
+     * trigger reads right before the store has loaded.
+     */
+    $employeeLabels = $employees ? HrEmployee::pickerLabels()->pluck('label', 'value') : collect();
+
     foreach ($document->getElementsByTagName('option') as $option) {
         $options[] = [
             'disabled' => $option->hasAttribute('disabled'),
@@ -59,7 +70,9 @@
         ? collect(is_iterable($rawValue) ? $rawValue : [])->map($toString)->values()->all()
         : [$toString($rawValue)];
     $currentValue = $currentValues[0] ?? '';
-    $selectedLabels = collect($options)->whereIn('value', $currentValues)->pluck('label')->all();
+    $selectedLabels = collect($options)->whereIn('value', $currentValues)->pluck('label')
+        ->merge($employees ? $employeeLabels->only($currentValues) : [])
+        ->values()->all();
     $selectedLabel = match (true) {
         $selectedLabels === [] => null,
         ! $multiple, count($selectedLabels) <= 2 => implode(', ', $selectedLabels),
@@ -67,7 +80,7 @@
     };
 
     $id ??= 'field-'.substr(md5($model.'|'.$label), 0, 10);
-    $searchable ??= count($options) > 7;
+    $searchable ??= $employees || count($options) > 7;
     $searchLabel ??= $label;
     $locked = $disabled && $lockedReason !== null;
     $helpText = $locked ? $lockedReason : $help;
@@ -98,6 +111,8 @@
             'multiple' => $multiple,
             'placeholder' => (string) $placeholder,
             'countTemplate' => __('common.count_selected', ['count' => '__COUNT__']),
+            'employeesUrl' => $employees ? route('employees.picker-options', ['l' => app()->getLocale()]) : null,
+            'knownLabels' => $employees ? $employeeLabels->only($currentValues)->all() : [],
         ]))"
         x-modelable="value"
         {{ $attributes->whereStartsWith('wire:model') }}
@@ -169,6 +184,10 @@
                         <svg class="{{ $checkClasses }}" @unless (in_array($option['value'], $currentValues, true)) style="display: none" @endunless x-show="isSelected({{ Illuminate\Support\Js::from($option['value']) }})" data-flux-icon xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" data-slot="icon"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
                     </button>
                 @endforeach
+                @if ($employees)
+                    <div wire:ignore x-ref="employeeList" class="contents" x-on:click="pickEmployee($event)" data-item-class="{{ $menuItemClasses }}" data-check-class="{{ $checkClasses }}"></div>
+                @endif
+
             </flux:menu>
         </flux:dropdown>
     </div>

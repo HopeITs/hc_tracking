@@ -9,6 +9,7 @@
     'searchable' => null,
     'searchLabel' => null,
     'value' => null,
+    'employees' => false,
 ])
 
 {{-- x-ui.form-select for several values: the menu stays open while picking, and the trigger names the picks. --}}
@@ -24,5 +25,6 @@
     :searchable="$searchable"
     :search-label="$searchLabel"
     :value="$value"
+    :employees="$employees"
     :attributes="$attributes"
 >{{ $slot }}</x-ui.form-select>

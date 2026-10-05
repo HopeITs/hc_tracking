@@ -1164,11 +1164,8 @@ new #[Title('titles.projects')] class extends Component {
                 @endforeach
             </x-ui.header-filter-select>
 
-            <x-ui.header-filter-select :label="__('projects.owner')" wire:model.live="owner" :value="$owner">
+            <x-ui.header-filter-select :label="__('projects.owner')" wire:model.live="owner" :value="$owner" employees>
                 <option value="">{{ __('projects.all_owners') }}</option>
-                @foreach ($this->userOptions as $userOption)
-                    <option value="{{ $userOption->id }}">{{ $userOption->name }} · {{ $userOption->secondary_name }}</option>
-                @endforeach
             </x-ui.header-filter-select>
 
             <x-ui.header-filter-select :label="__('projects.sort_by')" wire:model.live="sort" :value="$sort">

@@ -1,6 +1,7 @@
 @php
     use App\Enums\TaskPriority;
     use App\Enums\TaskStatus;
+    use App\Support\FluxMarkup;
     use Illuminate\Support\Js;
 
     /**
@@ -25,7 +26,7 @@
 
 <tr x-show="subtasksOpen[{{ $task->id }}]" x-cloak wire:key="task-subtask-composer-{{ $task->id }}" class="bg-secondary-soft/20 dark:bg-white/[0.03]" data-test="task-subtask-add-row-{{ $task->id }}">
     <td class="ps-3">
-        <flux:icon.plus variant="micro" class="size-4 shrink-0 text-primary dark:text-brand-text" aria-hidden="true" />
+        {{ FluxMarkup::icon('plus', 'micro', 'size-4 shrink-0 text-primary dark:text-brand-text') }}
     </td>
     <td class="min-w-0 px-2 py-2.5">
         <input
@@ -52,7 +53,7 @@
         >
                 @if ($draftAssignees->isEmpty())
                     <span class="inline-flex size-7 items-center justify-center rounded-full border border-dashed border-secondary-light text-secondary-light">
-                        <flux:icon.user-plus variant="micro" class="size-3.5" />
+                        {{ FluxMarkup::icon('user-plus', 'micro', 'size-3.5') }}
                     </span>
                 @else
                     @foreach ($draftAssignees->take(3) as $userOption)
@@ -79,35 +80,14 @@
         />
     </td>
     <td class="px-2">
-        <flux:dropdown position="bottom" align="start">
-            <button type="button" aria-label="{{ __('tasks.priority') }}: {{ $draftPriority->label() }}" class="inline-flex size-7 cursor-pointer items-center justify-center rounded hover:bg-secondary-soft dark:hover:bg-surface-2" data-test="task-subtask-priority-trigger-{{ $task->id }}">
-                <flux:icon.flag :variant="$draftPriority === TaskPriority::Low ? 'outline' : 'solid'" class="size-4 {{ $priorityIconClasses($draftPriority) }}" />
+        <button type="button" x-data aria-haspopup="menu" x-on:click="$store.taskMenu.openFor('priority', {{ Js::from('subtaskDrafts.'.$task->id.'.priority') }}, '{{ $draftPriority->value }}', $el.getBoundingClientRect(), '$set', [{{ Js::from('subtaskDrafts.'.$task->id.'.priority') }}])" aria-label="{{ __('tasks.priority') }}: {{ $draftPriority->label() }}" class="inline-flex size-7 cursor-pointer items-center justify-center rounded hover:bg-secondary-soft dark:hover:bg-surface-2" data-test="task-subtask-priority-trigger-{{ $task->id }}">
+                {{ FluxMarkup::priorityFlag($draftPriority) }}
             </button>
-            <flux:menu>
-                @foreach (TaskPriority::cases() as $priorityCase)
-                    <flux:menu.item wire:click="$set('subtaskDrafts.{{ $task->id }}.priority', '{{ $priorityCase->value }}')" :wire:key="'task-'.$task->id.'-subtask-draft-priority-'.$priorityCase->value">
-                        <flux:icon.flag :variant="$priorityCase === TaskPriority::Low ? 'outline' : 'solid'" class="size-4 shrink-0 {{ $priorityIconClasses($priorityCase) }}" />
-                        <span class="min-w-0 truncate">{{ $priorityCase->label() }}</span>
-                        @if ($draftPriority === $priorityCase)<flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" />@endif
-                    </flux:menu.item>
-                @endforeach
-            </flux:menu>
-        </flux:dropdown>
     </td>
     <td class="px-2">
-        <flux:dropdown position="bottom" align="start">
-            <button type="button" class="cursor-pointer" data-test="task-subtask-status-trigger-{{ $task->id }}">
-                <x-ui.status-pill :case="$draftStatus" />
+        <button type="button" x-data aria-haspopup="menu" x-on:click="$store.taskMenu.openFor('status', {{ Js::from('subtaskDrafts.'.$task->id.'.status') }}, '{{ $draftStatus->value }}', $el.getBoundingClientRect(), '$set', [{{ Js::from('subtaskDrafts.'.$task->id.'.status') }}])" class="cursor-pointer" data-test="task-subtask-status-trigger-{{ $task->id }}">
+                {{ FluxMarkup::statusPill($draftStatus) }}
             </button>
-            <flux:menu>
-                @foreach (TaskStatus::cases() as $statusCase)
-                    <flux:menu.item wire:click="$set('subtaskDrafts.{{ $task->id }}.status', '{{ $statusCase->value }}')" :wire:key="'task-'.$task->id.'-subtask-draft-status-'.$statusCase->value" :data-test="'task-subtask-status-option-'.$task->id.'-'.$statusCase->value">
-                        <x-ui.status-pill :case="$statusCase" />
-                        @if ($draftStatus === $statusCase)<flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" />@endif
-                    </flux:menu.item>
-                @endforeach
-            </flux:menu>
-        </flux:dropdown>
     </td>
     <td></td>
 </tr>
