@@ -46,7 +46,7 @@ final class DataGapScanner implements Scanner
         $owners = $this->employees->usersFor($active->pluck('user_id')->map(fn ($id): int => (int) $id)->unique()->values()->all());
 
         foreach ($active as $project) {
-            $owner = array_values(array_filter([$owners[(int) $project->user_id] ?? null]));
+            $owner = array_filter([$owners[(int) $project->user_id] ?? null]);
             $gaps = array_filter([
                 'no_milestones' => $project->milestones_count === 0 ? [] : null,
                 'no_indicators' => $project->indicators_count === 0 ? $meal : null,

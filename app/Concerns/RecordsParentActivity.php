@@ -16,8 +16,8 @@ trait RecordsParentActivity
 {
     public static function bootRecordsParentActivity(): void
     {
-        static::created(fn (Model $model) => $model->recordOnParent('created'));
-        static::deleted(fn (Model $model) => $model->recordOnParent('deleted'));
+        static::created(fn (self $model) => $model->recordOnParent('created'));
+        static::deleted(fn (self $model) => $model->recordOnParent('deleted'));
     }
 
     /**

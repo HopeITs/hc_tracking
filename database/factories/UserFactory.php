@@ -9,6 +9,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use stdClass;
 
 /**
  * @extends Factory<User>
@@ -65,8 +66,8 @@ class UserFactory extends Factory
         $email = (string) Arr::pull($attributes, 'email', fake()->unique()->safeEmail());
 
         if (! isset($attributes['hr_user_id'])) {
-            $account = DB::connection('hr')->table('users')->where('email', $email)->first(['id', 'employee_id'])
-                ?? $this->createHrAccount($name, $email);
+            $account = DB::connection('hr')->table('users')->where('email', $email)->first(['id', 'employee_id']);
+            $account = $account instanceof stdClass ? $account : $this->createHrAccount($name, $email);
 
             $attributes['hr_user_id'] = $account->id;
             if (! array_key_exists('employee_id', $attributes)) {
@@ -92,7 +93,7 @@ class UserFactory extends Factory
     /**
      * Insert an HR employee and its login account, and return the account.
      */
-    protected function createHrAccount(string $name, string $email): object
+    protected function createHrAccount(string $name, string $email): stdClass
     {
         [$firstName, $lastName] = array_pad(explode(' ', trim($name), 2), 2, '');
 

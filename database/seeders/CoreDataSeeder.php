@@ -151,10 +151,8 @@ class CoreDataSeeder extends Seeder
                     'internal_project_number' => $profile['internal_project_number'],
                     'planned_date_begin' => $profile['planned_date_begin'],
                     'planned_date_end' => $profile['planned_date_end'],
-                    'actual_date_begin' => $profile['actual_date_begin'] ?? null,
-                    'actual_date_end' => $profile['actual_date_end'] ?? null,
                     'status' => $profile['status'],
-                    'notes' => $profile['notes'] ?? null,
+                    'notes' => $profile['notes'],
                 ],
             );
         }

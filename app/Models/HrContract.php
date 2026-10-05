@@ -65,14 +65,13 @@ class HrContract extends HrModel
             ->where('title_en', $title)
             ->pluck('id');
 
-        return static::query()
+        return array_values(static::query()
             ->where('is_active', true)
             ->whereIn('position_id', $positionIds)
             ->pluck('employee_id')
             ->map(fn (mixed $id): int => (int) $id)
             ->unique()
-            ->values()
-            ->all();
+            ->all());
     }
 
     /**

@@ -77,3 +77,20 @@ test('a user has the reports they submitted', function () {
 
     expect($user->reports)->toHaveCount(1);
 });
+
+test('a user not saved yet has no name or email', function () {
+    $user = new User;
+
+    expect($user->name)->toBe('')
+        ->and($user->email)->toBe('');
+});
+
+test('users sort by the name hr holds for them', function () {
+    $zaid = User::factory()->create(['name' => 'Zaid Haddad']);
+    $amal = User::factory()->create(['name' => 'Amal Saleh']);
+    $maya = User::factory()->create(['name' => 'Maya Khoury']);
+
+    $ids = User::query()->orderByName()->pluck('id')->all();
+
+    expect($ids)->toBe([$amal->id, $maya->id, $zaid->id]);
+});

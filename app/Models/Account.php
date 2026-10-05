@@ -137,13 +137,12 @@ class Account extends Model implements TracksActivity
             return [];
         }
 
-        return static::query()
+        return array_values(static::query()
             ->select(['id', 'account_number'])
             ->get()
             ->filter(fn (Account $account): bool => Str::contains($account->account_number, $search, ignoreCase: true))
-            ->pluck('id')
-            ->values()
-            ->all();
+            ->map(fn (Account $account): int => $account->id)
+            ->all());
     }
 
     /**

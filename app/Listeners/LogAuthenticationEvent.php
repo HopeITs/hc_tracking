@@ -86,7 +86,11 @@ final class LogAuthenticationEvent
     private function context(object $event): array
     {
         $request = $event instanceof Lockout ? $event->request : $this->request;
-        $user = $event instanceof Lockout ? $request->user() : $event->user;
+        $user = match (true) {
+            $event instanceof Lockout => $request->user(),
+            property_exists($event, 'user') => $event->user,
+            default => null,
+        };
         $userAgent = $request->userAgent();
 
         $context = [

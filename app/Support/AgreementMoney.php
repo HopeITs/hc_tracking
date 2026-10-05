@@ -111,6 +111,7 @@ final class AgreementMoney
     /**
      * One totals row, typed.
      *
+     * @param  object|array<string, mixed>  $row
      * @return array{currency: string, agreements: int, tranches: int, budget: float, scheduled: float, received: float, in_transit: float, overdue: float, failed: float, unscheduled: float, outstanding: float, due_in_year: float, received_in_year: float}
      */
     public static function line(object|array $row): array

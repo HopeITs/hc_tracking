@@ -41,10 +41,6 @@ final class AlertOnFailedSecondStep
 
     public function handle(TwoFactorAuthenticationFailed $event): void
     {
-        if (! $event->user instanceof User) {
-            return;
-        }
-
         try {
             $this->record($event->user);
         } catch (Throwable $exception) {

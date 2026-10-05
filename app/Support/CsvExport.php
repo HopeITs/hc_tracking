@@ -6,6 +6,7 @@ namespace App\Support;
 
 use BackedEnum;
 use DateTimeInterface;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -22,6 +23,11 @@ final class CsvExport
     {
         return response()->streamDownload(function () use ($headings, $rows): void {
             $output = fopen('php://output', 'wb');
+
+            if ($output === false) {
+                throw new RuntimeException('Cannot open the response output stream.');
+            }
+
             fwrite($output, "\xEF\xBB\xBF");
             fputcsv($output, array_map(self::cell(...), $headings), ',', '"', '');
 

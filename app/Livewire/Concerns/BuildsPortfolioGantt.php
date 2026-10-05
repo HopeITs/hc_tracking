@@ -7,6 +7,7 @@ namespace App\Livewire\Concerns;
 use App\Enums\ProjectStatus;
 use App\Enums\ProposalPhase;
 use App\Enums\ProposalStatus;
+use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\Milestone;
 use App\Models\Project;
@@ -34,6 +35,10 @@ use Illuminate\Support\Collection;
  *
  * Rows share the shape BuildsProjectGantt produces, so the same x-ui.gantt
  * engine draws them.
+ *
+ * @phpstan-import-type GanttRow from BuildsProjectGantt
+ *
+ * @phpstan-type GanttRelation array{from: string, to: string, type: string}
  */
 trait BuildsPortfolioGantt
 {
@@ -50,7 +55,7 @@ trait BuildsPortfolioGantt
         $projects = $this->timelineProjects($programId, $status);
         $milestones = $this->timelineMilestones($projects);
 
-        $rows = collect();
+        $rows = $this->newGanttRows();
         $this->pushProjectGroups($projects, $milestones, $groupBy, $rows);
 
         return $this->readOnlyPayload($rows, $this->decoratePortfolioSchedule($projects, $milestones, $rows));
@@ -79,8 +84,8 @@ trait BuildsPortfolioGantt
             ->orderBy('id')
             ->get();
 
-        $rows = collect();
-        $relations = collect();
+        $rows = $this->newGanttRows();
+        $relations = $this->newGanttRelations();
 
         if ($proposals->isNotEmpty()) {
             $rows->push($this->ganttGroupRow('fundraising', '1', __('gantt.fundraising')));
@@ -98,9 +103,9 @@ trait BuildsPortfolioGantt
 
         $this->pushProjectGroups($projects, $milestones, $groupBy, $rows);
         $links = $this->decoratePortfolioSchedule($projects, $milestones, $rows);
-        $this->pushObligationRows($proposals->modelKeys(), $rows, $relations);
+        $this->pushObligationRows(array_values($proposals->map(fn (Proposal $proposal): int => $proposal->id)->all()), $rows, $relations);
 
-        return $this->readOnlyPayload($rows, $links, $relations->values()->all());
+        return $this->readOnlyPayload($rows, $links, array_values($relations->all()));
     }
 
     /**
@@ -109,7 +114,7 @@ trait BuildsPortfolioGantt
     protected function pipelineGanttPayload(?string $phase = null): array
     {
         if (! $this->ganttViewerCan('proposals.view')) {
-            return $this->readOnlyPayload(collect(), []);
+            return $this->readOnlyPayload($this->newGanttRows(), []);
         }
 
         $proposals = Proposal::query()
@@ -123,7 +128,7 @@ trait BuildsPortfolioGantt
             ->orderBy('id')
             ->get();
 
-        $rows = collect();
+        $rows = $this->newGanttRows();
         $groupIndex = 0;
 
         foreach (ProposalPhase::cases() as $proposalPhase) {
@@ -140,9 +145,9 @@ trait BuildsPortfolioGantt
 
             foreach ($inPhase as $index => $proposal) {
                 $wbs = $groupIndex.'.'.($index + 1);
-                $at = $rows->count();
 
-                $rows->push($this->proposalRow($proposal, $groupId, 1, $wbs));
+                // A proposal row keeps its own span; the projects it funds are listed, not rolled into it.
+                $rows->push([...$this->proposalRow($proposal, $groupId, 1, $wbs), 'summary' => false]);
 
                 foreach ($proposal->projects->sortBy('start_date')->values() as $projectIndex => $project) {
                     $rows->push($this->ganttRow(
@@ -160,9 +165,6 @@ trait BuildsPortfolioGantt
                         url: route('projects.show', $project),
                     ));
                 }
-
-                // A proposal row keeps its own span; the projects it funds are listed, not rolled into it.
-                $rows->put($at, array_merge($rows->get($at), ['summary' => false]));
             }
 
             $this->rollUp($rows, $groupAt);
@@ -177,7 +179,7 @@ trait BuildsPortfolioGantt
     protected function agreementGanttPayload(DonorProposal $agreement): array
     {
         $proposal = $agreement->proposal()->first(['id', 'name', 'status', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end']);
-        $rows = collect();
+        $rows = $this->newGanttRows();
 
         if ($proposal !== null) {
             $rows->push($this->ganttGroupRow('fundraising', '1', __('gantt.fundraising')));
@@ -246,7 +248,7 @@ trait BuildsPortfolioGantt
      * Every milestone of the given projects, grouped by project id.
      *
      * @param  EloquentCollection<int, Project>  $projects
-     * @return Collection<int, Collection<int, Milestone>>
+     * @return Collection<array-key, Collection<int, Milestone>>
      */
     private function timelineMilestones(EloquentCollection $projects): Collection
     {
@@ -257,7 +259,8 @@ trait BuildsPortfolioGantt
             ->orderBy('sequence')
             ->orderBy('id')
             ->get()
-            ->groupBy('project_id');
+            ->toBase()
+            ->groupBy(fn (Milestone $milestone): int => (int) $milestone->project_id);
     }
 
     /**
@@ -266,8 +269,8 @@ trait BuildsPortfolioGantt
      * whatever top-level rows are already on the chart.
      *
      * @param  EloquentCollection<int, Project>  $projects
-     * @param  Collection<int, Collection<int, Milestone>>  $milestones
-     * @param  Collection<int, array<string, mixed>>  $rows
+     * @param  Collection<array-key, Collection<int, Milestone>>  $milestones
+     * @param  Collection<int, GanttRow>  $rows
      */
     private function pushProjectGroups(EloquentCollection $projects, Collection $milestones, string $groupBy, Collection $rows): void
     {
@@ -307,35 +310,41 @@ trait BuildsPortfolioGantt
         }
 
         if ($groupBy === 'owner') {
-            return $projects
+            return array_values($projects
+                ->toBase()
                 ->groupBy(fn (Project $project): int => (int) $project->user_id)
-                ->map(fn (Collection $owned, int $userId): array => [
-                    'id' => 'owner-'.($userId === 0 ? 'none' : $userId),
-                    'name' => $owned->first()->user?->name ?? __('gantt.no_owner'),
-                    'projects' => $owned,
-                ])
+                ->map(
+                    /** @param Collection<int, Project> $owned */
+                    fn (Collection $owned, int $userId): array => [
+                        'id' => 'owner-'.($userId === 0 ? 'none' : $userId),
+                        'name' => $owned->first()->user->name ?? (string) __('gantt.no_owner'),
+                        'projects' => $owned,
+                    ],
+                )
                 ->sortBy(fn (array $group): string => ($group['id'] === 'owner-none' ? '1' : '0').mb_strtolower($group['name']))
-                ->values()
-                ->all();
+                ->all());
         }
 
         $index = 0;
 
-        return $projects
-            ->groupBy(fn (Project $project): string => $project->program?->name ?? '—')
+        return array_values($projects
+            ->toBase()
+            ->groupBy(fn (Project $project): string => $project->program->name ?? '—')
             ->sortKeys()
-            ->map(function (Collection $inProgram, int|string $name) use (&$index): array {
-                return ['id' => 'program-'.(++$index), 'name' => (string) $name, 'projects' => $inProgram];
-            })
-            ->values()
-            ->all();
+            ->map(
+                /** @param Collection<int, Project> $inProgram */
+                function (Collection $inProgram, int|string $name) use (&$index): array {
+                    return ['id' => 'program-'.(++$index), 'name' => (string) $name, 'projects' => $inProgram];
+                },
+            )
+            ->all());
     }
 
     /**
      * One project summary row followed by its milestone tree.
      *
      * @param  Collection<int, Milestone>  $milestones
-     * @param  Collection<int, array<string, mixed>>  $rows
+     * @param  Collection<int, GanttRow>  $rows
      */
     private function pushProjectBranch(Project $project, Collection $milestones, string $parentRowId, int $depth, string $wbs, Collection $rows): void
     {
@@ -374,7 +383,7 @@ trait BuildsPortfolioGantt
      * A proposal bar: its lifecycle span, donors and, for a viewer holding
      * funding-agreements.view, the money signed on it.
      *
-     * @return array<string, mixed>
+     * @return GanttRow
      */
     private function proposalRow(Proposal $proposal, string $parent, int $depth, string $wbs): array
     {
@@ -398,7 +407,12 @@ trait BuildsPortfolioGantt
             owner: $donors->pluck('name')->unique()->implode(', ') ?: null,
             url: route('proposals.show', $proposal),
             money: $this->ganttViewerCan('funding-agreements.view')
-                ? $this->ganttMoney($donors->map(fn ($donor): array => [$donor->pivot->budget, $donor->pivot->currency]))
+                ? $this->ganttMoney($donors->map(function (Donor $donor): array {
+                    // The donor_proposal row donors() loads with budget and currency.
+                    $pivot = $donor->getRelation('pivot');
+
+                    return [$pivot->budget, $pivot->currency];
+                }))
                 : null,
         );
     }
@@ -414,14 +428,24 @@ trait BuildsPortfolioGantt
     }
 
     /**
+     * An empty relation list for pushObligationRows() to fill.
+     *
+     * @return Collection<int, GanttRelation>
+     */
+    private function newGanttRelations(): Collection
+    {
+        return new Collection;
+    }
+
+    /**
      * Give each project's milestones the MS Project schedule reading the
      * project Plan tab shows — total float, critical flag and predecessors
      * text — worked on that project's own working week, and return the links
      * whose two ends are both on the chart.
      *
      * @param  EloquentCollection<int, Project>  $projects
-     * @param  Collection<int, Collection<int, Milestone>>  $milestones
-     * @param  Collection<int, array<string, mixed>>  $rows
+     * @param  Collection<array-key, Collection<int, Milestone>>  $milestones
+     * @param  Collection<int, GanttRow>  $rows
      * @return list<array<string, mixed>>
      */
     private function decoratePortfolioSchedule(EloquentCollection $projects, Collection $milestones, Collection $rows): array
@@ -474,20 +498,20 @@ trait BuildsPortfolioGantt
             return $row;
         });
 
-        return $links->map(fn (ScheduleDependency $link): array => [
+        return array_values($links->map(fn (ScheduleDependency $link): array => [
             'id' => $link->id,
             'from' => $link->predecessorRowId(),
             'to' => $link->successorRowId(),
             'type' => $link->type->value,
             'lag' => $link->lag_days,
             'label' => $link->type->label(),
-        ])->values()->all();
+        ])->all());
     }
 
     /**
      * Links whose two ends are both on the chart.
      *
-     * @param  Collection<int, array<string, mixed>>  $rows
+     * @param  Collection<int, GanttRow>  $rows
      * @return list<array<string, mixed>>
      */
     private function linksBetween(Collection $rows): array
@@ -499,7 +523,7 @@ trait BuildsPortfolioGantt
             return [];
         }
 
-        return ScheduleDependency::query()
+        return array_values(ScheduleDependency::query()
             ->where('predecessor_type', 'milestone')->whereIn('predecessor_id', $milestoneIds)
             ->where('successor_type', 'milestone')->whereIn('successor_id', $milestoneIds)
             ->get()
@@ -512,12 +536,11 @@ trait BuildsPortfolioGantt
                 'lag' => $link->lag_days,
                 'label' => $link->type->label(),
             ])
-            ->values()
-            ->all();
+            ->all());
     }
 
     /**
-     * @param  Collection<int, array<string, mixed>>  $rows
+     * @param  Collection<int, GanttRow>  $rows
      * @param  list<array<string, mixed>>  $links
      * @param  list<array{from: string, to: string, type: string}>  $relations
      * @return array<string, mixed>
@@ -561,7 +584,7 @@ trait BuildsPortfolioGantt
     private function proposalTone(Proposal $proposal): string
     {
         $phase = $proposal->status->phase();
-        $overdue = $proposal->planned_date_end !== null && $proposal->planned_date_end->isPast() && $phase === ProposalPhase::Planning;
+        $overdue = $proposal->planned_date_end->isPast() && $phase === ProposalPhase::Planning;
 
         return match (true) {
             $proposal->status === ProposalStatus::Rejected => 'muted',

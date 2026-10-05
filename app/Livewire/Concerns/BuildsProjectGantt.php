@@ -64,7 +64,7 @@ trait BuildsProjectGantt
      */
     protected function projectGanttPayload(Project $project, ?int $baselineId = null): array
     {
-        $rows = collect();
+        $rows = $this->newGanttRows();
 
         $this->pushFundraisingRows($project, $rows);
         $this->pushDeliveryRows($project, $rows);
@@ -75,22 +75,26 @@ trait BuildsProjectGantt
         $baseline = $baselineId === null ? null : $baselines->firstWhere('id', $baselineId);
         $this->decorateBaseline($baseline, $rows);
 
-        $dates = $rows->flatMap(fn (array $row): array => [$row['start'], $row['end'], $row['actualStart'], $row['actualEnd']])
-            ->push($project->start_date?->toDateString(), $project->end_date?->toDateString(), CarbonImmutable::today()->toDateString())
-            ->filter();
+        $dates = [
+            ...$rows->flatMap(fn (array $row): array => [$row['start'], $row['end'], $row['actualStart'], $row['actualEnd']])
+                ->push($project->start_date?->toDateString(), $project->end_date?->toDateString())
+                ->filter()
+                ->all(),
+            CarbonImmutable::today()->toDateString(),
+        ];
 
         return [
-            'rows' => $rows->values()->all(),
+            'rows' => array_values($rows->all()),
             'links' => $links,
-            'baselines' => $baselines->map(fn (ScheduleBaseline $saved): array => [
+            'baselines' => array_values($baselines->map(fn (ScheduleBaseline $saved): array => [
                 'id' => $saved->id,
                 'name' => $saved->name,
                 'savedOn' => $saved->created_at?->toDateString(),
-            ])->all(),
+            ])->all()),
             'baselineId' => $baseline?->id,
             'weekend' => $project->schedule_weekend,
-            'from' => $dates->min(),
-            'to' => $dates->max(),
+            'from' => min($dates),
+            'to' => max($dates),
             'today' => CarbonImmutable::today()->toDateString(),
         ];
     }
@@ -132,14 +136,14 @@ trait BuildsProjectGantt
             return $row;
         });
 
-        return $links->map(fn (ScheduleDependency $link): array => [
+        return array_values($links->map(fn (ScheduleDependency $link): array => [
             'id' => $link->id,
             'from' => $link->predecessorRowId(),
             'to' => $link->successorRowId(),
             'type' => $link->type->value,
             'lag' => $link->lag_days,
             'label' => $link->type->label(),
-        ])->values()->all();
+        ])->all());
     }
 
     /**
@@ -233,9 +237,10 @@ trait BuildsProjectGantt
             ->orderBy('id')
             ->get();
 
-        $milestonesByParent = $milestones->groupBy(fn (Milestone $milestone): int => (int) $milestone->parent_milestone_id);
-        $tasksByMilestone = $tasks->whereNull('parent_task_id')->groupBy('source_id');
-        $subtasksByParent = $tasks->whereNotNull('parent_task_id')->groupBy('parent_task_id');
+        // Plain collections: grouped, these hold collections, not models.
+        $milestonesByParent = $milestones->toBase()->groupBy(fn (Milestone $milestone): int => (int) $milestone->parent_milestone_id);
+        $tasksByMilestone = $tasks->whereNull('parent_task_id')->toBase()->groupBy('source_id');
+        $subtasksByParent = $tasks->whereNotNull('parent_task_id')->toBase()->groupBy('parent_task_id');
 
         $groupIndex = count($rows->where('depth', 0)) + 1;
         $groupAt = $rows->count();
@@ -247,9 +252,9 @@ trait BuildsProjectGantt
     }
 
     /**
-     * @param  Collection<int, Collection<int, Milestone>>  $milestonesByParent
-     * @param  Collection<int|string, Collection<int, Task>>  $tasksByMilestone
-     * @param  Collection<int|string, Collection<int, Task>>  $subtasksByParent
+     * @param  Collection<array-key, Collection<int, Milestone>>  $milestonesByParent
+     * @param  Collection<array-key, Collection<int, Task>>  $tasksByMilestone
+     * @param  Collection<array-key, Collection<int, Task>>  $subtasksByParent
      * @param  Collection<int, GanttRow>  $rows
      */
     private function pushMilestoneBranch(Collection $milestonesByParent, Collection $tasksByMilestone, Collection $subtasksByParent, int $parentId, string $parentRowId, int $depth, string $wbsPrefix, int $indexOffset, Collection $rows): void
@@ -401,7 +406,7 @@ trait BuildsProjectGantt
                 depth: 1,
                 kind: 'transfer',
                 wbs: $wbs,
-                name: __('gantt.transfer_from', ['donor' => $transfer->donorProposal?->donor?->name ?? '—']),
+                name: __('gantt.transfer_from', ['donor' => $transfer->donorProposal->donor->name ?? '—']),
                 start: $date,
                 end: $date,
                 actualStart: null,
@@ -423,7 +428,7 @@ trait BuildsProjectGantt
                 },
                 diamond: true,
                 url: route('transfers.index'),
-                money: $this->ganttMoney([[$transfer->payment_amount, $transfer->amount_transfered_currency?->value]]),
+                money: $this->ganttMoney([[$transfer->payment_amount, $transfer->amount_transfered_currency->value]]),
             )]);
 
             $relations?->push(['from' => 'transfer-'.$transfer->id, 'to' => 'proposal-'.$transfer->donorProposal?->proposal_id, 'type' => 'pays']);
@@ -504,6 +509,16 @@ trait BuildsProjectGantt
         }
 
         $rows->put($at, $parent);
+    }
+
+    /**
+     * An empty row list for the push*Rows() builders to fill.
+     *
+     * @return Collection<int, GanttRow>
+     */
+    private function newGanttRows(): Collection
+    {
+        return new Collection;
     }
 
     /**

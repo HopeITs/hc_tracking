@@ -473,3 +473,19 @@ test('a broken cache store does not lock out an active hr user', function () {
     expect($response->getContent())->toBe('ok');
     $this->assertAuthenticatedAs($user);
 });
+
+test('a cached hr answer in an unknown shape does not keep a deactivated hr user signed in', function () {
+    $employeeId = insertHrEmployee(isActive: false);
+    insertHrUser($employeeId, 'rana@example.org');
+    $user = User::factory()->create(['email' => 'rana@example.org']);
+    $this->actingAs($user);
+    Cache::put(EnsureHrAccountIsActive::cacheKey($user), ['lost_access' => false], 60);
+
+    $request = Request::create('/');
+    $request->setUserResolver(fn (): User => $user);
+    $request->setLaravelSession(app('session.store'));
+
+    expect(fn () => (new EnsureHrAccountIsActive)->handle($request, fn (): Response => new Response('ok')))
+        ->toThrow(AuthenticationException::class);
+    $this->assertGuest();
+});

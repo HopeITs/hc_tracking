@@ -95,7 +95,8 @@ class ReencryptSecrets extends Command
      */
     private function reencryptTable(string $table, array $columns, Encrypter $encrypter, bool $dryRun): array
     {
-        $report = array_fill_keys($columns, ['done' => 0, 'failed' => []]);
+        $done = array_fill_keys($columns, 0);
+        $failed = array_fill_keys($columns, []);
 
         DB::table($table)
             ->select(['id', ...$columns])
@@ -105,7 +106,7 @@ class ReencryptSecrets extends Command
                 }
             })
             ->lazyById()
-            ->each(function (object $row) use ($table, $columns, $encrypter, $dryRun, &$report): void {
+            ->each(function (object $row) use ($table, $columns, $encrypter, $dryRun, &$done, &$failed): void {
                 $updates = [];
 
                 foreach ($columns as $column) {
@@ -118,19 +119,25 @@ class ReencryptSecrets extends Command
                     try {
                         $plaintext = $encrypter->decrypt($payload, false);
                     } catch (DecryptException) {
-                        $report[$column]['failed'][] = (int) $row->id;
+                        $failed[$column][] = (int) $row->id;
 
                         continue;
                     }
 
                     $updates[$column] = $encrypter->encrypt($plaintext, false);
-                    $report[$column]['done']++;
+                    $done[$column]++;
                 }
 
                 if (! $dryRun && $updates !== []) {
                     DB::table($table)->where('id', $row->id)->update($updates);
                 }
             });
+
+        $report = [];
+
+        foreach ($columns as $column) {
+            $report[$column] = ['done' => $done[$column], 'failed' => $failed[$column]];
+        }
 
         return $report;
     }

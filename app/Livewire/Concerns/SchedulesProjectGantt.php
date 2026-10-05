@@ -11,6 +11,7 @@ use App\Models\ScheduleDependency;
 use App\Models\Task;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
+use InvalidArgumentException;
 
 /**
  * The scheduling maths behind the project Gantt, done the MS Project way on a
@@ -160,8 +161,8 @@ trait SchedulesProjectGantt
             }
 
             if ($earliestStart > $item['start']) {
-                $items[$rowId]['start'] = $this->snapForward($earliestStart, $weekend);
-                $items[$rowId]['end'] = max($items[$rowId]['start'], $this->addWorkingDays($items[$rowId]['start'], $duration - 1, $weekend));
+                $start = $this->snapForward($earliestStart, $weekend);
+                $items[$rowId] = ['start' => $start, 'end' => max($start, $this->addWorkingDays($start, $duration - 1, $weekend)), 'model' => $item['model']];
             }
         }
 
@@ -304,8 +305,13 @@ trait SchedulesProjectGantt
     {
         $iso = $date instanceof CarbonImmutable ? $date->toDateString() : $date;
         [$year, $month, $day] = array_map('intval', explode('-', $iso));
+        $timestamp = gmmktime(0, 0, 0, $month, $day, $year);
 
-        return intdiv(gmmktime(0, 0, 0, $month, $day, $year), 86400);
+        if ($timestamp === false) {
+            throw new InvalidArgumentException("Not a date: [{$iso}].");
+        }
+
+        return intdiv($timestamp, 86400);
     }
 
     protected function isoDate(int $dayNumber): string

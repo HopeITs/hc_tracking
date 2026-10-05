@@ -50,9 +50,7 @@ final class SecondStepFailed extends Notification implements ShouldQueue
     public function toMail(User $notifiable): MailMessage
     {
         $name = $notifiable->name;
-        $time = $this->failedAt
-            ->locale(Locale::current()->carbonLocale())
-            ->translatedFormat((string) __('formats.datetime'));
+        $time = Locale::current()->formatDate($this->failedAt, (string) __('formats.datetime'));
 
         $message = (new MailMessage)
             ->subject(__('security.second_step_failed_subject', ['app' => config('app.name')]))

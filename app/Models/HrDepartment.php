@@ -36,13 +36,14 @@ class HrDepartment extends HrModel
      */
     public static function employeeIdsInDepartment(int $departmentId): array
     {
-        return HrContract::query()
+        return array_values(HrContract::query()
             ->join('positions', 'positions.id', '=', 'contracts.position_id')
             ->where('contracts.is_active', true)
             ->where('positions.department_id', $departmentId)
             ->distinct()
             ->pluck('contracts.employee_id')
-            ->all();
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all());
     }
 
     /**

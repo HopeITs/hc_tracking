@@ -5,7 +5,6 @@ namespace App\Http\Responses;
 use App\Actions\Fortify\TrustedDevices;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Laravel\Fortify\Contracts\TwoFactorLoginResponse as TwoFactorLoginResponseContract;
 use Laravel\Fortify\Fortify;
 use Symfony\Component\HttpFoundation\Response;
@@ -22,7 +21,7 @@ class TwoFactorLoginResponse implements TwoFactorLoginResponseContract
             TrustedDevices::trust($request, $request->user());
         }
 
-        if ($request instanceof Request && $request->wantsJson()) {
+        if ($request->wantsJson()) {
             return new JsonResponse('', 204);
         }
 

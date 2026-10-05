@@ -97,7 +97,7 @@ class EmailTwoFactorController extends Controller
             return null;
         }
 
-        $user = User::query()->find($request->session()->get('login.id'));
+        $user = User::query()->whereKey($request->session()->get('login.id'))->first();
 
         return $user?->usesEmailTwoFactor() ? $user : null;
     }

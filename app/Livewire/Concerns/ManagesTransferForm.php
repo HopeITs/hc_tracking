@@ -160,7 +160,7 @@ trait ManagesTransferForm
         }
 
         if ($agreementId !== null) {
-            $agreement = $this->scopedAgreements()->select(['id', 'currency'])->findOrFail($agreementId);
+            $agreement = $this->scopedAgreements()->select(['id', 'currency'])->whereKey($agreementId)->firstOrFail();
 
             $this->transferAgreementId = (string) $agreement->id;
             $this->useAgreementCurrency($agreement);

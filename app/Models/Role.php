@@ -21,6 +21,10 @@ use Spatie\Permission\PermissionRegistrar;
  * Changes made from that page (create, rename, delete, permissions) are
  * recorded explicitly through recordActivity(); there are no automatic
  * model-event hooks, so seeders and tests creating roles log nothing.
+ *
+ * @property int $id
+ *
+ * @method static static findOrCreate(\BackedEnum|string $name, ?string $guardName = null)
  */
 class Role extends SpatieRole implements TracksActivity
 {

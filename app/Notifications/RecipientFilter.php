@@ -64,10 +64,10 @@ final class RecipientFilter
             return [];
         }
 
-        return User::permission($permission)
+        return array_values(User::permission($permission)
             ->whereIn('users.id', $ids)
             ->pluck('users.id')
             ->map(fn (int|string $id): int => (int) $id)
-            ->all();
+            ->all());
     }
 }

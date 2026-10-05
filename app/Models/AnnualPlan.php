@@ -156,7 +156,7 @@ class AnnualPlan extends Model implements TracksActivity
      */
     public function activityLabel(): string
     {
-        return Program::query()->find($this->activityAttribute('program_id'), ['id'])?->name.' · '.$this->activityAttribute('year');
+        return Program::query()->whereKey($this->activityAttribute('program_id'))->first(['id'])?->name.' · '.$this->activityAttribute('year');
     }
 
     public function activityProgramId(): ?int
@@ -189,6 +189,6 @@ class AnnualPlan extends Model implements TracksActivity
      */
     protected function activityPropertiesBeforeDelete(): array
     {
-        return ['employee_ids' => array_values(array_filter([(int) $this->activityAttribute('manager_id')]))];
+        return ['employee_ids' => array_filter([(int) $this->activityAttribute('manager_id')])];
     }
 }

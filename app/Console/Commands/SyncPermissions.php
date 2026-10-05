@@ -38,7 +38,7 @@ class SyncPermissions extends Command
         $administratorRoles = config('access-control.administrator_roles', []);
         $baselines = config('access-control.role_baselines', []);
 
-        $existingPermissions = Permission::query()->where('guard_name', 'web')->pluck('name')->all();
+        $existingPermissions = array_values(Permission::query()->where('guard_name', 'web')->pluck('name')->map(fn (mixed $name): string => (string) $name)->all());
         $newPermissions = array_values(array_diff($this->catalog(), $existingPermissions));
         $allPermissions = [...$existingPermissions, ...$newPermissions];
 
@@ -100,10 +100,15 @@ class SyncPermissions extends Command
      */
     protected function catalog(): array
     {
-        return collect(config('access-control.groups', []))
-            ->flatMap(fn (array $actions, string $module): array => array_map(fn (string $action): string => "{$module}.{$action}", $actions))
-            ->values()
-            ->all();
+        $names = [];
+
+        foreach (config('access-control.groups', []) as $module => $actions) {
+            foreach ($actions as $action) {
+                $names[] = "{$module}.{$action}";
+            }
+        }
+
+        return $names;
     }
 
     /**

@@ -60,8 +60,8 @@ return new class extends Migration
             $employee = $account === null ? null : $employees->get($account->employee_id);
 
             DB::table('users')->where('id', $user->id)->update([
-                'email' => $account?->email ?? "user-{$user->id}@invalid",
-                'name' => $employee !== null ? trim($employee->first_name_en.' '.$employee->last_name_en) : ($account?->email ?? ''),
+                'email' => $account->email ?? "user-{$user->id}@invalid",
+                'name' => $employee !== null ? trim($employee->first_name_en.' '.$employee->last_name_en) : ($account->email ?? ''),
             ]);
         }
 

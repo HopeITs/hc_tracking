@@ -34,3 +34,15 @@ test('a program has its projects, annual plans and results', function () {
         ->and($program->annualPlans)->toHaveCount(2)
         ->and($program->results)->toHaveCount(1);
 });
+
+test('programs sort by their hr name in either direction', function () {
+    $shelter = Program::factory()->create(['name' => 'Shelter']);
+    $health = Program::factory()->create(['name' => 'Health']);
+    $wash = Program::factory()->create(['name' => 'WASH']);
+
+    $ascending = Program::query()->orderByName()->pluck('id')->all();
+    $descending = Program::query()->orderByName('desc')->pluck('id')->all();
+
+    expect($ascending)->toBe([$health->id, $shelter->id, $wash->id])
+        ->and($descending)->toBe([$wash->id, $shelter->id, $health->id]);
+});

@@ -37,6 +37,9 @@ use Livewire\Attributes\Locked;
  * The using component provides $projectId, a `ganttPayload` computed property
  * and the BuildsProjectGantt trait (which brings SchedulesProjectGantt).
  *
+ * @property int $projectId
+ * @property-read array{rows: list<array<string, mixed>>, links: list<array<string, mixed>>, baselines: list<array<string, mixed>>, baselineId: int|null, weekend: string, from: string, to: string, today: string} $ganttPayload
+ *
  * @phpstan-type GanttAnswer array{ok: bool, payload: array<string, mixed>, changes: list<array{id: string, start: string, end: string}>, previous: mixed}
  */
 trait EditsProjectGantt
@@ -171,7 +174,7 @@ trait EditsProjectGantt
 
             $record->update([
                 'parent_task_id' => $parent?->id,
-                'source_id' => $parent?->source_id ?? $record->source_id,
+                'source_id' => $parent->source_id ?? $record->source_id,
             ]);
 
             return $this->ganttSaved();
@@ -394,7 +397,7 @@ trait EditsProjectGantt
 
     private function ganttProject(): Project
     {
-        return Project::query()->findOrFail($this->projectId);
+        return Project::query()->whereKey($this->projectId)->firstOrFail();
     }
 
     private function findLink(string $fromRowId, string $toRowId): ?ScheduleDependency

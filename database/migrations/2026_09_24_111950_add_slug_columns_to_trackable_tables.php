@@ -54,17 +54,17 @@ return new class extends Migration
         });
 
         foreach (self::SIMPLE_TABLES as $table => $sourceColumn) {
-            $this->backfill($table, fn (object $row): string => (string) $row->{$sourceColumn});
+            $this->backfill($table, fn (stdClass $row): string => (string) $row->{$sourceColumn});
         }
 
-        $this->backfill('donor_proposal', function (object $row): string {
+        $this->backfill('donor_proposal', function (stdClass $row): string {
             $donor = DB::table('donors')->where('id', $row->donor_id)->value('slug');
             $proposal = DB::table('proposals')->where('id', $row->proposal_id)->value('slug');
 
             return trim(($donor ?? '').'-'.($proposal ?? ''), '-');
         });
 
-        $this->backfill('reports', function (object $row): string {
+        $this->backfill('reports', function (stdClass $row): string {
             $indicatorName = DB::table('plan_indicators')
                 ->join('indicators', 'indicators.id', '=', 'plan_indicators.indicator_id')
                 ->where('plan_indicators.id', $row->plan_indicator_id)
@@ -73,7 +73,7 @@ return new class extends Migration
             return trim(($indicatorName ?? 'report').'-'.$row->planned_date);
         });
 
-        $this->backfill('annual_plans', function (object $row): string {
+        $this->backfill('annual_plans', function (stdClass $row): string {
             $programSlug = DB::connection('hr')->table('programs')->where('id', $row->program_id)->value('slug');
 
             return trim(($programSlug ?? 'program').'-'.$row->year);
@@ -99,7 +99,7 @@ return new class extends Migration
      * Fill every row's slug from $source, keeping slugs unique within the
      * table by appending -2, -3, ... on collision.
      *
-     * @param  callable(object): string  $source
+     * @param  callable(stdClass): string  $source
      */
     private function backfill(string $table, callable $source): void
     {

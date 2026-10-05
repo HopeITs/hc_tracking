@@ -246,3 +246,12 @@ test('dates use syrian month names with western digits in arabic', function () {
 test('blaze stays disabled so compiled views never bake in one language', function () {
     expect(config('blaze.enabled'))->toBeFalse();
 });
+
+test('a date is formatted with levantine month names without changing the caller locale', function () {
+    $date = CarbonImmutable::parse('2026-09-05')->locale('en');
+
+    $formatted = Locale::Arabic->formatDate($date, 'F Y');
+
+    expect($formatted)->toBe('أيلول 2026')
+        ->and($date->locale())->toBe('en');
+});

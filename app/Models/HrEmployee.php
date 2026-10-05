@@ -82,7 +82,7 @@ class HrEmployee extends HrModel
                 ->orWhere('last_name_ar', 'like', Like::contains($word)));
         }
 
-        return $query->pluck('id')->all();
+        return array_values($query->pluck('id')->map(fn (mixed $id): int => (int) $id)->all());
     }
 
     /**

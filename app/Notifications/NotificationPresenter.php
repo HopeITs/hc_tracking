@@ -52,6 +52,11 @@ final class NotificationPresenter
         $params = [];
 
         foreach (array_keys($data['params'] ?? []) as $index => $name) {
+            // Only a named param can fill a ":name" placeholder.
+            if (! is_string($name)) {
+                continue;
+            }
+
             $token = "\u{E000}{$index}\u{E001}";
             $params[$name] = $token;
             $tokens[$token] = sprintf(
@@ -175,8 +180,8 @@ final class NotificationPresenter
         return match (true) {
             isset($param['trans']) => (string) __($param['trans'], [], $locale),
             isset($param['enum']) => (string) __('enums.'.$param['enum'].'.'.$this->enumKey((string) $param['value']), [], $locale),
-            isset($param['date']) => CarbonImmutable::parse($param['date'])->locale($this->carbonLocale($locale))->translatedFormat((string) __('formats.date', [], $locale)),
-            isset($param['weekday']) => CarbonImmutable::parse($param['weekday'])->locale($this->carbonLocale($locale))->translatedFormat('l'),
+            isset($param['date']) => $this->formatDate($param['date'], (string) __('formats.date', [], $locale), $locale),
+            isset($param['weekday']) => $this->formatDate($param['weekday'], 'l', $locale),
             isset($param['localized']) => $this->localized($param['localized'], $locale),
             isset($param['localized_list']) => implode(
                 $locale === 'ar' ? '، ' : ', ',
@@ -193,6 +198,18 @@ final class NotificationPresenter
     private function carbonLocale(string $locale): string
     {
         return Locale::tryFrom($locale)?->carbonLocale() ?? $locale;
+    }
+
+    /**
+     * A stored date param in the given language. Carbon's locale() switches
+     * the parsed date itself; its return type is too wide to chain on.
+     */
+    private function formatDate(mixed $date, string $format, string $locale): string
+    {
+        $parsed = CarbonImmutable::parse($date);
+        $parsed->locale($this->carbonLocale($locale));
+
+        return $parsed->translatedFormat($format);
     }
 
     /**

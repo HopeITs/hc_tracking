@@ -8,6 +8,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | {resources/views/pages/transfers/**,resources/views/pages/funding-agreements/**,resources/views/pages/donors/**,resources/views/pages/proposals/**,resources/views/pages/admin/⚡accounts.blade.php} | .ai/rules/admin.md |
 | app/Notifications/Alerts/** | .ai/rules/alerts.md |
 | resources/views/pages/annual-plans/** | .ai/rules/annual-plans.md |
+| app/** | .ai/rules/app-2.md |
 | app/Livewire/Concerns/FiltersFinanceRegister.php | .ai/rules/app-livewire-concerns.md |
 | resources/views/{components/navigation/**,layouts/app/sidebar.blade.php}, resources/views/{components/navigation/sidebar.blade.php,components/desktop-user-menu.blade.php,layouts/app/sidebar.blade.php} | .ai/rules/app.md |
 | resources/views/pages/auth/login.blade.php | .ai/rules/auth.md |
@@ -48,6 +49,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/views/components/{navigation/sidebar.blade.php,ui/panel.blade.php,ui/stat-tile.blade.php,ui/data-table.blade.php,ui/timeline.blade.php} | .ai/rules/navigation.md |
 | resources/views/pages/notifications/** | .ai/rules/notifications.md |
 | app/Observers/**, app/Observers/{MilestoneObserver,ResultObserver}.php | .ai/rules/observers.md |
+| tests/PHPStan/** | .ai/rules/p-h-p-stan.md |
 | {database/migrations/**,app/Models/DonorReport.php,resources/views/pages/funding-agreements/**} | .ai/rules/pages-funding-agreements.md |
 | resources/views/pages/** | .ai/rules/pages.md |
 | {config/access-control.php,app/Policies/UserPolicy.php} | .ai/rules/policies.md |

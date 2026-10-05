@@ -26,7 +26,10 @@ abstract class HrModel extends Model
      * Tracking models must stay on the default connection; HR models already
      * name `hr` themselves.
      *
-     * @param  class-string<Model>  $class
+     * @template TRelatedModel of Model
+     *
+     * @param  class-string<TRelatedModel>  $class
+     * @return TRelatedModel
      */
     protected function newRelatedInstance($class): Model
     {

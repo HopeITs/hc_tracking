@@ -6,7 +6,6 @@ namespace App\Concerns;
 
 use App\Models\Activity;
 use App\Notifications\ActivityRecorder;
-use Illuminate\Database\Eloquent\Model;
 
 /**
  * Records one Activity per created / meaningful update / deleted event of a
@@ -28,14 +27,14 @@ trait RecordsActivity
 
     public static function bootRecordsActivity(): void
     {
-        static::created(fn (Model $model) => $model->recordLifecycleActivity('created'));
-        static::updated(fn (Model $model) => $model->recordLifecycleActivity('updated'));
-        static::deleting(function (Model $model): void {
+        static::created(fn (self $model) => $model->recordLifecycleActivity('created'));
+        static::updated(fn (self $model) => $model->recordLifecycleActivity('updated'));
+        static::deleting(function (self $model): void {
             if (Activity::isRecording()) {
                 $model->activityDeletionProperties = $model->activityPropertiesBeforeDelete();
             }
         });
-        static::deleted(fn (Model $model) => $model->recordLifecycleActivity('deleted'));
+        static::deleted(fn (self $model) => $model->recordLifecycleActivity('deleted'));
     }
 
     /**

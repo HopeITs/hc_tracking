@@ -375,7 +375,7 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
      */
     protected function name(): Attribute
     {
-        return Attribute::get(fn (): string => $this->hr_user_id === null ? '' : (HrUser::directoryEntry($this->hr_user_id)['name'] ?? ''));
+        return Attribute::get(fn (): string => $this->hrDirectoryEntry()['name'] ?? '');
     }
 
     /**
@@ -385,7 +385,25 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
      */
     protected function email(): Attribute
     {
-        return Attribute::get(fn (): string => $this->hr_user_id === null ? '' : (HrUser::directoryEntry($this->hr_user_id)['email'] ?? ''));
+        return Attribute::get(fn (): string => $this->hrDirectoryEntry()['email'] ?? '');
+    }
+
+    /**
+     * This user's HR directory entry, or null when HR no longer has the account.
+     *
+     * The column is NOT NULL, but a user built in memory and not saved yet
+     * (createFromHrAccount() before forceFill, factory make()) has no
+     * hr_user_id, so the attribute is read raw rather than through the
+     * `int` property type (and may arrive as a numeric string, depending on
+     * the database driver).
+     *
+     * @return array{email: string, name: string}|null
+     */
+    private function hrDirectoryEntry(): ?array
+    {
+        $hrUserId = $this->getAttribute('hr_user_id');
+
+        return is_numeric($hrUserId) ? HrUser::directoryEntry((int) $hrUserId) : null;
     }
 
     /**
@@ -465,7 +483,8 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
         $ids = HrUser::idsOrderedByName();
 
         if ($ids !== []) {
-            $query->orderByRaw('FIELD('.$query->qualifyColumn('hr_user_id').', '.implode(', ', array_map('intval', $ids)).')');
+            $placeholders = implode(', ', array_fill(0, count($ids), '?'));
+            $query->orderByRaw('FIELD(users.hr_user_id, '.$placeholders.')', $ids);
         }
 
         $query->orderBy($query->qualifyColumn('id'));

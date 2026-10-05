@@ -64,12 +64,13 @@ class HrUser extends HrModel
     {
         $employeeIds = HrEmployee::idsMatchingName($search);
 
-        return static::query()
+        return array_values(static::query()
             ->where(fn (Builder $query) => $query
                 ->where('email', 'like', Like::contains($search))
                 ->orWhereIn('employee_id', $employeeIds))
             ->pluck('id')
-            ->all();
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all());
     }
 
     /**

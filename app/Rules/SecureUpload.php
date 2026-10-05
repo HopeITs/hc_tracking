@@ -97,9 +97,15 @@ class SecureUpload implements ValidationRule
 
             for ($index = 0; $index < $zip->numFiles; $index++) {
                 $entry = $zip->statIndex($index);
-                $unpacked += $entry['size'] ?? 0;
 
-                if (stripos((string) $entry['name'], 'vbaProject.bin') !== false) {
+                // An entry that cannot be read cannot be checked for macros.
+                if ($entry === false) {
+                    return 'validation.secure_upload.content_mismatch';
+                }
+
+                $unpacked += $entry['size'];
+
+                if (stripos($entry['name'], 'vbaProject.bin') !== false) {
                     return 'validation.secure_upload.active_content';
                 }
             }
@@ -116,6 +122,8 @@ class SecureUpload implements ValidationRule
 
     private function detectedMime(string $path): string|false
     {
-        return finfo_file(finfo_open(FILEINFO_MIME_TYPE), $path);
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+
+        return $finfo === false ? false : finfo_file($finfo, $path);
     }
 }

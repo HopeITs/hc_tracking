@@ -18,7 +18,7 @@ final class UnreadSubjects
      */
     public function ids(User $user, string $subjectType): array
     {
-        return UserNotification::query()
+        return array_values(UserNotification::query()
             ->forUser($user)
             ->visible()
             ->whereNull('read_at')
@@ -27,7 +27,7 @@ final class UnreadSubjects
             ->orderBy('subject_id')
             ->pluck('subject_id')
             ->map(fn (int|string $id): int => (int) $id)
-            ->all();
+            ->all());
     }
 
     public function has(User $user, string $subjectType, int $subjectId): bool

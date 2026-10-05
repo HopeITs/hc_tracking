@@ -320,7 +320,7 @@ class PlanIndicator extends Model implements TracksActivity
      */
     protected function activityPropertiesBeforeDelete(): array
     {
-        return ['employee_ids' => array_values(array_filter([Project::ownerEmployeeIdFor($this->activityAttribute('project_id'))]))];
+        return ['employee_ids' => array_filter([Project::ownerEmployeeIdFor($this->activityAttribute('project_id'))])];
     }
 
     /**
@@ -330,7 +330,7 @@ class PlanIndicator extends Model implements TracksActivity
     public static function programIdFor(mixed $planIndicatorId, mixed $projectId = null, mixed $sourceType = null, mixed $sourceId = null): ?int
     {
         if ($projectId === null && $sourceType === null) {
-            $row = static::query()->select(['project_id', 'source_type', 'source_id'])->find($planIndicatorId);
+            $row = static::query()->select(['project_id', 'source_type', 'source_id'])->whereKey($planIndicatorId)->first();
             [$projectId, $sourceType, $sourceId] = [$row?->project_id, $row?->source_type, $row?->source_id];
         }
 

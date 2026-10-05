@@ -47,9 +47,7 @@ final class NewDeviceSignIn extends Notification implements ShouldQueue
     public function toMail(User $notifiable): MailMessage
     {
         $name = $notifiable->name;
-        $time = $this->signedInAt
-            ->locale(Locale::current()->carbonLocale())
-            ->translatedFormat((string) __('formats.datetime'));
+        $time = Locale::current()->formatDate($this->signedInAt, (string) __('formats.datetime'));
 
         $message = (new MailMessage)
             ->subject(__('security.new_sign_in_subject', ['app' => config('app.name')]))

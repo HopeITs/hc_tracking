@@ -86,19 +86,19 @@ class PruneStoredFiles extends Command
     protected function unreferencedUploads(Filesystem $disk, int $cutoff): array
     {
         $referenced = collect([Media::class, ReportFile::class, TaskAttachment::class])
-            ->flatMap(fn (string $model) => $model::query()
+            ->flatMap(fn (string $model): array => $model::query()
                 ->withoutGlobalScopes()
                 ->where('disk', 'local')
                 ->toBase()
-                ->pluck('path'))
+                ->pluck('path')
+                ->all())
             ->flip();
 
-        return collect(self::UploadDirectories)
-            ->flatMap(fn (string $directory) => $disk->allFiles($directory))
+        return array_values(collect(self::UploadDirectories)
+            ->flatMap(fn (string $directory): array => $disk->allFiles($directory))
             ->reject(fn (string $path) => $referenced->has($path))
             ->filter(fn (string $path) => $disk->lastModified($path) < $cutoff)
-            ->values()
-            ->all();
+            ->all());
     }
 
     /**
@@ -111,9 +111,9 @@ class PruneStoredFiles extends Command
     {
         $storage = FileUploadConfiguration::storage();
 
-        return collect($storage->files(FileUploadConfiguration::path()))
-            ->filter(fn (string $path) => $storage->lastModified($path) < $cutoff)
-            ->values()
-            ->all();
+        return array_values(array_filter(
+            $storage->files(FileUploadConfiguration::path()),
+            fn (string $path): bool => $storage->lastModified($path) < $cutoff,
+        ));
     }
 }

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use Carbon\CarbonInterface;
+
 /**
  * The interface languages hc-tracking is translated into.
  *
@@ -40,6 +42,20 @@ enum Locale: string
     public function carbonLocale(): string
     {
         return $this === self::Arabic ? 'ar_SY' : 'en';
+    }
+
+    /**
+     * The date written with this language's month and day names.
+     *
+     * Carbon's locale() switches the date it is called on, so a copy is
+     * localized and the caller's date keeps its own locale.
+     */
+    public function formatDate(CarbonInterface $date, string $format): string
+    {
+        $localized = $date->copy();
+        $localized->locale($this->carbonLocale());
+
+        return $localized->translatedFormat($format);
     }
 
     /**

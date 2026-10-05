@@ -68,7 +68,7 @@ final class Inbox
      */
     public function unreadAmong(User $user, array $ids): array
     {
-        return UserNotification::query()->forUser($user)->whereKey($ids)->whereNull('read_at')->pluck('id')->all();
+        return array_values(UserNotification::query()->forUser($user)->whereKey($ids)->whereNull('read_at')->pluck('id')->map(fn (mixed $id): string => (string) $id)->all());
     }
 
     /**
@@ -78,7 +78,7 @@ final class Inbox
      */
     public function visibleUnreadIds(User $user): array
     {
-        return UserNotification::query()->forUser($user)->visible()->whereNull('read_at')->pluck('id')->all();
+        return array_values(UserNotification::query()->forUser($user)->visible()->whereNull('read_at')->pluck('id')->map(fn (mixed $id): string => (string) $id)->all());
     }
 
     public function markAllRead(User $user): int

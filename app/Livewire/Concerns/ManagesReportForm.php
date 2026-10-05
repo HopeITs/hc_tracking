@@ -12,7 +12,6 @@ use App\Models\Proposal;
 use App\Models\Report;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
@@ -26,6 +25,8 @@ use Livewire\Attributes\Locked;
  * The using component renders resources/views/components/reports/form-modal
  * and delete-modal, and decides where to land after a save or delete through
  * reportSaved() and reportDeleted().
+ *
+ * @property-read PlanIndicator|null $formTarget  #[Computed] formTarget()
  */
 trait ManagesReportForm
 {
@@ -84,12 +85,12 @@ trait ManagesReportForm
     #[Computed]
     public function targetOptions(): array
     {
-        return PlanIndicator::query()
+        return array_values(PlanIndicator::query()
             ->select(['id', 'indicator_id', 'source_type', 'source_id', 'target', 'period', 'project_id'])
             ->with([
                 'indicator:id,name,measure',
                 'project:id,name',
-                'source' => fn (MorphTo $morphTo) => $morphTo->morphWith([AnnualPlan::class => [], Proposal::class => []]),
+                'source',
             ])
             ->get()
             ->filter(fn (PlanIndicator $target): bool => $target->source !== null)
@@ -99,8 +100,7 @@ trait ManagesReportForm
                 'label' => $this->targetLabel($target),
                 'measure' => $target->indicator->measure,
             ])
-            ->values()
-            ->all();
+            ->all());
     }
 
     /**
@@ -120,7 +120,7 @@ trait ManagesReportForm
         return implode(' · ', [
             $target->indicator->name,
             $committedIn,
-            $target->project?->name ?? __('common.organisation_wide'),
+            $target->project->name ?? __('common.organisation_wide'),
             __('reports.target_of_value', ['value' => $figure]),
         ]);
     }
@@ -139,7 +139,7 @@ trait ManagesReportForm
             ->select(['id', 'indicator_id', 'source_type', 'source_id', 'target', 'period'])
             ->with([
                 'indicator:id,name,measure,unit',
-                'source' => fn (MorphTo $morphTo) => $morphTo->morphWith([AnnualPlan::class => [], Proposal::class => []]),
+                'source',
             ])
             ->find((int) $this->reportTargetId);
     }
@@ -219,7 +219,7 @@ trait ManagesReportForm
         $this->resetReportForm();
         $this->editingReportId = $report->id;
         $this->reportTargetId = (string) $report->plan_indicator_id;
-        $this->plannedDate = $report->planned_date?->toDateString() ?? '';
+        $this->plannedDate = $report->planned_date->toDateString();
         $this->periodStart = $report->period_start?->toDateString() ?? '';
         $this->periodEnd = $report->period_end?->toDateString() ?? '';
         $this->value = (string) $report->value;

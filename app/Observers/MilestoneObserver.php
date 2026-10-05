@@ -88,7 +88,7 @@ final class MilestoneObserver
             return;
         }
 
-        $today = CarbonImmutable::now()->toDateString();
+        $today = CarbonImmutable::today();
 
         if ($milestone->status === MilestoneStatus::Ongoing && $milestone->actual_start_date === null) {
             $milestone->actual_start_date = $today;

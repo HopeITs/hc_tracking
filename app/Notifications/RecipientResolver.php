@@ -78,7 +78,7 @@ final class RecipientResolver
             return [];
         }
 
-        return User::role($existing)->pluck('users.id')->map(fn (int|string $id): int => (int) $id)->all();
+        return array_values(User::role($existing)->pluck('users.id')->map(fn (int|string $id): int => (int) $id)->all());
     }
 
     /**

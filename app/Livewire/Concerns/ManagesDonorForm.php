@@ -96,7 +96,7 @@ trait ManagesDonorForm
         $this->resetValidation();
         $this->editingDonorId = $donor->id;
         $this->name = $donor->name;
-        $this->donorType = $donor->type?->value ?? '';
+        $this->donorType = $donor->type->value ?? '';
         $this->contactPerson = (string) $donor->contact_person;
         $this->email = (string) $donor->email;
         $this->phone = (string) $donor->phone;

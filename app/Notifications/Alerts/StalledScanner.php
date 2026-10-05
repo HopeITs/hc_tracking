@@ -25,6 +25,8 @@ use Illuminate\Support\Collection;
  * Tranches are deliberately not here: a late tranche is already covered by
  * the overdue and escalation chain (DeadlineCatalog), and a second "stalled"
  * alert would tell Financial the same thing twice (user decision 2026-09-23).
+ *
+ * @phpstan-type Stall array{type: string, id: int, module: string, label: string, status: array{enum: string, value: string}, days: int, stage: string, userIds: list<int>, reviewerRoles: list<string>}
  */
 final class StalledScanner implements Scanner
 {
@@ -79,7 +81,7 @@ final class StalledScanner implements Scanner
     }
 
     /**
-     * @return list<array<string, mixed>>
+     * @return list<Stall>
      */
     private function tasks(CarbonImmutable $today, TaskStatus $status, int $threshold): array
     {
@@ -93,7 +95,7 @@ final class StalledScanner implements Scanner
     }
 
     /**
-     * @return list<array<string, mixed>>
+     * @return list<Stall>
      */
     private function reports(CarbonImmutable $today, ReportStatus $status, int $threshold): array
     {
@@ -106,25 +108,25 @@ final class StalledScanner implements Scanner
     }
 
     /**
-     * @return list<array<string, mixed>>
+     * @return list<Stall>
      */
     private function proposals(CarbonImmutable $today, int $threshold): array
     {
         $proposals = Proposal::query()->select(['id', 'name', 'status', 'updated_at'])->whereNotIn('status', [ProposalStatus::Completed->value, ProposalStatus::Rejected->value])->get();
         $since = $this->statusSince('proposal', $proposals->modelKeys(), ['proposal.created', 'proposal.status_changed']);
 
-        return collect($proposals)->flatMap(fn (Proposal $proposal): array => $this->stalls(
+        return array_values($proposals->flatMap(fn (Proposal $proposal): array => $this->stalls(
             collect([$proposal]), $since, $today, $threshold, 'proposal', 'proposals', $proposal->status->value,
             ['enum' => 'proposal_status', 'value' => $proposal->status->value], ['Financial'],
             fn (): array => [], fn (Proposal $proposal): string => $proposal->name,
-        ))->all();
+        ))->all());
     }
 
     /**
      * When each record's current status began: its latest status activity,
      * else its last update.
      *
-     * @param  list<int>  $ids
+     * @param  array<int, int|string>  $ids  model keys
      * @param  list<string>  $events
      * @return Collection<int, string>
      */
@@ -145,18 +147,22 @@ final class StalledScanner implements Scanner
     }
 
     /**
-     * @param  Collection<int, Model>  $records
+     * @template TRecord of Model
+     *
+     * @param  Collection<int, TRecord>  $records
      * @param  Collection<int, string>  $since
      * @param  array{enum: string, value: string}  $status
      * @param  list<string>  $reviewerRoles
-     * @return list<array<string, mixed>>
+     * @param  callable(TRecord): array<int, int|null>  $people
+     * @param  callable(TRecord): string  $label
+     * @return list<Stall>
      */
     private function stalls(Collection $records, Collection $since, CarbonImmutable $today, int $threshold, string $type, string $module, string $statusValue, array $status, array $reviewerRoles, callable $people, callable $label): array
     {
         $stalls = [];
 
         foreach ($records as $record) {
-            $start = CarbonImmutable::parse($since[$record->getKey()] ?? $record->updated_at);
+            $start = CarbonImmutable::parse($since[$record->getKey()] ?? $record->getAttribute($record->getUpdatedAtColumn()));
             $days = $this->calendar->workingDaysBetween($start, $today);
 
             if ($days < $threshold) {

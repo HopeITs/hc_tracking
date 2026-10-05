@@ -183,7 +183,7 @@ class AppServiceProvider extends ServiceProvider
     protected function configureRateLimiting(): void
     {
         RateLimiter::for('livewire', fn (Request $request) => Limit::perMinute(180)->by(
-            (string) ($request->user()?->id ?? $request->ip()),
+            (string) ($request->user()->id ?? $request->ip()),
         ));
 
         // On the whole `web` group (see bootstrap/app.php): the login page
@@ -199,18 +199,18 @@ class AppServiceProvider extends ServiceProvider
         // user (or a hijacked session) could otherwise script sequential
         // requests to exfiltrate every attachment in the system.
         RateLimiter::for('files', fn (Request $request) => Limit::perMinute(60)->by(
-            (string) ($request->user()?->id ?? $request->ip()),
+            (string) ($request->user()->id ?? $request->ip()),
         ));
 
         RateLimiter::for('locale', fn (Request $request) => Limit::perMinute(10)->by(
-            (string) ($request->user()?->id ?? $request->ip()),
+            (string) ($request->user()->id ?? $request->ip()),
         ));
 
         // POST /broadcasting/auth: a page authorizes its one private channel
         // once per load (and on a reconnect), so 30 a minute is far above
         // real use while stopping a script from hammering it.
         RateLimiter::for('broadcasting', fn (Request $request) => Limit::perMinute(30)->by(
-            (string) ($request->user()?->id ?? $request->ip()),
+            (string) ($request->user()->id ?? $request->ip()),
         ));
 
         // The resend endpoint used a flat, IP-only throttle: a distributed

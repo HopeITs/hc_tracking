@@ -139,7 +139,13 @@ class EnsureHrAccountIsActive
             return $this->lookUpHrAccountOrNull($user);
         }
 
-        return is_array($cached) ? $cached : $this->freshHrAccount($user);
+        // An entry in another shape (an older format, a damaged store) is
+        // not an answer: ask HR again.
+        if (is_array($cached) && is_bool($cached['lost_access'] ?? null) && is_string($cached['password_fingerprint'] ?? null)) {
+            return ['lost_access' => $cached['lost_access'], 'password_fingerprint' => $cached['password_fingerprint']];
+        }
+
+        return $this->freshHrAccount($user);
     }
 
     /**

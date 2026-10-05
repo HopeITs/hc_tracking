@@ -81,11 +81,13 @@ return [
         | sign-ins, failures, lockouts, sign-outs, two-factor and passkey
         | changes. Kept apart from laravel.log, at info level whatever
         | LOG_LEVEL says, for 90 days. LOG_AUTH_STACK picks the channels it
-        | writes to; the test suite sets it to "null" so no file is written.
+        | writes to; the test suite sets it to "null" so no file is written. Any
+        | non-string value (env() turns "null" and booleans into those) disables
+        | the channel.
         */
         'auth' => [
             'driver' => 'stack',
-            'channels' => explode(',', env('LOG_AUTH_STACK', 'auth_daily') ?? 'null'),
+            'channels' => explode(',', is_string($authStack = env('LOG_AUTH_STACK', 'auth_daily')) ? $authStack : 'null'),
             'ignore_exceptions' => false,
         ],
 

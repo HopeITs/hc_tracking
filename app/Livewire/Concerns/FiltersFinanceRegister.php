@@ -95,7 +95,7 @@ trait FiltersFinanceRegister
     #[Computed]
     public function yearOptions(): array
     {
-        $years = TransfersTracking::query()->toBase()
+        $years = array_values(TransfersTracking::query()->toBase()
             ->selectRaw('year(scheduled_date) as y')->whereNotNull('scheduled_date')
             ->union(TransfersTracking::query()->toBase()->selectRaw('year(receive_date) as y')->whereNotNull('receive_date'))
             ->pluck('y')
@@ -104,8 +104,7 @@ trait FiltersFinanceRegister
             ->when($this->selectedYear() !== null, fn ($years) => $years->push($this->selectedYear()))
             ->unique()
             ->sortDesc()
-            ->values()
-            ->all();
+            ->all());
 
         return $years;
     }

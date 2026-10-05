@@ -93,6 +93,6 @@ class Risk extends Model implements TracksActivity
      */
     protected function activityPropertiesBeforeDelete(): array
     {
-        return ['employee_ids' => array_values(array_filter([Project::ownerEmployeeIdFor($this->activityAttribute('project_id'))]))];
+        return ['employee_ids' => array_filter([Project::ownerEmployeeIdFor($this->activityAttribute('project_id'))])];
     }
 }

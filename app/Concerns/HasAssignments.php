@@ -7,7 +7,6 @@ namespace App\Concerns;
 use App\Enums\AssignmentStatus;
 use App\Models\Activity;
 use App\Models\Assignment;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\Auth;
 
@@ -30,7 +29,7 @@ trait HasAssignments
      */
     public static function bootHasAssignments(): void
     {
-        $sync = function (Model $model): void {
+        $sync = function (self $model): void {
             if (! Activity::isRecording()) {
                 return;
             }

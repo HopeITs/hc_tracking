@@ -9,5 +9,68 @@ parameters:
         - config/
         - database/
         - routes/
+        # Hosts for the Livewire traits only the Blade pages use (see that folder).
+        # The rest of tests/ stays out: see .ai/rules/enums.md.
+        - tests/PHPStan/
 
     level: 7
+
+    # Each entry is a place PHPStan's view contradicts what really runs.
+    # Keep them narrow (one identifier, one file, an exact count); an entry
+    # that stops matching fails the run, so a stale one cannot linger.
+    ignoreErrors:
+        -
+            # User::delete() runs SQL; a row still referenced by a restricting
+            # foreign key throws QueryException. Model::delete()'s @throws lists
+            # only LogicException, so PHPStan calls the catch dead.
+            identifier: catch.neverThrown
+            path: app/Models/User.php
+            count: 1
+        -
+            # $user->email reads the HR database, which can fail; a log line must
+            # never break the sign-in it describes. Accessors declare no @throws.
+            identifier: catch.neverThrown
+            path: app/Listeners/LogAuthenticationEvent.php
+            count: 1
+        -
+            # Seeder::$command is documented as non-null but is only set when the
+            # seeder runs from artisan or another seeder's call(); Laravel's own
+            # Seeder guards it with isset() for the same reason.
+            identifier: nullsafe.neverNull
+            path: database/seeders/NotificationDemoSeeder.php
+            count: 2
+
+        # Raw SQL that cannot be a literal string but carries no user input.
+        # Checked 2026-10-05: every value inside is an enum value, a date this
+        # code formats itself, or a whitelisted sort direction. Bind anything
+        # a user can type with ? placeholders instead of adding an entry here.
+        -
+            # The funding money SQL (stateSql() and the figures built on it) is
+            # one definition, nested fragment inside fragment; the only runtime
+            # values are today's date and a year's bounds (sprintf('%04d', int)).
+            message: '#expects (.+\|)?literal-string, .+ given#'
+            identifier: argument.type
+            path: app/Models/TransfersTracking.php
+            count: 5
+        -
+            message: '#expects (.+\|)?literal-string, .+ given#'
+            identifier: argument.type
+            path: app/Support/AccountMoney.php
+            count: 2
+        -
+            message: '#expects (.+\|)?literal-string, .+ given#'
+            identifier: argument.type
+            path: app/Support/AgreementMoney.php
+            count: 1
+        -
+            message: '#expects (.+\|)?literal-string, .+ given#'
+            identifier: argument.type
+            path: app/Models/DonorProposal.php
+            count: 1
+        -
+            # Sort terms are SQL each register page writes in its own code; only
+            # the direction varies and activeSortDir() limits it to asc/desc.
+            message: '#expects (.+\|)?literal-string, .+ given#'
+            identifier: argument.type
+            path: app/Livewire/Concerns/FiltersFinanceRegister.php
+            count: 1

@@ -93,13 +93,12 @@ final class SubjectLinks
 
         foreach ($idsByType as $type => $ids) {
             $class = Relation::getMorphedModel($type);
-            $existing[$type] = $class === null ? [] : $class::query()
+            $existing[$type] = $class === null ? [] : array_values($class::query()
                 ->whereKey(array_values(array_unique($ids)))
                 ->pluck((new $class)->getKeyName())
                 ->map(fn (int|string $id): int => (int) $id)
                 ->sort()
-                ->values()
-                ->all();
+                ->all());
         }
 
         return $existing;

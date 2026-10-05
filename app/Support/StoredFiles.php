@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Support;
 
 use App\Enums\FileType;
-use Illuminate\Database\Eloquent\Model;
+use App\Models\Media;
+use App\Models\ReportFile;
+use App\Models\TaskAttachment;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -31,7 +33,7 @@ final class StoredFiles
      * @param  array<string, mixed>  $uploadAttributes  columns written only when a file was uploaded
      */
     public static function save(
-        Model $file,
+        Media|ReportFile|TaskAttachment $file,
         ?UploadedFile $upload,
         string $directory,
         string $typedName,
@@ -42,7 +44,7 @@ final class StoredFiles
         $replaced = null;
 
         if ($upload !== null) {
-            if ($file->exists && $file->original_name !== null && $file->path !== null) {
+            if ($file->exists && $file->original_name !== null) {
                 $replaced = ['disk' => $file->disk, 'path' => $file->path];
             }
 

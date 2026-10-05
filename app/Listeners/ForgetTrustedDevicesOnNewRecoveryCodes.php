@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Listeners;
 
 use App\Actions\Fortify\TrustedDevices;
-use App\Models\User;
 use Laravel\Fortify\Events\RecoveryCodesGenerated;
 
 /**
@@ -21,8 +20,6 @@ final class ForgetTrustedDevicesOnNewRecoveryCodes
 {
     public function handle(RecoveryCodesGenerated $event): void
     {
-        if ($event->user instanceof User) {
-            TrustedDevices::forgetAll($event->user);
-        }
+        TrustedDevices::forgetAll($event->user);
     }
 }

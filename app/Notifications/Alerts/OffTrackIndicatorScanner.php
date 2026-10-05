@@ -34,13 +34,13 @@ final class OffTrackIndicatorScanner implements Scanner
         }
 
         $indicators = Indicator::query()->with('progress')->get();
-        $owners = $this->ownerUsers($indicators->pluck('project_id')->filter()->unique()->values()->all());
+        $owners = $this->ownerUsers(array_values($indicators->pluck('project_id')->filter()->map(fn (mixed $id): int => (int) $id)->unique()->all()));
         $meal = $this->resolver->usersWithRoles(['MEAL']);
         $paceStage = 'pace:'.$now->year;
         $sent = 0;
 
         foreach ($indicators as $indicator) {
-            $direct = array_values(array_filter([$owners[$indicator->project_id] ?? null]));
+            $direct = array_filter([$owners[$indicator->project_id] ?? null]);
 
             if ($this->isOffPace($indicator, $now)) {
                 $payload = $this->dispatcher->payload('indicators', NotificationPriority::Important, 'notifications.alerts.off_track.pace', [
@@ -54,7 +54,7 @@ final class OffTrackIndicatorScanner implements Scanner
                 $this->ledger->release('off_track', 'indicator', $indicator->id, $paceStage);
             }
 
-            $lastReading = $indicator->progress->last()?->date ?? $indicator->created_at;
+            $lastReading = $indicator->progress->last()->date ?? $indicator->created_at;
 
             if ($lastReading !== null && $lastReading->lt($now->subMonths($this->windowMonths($indicator->frequency)))) {
                 $payload = $this->dispatcher->payload('indicators', NotificationPriority::Important, 'notifications.alerts.off_track.silent', [

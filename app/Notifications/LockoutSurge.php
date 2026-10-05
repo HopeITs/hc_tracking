@@ -47,9 +47,7 @@ final class LockoutSurge extends Notification implements ShouldQueue
     public function toMail(User $notifiable): MailMessage
     {
         $name = $notifiable->name;
-        $time = $this->noticedAt
-            ->locale(Locale::current()->carbonLocale())
-            ->translatedFormat((string) __('formats.datetime'));
+        $time = Locale::current()->formatDate($this->noticedAt, (string) __('formats.datetime'));
 
         $message = (new MailMessage)
             ->subject(__('security.lockout_surge_subject', ['app' => config('app.name')]))

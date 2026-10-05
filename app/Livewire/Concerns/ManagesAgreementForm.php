@@ -28,6 +28,8 @@ use Livewire\Attributes\Locked;
  * lives inside one proposal pins the form to it through agreementProposalScope(),
  * and a page that lives inside one donor pins it through agreementDonorScope(),
  * so a tampered payload cannot file the agreement against another record.
+ *
+ * @property-read string|null $agreementDeleteBlocker  #[Computed] agreementDeleteBlocker()
  */
 trait ManagesAgreementForm
 {

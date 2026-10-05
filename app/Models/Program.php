@@ -171,7 +171,8 @@ class Program extends Model implements TracksActivity
         $ids = HrProgram::idsOrderedByName();
 
         if ($ids !== []) {
-            $query->orderByRaw('FIELD('.$query->qualifyColumn('id').', '.implode(', ', array_map('intval', $ids)).') '.($direction === 'desc' ? 'desc' : 'asc'));
+            $placeholders = implode(', ', array_fill(0, count($ids), '?'));
+            $query->orderByRaw('FIELD(programs.id, '.$placeholders.') '.($direction === 'desc' ? 'desc' : 'asc'), $ids);
         }
 
         $query->orderBy($query->qualifyColumn('id'), $direction === 'desc' ? 'desc' : 'asc');
@@ -275,6 +276,6 @@ class Program extends Model implements TracksActivity
      */
     protected function activityPropertiesBeforeDelete(): array
     {
-        return ['employee_ids' => array_values(array_filter([(int) $this->activityAttribute('manager_id')]))];
+        return ['employee_ids' => array_filter([(int) $this->activityAttribute('manager_id')])];
     }
 }

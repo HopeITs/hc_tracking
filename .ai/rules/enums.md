@@ -144,3 +144,5 @@ convention mandates trips `property.nonObject` — that is 300+ tests. And Pest'
 Do not add `tests/` to the paths without installing that plugin first and
 solving the query-builder union type. A permanently red `phpstan analyse` is
 worse than not analysing tests.
+
+The single exception: tests/PHPStan/ (abstract Livewire host classes, no Pest tests) IS in phpstan.neon's paths so traits used only by Blade pages get analysed — see .ai/rules/p-h-p-stan.md. Everything else in tests/ stays out.

@@ -153,7 +153,7 @@ class Task extends Model implements TracksActivity
     {
         $parentId = $this->activityAttribute('parent_task_id');
 
-        return $parentId === null ? null : Task::query()->find($parentId);
+        return $parentId === null ? null : Task::query()->whereKey($parentId)->first();
     }
 
     /**
@@ -175,7 +175,9 @@ class Task extends Model implements TracksActivity
      */
     public function sourceLabel(): string
     {
-        return $this->loadedSource()?->name ?? __('tasks.no_source');
+        $name = $this->loadedSource()?->getAttribute('name');
+
+        return is_string($name) ? $name : __('tasks.no_source');
     }
 
     /**

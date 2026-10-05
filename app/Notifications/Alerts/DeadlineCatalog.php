@@ -67,10 +67,10 @@ final class DeadlineCatalog
 
         $users = $this->employees->usersFor($tasks->flatMap(fn (Task $task) => $task->taskAssignees->pluck('employee_id'))->map(fn ($id): int => (int) $id)->unique()->values()->all());
 
-        return $tasks->map(fn (Task $task): DeadlineItem => new DeadlineItem(
+        return array_values($tasks->map(fn (Task $task): DeadlineItem => new DeadlineItem(
             'task', $task->id, 'tasks', $task->title, $task->due_date,
             $this->unique([...$task->taskAssignees->map(fn ($assignee): ?int => $users[(int) $assignee->employee_id] ?? null)->all(), $task->created_by]),
-        ))->all();
+        ))->all());
     }
 
     /**
@@ -88,10 +88,10 @@ final class DeadlineCatalog
 
         $users = $this->employees->usersFor($milestones->flatMap(fn (object $row): array => [(int) $row->responsible_user_id, (int) $row->owner_id])->unique()->values()->all());
 
-        return $milestones->map(fn (object $row): DeadlineItem => new DeadlineItem(
+        return array_values($milestones->map(fn (object $row): DeadlineItem => new DeadlineItem(
             'milestone', (int) $row->id, 'milestones', (string) $row->name, CarbonImmutable::parse($row->planned_end_date),
             $this->unique([$users[(int) $row->responsible_user_id] ?? null, $users[(int) $row->owner_id] ?? null]),
-        ))->all();
+        ))->all());
     }
 
     /**
@@ -99,7 +99,7 @@ final class DeadlineCatalog
      */
     private function reports(string $limit): array
     {
-        return Report::query()
+        return array_values(Report::query()
             ->join('plan_indicators', 'plan_indicators.id', '=', 'reports.plan_indicator_id')
             ->join('indicators', 'indicators.id', '=', 'plan_indicators.indicator_id')
             ->where('reports.status', ReportStatus::Draft->value)
@@ -108,7 +108,7 @@ final class DeadlineCatalog
             ->get(['reports.id', 'reports.user_id', 'reports.planned_date', 'indicators.name'])
             ->map(fn (object $row): DeadlineItem => new DeadlineItem(
                 'report', (int) $row->id, 'reports', (string) $row->name, CarbonImmutable::parse($row->planned_date), [(int) $row->user_id],
-            ))->all();
+            ))->all());
     }
 
     /**
@@ -116,13 +116,13 @@ final class DeadlineCatalog
      */
     private function donorReports(string $limit): array
     {
-        return DonorReport::query()
+        return array_values(DonorReport::query()
             ->whereNull('submitted_on')
             ->whereDate('due_on', '<=', $limit)
             ->get(['id', 'title', 'due_on'])
             ->map(fn (DonorReport $report): DeadlineItem => new DeadlineItem(
                 'donor_report', $report->id, 'funding-agreements', $report->title, $report->due_on, [], self::FinanceWatchers,
-            ))->all();
+            ))->all());
     }
 
     /**
@@ -130,13 +130,13 @@ final class DeadlineCatalog
      */
     private function proposals(string $limit): array
     {
-        return Proposal::query()
+        return array_values(Proposal::query()
             ->whereNotIn('status', [ProposalStatus::Completed->value, ProposalStatus::Rejected->value])
             ->whereDate('planned_date_end', '<=', $limit)
             ->get(['id', 'name', 'planned_date_end', 'status'])
             ->map(fn (Proposal $proposal): DeadlineItem => new DeadlineItem(
                 'proposal', $proposal->id, 'proposals', $proposal->name, $proposal->planned_date_end, [], self::FinanceWatchers,
-            ))->all();
+            ))->all());
     }
 
     /**
@@ -144,7 +144,7 @@ final class DeadlineCatalog
      */
     private function transfers(string $limit): array
     {
-        return TransfersTracking::query()
+        return array_values(TransfersTracking::query()
             ->join('donor_proposal', 'donor_proposal.id', '=', 'transfers_tracking.donor_proposal_id')
             ->join('donors', 'donors.id', '=', 'donor_proposal.donor_id')
             ->join('proposals', 'proposals.id', '=', 'donor_proposal.proposal_id')
@@ -157,7 +157,7 @@ final class DeadlineCatalog
             ->map(fn (object $row): DeadlineItem => new DeadlineItem(
                 'transfer', (int) $row->id, 'transfers', $row->donor.' · '.$row->proposal.' · '.number_format((float) $row->payment_amount, 2).' '.$row->amount_transfered_currency,
                 CarbonImmutable::parse($row->scheduled_date), [], ['Financial'],
-            ))->all();
+            ))->all());
     }
 
     /**
@@ -175,9 +175,9 @@ final class DeadlineCatalog
 
         $users = $this->employees->usersFor($projects->pluck('user_id')->map(fn ($id): int => (int) $id)->unique()->values()->all());
 
-        return $projects->map(fn (Project $project): DeadlineItem => new DeadlineItem(
+        return array_values($projects->map(fn (Project $project): DeadlineItem => new DeadlineItem(
             'project', $project->id, 'projects', $project->name, $project->end_date, $this->unique([$users[(int) $project->user_id] ?? null]),
-        ))->all();
+        ))->all());
     }
 
     /**

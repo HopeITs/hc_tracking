@@ -315,7 +315,7 @@ class Project extends Model implements TracksActivity
      */
     protected function activityPropertiesBeforeDelete(): array
     {
-        return ['employee_ids' => array_values(array_filter([(int) $this->activityAttribute('user_id')]))];
+        return ['employee_ids' => array_filter([(int) $this->activityAttribute('user_id')])];
     }
 
     /**
