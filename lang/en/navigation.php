@@ -1,13 +1,14 @@
 <?php
 
 return [
-    'activity_log' => 'Activity log',
-    'notification_settings' => 'Notification rules',
+    'activity_log' => 'Activity Log',
+    'notification_settings' => 'Notification Rules',
     'administration' => 'Administration',
     'application_navigation' => 'Application navigation',
     'documentation' => 'Documentation',
     'group_funding_finance' => 'Funding & Finance',
     'group_monitoring_evaluation' => 'Monitoring & Evaluation',
+    'group_overview' => 'Overview',
     'group_projects_delivery' => 'Projects & Delivery',
     'group_strategy_planning' => 'Strategy & Planning',
     'group_workspace' => 'My Workspace',
@@ -20,6 +21,6 @@ return [
     'switch_language' => 'Switch language',
     'toggle_sidebar' => 'Collapse or expand the sidebar',
     'report_a_problem' => 'Report a problem or bug',
-    'roles_and_permissions' => 'Roles & permissions',
-    'user_directory' => 'User directory',
+    'roles_and_permissions' => 'Roles & Permissions',
+    'user_directory' => 'User Directory',
 ];

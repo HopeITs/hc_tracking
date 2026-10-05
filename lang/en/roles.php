@@ -1,8 +1,8 @@
 <?php
 
 return [
-    'title' => 'Roles & permissions',
-    'new_role' => 'New role',
+    'title' => 'Roles & Permissions',
+    'new_role' => 'New Role',
     'role_name_placeholder' => 'e.g. Regional Auditor',
     'create_role' => 'Create role',
     'rename_role' => 'Rename role',

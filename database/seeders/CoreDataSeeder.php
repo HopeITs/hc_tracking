@@ -7,7 +7,6 @@ use App\Enums\ProposalStatus;
 use App\Models\Donor;
 use App\Models\HrUser;
 use App\Models\Proposal;
-use App\Models\Strategy;
 use App\Models\User;
 use Database\Seeders\Concerns\PicksHrRecords;
 use Illuminate\Database\Seeder;
@@ -16,7 +15,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 /**
- * Master data every other seeder builds on: staff, strategies, donors, and a
+ * Master data every other seeder builds on: staff, donors, and a
  * handful of real, program-independent proposals.
  *
  * Staff are the HR accounts: every active one gets a tracking user (no role,
@@ -36,18 +35,6 @@ class CoreDataSeeder extends Seeder
         }
 
         User::syncFromHrAccounts();
-
-        Strategy::factory()->create([
-            'name' => 'Country Strategy 2021-2025',
-            'start_year' => 2021,
-            'end_year' => 2025,
-        ]);
-
-        Strategy::factory()->create([
-            'name' => 'Country Strategy 2026-2030',
-            'start_year' => 2026,
-            'end_year' => 2030,
-        ]);
 
         // Real classifications, so the donor type filter has something on more
         // than one side of it. GIZ and SIDA are bilateral agencies; UNICEF and

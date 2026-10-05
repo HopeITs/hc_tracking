@@ -47,6 +47,35 @@ class HrContract extends HrModel
     }
 
     /**
+     * The person at the top of the organisation: the holder of the active
+     * position with the configured title (notifications.top_level_position_title,
+     * the Chief Executive Officer) that has no direct manager. They sit above
+     * the program managers in the notification chain. The deputy has no direct
+     * manager either, so the title is what singles the top out.
+     *
+     * @return list<int>
+     */
+    public static function topLevelEmployeeIds(): array
+    {
+        $title = (string) config('notifications.top_level_position_title');
+
+        $positionIds = HrPosition::query()
+            ->where('is_active', true)
+            ->whereNull('direct_manager_id')
+            ->where('title_en', $title)
+            ->pluck('id');
+
+        return static::query()
+            ->where('is_active', true)
+            ->whereIn('position_id', $positionIds)
+            ->pluck('employee_id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>

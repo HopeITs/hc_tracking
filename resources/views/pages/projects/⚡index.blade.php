@@ -18,11 +18,14 @@ use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -379,6 +382,7 @@ new #[Title('titles.projects')] class extends Component {
                 'program:id,strategy_id',
                 'program.strategy:id,name',
                 'user:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
+                'ownerAssignment',
             ])
             ->when($this->view === 'timeline', fn (Builder $query) => $query->with([
                 'milestones' => fn ($query) => $query
@@ -629,6 +633,43 @@ new #[Title('titles.projects')] class extends Component {
         return Program::options();
     }
 
+    /**
+     * Who can own a project: the managers of programs (loaded from HR into
+     * programs.manager_id), plus, when editing, the project's present owner so
+     * the form still shows them.
+     *
+     * @return Collection<int, HrEmployee>
+     */
+    #[Computed]
+    public function ownerOptions(): Collection
+    {
+        $ids = $this->programOptions->pluck('manager_id');
+
+        if ($this->editingProjectId !== null) {
+            $ids->push(Project::query()->whereKey($this->editingProjectId)->value('user_id'));
+        }
+
+        return $this->userOptions->whereIn('id', $ids->filter()->map(fn (mixed $id): int => (int) $id)->unique()->all())->values();
+    }
+
+    /**
+     * Choosing a program proposes its manager as the owner; the person filling
+     * the form can still pick another program manager. Left alone when the
+     * program has no manager or the editor may not change the owner.
+     */
+    public function updatedProgramId(string $value): void
+    {
+        if ($value === '' || ($this->editingProjectId !== null && ! Gate::allows('reassign', Project::query()->findOrFail($this->editingProjectId)))) {
+            return;
+        }
+
+        $managerId = Program::query()->whereKey((int) $value)->value('manager_id');
+
+        if ($managerId !== null) {
+            $this->userId = (string) $managerId;
+        }
+    }
+
     /** @return Collection<int, HrEmployee> */
     #[Computed]
     public function userOptions(): Collection
@@ -696,6 +737,17 @@ new #[Title('titles.projects')] class extends Component {
         $this->name = trim($this->name);
         $this->description = trim($this->description);
 
+        // A new project always starts as a draft; the status only opens up
+        // once its owner has acknowledged (see statusLocked()).
+        if ($this->editingProjectId === null) {
+            $this->projectStatus = ProjectStatus::Draft->value;
+        }
+
+        // Only someone who may change the owner has to pick a program manager;
+        // for anyone else the submitted owner is ignored below.
+        $mustPickProgramManager = $this->editingProjectId === null
+            || Gate::allows('reassign', Project::query()->findOrFail($this->editingProjectId));
+
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
@@ -713,7 +765,7 @@ new #[Title('titles.projects')] class extends Component {
             'targetGirls' => ['nullable', 'integer', 'min:0', 'max:4294967295'],
             'cityId' => ['required', 'integer', Rule::exists(HrCity::class, 'id')],
             'programId' => ['required', 'integer', Rule::exists(Program::class, 'id')],
-            'userId' => ['required', 'integer', Rule::exists(HrEmployee::class, 'id')],
+            'userId' => ['required', 'integer', Rule::exists(HrEmployee::class, 'id'), Rule::when($mustPickProgramManager, [Rule::in($this->ownerOptions->pluck('id')->all())])],
         ], [
             'name.required' => __('projects.enter_a_project_name'),
             'cityId.required' => __('projects.select_a_city_2'),
@@ -722,6 +774,7 @@ new #[Title('titles.projects')] class extends Component {
             'programId.exists' => __('projects.the_selected_program_is_no_longer_available'),
             'userId.required' => __('projects.select_a_project_owner'),
             'userId.exists' => __('projects.the_selected_owner_is_no_longer_available'),
+            'userId.in' => __('projects.owner_must_be_program_manager'),
             'endDate.after_or_equal' => __('projects.the_end_date_must_be_on_or_after_the_start_date'),
         ]);
 
@@ -736,6 +789,8 @@ new #[Title('titles.projects')] class extends Component {
         if ($project->exists && ProjectStatus::from($validated['projectStatus']) === ProjectStatus::Archived && $project->status !== ProjectStatus::Archived) {
             Gate::authorize('delete', $project);
         }
+
+        $this->ensureOwnerAcknowledgedToLeaveDraft($project, ProjectStatus::from($validated['projectStatus']), $mayReassign ? (int) $validated['userId'] : (int) $project->user_id);
 
         $project->fill([
             'name' => $validated['name'],
@@ -764,6 +819,55 @@ new #[Title('titles.projects')] class extends Component {
             text: $wasRecentlyCreated ? __('projects.project_created') : __('projects.project_updated'),
         );
     }
+
+    /**
+     * Whether the status dropdown in the project form is read-only: always for
+     * a new project, and for a draft until its owner has acknowledged (and the
+     * form still names that same owner). Other states move freely.
+     */
+    #[Computed]
+    public function statusLocked(): bool
+    {
+        if ($this->editingProjectId === null) {
+            return true;
+        }
+
+        $project = Project::query()->find($this->editingProjectId);
+
+        if ($project === null || $project->status !== ProjectStatus::Draft) {
+            return false;
+        }
+
+        return ! ($project->isAssignmentAcknowledged('user_id') && (int) $this->userId === (int) $project->user_id);
+    }
+
+    /**
+     * A draft stays a draft until its owner has acknowledged being in charge
+     * (see Assignment). Putting yourself in charge counts as acknowledging.
+     */
+    protected function ensureOwnerAcknowledgedToLeaveDraft(Project $project, ProjectStatus $target, int $ownerEmployeeId): void
+    {
+        $leavesDraft = ! $project->exists || $project->status === ProjectStatus::Draft;
+
+        if (! $leavesDraft || in_array($target, [ProjectStatus::Draft, ProjectStatus::Archived], true)) {
+            return;
+        }
+
+        $acknowledged = $project->exists && $ownerEmployeeId === (int) $project->user_id
+            ? $project->isAssignmentAcknowledged('user_id')
+            : (int) Auth::user()?->employee_id === $ownerEmployeeId;
+
+        if (! $acknowledged) {
+            throw ValidationException::withMessages(['projectStatus' => __('projects.owner_must_acknowledge_first')]);
+        }
+    }
+
+    /**
+     * The inbox changed (poll, push, or an action done from the bell): the
+     * unread dots and the Rejected badges are read fresh on this re-render.
+     */
+    #[On('notification-received')]
+    public function refreshFromInbox(): void {}
 
     public function closeProjectModal(): void
     {
@@ -1417,7 +1521,10 @@ new #[Title('titles.projects')] class extends Component {
                                                 <p class="type-meta text-secondary-medium dark:text-ink-muted">{{ __('projects.no_connections_yet') }}</p>
                                             @endif
 
-                                            <x-ui.employee-chip :employee="$project->user" compact class="shrink-0 justify-end" />
+                                            <div class="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                                                <x-ui.employee-chip :employee="$project->user" compact />
+                                                <x-ui.assignment-badge :project="$project" />
+                                            </div>
                                         </div>
                                     </div>
                                 </article>
@@ -1524,7 +1631,10 @@ new #[Title('titles.projects')] class extends Component {
                             </x-ui.data-table.cell>
 
                             <x-ui.data-table.cell :label="__('projects.owner')" class="@max-4xl:hidden @max-3xl:flex!">
-                                <x-ui.employee-chip :employee="$project->user" compact />
+                                <div class="flex flex-wrap items-center gap-1.5">
+                                    <x-ui.employee-chip :employee="$project->user" compact />
+                                    <x-ui.assignment-badge :project="$project" />
+                                </div>
                             </x-ui.data-table.cell>
 
                             <x-ui.data-table.cell :label="__('projects.col_schedule')">
@@ -1651,6 +1761,7 @@ new #[Title('titles.projects')] class extends Component {
                                         <div class="mt-2 flex flex-wrap items-center gap-1.5">
                                             <x-ui.enum-badge :case="$project->status" />
                                             <x-ui.employee-chip :employee="$project->user" compact />
+                                            <x-ui.assignment-badge :project="$project" />
                                         </div>
 
                                         <div class="mt-2 flex flex-wrap items-center gap-1">
@@ -1840,7 +1951,14 @@ new #[Title('titles.projects')] class extends Component {
                 <div class="grid grid-cols-2 gap-x-4 gap-y-3 @4xl/modal:grid-cols-3">
                     <x-ui.form-input wire:model="name" :label="__('projects.project_name')" maxlength="255" required autofocus class="col-span-2" />
 
-                    <x-ui.form-select wire:model="projectStatus" :label="__('common.status')" required class="col-span-2 @4xl/modal:col-span-1">
+                    <x-ui.form-select
+                        wire:model="projectStatus"
+                        :label="__('common.status')"
+                        required
+                        :disabled="$this->statusLocked"
+                        :locked-reason="$this->statusLocked ? ($editingProjectId === null ? __('projects.status_locked_new') : __('projects.status_locked_until_acknowledged')) : null"
+                        class="col-span-2 @4xl/modal:col-span-1"
+                    >
                         @foreach (ProjectStatus::cases() as $statusOption)
                             <option value="{{ $statusOption->value }}">{{ $statusOption->label() }}</option>
                         @endforeach
@@ -1869,14 +1987,14 @@ new #[Title('titles.projects')] class extends Component {
                         @endforeach
                     </x-ui.form-select>
 
-                    <x-ui.form-select wire:model="programId" :label="__('common.program')" :placeholder="__('projects.select_a_program')" required>
+                    <x-ui.form-select wire:model.live="programId" :label="__('common.program')" :placeholder="__('projects.select_a_program')" required>
                         @foreach ($this->programOptions as $programOption)
                             <option value="{{ $programOption->id }}">{{ $programOption->name }}</option>
                         @endforeach
                     </x-ui.form-select>
 
                     <x-ui.form-select wire:model="userId" :label="__('projects.owner')" :placeholder="__('projects.select_an_owner')" required>
-                        @foreach ($this->userOptions as $userOption)
+                        @foreach ($this->ownerOptions as $userOption)
                             <option value="{{ $userOption->id }}">{{ $userOption->name }} · {{ $userOption->secondary_name }}</option>
                         @endforeach
                     </x-ui.form-select>

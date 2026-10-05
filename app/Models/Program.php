@@ -27,8 +27,9 @@ use Illuminate\Support\Facades\DB;
  * The row exists only so local foreign keys (projects, annual plans, results)
  * and the tracking-owned links can hang off the HR program. Everything HR
  * holds, the name included, is read from HR (see HrProgram::namesById()) and
- * never copied here. Tracking owns only the strategy and manager links, which
- * stay empty until someone assigns them.
+ * never copied here. Tracking owns only the strategy and manager links; the manager follows
+ * HR's Program Manager position where there is one, the strategy stays
+ * empty until someone assigns it.
  *
  * @property int $id
  * @property-read string $name
@@ -58,25 +59,43 @@ class Program extends Model implements TracksActivity
     }
 
     /**
-     * Give every HR program its tracking row.
+     * Give every HR program its tracking row and keep its manager in step with HR.
      *
-     * Only ids are written: new HR programs get a row, existing rows are left
-     * alone, and programs that have disappeared from HR are kept so the
-     * projects and plans under them survive. The HR mirror is not somebody's
-     * action, so it records no activity.
+     * New HR programs get a row carrying the id. A program that has an active
+     * "Program Manager" position in HR takes its manager from HR on every sync:
+     * a change of holder, or a vacated seat (null), is mirrored here. A program
+     * with no such position keeps whatever manager was assigned in tracking.
+     * Programs that have disappeared from HR are kept so the projects and plans
+     * under them survive. The HR mirror is not somebody's action, so it records
+     * no activity.
      */
     public static function syncFromHr(): void
     {
         Activity::withoutRecording(function (): void {
             $now = now();
+            $managers = HrPosition::programManagerEmployeeIds();
 
             $rows = HrProgram::query()
                 ->pluck('id')
-                ->map(fn (int $id): array => ['id' => $id, 'created_at' => $now, 'updated_at' => $now])
+                ->map(fn (int $id): array => [
+                    'id' => $id,
+                    'manager_id' => $managers[$id] ?? null,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ])
                 ->all();
 
             if ($rows !== []) {
                 static::query()->toBase()->insertOrIgnore($rows);
+            }
+
+            foreach ($managers as $programId => $employeeId) {
+                static::query()->toBase()
+                    ->where('id', $programId)
+                    ->where(fn ($query) => $employeeId === null
+                        ? $query->whereNotNull('manager_id')
+                        : $query->whereNull('manager_id')->orWhere('manager_id', '!=', $employeeId))
+                    ->update(['manager_id' => $employeeId, 'updated_at' => $now]);
             }
         });
     }
@@ -88,7 +107,7 @@ class Program extends Model implements TracksActivity
      */
     public static function options(): Collection
     {
-        return static::query()->select(['id'])->orderByName()->get();
+        return static::query()->select(['id', 'manager_id'])->orderByName()->get();
     }
 
     /**

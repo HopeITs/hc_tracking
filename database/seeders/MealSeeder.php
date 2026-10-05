@@ -20,7 +20,7 @@ use Illuminate\Support\Collection;
  * The MEAL layer: the logframe, the targets planned against it, and the
  * actuals reported back.
  *
- * Depends on ProgrammeSeeder.
+ * Depends on DemoDeliverySeeder.
  */
 class MealSeeder extends Seeder
 {

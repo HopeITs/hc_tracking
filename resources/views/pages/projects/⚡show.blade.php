@@ -12,6 +12,8 @@ use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Livewire\Concerns\BuildsProjectGantt;
 use App\Livewire\Concerns\EditsProjectGantt;
+use App\Enums\AssignmentStatus;
+use App\Models\Assignment;
 use App\Models\DonorProposal;
 use App\Models\HrEmployee;
 use App\Models\Indicator;
@@ -28,12 +30,14 @@ use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -83,9 +87,110 @@ new #[Title('titles.project')] class extends Component {
     /** @var array<int, string> */
     public array $newTaskAssignedTo = [];
 
+    /** The owner assignment dialog: the owner acknowledges or rejects. */
+    #[Url(as: 'respond', except: '')]
+    public string $respond = '';
+
+    public bool $showAssignmentModal = false;
+
+    #[Locked]
+    public string $assignmentMode = 'reject';
+
+    public string $assignmentNote = '';
+
     public function mount(Project $project): void
     {
         $this->projectId = $project->id;
+
+        $assignment = $project->currentAssignment('user_id');
+
+        if ($assignment !== null && Auth::user() !== null && $assignment->status === AssignmentStatus::Pending && $assignment->isFor(Auth::user())) {
+            $assignment->markSeen();
+
+            if ($this->respond === 'reject') {
+                $this->openAssignmentModal('reject');
+            }
+        }
+
+        $this->respond = '';
+    }
+
+    /**
+     * The owner assignment that stands for this project right now.
+     */
+    #[Computed]
+    public function ownerAssignment(): ?Assignment
+    {
+        return Project::query()->findOrFail($this->projectId)->currentAssignment('user_id')?->load('assigner');
+    }
+
+    public function openAssignmentModal(string $mode): void
+    {
+        abort_unless(in_array($mode, ['acknowledge', 'reject'], true), 404);
+
+        $assignment = $this->ownerAssignment;
+        abort_if($assignment === null, 404);
+        Gate::authorize('respond', $assignment);
+
+        $this->resetValidation();
+        $this->assignmentMode = $mode;
+        $this->assignmentNote = '';
+        $this->showAssignmentModal = true;
+    }
+
+    public function closeAssignmentModal(): void
+    {
+        $this->showAssignmentModal = false;
+        $this->assignmentNote = '';
+        $this->resetValidation();
+    }
+
+    /**
+     * Acknowledge (note optional) or reject (reason required).
+     * Authorized again here: the dialog may have been open for a while.
+     */
+    public function submitAssignment(): void
+    {
+        $assignment = $this->ownerAssignment;
+        abort_if($assignment === null, 404);
+
+        $user = Auth::user();
+        Gate::authorize('respond', $assignment);
+
+        $this->assignmentNote = trim($this->assignmentNote);
+
+        $validated = $this->validate([
+            'assignmentNote' => $this->assignmentMode === 'reject'
+                ? ['required', 'string', 'min:10', 'max:1000']
+                : ['nullable', 'string', 'max:1000'],
+        ], [
+            'assignmentNote.required' => __('projects.assignment_reason_required'),
+            'assignmentNote.min' => __('projects.assignment_reason_required'),
+        ]);
+
+        match ($this->assignmentMode) {
+            'acknowledge' => $assignment->acknowledge($user, $validated['assignmentNote']),
+            default => $assignment->reject($user, $validated['assignmentNote']),
+        };
+
+        $mode = $this->assignmentMode;
+        $this->closeAssignmentModal();
+        unset($this->ownerAssignment);
+
+        Flux::toast(variant: 'success', text: match ($mode) {
+            'acknowledge' => __('projects.assignment_acknowledge_done'),
+            default => __('projects.assignment_reject_done'),
+        });
+    }
+
+    /**
+     * The inbox changed (a poll, a push, or a read / acknowledge / reject done
+     * from the bell): re-render so the banner and the unread dot follow it.
+     */
+    #[On('notification-received')]
+    public function refreshFromInbox(): void
+    {
+        unset($this->ownerAssignment);
     }
 
     /**
@@ -831,6 +936,82 @@ new #[Title('titles.project')] class extends Component {
             </div>
         </x-slot:summary>
     </x-ui.detail-header>
+
+    @php
+        $ownerAssignment = $this->ownerAssignment;
+        $assignmentViewer = auth()->user();
+        // Legacy owners (no responder) and people who put themselves in charge
+        // were never asked, so there is nothing to show for them.
+        $showAssignmentBanner = $ownerAssignment !== null
+            && ($ownerAssignment->status !== AssignmentStatus::Acknowledged
+                || ($ownerAssignment->responded_by !== null && $ownerAssignment->responded_by !== $ownerAssignment->assigned_by));
+    @endphp
+
+    @if ($showAssignmentBanner)
+        @php
+            $assignmentTone = match ($ownerAssignment->status) {
+                AssignmentStatus::Rejected => 'border-status-critical bg-status-critical-soft',
+                AssignmentStatus::Pending => 'border-status-warn bg-status-warn-soft',
+                default => 'border-status-good bg-status-good-soft',
+            };
+        @endphp
+        <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm {{ $assignmentTone }}" data-test="owner-assignment-banner" data-status="{{ $ownerAssignment->status->value }}">
+            <div class="min-w-0">
+                <p class="font-semibold text-secondary-dark dark:text-ink">
+                    @if ($ownerAssignment->status === AssignmentStatus::Pending)
+                        {{ $ownerAssignment->isFor($assignmentViewer) ? __('projects.assignment_pending_you', ['assigner' => $ownerAssignment->assigner?->name ?? __('notifications.system')]) : __('projects.assignment_pending', ['name' => $this->project->user?->name]) }}
+                        <span class="font-normal text-secondary-medium dark:text-ink-muted">· {{ $ownerAssignment->seen_at === null ? __('projects.assignment_not_seen') : __('projects.assignment_seen', ['when' => $ownerAssignment->seen_at->diffForHumans()]) }}</span>
+                    @elseif ($ownerAssignment->status === AssignmentStatus::Rejected)
+                        {{ __('projects.assignment_rejected', ['name' => $this->project->user?->name]) }}
+                    @else
+                        {{ __('projects.assignment_acknowledged', ['name' => $this->project->user?->name]) }}
+                    @endif
+                </p>
+                @if ($ownerAssignment->response_note !== null)
+                    <p class="mt-1 text-secondary-dark dark:text-ink">“{{ $ownerAssignment->response_note }}”</p>
+                @endif
+                @if ($ownerAssignment->status === AssignmentStatus::Rejected)
+                    <p class="mt-1 text-secondary-medium dark:text-ink-muted">{{ __('projects.assignment_rejected_hint') }}</p>
+                @endif
+            </div>
+
+            <div class="flex flex-wrap gap-2">
+                @can('respond', $ownerAssignment)
+                    <x-ui.button type="button" tone="primary" wire:click="openAssignmentModal('acknowledge')" data-test="assignment-acknowledge-button">{{ __('projects.assignment_acknowledge') }}</x-ui.button>
+                    <x-ui.button type="button" wire:click="openAssignmentModal('reject')" data-test="assignment-reject-button">{{ __('projects.assignment_reject') }}</x-ui.button>
+                @endcan
+            </div>
+        </div>
+    @endif
+
+    <x-ui.modal
+        wire:model="showAssignmentModal"
+        size="md"
+        :title="match ($assignmentMode) {
+            'acknowledge' => __('projects.assignment_acknowledge_title'),
+            default => __('projects.assignment_reject_title'),
+        }"
+        submit="submitAssignment"
+        close="closeAssignmentModal"
+    >
+        @if ($showAssignmentModal)
+            <x-ui.form-textarea
+                wire:model="assignmentNote"
+                :label="$assignmentMode === 'reject' ? __('projects.assignment_reason') : __('projects.assignment_note_optional')"
+                :required="$assignmentMode === 'reject'"
+                :help="$assignmentMode === 'reject' ? __('projects.assignment_reason_help') : null"
+                rows="4"
+                data-test="assignment-note"
+            />
+        @endif
+
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="assignment-submit-button">{{ match ($assignmentMode) {
+                'acknowledge' => __('projects.assignment_acknowledge'),
+                default => __('projects.assignment_reject'),
+            } }}</x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
 
     <div class="grid gap-3 @2xl/detail:grid-cols-2 @5xl/detail:grid-cols-4">
         <x-ui.stat-tile :label="__('common.start_date')" :value="$this->project->start_date?->translatedFormat(__('formats.date')) ?? '—'" />

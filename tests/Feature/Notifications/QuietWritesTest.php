@@ -3,13 +3,13 @@
 use App\Models\Activity;
 use App\Models\Program;
 use App\Models\User;
-use App\Models\UserNotification;
 
-test('seeding the database records no activity and sends no notifications', function () {
+test('seeding the database records no activity apart from the demo notifications', function () {
+    insertHrSeedReferenceData();
+
     $this->seed();
 
-    expect(Activity::query()->count())->toBe(0)
-        ->and(UserNotification::query()->count())->toBe(0);
+    expect(Activity::query()->whereNull('actor_id')->count())->toBe(0);
 });
 
 test('mirroring hr programs records no activity', function () {

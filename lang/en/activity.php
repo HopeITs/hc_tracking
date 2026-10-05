@@ -5,7 +5,7 @@ return [
     'empty' => 'Nothing has happened here yet.',
     'load_more' => 'Show older activity',
     'changed_to' => 'changed to',
-    'log_title' => 'Activity log',
+    'log_title' => 'Activity Log',
     'filters' => [
         'module' => 'Module',
         'all_modules' => 'All modules',

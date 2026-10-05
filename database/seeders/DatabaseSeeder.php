@@ -29,7 +29,9 @@ class DatabaseSeeder extends Seeder
             $this->call([
                 RolesAndPermissionsSeeder::class,
                 CoreDataSeeder::class,
+                StrategySeeder::class,
                 ProgrammeSeeder::class,
+                DemoDeliverySeeder::class,
                 DeliverySeeder::class,
                 MealSeeder::class,
                 FinanceSeeder::class,

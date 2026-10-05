@@ -395,6 +395,7 @@ function createHrSchema(): void
         $table->id();
         $table->unsignedBigInteger('department_id');
         $table->unsignedBigInteger('program_id')->nullable();
+        $table->unsignedBigInteger('direct_manager_id')->nullable();
         $table->string('title_en');
         $table->string('title_ar');
         $table->boolean('is_active')->default(true);
@@ -426,6 +427,35 @@ function insertHrCity(string $nameEn = 'Aleppo', string $nameAr = 'حلب', bool
         'code' => fake()->unique()->bothify('??####'),
         'is_active' => $isActive,
     ]);
+}
+
+/**
+ * Fill the empty test HR database with the programs and cities the real-data
+ * seeders point at by id (programs 1-14, cities 1-17), with the first four programs
+ * managed by an HR Program Manager, so a full database
+ * seed has the HR records production already has.
+ */
+function insertHrSeedReferenceData(): void
+{
+    foreach (range(1, 14) as $id) {
+        DB::connection('hr')->table('programs')->insert([
+            'id' => $id,
+            'name' => 'Program '.$id,
+            'code' => 'P'.$id,
+            'slug' => 'program-'.$id,
+            'is_active' => true,
+        ]);
+    }
+
+    foreach (range(1, 17) as $i) {
+        insertHrCity('City '.$i);
+    }
+
+    $department = insertHrDepartment();
+
+    foreach (range(1, 4) as $programId) {
+        insertHrContract(insertHrEmployee(), insertHrPosition($department, 'Program Manager', $programId));
+    }
 }
 
 /**
@@ -483,11 +513,12 @@ function insertHrUser(?int $employeeId, string $email, string $password = 'passw
 /**
  * Insert an HR position (within a department) and return its id.
  */
-function insertHrPosition(int $departmentId, string $titleEn = 'Officer', ?int $programId = null, bool $isActive = true): int
+function insertHrPosition(int $departmentId, string $titleEn = 'Officer', ?int $programId = null, bool $isActive = true, ?int $directManagerId = null): int
 {
     return DB::connection('hr')->table('positions')->insertGetId([
         'department_id' => $departmentId,
         'program_id' => $programId,
+        'direct_manager_id' => $directManagerId,
         'title_en' => $titleEn,
         'title_ar' => $titleEn,
         'is_active' => $isActive,

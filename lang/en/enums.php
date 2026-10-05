@@ -47,6 +47,12 @@ return [
         'semi_annual' => 'Semi-Annual',
         'annual' => 'Annual',
     ],
+    'assignment_status' => [
+        'pending' => 'Pending',
+        'acknowledged' => 'Acknowledged',
+        'rejected' => 'Rejected',
+        'superseded' => 'Superseded',
+    ],
     'project_status' => [
         'draft' => 'Draft',
         'submitted' => 'Submitted',
