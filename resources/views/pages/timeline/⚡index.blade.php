@@ -192,7 +192,7 @@ new #[Title('titles.timeline')] class extends Component {
         </x-slot:filters>
     </x-ui.page-header>
 
-    <div class="relative rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-transparent dark:bg-surface-1 dark:shadow-raised" data-timeline-board>
+    <div class="relative rounded-xl border border-secondary-soft bg-white shadow-card dark:border-transparent dark:bg-surface-1 dark:shadow-raised" data-timeline-board>
         {{-- The three lenses on the same portfolio --}}
         <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-board-line px-4 py-3">
             <x-ui.view-toggle wire-model="view" :active="$activeView" :options="array_values($views)" :label="__('gantt.view')" class="max-w-full overflow-x-auto [&>button]:shrink-0 [&>button]:whitespace-nowrap" />

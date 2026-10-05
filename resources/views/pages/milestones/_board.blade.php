@@ -54,7 +54,7 @@
                         $canMoveMilestone = auth()->user()->can('updateProgress', $milestone);
                     @endphp
                     <div
-                        class="flex flex-col gap-2 rounded-lg border border-secondary-soft bg-white p-3 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-opacity dark:border-line dark:bg-surface-1"
+                        class="flex flex-col gap-2 rounded-lg border border-secondary-soft bg-white p-3 shadow-hairline transition-opacity dark:border-line dark:bg-surface-1"
                         wire:key="milestone-board-card-{{ $milestone->id }}"
                         data-milestone-card
                         draggable="{{ $canMoveMilestone ? 'true' : 'false' }}"

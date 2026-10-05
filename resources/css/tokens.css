@@ -1,0 +1,172 @@
+/* Design tokens: the Somar Sans faces, the @theme palette and spacing, and the Graphite dark values. */
+
+@font-face {
+    font-family: 'Somar Sans';
+    src: url('../fonts/somar-sans/SomarSans-Light.woff2') format('woff2');
+    font-weight: 300;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Somar Sans';
+    src: url('../fonts/somar-sans/SomarSans-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Somar Sans';
+    src: url('../fonts/somar-sans/SomarSans-Medium.woff2') format('woff2');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Somar Sans';
+    src: url('../fonts/somar-sans/SomarSans-SemiBold.woff2') format('woff2');
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Somar Sans';
+    src: url('../fonts/somar-sans/SomarSans-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Somar Sans';
+    src: url('../fonts/somar-sans/SomarSans-ExtraBold.woff2') format('woff2');
+    font-weight: 800;
+    font-style: normal;
+    font-display: swap;
+}
+
+@theme {
+    --font-sans: 'Somar Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+
+    --color-primary: #be1f24;
+    --color-secondary-dark: #58595b;
+    --color-secondary-medium: #6d6e71;
+    --color-secondary-light: #939598;
+    --color-secondary-soft: #dcddde;
+
+    --color-zinc-50: #fafafa;
+    --color-zinc-100: #f5f5f5;
+    --color-zinc-200: #e5e5e5;
+    --color-zinc-300: #d4d4d4;
+    --color-zinc-400: #a3a3a3;
+    --color-zinc-500: #737373;
+    --color-zinc-600: #525252;
+    --color-zinc-700: #404040;
+    --color-zinc-800: #262626;
+    --color-zinc-900: #171717;
+    --color-zinc-950: #0a0a0a;
+
+    --color-accent: var(--color-neutral-800);
+    --color-accent-content: var(--color-neutral-800);
+    --color-accent-foreground: var(--color-white);
+
+    /* Status, funding and board surface tokens — data-viz and record status only, never brand/nav/buttons. */
+    --color-status-good: #1d7a4c;
+    --color-status-good-soft: #e6f2ec;
+    --color-status-warn: #9a6412;
+    --color-status-warn-soft: #f7eedd;
+    --color-status-critical: var(--color-primary);
+    --color-status-critical-soft: #f8e4e4;
+    --color-status-active: #2563a8;
+    --color-status-active-soft: #e5eef7;
+    --color-funding: #2b5f6b;
+    --color-funding-soft: #e3eef0;
+    --color-ground: #f3f3f4;
+    --color-board: #ffffff;
+    --color-board-line: #dcddde;
+    --color-board-head: #f8f8f9;
+
+    /* The full-page backdrop behind the sign-in card and the error pages (light only; dark uses surface-0). */
+    --color-auth-ground: #e5e7eb;
+
+    /* Graphite dark-mode semantic layer — only referenced behind dark: or inside .dark; light values are equivalents so the utilities exist. */
+    --color-surface-0: #ffffff;
+    --color-surface-1: #ffffff;
+    --color-surface-2: #f8f8f9;
+    --color-surface-3: #ffffff;
+    --color-ink: #58595b;
+    --color-ink-muted: #6d6e71;
+    --color-ink-faint: #939598;
+    --color-line: #dcddde;
+    --color-line-strong: #939598;
+    --color-field-line: #939598;
+    --color-brand: #be1f24;
+    --color-brand-hover: #a81b20;
+    --color-brand-text: #be1f24;
+
+    /* Dark elevation: a 1px top-edge highlight on raised surfaces instead of a drop shadow (dark:shadow-raised). */
+    --shadow-raised: inset 0 1px 0 rgb(255 255 255 / 0.04);
+
+    /* Light elevation for cards and rows: a hairline lift, a resting card, and the card under hover. */
+    --shadow-hairline: 0 1px 2px rgb(16 24 40 / 0.04);
+    --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.06);
+    --shadow-card-hover: 0 2px 4px rgb(16 24 40 / 0.06), 0 4px 8px rgb(16 24 40 / 0.08);
+
+    --spacing-ui-2xs: 0.25rem;
+    --spacing-ui-xs: 0.5rem;
+    --spacing-ui-sm: 0.75rem;
+    --spacing-ui-md: 1rem;
+    --spacing-ui-lg: 1.5rem;
+    --spacing-ui-xl: 2rem;
+    --spacing-ui-2xl: 3rem;
+    --spacing-ui-3xl: 4rem;
+    --spacing-control: var(--spacing-ui-sm);
+    --spacing-card: var(--spacing-ui-lg);
+    --spacing-section: var(--spacing-ui-3xl);
+    --spacing-page: var(--spacing-ui-xl);
+
+    /* Fast start, long soft settle: the sidebar's collapse, expand and mobile drawer motion. */
+    --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@layer theme {
+    .dark {
+        /* Graphite: cool charcoal from the brand grey hue, one lightness step per layer. */
+        --color-surface-0: #151618;
+        --color-surface-1: #1c1d20;
+        --color-surface-2: #242528;
+        --color-surface-3: #2d2e32;
+        --color-ink: #ececee;
+        --color-ink-muted: #a8aaae;
+        --color-ink-faint: #8a8c93;
+        --color-line: #34353a;
+        --color-line-strong: #4a4b51;
+        --color-field-line: #6b6d74;
+        --color-brand: #d4343a;
+        --color-brand-hover: #e04046;
+        --color-brand-text: #ff7b7f;
+
+        /* Flux's neutral accent (primary Flux buttons, checked controls): ink on the page ground. */
+        --color-accent: var(--color-ink);
+        --color-accent-content: var(--color-ink);
+        --color-accent-foreground: var(--color-surface-0);
+
+        --color-status-good: #5fd09a;
+        --color-status-good-soft: #14281e;
+        --color-status-warn: #e8b050;
+        --color-status-warn-soft: #2c2313;
+        --color-status-critical: #ff8a86;
+        --color-status-critical-soft: #381a1c;
+        --color-status-active: #7db3ec;
+        --color-status-active-soft: #172637;
+        --color-funding: #7cc3cf;
+        --color-funding-soft: #122629;
+        --color-ground: var(--color-surface-0);
+        --color-board: var(--color-surface-1);
+        --color-board-line: var(--color-line);
+        --color-board-head: var(--color-surface-2);
+    }
+}

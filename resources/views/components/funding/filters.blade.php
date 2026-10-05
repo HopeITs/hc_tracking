@@ -15,7 +15,8 @@
 <div class="contents" x-data="financeFilters(@js($name))">
     <x-ui.button
         icon="adjustments-horizontal"
-        @class(['page-action', 'page-action-on' => $count > 0])
+        tone="action"
+        @class(['page-action-on' => $count > 0])
         x-on:click="open()"
         aria-haspopup="dialog"
         :aria-label="__('finance_tables.filters').' · '.trans_choice('finance_tables.filters_active', $count, ['count' => $count])"
@@ -61,7 +62,7 @@
                     </button>
                 </div>
 
-                <x-ui.button type="button" class="page-action" x-on:click="dismiss()" data-test="cancel-filters">
+                <x-ui.button tone="action" type="button" x-on:click="dismiss()" data-test="cancel-filters">
                     {{ __('common.cancel') }}
                 </x-ui.button>
 

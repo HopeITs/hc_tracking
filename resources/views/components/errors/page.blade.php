@@ -19,7 +19,7 @@
     <head>
         @include('partials.head', ['title' => $heading])
     </head>
-    <body class="min-h-screen bg-[#e5e7eb] antialiased dark:bg-surface-0">
+    <body class="min-h-screen bg-auth-ground antialiased dark:bg-surface-0">
         <div class="error-page relative flex min-h-svh flex-col items-center justify-center overflow-hidden p-6 md:p-10">
 
             {{-- The tracking route: a faint path threading from origin to destination, with its waypoints along the way. Purely ambient, never a UI element. --}}

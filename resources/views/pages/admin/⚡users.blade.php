@@ -707,7 +707,7 @@ new #[Title('titles.user_directory')] class extends Component {
         </div>
 
         <div class="grid min-w-0 gap-6 xl:grid-cols-[21rem_minmax(0,1fr)]">
-            <section class="flex min-w-0 flex-col overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-transparent dark:bg-surface-1 dark:shadow-raised">
+            <section class="flex min-w-0 flex-col overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-card dark:border-transparent dark:bg-surface-1 dark:shadow-raised">
                 <div class="max-h-[min(62vh,44rem)] divide-y divide-secondary-soft overflow-y-auto overscroll-contain dark:divide-line">
                     @forelse ($this->users as $user)
                         <button type="button" wire:click="selectUser({{ $user->id }})" wire:key="access-user-{{ $user->id }}" @class([
@@ -753,7 +753,7 @@ new #[Title('titles.user_directory')] class extends Component {
                 </div>
             </section>
 
-            <section class="flex min-w-0 flex-col rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-transparent dark:bg-surface-1 dark:shadow-raised">
+            <section class="flex min-w-0 flex-col rounded-xl border border-secondary-soft bg-white shadow-card dark:border-transparent dark:bg-surface-1 dark:shadow-raised">
                 @if ($this->selectedUser)
                     @php
                         $selectedUser = $this->selectedUser;
@@ -839,7 +839,7 @@ new #[Title('titles.user_directory')] class extends Component {
         </div>
     @else
         <div class="grid min-w-0 gap-6 xl:grid-cols-[19rem_minmax(0,1fr)]">
-            <aside class="min-w-0 overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-transparent dark:bg-surface-1 dark:shadow-raised">
+            <aside class="min-w-0 overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-card dark:border-transparent dark:bg-surface-1 dark:shadow-raised">
                 @can('access-management.manage-roles')
                     <form wire:submit="createRole" class="border-b border-secondary-soft p-3 dark:border-line" data-test="create-role-form">
                         <label for="new-role-name" class="mb-2 block text-sm font-bold text-secondary-dark dark:text-ink">{{ __('roles.new_role') }}</label>
@@ -870,7 +870,7 @@ new #[Title('titles.user_directory')] class extends Component {
                 </div>
             </aside>
 
-            <section class="min-w-0 rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-transparent dark:bg-surface-1 dark:shadow-raised">
+            <section class="min-w-0 rounded-xl border border-secondary-soft bg-white shadow-card dark:border-transparent dark:bg-surface-1 dark:shadow-raised">
                 @if ($this->selectedRole)
                     <div class="flex flex-wrap items-start justify-between gap-4 border-b border-secondary-soft px-6 py-4 dark:border-line">
                         <div class="min-w-0">

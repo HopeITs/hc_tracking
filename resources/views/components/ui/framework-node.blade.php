@@ -59,7 +59,7 @@
     data-result-type="{{ $result->type->value }}"
     x-data="{ branchOpen: true, measuresOpen: {{ $indicatorCount > 0 && $indicatorCount <= 4 ? 'true' : 'false' }} }"
 >
-    <article class="logframe-reveal overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] transition-colors hover:border-secondary-light dark:border-transparent dark:bg-surface-1 dark:shadow-raised dark:hover:border-field-line" style="--logframe-order: {{ $order }}">
+    <article class="logframe-reveal overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-card transition-colors hover:border-secondary-light dark:border-transparent dark:bg-surface-1 dark:shadow-raised dark:hover:border-field-line" style="--logframe-order: {{ $order }}">
         <span aria-hidden="true" class="block {{ $accent }}"></span>
 
         <div class="flex flex-wrap items-start gap-x-3 gap-y-2 px-4 pt-3.5">

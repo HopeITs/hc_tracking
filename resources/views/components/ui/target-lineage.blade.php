@@ -19,7 +19,7 @@
 <div {{ $attributes->class('flex flex-col gap-4') }}>
     @foreach ($groups as $index => $group)
         <article
-            class="logframe-reveal overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-transparent dark:bg-surface-1 dark:shadow-raised"
+            class="logframe-reveal overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-card dark:border-transparent dark:bg-surface-1 dark:shadow-raised"
             style="--logframe-order: {{ $index }}"
             wire:key="target-result-{{ $group['result']->id }}"
         >

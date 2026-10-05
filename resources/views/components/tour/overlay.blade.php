@@ -111,7 +111,7 @@
                 aria-describedby="tour-body"
                 :style="cardStyle()"
                 :class="card.sheet ? 'inset-x-3 bottom-3' : 'w-[min(23rem,calc(100vw-2rem))]'"
-                class="absolute overflow-hidden rounded-2xl border border-secondary-soft bg-white text-secondary-dark shadow-[0_18px_48px_-12px_rgb(88_89_91/0.45)] transition-[top,left] duration-300 ease-out motion-reduce:transition-none dark:border-secondary-medium dark:bg-secondary-dark dark:text-white"
+                class="absolute overflow-hidden rounded-2xl border border-secondary-soft bg-white text-secondary-dark shadow-[0_18px_48px_-12px_rgb(88_89_91/0.45)] transition-[top,left] duration-300 ease-out motion-reduce:transition-none dark:border-line dark:bg-surface-3 dark:text-ink dark:shadow-raised"
             >
                 <div class="h-1 bg-primary" aria-hidden="true"></div>
 
@@ -123,14 +123,14 @@
                         <span x-show="step?.key !== 'welcome'" class="text-4xl leading-none font-bold tracking-tight text-status-critical tabular-nums" x-text="number(index)" aria-hidden="true"></span>
 
                         <div class="min-w-0 flex-1 pt-0.5">
-                            <p class="text-[11px] font-semibold tracking-[0.12em] text-secondary-light uppercase dark:text-secondary-soft" x-text="step?.kicker"></p>
-                            <p class="mt-1 text-xs text-secondary-medium tabular-nums dark:text-secondary-soft" x-text="@js(__('tour.step_of', ['current' => '{c}', 'total' => '{t}'])).replace('{c}', index + 1).replace('{t}', steps.length)"></p>
+                            <p class="text-[11px] font-semibold tracking-[0.12em] text-secondary-light uppercase dark:text-ink-muted" x-text="step?.kicker"></p>
+                            <p class="mt-1 text-xs text-secondary-medium tabular-nums dark:text-ink-muted" x-text="@js(__('tour.step_of', ['current' => '{c}', 'total' => '{t}'])).replace('{c}', index + 1).replace('{t}', steps.length)"></p>
                         </div>
 
                         <button
                             type="button"
                             x-on:click="finish(false)"
-                            class="-me-1.5 -mt-1.5 inline-flex size-8 shrink-0 cursor-pointer touch-manipulation items-center justify-center rounded-lg text-secondary-medium hover:bg-secondary-soft/70 hover:text-secondary-dark dark:text-secondary-soft dark:hover:bg-white/10 dark:hover:text-white"
+                            class="-me-1.5 -mt-1.5 inline-flex size-8 shrink-0 cursor-pointer touch-manipulation items-center justify-center rounded-lg text-secondary-medium hover:bg-secondary-soft/70 hover:text-secondary-dark dark:text-ink-muted dark:hover:bg-white/10 dark:hover:text-ink"
                             aria-label="{{ __('tour.close') }}"
                         >
                             <flux:icon.x-mark variant="mini" class="size-4" />
@@ -138,14 +138,14 @@
                     </div>
 
                     <h2 id="tour-title" class="mt-4 text-xl leading-snug font-bold text-balance" x-text="step?.title"></h2>
-                    <p id="tour-body" class="mt-1.5 text-sm leading-relaxed text-secondary-medium text-pretty dark:text-secondary-soft" x-text="body"></p>
+                    <p id="tour-body" class="mt-1.5 text-sm leading-relaxed text-secondary-medium text-pretty dark:text-ink-muted" x-text="body"></p>
                 </div>
 
                 <div class="flex gap-1 px-5" aria-hidden="true">
                     <template x-for="(item, position) in steps" :key="item.key">
                         <span
                             class="h-1 flex-1 rounded-full transition-colors duration-300"
-                            :class="position <= index ? 'bg-primary' : 'bg-secondary-soft dark:bg-secondary-medium'"
+                            :class="position <= index ? 'bg-primary' : 'bg-secondary-soft dark:bg-line-strong'"
                         ></span>
                     </template>
                 </div>
@@ -155,7 +155,7 @@
                         type="button"
                         x-show="! isLast"
                         x-on:click="finish(false)"
-                        class="me-auto cursor-pointer touch-manipulation rounded-lg px-2 py-2 text-sm font-medium text-secondary-medium hover:text-secondary-dark max-lg:min-h-11 dark:text-secondary-soft dark:hover:text-white"
+                        class="me-auto cursor-pointer touch-manipulation rounded-lg px-2 py-2 text-sm font-medium text-secondary-medium hover:text-secondary-dark max-lg:min-h-11 dark:text-ink-muted dark:hover:text-ink"
                     >
                         {{ __('tour.skip') }}
                     </button>
@@ -165,7 +165,7 @@
                         x-show="index > 0"
                         x-on:click="back()"
                         :class="isLast ? 'ms-auto' : ''"
-                        class="inline-flex cursor-pointer touch-manipulation items-center gap-1.5 rounded-lg border border-secondary-soft px-3.5 py-2 text-sm font-semibold text-secondary-dark hover:bg-secondary-soft/60 max-lg:min-h-11 dark:border-secondary-medium dark:text-white dark:hover:bg-white/10"
+                        class="inline-flex cursor-pointer touch-manipulation items-center gap-1.5 rounded-lg border border-secondary-soft px-3.5 py-2 text-sm font-semibold text-secondary-dark hover:bg-secondary-soft/60 max-lg:min-h-11 dark:border-line-strong dark:text-ink dark:hover:bg-white/10"
                     >
                         <flux:icon.arrow-left variant="micro" class="rtl:-scale-x-100" />
                         {{ __('tour.back') }}

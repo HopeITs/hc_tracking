@@ -347,6 +347,7 @@ new #[Title('titles.strategies')] class extends Component {
         <x-slot:filters>
             <x-ui.input
                 id="strategy-search"
+                data-directory-search
                 type="search"
                 icon="magnifying-glass"
                 :label="__('strategies.search_strategies')"

@@ -1543,19 +1543,19 @@ new #[Title('titles.tasks')] class extends Component
     </x-ui.page-header>
 
     <div class="grid gap-3 @2xl/directory:grid-cols-2 @4xl/directory:grid-cols-3 @6xl/directory:grid-cols-5">
-        <button type="button" wire:click="clearFilters" data-test="task-stat-total" @class(['text-left transition-transform', 'scale-[0.98]' => ! $filtersAreActive])>
+        <button type="button" wire:click="clearFilters" data-test="task-stat-total" @class(['text-start transition-transform', 'scale-[0.98]' => ! $filtersAreActive])>
             <x-ui.stat-tile :label="__('tasks.total_tasks')" :value="$this->taskStats['total']" icon="clipboard-document-check" />
         </button>
-        <button type="button" wire:click="toggleStatusFilter('{{ TaskStatus::Done->value }}')" data-test="task-stat-done" @class(['text-left transition-transform', 'scale-[0.98] ring-2 ring-status-good rounded-xl' => $status === TaskStatus::Done->value])>
+        <button type="button" wire:click="toggleStatusFilter('{{ TaskStatus::Done->value }}')" data-test="task-stat-done" @class(['text-start transition-transform', 'scale-[0.98] ring-2 ring-status-good rounded-xl' => $status === TaskStatus::Done->value])>
             <x-ui.stat-tile :label="TaskStatus::Done->label()" :value="$this->taskStats['done']" icon="check-circle" tone="good" />
         </button>
-        <button type="button" wire:click="toggleDueFilter('overdue')" data-test="task-stat-overdue" @class(['text-left transition-transform', 'scale-[0.98] ring-2 ring-status-critical rounded-xl' => $dueFilter === 'overdue'])>
+        <button type="button" wire:click="toggleDueFilter('overdue')" data-test="task-stat-overdue" @class(['text-start transition-transform', 'scale-[0.98] ring-2 ring-status-critical rounded-xl' => $dueFilter === 'overdue'])>
             <x-ui.stat-tile :label="__('tasks.overdue')" :value="$this->taskStats['overdue']" icon="exclamation-triangle" tone="critical" />
         </button>
-        <button type="button" wire:click="toggleDueFilter('missed')" data-test="task-stat-missed" @class(['text-left transition-transform', 'scale-[0.98] ring-2 ring-status-critical rounded-xl' => $dueFilter === 'missed'])>
+        <button type="button" wire:click="toggleDueFilter('missed')" data-test="task-stat-missed" @class(['text-start transition-transform', 'scale-[0.98] ring-2 ring-status-critical rounded-xl' => $dueFilter === 'missed'])>
             <x-ui.stat-tile :label="__('tasks.missed')" :value="$this->taskStats['missed']" icon="exclamation-circle" tone="critical" />
         </button>
-        <button type="button" wire:click="toggleDueFilter('due_soon')" data-test="task-stat-due-soon" @class(['text-left transition-transform', 'scale-[0.98] ring-2 ring-status-warn rounded-xl' => $dueFilter === 'due_soon'])>
+        <button type="button" wire:click="toggleDueFilter('due_soon')" data-test="task-stat-due-soon" @class(['text-start transition-transform', 'scale-[0.98] ring-2 ring-status-warn rounded-xl' => $dueFilter === 'due_soon'])>
             <x-ui.stat-tile :label="__('tasks.due_within_7_days')" :value="$this->taskStats['due_soon']" icon="clock" tone="warn" />
         </button>
     </div>
@@ -1591,7 +1591,7 @@ new #[Title('titles.tasks')] class extends Component
                         wire:key="my-task-{{ $myTask->id }}"
                         data-test="my-task-card-{{ $myTask->id }}"
                         @class([
-                            'flex w-64 shrink-0 flex-col gap-2 rounded-xl border p-3 text-left shadow-sm transition-shadow hover:shadow-md dark:bg-surface-1',
+                            'flex w-64 shrink-0 flex-col gap-2 rounded-xl border p-3 text-start shadow-sm transition-shadow hover:shadow-md dark:bg-surface-1',
                             'border-primary/30 bg-white dark:border-status-critical/30' => $isAssignedToMe,
                             'border-dashed border-secondary-light bg-secondary-soft/30 dark:border-line dark:bg-white/[0.03]' => ! $isAssignedToMe,
                         ])

@@ -1,0 +1,881 @@
+/* Data visualisation: results framework, funding flows, ledgers, registers, previews and charts. */
+
+@layer components {
+        /* Logframe branches settle in one after another beneath their apex. */
+        @media (prefers-reduced-motion: no-preference) {
+            .logframe-reveal {
+                animation: logframe-reveal 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+                animation-delay: calc(var(--logframe-order, 0) * 70ms + 80ms);
+            }
+        }
+
+        /* Targets: each result group rises in turn, and its achievement bars grow from the start edge. */
+        @media (prefers-reduced-motion: no-preference) {
+            .target-group {
+                animation: logframe-reveal 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+                animation-delay: calc(var(--group-order, 0) * 70ms + 60ms);
+            }
+
+            .target-group .target-bar {
+                transform-origin: left center;
+                animation: target-bar-grow 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+                animation-delay: calc(var(--group-order, 0) * 70ms + 180ms);
+            }
+
+            [dir='rtl'] .target-group .target-bar {
+                transform-origin: right center;
+            }
+
+            .target-trail {
+                animation: logframe-reveal 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+        }
+
+        /* The planning arc's line draws itself in once on load; --arc-length is set inline per path. */
+        @media (prefers-reduced-motion: no-preference) {
+            .arc-line-draw {
+                stroke-dasharray: var(--arc-length, 1600);
+                animation: arc-line-draw 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+                animation-delay: 120ms;
+            }
+        }
+
+    /* Reported but not yet approved: a hatch of the ink colour, so it reads as provisional. */
+    .target-pending {
+        background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--color-secondary-dark) 45%, transparent) 0 2px, transparent 2px 5px);
+    }
+
+    .dark .target-pending {
+        background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--color-ink) 45%, transparent) 0 2px, transparent 2px 5px);
+    }
+
+    @keyframes target-bar-grow {
+        from {
+            transform: scaleX(0);
+        }
+    }
+
+    @keyframes logframe-reveal {
+        from {
+            opacity: 0;
+            transform: translateY(0.5rem);
+        }
+    }
+
+    @keyframes arc-line-draw {
+        from {
+            stroke-dashoffset: var(--arc-length, 1600);
+        }
+        to {
+            stroke-dashoffset: 0;
+        }
+    }
+
+    /*
+     * Funding agreements cash-flow calendar (resources/views/pages/funding-agreements/⚡index.blade.php):
+     * the collection line, agreement lanes and tranches placed on their dates.
+     */
+    .ledger-unscheduled {
+        background-color: color-mix(in srgb, var(--color-secondary-light) 8%, transparent);
+        border: 1.5px dashed var(--color-secondary-light);
+    }
+
+    .cal-scroller {
+        scrollbar-width: thin;
+        scrollbar-color: var(--color-secondary-light) transparent;
+    }
+
+    .dark .cal-scroller {
+        scrollbar-color: var(--color-line-strong) transparent;
+    }
+
+    .cal-ledger {
+        transition: grid-template-rows 360ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+        /* The calendar fills in once, in time order: today drops in, the landed thread draws,
+           then each tranche settles onto its date from the earliest month onwards. */
+        .cal-today {
+            transform-origin: top center;
+            animation: cal-drop 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            animation-delay: 120ms;
+        }
+
+        .cal-thread {
+            transform-origin: left center;
+            animation: target-bar-grow 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            animation-delay: calc(200ms + var(--lane-order, 0) * 40ms);
+        }
+
+        [dir='rtl'] .cal-thread {
+            transform-origin: right center;
+        }
+
+        .cal-pill {
+            animation: cal-settle 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            animation-delay: calc(260ms + var(--pill-order, 0) * 45ms + var(--lane-order, 0) * 20ms);
+        }
+
+        .cal-late-tail {
+            animation: cal-settle 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            animation-delay: 700ms;
+        }
+
+        .cal-inflow-bar {
+            animation: wallet-rise 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            animation-delay: 200ms;
+        }
+
+        .ledger-segment {
+            transform-origin: left center;
+            animation: target-bar-grow 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            animation-delay: 150ms;
+        }
+
+        [dir='rtl'] .ledger-segment {
+            transform-origin: right center;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .cal-ledger {
+            transition: none;
+        }
+    }
+
+    @keyframes cal-drop {
+        from {
+            transform: scaleY(0);
+        }
+    }
+
+    @keyframes cal-settle {
+        from {
+            opacity: 0;
+            filter: blur(3px);
+        }
+    }
+
+    /* Proposals funding flow (resources/js/funding-flow.js) and money bars. */
+    .money-pending {
+        background-color: color-mix(in srgb, var(--color-status-warn) 22%, transparent);
+        background-image: repeating-linear-gradient(135deg, var(--color-status-warn) 0 2px, transparent 2px 6px);
+    }
+
+    /* A transfer that failed: still owed, but it went wrong rather than simply not arriving yet. */
+    .money-failed {
+        background-color: color-mix(in srgb, var(--color-primary) 18%, transparent);
+        background-image: repeating-linear-gradient(135deg, var(--color-primary) 0 2px, transparent 2px 6px);
+    }
+
+    /* Received, but what landed was never recorded: counted as nothing landed until it is. */
+    .money-unrecorded {
+        background-color: color-mix(in srgb, var(--color-funding) 14%, transparent);
+        background-image: repeating-linear-gradient(135deg, var(--color-funding) 0 1.5px, transparent 1.5px 5px);
+    }
+
+    .flow-ribbon {
+        fill: var(--color-funding);
+        fill-opacity: 0.32;
+        transition: fill-opacity 200ms cubic-bezier(0.16, 1, 0.3, 1), fill 200ms ease-out;
+    }
+
+    .flow-ribbon[data-state='lit'] {
+        fill-opacity: 0.55;
+    }
+
+    .flow-ribbon[data-state='dim'] {
+        fill-opacity: 0.06;
+    }
+
+    .flow-thread {
+        fill: none;
+        stroke: var(--color-secondary-light);
+        stroke-width: 1.5;
+        stroke-linecap: round;
+        transition: stroke-opacity 200ms cubic-bezier(0.16, 1, 0.3, 1), stroke 200ms ease-out;
+    }
+
+    .flow-thread[data-state='lit'] {
+        stroke: var(--color-primary);
+        stroke-width: 2;
+    }
+
+    .flow-thread[data-state='dim'] {
+        stroke-opacity: 0.15;
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+        /* The river pours in once from the donors' side; bars fill from the start edge. */
+        .flow-reveal {
+            animation: flow-pour 1100ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            animation-delay: 150ms;
+        }
+
+        [dir='rtl'] .flow-reveal {
+            animation-name: flow-pour-rtl;
+        }
+
+        .money-grow {
+            transform-origin: left center;
+            animation: target-bar-grow 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            animation-delay: 200ms;
+        }
+
+        [dir='rtl'] .money-grow {
+            transform-origin: right center;
+        }
+
+        /* Donors share-of-wallet: segments rise into place one after another. */
+        .wallet-grow {
+            animation: wallet-rise 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            animation-delay: calc(120ms + var(--wallet-order, 0) * 60ms);
+        }
+    }
+
+    @keyframes wallet-rise {
+        from {
+            opacity: 0;
+            clip-path: inset(100% 0 0 0);
+        }
+        to {
+            opacity: 1;
+            clip-path: inset(0 0 0 0);
+        }
+    }
+
+    @keyframes flow-pour {
+        from {
+            clip-path: inset(0 100% 0 0);
+        }
+        to {
+            clip-path: inset(0 0 0 0);
+        }
+    }
+
+    @keyframes flow-pour-rtl {
+        from {
+            clip-path: inset(0 0 0 100%);
+        }
+        to {
+            clip-path: inset(0 0 0 0);
+        }
+    }
+
+    /*
+     * A proposal's chronology (resources/views/pages/proposals/⚡show.blade.php and
+     * resources/js/proposal-clock.js): one time axis with the money above the line
+     * and the delivery below it.
+     *
+     * Everything positions with `inset-inline-start`, so the axis mirrors with the
+     * page in RTL for free. The only exception is the plot SVG, which holds no text
+     * and is therefore flipped whole.
+     */
+    .chrono-plot {
+        overflow: visible;
+    }
+
+    [dir='rtl'] .chrono-plot {
+        transform: scaleX(-1);
+    }
+
+    .chrono-area {
+        fill: var(--color-funding);
+        fill-opacity: 0.16;
+    }
+
+    .chrono-line {
+        fill: none;
+        stroke: var(--color-funding);
+        stroke-width: 2;
+        /* The plot is scaled non-uniformly, so the stroke must not scale with it. */
+        vector-effect: non-scaling-stroke;
+        stroke-linejoin: round;
+    }
+
+    /* What was committed, as a ceiling the arrivals climb towards. */
+    .chrono-ceiling {
+        stroke: var(--color-secondary-light);
+        stroke-width: 1;
+        stroke-dasharray: 3 4;
+        vector-effect: non-scaling-stroke;
+    }
+
+    .chrono-cursor {
+        background: var(--color-secondary-dark);
+    }
+
+    .dark .chrono-cursor {
+        background: var(--color-ink);
+    }
+
+    /*
+     * The scrub handle sits centred on its day and on the track, the same
+     * convention the marks above it use. Without this it hung half a handle below
+     * the rail and ran off the end at 100%.
+     */
+    .chrono-handle {
+        translate: -50% -50%;
+    }
+
+    [dir='rtl'] .chrono-handle {
+        translate: 50% -50%;
+    }
+
+    /* The money climbs its plot once, in the direction the page reads. */
+    @media (prefers-reduced-motion: no-preference) {
+        .chrono-plot {
+            animation: chrono-draw 1000ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            animation-delay: 120ms;
+        }
+
+        [dir='rtl'] .chrono-plot {
+            animation-name: chrono-draw-rtl;
+        }
+    }
+
+    @keyframes chrono-draw {
+        from {
+            clip-path: inset(0 100% 0 0);
+        }
+        to {
+            clip-path: inset(0 0 0 0);
+        }
+    }
+
+    @keyframes chrono-draw-rtl {
+        from {
+            clip-path: inset(0 0 0 100%);
+        }
+        to {
+            clip-path: inset(0 0 0 0);
+        }
+    }
+
+    /*
+     * Browser surfaces the dossier did not draw but still owns, scoped to it so the
+     * rest of the app is untouched: selection, caret and its scrollbars take the
+     * brand palette rather than the browser's defaults.
+     */
+    .dossier ::selection {
+        background: color-mix(in srgb, var(--color-primary) 22%, transparent);
+        color: var(--color-secondary-dark);
+    }
+
+    .dark .dossier ::selection {
+        background: color-mix(in srgb, var(--color-brand) 35%, transparent);
+        color: var(--color-ink);
+    }
+
+    .dossier {
+        caret-color: var(--color-primary);
+        scrollbar-width: thin;
+        scrollbar-color: var(--color-secondary-light) transparent;
+    }
+
+    .dark .dossier {
+        caret-color: var(--color-brand-text);
+        scrollbar-color: var(--color-line-strong) transparent;
+    }
+
+    /* In-page Office previews (resources/js/file-preview.js): a spreadsheet grid and docx-preview's paper pages. */
+    .sheet-preview-table {
+        border-collapse: collapse;
+        font-size: 0.8125rem;
+        background: var(--color-white);
+        color: var(--color-secondary-dark);
+    }
+
+    .sheet-preview-table :is(th, td) {
+        border: 1px solid var(--color-secondary-soft);
+        padding: 0.25rem 0.5rem;
+        white-space: nowrap;
+        max-width: 24rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        text-align: start;
+    }
+
+    .sheet-preview-table tr:first-child > th,
+    .sheet-preview-table th:first-child {
+        background: var(--color-board-head);
+        font-weight: 600;
+    }
+
+    .sheet-preview-table th:first-child {
+        color: var(--color-secondary-light);
+        text-align: end;
+        position: sticky;
+        inset-inline-start: 0;
+    }
+
+    /*
+     * A funding agreement's collection dial (resources/views/pages/funding-agreements/⚡show.blade.php):
+     * one arc per tranche on a 0–100 circumference, lit together with its journey row.
+     */
+    .dial-upcoming {
+        stroke: url(#dial-stripes-warn);
+    }
+
+    .dial-failed {
+        stroke: url(#dial-stripes-critical);
+    }
+
+    .dial-unrecorded {
+        stroke: url(#dial-stripes-funding);
+    }
+
+    .dial-arc .dial-stroke {
+        transition: opacity 200ms cubic-bezier(0.16, 1, 0.3, 1), stroke-width 200ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .dial-arc[data-state='lit'] .dial-stroke {
+        stroke-width: 22;
+    }
+
+    .dial-arc[data-state='dim'] .dial-stroke {
+        opacity: 0.22;
+    }
+
+    .dial-arc:focus-visible .dial-stroke {
+        stroke-width: 22;
+    }
+
+    .tranche-row {
+        transition: background-color 200ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .tranche-row[data-state='lit'] {
+        background-color: var(--color-board-head);
+    }
+
+    /* The thread joining the connected records, drawn through each node's dot. */
+    .connection-thread > li:not(:last-child)::before {
+        content: '';
+        position: absolute;
+        inset-inline-start: 0.34375rem;
+        top: 1rem;
+        bottom: -0.25rem;
+        width: 1px;
+        background: var(--color-secondary-soft);
+    }
+
+    .dark .connection-thread > li:not(:last-child)::before {
+        background: var(--color-line-strong);
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+        /* The promise fills in once, tranche after tranche, clockwise from the top. */
+        .dial-arc .dial-stroke {
+            animation: dial-draw 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            animation-delay: calc(150ms + var(--dial-order, 0) * 140ms);
+        }
+    }
+
+    @keyframes dial-draw {
+        from {
+            stroke-dasharray: 0 100;
+        }
+    }
+
+    /*
+     * Transfers shortfall ledger (resources/views/pages/transfers/⚡index.blade.php):
+     * every tranche drawn at the amount the donor promised, with what the journey
+     * took cut out of it. Each material below says one thing about where money is,
+     * so the same fill never means two different things on the page.
+     */
+
+    /* Taken by fees: recorded, explainable, someone's bank charged it. */
+    .money-fees {
+        background-color: color-mix(in srgb, var(--color-status-warn) 42%, transparent);
+    }
+
+    /* The rest of the gap: exchange, rounding, and whatever nobody wrote down. */
+    .money-gap {
+        background-color: color-mix(in srgb, var(--color-secondary-light) 22%, transparent);
+        background-image: repeating-linear-gradient(135deg, var(--color-secondary-light) 0 1px, transparent 1px 4px);
+    }
+
+    /*
+     * Should have arrived and did not. Drawn empty, because nothing landed.
+     * status-critical rather than primary: the two are the same red in light mode,
+     * but primary is muddy on the dark ground, and an overdue mark that reads as
+     * brown is an overdue mark nobody chases.
+     */
+    .money-overdue {
+        background-color: color-mix(in srgb, var(--color-status-critical) 12%, transparent);
+        border: 1.5px dashed var(--color-status-critical);
+    }
+
+    /* Sent and still moving: solid, because it exists, but not yet teal. */
+    .money-transit {
+        background-color: color-mix(in srgb, var(--color-status-warn) 34%, transparent);
+    }
+
+    /*
+     * The measure. The track is the promise at full length; the fills are what
+     * became of it. An unreceived tranche still draws its measure rather than
+     * collapsing to a dash, so an empty slot reads as deliberate.
+     */
+    .measure-track {
+        background-color: color-mix(in srgb, var(--color-secondary-soft) 40%, transparent);
+    }
+
+    .dark .measure-track {
+        background-color: var(--color-line);
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+        /* One authored moment: every measure grows out of the inline start edge
+           once, on first paint, and nothing on this page animates again. */
+        .measure-fill {
+            transform-origin: left center;
+            animation: target-bar-grow 820ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            animation-delay: 220ms;
+        }
+
+        [dir='rtl'] .measure-fill {
+            transform-origin: right center;
+        }
+    }
+
+    /*
+     * Executive summary commitment ledger
+     * (resources/views/pages/executive-summary/⚡index.blade.php).
+     *
+     * The spread is a double-entry account: committed on the start side, delivered
+     * on the end side, and one continuous variance spine between them. The spine is
+     * drawn per row rather than as a single element so it survives a row opening on
+     * to its breakdown, and each row's gap mark sits on top of it with the page
+     * ground behind it, punching a hole in the rule exactly where the figure is.
+     */
+    .ledger-spread::before {
+        content: '';
+        position: absolute;
+        inset-block: 0;
+        inset-inline-start: 50%;
+        width: 1px;
+        transform: translateX(-50%);
+        background: var(--color-secondary-soft);
+        opacity: 0;
+    }
+
+    .dark .ledger-spread::before {
+        background: var(--color-line);
+    }
+
+    /*
+     * The spine only exists where the two columns do. Stacked, the same rule lies
+     * flat between the pair, so the gap is still struck between what was promised
+     * and what answered it rather than simply floating above it.
+     */
+    .ledger-strike::before {
+        content: '';
+        position: absolute;
+        inset-inline: 0;
+        inset-block-start: 50%;
+        height: 1px;
+        background: var(--color-secondary-soft);
+    }
+
+    .dark .ledger-strike::before {
+        background: var(--color-line);
+    }
+
+    /*
+     * The figure sits on the rule with the page ground behind it, punching a hole
+     * in the line exactly where the number is.
+     */
+    .ledger-chip {
+        background: var(--color-white);
+    }
+
+    .dark .ledger-chip {
+        background: var(--color-surface-1);
+    }
+
+    .exec-ledger [aria-expanded='true'] .ledger-chip,
+    .ledger-reveal .ledger-chip {
+        background: color-mix(in srgb, var(--color-secondary-soft) 20%, var(--color-white));
+    }
+
+    /* Must match the open row's dark ground (.ledger-reveal: dark:bg-surface-2). */
+    .dark .exec-ledger [aria-expanded='true'] .ledger-chip,
+    .dark .ledger-reveal .ledger-chip {
+        background: var(--color-surface-2);
+    }
+
+    /*
+     * A commitment nothing answered at all. Drawn as the promise at full length in
+     * dashes rather than as an empty track, so "nothing landed" reads as a measured
+     * fact rather than as a rule someone forgot to fill in.
+     */
+    .ledger-unanswered {
+        background-image: repeating-linear-gradient(90deg, var(--color-secondary-light) 0 3px, transparent 3px 8px);
+    }
+
+    @container ledger (min-width: 42rem) {
+        .ledger-spread::before {
+            opacity: 1;
+        }
+
+        .ledger-strike::before {
+            inset-inline: auto;
+            inset-inline-start: 50%;
+            inset-block: 0;
+            width: 1px;
+            height: auto;
+            transform: translateX(-50%);
+        }
+    }
+
+    /*
+     * A row opens on click, so its whole header is a control. The focus ring is the
+     * page's own rather than the browser default, and the hover state moves the
+     * ground instead of the ink: nothing on a ledger should change weight when a
+     * pointer passes over it.
+     */
+    .exec-ledger .ledger-open {
+        border-radius: 0.375rem;
+        transition: background-color 160ms ease-out;
+    }
+
+    .exec-ledger .ledger-open:hover {
+        background-color: color-mix(in srgb, var(--color-secondary-soft) 30%, transparent);
+    }
+
+    .dark .exec-ledger .ledger-open:hover {
+        background-color: var(--color-surface-2);
+    }
+
+    .exec-ledger .ledger-open:focus-visible {
+        outline: 2px solid var(--color-primary);
+        outline-offset: 2px;
+    }
+
+    .dark .exec-ledger .ledger-open:focus-visible {
+        outline-color: var(--color-brand);
+    }
+
+    /*
+     * Browser surfaces the ledger did not draw but still owns, scoped to it so the
+     * rest of the app is untouched.
+     */
+    .exec-ledger ::selection {
+        background: color-mix(in srgb, var(--color-primary) 22%, transparent);
+        color: var(--color-secondary-dark);
+    }
+
+    .dark .exec-ledger ::selection {
+        background: color-mix(in srgb, var(--color-brand) 35%, transparent);
+        color: var(--color-ink);
+    }
+
+    .exec-ledger {
+        caret-color: var(--color-primary);
+        scrollbar-width: thin;
+        scrollbar-color: var(--color-secondary-light) transparent;
+    }
+
+    .dark .exec-ledger {
+        caret-color: var(--color-brand-text);
+        scrollbar-color: var(--color-line-strong) transparent;
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+        /*
+         * The page's one authored moment: the spread strikes its balance. Every
+         * measure grows out of the inline start edge in row order and each gap mark
+         * settles on to the spine behind it. Nothing on this page animates again.
+         */
+        .exec-ledger .ledger-fill {
+            transform-origin: left center;
+            animation: target-bar-grow 760ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            animation-delay: calc(var(--row-order, 0) * 90ms + 200ms);
+        }
+
+        [dir='rtl'] .exec-ledger .ledger-fill {
+            transform-origin: right center;
+        }
+
+        .exec-ledger .ledger-gap-mark {
+            animation: ledger-gap-strike 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            animation-delay: calc(var(--row-order, 0) * 90ms + 420ms);
+        }
+
+        /* A breakdown arrives under the row it belongs to, not from nowhere. */
+        .exec-ledger .ledger-reveal {
+            animation: ledger-reveal 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+    }
+
+    @keyframes ledger-gap-strike {
+        from {
+            opacity: 0;
+            transform: scale(0.88);
+        }
+    }
+
+    @keyframes ledger-reveal {
+        from {
+            opacity: 0;
+            transform: translateY(-4px);
+        }
+    }
+}
+
+/*
+ * Finance registers (x-funding.register): the tables of the Funding pages.
+ * .register is a size container. Table min-width per size; while the
+ * container is at least that wide nothing scrolls sideways and the heading
+ * row sticks under the app bar (sticky cannot work inside an overflow box);
+ * narrower, the table scrolls inside .register-scroll with its first column
+ * pinned; under 48rem each row stacks as labelled pairs.
+ */
+@layer components {
+    .register {
+        container-type: inline-size;
+        --register-ground: var(--color-white);
+        --register-ink: var(--color-secondary-dark);
+        --register-muted: var(--color-secondary-medium);
+        --register-sticky-top: 4rem;
+        color: var(--register-ink);
+    }
+
+    .dark .register {
+        --register-ground: var(--color-surface-0);
+        --register-ink: var(--color-ink);
+        --register-muted: var(--color-ink-muted);
+    }
+
+    .register-scroll {
+        position: relative;
+        overflow-x: auto;
+        border-block: 1px solid var(--color-board-line);
+    }
+
+    .register table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        font-size: 0.875rem;
+    }
+
+    .register-sm table { min-width: 56rem; }
+    .register-md table { min-width: 68rem; }
+    .register-lg table { min-width: 80rem; }
+    .register-xl table { min-width: 92rem; }
+    .register-2xl table { min-width: 104rem; }
+
+    .register th,
+    .register td {
+        padding: 0.625rem 0.75rem;
+        text-align: center;
+        vertical-align: middle;
+        border-bottom: 1px solid var(--color-board-line);
+        background: var(--register-ground);
+    }
+
+    .register thead th {
+        background: var(--color-board-head);
+        color: var(--register-muted);
+        font-size: 0.75rem;
+        font-weight: 600;
+        white-space: nowrap;
+        vertical-align: middle;
+    }
+
+    .register tbody tr:hover td { background: var(--color-board-head); }
+
+    .register th:first-child,
+    .register td:first-child {
+        position: sticky;
+        inset-inline-start: 0;
+        z-index: 1;
+        min-width: 14rem;
+        text-align: start;
+    }
+
+    .register .num { text-align: center; white-space: nowrap; }
+    .register .date { white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .register .fig { display: inline-block; direction: ltr; unicode-bidi: isolate; font-variant-numeric: tabular-nums; }
+    .register .sub { display: block; margin-top: 0.125rem; font-size: 0.75rem; font-weight: 400; color: var(--register-muted); }
+    .register .fig.block { display: block; }
+
+    .register-sort {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        font: inherit;
+        color: inherit;
+        cursor: pointer;
+    }
+
+    .register td > .flex.justify-end { justify-content: center; }
+    .register th[aria-sort] { color: var(--register-ink); }
+
+    .register tr.register-group td {
+        background: var(--color-board-head);
+        font-weight: 700;
+        border-top: 1px solid var(--color-board-line);
+    }
+
+    .register tfoot td {
+        background: var(--color-board-head);
+        font-weight: 700;
+        border-top: 2px solid var(--color-board-line);
+    }
+
+    @container (min-width: 56rem) { .register-sm > .register-scroll { overflow: visible; } .register-sm thead th { position: sticky; top: var(--register-sticky-top); z-index: 2; } }
+    @container (min-width: 68rem) { .register-md > .register-scroll { overflow: visible; } .register-md thead th { position: sticky; top: var(--register-sticky-top); z-index: 2; } }
+    @container (min-width: 80rem) { .register-lg > .register-scroll { overflow: visible; } .register-lg thead th { position: sticky; top: var(--register-sticky-top); z-index: 2; } }
+    @container (min-width: 92rem) { .register-xl > .register-scroll { overflow: visible; } .register-xl thead th { position: sticky; top: var(--register-sticky-top); z-index: 2; } }
+    @container (min-width: 104rem) { .register-2xl > .register-scroll { overflow: visible; } .register-2xl thead th { position: sticky; top: var(--register-sticky-top); z-index: 2; } }
+
+    @container (max-width: 47.99rem) {
+        .register .register-scroll { overflow: visible; border: 0; }
+        .register table { min-width: 0; }
+        .register table,
+        .register tbody,
+        .register tfoot,
+        .register tr,
+        .register td { display: block; width: 100%; }
+        .register thead { display: none; }
+        .register tr { padding: 0.75rem 0; border-bottom: 1px solid var(--color-board-line); }
+        .register td { position: static; display: block; padding: 0.25rem 0; border: 0; text-align: start; background: transparent; }
+        .register td[data-label]:not([data-wide]) { display: grid; grid-template-columns: minmax(6rem, auto) minmax(0, 1fr); column-gap: 1rem; align-items: start; padding: 0.25rem 0; border: 0; text-align: end; }
+        .register td[data-label]:not([data-wide]) > * { grid-column: 2; justify-self: end; min-inline-size: 0; max-inline-size: 100%; text-align: end; overflow-wrap: anywhere; }
+        .register td:empty { display: none; }
+        .register td[data-label]:not([data-wide])::before { content: attr(data-label); color: var(--register-muted); font-size: 0.75rem; font-weight: 600; text-align: start; grid-column: 1; grid-row: 1 / span 20; }
+        .register td[data-wide] { display: block; text-align: start; font-size: 1rem; }
+        .register td[data-wide]::before { content: none; }
+    }
+}
+
+/* docx-preview injects its own unlayered stylesheet for these, so the override stays unlayered. */
+.docx-preview-wrapper {
+    background: transparent !important;
+    padding: 1rem !important;
+}
+
+.docx-preview-wrapper > section.docx-preview {
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.12) !important;
+    margin-bottom: 1rem !important;
+}
+
+/*
+ * ApexCharts tooltips (resources/js/charts.js switches them to theme 'dark' in dark
+ * mode). Unlayered on purpose: they must beat the stylesheet ApexCharts injects.
+ */
+.dark .apexcharts-tooltip.apexcharts-theme-dark {
+    background: var(--color-surface-3);
+    color: var(--color-ink);
+    border: 1px solid var(--color-line);
+    box-shadow: var(--shadow-raised);
+}
+
+.dark .apexcharts-tooltip.apexcharts-theme-dark .apexcharts-tooltip-title {
+    background: var(--color-surface-2);
+    border-bottom: 1px solid var(--color-line);
+}

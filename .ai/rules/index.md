@@ -23,7 +23,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | config/session.php | .ai/rules/config-2.md |
 | {config/database.php,.env.example} | .ai/rules/config.md |
 | {database/seeders/**,app/Console/Commands/**} | .ai/rules/console-commands.md |
-| resources/css/app.css | .ai/rules/css.md |
+| resources/css/*.css | .ai/rules/css.md |
 | database/migrations/** | .ai/rules/database-migrations.md |
 | database/seeders/** | .ai/rules/database-seeders.md |
 | {app/Livewire/Concerns/ManagesDonorForm.php,resources/views/components/donors/**,resources/views/pages/donors/**} | .ai/rules/donors.md |
@@ -44,7 +44,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/views/pages/milestones/** | .ai/rules/milestones.md |
 | resources/views/pages/{milestones,tasks}/** | .ai/rules/milestonestasks.md |
 | app/Models/**, app/Models/Account.php, app/Models/Hr*.php, app/Models/Program.php, app/Models/User.php, app/Models/Task.php | .ai/rules/models.md |
-| {app/Http/Middleware/SetLocale.php,app/Http/Controllers/SwitchLocaleController.php,resources/views/components/navigation/sidebar.blade.php,resources/css/app.css} | .ai/rules/navigation-css.md |
+| {app/Http/Middleware/SetLocale.php,app/Http/Controllers/SwitchLocaleController.php,resources/views/components/navigation/sidebar.blade.php,resources/css/*.css} | .ai/rules/navigation-css.md |
 | resources/views/components/{navigation/sidebar.blade.php,ui/panel.blade.php,ui/stat-tile.blade.php,ui/data-table.blade.php,ui/timeline.blade.php} | .ai/rules/navigation.md |
 | resources/views/pages/notifications/** | .ai/rules/notifications.md |
 | app/Observers/**, app/Observers/{MilestoneObserver,ResultObserver}.php | .ai/rules/observers.md |

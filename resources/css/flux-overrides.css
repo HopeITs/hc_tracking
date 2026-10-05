@@ -1,0 +1,807 @@
+/* Flux overrides: controls, directory pages, modals, toasts and the Graphite dark layer. */
+
+/* Every clickable button gets a hand cursor, matching links. A default, so a page's own cursor-* utility (grab, crosshair) wins. */
+@layer base {
+    button:not(:disabled),
+    [data-flux-button]:not(:disabled),
+    [role='button']:not([aria-disabled='true']) {
+        cursor: pointer;
+    }
+}
+
+/*
+ * Field rhythm. Unlayered on purpose: Flux spaces labels with arbitrary
+ * variants on the field (`*:data-flux-label:mb-3`, `[&>[data-flux-label]~…]`)
+ * whose specificity no single-attribute rule in a layer can reach.
+ */
+[data-flux-field]:not(ui-radio, ui-checkbox) {
+    @apply grid gap-2;
+}
+
+[data-flux-label] {
+    @apply !mb-0 !leading-tight;
+}
+
+/*
+ * Directory filter rows (.directory-filters) restyle the field rhythm above, so they sit
+ * beside it. Flux renders its field label as an inline-flex <ui-label>, so it sits in a
+ * line box whose height comes from the field's inherited line-height, not from the
+ * label. That pushed a Flux input's control about 8px below the shared picker's next to
+ * it, which uses a plain block <label>. Block-level here puts every filter control in a
+ * header row on the same baseline. The three !important declarations answer the
+ * important gap, margin and leading of the rhythm rules.
+ */
+.directory-filters ui-field {
+    row-gap: 0 !important;
+}
+
+.directory-filters [data-flux-label] {
+    display: block;
+    margin-bottom: 0.375rem !important;
+    color: var(--color-secondary-medium);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1rem !important;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.dark .directory-filters [data-flux-label] {
+    color: var(--color-ink-muted);
+}
+
+/* Tracking pulls Arabic letters apart, and Arabic has no capitals. */
+.directory-filters [data-flux-label]:lang(ar) {
+    letter-spacing: normal;
+}
+
+/*
+ * Directory pages (.admin-directory, .directory-filters, .filter-picker, .filter-menu)
+ * and the shared control focus ring. In @layer utilities after Tailwind's own, so
+ * every selector here (0,2,0 and up) out-ranks Flux's resting and state classes
+ * by specificity or order, while a page utility with `!` can still win.
+ */
+@layer utilities {
+    input:focus[data-flux-control],
+    textarea:focus[data-flux-control],
+    select:focus[data-flux-control] {
+        outline: 2px solid var(--color-secondary-medium);
+        outline-offset: 2px;
+        box-shadow: none;
+    }
+
+    .dark :is(input, textarea, select):focus[data-flux-control] {
+        outline-color: var(--color-ink-muted);
+    }
+
+    input[type='search']::-webkit-search-cancel-button {
+        cursor: pointer;
+        filter: grayscale(1) saturate(0) brightness(0.72);
+        opacity: 0.85;
+    }
+
+    /* color-scheme: dark already draws the native glyph light; only keep it neutral. */
+    .dark input[type='search']::-webkit-search-cancel-button {
+        filter: grayscale(1) saturate(0);
+    }
+
+    /* Keep administrative directories inside their approved brand palette. */
+    .admin-directory [data-flux-table],
+    .admin-directory [data-flux-table] thead,
+    .admin-directory [data-flux-table] tbody,
+    .admin-directory [data-flux-table] tr {
+        color: var(--color-secondary-dark);
+        outline-color: var(--color-secondary-light);
+    }
+
+    .dark .admin-directory [data-flux-table],
+    .dark .admin-directory [data-flux-table] thead,
+    .dark .admin-directory [data-flux-table] tbody,
+    .dark .admin-directory [data-flux-table] tr {
+        color: var(--color-ink);
+        outline-color: var(--color-line);
+    }
+
+    .admin-directory [data-flux-control] {
+        background-color: var(--color-white);
+        border-color: var(--color-secondary-light);
+        box-shadow: none;
+        color: var(--color-secondary-dark);
+        outline-color: var(--color-secondary-light);
+    }
+
+    .dark .admin-directory [data-flux-control] {
+        border-color: var(--color-field-line);
+        background-color: var(--color-surface-2);
+        color: var(--color-ink);
+        outline-color: var(--color-field-line);
+    }
+
+    .admin-directory [data-flux-control]::placeholder,
+    .admin-directory [data-flux-input]>div,
+    .admin-directory [data-flux-clear-button],
+    .admin-directory [data-flux-clear-button] [data-flux-icon] {
+        color: var(--color-secondary-light);
+    }
+
+    .admin-directory [data-flux-control]:focus,
+    .admin-directory [data-flux-control]:focus-visible,
+    .admin-directory [data-flux-button]:focus-visible {
+        box-shadow: none;
+        outline: 2px solid var(--color-secondary-medium);
+        outline-offset: 2px;
+    }
+
+    .dark .admin-directory [data-flux-control]::placeholder,
+    .dark .admin-directory [data-flux-input]>div,
+    .dark .admin-directory [data-flux-clear-button],
+    .dark .admin-directory [data-flux-clear-button] [data-flux-icon] {
+        color: var(--color-ink-faint);
+    }
+
+    .dark .admin-directory [data-flux-control]:focus,
+    .dark .admin-directory [data-flux-control]:focus-visible,
+    .dark .admin-directory [data-flux-button]:focus-visible {
+        outline-color: var(--color-ink-muted);
+    }
+
+    /* The tinted-fill filter row treatment: shared by every directory-style index page's toolbar, not just Programs. */
+    .directory-filters [data-flux-control] {
+        min-height: 2.75rem;
+        border-color: var(--color-secondary-soft);
+        background-color: color-mix(in srgb, var(--color-secondary-soft) 38%, var(--color-white));
+        transition: border-color 150ms ease, background-color 150ms ease;
+    }
+
+    .directory-filters [data-flux-control]:hover {
+        border-color: var(--color-secondary-light);
+        background-color: var(--color-white);
+    }
+
+    /* Flux's disabled:data-invalid:border-red-500 is 0,3,0; filters keep their resting border in every state. */
+    .directory-filters [data-flux-control][data-invalid]:disabled {
+        border-color: var(--color-secondary-soft);
+    }
+
+    .directory-filters [data-flux-control]:focus,
+    .directory-filters [data-flux-control]:focus-visible {
+        border-color: var(--color-secondary-medium);
+    }
+
+    .directory-filters [data-directory-search]:is(:focus, :focus-visible) {
+        border-color: var(--color-secondary-soft);
+        outline: none;
+        outline-offset: 0;
+        box-shadow: none;
+    }
+
+    /*
+     * Dark filters: every control, the search input included, is a surface-2 field
+     * with ink text (the search input used to keep the light tint under white text).
+     * Fields stay on surface-2 when hovered or focused — only the border lifts — so
+     * ink-faint placeholders never sit on surface-3 (4.0 : 1).
+     */
+    .dark .directory-filters [data-flux-control] {
+        border-color: var(--color-field-line);
+        background-color: var(--color-surface-2);
+        color: var(--color-ink);
+    }
+
+    .dark .directory-filters [data-flux-control]:hover {
+        border-color: var(--color-ink-faint);
+        background-color: var(--color-surface-2);
+    }
+
+    .dark .directory-filters [data-flux-control][data-invalid]:disabled {
+        border-color: var(--color-field-line);
+    }
+
+    .dark .directory-filters [data-flux-control]:focus,
+    .dark .directory-filters [data-flux-control]:focus-visible {
+        border-color: var(--color-ink-muted);
+    }
+
+    /* As in light, the directory search keeps its resting border while focused. */
+    .dark .directory-filters [data-directory-search]:is(:focus, :focus-visible) {
+        border-color: var(--color-field-line);
+    }
+
+    /* Chrome paints autofill with a UA background; an inset shadow is the only way to keep the field dark. */
+    .dark .directory-filters [data-flux-control]:autofill {
+        box-shadow: inset 0 0 0 100vmax var(--color-surface-2);
+        -webkit-text-fill-color: var(--color-ink);
+        caret-color: var(--color-ink);
+    }
+
+    .filter-picker [data-flux-button] {
+        min-height: 2.75rem;
+        border-color: var(--color-secondary-soft);
+        background-color: color-mix(in srgb, var(--color-secondary-soft) 38%, var(--color-white));
+        box-shadow: none;
+        color: var(--color-secondary-dark);
+    }
+
+    .filter-picker [data-flux-button]:hover {
+        border-color: var(--color-secondary-light);
+        background-color: var(--color-white);
+    }
+
+    .filter-picker [data-flux-menu] {
+        width: min(18.5rem, calc(100vw - 2rem));
+        max-height: 18rem;
+        overflow-y: auto;
+        border-color: var(--color-secondary-soft);
+        background-color: var(--color-white);
+        box-shadow: 0 10px 24px rgb(88 89 91 / 12%);
+    }
+
+    .filter-picker [data-flux-menu-item] {
+        color: var(--color-secondary-dark);
+    }
+
+    .filter-picker [data-flux-menu-item][data-active] {
+        background-color: var(--color-secondary-soft);
+    }
+
+    .filter-menu [data-flux-control] {
+        min-height: 2rem;
+        height: 2rem;
+        border-color: var(--color-secondary-soft);
+        background-color: color-mix(in srgb, var(--color-secondary-soft) 38%, var(--color-white));
+        box-shadow: none;
+        font-size: 0.8125rem;
+    }
+
+    .filter-menu [data-flux-control]:focus,
+    .filter-menu [data-flux-control]:focus-visible {
+        border-color: var(--color-secondary-soft);
+        outline: none;
+        outline-offset: 0;
+    }
+
+    .dark .filter-picker [data-flux-button] {
+        border-color: var(--color-field-line);
+        background-color: var(--color-surface-2);
+        color: var(--color-ink);
+    }
+
+    .dark .filter-picker [data-flux-button]:hover {
+        border-color: var(--color-ink-faint);
+        background-color: var(--color-surface-2);
+    }
+
+    .dark .filter-picker [data-flux-menu-item][data-active] {
+        background-color: rgb(255 255 255 / 0.06);
+    }
+
+    .dark .filter-picker [data-flux-menu] {
+        border-color: var(--color-line);
+        background-color: var(--color-surface-3);
+        box-shadow: var(--shadow-raised);
+    }
+
+    .dark .filter-menu [data-flux-control] {
+        border-color: var(--color-field-line);
+        background-color: var(--color-surface-2);
+        color: var(--color-ink);
+    }
+
+    .dark .filter-picker [data-flux-menu-item] {
+        color: var(--color-ink);
+    }
+
+    .admin-directory [data-flux-control][data-invalid] {
+        border-color: var(--color-primary);
+    }
+
+    .dark .admin-directory [data-flux-control][data-invalid] {
+        border-color: var(--color-brand-text);
+    }
+
+    .admin-directory [data-flux-button] {
+        box-shadow: none;
+    }
+
+    .admin-directory [data-flux-button][x-data='fluxInputViewable'],
+    .admin-directory ui-close [data-flux-button] {
+        color: var(--color-secondary-light);
+    }
+
+    .admin-directory [data-flux-button][x-data='fluxInputViewable']:hover,
+    .admin-directory ui-close [data-flux-button]:hover {
+        background-color: var(--color-secondary-soft);
+        color: var(--color-secondary-dark);
+    }
+
+    .dark .admin-directory [data-flux-button][x-data='fluxInputViewable'] {
+        color: var(--color-ink-muted);
+    }
+
+    .dark .admin-directory [data-flux-button][x-data='fluxInputViewable']:hover,
+    .dark .admin-directory ui-close [data-flux-button]:hover {
+        background-color: rgb(255 255 255 / 0.06);
+        color: var(--color-ink);
+    }
+
+    .admin-directory [data-flux-error] {
+        color: var(--color-primary);
+    }
+
+    .admin-directory [data-flux-pagination],
+    .admin-directory [data-flux-pagination]>div {
+        border-color: var(--color-secondary-soft);
+        color: var(--color-secondary-medium);
+    }
+
+    .dark .admin-directory [data-flux-error] {
+        color: var(--color-brand-text);
+    }
+
+    .dark .admin-directory [data-flux-pagination],
+    .dark .admin-directory [data-flux-pagination]>div {
+        border-color: var(--color-line);
+        color: var(--color-ink-muted);
+    }
+
+    /* Form dropdowns reuse the picker; these add the form-only states. */
+    .filter-picker [data-flux-button][aria-invalid='true'] {
+        border-color: var(--color-primary);
+    }
+
+    .dark .filter-picker [data-flux-button][aria-invalid='true'] {
+        border-color: var(--color-brand-text);
+    }
+
+    .filter-picker [data-flux-button]:disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+}
+
+/*
+ * Close buttons. Flux colours its close X with `!` classes; an important rule only
+ * beats an important utility from an earlier layer, so these sit in @layer base.
+ */
+@layer base {
+    .admin-directory ui-close [data-flux-button] {
+        color: var(--color-secondary-light) !important;
+    }
+
+    /* Same layer as the rule above, so it can out-rank Flux's own `!` classes on the close X. */
+    .dark .admin-directory ui-close [data-flux-button] {
+        color: var(--color-ink-muted) !important;
+    }
+
+    .dark .admin-directory ui-close [data-flux-button]:hover {
+        color: var(--color-ink) !important;
+    }
+
+    /* Flux's own modal X (its absolute top-end wrapper, not a page's modal.close) is text-zinc-500! in dark: 2.9 : 1 on surface-3. */
+    .dark :is([data-flux-modal] > dialog, [data-flux-modal-content]) > .absolute.top-0.end-0 > [data-flux-modal-close] > [data-flux-button] {
+        color: var(--color-ink-muted) !important;
+    }
+
+    .dark :is([data-flux-modal] > dialog, [data-flux-modal-content]) > .absolute.top-0.end-0 > [data-flux-modal-close] > [data-flux-button]:hover {
+        color: var(--color-ink) !important;
+    }
+}
+
+/*
+ * Keep every Flux modal visually separated from the page beneath it. Unlayered on
+ * purpose: flux.css styles the dialog and its backdrop with unlayered rules of its own.
+ */
+[data-flux-modal] > dialog::backdrop {
+    background-color: color-mix(in srgb, var(--color-secondary-dark) 72%, transparent) !important;
+    -webkit-backdrop-filter: blur(4px) saturate(75%);
+    backdrop-filter: blur(4px) saturate(75%);
+    transition-duration: 180ms;
+    transition-timing-function: ease-out;
+}
+
+.dark [data-flux-modal] > dialog::backdrop {
+    background-color: rgb(0 0 0 / 0.6) !important;
+}
+
+[data-flux-modal] > dialog:not([data-flux-flyout]):not([data-flux-modal-overflow]) {
+    width: calc(100% - 2rem);
+    min-width: 0 !important;
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+[data-flux-modal] > dialog:not(.bg-transparent):not([data-flux-flyout]):not([data-flux-modal-overflow]),
+[data-flux-modal] [data-flux-modal-content]:not(.bg-transparent) {
+    border: 1px solid color-mix(in srgb, var(--color-secondary-light) 55%, transparent) !important;
+    box-shadow:
+        0 2px 8px color-mix(in srgb, var(--color-secondary-dark) 22%, transparent),
+        0 24px 64px color-mix(in srgb, var(--color-secondary-dark) 48%, transparent) !important;
+}
+
+/* Dark overlays: no drop shadow, a line border and the top-edge highlight; the backdrop does the separating. */
+.dark [data-flux-modal] > dialog:not(.bg-transparent):not([data-flux-flyout]):not([data-flux-modal-overflow]),
+.dark [data-flux-modal] [data-flux-modal-content]:not(.bg-transparent) {
+    border-color: var(--color-line) !important;
+    box-shadow: var(--shadow-raised) !important;
+}
+
+[data-flux-modal] > dialog:not([data-flux-flyout]):not([data-flux-modal-overflow]),
+[data-flux-modal] [data-flux-modal-content] {
+    transform: translateY(0.5rem) scale(0.98);
+    transition-duration: 180ms;
+    transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-flux-modal] > dialog[open]:not([data-flux-flyout]):not([data-flux-modal-overflow]),
+[data-flux-modal] > dialog[open] [data-flux-modal-content] {
+    transform: translateY(0) scale(1);
+}
+
+@starting-style {
+
+    [data-flux-modal] > dialog[open]:not([data-flux-flyout]):not([data-flux-modal-overflow]),
+    [data-flux-modal] > dialog[open] [data-flux-modal-content] {
+        transform: translateY(0.5rem) scale(0.98);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    [data-flux-modal] > dialog,
+    [data-flux-modal] > dialog::backdrop,
+    [data-flux-modal] [data-flux-modal-content] {
+        transition-duration: 0.01ms !important;
+    }
+
+    [data-flux-modal] > dialog:not([data-flux-flyout]),
+    [data-flux-modal] [data-flux-modal-content] {
+        transform: none !important;
+    }
+}
+
+/*
+ * Flux toasts (Flux::toast(), CRUD confirmations), styled as a centred,
+ * SweetAlert-style popup instead of a corner snackbar. `position="center"` on
+ * <flux:toast.group> (see the app and auth layouts) is the hook for all of this.
+ *
+ * True centring: Flux's own [position*="center"] rule only centers horizontally.
+ * The group collapses to zero height (its dialog is absolutely positioned inside
+ * it), so auto margins alone don't centre it vertically — Flux's CSS only sets
+ * top/bottom for "top"/"bottom" positions, and "center" matches neither, leaving
+ * the dialog at its static position. `top: 50%` plus a same-height translateY
+ * fixes that regardless of the dialog's rendered height.
+ *
+ * The rest restyles Flux's fixed toast markup (vendor/livewire/flux/stubs/.../
+ * toast/index.blade.php has no class hooks of its own) by structural position:
+ * card (first div) > content row (its only child) > [icon+text row, action/close row].
+ *
+ * Unlayered on purpose, like the rule it re-centres: these must out-rank Flux's
+ * toast utilities and its own unlayered position rules.
+ */
+ui-toast-group[position='center'] {
+    margin-top: auto;
+    margin-bottom: auto;
+
+    [data-flux-toast-dialog] {
+        top: 50%;
+        /* !important: Flux's JS sets an inline `transform` on this element itself
+           (it positions stacked toasts by translating each one), which otherwise
+           always beats an external rule regardless of specificity. */
+        transform: translateY(-50%) scale(0.94) !important;
+        transition: opacity 0.25s allow-discrete, transform 0.25s allow-discrete, height 0.35s allow-discrete;
+
+        &.showing {
+            transform: translateY(-50%) scale(1) !important;
+        }
+
+        /* Card: Flux's own p-2/rounded-xl/shadow-lg wrapper, widened and padded into a popup.
+           The backdrop dimming the rest of the page is a giant-spread box-shadow rather than
+           a real ::backdrop — a real backdrop only paints while the popover is genuinely
+           open, and the group here never reliably reports "closed" once every toast in it
+           has been dismissed, which left the dimming stuck on screen. A shadow is just paint
+           tied to this element, so it appears and fades with the popup itself, every time. */
+        > div {
+            position: relative;
+            overflow: hidden;
+            width: 22rem;
+            max-width: calc(100vw - 2.5rem);
+            padding: 1.75rem 1.5rem 1.375rem;
+            border-radius: 1.25rem;
+            box-shadow:
+                0 2px 8px color-mix(in srgb, var(--color-secondary-dark) 22%, transparent),
+                0 24px 64px color-mix(in srgb, var(--color-secondary-dark) 40%, transparent),
+                0 0 0 100vmax color-mix(in srgb, var(--color-secondary-dark) 45%, transparent);
+        }
+
+        /* Content row: stack icon above text instead of side-by-side, and centre it. */
+        > div > div {
+            flex-direction: column;
+            align-items: center;
+            gap: 0.625rem;
+            overflow: visible;
+        }
+
+        /* Icon + text column: also stacked, icon first. */
+        > div > div > div:first-child {
+            flex-direction: column;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0;
+            text-align: center;
+        }
+
+        /* The variant icon becomes a colour-tinted circular badge. */
+        svg {
+            width: 2.75rem;
+            height: 2.75rem;
+            padding: 0.625rem;
+            border-radius: 9999px;
+        }
+
+        /* Action/close row: off the content flow, into the card's top-end corner,
+           clear of the icon badge's own padding. */
+        > div > div > div:last-child {
+            position: absolute;
+            top: 0.375rem;
+            inset-inline-end: 0.375rem;
+        }
+
+        /* The dismiss countdown. Flux tracks its own `duration` in JS with no CSS
+           hook, so this assumes the shared default (Flux::toast()'s 5s) — every
+           toast in this app relies on that default rather than passing its own. */
+        > div::after {
+            content: '';
+            position: absolute;
+            inset-inline: 0;
+            bottom: 0;
+            height: 3px;
+            transform-origin: left center;
+            animation: hc-center-toast-countdown 5s linear forwards;
+        }
+
+        &[data-variant='success'] {
+            svg {
+                background-color: var(--color-status-good-soft);
+                color: var(--color-status-good);
+            }
+
+            > div::after {
+                background-color: var(--color-status-good);
+            }
+        }
+
+        &[data-variant='warning'] {
+            svg {
+                background-color: var(--color-status-warn-soft);
+                color: var(--color-status-warn);
+            }
+
+            > div::after {
+                background-color: var(--color-status-warn);
+            }
+        }
+
+        &[data-variant='danger'] {
+            svg {
+                background-color: var(--color-status-critical-soft);
+                color: var(--color-status-critical);
+            }
+
+            > div::after {
+                background-color: var(--color-status-critical);
+            }
+        }
+
+        &:not([data-variant]),
+        &[data-variant='info'] {
+            svg {
+                background-color: var(--color-status-active-soft);
+                color: var(--color-status-active);
+            }
+
+            > div::after {
+                background-color: var(--color-status-active);
+            }
+        }
+    }
+}
+
+[dir='rtl'] ui-toast-group[position='center'] [data-flux-toast-dialog] > div::after {
+    transform-origin: right center;
+}
+
+/* Dark toasts: a surface-3 card on a black/60 dim, Graphite text, no drop shadow. */
+.dark [data-flux-toast-dialog] > div {
+    border-color: var(--color-line);
+    background-color: var(--color-surface-3);
+}
+
+.dark ui-toast-group[position='center'] [data-flux-toast-dialog] > div {
+    box-shadow:
+        var(--shadow-raised),
+        0 0 0 100vmax rgb(0 0 0 / 0.6);
+}
+
+/* Heading, then text: the text is primary on its own and supporting under a heading, as in Flux. */
+.dark [data-flux-toast-dialog] > div > div > div:first-child > div > div {
+    color: var(--color-ink);
+}
+
+.dark [data-flux-toast-dialog] > div > div > div:first-child > div > div:not(:empty) + div {
+    color: var(--color-ink-muted);
+}
+
+.dark [data-flux-toast-dialog] ui-close button {
+    color: var(--color-ink-muted);
+}
+
+.dark [data-flux-toast-dialog] ui-close button:hover {
+    color: var(--color-ink);
+}
+
+@keyframes hc-center-toast-countdown {
+    from {
+        transform: scaleX(1);
+    }
+    to {
+        transform: scaleX(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    ui-toast-group[position='center'] [data-flux-toast-dialog] {
+        transition: opacity 0.2s;
+        transform: none !important;
+
+        > div::after {
+            animation: none;
+            opacity: 0;
+        }
+    }
+}
+
+/*
+ * Flux in dark mode: overlays on surface-3, fields on surface-2.
+ *
+ * Flux colours itself with its own dark: utilities (dark:bg-zinc-800 on modals,
+ * dark:bg-zinc-700 on menus and tooltips, dark:bg-white/10 on fields). Those live
+ * in Tailwind's utilities layer, so a rule in @layer components can never
+ * out-rank them, and an unlayered rule would out-rank every utility in the app.
+ * These rules therefore sit in @layer utilities, after Tailwind's generated
+ * ones, at the specificity of the Flux class they replace (0,1,0 — everything
+ * else is inside :where()). A tie goes to the later rule, so they beat Flux's
+ * resting classes, while Flux's own state variants (disabled, data-invalid,
+ * data-active) and any page utility with `!` or a state variant still win.
+ */
+@layer utilities {
+    /*
+     * Page header actions (Filters, Export, Add) share one shape with the
+     * view toggle: 40px tall, 8px corners, 14px semibold. Secondary actions
+     * are white with a soft hairline; red is kept for the one primary action.
+     * x-ui.button tone="action" emits only this hook (no !-suffixed tone colours),
+     * so these out-rank Flux's size and variant classes by specificity alone.
+     */
+    [data-flux-button].page-action {
+        height: 2.5rem;
+        min-height: 2.5rem;
+        border-radius: 0.5rem;
+        padding-inline: 0.875rem;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        box-shadow: none;
+    }
+
+    [data-flux-button].page-action:not(.page-action-primary) {
+        border: 1px solid var(--color-secondary-soft);
+        background-color: var(--color-white);
+        color: var(--color-secondary-dark);
+    }
+
+    [data-flux-button].page-action:not(.page-action-primary):hover {
+        border-color: var(--color-secondary-light);
+        background-color: color-mix(in oklab, var(--color-secondary-soft) 45%, var(--color-white));
+    }
+
+    [data-flux-button].page-action:not(.page-action-primary) > [data-flux-icon] { color: var(--color-secondary-medium); }
+
+    [data-flux-button].page-action.page-action-on {
+        border-color: var(--color-secondary-dark);
+    }
+
+    :where(.dark) [data-flux-button].page-action:not(.page-action-primary) {
+        border-color: var(--color-line);
+        background-color: var(--color-surface-1);
+        color: var(--color-ink);
+    }
+
+    :where(.dark) [data-flux-button].page-action:not(.page-action-primary):hover {
+        border-color: var(--color-line-strong);
+        background-color: var(--color-surface-2);
+    }
+
+    :where(.dark) [data-flux-button].page-action:not(.page-action-primary) > [data-flux-icon] { color: var(--color-ink-muted); }
+    :where(.dark) [data-flux-button].page-action.page-action-on { border-color: var(--color-ink); }
+}
+
+@layer utilities {
+    /* Modals, modal content and flyouts. The resting modal's border and shadow are the unlayered !important rules above. */
+    :where(.dark [data-flux-modal] > dialog, .dark [data-flux-modal] [data-flux-modal-content]):not(.bg-transparent, [data-flux-modal-overflow]) {
+        border-color: var(--color-line);
+        background-color: var(--color-surface-3);
+        --tw-ring-color: var(--color-line);
+    }
+
+    /* Menus (every dropdown panel in the app is a flux:menu). */
+    :where(.dark) [data-flux-menu] {
+        border-color: var(--color-line);
+        background-color: var(--color-surface-3);
+        box-shadow: var(--shadow-raised);
+    }
+
+    :where(.dark) :is([data-flux-menu-item], [data-flux-menu-radio], [data-flux-menu-checkbox]) {
+        color: var(--color-ink);
+    }
+
+    :where(.dark) [data-flux-menu-heading] {
+        color: var(--color-ink-muted);
+    }
+
+    /* Tooltips (the top-bar ones have their own unlayered look above). */
+    :where(.dark) [data-flux-tooltip-content] {
+        border-color: var(--color-line);
+        background-color: var(--color-surface-3);
+        color: var(--color-ink);
+    }
+
+    /* Fields; checkboxes, radios and file inputs keep Flux's own look. */
+    :where(.dark) :where(input, textarea, select):where(:not([type='checkbox'], [type='radio'], [type='file']))[data-flux-control] {
+        border-color: var(--color-field-line);
+        background-color: var(--color-surface-2);
+        color: var(--color-ink);
+    }
+
+    :where(.dark) :where(input, textarea)[data-flux-control]::placeholder {
+        color: var(--color-ink-faint);
+    }
+
+    /* Invalid fields: ties Flux's dark:data-invalid:border-red-500 (0,2,0) and wins by order. */
+    :where(.dark) [data-flux-control][data-invalid] {
+        border-color: var(--color-brand-text);
+    }
+
+    :where(.dark select)[data-flux-control] option {
+        background-color: var(--color-surface-3);
+        color: var(--color-ink);
+    }
+
+    /* Tables: a surface-2 header with ink-faint labels, line row dividers. */
+    :where(.dark) [data-flux-column] {
+        border-color: var(--color-line);
+        background-color: var(--color-surface-2);
+        color: var(--color-ink-faint);
+    }
+
+    :where(.dark) [data-flux-cell] {
+        border-color: var(--color-line);
+    }
+}
+
+/*
+ * Two Flux dark classes cannot be tied without also beating Flux's own states or
+ * `!`: the active menu row (dark:data-active:bg-zinc-600, which danger rows swap
+ * for red) and the menu separator (dark:bg-zinc-600!). Instead the zinc-600
+ * token they read is re-pointed on those elements alone; a custom property set
+ * on the element itself wins in any layer, and neither element has descendants
+ * that read zinc-600.
+ */
+@layer components {
+    :where(.dark) :is([data-flux-menu-item], [data-flux-menu-radio], [data-flux-menu-checkbox]),
+    :where(.dark) [data-flux-sidebar-group-dropdown] [data-flux-sidebar-item] {
+        --color-zinc-600: rgb(255 255 255 / 0.06);
+    }
+
+    :where(.dark) [data-flux-menu-separator] > [data-flux-separator] {
+        --color-zinc-600: var(--color-line);
+    }
+}

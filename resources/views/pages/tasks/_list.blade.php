@@ -73,7 +73,7 @@
     </div>
 
     <div wire:loading.remove wire:target="search,status,priority,assignee,sourceType,sourceId,sort,group" class="flex flex-col gap-4">
-        <div class="overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-transparent dark:bg-surface-1 dark:shadow-raised">
+        <div class="overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-card dark:border-transparent dark:bg-surface-1 dark:shadow-raised">
             <div class="border-b border-secondary-soft px-4 py-2.5 dark:border-line">
                 <p class="text-xs text-secondary-medium dark:text-ink-muted">{{ trans_choice('tasks.count_matching_task', $paginator->total(), ['count' => $paginator->total()]) }}</p>
             </div>

@@ -248,7 +248,7 @@ new #[Title('titles.programs')] class extends Component {
         <x-slot:filters>
             <div class="min-w-0">
                 <label for="program-search" class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-ink-muted">{{ __('programs.search_programs') }}</label>
-                <x-ui.input id="program-search" type="search" icon="magnifying-glass" :aria-label="__('programs.search_programs')" :placeholder="__('programs.program_strategy_or_manager')" wire:model.live.debounce.300ms="search" />
+                <x-ui.input id="program-search" data-directory-search type="search" icon="magnifying-glass" :aria-label="__('programs.search_programs')" :placeholder="__('programs.program_strategy_or_manager')" wire:model.live.debounce.300ms="search" />
             </div>
             <x-ui.header-filter-select id="program-strategy" :label="__('common.strategy')" :search-label="__('programs.search_strategies')" wire:model.live="strategy" :value="$strategy">
                 <option value="">{{ __('programs.all_strategies') }}</option>

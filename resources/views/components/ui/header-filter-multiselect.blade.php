@@ -58,10 +58,10 @@
     Driven by Alpine rather than flux:dropdown: a flux menu item closes the
     popover as soon as it is chosen, which makes picking a second value cost a
     second trip through the trigger. The Flux data attributes are kept so the
-    shared .program-filter-picker styling still applies.
+    shared .filter-picker styling still applies.
 --}}
 <div
-    class="program-filter-picker min-w-0"
+    class="filter-picker min-w-0"
     data-header-filter-select
     x-data="{ open: false, optionSearch: '' }"
     x-on:keydown.escape.stop="open = false"
@@ -80,7 +80,7 @@
             x-bind:aria-expanded="open ? 'true' : 'false'"
             aria-haspopup="listbox"
             aria-label="{{ $label }}"
-            class="program-filter-trigger flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border px-3 text-start text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            class="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border px-3 text-start text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
             <span class="truncate">{{ $triggerLabel }}</span>
             <flux:icon.chevron-up-down class="size-4 shrink-0 text-secondary-medium dark:text-ink-muted" aria-hidden="true" />
@@ -97,7 +97,7 @@
             class="absolute z-30 mt-1 w-full! rounded-lg border p-[.3125rem] shadow-xs"
         >
             @if ($searchable)
-                <div class="program-filter-menu border-b border-secondary-soft p-1.5 dark:border-line">
+                <div class="filter-menu border-b border-secondary-soft p-1.5 dark:border-line">
                     <x-ui.input
                         type="search"
                         size="sm"

@@ -17,7 +17,7 @@
     };
 @endphp
 
-<article {{ $attributes->class('group flex flex-col gap-3 rounded-2xl border border-secondary-soft bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] transition-all hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgba(16,24,40,0.06),0_4px_8px_rgba(16,24,40,0.08)] dark:border-transparent dark:bg-surface-1 dark:shadow-raised') }}>
+<article {{ $attributes->class('group flex flex-col gap-3 rounded-2xl border border-secondary-soft bg-white p-4 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-card-hover dark:border-transparent dark:bg-surface-1 dark:shadow-raised') }}>
     <div class="flex items-start gap-3">
         <div class="flex size-12 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-secondary-soft bg-board-head transition-transform group-hover:scale-105 dark:border-line dark:bg-surface-2">
             <flux:icon :name="$icon" variant="micro" class="size-4 text-secondary-medium dark:text-ink-muted" />

@@ -1983,7 +1983,7 @@ new #[Title('titles.calendar')] class extends Component {
             <x-ui.panel :title="__('calendar.related_dates')" :count="$this->focusedItems->count()">
                 <div class="flex max-h-96 flex-col gap-2 overflow-y-auto p-2" data-test="calendar-focused-list">
                     @forelse ($this->focusedItems as $item)
-                        <div class="flex items-start gap-2 rounded-xl border border-secondary-soft bg-white p-2.5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] dark:border-line dark:bg-surface-1" wire:key="calendar-focused-item-{{ $item['kind'] }}-{{ $item['id'] }}-{{ $item['date']->toDateString() }}">
+                        <div class="flex items-start gap-2 rounded-xl border border-secondary-soft bg-white p-2.5 shadow-hairline dark:border-line dark:bg-surface-1" wire:key="calendar-focused-item-{{ $item['kind'] }}-{{ $item['id'] }}-{{ $item['date']->toDateString() }}">
                             <span class="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary-soft dark:bg-surface-2">
                                 @switch($focusedType)
                                     @case('milestone')
@@ -2046,7 +2046,7 @@ new #[Title('titles.calendar')] class extends Component {
             <div class="flex min-h-24 flex-col gap-2 p-2" x-data="taskDropList('my-calendar', (wire, id) => wire.rescheduleTask(id, ''))" data-test="calendar-unscheduled">
                 @forelse ($calendar['unscheduledTasks'] as $task)
                     <div
-                        class="flex cursor-grab flex-col gap-1.5 rounded-xl border border-secondary-soft bg-white p-2.5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md active:cursor-grabbing dark:border-line dark:bg-surface-1"
+                        class="flex cursor-grab flex-col gap-1.5 rounded-xl border border-secondary-soft bg-white p-2.5 shadow-hairline transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md active:cursor-grabbing dark:border-line dark:bg-surface-1"
                         data-task-id="{{ $task->id }}"
                         wire:key="calendar-unscheduled-{{ $task->id }}"
                     >
@@ -2235,7 +2235,7 @@ new #[Title('titles.calendar')] class extends Component {
     >
         <div class="flex flex-col gap-2" data-test="calendar-daydetail-list">
             @forelse ($this->dayDetailItems as $item)
-                <div class="flex items-start gap-2 rounded-xl border border-secondary-soft bg-white p-2.5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] dark:border-line dark:bg-surface-1" wire:key="calendar-daydetail-{{ $item['type'] }}-{{ $item['kind'] }}-{{ $item['id'] }}">
+                <div class="flex items-start gap-2 rounded-xl border border-secondary-soft bg-white p-2.5 shadow-hairline dark:border-line dark:bg-surface-1" wire:key="calendar-daydetail-{{ $item['type'] }}-{{ $item['kind'] }}-{{ $item['id'] }}">
                     <span class="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary-soft dark:bg-surface-2">
                         <span class="size-2 rounded-full {{ $typeDotClasses[$item['type']] }}"></span>
                     </span>

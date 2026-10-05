@@ -1640,7 +1640,7 @@ new #[Title('titles.indicators')] class extends Component {
                 @endphp
 
                 <article
-                    class="group relative flex flex-col overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] transition-all hover:-translate-y-0.5 hover:border-secondary-light hover:shadow-[0_2px_4px_rgba(16,24,40,0.06),0_4px_8px_rgba(16,24,40,0.08)] dark:border-transparent dark:bg-surface-1 dark:shadow-raised dark:hover:shadow-raised"
+                    class="group relative flex flex-col overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-card transition-all hover:-translate-y-0.5 hover:border-secondary-light hover:shadow-card-hover dark:border-transparent dark:bg-surface-1 dark:shadow-raised dark:hover:shadow-raised"
                     wire:key="indicator-card-{{ $indicator->id }}"
                     data-result-type="{{ $indicator->result->type->value }}"
                 >

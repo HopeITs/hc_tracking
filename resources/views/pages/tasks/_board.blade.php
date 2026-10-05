@@ -80,7 +80,7 @@
                     @endphp
                     <div
                         @class([
-                            'group flex flex-col gap-2.5 rounded-xl border border-secondary-soft bg-white p-3 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md dark:border-line dark:bg-surface-1',
+                            'group flex flex-col gap-2.5 rounded-xl border border-secondary-soft bg-white p-3 shadow-hairline transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md dark:border-line dark:bg-surface-1',
                             'cursor-grab active:cursor-grabbing' => ! $isDone && $canMove,
                         ])
                         wire:key="task-board-card-{{ $task->id }}"

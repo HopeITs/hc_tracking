@@ -659,7 +659,7 @@ new #[Title('titles.dashboard')] class extends Component {
     $counts = $this->attentionCounts;
     $shown = $this->attentionShown;
     $myWork = $this->myWork;
-    $cardClasses = 'rounded-xl border border-secondary-soft bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-transparent dark:bg-surface-1 dark:shadow-raised';
+    $cardClasses = 'rounded-xl border border-secondary-soft bg-white shadow-card dark:border-transparent dark:bg-surface-1 dark:shadow-raised';
     $iconTone = fn (string $tone): string => match ($tone) {
         'critical' => 'bg-status-critical-soft text-primary dark:bg-status-critical-soft dark:text-status-critical',
         'warn' => 'bg-status-warn-soft text-status-warn',

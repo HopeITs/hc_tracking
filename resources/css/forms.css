@@ -1,0 +1,972 @@
+/* Form field kit, modal shell and filter sheets (x-ui.form-*, x-ui.modal, x-funding.filters). */
+
+@layer components {
+    /*
+     * Form field kit (x-ui.form-*). Every field is the header filter picker's
+     * 44px tinted box, so a form row never mixes looks: dropdown triggers take
+     * that look from the .filter-picker rules above, every other control from
+     * .form-box here.
+     */
+    .form-label {
+        display: block;
+        margin-bottom: 0.375rem;
+        color: var(--color-secondary-medium);
+        font-size: 0.6875rem;
+        font-weight: 600;
+        line-height: 1rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+    }
+
+    /* Tracking pulls Arabic letters apart, and Arabic has no capitals. */
+    .form-label:lang(ar) {
+        letter-spacing: normal;
+        text-transform: none;
+    }
+
+    .dark .form-label {
+        color: var(--color-ink-muted);
+    }
+
+    .form-required {
+        color: var(--color-status-critical);
+    }
+
+    .form-box {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-height: 2.75rem;
+        padding-inline: 0.875rem;
+        border: 1px solid var(--color-secondary-soft);
+        border-radius: 0.5rem;
+        background-color: color-mix(in srgb, var(--color-secondary-soft) 38%, var(--color-white));
+        color: var(--color-secondary-dark);
+        font-size: 0.875rem;
+        transition: border-color 150ms ease, background-color 150ms ease;
+    }
+
+    .form-box:hover {
+        border-color: var(--color-secondary-light);
+        background-color: var(--color-white);
+    }
+
+    .form-box:focus-within {
+        border-color: var(--color-secondary-medium);
+        background-color: var(--color-white);
+        outline: 2px solid var(--color-secondary-medium);
+        outline-offset: 2px;
+    }
+
+    .form-box[data-invalid] {
+        border-color: var(--color-primary);
+    }
+
+    .form-box-multiline {
+        align-items: stretch;
+    }
+
+    .form-box:has(.form-box-input:disabled) {
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+
+    .form-box-input {
+        flex: 1 1 auto;
+        min-width: 0;
+        height: 2.625rem;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        outline: none;
+    }
+
+    textarea.form-box-input {
+        height: auto;
+        padding-block: 0.5rem;
+        line-height: 1.4;
+        resize: none;
+    }
+
+    .form-box-input::placeholder {
+        color: var(--color-secondary-light);
+    }
+
+    .form-affix {
+        flex-shrink: 0;
+        color: var(--color-secondary-medium);
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .form-help {
+        margin-top: 0.25rem;
+        color: var(--color-secondary-medium);
+        font-size: 0.75rem;
+        line-height: 1rem;
+    }
+
+    .form-error {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        margin-top: 0.25rem;
+        color: var(--color-status-critical);
+        font-size: 0.75rem;
+        font-weight: 500;
+        line-height: 1rem;
+    }
+
+    .dark .form-box {
+        border-color: var(--color-field-line);
+        background-color: var(--color-surface-2);
+        color: var(--color-ink);
+    }
+
+    .dark .form-box:hover {
+        border-color: var(--color-ink-faint);
+        background-color: var(--color-surface-2);
+    }
+
+    .dark .form-box:focus-within {
+        border-color: var(--color-ink-muted);
+        background-color: var(--color-surface-2);
+        outline-color: var(--color-ink-muted);
+    }
+
+    /* brand-text, not brand: an invalid border must clear 3 : 1 against a surface-3 dialog too. */
+    .dark .form-box[data-invalid] {
+        border-color: var(--color-brand-text);
+    }
+
+    .dark .form-box-input {
+        color-scheme: dark;
+    }
+
+    .dark .form-box-input::placeholder {
+        color: var(--color-ink-faint);
+    }
+
+    .dark .form-affix,
+    .dark .form-help {
+        color: var(--color-ink-muted);
+    }
+
+    .dark .form-required,
+    .dark .form-error {
+        color: var(--color-brand-text);
+    }
+
+    /* Form dropdowns are the header filter picker; these add the form-only states. */
+    .form-select-placeholder {
+        color: var(--color-secondary-light);
+        font-weight: 400;
+    }
+
+    .dark .form-select-placeholder {
+        color: var(--color-ink-faint);
+    }
+
+    /* A value the form shows but will not let you change (a pinned donor, a fixed currency). */
+    .form-box[data-locked] {
+        cursor: not-allowed;
+        font-weight: 500;
+    }
+
+    .form-box[data-locked]:hover {
+        border-color: var(--color-secondary-soft);
+        background-color: color-mix(in srgb, var(--color-secondary-soft) 38%, var(--color-white));
+    }
+
+    .dark .form-box[data-locked]:hover {
+        border-color: var(--color-field-line);
+        background-color: var(--color-surface-2);
+    }
+
+    /*
+     * Modal shell (x-ui.modal): header and footer pinned, only the body scrolls,
+     * and only when the window is genuinely too short. Below the sm breakpoint
+     * the dialog becomes a full-height sheet with two full-width buttons.
+     */
+    .modal-shell-frame {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        min-height: 0;
+    }
+
+    .modal-shell-header {
+        display: flex;
+        flex-shrink: 0;
+        align-items: flex-start;
+        gap: var(--spacing-control);
+        padding: 1rem var(--spacing-card) 0.875rem;
+        border-bottom: 1px solid var(--color-secondary-soft);
+    }
+
+    .modal-shell-title {
+        font-size: 1.125rem;
+        font-weight: 700;
+        line-height: 1.75rem;
+    }
+
+    .modal-shell-description {
+        color: var(--color-secondary-medium);
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+    }
+
+    .modal-shell-close {
+        display: inline-flex;
+        flex-shrink: 0;
+        align-items: center;
+        justify-content: center;
+        width: 2.25rem;
+        height: 2.25rem;
+        margin-inline-end: -0.5rem;
+        border-radius: 0.375rem;
+        color: var(--color-secondary-light);
+    }
+
+    .modal-shell-close:hover {
+        background-color: var(--color-secondary-soft);
+        color: var(--color-secondary-dark);
+    }
+
+    .modal-shell-close:focus-visible {
+        outline: 2px solid var(--color-secondary-medium);
+        outline-offset: 2px;
+    }
+
+    .modal-shell-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        padding: 1.25rem var(--spacing-card);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        container: modal / inline-size;
+    }
+
+    .modal-shell-footer {
+        display: flex;
+        flex-shrink: 0;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--spacing-control);
+        padding: var(--spacing-control) var(--spacing-card);
+        border-top: 1px solid var(--color-secondary-soft);
+        background-color: var(--color-board-head);
+    }
+
+    .modal-shell-meta {
+        color: var(--color-secondary-medium);
+        font-size: 0.75rem;
+    }
+
+    .modal-shell-actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-inline-start: auto;
+    }
+
+    .modal-shell-submit {
+        display: flex;
+        gap: 0.5rem;
+        min-width: 0;
+        margin: 0;
+        padding: 0;
+        border: 0;
+    }
+
+    /* Rail forms (xl) sit a little wider; their sections bring their own vertical rhythm. */
+    .modal-shell-xl .modal-shell-header {
+        padding: 0.875rem 1.75rem 0.75rem;
+    }
+
+    .modal-shell-lg .modal-shell-title,
+    .modal-shell-xl .modal-shell-title {
+        font-size: 1.25rem;
+    }
+
+    .modal-shell-xl .modal-shell-body {
+        padding: 0 1.75rem;
+    }
+
+    .modal-shell-xl .modal-shell-footer {
+        padding-inline: 1.75rem;
+    }
+
+    /* Viewers (file previews) fill the body edge to edge. */
+    .modal-shell .modal-shell-body.modal-shell-body-flush {
+        padding: 0;
+    }
+
+    .dark .modal-shell-header,
+    .dark .modal-shell-footer {
+        border-color: var(--color-line);
+    }
+
+    .dark .modal-shell-footer {
+        background-color: var(--color-surface-3);
+    }
+
+    .dark .modal-shell-description,
+    .dark .modal-shell-meta {
+        color: var(--color-ink-muted);
+    }
+
+    .dark .modal-shell-close {
+        color: var(--color-ink-muted);
+    }
+
+    .dark .modal-shell-close:hover {
+        background-color: rgb(255 255 255 / 0.06);
+        color: var(--color-ink);
+    }
+
+    .dark .modal-shell-close:focus-visible {
+        outline-color: var(--color-ink-muted);
+    }
+
+    @media (width < 40rem) {
+        .modal-shell-header,
+        .modal-shell-xl .modal-shell-header {
+            padding-inline: 1rem;
+        }
+
+        .modal-shell-body,
+        .modal-shell-xl .modal-shell-body {
+            padding-inline: 1rem;
+        }
+
+        .modal-shell-footer,
+        .modal-shell-xl .modal-shell-footer {
+            padding: 0.75rem 1rem;
+        }
+
+        .modal-shell-footer {
+            flex-wrap: wrap;
+        }
+
+        /* The required note is decoration; anything else in the meta slot (a delete action) stays, on its own row. */
+        .modal-shell-meta {
+            flex: 1 1 100%;
+        }
+
+        .modal-shell-meta-note {
+            display: none;
+        }
+
+        .modal-shell-actions {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            width: 100%;
+        }
+
+        .modal-shell-submit > * {
+            flex: 1 1 0;
+        }
+    }
+
+    /*
+     * Rail sections (x-ui.form-section). In a wide dialog each section's name sits
+     * in a start-side rail, one dot per section on a single thread (the app's
+     * dot-thread motif), so headings cost width instead of height. Narrower
+     * dialogs fold the rail into a dot + hairline heading above the fields.
+     */
+    .form-section {
+        display: grid;
+        gap: 0.75rem;
+        padding-block: 0.75rem;
+    }
+
+    .form-section-rail {
+        position: relative;
+        min-width: 0;
+    }
+
+    .form-section-heading {
+        display: flex;
+        align-items: center;
+        gap: 0.625rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        line-height: 1.25rem;
+    }
+
+    .form-section-heading::after {
+        content: '';
+        flex: 1 1 auto;
+        height: 1px;
+        background-color: var(--color-secondary-soft);
+    }
+
+    .form-section-dot {
+        position: relative;
+        z-index: 1;
+        flex-shrink: 0;
+        width: 7px;
+        height: 7px;
+        border-radius: 9999px;
+        background-color: var(--color-secondary-dark);
+        box-shadow: 0 0 0 4px var(--color-white);
+    }
+
+    .form-section[data-invalid] .form-section-dot {
+        background-color: var(--color-primary);
+    }
+
+    .form-section-hint {
+        margin-top: 0.125rem;
+        margin-inline-start: 17px;
+        color: var(--color-secondary-medium);
+        font-size: 0.75rem;
+        line-height: 1rem;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .form-section[data-invalid] .form-section-hint {
+        color: var(--color-status-critical);
+    }
+
+    .form-section-figure {
+        color: var(--color-secondary-dark);
+        font-weight: 600;
+    }
+
+    .dark .form-section-heading::after {
+        background-color: var(--color-line);
+    }
+
+    /* The ring is a gap cut into the thread, so it takes the dialog's own surface. */
+    .dark .form-section-dot {
+        background-color: var(--color-ink-muted);
+        box-shadow: 0 0 0 4px var(--color-surface-3);
+    }
+
+    .dark .form-section[data-invalid] .form-section-dot {
+        background-color: var(--color-brand);
+    }
+
+    .dark .form-section-hint {
+        color: var(--color-ink-muted);
+    }
+
+    .dark .form-section[data-invalid] .form-section-hint {
+        color: var(--color-brand-text);
+    }
+
+    .dark .form-section-figure {
+        color: var(--color-ink);
+    }
+
+    @container modal (width >= 56rem) {
+        .form-section {
+            grid-template-columns: 10rem minmax(0, 1fr);
+            column-gap: 2rem;
+        }
+
+        .form-section + .form-section {
+            border-top: 1px solid color-mix(in srgb, var(--color-secondary-soft) 70%, transparent);
+        }
+
+        .dark .form-section + .form-section {
+            border-top-color: var(--color-line);
+        }
+
+        .form-section-heading::after {
+            content: none;
+        }
+
+        /* The thread: out of the first dot, through every section, into the last dot. */
+        .form-section-rail::before {
+            content: '';
+            position: absolute;
+            inset-inline-start: 3px;
+            top: -0.75rem;
+            bottom: -0.75rem;
+            width: 1px;
+            background-color: var(--color-secondary-soft);
+        }
+
+        .form-section:first-child .form-section-rail::before {
+            top: 0.625rem;
+        }
+
+        .form-section:last-child .form-section-rail::before {
+            bottom: auto;
+            height: 1.375rem;
+        }
+
+        .form-section:only-child .form-section-rail::before {
+            content: none;
+        }
+
+        .dark .form-section-rail::before {
+            background-color: var(--color-line-strong);
+        }
+    }
+
+    /* Confirmations (x-ui.confirm-modal): the small warning mark beside the title. */
+    .confirm-mark {
+        display: inline-flex;
+        flex-shrink: 0;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        margin-top: 0.125rem;
+        border-radius: 9999px;
+    }
+
+    /*
+     * The install dialog's reasons (x-notifications.install-modal) on the app's
+     * dot thread: a hairline runs from each dot down into the next, and the first
+     * dot is filled.
+     */
+    .install-thread {
+        display: grid;
+        gap: 1.125rem;
+    }
+
+    .install-thread-step {
+        position: relative;
+        padding-inline-start: 1.875rem;
+    }
+
+    .install-thread-step:not(:last-child)::before {
+        position: absolute;
+        top: 1.0625rem;
+        bottom: -1.5rem;
+        inset-inline-start: 0.3125rem;
+        width: 1px;
+        background-color: var(--color-secondary-soft);
+        content: '';
+    }
+
+    .install-thread-dot {
+        position: absolute;
+        top: 0.375rem;
+        inset-inline-start: 0;
+        width: 0.6875rem;
+        height: 0.6875rem;
+        border: 2px solid var(--color-primary);
+        border-radius: 9999px;
+        background-color: var(--color-white);
+    }
+
+    .install-thread-step:first-child .install-thread-dot {
+        background-color: var(--color-primary);
+    }
+
+    .install-thread-title {
+        font-size: 0.9375rem;
+        font-weight: 700;
+        line-height: 1.375rem;
+    }
+
+    .install-thread-text {
+        color: var(--color-secondary-medium);
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+    }
+
+    .dark .install-thread-step:not(:last-child)::before {
+        background-color: var(--color-line-strong);
+    }
+
+    .dark .install-thread-dot {
+        border-color: var(--color-brand);
+        background-color: var(--color-surface-3);
+    }
+
+    .dark .install-thread-step:first-child .install-thread-dot {
+        background-color: var(--color-brand);
+    }
+
+    .dark .install-thread-text {
+        color: var(--color-ink-muted);
+    }
+
+    /* One-click segments (x-ui.form-segmented): the same 44px box, split into choices. */
+    .form-segmented {
+        display: flex;
+        gap: 3px;
+        min-height: 2.75rem;
+        padding: 3px;
+        border: 1px solid var(--color-secondary-soft);
+        border-radius: 0.5rem;
+        background-color: color-mix(in srgb, var(--color-secondary-soft) 38%, var(--color-white));
+    }
+
+    .form-segmented[data-invalid] {
+        border-color: var(--color-primary);
+    }
+
+    .form-segment {
+        display: inline-flex;
+        flex: 1 1 0;
+        align-items: center;
+        justify-content: center;
+        gap: 0.375rem;
+        min-width: 0;
+        padding-inline: 0.5rem;
+        border-radius: 0.375rem;
+        color: var(--color-secondary-medium);
+        font-size: 0.8125rem;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .form-segment[aria-checked='true'] {
+        background-color: var(--color-white);
+        color: var(--color-secondary-dark);
+        box-shadow:
+            0 1px 2px color-mix(in srgb, var(--color-secondary-dark) 18%, transparent),
+            0 0 0 1px color-mix(in srgb, var(--color-secondary-dark) 8%, transparent);
+    }
+
+    .form-segment:focus-visible {
+        outline: 2px solid var(--color-secondary-medium);
+        outline-offset: 1px;
+    }
+
+    .form-segment:disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+
+    .dark .form-segmented {
+        border-color: var(--color-field-line);
+        background-color: var(--color-surface-2);
+    }
+
+    .dark .form-segmented[data-invalid] {
+        border-color: var(--color-brand-text);
+    }
+
+    .dark .form-segment {
+        color: var(--color-ink-muted);
+    }
+
+    .dark .form-segment[aria-checked='true'] {
+        background-color: var(--color-surface-3);
+        color: var(--color-ink);
+        box-shadow:
+            var(--shadow-raised),
+            0 0 0 1px var(--color-line-strong);
+    }
+
+    .dark .form-segment:focus-visible {
+        outline-color: var(--color-ink-muted);
+    }
+
+    /* File field (x-ui.form-file): a dashed drop zone, then the chosen file with its progress. */
+    .form-file-zone,
+    .form-file-chosen {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        min-height: 5.5rem;
+        padding-inline: 1.25rem;
+        border-radius: 0.5rem;
+    }
+
+    .form-file-zone {
+        border: 1px dashed var(--color-secondary-light);
+        background-color: color-mix(in srgb, var(--color-secondary-soft) 38%, var(--color-white));
+        cursor: pointer;
+        transition: border-color 150ms ease, background-color 150ms ease;
+    }
+
+    .form-file-zone:hover,
+    .form-file[data-dragging] .form-file-zone {
+        border-color: var(--color-secondary-medium);
+        background-color: var(--color-white);
+    }
+
+    .form-file-zone:focus-within {
+        outline: 2px solid var(--color-secondary-medium);
+        outline-offset: 2px;
+    }
+
+    .form-file[data-invalid] .form-file-zone {
+        border-color: var(--color-primary);
+    }
+
+    .form-file-chosen {
+        border: 1px solid var(--color-secondary-soft);
+        background-color: var(--color-white);
+    }
+
+    .form-file-icon,
+    .form-file-doc {
+        display: inline-flex;
+        flex-shrink: 0;
+        align-items: center;
+        justify-content: center;
+        width: 2.5rem;
+        height: 2.5rem;
+    }
+
+    .form-file-icon {
+        border-radius: 9999px;
+        background-color: var(--color-white);
+        color: var(--color-secondary-medium);
+    }
+
+    .form-file-doc {
+        border-radius: 0.5rem;
+        background-color: color-mix(in srgb, var(--color-primary) 10%, transparent);
+        color: var(--color-status-critical);
+    }
+
+    .form-file-browse {
+        color: var(--color-status-critical);
+        font-weight: 600;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+    }
+
+    .form-file-track {
+        flex: 1 1 auto;
+        height: 0.25rem;
+        overflow: hidden;
+        border-radius: 9999px;
+        background-color: var(--color-secondary-soft);
+    }
+
+    .form-file-bar {
+        display: block;
+        height: 100%;
+        border-radius: 9999px;
+        background-color: var(--color-secondary-dark);
+        transition: width 150ms ease;
+    }
+
+    .form-file-remove {
+        display: inline-flex;
+        flex-shrink: 0;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        border-radius: 0.375rem;
+        color: var(--color-secondary-light);
+    }
+
+    .form-file-remove:hover {
+        background-color: var(--color-secondary-soft);
+        color: var(--color-secondary-dark);
+    }
+
+    .dark .form-file-zone {
+        border-color: var(--color-field-line);
+        background-color: var(--color-surface-2);
+    }
+
+    .dark .form-file-zone:hover,
+    .dark .form-file[data-dragging] .form-file-zone {
+        border-color: var(--color-ink-muted);
+        background-color: var(--color-surface-2);
+    }
+
+    .dark .form-file-zone:focus-within {
+        outline-color: var(--color-ink-muted);
+    }
+
+    .dark .form-file[data-invalid] .form-file-zone {
+        border-color: var(--color-brand-text);
+    }
+
+    .dark .form-file-chosen {
+        border-color: var(--color-line);
+        background-color: var(--color-surface-2);
+    }
+
+    .dark .form-file-icon {
+        background-color: var(--color-surface-3);
+        color: var(--color-ink-muted);
+    }
+
+    .dark .form-file-track {
+        background-color: var(--color-line-strong);
+    }
+
+    .dark .form-file-bar {
+        background-color: var(--color-ink);
+    }
+
+    .dark .form-file-remove {
+        color: var(--color-ink-muted);
+    }
+
+    .dark .form-file-remove:hover {
+        background-color: rgb(255 255 255 / 0.06);
+        color: var(--color-ink);
+    }
+}
+
+/*
+ * The modal shell's frame is Flux's own <dialog>, which flux.css styles with unlayered
+ * rules and Flux's utility classes, so these stay unlayered to out-rank both.
+ */
+[data-flux-modal] > dialog.modal-shell:not([data-flux-flyout]):not([data-flux-modal-overflow]) {
+    padding: 0;
+    overflow: hidden;
+    background-color: var(--color-white);
+    color: var(--color-secondary-dark);
+}
+
+[data-flux-modal] > dialog.modal-shell[open]:not([data-flux-flyout]):not([data-flux-modal-overflow]) {
+    display: flex;
+    flex-direction: column;
+}
+
+.dark [data-flux-modal] > dialog.modal-shell:not([data-flux-flyout]):not([data-flux-modal-overflow]) {
+    background-color: var(--color-surface-3);
+    color: var(--color-ink);
+}
+
+@media (width < 40rem) {
+    [data-flux-modal] > dialog.modal-shell:not([data-flux-flyout]):not([data-flux-modal-overflow]) {
+        width: 100%;
+        max-width: 100%;
+        height: 100dvh;
+        max-height: 100dvh;
+        margin: 0;
+        border-radius: 0;
+    }
+
+    .modal-shell-actions [data-flux-button] {
+        width: 100%;
+        min-height: 2.75rem;
+    }
+}
+
+/*
+ * Funding filters sheet (x-funding.filters). Each section (x-funding.filter-row)
+ * hangs off one vertical thread; its dot fills red while that filter is on, so
+ * the thread reads as a map of what is narrowing the list.
+ */
+@layer components {
+    .filter-thread {
+        --thread-line: var(--color-secondary-soft);
+        --thread-dot: var(--color-white);
+        --thread-dot-ring: var(--color-secondary-light);
+        --thread-on: var(--color-primary);
+        --thread-label: var(--color-secondary-medium);
+        --thread-label-on: var(--color-secondary-dark);
+    }
+
+    .dark .filter-thread {
+        --thread-line: var(--color-line);
+        --thread-dot: var(--color-surface-3);
+        --thread-dot-ring: var(--color-line-strong);
+        --thread-on: var(--color-brand);
+        --thread-label: var(--color-ink-muted);
+        --thread-label-on: var(--color-ink);
+    }
+
+    .filter-thread > .directory-filters { margin-bottom: 1.75rem; }
+
+    .filter-section {
+        position: relative;
+        padding-inline-start: 1.5rem;
+        padding-bottom: 1.5rem;
+    }
+
+    .filter-section::before {
+        content: '';
+        position: absolute;
+        inset-inline-start: 0.25rem;
+        top: 1.125rem;
+        bottom: 0;
+        width: 1px;
+        background: var(--thread-line);
+    }
+
+    .filter-section:last-child { padding-bottom: 0; }
+    .filter-section:last-child::before { content: none; }
+
+    .filter-section-label {
+        position: relative;
+        margin-bottom: 0.625rem;
+        font-size: 0.6875rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--thread-label);
+    }
+
+    .filter-section-label:lang(ar) {
+        letter-spacing: normal;
+    }
+
+    .filter-section-label::before {
+        content: '';
+        position: absolute;
+        inset-inline-start: -1.5rem;
+        top: 50%;
+        width: 0.5625rem;
+        height: 0.5625rem;
+        border-radius: 9999px;
+        background: var(--thread-dot);
+        box-shadow: inset 0 0 0 1.5px var(--thread-dot-ring);
+        translate: 0 -50%;
+        transition: background-color 150ms, box-shadow 150ms;
+    }
+
+    .filter-section[data-on] > .filter-section-label { color: var(--thread-label-on); }
+
+    .filter-section[data-on] > .filter-section-label::before {
+        background: var(--thread-on);
+        box-shadow: 0 0 0 3px color-mix(in oklab, var(--thread-on) 18%, transparent);
+    }
+
+    .filter-pill {
+        display: inline-flex;
+        min-height: 2.25rem;
+        align-items: center;
+        gap: 0.375rem;
+        border-radius: 9999px;
+        padding-inline: 0.875rem;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: var(--color-secondary-dark);
+        background: var(--color-white);
+        box-shadow: inset 0 0 0 1px var(--color-secondary-soft);
+        touch-action: manipulation;
+        transition: background-color 150ms, box-shadow 150ms, color 150ms;
+    }
+
+    .filter-pill:hover { box-shadow: inset 0 0 0 1px var(--color-secondary-light); }
+    .filter-pill:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+    .filter-pill[aria-pressed='true'] {
+        color: var(--color-white);
+        background: var(--color-secondary-dark);
+        box-shadow: inset 0 0 0 1px var(--color-secondary-dark);
+    }
+
+    .dark .filter-pill {
+        color: var(--color-ink);
+        background: var(--color-surface-2);
+        box-shadow: inset 0 0 0 1px var(--color-line);
+    }
+
+    .dark .filter-pill:hover { box-shadow: inset 0 0 0 1px var(--color-line-strong); }
+
+    .dark .filter-pill[aria-pressed='true'] {
+        color: var(--color-surface-0);
+        background: var(--color-ink);
+        box-shadow: inset 0 0 0 1px var(--color-ink);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .filter-section-label::before,
+        .filter-pill { transition: none; }
+    }
+}

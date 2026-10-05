@@ -1,0 +1,62 @@
+/* Base layer: element defaults, rem scaling on large screens, dark browser surfaces and the theme cross-fade. */
+
+@layer base {
+
+    *,
+    ::after,
+    ::before,
+    ::backdrop,
+    ::file-selector-button {
+        border-color: var(--color-gray-200, currentColor);
+    }
+
+    /* Scale the rem grid on QHD/4K so the 90rem page column keeps a sensible share of the screen. */
+    @media (min-width: 2200px) {
+        html {
+            font-size: 112.5%;
+        }
+    }
+
+    @media (min-width: 3200px) {
+        html {
+            font-size: 150%;
+        }
+    }
+}
+
+/*
+ * Dark mode (Graphite) browser surfaces. In the base layer so any utility still
+ * wins: native controls, autofill and the search-cancel glyph follow the dark
+ * scheme; scrollbars (inherited) and selection take the Graphite tokens; photos
+ * are dimmed slightly unless they opt out with data-no-dim (logos, previews, charts).
+ */
+@layer base {
+    .dark {
+        color-scheme: dark;
+        scrollbar-color: var(--color-line-strong) transparent;
+    }
+
+    .dark ::selection {
+        background-color: color-mix(in srgb, var(--color-brand) 35%, transparent);
+    }
+
+    .dark img:not([data-no-dim]) {
+        filter: brightness(0.9);
+    }
+}
+
+/*
+ * Theme switch (resources/js, document.startViewTransition()): a short cross-fade
+ * of the whole page. These pseudo-elements only exist during a transition.
+ */
+::view-transition-old(root),
+::view-transition-new(root) {
+    animation-duration: 200ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+        animation: none;
+    }
+}

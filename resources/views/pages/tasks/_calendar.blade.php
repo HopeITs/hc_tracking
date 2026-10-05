@@ -93,7 +93,7 @@
         </div>
 
         @if ($viewMode === 'month')
-            <div class="overflow-hidden rounded-2xl border border-secondary-soft shadow-[0_1px_2px_rgba(16,24,40,0.04)] dark:border-line">
+            <div class="overflow-hidden rounded-2xl border border-secondary-soft shadow-hairline dark:border-line">
                 <div class="grid grid-cols-7 border-b border-secondary-soft bg-secondary-soft/40 text-center text-[11px] font-bold tracking-wider text-secondary-medium uppercase dark:border-line dark:bg-surface-2 dark:text-ink-muted">
                     @foreach ($calendar['weeks'][0] as $weekdayHeader)
                         <div class="py-2.5">{{ $weekdayHeader->translatedFormat('D') }}</div>
@@ -140,7 +140,7 @@
                 $gridColumns = 'grid-template-columns: 4.5rem repeat('.count($periodDays).', minmax(0, 1fr)); min-width: '.$gridMinWidth.'rem;';
             @endphp
 
-            <div class="overflow-hidden rounded-2xl border border-secondary-soft shadow-[0_1px_2px_rgba(16,24,40,0.04)] dark:border-line">
+            <div class="overflow-hidden rounded-2xl border border-secondary-soft shadow-hairline dark:border-line">
                 <div class="overflow-x-auto" x-data="{ addOpen: {} }">
                     <div class="grid" style="{{ $gridColumns }}">
                         <div class="border-b border-e border-secondary-soft dark:border-line"></div>
@@ -193,7 +193,7 @@
         <div class="flex min-h-24 flex-col gap-2 p-2" x-data="taskDropList('task-calendar', (wire, id) => wire.rescheduleTask(id, ''))" data-test="task-calendar-unscheduled">
             @forelse ($calendar['unscheduled'] as $task)
                 <div
-                    class="flex cursor-grab flex-col gap-1.5 rounded-xl border border-secondary-soft bg-white p-2.5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md active:cursor-grabbing dark:border-line dark:bg-surface-1"
+                    class="flex cursor-grab flex-col gap-1.5 rounded-xl border border-secondary-soft bg-white p-2.5 shadow-hairline transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md active:cursor-grabbing dark:border-line dark:bg-surface-1"
                     data-task-id="{{ $task->id }}"
                     wire:key="task-unscheduled-{{ $task->id }}"
                 >

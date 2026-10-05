@@ -1262,10 +1262,10 @@ new #[Title('titles.projects')] class extends Component {
                         // Match the container's rounded-xl so an active tile's own border
                         // isn't squared off where the container clips it round.
                         $lensCornerClasses = match ($loop->index) {
-                            0 => 'rounded-tl-xl @2xl/directory:rounded-bl-xl',
-                            1 => 'rounded-tr-xl @2xl/directory:rounded-tr-none',
-                            2 => 'rounded-bl-xl @2xl/directory:rounded-bl-none',
-                            3 => 'rounded-br-xl @2xl/directory:rounded-tr-xl',
+                            0 => 'rounded-ss-xl @2xl/directory:rounded-es-xl',
+                            1 => 'rounded-se-xl @2xl/directory:rounded-se-none',
+                            2 => 'rounded-es-xl @2xl/directory:rounded-es-none',
+                            3 => 'rounded-ee-xl @2xl/directory:rounded-se-xl',
                         };
                     @endphp
 

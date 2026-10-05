@@ -3,7 +3,7 @@
     <head>
         @include('partials.head')
     </head>
-    <body class="min-h-screen bg-[#e5e7eb] antialiased dark:bg-surface-0">
+    <body class="min-h-screen bg-auth-ground antialiased dark:bg-surface-0">
         @persist('preloader')
             <x-preloader />
         @endpersist
@@ -16,7 +16,7 @@
                     <span class="sr-only">{{ config('app.name', 'Laravel') }}</span>
                 </a>
 
-                <div class="w-full rounded-2xl border border-secondary-soft bg-white p-8 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.06)] dark:border-line dark:bg-surface-1">
+                <div class="w-full rounded-2xl border border-secondary-soft bg-white p-8 shadow-card dark:border-line dark:bg-surface-1">
                     {{ $slot }}
                 </div>
 

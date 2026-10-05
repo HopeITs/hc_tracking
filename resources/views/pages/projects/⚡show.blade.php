@@ -1299,7 +1299,7 @@ new #[Title('titles.project')] class extends Component {
                 <div class="grid gap-4 p-3.5 @3xl/detail:grid-cols-2 @3xl/detail:p-5">
                     @foreach ($this->attachedProposals as $proposal)
                         <article
-                            class="group flex flex-col gap-3.5 rounded-xl border border-secondary-soft bg-white p-4 transition-all hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgba(16,24,40,0.06),0_4px_8px_rgba(16,24,40,0.08)] dark:border-transparent dark:bg-surface-1 dark:hover:shadow-raised"
+                            class="group flex flex-col gap-3.5 rounded-xl border border-secondary-soft bg-white p-4 transition-all hover:-translate-y-0.5 hover:shadow-card-hover dark:border-transparent dark:bg-surface-1 dark:hover:shadow-raised"
                             wire:key="project-proposal-{{ $proposal->id }}"
                         >
                             <div class="flex items-start justify-between gap-3">

@@ -42,7 +42,7 @@
     $searchLabel ??= $label;
 
     /* flux:menu.item's own default-variant classes (vendor/livewire/flux/stubs/resources/views/flux/menu/item.blade.php). */
-    $menuItemClasses = 'flex items-center px-2 py-1.5 w-full focus:outline-hidden select-none rounded-md text-start text-sm font-medium [&[disabled]]:opacity-50 text-zinc-800 data-active:bg-zinc-50 dark:text-white dark:data-active:bg-zinc-600 **:data-flux-menu-item-icon:text-zinc-400 dark:**:data-flux-menu-item-icon:text-white/60 [&[data-active]_[data-flux-menu-item-icon]]:text-current';
+    $menuItemClasses = 'flex items-center px-2 py-1.5 w-full focus:outline-hidden select-none rounded-md text-start text-sm font-medium [&[disabled]]:opacity-50 text-zinc-800 data-active:bg-zinc-50 dark:text-white dark:data-active:bg-white/6 **:data-flux-menu-item-icon:text-zinc-400 dark:**:data-flux-menu-item-icon:text-white/60 [&[data-active]_[data-flux-menu-item-icon]]:text-current';
 @endphp
 
 {{-- `deferred` writes the choice to Livewire's client state only (the finance filters dialog applies it later), so the label and the check follow $wire instead of the server. --}}
@@ -51,12 +51,12 @@
         {{ $label }}
     </label>
 
-    <flux:dropdown position="bottom" align="start" class="program-filter-picker block! w-full!" x-data="{ optionSearch: '' }">
+    <flux:dropdown position="bottom" align="start" class="filter-picker block! w-full!" x-data="{ optionSearch: '' }">
         <flux:button
             :id="$id"
             variant="outline"
             icon:trailing="chevron-up-down"
-            class="program-filter-trigger w-full! justify-between!"
+            class="w-full! justify-between!"
             :aria-label="$label"
         >
             @if ($deferred)
@@ -66,7 +66,7 @@
             @endif
         </flux:button>
 
-        <flux:menu class="program-filter-menu">
+        <flux:menu class="filter-menu">
             @if ($searchable)
                 <div class="border-b border-secondary-soft p-1.5 dark:border-line">
                     <x-ui.input
