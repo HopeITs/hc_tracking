@@ -2409,7 +2409,6 @@ new #[Title('titles.proposal')] class extends Component
                     $canTransfers = $this->canViewTransfers();
                     $agreementRows = $this->agreementRows;
                     $fundingColumns = AgreementMoney::columns(withTransfers: $canTransfers);
-                    $fundingFootLines = AgreementMoney::totals($agreementRows);
 
                     $fundingTotalLines = collect($this->moneyByCurrency)->map(fn (array $line, string $lineCurrency): array => [
                         'currency' => $lineCurrency,
@@ -2462,10 +2461,6 @@ new #[Title('titles.proposal')] class extends Component
                             </x-slot:actions>
                         </x-funding.agreement-row>
                     @endforeach
-
-                    <x-slot:foot>
-                        <x-funding.agreement-foot :lines="$fundingFootLines" :columns="$fundingColumns" :lead="1" />
-                    </x-slot:foot>
                 </x-funding.register>
 
                 {{-- Every tranche, in full. --}}

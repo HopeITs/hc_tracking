@@ -144,7 +144,7 @@ test('the head offers a sort button per sortable column only when asked', functi
         ->and(substr_count($plain, '<th scope='))->toBe(12);
 });
 
-test('the tranche table prints every tranche, an identity column when asked, and a totals row per currency', function () {
+test('the tranche table prints every tranche and an identity column when asked, with no totals row', function () {
     $agreement = DonorProposal::factory()->create([
         'proposal_id' => Proposal::factory()->create(['name' => 'Water Response'])->id,
         'external_project_number' => 'WR-9',
@@ -161,8 +161,8 @@ test('the tranche table prints every tranche, an identity column when asked, and
         ->and($html)->toContain('Water Response')
         ->and($html)->toContain('WR-9')
         ->and(substr_count($html, 'data-transfer="'))->toBe(2)
-        ->and($html)->toContain('data-register-total="USD"')
-        ->and($html)->toContain('500.00')
-        ->and($html)->toContain('−10.00')
+        ->and($html)->not->toContain('data-register-total')
+        ->and($html)->not->toContain('<tfoot>')
+        ->and($html)->toContain('400.00')
         ->and($html)->not->toContain('data-test="edit-transfer-');
 });

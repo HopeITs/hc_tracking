@@ -1,29 +1,49 @@
-@props(['label', 'pills' => []])
+@props(['label', 'pills' => [], 'on' => null, 'watch' => [], 'keep' => false])
 
-{{-- One value per row: a pill sets it, the active pill clears it. A null entry is skipped. --}}
-<x-funding.filter-row :label="$label" {{ $attributes }}>
-    @foreach (array_filter($pills) as $pill)
+@php
+    /*
+     * One value per row. Each pill names the property it writes (`model`) and
+     * its `value`; a `toggle` pill clears the property when chosen again, and
+     * `also` sets companion properties with it (a sort and its direction).
+     * The dialog holds these as a draft until "Show results"
+     * (resources/js/finance-filters.js). A pill marked `default` is the row's
+     * resting choice ("All", "All years"): the row only counts as on when
+     * some other pill is chosen. A null entry is skipped.
+     */
+    $pills = array_values(array_filter($pills));
+    $on ??= collect($pills)->contains(fn (array $pill): bool => ($pill['active'] ?? false) && ! ($pill['default'] ?? false));
+
+    $pairs = collect($pills)
+        ->reject(fn (array $pill): bool => (bool) ($pill['default'] ?? false))
+        ->map(fn (array $pill): array => [$pill['model'], (string) $pill['value']])
+        ->values()
+        ->all();
+    $models = collect($pills)->flatMap(fn (array $pill): array => [$pill['model'], ...array_keys($pill['also'] ?? [])])->unique()->values()->all();
+    $defaults = collect($pills)->filter(fn (array $pill): bool => (bool) ($pill['default'] ?? false))->mapWithKeys(fn (array $pill): array => [$pill['model'] => (string) $pill['value']])->all();
+@endphp
+
+<x-funding.filter-row :label="$label" :on="$on" :pairs="$watch === [] ? $pairs : []" :watch="$watch" :models="$models" :defaults="$defaults" :keep="$keep" {{ $attributes }}>
+    @foreach ($pills as $pill)
         @php
             $isActive = (bool) ($pill['active'] ?? false);
             $tone = $pill['tone'] ?? null;
+            $model = Illuminate\Support\Js::from($pill['model']);
+            $value = Illuminate\Support\Js::from((string) $pill['value']);
         @endphp
         <button
             type="button"
-            wire:click="{{ $pill['click'] }}"
+            x-on:click="pick({{ $model }}, {{ $value }}, {{ ($pill['toggle'] ?? false) ? 'true' : 'false' }}, {{ Illuminate\Support\Js::from((object) ($pill['also'] ?? [])) }})"
             aria-pressed="{{ $isActive ? 'true' : 'false' }}"
+            x-bind:aria-pressed="is({{ $model }}, {{ $value }}) ? 'true' : 'false'"
             @isset($pill['test']) data-test="{{ $pill['test'] }}" @endisset
-            @class([
-                'inline-flex min-h-8 touch-manipulation items-center gap-1.5 rounded-full px-3 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
-                'bg-secondary-dark text-white dark:bg-ink dark:text-surface-0' => $isActive,
-                'text-secondary-dark hover:bg-secondary-soft dark:text-ink dark:hover:bg-surface-2' => ! $isActive,
-            ])
+            class="filter-pill group/pill"
         >
-            @if ($tone !== null && ! $isActive)
-                <span @class(['size-1.5 rounded-full', 'bg-primary dark:bg-status-critical' => $tone === 'critical', 'bg-status-warn' => $tone === 'warn']) aria-hidden="true"></span>
+            @if ($tone !== null)
+                <span @class(['size-1.5 rounded-full group-aria-pressed/pill:hidden', 'bg-primary dark:bg-status-critical' => $tone === 'critical', 'bg-status-warn' => $tone === 'warn']) aria-hidden="true"></span>
             @endif
             {{ $pill['label'] }}
             @if (array_key_exists('count', $pill))
-                <span class="tabular-nums opacity-70">{{ $pill['count'] }}</span>
+                <span class="tabular-nums opacity-60">{{ $pill['count'] }}</span>
             @endif
         </button>
     @endforeach

@@ -100,4 +100,10 @@ return [
     'view_overview' => 'Overview',
     'view_table' => 'Table',
     'year' => 'Year',
+    'filters' => 'Filters',
+    'filters_active' => '{0} No filters on|{1} 1 filter on|[2,*] :count filters on',
+    'count_agreements' => '{0} no agreements|{1} 1 agreement|[2,*] :count agreements',
+    'filters_clear_all' => 'Clear all',
+    'filters_apply' => 'Show results',
+    'filters_draft_hint' => 'Nothing changes until you press Show results.',
 ];

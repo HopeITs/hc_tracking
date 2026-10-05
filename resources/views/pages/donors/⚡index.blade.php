@@ -872,8 +872,9 @@ new #[Title('titles.donors')] class extends Component {
     $showsOverview = $this->view === 'overview';
     $canAgreements = $this->canViewAgreements();
     $canTransfers = $canAgreements && $this->canViewTransfers();
-    $filtersAreActive = collect([$this->search, $this->type, $this->relationship, $this->countryFilter, $this->currency, $this->flag, $this->year])
-        ->contains(fn (string $value): bool => $value !== '');
+    $activeFilterCount = collect([$this->search, $this->type, $this->relationship, $this->countryFilter, $this->currency, $this->flag, $this->year])
+        ->filter(fn (string $value): bool => $value !== '')
+        ->count();
     $total = $showsOverview ? $this->donors->total() : $this->donorCount;
 
     $mutedText = 'text-secondary-medium dark:text-ink-muted';
@@ -902,46 +903,46 @@ new #[Title('titles.donors')] class extends Component {
 
     $setPill = fn (string $property, string $value, string $label): array => [
         'label' => $label,
-        'click' => "\$set('{$property}', '".($chosen[$property] === $value ? '' : $value)."')",
+        'model' => $property, 'value' => $value, 'toggle' => true,
         'active' => $chosen[$property] === $value,
     ];
 
     $yearPills = [
-        ['label' => __('finance_tables.all_years'), 'click' => "\$set('year', '')", 'active' => $chosen['year'] === ''],
+        ['default' => true, 'label' => __('finance_tables.all_years'), 'model' => 'year', 'value' => '', 'active' => $chosen['year'] === ''],
         ...array_map(fn (int $option): array => $setPill('year', (string) $option, (string) $option), $canTransfers ? $this->yearOptions : []),
     ];
     $figurePills = [
-        ['label' => __('finance_tables.figures_lifetime'), 'click' => "\$set('figures', 'lifetime')", 'active' => $chosen['figures'] === 'lifetime'],
-        ['label' => __('finance_tables.figures_year', ['year' => $chosen['year']]), 'click' => "\$set('figures', 'year')", 'active' => $chosen['figures'] === 'year'],
+        ['default' => true, 'label' => __('finance_tables.figures_lifetime'), 'model' => 'figures', 'value' => 'lifetime', 'active' => $chosen['figures'] === 'lifetime'],
+        ['label' => __('finance_tables.figures_year', ['year' => $chosen['year']]), 'model' => 'figures', 'value' => 'year', 'active' => $chosen['figures'] === 'year'],
     ];
     $relationshipPills = [
-        ['label' => __('finance_tables.all'), 'click' => "\$set('relationship', '')", 'active' => $chosen['relationship'] === ''],
+        ['default' => true, 'label' => __('finance_tables.all'), 'model' => 'relationship', 'value' => '', 'active' => $chosen['relationship'] === ''],
         $setPill('relationship', 'funding', __('donors.funding_now')),
         $setPill('relationship', 'prospect', __('donors.prospects')),
     ];
     $typePills = [
-        ['label' => __('finance_tables.all'), 'click' => "toggleType('')", 'active' => $chosen['type'] === ''],
+        ['default' => true, 'label' => __('finance_tables.all'), 'model' => 'type', 'value' => '', 'active' => $chosen['type'] === ''],
         ...array_map(fn (array $stop): array => [
             'label' => $stop['label'],
-            'click' => "toggleType('{$stop['value']}')",
+            'model' => 'type', 'value' => $stop['value'], 'toggle' => true,
             'active' => $chosen['type'] === $stop['value'],
             'count' => $stop['count'],
             'test' => 'type-'.$stop['value'],
         ], $this->typeRail),
     ];
     $currencyPills = [
-        ['label' => __('finance_tables.all'), 'click' => "\$set('currency', '')", 'active' => $chosen['currency'] === ''],
+        ['default' => true, 'label' => __('finance_tables.all'), 'model' => 'currency', 'value' => '', 'active' => $chosen['currency'] === ''],
         ...array_map(fn (Currency $case): array => $setPill('currency', $case->value, $case->value), Currency::cases()),
     ];
     $flagPills = array_values(array_filter([
-        $canTransfers ? ['label' => __('finance_tables.flag_has_overdue'), 'click' => "toggleFlag('overdue')", 'active' => $chosen['flag'] === 'overdue', 'tone' => 'critical', 'test' => 'flag-overdue'] : null,
-        ['label' => __('finance_tables.flag_follow_up_due'), 'click' => "toggleFlag('follow_up')", 'active' => $chosen['flag'] === 'follow_up', 'test' => 'flag-follow-up'],
+        $canTransfers ? ['label' => __('finance_tables.flag_has_overdue'), 'model' => 'flag', 'value' => 'overdue', 'toggle' => true, 'active' => $chosen['flag'] === 'overdue', 'tone' => 'critical', 'test' => 'flag-overdue'] : null,
+        ['label' => __('finance_tables.flag_follow_up_due'), 'model' => 'flag', 'value' => 'follow_up', 'toggle' => true, 'active' => $chosen['flag'] === 'follow_up', 'test' => 'flag-follow-up'],
     ]));
     $overviewOrderPills = array_values(array_filter([
-        ['label' => __('donors.sort_name'), 'click' => "\$set('sort', 'name')", 'active' => $chosen['sort'] === 'name'],
-        ['label' => __('donors.sort_agreements'), 'click' => "\$set('sort', 'agreements')", 'active' => $chosen['sort'] === 'agreements'],
-        $canTransfers ? ['label' => __('donors.sort_next_due'), 'click' => "\$set('sort', 'next_due')", 'active' => $chosen['sort'] === 'next_due'] : null,
-        ['label' => __('donors.sort_follow_up'), 'click' => "\$set('sort', 'follow_up')", 'active' => $chosen['sort'] === 'follow_up'],
+        ['default' => true, 'label' => __('donors.sort_name'), 'model' => 'sort', 'value' => 'name', 'active' => $chosen['sort'] === 'name'],
+        ['label' => __('donors.sort_agreements'), 'model' => 'sort', 'value' => 'agreements', 'active' => $chosen['sort'] === 'agreements'],
+        $canTransfers ? ['label' => __('donors.sort_next_due'), 'model' => 'sort', 'value' => 'next_due', 'active' => $chosen['sort'] === 'next_due'] : null,
+        ['label' => __('donors.sort_follow_up'), 'model' => 'sort', 'value' => 'follow_up', 'active' => $chosen['sort'] === 'follow_up'],
     ]));
 @endphp
 
@@ -955,19 +956,45 @@ new #[Title('titles.donors')] class extends Component {
         :title="__('common.donors')"
         :count="$total"
     >
-        <x-slot:filters>
-            <x-ui.input type="search" icon="magnifying-glass" :label="__('donors.search_donors')" :placeholder="__('donors.name_country_or_contact')" wire:model.live.debounce.300ms="search" clearable />
-
-            <x-ui.header-filter-select :label="__('donors.country')" wire:model.live="countryFilter" :value="$this->countryFilter">
-                <flux:select.option value="">{{ __('finance_tables.all_countries') }}</flux:select.option>
-                @foreach ($this->countryOptions as $countryOption)
-                    <flux:select.option :value="$countryOption" :wire:key="'donor-country-'.md5($countryOption)">{{ $countryOption }}</flux:select.option>
-                @endforeach
-            </x-ui.header-filter-select>
-        </x-slot:filters>
-
         <x-slot:actions>
             <div class="flex flex-wrap items-center justify-end gap-2">
+                @if ($this->hasAnyDonor)
+                    <x-funding.filters :active="$activeFilterCount" :results="$total">
+                        <div class="directory-filters grid gap-3 sm:grid-cols-2">
+                            <x-ui.input type="search" icon="magnifying-glass" :label="__('donors.search_donors')" :placeholder="__('donors.name_country_or_contact')" wire:model="search" clearable />
+
+                            <x-ui.header-filter-select deferred :label="__('donors.country')" wire:model="countryFilter" :value="$this->countryFilter">
+                                <flux:select.option value="">{{ __('finance_tables.all_countries') }}</flux:select.option>
+                                @foreach ($this->countryOptions as $countryOption)
+                                    <flux:select.option :value="$countryOption" :wire:key="'donor-country-'.md5($countryOption)">{{ $countryOption }}</flux:select.option>
+                                @endforeach
+                            </x-ui.header-filter-select>
+                        </div>
+
+                        {{-- A year narrows by tranches, so it is offered only to someone who may see them. --}}
+                        @if ($canTransfers)
+                            <x-funding.pills :label="__('finance_tables.year')" :pills="$yearPills" />
+
+                            @if ($selectedYear !== null)
+                                <x-funding.pills :label="__('finance_tables.figures_label')" :pills="$figurePills" />
+                            @endif
+                        @endif
+
+                        <x-funding.pills :label="__('donors.relationship')" :pills="$relationshipPills" />
+                        <x-funding.pills :label="__('common.type')" :pills="$typePills" />
+
+                        @if ($canAgreements)
+                            <x-funding.pills :label="__('common.currency')" :pills="$currencyPills" />
+                        @endif
+
+                        <x-funding.pills :label="__('finance_tables.flags')" :pills="$flagPills" />
+
+                        @if ($showsOverview)
+                            <x-funding.pills :label="__('finance_tables.order')" :pills="$overviewOrderPills" keep />
+                        @endif
+                    </x-funding.filters>
+                @endif
+
                 <x-ui.view-toggle
                     :label="__('finance_tables.view_label')"
                     wire-model="view"
@@ -979,46 +1006,18 @@ new #[Title('titles.donors')] class extends Component {
                 />
 
                 @if ($this->hasAnyDonor)
-                    <x-ui.button icon="arrow-down-tray" class="min-h-11 touch-manipulation @sm/directory:min-h-10" wire:click="exportCsv" wire:loading.attr="disabled" wire:target="exportCsv" data-test="export-csv">
+                    <x-ui.button icon="arrow-down-tray" class="page-action" wire:click="exportCsv" wire:loading.attr="disabled" wire:target="exportCsv" data-test="export-csv">
                         {{ __('finance_tables.export_csv') }}
                     </x-ui.button>
                 @endif
 
                 @can('donors.create')
-                <x-ui.button tone="primary" icon="plus" class="min-h-11 touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-donor-button">
+                <x-ui.button tone="primary" icon="plus" class="page-action page-action-primary" wire:click="openCreateModal" data-test="create-donor-button">
                     {{ __('donors.add_donor') }}
                 </x-ui.button>
                 @endcan
             </div>
         </x-slot:actions>
-
-        @if ($this->hasAnyDonor)
-            <x-slot:summary>
-                <x-funding.filters :active="$filtersAreActive">
-                    {{-- A year narrows by tranches, so it is offered only to someone who may see them. --}}
-                    @if ($canTransfers)
-                        <x-funding.pills :label="__('finance_tables.year')" :pills="$yearPills" />
-
-                        @if ($selectedYear !== null)
-                            <x-funding.pills :label="__('finance_tables.figures_label')" :pills="$figurePills" />
-                        @endif
-                    @endif
-
-                    <x-funding.pills :label="__('donors.relationship')" :pills="$relationshipPills" />
-                    <x-funding.pills :label="__('common.type')" :pills="$typePills" />
-
-                    @if ($canAgreements)
-                        <x-funding.pills :label="__('common.currency')" :pills="$currencyPills" />
-                    @endif
-
-                    <x-funding.pills :label="__('finance_tables.flags')" :pills="$flagPills" />
-
-                    @if ($showsOverview)
-                        <x-funding.pills :label="__('finance_tables.order')" :pills="$overviewOrderPills" />
-                    @endif
-                </x-funding.filters>
-            </x-slot:summary>
-        @endif
     </x-ui.page-header>
 
     @if (! $this->hasAnyDonor)
@@ -1055,20 +1054,17 @@ new #[Title('titles.donors')] class extends Component {
             <x-funding.totals :lines="$totalLines" />
         @endif
 
-        <x-funding.register :size="$canAgreements ? 'xl' : 'md'" :caption="__('finance_tables.donors_caption')">
+        {{-- A slim register: who, when to follow up, and the money at a glance. Contact details, the next step and the rest of the rhythm wait on the donor's own page. --}}
+        <x-funding.register :size="! $canTransfers ? 'sm' : ($showsYearColumns ? 'lg' : 'md')" :caption="__('finance_tables.donors_caption')">
             <x-slot:head>
                 <x-funding.register.th sort="donor" :active="$sortKey" :dir="$sortDirection">{{ __('donors.donor') }}</x-funding.register.th>
-                <x-funding.register.th sort="country" :active="$sortKey" :dir="$sortDirection">{{ __('donors.country') }}</x-funding.register.th>
                 <x-funding.register.th>{{ __('donors.section_contact') }}</x-funding.register.th>
                 <x-funding.register.th sort="follow_up" :active="$sortKey" :dir="$sortDirection">{{ __('donors.follow_up') }}</x-funding.register.th>
                 @if ($canAgreements)
-                    <x-funding.register.th sort="agreements" :active="$sortKey" :dir="$sortDirection" numeric>{{ __('finance_tables.agreements') }}</x-funding.register.th>
-                    <x-funding.register.th>{{ __('common.currency') }}</x-funding.register.th>
                     <x-funding.register.th sort="committed" :active="$sortKey" :dir="$sortDirection" numeric>{{ $yearOnly ? __('finance_tables.committed_whole') : __('common.committed') }}</x-funding.register.th>
                 @endif
                 @if ($canTransfers)
                     <x-funding.register.th sort="received" :active="$sortKey" :dir="$sortDirection" numeric>{{ __('finance_tables.received') }}</x-funding.register.th>
-                    <x-funding.register.th sort="percent" :active="$sortKey" :dir="$sortDirection" numeric>{{ __('finance_tables.percent_received') }}</x-funding.register.th>
                     @if ($showsYearColumns)
                         <x-funding.register.th sort="due_in_year" :active="$sortKey" :dir="$sortDirection" numeric>{{ __('finance_tables.due_in_year', ['year' => $selectedYear]) }}</x-funding.register.th>
                         <x-funding.register.th sort="received_in_year" :active="$sortKey" :dir="$sortDirection" numeric>{{ __('finance_tables.received_in_year', ['year' => $selectedYear]) }}</x-funding.register.th>
@@ -1078,7 +1074,6 @@ new #[Title('titles.donors')] class extends Component {
                     @endunless
                     <x-funding.register.th sort="overdue" :active="$sortKey" :dir="$sortDirection" numeric>{{ __('finance_tables.overdue') }}</x-funding.register.th>
                     <x-funding.register.th sort="next_transfer" :active="$sortKey" :dir="$sortDirection">{{ __('donors.next_transfer') }}</x-funding.register.th>
-                    <x-funding.register.th sort="last_received" :active="$sortKey" :dir="$sortDirection">{{ __('finance_tables.last_received') }}</x-funding.register.th>
                 @endif
                 <th scope="col"><span class="sr-only">{{ __('common.actions') }}</span></th>
             </x-slot:head>
@@ -1093,53 +1088,45 @@ new #[Title('titles.donors')] class extends Component {
                     $hasMoney = $lineCurrency !== null;
                     $next = $canTransfers && $hasMoney ? $this->nextTransfers->get($donor->id.'|'.$lineCurrency) : null;
                     $nextDate = $next === null ? null : \Carbon\CarbonImmutable::parse($next->scheduled_date);
-                    $lastReceived = $canTransfers && $hasMoney && $donor->money_last_received !== null ? \Carbon\CarbonImmutable::parse($donor->money_last_received) : null;
                     $overdue = $canTransfers && $hasMoney ? (float) $donor->money_overdue : 0.0;
+                    // Several people share one field, split by slashes: the row names the first and counts the rest.
+                    $contacts = collect(preg_split('/\s*\/\s*/u', (string) $donor->contact_person) ?: [])->map(fn (string $name): string => trim($name))->filter()->values();
+                    $identity = collect([$donor->type?->label() ?? __('donors.not_classified'), $donor->country])->filter()->implode(' · ');
                 @endphp
                 <tr wire:key="donor-{{ $donor->id }}-{{ $lineCurrency ?? 'none' }}" data-donor-row data-donor="{{ $donor->id }}">
                     <td data-label="{{ __('donors.donor') }}" data-wide>
-                        <span @class(['font-semibold', $mutedText => $isRepeat])>{{ $donor->name }}</span>
+                        <span @class(['line-clamp-2 max-w-64 font-semibold', $mutedText => $isRepeat]) title="{{ $donor->name }}">{{ $donor->name }}</span>
                         @unless ($isRepeat)
-                            <span class="sub">{{ $donor->type?->label() ?? __('donors.not_classified') }}</span>
+                            <span class="sub max-w-64 truncate">{{ $identity }}</span>
                         @endunless
                     </td>
-                    <td data-label="{{ __('donors.country') }}">{{ $isRepeat ? '' : ($donor->country ?? '—') }}</td>
                     <td data-label="{{ __('donors.section_contact') }}">
                         @unless ($isRepeat)
-                            @if (filled($donor->contact_person) || filled($donor->email) || filled($donor->phone))
-                                {{ $donor->contact_person }}
-                                @if (filled($donor->email))
-                                    <a href="mailto:{{ $donor->email }}" class="sub underline-offset-2 hover:underline">{{ $donor->email }}</a>
+                            @if ($contacts->isNotEmpty())
+                                <span class="mx-auto block max-w-48 truncate" title="{{ $contacts->first() }}">{{ $contacts->first() }}</span>
+                                @if ($contacts->count() > 1)
+                                    <span class="sub">{{ __('donors.count_more_contacts', ['count' => $contacts->count() - 1]) }}</span>
                                 @endif
-                                @if (filled($donor->phone))
-                                    <a href="tel:{{ preg_replace('/[^\d+]/', '', $donor->phone) }}" dir="ltr" class="sub underline-offset-2 hover:underline">{{ $donor->phone }}</a>
-                                @endif
+                            @elseif (filled($donor->email) || filled($donor->phone))
+                                <span class="mx-auto block max-w-48 truncate">{{ $donor->email ?: $donor->phone }}</span>
                             @else
-                                <span class="{{ $mutedText }}">{{ __('donors.no_contact_on_file') }}</span>
+                                <span class="{{ $mutedText }}">—</span>
                             @endif
                         @endunless
                     </td>
-                    <td data-label="{{ __('donors.follow_up') }}">
-                        @unless ($isRepeat)
-                            @if (filled($donor->next_step))
-                                {{ $donor->next_step }}
-                                @if ($donor->next_step_due_on !== null)
-                                    <span @class(['sub', 'font-semibold text-status-critical!' => $donor->isFollowUpOverdue()]) @if ($donor->isFollowUpOverdue()) data-follow-up-overdue @endif>
-                                        {{ $donor->isFollowUpOverdue() ? __('donors.follow_up_was_due', ['date' => $date($donor->next_step_due_on)]) : __('donors.follow_up_due', ['date' => $date($donor->next_step_due_on)]) }}
-                                    </span>
-                                @endif
-                            @else
-                                —
-                            @endif
-                        @endunless
+                    <td class="date" data-label="{{ __('donors.follow_up') }}">
+                        @if (! $isRepeat && $donor->next_step_due_on !== null)
+                            <span @class(['font-semibold text-status-critical' => $donor->isFollowUpOverdue()]) @if ($donor->isFollowUpOverdue()) data-follow-up-overdue @endif>{{ $date($donor->next_step_due_on) }}</span>
+                        @elseif (! $isRepeat)
+                            —
+                        @endif
                     </td>
 
                     @if ($canAgreements)
-                        <td class="num" data-label="{{ __('finance_tables.agreements') }}"><span class="fig">{{ (int) $donor->money_agreements }}</span></td>
-                        <td data-label="{{ __('common.currency') }}">{{ $lineCurrency ?? '—' }}</td>
                         <td class="num" data-label="{{ __('common.committed') }}" data-cell="committed">
                             @if ($hasMoney)
                                 <span class="fig font-semibold">{{ $money($donor->money_committed) }}</span>
+                                <span class="sub">{{ $lineCurrency }} · {{ trans_choice('finance_tables.count_agreements', (int) $donor->money_agreements, ['count' => (int) $donor->money_agreements]) }}</span>
                             @else
                                 —
                             @endif
@@ -1150,13 +1137,7 @@ new #[Title('titles.donors')] class extends Component {
                         <td class="num" data-label="{{ __('finance_tables.received') }}" data-cell="received">
                             @if ($hasMoney)
                                 <span class="fig font-semibold text-funding">{{ $money($donor->money_received) }}</span>
-                            @else
-                                —
-                            @endif
-                        </td>
-                        <td class="num" data-label="{{ __('finance_tables.percent_received') }}" data-cell="percent">
-                            @if ($hasMoney)
-                                <span class="fig">{{ DonorProposal::percentLabel((float) $donor->money_received, (float) $donor->money_committed) }}%</span>
+                                <span class="sub"><span class="fig">{{ DonorProposal::percentLabel((float) $donor->money_received, (float) $donor->money_committed) }}%</span></span>
                             @else
                                 —
                             @endif
@@ -1177,9 +1158,6 @@ new #[Title('titles.donors')] class extends Component {
                         <td class="num" data-label="{{ __('finance_tables.overdue') }}" data-cell="overdue">
                             @if ($hasMoney)
                                 <span @class(['fig', 'font-semibold text-status-critical' => $overdue > 0])>{{ $money($overdue) }}</span>
-                                @if ($overdue > 0)
-                                    <span class="sub text-status-critical!">{{ trans_choice('donors.count_transfers_overdue', (int) $donor->money_overdue_count, ['count' => (int) $donor->money_overdue_count]) }}</span>
-                                @endif
                             @else
                                 —
                             @endif
@@ -1192,7 +1170,6 @@ new #[Title('titles.donors')] class extends Component {
                                 —
                             @endif
                         </td>
-                        <td class="date" data-label="{{ __('finance_tables.last_received') }}">{{ $date($lastReceived) }}</td>
                     @endif
 
                     <td>
@@ -1218,39 +1195,9 @@ new #[Title('titles.donors')] class extends Component {
                     </td>
                 </tr>
             @endforeach
-
-            @if ($canAgreements)
-                <x-slot:foot>
-                    @foreach ($totals as $line)
-                        <tr wire:key="donor-total-{{ $line['currency'] }}" data-register-total="{{ $line['currency'] }}">
-                            <td colspan="4" data-wide>
-                                {{ __('finance_tables.total') }}
-                                <span class="sub">{{ trans_choice('finance_tables.count_donors', $line['donors'], ['count' => $line['donors']]) }}</span>
-                            </td>
-                            <td class="num" data-label="{{ __('finance_tables.agreements') }}"><span class="fig">{{ $line['agreements'] }}</span></td>
-                            <td data-label="{{ __('common.currency') }}">{{ $line['currency'] }}</td>
-                            <td class="num" data-label="{{ __('common.committed') }}"><span class="fig">{{ $money($line['committed']) }}</span></td>
-                            @if ($canTransfers)
-                                <td class="num" data-label="{{ __('finance_tables.received') }}"><span class="fig text-funding">{{ $money($line['received']) }}</span></td>
-                                <td class="num" data-label="{{ __('finance_tables.percent_received') }}"><span class="fig">{{ DonorProposal::percentLabel($line['received'], $line['committed']) }}%</span></td>
-                                @if ($showsYearColumns)
-                                    <td class="num" data-label="{{ __('finance_tables.due_in_year', ['year' => $selectedYear]) }}"><span class="fig">{{ $money($line['due_in_year']) }}</span></td>
-                                    <td class="num" data-label="{{ __('finance_tables.received_in_year', ['year' => $selectedYear]) }}"><span class="fig text-funding">{{ $money($line['received_in_year']) }}</span></td>
-                                @endif
-                                @unless ($yearOnly)
-                                    <td class="num" data-label="{{ __('finance_tables.outstanding') }}"><span class="fig">{{ $money($line['outstanding']) }}</span></td>
-                                @endunless
-                                <td class="num" data-label="{{ __('finance_tables.overdue') }}"><span @class(['fig', 'text-status-critical' => $line['overdue'] > 0])>{{ $money($line['overdue']) }}</span></td>
-                                <td colspan="2"></td>
-                            @endif
-                            <td></td>
-                        </tr>
-                    @endforeach
-                </x-slot:foot>
-            @endif
         </x-funding.register>
 
-        <x-funding.pager :paginator="$this->rows" :per-page="$this->perPage" scroll-to="#donor-directory-heading" />
+        <x-funding.pager :paginator="$this->rows" :per-page="(string) $this->registerPerPage()" :sizes="$this->registerPageSizes()" scroll-to="#donor-directory-heading" />
     @endif
 
     <x-donors.form-modal :editing="$editingDonorId !== null" :type-options="$this->donorTypeOptions" />

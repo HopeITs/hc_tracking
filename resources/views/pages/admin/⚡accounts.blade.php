@@ -626,8 +626,9 @@ new #[Title('titles.accounts')] class extends Component {
 
 @php
     $showsOverview = $this->view === 'overview';
-    $filtersAreActive = collect([$this->search, $this->state, $this->currencyFilter, $this->countryFilter, $this->flag, $this->year])
-        ->contains(fn (string $value): bool => $value !== '');
+    $activeFilterCount = collect([$this->search, $this->state, $this->currencyFilter, $this->countryFilter, $this->flag, $this->year])
+        ->filter(fn (string $value): bool => $value !== '')
+        ->count();
     $total = $showsOverview ? $this->accounts->total() : $this->rows->total();
     $mutedText = 'text-secondary-medium dark:text-ink-muted';
 
@@ -646,31 +647,31 @@ new #[Title('titles.accounts')] class extends Component {
 
     $setPill = fn (string $property, string $value, string $label): array => [
         'label' => $label,
-        'click' => "\$set('{$property}', '".($chosen[$property] === $value ? '' : $value)."')",
+        'model' => $property, 'value' => $value, 'toggle' => true,
         'active' => $chosen[$property] === $value,
     ];
     $flagPill = fn (string $value, string $label): array => [
         'label' => $label,
-        'click' => "toggleFlag('{$value}')",
+        'model' => 'flag', 'value' => $value, 'toggle' => true,
         'active' => $chosen['flag'] === $value,
         'test' => 'flag-'.$value,
     ];
 
     $yearPills = [
-        ['label' => __('finance_tables.all_years'), 'click' => "\$set('year', '')", 'active' => $chosen['year'] === ''],
+        ['default' => true, 'label' => __('finance_tables.all_years'), 'model' => 'year', 'value' => '', 'active' => $chosen['year'] === ''],
         ...array_map(fn (int $option): array => $setPill('year', (string) $option, (string) $option), $this->yearOptions),
     ];
     $figurePills = [
-        ['label' => __('finance_tables.figures_all_time'), 'click' => "\$set('figures', 'lifetime')", 'active' => $chosen['figures'] === 'lifetime'],
-        ['label' => __('finance_tables.figures_year', ['year' => $chosen['year']]), 'click' => "\$set('figures', 'year')", 'active' => $chosen['figures'] === 'year'],
+        ['default' => true, 'label' => __('finance_tables.figures_all_time'), 'model' => 'figures', 'value' => 'lifetime', 'active' => $chosen['figures'] === 'lifetime'],
+        ['label' => __('finance_tables.figures_year', ['year' => $chosen['year']]), 'model' => 'figures', 'value' => 'year', 'active' => $chosen['figures'] === 'year'],
     ];
     $statePills = [
-        ['label' => __('finance_tables.all'), 'click' => "\$set('state', '')", 'active' => $chosen['state'] === ''],
+        ['default' => true, 'label' => __('finance_tables.all'), 'model' => 'state', 'value' => '', 'active' => $chosen['state'] === ''],
         $setPill('state', 'active', __('accounts.open')),
         $setPill('state', 'closed', __('accounts.closed')),
     ];
     $currencyPills = [
-        ['label' => __('finance_tables.all'), 'click' => "\$set('currencyFilter', '')", 'active' => $chosen['currencyFilter'] === ''],
+        ['default' => true, 'label' => __('finance_tables.all'), 'model' => 'currencyFilter', 'value' => '', 'active' => $chosen['currencyFilter'] === ''],
         ...array_map(fn (Currency $case): array => $setPill('currencyFilter', $case->value, $case->value), Currency::cases()),
     ];
     $flagPills = [
@@ -686,19 +687,33 @@ new #[Title('titles.accounts')] class extends Component {
         :title="__('common.accounts')"
         :count="$total"
     >
-        <x-slot:filters>
-            <x-ui.input type="search" icon="magnifying-glass" :label="__('accounts.search_accounts')" :placeholder="__('accounts.account_name')" wire:model.live.debounce.300ms="search" clearable />
-
-            <x-ui.header-filter-select :label="__('donors.country')" wire:model.live="countryFilter" :value="$this->countryFilter">
-                <flux:select.option value="">{{ __('finance_tables.all_countries') }}</flux:select.option>
-                @foreach ($this->countryOptions as $countryOption)
-                    <flux:select.option :value="$countryOption" :wire:key="'account-country-'.md5($countryOption)">{{ $countryOption }}</flux:select.option>
-                @endforeach
-            </x-ui.header-filter-select>
-        </x-slot:filters>
-
         <x-slot:actions>
             <div class="flex flex-wrap items-center justify-end gap-2">
+                @if ($this->hasAnyAccount)
+                    <x-funding.filters :active="$activeFilterCount" :results="$total">
+                        <div class="directory-filters grid gap-3 sm:grid-cols-2">
+                            <x-ui.input type="search" icon="magnifying-glass" :label="__('accounts.search_accounts')" :placeholder="__('accounts.account_name')" wire:model="search" clearable />
+
+                            <x-ui.header-filter-select deferred :label="__('donors.country')" wire:model="countryFilter" :value="$this->countryFilter">
+                                <flux:select.option value="">{{ __('finance_tables.all_countries') }}</flux:select.option>
+                                @foreach ($this->countryOptions as $countryOption)
+                                    <flux:select.option :value="$countryOption" :wire:key="'account-country-'.md5($countryOption)">{{ $countryOption }}</flux:select.option>
+                                @endforeach
+                            </x-ui.header-filter-select>
+                        </div>
+
+                        <x-funding.pills :label="__('finance_tables.year')" :pills="$yearPills" />
+
+                        @if ($selectedYear !== null)
+                            <x-funding.pills :label="__('finance_tables.figures_label')" :pills="$figurePills" />
+                        @endif
+
+                        <x-funding.pills :label="__('common.state')" :pills="$statePills" />
+                        <x-funding.pills :label="__('common.currency')" :pills="$currencyPills" />
+                        <x-funding.pills :label="__('finance_tables.flags')" :pills="$flagPills" />
+                    </x-funding.filters>
+                @endif
+
                 <x-ui.view-toggle
                     :label="__('finance_tables.view_label')"
                     wire-model="view"
@@ -710,34 +725,18 @@ new #[Title('titles.accounts')] class extends Component {
                 />
 
                 @if ($this->hasAnyAccount)
-                    <x-ui.button icon="arrow-down-tray" class="min-h-11 touch-manipulation @sm/directory:min-h-10" wire:click="exportCsv" wire:loading.attr="disabled" wire:target="exportCsv" data-test="export-csv">
+                    <x-ui.button icon="arrow-down-tray" class="page-action" wire:click="exportCsv" wire:loading.attr="disabled" wire:target="exportCsv" data-test="export-csv">
                         {{ __('finance_tables.export_csv') }}
                     </x-ui.button>
                 @endif
 
                 @can('accounts.create')
-                    <x-ui.button tone="primary" icon="plus" class="min-h-11 touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-account-button">
+                    <x-ui.button tone="primary" icon="plus" class="page-action page-action-primary" wire:click="openCreateModal" data-test="create-account-button">
                         {{ __('accounts.open_account') }}
                     </x-ui.button>
                 @endcan
             </div>
         </x-slot:actions>
-
-        @if ($this->hasAnyAccount)
-            <x-slot:summary>
-                <x-funding.filters :active="$filtersAreActive">
-                    <x-funding.pills :label="__('finance_tables.year')" :pills="$yearPills" />
-
-                    @if ($selectedYear !== null)
-                        <x-funding.pills :label="__('finance_tables.figures_label')" :pills="$figurePills" />
-                    @endif
-
-                    <x-funding.pills :label="__('common.state')" :pills="$statePills" />
-                    <x-funding.pills :label="__('common.currency')" :pills="$currencyPills" />
-                    <x-funding.pills :label="__('finance_tables.flags')" :pills="$flagPills" />
-                </x-funding.filters>
-            </x-slot:summary>
-        @endif
     </x-ui.page-header>
 
     @if (! $this->hasAnyAccount)
@@ -847,45 +846,23 @@ new #[Title('titles.accounts')] class extends Component {
                     <td>
                         <span class="flex items-center justify-end">
                             @can('transfers.view')
-                                <x-ui.button tone="ghost" size="sm" icon="eye" class="size-8!" :href="route('transfers.index', ['account' => $account->id])" wire:navigate :aria-label="__('accounts.view_transfers_for_name', ['name' => $account->account_name])" />
+                                <x-ui.button tone="ghost" size="sm" icon="eye" icon:variant="outline" class="size-8!" :href="route('transfers.index', ['account' => $account->id])" wire:navigate :aria-label="__('accounts.view_transfers_for_name', ['name' => $account->account_name])" />
                             @endcan
                             @can('accounts.update')
-                                <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-8!" wire:click="openEditModal({{ $account->id }})" :aria-label="__('common.edit_name', ['name' => $account->account_name])" />
+                                <x-ui.button tone="ghost" size="sm" icon="pencil-square" icon:variant="outline" class="size-8!" wire:click="openEditModal({{ $account->id }})" :aria-label="__('common.edit_name', ['name' => $account->account_name])" />
                             @endcan
 
                             {{-- No delete anywhere: transfers_tracking.account_id RESTRICTs. Closing needs accounts.delete. --}}
                             @if ($account->is_active && auth()->user()->can('accounts.delete'))
-                                <x-ui.button tone="ghost" size="sm" icon="lock-closed" class="size-8!" wire:click="confirmClose({{ $account->id }})" :aria-label="__('accounts.close_name', ['name' => $account->account_name])" />
+                                <x-ui.button tone="ghost" size="sm" icon="lock-closed" icon:variant="outline" class="size-8!" wire:click="confirmClose({{ $account->id }})" :aria-label="__('accounts.close_name', ['name' => $account->account_name])" />
                             @endif
                         </span>
                     </td>
                 </tr>
             @endforeach
-
-            <x-slot:foot>
-                @foreach ($totals as $line)
-                    <tr wire:key="account-total-{{ $line['currency'] }}" data-register-total="{{ $line['currency'] }}">
-                        <td colspan="3" data-wide>
-                            {{ __('finance_tables.total') }}
-                            <span class="sub">{{ __('finance_tables.count_accounts_open', ['count' => $line['accounts'], 'open' => $line['open_accounts']]) }}</span>
-                        </td>
-                        <td data-label="{{ __('common.currency') }}">{{ $line['currency'] }}</td>
-                        <td colspan="4"></td>
-                        <td class="num" data-label="{{ __('common.transfers') }}"><span class="fig">{{ $line['transfers'] }}</span></td>
-                        <td class="num" data-label="{{ __('finance_tables.received') }}"><span class="fig text-funding">{{ $money($line['received']) }}</span></td>
-                        @if ($showsYearColumn)
-                            <td class="num" data-label="{{ __('finance_tables.received_in_year', ['year' => $selectedYear]) }}"><span class="fig text-funding">{{ $money($line['received_in_year']) }}</span></td>
-                        @endif
-                        <td class="num" data-label="{{ __('finance_tables.in_transit') }}"><span class="fig">{{ $money($line['in_transit']) }}</span></td>
-                        <td class="num" data-label="{{ __('finance_tables.upcoming') }}"><span class="fig">{{ $money($line['upcoming']) }}</span></td>
-                        <td class="num" data-label="{{ __('finance_tables.overdue') }}"><span @class(['fig', 'text-status-critical' => $line['overdue'] > 0])>{{ $money($line['overdue']) }}</span></td>
-                        <td colspan="2"></td>
-                    </tr>
-                @endforeach
-            </x-slot:foot>
         </x-funding.register>
 
-        <x-funding.pager :paginator="$this->rows" :per-page="$this->perPage" scroll-to="#account-directory-heading" />
+        <x-funding.pager :paginator="$this->rows" :per-page="(string) $this->registerPerPage()" :sizes="$this->registerPageSizes()" scroll-to="#account-directory-heading" />
     @endif
 
     <x-ui.modal

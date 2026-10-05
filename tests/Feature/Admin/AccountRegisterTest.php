@@ -164,7 +164,7 @@ test('totals are kept per currency and count open accounts', function () {
         ->and($totals['USD'])->toMatchArray(['accounts' => 2, 'open_accounts' => 1, 'received' => 985.0, 'in_transit' => 50.0, 'upcoming' => 100.0, 'overdue' => 200.0])
         ->and($totals['EUR']['received'])->toBe(0.0);
 
-    $page->assertSeeHtml('data-register-total="USD"')->assertSeeHtml('data-register-total="EUR"');
+    $page->assertDontSeeHtml('data-register-total=')->assertSeeHtml('data-totals-currency="USD"')->assertSeeHtml('data-totals-currency="EUR"');
 });
 
 test('the table opens by account name and a heading sorts it', function () {
@@ -194,7 +194,7 @@ test('values typed into the address bar fall back to the defaults', function () 
         ->assertSet('countryFilter', '')
         ->assertSet('flag', '')
         ->assertSet('sortBy', '')
-        ->assertSet('perPage', '25')
+        ->assertSet('perPage', '')
         ->assertOk();
 });
 

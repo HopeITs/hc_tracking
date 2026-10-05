@@ -2,16 +2,12 @@
 
 @php
     /**
-     * A full tranche table for a collection already in memory: the detail
-     * pages hold a handful of tranches each, so their totals are summed here
-     * by the same rules the transfers page sums in SQL.
+     * A full tranche table for a collection already in memory.
      *
      * `party` names the identity column a page needs when its tranches belong
      * to several agreements: the proposal on a donor page, the donor on a
      * proposal page.
      */
-    $lines = array_values(\App\Support\Tranches::totals($transfers));
-    $lead = $party === null ? 0 : 1;
     $partyLabel = $party === 'donor' ? __('funding_agreements.donor') : __('common.proposal');
 @endphp
 
@@ -54,15 +50,11 @@
                 <x-slot:actions>
                     <td>
                         @can('transfers.update')
-                            <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-8!" wire:click="openTransferEdit({{ $transfer->id }})" :aria-label="__('transfers.edit_transfer')" data-test="edit-transfer-{{ $transfer->id }}" />
+                            <x-ui.button tone="ghost" size="sm" icon="pencil-square" icon:variant="outline" class="size-8!" wire:click="openTransferEdit({{ $transfer->id }})" :aria-label="__('transfers.edit_transfer')" data-test="edit-transfer-{{ $transfer->id }}" />
                         @endcan
                     </td>
                 </x-slot:actions>
             @endif
         </x-funding.tranche-row>
     @endforeach
-
-    <x-slot:foot>
-        <x-funding.tranche-foot :lines="$lines" :lead="$lead" :actions="$editable" />
-    </x-slot:foot>
 </x-funding.register>

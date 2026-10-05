@@ -859,6 +859,7 @@ test('the agreement page shows both project numbers', function () {
 
 test('the agreements search hint names the project number', function () {
     $user = User::factory()->role('Financial')->create();
+    DonorProposal::factory()->create();
 
     Livewire::actingAs($user)
         ->test('pages::funding-agreements.index')

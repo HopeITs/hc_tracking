@@ -200,8 +200,8 @@ test('totals are kept per currency and add up to the rows shown', function () {
         ->and($totals['USD'])->toMatchArray(['proposals' => 2, 'agreements' => 2, 'committed' => 3000.0, 'received' => 390.0, 'outstanding' => 2600.0, 'overdue' => 200.0])
         ->and($totals['EUR'])->toMatchArray(['proposals' => 1, 'committed' => 500.0]);
 
-    $page->assertSeeHtml('data-register-total="USD"')
-        ->assertSeeHtml('data-register-total="EUR"')
+    $page->assertDontSeeHtml('data-register-total=')->assertSeeHtml('data-totals-currency="USD"')
+        ->assertSeeHtml('data-totals-currency="EUR"')
         ->assertDontSee('3,500.00');
 });
 
@@ -266,7 +266,7 @@ test('values typed into the address bar fall back to the defaults', function () 
         ->assertSet('currency', '')
         ->assertSet('flag', '')
         ->assertSet('sortBy', '')
-        ->assertSet('perPage', '25')
+        ->assertSet('perPage', '')
         ->assertOk();
 });
 

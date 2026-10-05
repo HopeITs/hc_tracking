@@ -114,15 +114,17 @@ test('the overview view shows the wallet and the donor list instead of the table
         ->assertDontSeeHtml('data-register');
 });
 
-test('a row shows the contact, the follow-up and the next transfer with its amount', function () {
+test('a row names the first contact, the follow-up date and the next transfer, and leaves the rest to the donor page', function () {
     $donor = registerFundingDonor();
-    $donor->update(['next_step' => 'Send the interim report', 'next_step_due_on' => '2026-06-01']);
+    $donor->update(['contact_person' => 'Lina Haddad / Omar Saleh / Rana Aziz', 'next_step' => 'Send the interim report', 'next_step_due_on' => '2026-06-01']);
 
     donorRegister()
         ->assertSee('Lina Haddad')
-        ->assertSeeHtml('href="mailto:grants@unicef.test"')
-        ->assertSeeHtml('href="tel:+9611234567"')
-        ->assertSee('Send the interim report')
+        ->assertDontSee('Omar Saleh')
+        ->assertSee('+2 more')
+        ->assertDontSeeHtml('href="mailto:grants@unicef.test"')
+        ->assertDontSeeHtml('href="tel:+9611234567"')
+        ->assertDontSee('Send the interim report')
         ->assertSeeHtml('data-follow-up-overdue')
         ->assertSeeHtml('data-next-transfer')
         ->assertSee('200.00 USD')
@@ -186,8 +188,8 @@ test('totals are kept per currency and add up to the rows shown', function () {
         ->and($totals['USD'])->toMatchArray(['donors' => 2, 'agreements' => 2, 'committed' => 3000.0, 'received' => 390.0, 'outstanding' => 2600.0, 'overdue' => 200.0])
         ->and($totals['EUR'])->toMatchArray(['donors' => 1, 'committed' => 500.0]);
 
-    $page->assertSeeHtml('data-register-total="USD"')
-        ->assertSeeHtml('data-register-total="EUR"')
+    $page->assertDontSeeHtml('data-register-total=')->assertSeeHtml('data-totals-currency="USD"')
+        ->assertSeeHtml('data-totals-currency="EUR"')
         ->assertDontSee('3,500.00');
 });
 
@@ -242,6 +244,45 @@ test('someone who may see agreements but not transfers gets budgets without tran
         ->and($page->instance()->nextTransfers)->toBeEmpty();
 });
 
+test('the table shows five donors a page by default and offers a few more', function () {
+    Donor::factory()->count(12)->create();
+
+    $page = donorRegister()->assertSet('perPage', '')->assertSeeHtml('data-test="per-page-5"');
+
+    expect($page->instance()->rows)->toHaveCount(5);
+
+    $page->set('perPage', '10');
+    expect($page->instance()->rows)->toHaveCount(10);
+
+    $page->set('perPage', '5')->assertSet('perPage', '');
+});
+
+test('every filter sits behind one filters button, whose badge counts the filters applied', function () {
+    registerFundingDonor();
+
+    donorRegister(['type' => 'bilateral', 'country' => 'Switzerland'])
+        ->assertSeeHtml('data-test="open-filters"')
+        ->assertSeeHtml('data-filter-count>2</span>')
+        ->call('clearFilters')
+        ->assertDontSeeHtml('data-filter-count');
+});
+
+test('the filters dialog only drafts: its controls send nothing until the draft is applied', function () {
+    registerFundingDonor();
+    Donor::factory()->create(['name' => 'Zeta Trust', 'country' => 'Norway']);
+
+    $page = donorRegister()
+        ->assertSeeHtml('wire:model="search"')
+        ->assertDontSeeHtml('wire:model.live.debounce.300ms="search"')
+        ->assertDontSeeHtml("wire:click=\"toggleType('bilateral')\"")
+        ->assertSeeHtml("pick('type', 'bilateral', true");
+
+    // The draft arrives with the apply call: the list narrows and starts again at page one.
+    $page->set('countryFilter', 'Norway')->call('applyFilters');
+
+    expect($page->instance()->rows->pluck('name')->all())->toBe(['Zeta Trust']);
+});
+
 test('values typed into the address bar fall back to the defaults', function () {
     registerFundingDonor();
 
@@ -254,7 +295,7 @@ test('values typed into the address bar fall back to the defaults', function () 
         ->assertSet('currency', '')
         ->assertSet('flag', '')
         ->assertSet('sortBy', '')
-        ->assertSet('perPage', '25')
+        ->assertSet('perPage', '')
         ->assertOk();
 });
 

@@ -1,7 +1,7 @@
 @props(['wireModel', 'active' => null, 'options' => [], 'label' => null])
 
 <div
-    data-view-toggle {{ $attributes->class('inline-flex items-center gap-0.5 rounded-lg border border-secondary-soft bg-white p-0.5 dark:border-line dark:bg-surface-1') }}
+    data-view-toggle {{ $attributes->class('inline-flex h-10 items-center gap-0.5 rounded-lg border border-secondary-soft bg-white p-1 dark:border-line dark:bg-surface-1') }}
     role="radiogroup"
     @if ($label !== null) aria-label="{{ $label }}" @endif
 >
@@ -13,9 +13,9 @@
             aria-checked="{{ $isActive ? 'true' : 'false' }}"
             wire:click="$set('{{ $wireModel }}', '{{ $option['key'] }}')"
             @class([
-                'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 type-meta font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-primary',
-                'bg-primary dark:bg-ink dark:text-surface-0 text-white' => $isActive,
-                'text-secondary-medium hover:text-secondary-dark dark:text-ink-muted dark:hover:text-ink' => ! $isActive,
+                'inline-flex h-full items-center gap-1.5 rounded-md px-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-primary',
+                'bg-secondary-dark text-white dark:bg-ink dark:text-surface-0' => $isActive,
+                'text-secondary-medium hover:bg-secondary-soft/60 hover:text-secondary-dark dark:text-ink-muted dark:hover:bg-surface-2 dark:hover:text-ink' => ! $isActive,
             ])
         >
             @if (! empty($option['icon']))

@@ -905,8 +905,9 @@ new #[Title('titles.transfers')] class extends Component {
 
 @php
     $showsOverview = $this->view === 'overview';
-    $filtersAreActive = collect([$this->search, $this->donor, $this->account, $this->currency, $this->stage, $this->flag, $this->from, $this->to, $this->min, $this->max, $this->agreement])
-        ->contains(fn (string $value): bool => $value !== '');
+    $activeFilterCount = collect([$this->search, $this->donor, $this->account, $this->currency, $this->stage, $this->flag, $this->from, $this->to, $this->min, $this->max, $this->agreement])
+        ->filter(fn (string $value): bool => $value !== '')
+        ->count();
     $total = $showsOverview ? $this->transfers->total() : $this->rows->total();
 
     $mutedText = 'text-secondary-medium dark:text-ink-muted';
@@ -974,12 +975,12 @@ new #[Title('titles.transfers')] class extends Component {
 
     $setPill = fn (string $property, string $value, string $label): array => [
         'label' => $label,
-        'click' => "\$set('{$property}', '".($chosen[$property] === $value ? '' : $value)."')",
+        'model' => $property, 'value' => $value, 'toggle' => true,
         'active' => $chosen[$property] === $value,
     ];
     $stagePill = fn (string $value, string $label, ?string $tone = null): array => [
         'label' => $label,
-        'click' => "toggleStage('{$value}')",
+        'model' => 'stage', 'value' => $value, 'toggle' => true,
         'active' => $chosen['stage'] === $value,
         'count' => $counts[$value] ?? 0,
         'tone' => ($counts[$value] ?? 0) > 0 ? $tone : null,
@@ -987,7 +988,7 @@ new #[Title('titles.transfers')] class extends Component {
     ];
 
     $yearPills = [
-        ['label' => __('finance_tables.all_years'), 'click' => "\$set('year', '')", 'active' => $chosen['year'] === ''],
+        ['default' => true, 'label' => __('finance_tables.all_years'), 'model' => 'year', 'value' => '', 'active' => $chosen['year'] === ''],
         ...array_map(fn (int $option): array => $setPill('year', (string) $option, (string) $option), $this->yearOptions),
     ];
     $basisPills = [
@@ -996,7 +997,7 @@ new #[Title('titles.transfers')] class extends Component {
         $setPill('dateBasis', 'received', __('finance_tables.basis_received')),
     ];
     $statusPills = [
-        ['label' => __('finance_tables.all'), 'click' => "toggleStage('')", 'active' => $chosen['stage'] === '', 'count' => $counts['all'] ?? 0, 'test' => 'stage-all'],
+        ['default' => true, 'label' => __('finance_tables.all'), 'model' => 'stage', 'value' => '', 'active' => $chosen['stage'] === '', 'count' => $counts['all'] ?? 0, 'test' => 'stage-all'],
         $stagePill('upcoming', __('finance_tables.state_upcoming')),
         $stagePill('overdue', __('finance_tables.state_late'), 'critical'),
         $stagePill('transit', __('finance_tables.state_transit'), 'warn'),
@@ -1004,25 +1005,25 @@ new #[Title('titles.transfers')] class extends Component {
         $stagePill('failed', __('finance_tables.state_failed'), 'critical'),
     ];
     $currencyPills = [
-        ['label' => __('finance_tables.all'), 'click' => "\$set('currency', '')", 'active' => $chosen['currency'] === ''],
+        ['default' => true, 'label' => __('finance_tables.all'), 'model' => 'currency', 'value' => '', 'active' => $chosen['currency'] === ''],
         ...array_map(fn (Currency $case): array => $setPill('currency', $case->value, $case->value), Currency::cases()),
     ];
     /* Landed short and net-not-recorded are stages of a received tranche, so they share the status property. */
     $flagPills = [
         $stagePill('short', __('finance_tables.flag_short'), 'critical'),
         $stagePill('unrecorded', __('finance_tables.flag_unrecorded'), 'warn'),
-        ['label' => __('finance_tables.flag_converted'), 'click' => "toggleFlag('converted')", 'active' => $chosen['flag'] === 'converted', 'test' => 'flag-converted'],
-        ['label' => __('finance_tables.flag_no_account'), 'click' => "toggleFlag('no_account')", 'active' => $chosen['flag'] === 'no_account', 'test' => 'flag-no-account'],
+        ['label' => __('finance_tables.flag_converted'), 'model' => 'flag', 'value' => 'converted', 'toggle' => true, 'active' => $chosen['flag'] === 'converted', 'test' => 'flag-converted'],
+        ['label' => __('finance_tables.flag_no_account'), 'model' => 'flag', 'value' => 'no_account', 'toggle' => true, 'active' => $chosen['flag'] === 'no_account', 'test' => 'flag-no-account'],
     ];
     $groupPills = [
-        ['label' => __('finance_tables.group_none'), 'click' => "\$set('group', '')", 'active' => $chosen['group'] === ''],
+        ['default' => true, 'label' => __('finance_tables.group_none'), 'model' => 'group', 'value' => '', 'active' => $chosen['group'] === ''],
         $setPill('group', 'agreement', __('finance_tables.group_agreement')),
         $setPill('group', 'donor', __('finance_tables.group_donor')),
         $setPill('group', 'account', __('finance_tables.group_account')),
         $setPill('group', 'month', __('finance_tables.group_month')),
     ];
     $orderPills = [
-        ['label' => __('finance_tables.needs_attention_first'), 'click' => 'toggleAttentionOrder', 'active' => $sortKey === 'attention', 'test' => 'order-attention'],
+        ['label' => __('finance_tables.needs_attention_first'), 'model' => 'sortBy', 'value' => 'attention', 'toggle' => true, 'also' => ['sortDir' => 'asc'], 'active' => $sortKey === 'attention', 'test' => 'order-attention'],
     ];
 @endphp
 
@@ -1035,28 +1036,65 @@ new #[Title('titles.transfers')] class extends Component {
         :title="__('common.transfers')"
         :count="$total"
     >
-        <x-slot:filters>
-            <x-ui.input type="search" icon="magnifying-glass" :label="__('transfers.search_transfers')" :placeholder="__('common.reference_donor_or_proposal')" wire:model.live.debounce.300ms="search" clearable />
-
-            <x-ui.header-filter-select :label="__('funding_agreements.donor')" wire:model.live="donor" :value="$this->donor">
-                <flux:select.option value="">{{ __('funding_agreements.all_donors') }}</flux:select.option>
-                @foreach ($this->filterDonors as $donorOption)
-                    <flux:select.option :value="$donorOption->id" :wire:key="'tr-donor-'.$donorOption->id">{{ $donorOption->name }}</flux:select.option>
-                @endforeach
-            </x-ui.header-filter-select>
-
-            <x-ui.header-filter-select :label="__('transfers.account')" wire:model.live="account" :value="$this->account">
-                <flux:select.option value="">{{ __('common.all_accounts') }}</flux:select.option>
-                @foreach ($this->filterAccounts as $accountOption)
-                    <flux:select.option :value="$accountOption->id" :wire:key="'tr-account-'.$accountOption->id">
-                        {{ $accountOption->account_name }}@unless ($accountOption->is_active) · {{ __('common.closed') }}@endunless
-                    </flux:select.option>
-                @endforeach
-            </x-ui.header-filter-select>
-        </x-slot:filters>
-
         <x-slot:actions>
             <div class="flex flex-wrap items-center justify-end gap-2">
+                @if ($this->hasAnyTransfer)
+                    <x-funding.filters :active="$activeFilterCount" :results="$total">
+                        <div class="directory-filters grid gap-3 sm:grid-cols-2">
+                            <x-ui.input type="search" icon="magnifying-glass" :label="__('transfers.search_transfers')" :placeholder="__('common.reference_donor_or_proposal')" wire:model="search" clearable />
+
+                            <x-ui.header-filter-select deferred :label="__('funding_agreements.donor')" wire:model="donor" :value="$this->donor">
+                                <flux:select.option value="">{{ __('funding_agreements.all_donors') }}</flux:select.option>
+                                @foreach ($this->filterDonors as $donorOption)
+                                    <flux:select.option :value="$donorOption->id" :wire:key="'tr-donor-'.$donorOption->id">{{ $donorOption->name }}</flux:select.option>
+                                @endforeach
+                            </x-ui.header-filter-select>
+
+                            <x-ui.header-filter-select deferred :label="__('transfers.account')" wire:model="account" :value="$this->account">
+                                <flux:select.option value="">{{ __('common.all_accounts') }}</flux:select.option>
+                                @foreach ($this->filterAccounts as $accountOption)
+                                    <flux:select.option :value="$accountOption->id" :wire:key="'tr-account-'.$accountOption->id">
+                                        {{ $accountOption->account_name }}@unless ($accountOption->is_active) · {{ __('common.closed') }}@endunless
+                                    </flux:select.option>
+                                @endforeach
+                            </x-ui.header-filter-select>
+                        </div>
+
+                        <x-funding.pills :label="__('finance_tables.year')" :pills="$yearPills" />
+
+                        <x-funding.pills :label="__('finance_tables.date_is')" :pills="$basisPills" :on="$this->from !== '' || $this->to !== ''" :watch="['from', 'to']">
+                            <span class="ms-1 text-xs font-semibold {{ $mutedText }}">{{ __('finance_tables.from') }}</span>
+                            <x-ui.input type="date" size="sm" class="w-40" wire:model="from" :aria-label="__('finance_tables.from')" />
+                            <span class="text-xs font-semibold {{ $mutedText }}">{{ __('finance_tables.to') }}</span>
+                            <x-ui.input type="date" size="sm" class="w-40" wire:model="to" :aria-label="__('finance_tables.to')" />
+                        </x-funding.pills>
+
+                        <x-funding.pills :label="__('common.status')" :pills="$statusPills" />
+                        <x-funding.pills :label="__('common.currency')" :pills="$currencyPills" />
+                        <x-funding.pills :label="__('finance_tables.flags')" :pills="$flagPills" />
+
+                        <x-funding.filter-row :label="__('finance_tables.amount')" :on="$this->min !== '' || $this->max !== ''" :watch="['min', 'max']">
+                            <x-ui.input type="number" inputmode="decimal" min="0" step="0.01" size="sm" class="w-36" wire:model="min" :placeholder="__('finance_tables.minimum')" :aria-label="__('finance_tables.minimum')" />
+                            <span class="text-xs font-semibold {{ $mutedText }}">{{ __('finance_tables.to') }}</span>
+                            <x-ui.input type="number" inputmode="decimal" min="0" step="0.01" size="sm" class="w-36" wire:model="max" :placeholder="__('finance_tables.maximum')" :aria-label="__('finance_tables.maximum')" />
+                        </x-funding.filter-row>
+
+                        @unless ($showsOverview)
+                            <x-funding.pills :label="__('finance_tables.group_by')" :pills="$groupPills" keep />
+                            <x-funding.pills :label="__('finance_tables.order')" :pills="$orderPills" keep />
+                        @endunless
+
+                        @if ($this->agreementFilter !== null)
+                            <x-funding.filter-row :label="__('finance_tables.group_agreement')" on :watch="['agreement']" :models="['agreement']" x-show="filled(['agreement'])">
+                                <button type="button" x-on:click="pick('agreement', '')" class="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-funding-soft ps-3 pe-2 text-xs font-semibold text-funding transition-colors hover:bg-funding hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink dark:hover:text-surface-0" data-agreement-chip>
+                                    {{ __('transfers.agreement_filter_chip', ['donor' => $this->agreementFilter->donor->name, 'proposal' => $this->agreementFilter->proposal->name]) }}
+                                    <flux:icon.x-mark variant="micro" class="size-3.5" />
+                                </button>
+                            </x-funding.filter-row>
+                        @endif
+                    </x-funding.filters>
+                @endif
+
                 <x-ui.view-toggle
                     :label="__('finance_tables.view_label')"
                     wire-model="view"
@@ -1068,57 +1106,18 @@ new #[Title('titles.transfers')] class extends Component {
                 />
 
                 @if ($this->hasAnyTransfer)
-                    <x-ui.button icon="arrow-down-tray" class="min-h-11 touch-manipulation @sm/ladder:min-h-10" wire:click="exportCsv" wire:loading.attr="disabled" wire:target="exportCsv" data-test="export-csv">
+                    <x-ui.button icon="arrow-down-tray" class="page-action" wire:click="exportCsv" wire:loading.attr="disabled" wire:target="exportCsv" data-test="export-csv">
                         {{ __('finance_tables.export_csv') }}
                     </x-ui.button>
                 @endif
 
                 @can('transfers.create')
-                <x-ui.button tone="primary" icon="plus" class="min-h-11 touch-manipulation @sm/ladder:min-h-10" wire:click="openCreateModal" data-test="create-transfer-button">
+                <x-ui.button tone="primary" icon="plus" class="page-action page-action-primary" wire:click="openCreateModal" data-test="create-transfer-button">
                     {{ __('transfers.record_transfer') }}
                 </x-ui.button>
                 @endcan
             </div>
         </x-slot:actions>
-
-        @if ($this->hasAnyTransfer)
-            <x-slot:summary>
-                <x-funding.filters :active="$filtersAreActive">
-                    <x-funding.pills :label="__('finance_tables.year')" :pills="$yearPills" />
-
-                    <x-funding.pills :label="__('finance_tables.date_is')" :pills="$basisPills">
-                        <span class="ms-1 text-xs font-semibold {{ $mutedText }}">{{ __('finance_tables.from') }}</span>
-                        <x-ui.input type="date" size="sm" class="w-40" wire:model.live="from" :aria-label="__('finance_tables.from')" />
-                        <span class="text-xs font-semibold {{ $mutedText }}">{{ __('finance_tables.to') }}</span>
-                        <x-ui.input type="date" size="sm" class="w-40" wire:model.live="to" :aria-label="__('finance_tables.to')" />
-                    </x-funding.pills>
-
-                    <x-funding.pills :label="__('common.status')" :pills="$statusPills" />
-                    <x-funding.pills :label="__('common.currency')" :pills="$currencyPills" />
-                    <x-funding.pills :label="__('finance_tables.flags')" :pills="$flagPills" />
-
-                    <x-funding.filter-row :label="__('finance_tables.amount')">
-                        <x-ui.input type="number" inputmode="decimal" min="0" step="0.01" size="sm" class="w-36" wire:model.live.debounce.400ms="min" :placeholder="__('finance_tables.minimum')" :aria-label="__('finance_tables.minimum')" />
-                        <span class="text-xs font-semibold {{ $mutedText }}">{{ __('finance_tables.to') }}</span>
-                        <x-ui.input type="number" inputmode="decimal" min="0" step="0.01" size="sm" class="w-36" wire:model.live.debounce.400ms="max" :placeholder="__('finance_tables.maximum')" :aria-label="__('finance_tables.maximum')" />
-                    </x-funding.filter-row>
-
-                    @unless ($showsOverview)
-                        <x-funding.pills :label="__('finance_tables.group_by')" :pills="$groupPills" />
-                        <x-funding.pills :label="__('finance_tables.order')" :pills="$orderPills" />
-                    @endunless
-
-                    @if ($this->agreementFilter !== null)
-                        <x-funding.filter-row :label="__('finance_tables.group_agreement')">
-                            <button type="button" wire:click="$set('agreement', '')" class="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-funding-soft ps-3 pe-2 text-xs font-semibold text-funding transition-colors hover:bg-funding hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink dark:hover:text-surface-0" data-agreement-chip>
-                                {{ __('transfers.agreement_filter_chip', ['donor' => $this->agreementFilter->donor->name, 'proposal' => $this->agreementFilter->proposal->name]) }}
-                                <flux:icon.x-mark variant="micro" class="size-3.5" />
-                            </button>
-                        </x-funding.filter-row>
-                    @endif
-                </x-funding.filters>
-            </x-slot:summary>
-        @endif
     </x-ui.page-header>
 
     @if (! $this->hasAnyTransfer)
@@ -1158,16 +1157,6 @@ new #[Title('titles.transfers')] class extends Component {
                 ])),
             ])->all();
 
-            $footLines = $this->totals->map(fn (array $line): array => [
-                'currency' => $line['currency'],
-                'tranches' => $line['tranches'],
-                'sent' => $line['expected'],
-                'fees' => $line['recordedFees'],
-                'gross' => $line['gross'],
-                'net' => $line['landed'],
-                'shortfall' => $line['shrink'],
-                'overage' => $line['overage'],
-            ])->all();
 
             $isGrouped = $this->group !== '';
             $previousGroup = null;
@@ -1227,19 +1216,17 @@ new #[Title('titles.transfers')] class extends Component {
                         <td>
                             @can('transfers.update')
                                 {{-- Deleting a tranche happens inside its edit form. --}}
-                                <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-8!" wire:click="openEditModal({{ $transfer->id }})" :aria-label="__('transfers.edit_transfer')" data-test="edit-transfer-{{ $transfer->id }}" />
+                                <span class="flex items-center justify-end">
+                                    <x-ui.button tone="ghost" size="sm" icon="pencil-square" icon:variant="outline" class="size-8!" wire:click="openEditModal({{ $transfer->id }})" :aria-label="__('transfers.edit_transfer')" data-test="edit-transfer-{{ $transfer->id }}" />
+                                </span>
                             @endcan
                         </td>
                     </x-slot:actions>
                 </x-funding.tranche-row>
             @endforeach
-
-            <x-slot:foot>
-                <x-funding.tranche-foot :lines="$footLines" :lead="1" />
-            </x-slot:foot>
         </x-funding.register>
 
-        <x-funding.pager :paginator="$this->rows" :per-page="$this->perPage" scroll-to="#transfer-ladder-heading" />
+        <x-funding.pager :paginator="$this->rows" :per-page="(string) $this->registerPerPage()" :sizes="$this->registerPageSizes()" scroll-to="#transfer-ladder-heading" />
     @endif
 
     <x-funding.transfer-modal

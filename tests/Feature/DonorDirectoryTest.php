@@ -364,6 +364,7 @@ test('a donor phone link dials digits only', function () {
 
     Livewire::actingAs($user)
         ->test('pages::donors.index')
+        ->set('view', 'overview')
         ->assertSeeHtml('href="tel:+9611234567"');
 });
 

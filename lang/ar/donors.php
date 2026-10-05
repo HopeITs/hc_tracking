@@ -127,4 +127,5 @@ return [
     'count_reports_owed_to_donor' => '{1} تقرير واحد مستحق للمانح|{2} تقريران مستحقان للمانح|[3,10] :count تقارير مستحقة للمانح|[11,*] :count تقريرًا مستحقًا للمانح',
     'report_overdue_since' => 'متأخر منذ :date',
     'report_due_on' => 'مستحق في :date',
+    'count_more_contacts' => '+:count آخرين',
 ];

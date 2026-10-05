@@ -127,4 +127,5 @@ return [
     'count_reports_owed_to_donor' => '{1} :count report owed to the donor|[2,*] :count reports owed to the donor',
     'report_overdue_since' => 'Overdue since :date',
     'report_due_on' => 'Due :date',
+    'count_more_contacts' => '+:count more',
 ];

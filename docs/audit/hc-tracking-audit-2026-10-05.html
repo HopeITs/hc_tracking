@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HC Tracking Audit</title>
+<style>
+:root{
+  --bg:#f7f5f1;--surface:#ffffff;--ink:#1b1c1e;--muted:#5f6368;--line:#e3dfd8;
+  --accent:#a3262a;--crit:#b3261e;--high:#c25a00;--med:#9a7b00;--low:#2e7d4f;--ok:#2e7d4f;
+  --code:#f0ece5;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141517;--surface:#1c1d20;--ink:#ecebe8;--muted:#a3a6ab;--line:#2c2e32;
+    --accent:#e0585c;--crit:#f2766d;--high:#f29a4a;--med:#e3c44f;--low:#6fcf97;--ok:#6fcf97;--code:#25272b;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141517;--surface:#1c1d20;--ink:#ecebe8;--muted:#a3a6ab;--line:#2c2e32;
+  --accent:#e0585c;--crit:#f2766d;--high:#f29a4a;--med:#e3c44f;--low:#6fcf97;--ok:#6fcf97;--code:#25272b;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1040px;margin:0 auto;padding:48px 16px 96px}
+header.top{border-bottom:2px solid var(--ink);padding-bottom:24px;margin-bottom:40px}
+.eyebrow{font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:700}
+h1{font-size:clamp(2rem,5vw,3.2rem);line-height:1.05;margin:.3em 0 .2em;letter-spacing:-.02em}
+.meta{color:var(--muted);font-size:.92rem}
+nav.toc{display:flex;flex-wrap:wrap;gap:6px 18px;margin:24px 0 0;font-size:.9rem}
+nav.toc a{color:var(--ink);text-decoration:none;border-bottom:1px dotted var(--muted)}
+nav.toc a:hover{color:var(--accent)}
+section{margin:56px 0}
+h2{font-size:1.55rem;margin:0 0 6px;letter-spacing:-.01em;display:flex;align-items:baseline;gap:12px}
+h2 .n{font-variant-numeric:tabular-nums;color:var(--accent);font-size:1rem;font-weight:700}
+h3{font-size:1.1rem;margin:28px 0 8px}
+p{margin:.5em 0 1em}
+.lede{color:var(--muted);margin-top:0}
+code{font:.88em ui-monospace,SFMono-Regular,Consolas,monospace;background:var(--code);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+a{color:var(--accent)}
+.alert{border-left:4px solid var(--crit);padding:14px 18px;background:color-mix(in srgb,var(--crit) 8%,var(--surface));margin:0 0 40px;border-radius:0 6px 6px 0}
+.alert strong{color:var(--crit)}
+.alert ol{margin:8px 0 0;padding-left:20px}
+
+/* headline figures */
+.figures{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:28px 32px;margin:28px 0 8px}
+.fig .num{font-size:clamp(2.2rem,5vw,3rem);font-weight:800;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.03em}
+.fig .lbl{color:var(--muted);font-size:.85rem;margin-top:6px}
+.c-crit{color:var(--crit)}.c-high{color:var(--high)}.c-med{color:var(--med)}.c-low{color:var(--low)}
+
+/* verdict list with dot thread */
+.thread{list-style:none;padding:0;margin:16px 0;position:relative}
+.thread:before{content:"";position:absolute;left:7px;top:10px;bottom:10px;border-left:2px dotted var(--line)}
+.thread li{position:relative;padding:10px 0 10px 32px;border-bottom:1px solid var(--line)}
+.thread li:last-child{border-bottom:0}
+.thread li:before{content:"";position:absolute;left:1px;top:18px;width:14px;height:14px;border-radius:50%;background:var(--surface);border:3px solid var(--muted)}
+.thread li.good:before{border-color:var(--ok)}
+.thread li.warn:before{border-color:var(--med)}
+.thread li.bad:before{border-color:var(--crit)}
+.thread li.pend:before{border-style:dashed}
+.q{font-weight:700}
+.a{color:var(--muted)}
+.score{float:right;font-weight:800;font-variant-numeric:tabular-nums;margin-left:12px}
+
+table{width:100%;border-collapse:collapse;font-size:.93rem;margin:12px 0 20px}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700}
+td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+
+/* findings */
+.sev{margin:36px 0 0}
+.sev h3{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.dot{width:12px;height:12px;border-radius:50%;display:inline-block;flex:none}
+.finding{padding:16px 0;border-bottom:1px solid var(--line);display:grid;grid-template-columns:44px 1fr;gap:4px 12px}
+.finding .id{font-weight:800;font-variant-numeric:tabular-nums;color:var(--muted);font-size:1.1rem}
+.finding .t{font-weight:700}
+.finding dl{margin:6px 0 0;display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;font-size:.92rem}
+.finding dt{color:var(--muted)}
+.finding dd{margin:0}
+.tag{display:inline-block;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;font-weight:700;padding:1px 7px;border-radius:999px;border:1px solid currentColor;margin-left:6px;vertical-align:2px}
+
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:32px}
+ul.plain{padding-left:20px;margin:8px 0}
+ul.plain li{margin:4px 0}
+.check{color:var(--ok);font-weight:700}
+.cross{color:var(--crit);font-weight:700}
+footer{margin-top:72px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem}
+.themebtn{position:fixed;top:12px;right:12px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:.8rem;cursor:pointer}
+@media (max-width:700px){
+  .cols{grid-template-columns:1fr}
+  .finding{grid-template-columns:1fr}
+  .finding dl{grid-template-columns:1fr}
+  .finding dt{margin-top:4px}
+  .score{float:none;display:block}
+}
+@media (min-width:1800px){ body{font-size:18px} .wrap{max-width:1240px} }
+@media print{ .themebtn{display:none} section{break-inside:avoid-page} }
+</style>
+</head>
+<body>
+<button class="themebtn" type="button" onclick="toggleTheme()">Theme</button>
+<div class="wrap">
+
+<header class="top">
+  <div class="eyebrow">Full project &amp; production audit · Round 1 of 2</div>
+  <h1>HC Tracking — Audit Report</h1>
+  <div class="meta">
+    Target: <code>https://pt.hcsyria-apps.org</code> · Codebase: <code>hc-tracking</code> (branch <code>Security-handeling-youssef</code>) · Date: 5 October 2026
+  </div>
+  <nav class="toc" aria-label="Contents">
+    <a href="#urgent">Urgent</a><a href="#verdict">Verdict</a><a href="#what">What it is</a><a href="#method">Method &amp; scope</a>
+    <a href="#structure">File structure</a><a href="#speed">Speed &amp; latency</a><a href="#security">Security</a>
+    <a href="#scale">Scalability</a><a href="#findings">All 19 fixes</a><a href="#design">Design &amp; responsive</a>
+    <a href="#concept">Concept &amp; originality</a><a href="#roadmap">Roadmap</a><a href="#next">Round 2</a>
+  </nav>
+</header>
+
+<div class="alert" id="urgent">
+  <strong>Do these first:</strong>
+  <ol>
+    <li><b>Change or delete</b> the account <code>youssef.kharbout@hcsyria.org</code>. Its password (<code>password</code>) was shared in chat and is trivially guessable on a public production site.</li>
+    <li><b>Sign in yourself</b> in the browser pane so Round 2 (in-app UI, design bugs, responsive at every size) can run. Claude does not type passwords into production sites.</li>
+  </ol>
+</div>
+
+<!-- VERDICT -->
+<section id="verdict">
+  <h2><span class="n">01</span>Verdict at a glance</h2>
+  <p class="lede">Short answers to every question asked. Each is expanded in its own section below.</p>
+
+  <div class="figures">
+    <div class="fig"><div class="num">19</div><div class="lbl">fixes found (round 1)</div></div>
+    <div class="fig"><div class="num c-crit">1</div><div class="lbl">critical</div></div>
+    <div class="fig"><div class="num c-high">5</div><div class="lbl">high</div></div>
+    <div class="fig"><div class="num c-med">8</div><div class="lbl">medium</div></div>
+    <div class="fig"><div class="num c-low">5</div><div class="lbl">low</div></div>
+  </div>
+
+  <ul class="thread">
+    <li class="warn"><span class="score">Yes*</span><span class="q">Ready for production?</span><br><span class="a">*Yes for a small internal team (tens of users). Not yet for heavy concurrent use, large data volumes or a real DDoS.</span></li>
+    <li class="good"><span class="score">8/10</span><span class="q">Security — application code</span><br><span class="a">Well above typical Laravel apps: no SQL injection or XSS found, hardened uploads, 2FA/passkeys, layered rate limits, 0 vulnerable dependencies.</span></li>
+    <li class="bad"><span class="score">4/10</span><span class="q">Security — infrastructure / DDoS</span><br><span class="a">Single Apache origin, public IP, no CDN/WAF, Turnstile off, rate-limit counters stored in MySQL.</span></li>
+    <li class="good"><span class="score">Good</span><span class="q">Speed online (production)</span><br><span class="a">Server work is 20–150 ms; warm page response ≈ 0.2 s. Most delay is network distance, not code.</span></li>
+    <li class="warn"><span class="score">n/m</span><span class="q">Speed locally</span><br><span class="a">Not measured. Local runs with debug on and database cache/sessions, so it is not representative of production.</span></li>
+    <li class="bad"><span class="score">Unproven</span><span class="q">Scalable with many users / much data?</span><br><span class="a">Largest table ≈ 1,000 rows, most under 100. Several pages filter dates in ways that skip indexes and add up totals in PHP; this will slow down as data grows.</span></li>
+    <li class="warn"><span class="score">7/10</span><span class="q">File structure</span><br><span class="a">Clean Laravel layout, but page components are very large (up to 3,243 lines) and write logic is split two ways.</span></li>
+    <li class="good"><span class="score">Yes</span><span class="q">Original concept, not a template CRM?</span><br><span class="a">Domain-specific NGO system: logframe, results/targets, grants &amp; tranches, Gantt with dependencies, HR-linked auth, bilingual AR/EN.</span></li>
+    <li class="pend warn"><span class="score">Partial</span><span class="q">Pixel-perfect &amp; responsive (mobile → 4K)?</span><br><span class="a">Login page checked at 375 px, desktop and 3840 px; one overlap bug found. In-app pages pending Round 2.</span></li>
+    <li class="pend warn"><span class="score">Partial</span><span class="q">Functional bugs?</span><br><span class="a">No logic bugs confirmed in the code paths reviewed. A click-through of every page needs a signed-in session (Round 2).</span></li>
+  </ul>
+</section>
+
+<!-- WHAT -->
+<section id="what">
+  <h2><span class="n">02</span>What the website is, exactly</h2>
+  <p>An internal operations platform for <b>Christian Hope Center</b> that tracks the full life of humanitarian programme work, from strategy down to individual tasks, alongside the money that funds it.</p>
+  <div class="cols">
+    <div>
+      <h3>Delivery chain</h3>
+      <ul class="plain">
+        <li>Strategies → Programs → Annual plans → Projects</li>
+        <li>Milestones and Tasks (with Gantt, dependencies, baselines)</li>
+        <li>Results, Indicators, Targets, Indicator progress</li>
+        <li>Reports with draft → review → approval flow</li>
+        <li>Risks, Calendar, Timeline, Executive summary</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Funding chain</h3>
+      <ul class="plain">
+        <li>Proposals and their pipeline phases</li>
+        <li>Donors and Funding agreements</li>
+        <li>Tranches (instalments) and Transfers tracking</li>
+        <li>Bank accounts with per-account money roll-ups</li>
+        <li>Donor reports</li>
+      </ul>
+    </div>
+  </div>
+  <h3>How it works underneath</h3>
+  <ul class="plain">
+    <li><b>Sign-in:</b> staff use their <b>HR database</b> password (<code>hr_db</code>, read-only). Managers, finance and admins must enable two-factor (TOTP, email codes or passkeys).</li>
+    <li><b>Session safety:</b> each request re-checks HR (cached 60 s). If HR deactivates a person or changes their password, every open session ends.</li>
+    <li><b>Live updates:</b> notifications pushed over private websocket channels (Reverb / Pusher), with digests and alert scanners on a schedule.</li>
+    <li><b>Stack:</b> PHP 8.5, Laravel 13, Livewire 4 single-file pages, Flux UI, Tailwind 4, Vite, MySQL, Spatie Permission; served by Apache.</li>
+  </ul>
+</section>
+
+<!-- METHOD -->
+<section id="method">
+  <h2><span class="n">03</span>Method &amp; scope</h2>
+  <div class="cols">
+    <div>
+      <h3>Done in round 1</h3>
+      <ul class="plain">
+        <li><span class="check">✓</span> Live timing (cold and keep-alive) and response headers</li>
+        <li><span class="check">✓</span> Read-only GET probes of 28 sensitive/public paths</li>
+        <li><span class="check">✓</span> Production asset weights, compression and caching</li>
+        <li><span class="check">✓</span> Login page at 375 px, desktop and 3840 × 2160</li>
+        <li><span class="check">✓</span> Code review: routes, middleware, auth, policies, uploads, raw SQL, unescaped output, queries</li>
+        <li><span class="check">✓</span> <code>composer audit</code> and <code>npm audit</code></li>
+        <li><span class="check">✓</span> Local database size and index counts</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Not done (and why)</h3>
+      <ul class="plain">
+        <li><span class="cross">✗</span> Signed-in pages: Claude does not enter passwords on production sites</li>
+        <li><span class="cross">✗</span> Load / DDoS testing: never run against a live server without a planned window</li>
+        <li><span class="cross">✗</span> Local speed: not representative (debug on)</li>
+        <li><span class="cross">✗</span> Live <code>.env</code>: not visible from outside</li>
+        <li><span class="cross">✗</span> Full test suite: about 10 minutes; not run</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- STRUCTURE -->
+<section id="structure">
+  <h2><span class="n">04</span>File structure</h2>
+  <p class="lede">Verdict: a good, conventional base that has grown unevenly. Not the best possible option yet.</p>
+  <div class="tablewrap"><table>
+    <tr><th>Item</th><th>Count / size</th><th>Comment</th></tr>
+    <tr><td>PHP classes in <code>app/</code></td><td class="num">257</td><td>Clean split: Actions, Concerns, Enums, Policies, Observers, Support, Notifications.</td></tr>
+    <tr><td>Blade views</td><td class="num">208</td><td>Livewire 4 single-file pages under <code>resources/views/pages</code>.</td></tr>
+    <tr><td>Page component lines</td><td class="num">46,932</td><td>24 pages exceed 750 lines; largest is <code>proposals/⚡show</code> at 3,243.</td></tr>
+    <tr><td>Test files</td><td class="num">249</td><td>Strong coverage culture (Pest).</td></tr>
+    <tr><td>Migrations</td><td class="num">72</td><td>—</td></tr>
+    <tr><td>Action classes</td><td class="num">8 domains</td><td>Donors, Funding agreements, Projects, Proposals, Reports, Tasks, Transfers, Fortify. Other domains save inline in pages.</td></tr>
+  </table></div>
+  <h3>Strengths</h3>
+  <ul class="plain">
+    <li>Enums for every status; policies for core models; a <code>Support</code> layer for money math (<code>AgreementMoney</code>, <code>AccountMoney</code>, <code>Tranches</code>).</li>
+    <li>Committed team rules in <code>.ai/rules</code>, static analysis (Larastan) and Pint formatting.</li>
+  </ul>
+  <h3>Weaknesses</h3>
+  <ul class="plain">
+    <li>Very large single-file pages mix queries, business rules and markup, which makes them hard to review and easy to break.</li>
+    <li>Writes are handled two different ways (Action classes vs inline page methods).</li>
+    <li><code>composer.json</code> still names the project <code>laravel/livewire-starter-kit</code>; a stray <code>work/node_modules</code> folder sits in the root.</li>
+  </ul>
+</section>
+
+<!-- SPEED -->
+<section id="speed">
+  <h2><span class="n">05</span>Speed &amp; latency</h2>
+  <h3>Production, measured</h3>
+  <div class="tablewrap"><table>
+    <tr><th>Measurement</th><th>Value</th><th>Meaning</th></tr>
+    <tr><td>DNS lookup</td><td class="num">0.21 s</td><td>Cold, first visit only.</td></tr>
+    <tr><td>TCP connect</td><td class="num">≈ 0.11 s</td><td>Network round trip to 195.42.143.64.</td></tr>
+    <tr><td>TLS handshake done</td><td class="num">0.51 s</td><td>Cold.</td></tr>
+    <tr><td>Login page, cold (first byte)</td><td class="num">0.91 s</td><td>Includes all of the above.</td></tr>
+    <tr><td>Login page, new connection each time</td><td class="num">0.52–0.66 s</td><td>Mostly handshake.</td></tr>
+    <tr><td>Login page, reused connection</td><td class="num">0.23–0.34 s</td><td>Real user experience after first load.</td></tr>
+    <tr><td><code>/up</code> server render time</td><td class="num">20 ms</td><td>The app itself is fast.</td></tr>
+    <tr><td>Browser: DOM ready / load (warm cache)</td><td class="num">245 / 249 ms</td><td>Good.</td></tr>
+  </table></div>
+  <h3>Assets</h3>
+  <div class="tablewrap"><table>
+    <tr><th>File</th><th>Raw</th><th>Over the wire (gzip)</th><th>Note</th></tr>
+    <tr><td><code>app.css</code></td><td class="num">524 KB</td><td class="num">68 KB</td><td>Large for Tailwind 4; trim unused styles.</td></tr>
+    <tr><td><code>app.js</code></td><td class="num">155 KB</td><td class="num">47 KB</td><td>Fine.</td></tr>
+    <tr><td><code>apexcharts</code></td><td class="num">567 KB</td><td class="num">151 KB</td><td>Loaded as a separate chunk; ok if only on chart pages.</td></tr>
+    <tr><td><code>xlsx</code></td><td class="num">493 KB</td><td class="num">158 KB</td><td>Separate chunk; load only on preview.</td></tr>
+    <tr><td><code>docx-preview</code></td><td class="num">171 KB</td><td class="num">48 KB</td><td>Separate chunk.</td></tr>
+    <tr><td>Somar Sans fonts (6 × <code>.otf</code>)</td><td class="num">≈ 65 KB each</td><td class="num">not compressed</td><td>Convert to <code>woff2</code>; about half the size.</td></tr>
+  </table></div>
+  <ul class="plain">
+    <li><span class="check">✓</span> Built assets cached for 1 year with hashed names and gzip.</li>
+    <li><span class="cross">✗</span> HTTP/2 over TLS could not be confirmed (Apache advertises <code>Upgrade: h2</code>; verify ALPN on the server).</li>
+    <li><span class="cross">✗</span> No CDN, so every user, wherever they are, travels to one origin.</li>
+  </ul>
+  <h3>Local</h3>
+  <p>Not measured. Local <code>.env</code> has <code>APP_DEBUG=true</code>, <code>CACHE_STORE=database</code>, <code>SESSION_DRIVER=database</code>, <code>QUEUE_CONNECTION=sync</code>. Local timings will always be slower and do not predict production.</p>
+</section>
+
+<!-- SECURITY -->
+<section id="security">
+  <h2><span class="n">06</span>Security against attacks</h2>
+  <div class="tablewrap"><table>
+    <tr><th>Attack</th><th>Status</th><th>Evidence</th></tr>
+    <tr><td>SQL injection</td><td class="c-low"><b>Protected</b></td><td>All raw SQL (<code>selectRaw</code>, <code>orderByRaw</code>, <code>whereRaw</code>) uses allow-listed sort keys, integer casts or bound parameters.</td></tr>
+    <tr><td>XSS</td><td class="c-low"><b>Protected</b></td><td>Every <code>{!! !!}</code> passes values through <code>e()</code> or <code>JSON_HEX_TAG</code>; spreadsheet previews use <code>textContent</code>.</td></tr>
+    <tr><td>CSRF</td><td class="c-low"><b>Protected</b></td><td>Laravel tokens, <code>SameSite=Lax</code> cookies, <code>form-action 'self'</code>.</td></tr>
+    <tr><td>Brute force / password spraying</td><td class="c-low"><b>Protected</b></td><td>5/min per email+IP, extra per-IP and per-email limits on failures, 2FA rate limits per minute/hour/day.</td></tr>
+    <tr><td>Session hijack</td><td class="c-low"><b>Strong</b></td><td>Cookies <code>Secure</code> + <code>HttpOnly</code>; sessions end on HR password change or deactivation.</td></tr>
+    <tr><td>Malicious uploads / path traversal</td><td class="c-low"><b>Protected</b></td><td>Private disk, type from validated extension, cleaned filenames, ownership checks (404 otherwise), <code>nosniff</code>, sandbox CSP on images.</td></tr>
+    <tr><td>IDOR (other records by URL)</td><td class="c-med"><b>Partly</b></td><td>Files are bound to their parent. But view rights are role-wide, not per program (see #8).</td></tr>
+    <tr><td>Clickjacking</td><td class="c-low"><b>Protected</b></td><td><code>X-Frame-Options: SAMEORIGIN</code>, <code>frame-ancestors 'self'</code>.</td></tr>
+    <tr><td>Secret exposure</td><td class="c-low"><b>Protected</b></td><td><code>/.env</code>, <code>/.git/HEAD</code> → 403; <code>composer.json</code>, logs, <code>vendor</code> → 404; no Telescope/Horizon/debug routes.</td></tr>
+    <tr><td>Supply chain</td><td class="c-low"><b>Clean</b></td><td><code>composer audit</code>: 0 advisories. <code>npm audit</code>: 0 vulnerabilities.</td></tr>
+    <tr><td>Phishing / bots on login</td><td class="c-med"><b>Weak</b></td><td>Turnstile is built in but switched off in production.</td></tr>
+    <tr><td>DDoS</td><td class="c-crit"><b>Exposed</b></td><td>Direct Apache on a public IP, no CDN/WAF; app throttles write to MySQL, so a flood still reaches the database.</td></tr>
+    <tr><td>Script-injection fallback (CSP)</td><td class="c-med"><b>Weakened</b></td><td><code>script-src</code> allows <code>'unsafe-inline'</code> and <code>'unsafe-eval'</code>.</td></tr>
+    <tr><td>HTTPS downgrade</td><td class="c-med"><b>Weak</b></td><td>HSTS <code>max-age=86400</code> (1 day), no <code>includeSubDomains</code>.</td></tr>
+  </table></div>
+  <h3>Live response headers (login page)</h3>
+  <ul class="plain">
+    <li><span class="check">✓</span> <code>X-Content-Type-Options: nosniff</code>, <code>Referrer-Policy</code>, <code>Permissions-Policy</code>, <code>Cross-Origin-Opener-Policy: same-origin</code></li>
+    <li><span class="check">✓</span> <code>Content-Security-Policy</code> with <code>object-src 'none'</code>, <code>base-uri 'self'</code>, <code>upgrade-insecure-requests</code></li>
+    <li><span class="cross">✗</span> CSP <code>connect-src</code> still lists <code>ws://localhost:8085</code> and Pusher hosts</li>
+    <li><span class="check">✓</span> HTTP → HTTPS 301 redirect</li>
+  </ul>
+</section>
+
+<!-- SCALE -->
+<section id="scale">
+  <h2><span class="n">07</span>Scalability: many users, much data</h2>
+  <h3>Current data volume (local database)</h3>
+  <div class="tablewrap"><table>
+    <tr><th>Table</th><th>Rows</th><th>Indexes</th></tr>
+    <tr><td>notifications</td><td class="num">997</td><td class="num">7</td></tr>
+    <tr><td>activities</td><td class="num">561</td><td class="num">5</td></tr>
+    <tr><td>users</td><td class="num">203</td><td class="num">4</td></tr>
+    <tr><td>donors</td><td class="num">63</td><td class="num">5</td></tr>
+    <tr><td>milestones</td><td class="num">53</td><td class="num">6</td></tr>
+    <tr><td>tasks</td><td class="num">44</td><td class="num">6</td></tr>
+    <tr><td>proposals</td><td class="num">38</td><td class="num">4</td></tr>
+    <tr><td>projects</td><td class="num">36</td><td class="num">7</td></tr>
+    <tr><td>reports</td><td class="num">33</td><td class="num">5</td></tr>
+  </table></div>
+  <p>Every page will look fast at this size. The real question is what happens at 10k–100k rows.</p>
+  <h3>Many users</h3>
+  <ul class="plain">
+    <li>Cache, sessions, rate-limit counters and the queue all live in MySQL, so every request writes to the database.</li>
+    <li>Per-request HR check (cached 60 s per user) and HR program sync (once a minute, during a visitor's request) tie page speed to the HR database.</li>
+    <li>Realistic today: dozens of people at once. For hundreds: Redis plus a CDN first.</li>
+  </ul>
+  <h3>Much data</h3>
+  <ul class="plain">
+    <li><code>whereYear('scheduled_date', …)</code> and <code>year(coalesce(…)) = ?</code> wrap the column, so MySQL cannot use its index and scans the whole table (executive summary, finance registers).</li>
+    <li>Totals built in PHP after <code>->get()</code> on whole result sets: calendar (18 loads), dashboard (12), admin users (12), proposal page (10), executive summary (8).</li>
+    <li>35 paginated lists: good. The risk is in dashboards and summaries, not in lists.</li>
+  </ul>
+</section>
+
+<!-- FINDINGS -->
+<section id="findings">
+  <h2><span class="n">08</span>All fixes, ranked</h2>
+  <p class="lede">19 found in round 1. Ranked by how badly each one can hurt the organisation.</p>
+
+  <div class="sev">
+    <h3><span class="dot" style="background:var(--crit)"></span>Critical <span class="tag c-crit">1</span></h3>
+    <div class="finding"><div class="id">01</div><div>
+      <div class="t">Production account with password <code>password</code>, now shared in chat</div>
+      <dl><dt>Risk</dt><dd>Anyone who guesses or reads it gets that account's role on live data.</dd>
+      <dt>Fix</dt><dd>Change or delete it in HR today; use a strong unique password for any test account; never share credentials in chat.</dd>
+      <dt>Effort</dt><dd>Minutes.</dd></dl>
+    </div></div>
+  </div>
+
+  <div class="sev">
+    <h3><span class="dot" style="background:var(--high)"></span>High <span class="tag c-high">5</span></h3>
+    <div class="finding"><div class="id">02</div><div>
+      <div class="t">No CDN, WAF or DDoS protection</div>
+      <dl><dt>Where</dt><dd>Infrastructure: Apache on public IP 195.42.143.64.</dd>
+      <dt>Risk</dt><dd>A modest flood takes the site offline; the origin IP can be hit directly.</dd>
+      <dt>Fix</dt><dd>Put Cloudflare in front; set <code>TRUSTED_PROXIES=cloudflare</code> and <code>TRUSTED_PROXIES_REQUIRED=true</code> (already supported in code); firewall the server to Cloudflare ranges; fill <code>TURNSTILE_SITE_KEY</code>/<code>TURNSTILE_SECRET_KEY</code>.</dd>
+      <dt>Effort</dt><dd>Half a day.</dd></dl>
+    </div></div>
+    <div class="finding"><div class="id">03</div><div>
+      <div class="t">Cache, sessions, rate limits and queue all on MySQL</div>
+      <dl><dt>Where</dt><dd><code>.env</code>: <code>CACHE_STORE</code>, <code>SESSION_DRIVER</code>, <code>QUEUE_CONNECTION</code>.</dd>
+      <dt>Risk</dt><dd>Each request writes to the database; under load or attack the database is the first thing to fall over.</dd>
+      <dt>Fix</dt><dd>Move cache, sessions and rate limiting to Redis; run a real queue worker.</dd>
+      <dt>Effort</dt><dd>1 day including server setup.</dd></dl>
+    </div></div>
+    <div class="finding"><div class="id">04</div><div>
+      <div class="t">Queries that will slow down as data grows</div>
+      <dl><dt>Where</dt><dd><code>executive-summary/⚡index</code>, <code>dashboard/⚡index</code>, <code>calendar/⚡index</code>, finance registers.</dd>
+      <dt>Risk</dt><dd>Full table scans and large PHP memory use; summary pages get seconds-slow at tens of thousands of rows.</dd>
+      <dt>Fix</dt><dd>Replace <code>whereYear()</code>/<code>YEAR(col)</code> with <code>whereBetween(col, [start, end])</code>; compute sums and counts in SQL; add composite indexes on date + status columns; seed ≈100k rows and measure.</dd>
+      <dt>Effort</dt><dd>2–3 days.</dd></dl>
+    </div></div>
+    <div class="finding"><div class="id">05</div><div>
+      <div class="t">Oversized page components</div>
+      <dl><dt>Where</dt><dd><code>proposals/⚡show</code> 3,243 lines; <code>calendar</code> 2,270; <code>indicators</code> 2,211; <code>projects/⚡index</code> 1,933; 24 pages over 750.</dd>
+      <dt>Risk</dt><dd>Hard to review, easy to introduce bugs, heavier Livewire state on every interaction.</dd>
+      <dt>Fix</dt><dd>Split into child components or islands; move writes to Action classes; move queries to model scopes.</dd>
+      <dt>Effort</dt><dd>Ongoing; start with the top five.</dd></dl>
+    </div></div>
+    <div class="finding"><div class="id">06</div><div>
+      <div class="t">HSTS lasts only one day</div>
+      <dl><dt>Where</dt><dd><code>HSTS_MAX_AGE=86400</code>.</dd>
+      <dt>Risk</dt><dd>Browsers forget to force HTTPS after a day, leaving a downgrade window on hostile networks.</dd>
+      <dt>Fix</dt><dd>Set <code>31536000</code> and add <code>includeSubDomains</code> once all subdomains are HTTPS.</dd>
+      <dt>Effort</dt><dd>Minutes.</dd></dl>
+    </div></div>
+  </div>
+
+  <div class="sev">
+    <h3><span class="dot" style="background:var(--med)"></span>Medium <span class="tag c-med">8</span></h3>
+    <div class="finding"><div class="id">07</div><div>
+      <div class="t">Content Security Policy allows inline and eval scripts; stale hosts</div>
+      <dl><dt>Fix</dt><dd>Use the Livewire/Alpine CSP-safe build and nonces; remove <code>ws://localhost:8085</code> and unused Pusher hosts from <code>connect-src</code>.</dd></dl>
+    </div></div>
+    <div class="finding"><div class="id">08</div><div>
+      <div class="t">View permission is role-wide, not per program</div>
+      <dl><dt>Where</dt><dd><code>ProjectPolicy::view</code>, <code>ProposalPolicy::view</code> return only <code>$user->can('….view')</code>.</dd>
+      <dt>Fix</dt><dd>Confirm this is intended. If not, add program-scoped global scopes like the existing <code>TaskVisibilityScope</code>.</dd></dl>
+    </div></div>
+    <div class="finding"><div class="id">09</div><div>
+      <div class="t">Fonts shipped as uncompressed <code>.otf</code></div>
+      <dl><dt>Fix</dt><dd>Convert the six Somar Sans weights to <code>woff2</code>; preload only Regular and SemiBold.</dd></dl>
+    </div></div>
+    <div class="finding"><div class="id">10</div><div>
+      <div class="t">CSS bundle is 524 KB raw</div>
+      <dl><dt>Fix</dt><dd>Check for safelisted classes or wide <code>@source</code> globs; aim for under 150 KB raw.</dd></dl>
+    </div></div>
+    <div class="finding"><div class="id">11</div><div>
+      <div class="t">Login splash overlaps the form on mobile</div>
+      <dl><dt>Seen</dt><dd>At 375 × 812, 4 s after load, the intro logo was still drawn over the email field.</dd>
+      <dt>Fix</dt><dd>Shorten the intro, make it non-blocking, skip it on repeat visits and when reduced motion is preferred.</dd></dl>
+    </div></div>
+    <div class="finding"><div class="id">12</div><div>
+      <div class="t">Two different ways of saving data</div>
+      <dl><dt>Fix</dt><dd>Adopt Action classes everywhere (milestones, risks, results, indicators, targets, plans, strategies).</dd></dl>
+    </div></div>
+    <div class="finding"><div class="id">13</div><div>
+      <div class="t">HR program sync runs inside a visitor's request</div>
+      <dl><dt>Where</dt><dd><code>SyncProgramsFromHr</code> middleware.</dd>
+      <dt>Fix</dt><dd>Move to the scheduler (<code>everyMinute()</code>) so no user ever waits on HR.</dd></dl>
+    </div></div>
+    <div class="finding"><div class="id">14</div><div>
+      <div class="t">Production queue mode unknown</div>
+      <dl><dt>Fix</dt><dd>If production uses <code>QUEUE_CONNECTION=sync</code>, notification fan-out blocks the user's action. Use a worker (database or Redis queue).</dd></dl>
+    </div></div>
+  </div>
+
+  <div class="sev">
+    <h3><span class="dot" style="background:var(--low)"></span>Low <span class="tag c-low">5</span></h3>
+    <div class="finding"><div class="id">15</div><div><div class="t"><code>composer.json</code> still says “laravel/livewire-starter-kit”</div><dl><dt>Fix</dt><dd>Rename and describe the project.</dd></dl></div></div>
+    <div class="finding"><div class="id">16</div><div><div class="t"><code>/up</code> health page is public and shows render time</div><dl><dt>Fix</dt><dd>Restrict to monitoring IPs or return a bare 200.</dd></dl></div></div>
+    <div class="finding"><div class="id">17</div><div><div class="t">“Remember me” lasts 30 days</div><dl><dt>Fix</dt><dd>Shorten for admin and finance roles (e.g. 7 days).</dd></dl></div></div>
+    <div class="finding"><div class="id">18</div><div><div class="t">Stray <code>work/node_modules</code> folder in project root</div><dl><dt>Fix</dt><dd>Delete it (untracked).</dd></dl></div></div>
+    <div class="finding"><div class="id">19</div><div><div class="t">Login card stays ≈400 px wide on 4K</div><dl><dt>Fix</dt><dd>Fine for login; verify app pages scale on 32″ 4K in Round 2.</dd></dl></div></div>
+  </div>
+</section>
+
+<!-- DESIGN -->
+<section id="design">
+  <h2><span class="n">09</span>Design, pixel accuracy &amp; responsiveness</h2>
+  <div class="tablewrap"><table>
+    <tr><th>Screen</th><th>Login page</th><th>App pages</th></tr>
+    <tr><td>Phone 375 × 812</td><td class="c-med">Layout fits; splash overlaps form (#11)</td><td>Round 2</td></tr>
+    <tr><td>Desktop</td><td class="c-low">Clean, centred, consistent</td><td>Round 2</td></tr>
+    <tr><td>4K 3840 × 2160</td><td class="c-low">Correct but small (#19)</td><td>Round 2</td></tr>
+  </table></div>
+  <p>Code signals are positive: container queries (<code>@5xl/directory:</code>), <code>text-balance</code>, RTL-aware Arabic support, dark mode, accessible labels (<code>role="img"</code> with <code>aria-label</code> on charts). A pixel-level verdict on the app needs a signed-in session.</p>
+</section>
+
+<!-- CONCEPT -->
+<section id="concept">
+  <h2><span class="n">10</span>Concept, originality &amp; mission fit</h2>
+  <ul class="thread">
+    <li class="good"><span class="q">Innovative workflow?</span><br><span class="a">Yes. It joins delivery (logframe → targets → reports) with funding (proposals → agreements → tranches → transfers) in one system. Most NGOs run these in separate spreadsheets.</span></li>
+    <li class="good"><span class="q">Not a template / AI-generated CRM?</span><br><span class="a">Yes in structure: HR-linked identity, password-fingerprint session kill, Gantt baselines and dependencies, per-account money roll-ups and bilingual AR/EN are bespoke. Visual originality will be judged in Round 2.</span></li>
+    <li class="good"><span class="q">Delivers the mission?</span><br><span class="a">Yes for tracking programme delivery and donor money in one place with audit trails and alerts.</span></li>
+  </ul>
+</section>
+
+<!-- ROADMAP -->
+<section id="roadmap">
+  <h2><span class="n">11</span>Suggested order of work</h2>
+  <div class="tablewrap"><table>
+    <tr><th>When</th><th>Fixes</th><th>Outcome</th></tr>
+    <tr><td>Today</td><td>#01, #06</td><td>Close the open account; HTTPS enforced for a year.</td></tr>
+    <tr><td>This week</td><td>#02, #03, #13, #14</td><td>DDoS-resistant edge, database freed from cache/session load.</td></tr>
+    <tr><td>Next 2 weeks</td><td>#04, #07, #09, #10, #11</td><td>Fast with real data volume; tighter CSP; lighter pages.</td></tr>
+    <tr><td>Ongoing</td><td>#05, #08, #12, #15–#19</td><td>Maintainable codebase; confirmed data visibility rules.</td></tr>
+  </table></div>
+</section>
+
+<!-- NEXT -->
+<section id="next">
+  <h2><span class="n">12</span>Round 2: what still needs a signed-in session</h2>
+  <ul class="plain">
+    <li>Click through every page and action for functional bugs.</li>
+    <li>Screenshots of every page at 375 px, 768 px, 1440 px and 3840 px for layout and pixel accuracy.</li>
+    <li>Browser console and network errors on each page.</li>
+    <li>Real page timings for the heaviest pages (executive summary, calendar, proposals).</li>
+    <li>Optional, with approval: seed about 100k rows locally and measure query times.</li>
+  </ul>
+</section>
+
+<footer>
+  Prepared 5 October 2026 by Claude (Claude Code) on request. Read-only checks only; no load or attack traffic was sent to production.
+</footer>
+</div>
+<script>
+function toggleTheme(){
+  var r=document.documentElement;
+  var dark=r.getAttribute('data-theme')==='dark'||(!r.getAttribute('data-theme')&&matchMedia('(prefers-color-scheme: dark)').matches);
+  r.setAttribute('data-theme',dark?'light':'dark');
+}
+</script>
+</body>
+</html>

@@ -18,9 +18,6 @@ trait FiltersFinanceRegister
 {
     use SwitchesFundingView;
 
-    /** @var list<string> */
-    private const REGISTER_PAGE_SIZES = ['25', '50', '100'];
-
     #[Url(except: '')]
     public string $year = '';
 
@@ -34,8 +31,9 @@ trait FiltersFinanceRegister
     #[Url(except: '')]
     public string $sortDir = '';
 
-    #[Url(except: '25')]
-    public string $perPage = '25';
+    /** The chosen page size; empty while the page's default size applies. */
+    #[Url(except: '')]
+    public string $perPage = '';
 
     /**
      * What each column heading sorts by: its default direction and the SQL
@@ -58,6 +56,16 @@ trait FiltersFinanceRegister
             $this->normaliseRegister();
             $this->resetRegisterPage();
         }
+    }
+
+    /**
+     * Apply the filters dialog's draft. The dialog holds its choices on the
+     * client and sends them with this call, so each one has already passed
+     * through the page's updated() hooks; all that is left is the first page.
+     */
+    public function applyFilters(): void
+    {
+        $this->resetRegisterPage();
     }
 
     /**
@@ -139,9 +147,20 @@ trait FiltersFinanceRegister
         return $this->selectedYear() !== null && $this->figures === 'year';
     }
 
+    /**
+     * The page sizes the pager offers, the default first: five rows keep a
+     * register readable without scrolling.
+     *
+     * @return list<string>
+     */
+    protected function registerPageSizes(): array
+    {
+        return ['5', '10', '25'];
+    }
+
     protected function registerPerPage(): int
     {
-        return (int) $this->perPage;
+        return (int) ($this->perPage !== '' ? $this->perPage : $this->registerPageSizes()[0]);
     }
 
     /**
@@ -174,8 +193,10 @@ trait FiltersFinanceRegister
             $this->sortDir = '';
         }
 
-        if (! in_array($this->perPage, self::REGISTER_PAGE_SIZES, true)) {
-            $this->perPage = '25';
+        $sizes = $this->registerPageSizes();
+
+        if (! in_array($this->perPage, $sizes, true) || $this->perPage === $sizes[0]) {
+            $this->perPage = '';
         }
     }
 

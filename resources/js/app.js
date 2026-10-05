@@ -10,6 +10,7 @@ import './modal-shell';
 import './notification-inbox';
 import './notification-rules';
 import './file-preview';
+import './finance-filters';
 import './proposal-clock';
 import './scroll-lock';
 import './section-rail';

@@ -122,8 +122,8 @@ test('totals are kept per currency and add up to the rows shown', function () {
         ])
         ->and($totals['EUR']['budget'])->toBe(500.0);
 
-    $page->assertSeeHtml('data-register-total="USD"')
-        ->assertSeeHtml('data-register-total="EUR"')
+    $page->assertDontSeeHtml('data-register-total=')->assertSeeHtml('data-totals-currency="USD"')
+        ->assertSeeHtml('data-totals-currency="EUR"')
         ->assertDontSee('3,500.00');
 
     // A status narrows the rows, and the totals follow the rows.
@@ -235,7 +235,7 @@ test('values typed into the address bar fall back to the defaults', function () 
         ->assertSet('year', '')
         ->assertSet('figures', 'lifetime')
         ->assertSet('sortBy', '')
-        ->assertSet('perPage', '25')
+        ->assertSet('perPage', '')
         ->assertOk();
 });
 

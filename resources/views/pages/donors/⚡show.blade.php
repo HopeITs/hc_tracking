@@ -617,7 +617,6 @@ new #[Title('titles.donor')] class extends Component {
                 $canTransfers = auth()->user()->can('transfers.view');
                 $agreementRows = $this->agreementRows;
                 $columns = \App\Support\AgreementMoney::columns(withTransfers: $canTransfers);
-                $footLines = \App\Support\AgreementMoney::totals($agreementRows);
 
                 $totalLines = collect($this->moneyByCurrency)->map(fn (array $line, string $lineCurrency): array => [
                     'currency' => $lineCurrency,
@@ -686,10 +685,6 @@ new #[Title('titles.donor')] class extends Component {
                             </x-slot:actions>
                         </x-funding.agreement-row>
                     @endforeach
-
-                    <x-slot:foot>
-                        <x-funding.agreement-foot :lines="$footLines" :columns="$columns" :lead="1" />
-                    </x-slot:foot>
                 </x-funding.register>
             </section>
 

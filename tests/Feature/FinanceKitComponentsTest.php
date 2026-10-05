@@ -20,10 +20,13 @@ test('the register, its heading, the totals, the pills and the pager print the h
         ->and(Blade::render('<x-funding.totals :lines="[]" />'))->not->toContain('data-register');
 
     $filters = Blade::render('<x-funding.filters :active="true"><x-funding.pills label="Year" :pills="$pills" /></x-funding.filters>', ['pills' => [
-        ['label' => '2026', 'click' => "\$set('year', '2026')", 'active' => true, 'count' => 3, 'test' => 'year-2026'],
+        ['label' => '2026', 'model' => 'year', 'value' => '2026', 'toggle' => true, 'active' => true, 'count' => 3, 'test' => 'year-2026'],
         null,
     ]]);
 
     expect($filters)->toContain('data-finance-filters')->not->toContain('data-register')
-        ->toContain('aria-pressed="true"')->toContain('data-test="year-2026"')->toContain('data-test="reset-filters"');
+        ->toContain('aria-pressed="true"')->toContain('data-test="year-2026"')->toContain('data-test="reset-filters"')
+        ->toContain('data-test="open-filters"')->toContain('data-filter-count>1</span>')
+        ->toContain('x-data="financeFilters(')->toContain('data-test="apply-filters"')->toContain('data-filter-models="[&quot;year&quot;]"')
+        ->toContain("pick('year', '2026', true")->not->toContain('wire:click=');
 });

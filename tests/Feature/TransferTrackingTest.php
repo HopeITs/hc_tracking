@@ -639,6 +639,7 @@ test('the transfer picker names each agreement by both project numbers', functio
 
 test('the transfers search hint names the project number', function () {
     $user = User::factory()->role('Financial')->create();
+    TransfersTracking::factory()->create();
 
     Livewire::actingAs($user)
         ->test('pages::transfers.index')

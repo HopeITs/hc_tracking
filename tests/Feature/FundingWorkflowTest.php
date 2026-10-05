@@ -146,7 +146,7 @@ test('the funding flow opens a proposal that is not on the current page', functi
     $offPage = Livewire::actingAs($user)->test('pages::proposals.index')->instance()->proposals->getCollection()->modelKeys();
     $missing = $agreements->pluck('proposal_id')->diff($offPage)->first();
 
-    Livewire::actingAs($user)->test('pages::proposals.index')
+    Livewire::actingAs($user)->withQueryParams(['perPage' => '25'])->test('pages::proposals.index')
         ->assertSeeHtml('href="'.route('proposals.show', Proposal::query()->findOrFail($missing)).'"');
 });
 

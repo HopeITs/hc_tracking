@@ -509,6 +509,7 @@ test('a placeholder internal number carries the replace chip and a real one does
 
 test('the proposals search hint says it also matches the internal number', function () {
     $user = User::factory()->role('Financial')->create();
+    Proposal::factory()->create();
 
     Livewire::actingAs($user)
         ->test('pages::proposals.index')

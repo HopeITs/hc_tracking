@@ -193,7 +193,7 @@ test('values a visitor types into the address bar fall back to the defaults', fu
         ->assertSet('max', '')
         ->assertSet('sortBy', '')
         ->assertSet('sortDir', '')
-        ->assertSet('perPage', '25')
+        ->assertSet('perPage', '')
         ->assertSet('donor', '')
         ->assertSet('account', '')
         ->assertSet('sort', 'attention')
@@ -271,8 +271,8 @@ test('table totals never add currencies together and never net an overage agains
         ->and($totals['USD']['overage'])->toBe(30000.0)
         ->and($totals['EUR']['expected'])->toBe(7000.0);
 
-    $page->assertSeeHtml('data-register-total="USD"')
-        ->assertSeeHtml('data-register-total="EUR"')
+    $page->assertDontSeeHtml('data-register-total=')->assertSeeHtml('data-totals-currency="USD"')
+        ->assertSeeHtml('data-totals-currency="EUR"')
         ->assertSee('−10,000.00')
         ->assertSee('+30,000.00')
         ->assertDontSee('157,000.00');
@@ -325,7 +325,7 @@ test('a group subtotal covers the whole group even when the group runs onto the 
 
     $page = transferRegister()->set('group', 'donor');
 
-    expect($page->instance()->rows)->toHaveCount(25)
+    expect($page->instance()->rows)->toHaveCount(5)
         ->and((float) $page->instance()->groupTotals->get((string) $donor->id)->first()->sent)->toBe(2600.0);
 
     $page->assertSeeHtml('data-group="'.$donor->id.'"')
@@ -349,12 +349,12 @@ test('the page size can be changed and an unknown size is ignored', function () 
 
     $page = transferRegister();
 
+    expect($page->instance()->rows)->toHaveCount(5);
+
+    $page->set('perPage', '25');
     expect($page->instance()->rows)->toHaveCount(25);
 
-    $page->set('perPage', '50');
-    expect($page->instance()->rows)->toHaveCount(30);
-
-    $page->set('perPage', '5000')->assertSet('perPage', '25');
+    $page->set('perPage', '5000')->assertSet('perPage', '');
 });
 
 test('reset filters clears every filter and keeps the view, the grouping and the sort', function () {

@@ -42,7 +42,13 @@ test('values from the address bar fall back to the defaults', function () {
     Livewire::withQueryParams(['view' => 'grid', 'year' => '20x6', 'figures' => 'decade', 'sortBy' => 'id;drop', 'sortDir' => 'up', 'perPage' => '7'])
         ->test(registerProbe())
         ->assertSet('view', 'table')->assertSet('year', '')->assertSet('figures', 'lifetime')
-        ->assertSet('sortBy', '')->assertSet('sortDir', '')->assertSet('perPage', '25');
+        ->assertSet('sortBy', '')->assertSet('sortDir', '')->assertSet('perPage', '');
+});
+
+test('the default page size stays out of the address bar', function () {
+    Livewire::test(registerProbe())
+        ->set('perPage', '10')->assertSet('perPage', '10')
+        ->set('perPage', '5')->assertSet('perPage', '');
 });
 
 test('year only needs a year', function () {

@@ -1143,8 +1143,9 @@ new #[Title('titles.proposals')] class extends Component {
     $showsOverview = $this->view === 'overview';
     $canAgreements = $this->canViewAgreements();
     $canTransfers = $canAgreements && $this->canViewTransfers();
-    $filtersAreActive = collect([$this->search, $this->status, $this->phase, $this->donor, $this->currency, $this->flag, $this->year])
-        ->contains(fn (string $value): bool => $value !== '');
+    $activeFilterCount = collect([$this->search, $this->status, $this->phase, $this->donor, $this->currency, $this->flag, $this->year])
+        ->filter(fn (string $value): bool => $value !== '')
+        ->count();
     $total = $showsOverview ? $this->proposals->total() : $this->proposalCount;
 
     $mutedText = 'text-secondary-medium dark:text-ink-muted';
@@ -1172,41 +1173,41 @@ new #[Title('titles.proposals')] class extends Component {
 
     $setPill = fn (string $property, string $value, string $label): array => [
         'label' => $label,
-        'click' => "\$set('{$property}', '".($chosen[$property] === $value ? '' : $value)."')",
+        'model' => $property, 'value' => $value, 'toggle' => true,
         'active' => $chosen[$property] === $value,
     ];
 
     $yearPills = [
-        ['label' => __('finance_tables.all_years'), 'click' => "\$set('year', '')", 'active' => $chosen['year'] === ''],
+        ['default' => true, 'label' => __('finance_tables.all_years'), 'model' => 'year', 'value' => '', 'active' => $chosen['year'] === ''],
         ...array_map(fn (int $option): array => $setPill('year', (string) $option, (string) $option), $canTransfers ? $this->yearOptions : []),
     ];
     $figurePills = [
-        ['label' => __('finance_tables.figures_lifetime'), 'click' => "\$set('figures', 'lifetime')", 'active' => $chosen['figures'] === 'lifetime'],
-        ['label' => __('finance_tables.figures_year', ['year' => $chosen['year']]), 'click' => "\$set('figures', 'year')", 'active' => $chosen['figures'] === 'year'],
+        ['default' => true, 'label' => __('finance_tables.figures_lifetime'), 'model' => 'figures', 'value' => 'lifetime', 'active' => $chosen['figures'] === 'lifetime'],
+        ['label' => __('finance_tables.figures_year', ['year' => $chosen['year']]), 'model' => 'figures', 'value' => 'year', 'active' => $chosen['figures'] === 'year'],
     ];
     $statusPills = [
-        ['label' => __('finance_tables.all'), 'click' => "\$set('status', '')", 'active' => $chosen['status'] === ''],
+        ['default' => true, 'label' => __('finance_tables.all'), 'model' => 'status', 'value' => '', 'active' => $chosen['status'] === ''],
         ...array_map(fn (ProposalStatus $case): array => $setPill('status', $case->value, $case->label()), ProposalStatus::cases()),
     ];
     /* The pipeline counts ignore the phase filter itself, so every phase stays countable. */
     $phasePills = [
-        ['label' => __('finance_tables.all'), 'click' => "togglePhase('')", 'active' => $chosen['phase'] === ''],
+        ['default' => true, 'label' => __('finance_tables.all'), 'model' => 'phase', 'value' => '', 'active' => $chosen['phase'] === ''],
         ...array_map(fn (array $stop): array => [
             'label' => $stop['phase']->label(),
-            'click' => "togglePhase('{$stop['phase']->value}')",
+            'model' => 'phase', 'value' => $stop['phase']->value, 'toggle' => true,
             'active' => $chosen['phase'] === $stop['phase']->value,
             'count' => $stop['count'],
             'test' => 'phase-'.$stop['phase']->value,
         ], $this->pipeline),
     ];
     $currencyPills = [
-        ['label' => __('finance_tables.all'), 'click' => "\$set('currency', '')", 'active' => $chosen['currency'] === ''],
+        ['default' => true, 'label' => __('finance_tables.all'), 'model' => 'currency', 'value' => '', 'active' => $chosen['currency'] === ''],
         ...array_map(fn (Currency $case): array => $setPill('currency', $case->value, $case->value), Currency::cases()),
     ];
     $flagPills = array_values(array_filter([
-        ['label' => __('finance_tables.flag_no_agreement'), 'click' => "toggleFlag('no_agreement')", 'active' => $chosen['flag'] === 'no_agreement', 'test' => 'flag-no-agreement'],
-        $canTransfers ? ['label' => __('finance_tables.flag_has_overdue'), 'click' => "toggleFlag('overdue')", 'active' => $chosen['flag'] === 'overdue', 'tone' => 'critical', 'test' => 'flag-overdue'] : null,
-        ['label' => __('finance_tables.flag_report_overdue'), 'click' => "toggleFlag('report_overdue')", 'active' => $chosen['flag'] === 'report_overdue', 'test' => 'flag-report-overdue'],
+        ['label' => __('finance_tables.flag_no_agreement'), 'model' => 'flag', 'value' => 'no_agreement', 'toggle' => true, 'active' => $chosen['flag'] === 'no_agreement', 'test' => 'flag-no-agreement'],
+        $canTransfers ? ['label' => __('finance_tables.flag_has_overdue'), 'model' => 'flag', 'value' => 'overdue', 'toggle' => true, 'active' => $chosen['flag'] === 'overdue', 'tone' => 'critical', 'test' => 'flag-overdue'] : null,
+        ['label' => __('finance_tables.flag_report_overdue'), 'model' => 'flag', 'value' => 'report_overdue', 'toggle' => true, 'active' => $chosen['flag'] === 'report_overdue', 'test' => 'flag-report-overdue'],
     ]));
 @endphp
 
@@ -1216,21 +1217,55 @@ new #[Title('titles.proposals')] class extends Component {
         :title="__('common.proposals')"
         :count="$total"
     >
-        <x-slot:filters>
-            <x-ui.input type="search" icon="magnifying-glass" :label="__('proposals.search_proposals')" :placeholder="__('proposals.name_or_notes')" wire:model.live.debounce.300ms="search" clearable />
-
-            @if ($canAgreements)
-                <x-ui.header-filter-select :label="__('funding_agreements.donor')" wire:model.live="donor" :value="$this->donor">
-                    <flux:select.option value="">{{ __('funding_agreements.all_donors') }}</flux:select.option>
-                    @foreach ($this->filterDonors as $donorOption)
-                        <flux:select.option :value="$donorOption->id" :wire:key="'proposal-donor-'.$donorOption->id">{{ $donorOption->name }}</flux:select.option>
-                    @endforeach
-                </x-ui.header-filter-select>
-            @endif
-        </x-slot:filters>
-
         <x-slot:actions>
             <div class="flex flex-wrap items-center justify-end gap-2">
+                @if ($this->hasAnyProposal)
+                    <x-funding.filters :active="$activeFilterCount" :results="$total">
+                        <div class="directory-filters grid gap-3 sm:grid-cols-2">
+                            <x-ui.input type="search" icon="magnifying-glass" :label="__('proposals.search_proposals')" :placeholder="__('proposals.name_or_notes')" wire:model="search" clearable />
+
+                            @if ($canAgreements)
+                                <x-ui.header-filter-select deferred :label="__('funding_agreements.donor')" wire:model="donor" :value="$this->donor">
+                                    <flux:select.option value="">{{ __('funding_agreements.all_donors') }}</flux:select.option>
+                                    @foreach ($this->filterDonors as $donorOption)
+                                        <flux:select.option :value="$donorOption->id" :wire:key="'proposal-donor-'.$donorOption->id">{{ $donorOption->name }}</flux:select.option>
+                                    @endforeach
+                                </x-ui.header-filter-select>
+                            @endif
+                        </div>
+
+                        {{-- A year narrows by tranches, so it is offered only to someone who may see them. --}}
+                        @if ($canTransfers)
+                            <x-funding.pills :label="__('finance_tables.year')" :pills="$yearPills" />
+
+                            @if ($selectedYear !== null)
+                                <x-funding.pills :label="__('finance_tables.figures_label')" :pills="$figurePills" />
+                            @endif
+                        @endif
+
+                        <x-funding.pills :label="__('common.status')" :pills="$statusPills" />
+
+                        {{-- The Overview view chooses the phase on its own pipeline rail. --}}
+                        @unless ($showsOverview)
+                            <x-funding.pills :label="__('proposals.phase')" :pills="$phasePills" />
+                        @endunless
+
+                        @if ($canAgreements)
+                            <x-funding.pills :label="__('common.currency')" :pills="$currencyPills" />
+                            <x-funding.pills :label="__('finance_tables.flags')" :pills="$flagPills" />
+                        @endif
+
+                        @if ($this->donorFilterName !== null)
+                            <x-funding.filter-row :label="__('funding_agreements.donor')" on :watch="['donor']" :models="['donor']" x-show="filled(['donor'])">
+                                <button type="button" x-on:click="pick('donor', '')" class="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-funding-soft ps-3 pe-2 text-xs font-semibold text-funding transition-colors hover:bg-funding hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink dark:hover:text-surface-0" aria-label="{{ __('proposals.remove_donor_filter', ['name' => $this->donorFilterName]) }}" data-donor-chip>
+                                    {{ __('proposals.funded_by', ['name' => $this->donorFilterName]) }}
+                                    <flux:icon.x-mark variant="micro" class="size-3.5" />
+                                </button>
+                            </x-funding.filter-row>
+                        @endif
+                    </x-funding.filters>
+                @endif
+
                 <x-ui.view-toggle
                     :label="__('finance_tables.view_label')"
                     wire-model="view"
@@ -1242,54 +1277,18 @@ new #[Title('titles.proposals')] class extends Component {
                 />
 
                 @if ($this->hasAnyProposal)
-                    <x-ui.button icon="arrow-down-tray" class="min-h-11 touch-manipulation @sm/directory:min-h-10" wire:click="exportCsv" wire:loading.attr="disabled" wire:target="exportCsv" data-test="export-csv">
+                    <x-ui.button icon="arrow-down-tray" class="page-action" wire:click="exportCsv" wire:loading.attr="disabled" wire:target="exportCsv" data-test="export-csv">
                         {{ __('finance_tables.export_csv') }}
                     </x-ui.button>
                 @endif
 
                 @can('create', App\Models\Proposal::class)
-                <x-ui.button tone="primary" icon="plus" class="min-h-11 touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-proposal-button">
+                <x-ui.button tone="primary" icon="plus" class="page-action page-action-primary" wire:click="openCreateModal" data-test="create-proposal-button">
                     {{ __('proposals.add_proposal') }}
                 </x-ui.button>
                 @endcan
             </div>
         </x-slot:actions>
-
-        @if ($this->hasAnyProposal)
-            <x-slot:summary>
-                <x-funding.filters :active="$filtersAreActive">
-                    {{-- A year narrows by tranches, so it is offered only to someone who may see them. --}}
-                    @if ($canTransfers)
-                        <x-funding.pills :label="__('finance_tables.year')" :pills="$yearPills" />
-
-                        @if ($selectedYear !== null)
-                            <x-funding.pills :label="__('finance_tables.figures_label')" :pills="$figurePills" />
-                        @endif
-                    @endif
-
-                    <x-funding.pills :label="__('common.status')" :pills="$statusPills" />
-
-                    {{-- The Overview view chooses the phase on its own pipeline rail. --}}
-                    @unless ($showsOverview)
-                        <x-funding.pills :label="__('proposals.phase')" :pills="$phasePills" />
-                    @endunless
-
-                    @if ($canAgreements)
-                        <x-funding.pills :label="__('common.currency')" :pills="$currencyPills" />
-                        <x-funding.pills :label="__('finance_tables.flags')" :pills="$flagPills" />
-                    @endif
-
-                    @if ($this->donorFilterName !== null)
-                        <x-funding.filter-row :label="__('funding_agreements.donor')">
-                            <button type="button" wire:click="toggleDonor({{ (int) $this->donor }})" class="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-funding-soft ps-3 pe-2 text-xs font-semibold text-funding transition-colors hover:bg-funding hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink dark:hover:text-surface-0" aria-label="{{ __('proposals.remove_donor_filter', ['name' => $this->donorFilterName]) }}" data-donor-chip>
-                                {{ __('proposals.funded_by', ['name' => $this->donorFilterName]) }}
-                                <flux:icon.x-mark variant="micro" class="size-3.5" />
-                            </button>
-                        </x-funding.filter-row>
-                    @endif
-                </x-funding.filters>
-            </x-slot:summary>
-        @endif
     </x-ui.page-header>
 
     @if (! $this->hasAnyProposal)
@@ -1456,15 +1455,15 @@ new #[Title('titles.proposals')] class extends Component {
                     <td>
                         @unless ($isRepeat)
                             <span class="flex items-center justify-end">
-                                <x-ui.button tone="ghost" size="sm" icon="eye" class="size-8!" :href="route('proposals.show', $proposal)" wire:navigate :aria-label="__('common.view_name', ['name' => $proposal->name])" />
+                                <x-ui.button tone="ghost" size="sm" icon="eye" icon:variant="outline" class="size-8!" :href="route('proposals.show', $proposal)" wire:navigate :aria-label="__('common.view_name', ['name' => $proposal->name])" />
                                 @can('update', $proposal)
                                     {{-- Status only moves with an audit note, so this opens the same form the dossier did. --}}
-                                    <x-ui.button tone="ghost" size="sm" icon="arrows-right-left" class="size-8!" wire:click="openStageModal({{ $proposal->id }})" :aria-label="__('proposals.change_status')" data-test="advance-proposal-{{ $proposal->id }}" />
-                                    <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-8!" wire:click="openEditModal({{ $proposal->id }})" :aria-label="__('common.edit_name', ['name' => $proposal->name])" />
+                                    <x-ui.button tone="ghost" size="sm" icon="arrows-right-left" icon:variant="outline" class="size-8!" wire:click="openStageModal({{ $proposal->id }})" :aria-label="__('proposals.change_status')" data-test="advance-proposal-{{ $proposal->id }}" />
+                                    <x-ui.button tone="ghost" size="sm" icon="pencil-square" icon:variant="outline" class="size-8!" wire:click="openEditModal({{ $proposal->id }})" :aria-label="__('common.edit_name', ['name' => $proposal->name])" />
                                 @endcan
                                 @can('delete', $proposal)
                                     @if ($proposal->donor_proposals_count === 0)
-                                        <x-ui.button tone="ghost" size="sm" icon="trash" class="size-8!" wire:click="confirmDelete({{ $proposal->id }})" :aria-label="__('common.delete_name', ['name' => $proposal->name])" />
+                                        <x-ui.button tone="ghost" size="sm" icon="trash" icon:variant="outline" class="size-8!" wire:click="confirmDelete({{ $proposal->id }})" :aria-label="__('common.delete_name', ['name' => $proposal->name])" />
                                     @else
                                         <flux:tooltip :content="__('proposals.funded_proposals_cannot_be_deleted_remove_the_funding_agreem')">
                                             <span class="inline-flex size-8 cursor-not-allowed items-center justify-center text-secondary-light" aria-disabled="true" tabindex="0" aria-label="{{ __('proposals.funded_proposals_cannot_be_deleted_remove_the_funding_agreem') }}">
@@ -1478,39 +1477,9 @@ new #[Title('titles.proposals')] class extends Component {
                     </td>
                 </tr>
             @endforeach
-
-            @if ($canAgreements)
-                <x-slot:foot>
-                    @foreach ($totals as $line)
-                        <tr wire:key="proposal-total-{{ $line['currency'] }}" data-register-total="{{ $line['currency'] }}">
-                            <td colspan="7" data-wide>
-                                {{ __('finance_tables.total') }}
-                                <span class="sub">{{ trans_choice('finance_tables.count_proposals', $line['proposals'], ['count' => $line['proposals']]) }}</span>
-                            </td>
-                            <td class="num" data-label="{{ __('finance_tables.agreements') }}"><span class="fig">{{ $line['agreements'] }}</span></td>
-                            <td data-label="{{ __('common.currency') }}">{{ $line['currency'] }}</td>
-                            <td class="num" data-label="{{ __('common.committed') }}"><span class="fig">{{ $money($line['committed']) }}</span></td>
-                            @if ($canTransfers)
-                                <td class="num" data-label="{{ __('finance_tables.received') }}"><span class="fig text-funding">{{ $money($line['received']) }}</span></td>
-                                <td class="num" data-label="{{ __('finance_tables.percent_received') }}"><span class="fig">{{ DonorProposal::percentLabel($line['received'], $line['committed']) }}%</span></td>
-                                @if ($showsYearColumns)
-                                    <td class="num" data-label="{{ __('finance_tables.due_in_year', ['year' => $selectedYear]) }}"><span class="fig">{{ $money($line['due_in_year']) }}</span></td>
-                                    <td class="num" data-label="{{ __('finance_tables.received_in_year', ['year' => $selectedYear]) }}"><span class="fig text-funding">{{ $money($line['received_in_year']) }}</span></td>
-                                @endif
-                                @unless ($yearOnly)
-                                    <td class="num" data-label="{{ __('finance_tables.outstanding') }}"><span class="fig">{{ $money($line['outstanding']) }}</span></td>
-                                @endunless
-                                <td class="num" data-label="{{ __('finance_tables.overdue') }}"><span @class(['fig', 'text-status-critical' => $line['overdue'] > 0])>{{ $money($line['overdue']) }}</span></td>
-                                <td></td>
-                            @endif
-                            <td></td>
-                        </tr>
-                    @endforeach
-                </x-slot:foot>
-            @endif
         </x-funding.register>
 
-        <x-funding.pager :paginator="$this->rows" :per-page="$this->perPage" scroll-to="#proposal-pipeline-heading" />
+        <x-funding.pager :paginator="$this->rows" :per-page="(string) $this->registerPerPage()" :sizes="$this->registerPageSizes()" scroll-to="#proposal-pipeline-heading" />
     @endif
 
 

@@ -4,6 +4,7 @@
     'searchable' => null,
     'searchLabel' => null,
     'value' => '',
+    'deferred' => false,
 ])
 
 @php
@@ -44,7 +45,8 @@
     $menuItemClasses = 'flex items-center px-2 py-1.5 w-full focus:outline-hidden select-none rounded-md text-start text-sm font-medium [&[disabled]]:opacity-50 text-zinc-800 data-active:bg-zinc-50 dark:text-white dark:data-active:bg-zinc-600 **:data-flux-menu-item-icon:text-zinc-400 dark:**:data-flux-menu-item-icon:text-white/60 [&[data-active]_[data-flux-menu-item-icon]]:text-current';
 @endphp
 
-<div class="min-w-0" data-header-filter-select>
+{{-- `deferred` writes the choice to Livewire's client state only (the finance filters dialog applies it later), so the label and the check follow $wire instead of the server. --}}
+<div class="min-w-0" data-header-filter-select @if ($deferred) data-filter-models="{{ json_encode([$model]) }}" @endif>
     <label for="{{ $id }}" class="mb-1.5 block text-[11px] font-semibold uppercase leading-4 tracking-[0.1em] text-secondary-medium dark:text-ink-muted">
         {{ $label }}
     </label>
@@ -57,7 +59,11 @@
             class="program-filter-trigger w-full! justify-between!"
             :aria-label="$label"
         >
-            <span class="truncate">{{ $selectedLabel }}</span>
+            @if ($deferred)
+                <span class="truncate" x-text="{{ Illuminate\Support\Js::from(collect($options)->pluck('label', 'value')) }}[String($wire.{{ $model }} ?? '')] ?? {{ Illuminate\Support\Js::from($options[0]['label'] ?? '') }}">{{ $selectedLabel }}</span>
+            @else
+                <span class="truncate">{{ $selectedLabel }}</span>
+            @endif
         </flux:button>
 
         <flux:menu class="program-filter-menu">
@@ -83,7 +89,11 @@
                     type="button"
                     class="{{ $menuItemClasses }}"
                     data-flux-menu-item
-                    wire:click="$set('{{ $model }}', {{ Illuminate\Support\Js::from($option['value']) }})"
+                    @if ($deferred)
+                        x-on:click="pick('{{ $model }}', {{ Illuminate\Support\Js::from($option['value']) }})"
+                    @else
+                        wire:click="$set('{{ $model }}', {{ Illuminate\Support\Js::from($option['value']) }})"
+                    @endif
                     x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
                     @disabled($option['disabled'])
                     @if ($selectedValue === $option['value']) data-selected="true" @endif
@@ -92,7 +102,9 @@
                     <div class="w-7 hidden [[data-flux-menu]:has(>[data-flux-menu-item-has-icon])_&]:block"></div>
                     <span class="min-w-0 truncate">{{ $option['label'] }}</span>
 
-                    @if ($selectedValue === $option['value'])
+                    @if ($deferred)
+                        <flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" x-show="is('{{ $model }}', {{ Illuminate\Support\Js::from($option['value']) }})" />
+                    @elseif ($selectedValue === $option['value'])
                         <flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" />
                     @endif
                 </button>
