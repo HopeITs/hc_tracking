@@ -387,13 +387,9 @@ new #[Title('titles.strategy')] class extends Component {
                                 <div class="flex size-8 shrink-0 items-center justify-center rounded-md bg-secondary-soft text-secondary-dark dark:bg-surface-2 dark:text-ink">
                                     <flux:icon.briefcase class="size-4" />
                                 </div>
-                                @if (Route::has('programs.show'))
-                                    <a href="{{ route('programs.show', $program) }}" wire:navigate class="truncate font-semibold text-secondary-dark hover:underline dark:text-ink">
-                                        {{ $program->name }}
-                                    </a>
-                                @else
-                                    <p class="truncate font-semibold text-secondary-dark dark:text-ink">{{ $program->name }}</p>
-                                @endif
+                                <a href="{{ route('programs.show', $program) }}" wire:navigate class="truncate font-semibold text-secondary-dark hover:underline dark:text-ink">
+                                    {{ $program->name }}
+                                </a>
                             </div>
                         </x-ui.data-table.cell>
                         <x-ui.data-table.cell :label="__('programs.manager')">

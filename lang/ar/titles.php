@@ -25,7 +25,6 @@ return [
     'reports' => 'التقارير',
     'results_framework' => 'إطار النتائج',
     'risks' => 'المخاطر',
-    'roles_and_permissions' => 'الأدوار والصلاحيات',
     'security_settings' => 'إعدادات الأمان',
     'strategies' => 'الاستراتيجيات',
     'strategy' => 'الاستراتيجية',

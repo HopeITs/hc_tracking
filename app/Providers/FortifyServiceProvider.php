@@ -3,9 +3,7 @@
 namespace App\Providers;
 
 use App\Actions\Fortify\AuthenticateWithHrAccount;
-use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\RedirectIfTwoFactorRequired;
-use App\Actions\Fortify\ResetUserPassword;
 use App\Http\Responses\LoginResponse;
 use App\Http\Responses\TwoFactorLoginResponse;
 use App\Models\User;
@@ -48,9 +46,6 @@ class FortifyServiceProvider extends ServiceProvider
      */
     private function configureActions(): void
     {
-        Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
-        Fortify::createUsersUsing(CreateNewUser::class);
-
         // After the password: the authenticator app challenge, or an emailed code.
         Fortify::redirectUserForTwoFactorAuthenticationUsing(RedirectIfTwoFactorRequired::class);
 
@@ -75,9 +70,6 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::loginView(fn () => view('pages::auth.login'));
         Fortify::twoFactorChallengeView(fn () => view('pages::auth.two-factor-challenge'));
         Fortify::confirmPasswordView(fn () => view('pages::auth.confirm-password'));
-        Fortify::registerView(fn () => view('pages::auth.register'));
-        Fortify::resetPasswordView(fn () => view('pages::auth.reset-password'));
-        Fortify::requestPasswordResetLinkView(fn () => view('pages::auth.forgot-password'));
     }
 
     /**

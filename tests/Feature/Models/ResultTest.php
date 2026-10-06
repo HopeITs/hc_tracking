@@ -73,16 +73,12 @@ test('a result subtree eager-loaded through childrenRecursive costs no further q
         ->and(DB::getQueryLog())->toBeEmpty();
 });
 
-test('a result knows its depth and whether it is a root or a leaf', function () {
+test('a result knows its depth', function () {
     $impact = Result::factory()->type(ResultType::Impact)->create();
     $outcome = Result::factory()->type(ResultType::Outcome)->childOf($impact)->create();
 
     expect($impact->depth())->toBe(0)
-        ->and($impact->isRoot())->toBeTrue()
-        ->and($impact->isLeaf())->toBeFalse()
-        ->and($outcome->depth())->toBe(1)
-        ->and($outcome->isRoot())->toBeFalse()
-        ->and($outcome->isLeaf())->toBeTrue();
+        ->and($outcome->depth())->toBe(1);
 });
 
 test('the roots scope returns only top-level results', function () {
@@ -105,19 +101,5 @@ test('parentRecursive eager-loads a breadcrumb chain without a query per level',
     expect($loaded->parentRecursive->id)->toBe($outcome->id)
         ->and($loaded->parentRecursive->parentRecursive->id)->toBe($impact->id)
         ->and($loaded->parentRecursive->parentRecursive->parentRecursive)->toBeNull()
-        ->and(DB::getQueryLog())->toBeEmpty();
-});
-
-test('isLeaf answers from an eager-loaded subtree without querying', function () {
-    $impact = Result::factory()->type(ResultType::Impact)->create();
-    Result::factory()->type(ResultType::Outcome)->childOf($impact)->create();
-
-    $root = Result::query()->with('childrenRecursive')->findOrFail($impact->id);
-
-    DB::flushQueryLog();
-    DB::enableQueryLog();
-
-    expect($root->isLeaf())->toBeFalse()
-        ->and($root->childrenRecursive->first()->isLeaf())->toBeTrue()
         ->and(DB::getQueryLog())->toBeEmpty();
 });

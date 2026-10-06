@@ -21,17 +21,12 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Component;
-/* @chisel-passkeys */
 use Laravel\Passkeys\Actions\DeletePasskey;
-/* @end-chisel-passkeys */
-/* @chisel-2fa */
 use Livewire\Attributes\On;
-/* @end-chisel-2fa */
 
 new #[Title('titles.security_settings')] class extends Component {
     use RequiresConfirmedPassword;
 
-    /* @chisel-2fa */
     #[Locked]
     public bool $canManageTwoFactor;
 
@@ -47,7 +42,6 @@ new #[Title('titles.security_settings')] class extends Component {
      */
     #[Locked]
     public bool $twoFactorRequired = false;
-    /* @end-chisel-2fa */
 
     /**
      * Whether each sign-in asks for a code emailed to the user
@@ -65,7 +59,6 @@ new #[Title('titles.security_settings')] class extends Component {
     #[Locked]
     public bool $canManageSignedInDevices;
 
-    /* @chisel-passkeys */
     #[Locked]
     public bool $canManagePasskeys;
 
@@ -79,7 +72,6 @@ new #[Title('titles.security_settings')] class extends Component {
 
     #[Locked]
     public string $deletingPasskeyName = '';
-    /* @end-chisel-passkeys */
 
     /**
      * Turn the emailed sign-in code on or off for the signed-in user.
@@ -110,7 +102,6 @@ new #[Title('titles.security_settings')] class extends Component {
      */
     public function mount(DisableTwoFactorAuthentication $disableTwoFactorAuthentication): void
     {
-        /* @chisel-2fa */
         $this->canManageTwoFactor = Features::canManageTwoFactorAuthentication();
 
         if ($this->canManageTwoFactor) {
@@ -122,24 +113,20 @@ new #[Title('titles.security_settings')] class extends Component {
             $this->requiresConfirmation = Features::optionEnabled(Features::twoFactorAuthentication(), 'confirm');
             $this->twoFactorRequired = EnsureTwoFactorIsEnabled::appIsOnlyFactorFor(auth()->user());
         }
-        /* @end-chisel-2fa */
 
         $this->emailTwoFactorEnabled = auth()->user()->usesEmailTwoFactor();
         $this->emailTwoFactorRequired = EnsureTwoFactorIsEnabled::emailCodeRequiredFor(auth()->user());
 
         $this->canManageSignedInDevices = config('session.driver') === 'database';
 
-        /* @chisel-passkeys */
         $this->canManagePasskeys = Features::canManagePasskeys();
 
         if ($this->canManagePasskeys) {
             $this->loadPasskeys();
         }
-        /* @end-chisel-passkeys */
     }
 
 
-    /* @chisel-passkeys */
     /**
      * Load the user's passkeys.
      */
@@ -203,9 +190,7 @@ new #[Title('titles.security_settings')] class extends Component {
         $this->deletingPasskeyId = null;
         $this->deletingPasskeyName = '';
     }
-    /* @end-chisel-passkeys */
 
-    /* @chisel-2fa */
     /**
      * Handle the two-factor authentication enabled event.
      */
@@ -239,7 +224,6 @@ new #[Title('titles.security_settings')] class extends Component {
 
         Flux::toast(variant: 'success', text: __('settings.two_factor_authentication_disabled'));
     }
-    /* @end-chisel-2fa */
 
     /**
      * What a new sign-in asks for after the password: the authenticator app
@@ -475,7 +459,6 @@ new #[Title('titles.security_settings')] class extends Component {
                     @endif
                 </x-security.step>
 
-                {{-- @chisel-2fa --}}
                 @if ($appStepAvailable)
                     <x-security.step
                         :title="__('settings.app_2fa_heading')"
@@ -522,17 +505,13 @@ new #[Title('titles.security_settings')] class extends Component {
                         @endif
                     </x-security.step>
                 @endif
-                {{-- @end-chisel-2fa --}}
             </ol>
 
-            {{-- @chisel-2fa --}}
             @if ($appStepAvailable && ! $twoFactorEnabled)
                 <livewire:pages::settings.two-factor-setup-modal :requires-confirmation="$requiresConfirmation" />
             @endif
-            {{-- @end-chisel-2fa --}}
         </section>
 
-        {{-- @chisel-passkeys --}}
         @if ($canManagePasskeys)
             <section aria-labelledby="passkeys-heading" class="grid gap-5 border-t border-secondary-soft pt-10 dark:border-line" data-test="passkeys">
                 <div>
@@ -586,7 +565,6 @@ new #[Title('titles.security_settings')] class extends Component {
                 <x-passkey-registration />
             </section>
         @endif
-        {{-- @end-chisel-passkeys --}}
 
         {{-- Devices: where this account is signed in, and which browsers skip the sign-in code. --}}
         <section aria-labelledby="devices-heading" class="grid gap-10 border-t border-secondary-soft pt-10 dark:border-line">
@@ -690,7 +668,6 @@ new #[Title('titles.security_settings')] class extends Component {
         </section>
     </div>
 
-    {{-- @chisel-passkeys --}}
     <flux:modal
         name="delete-passkey-modal"
         class="max-w-md md:min-w-md"
@@ -715,5 +692,4 @@ new #[Title('titles.security_settings')] class extends Component {
             </div>
         </div>
     </flux:modal>
-    {{-- @end-chisel-passkeys --}}
 </section>

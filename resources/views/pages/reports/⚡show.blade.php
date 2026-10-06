@@ -416,8 +416,8 @@ new #[Title('titles.report')] class extends Component {
 
     $sourceHref = match (true) {
         $planIndicator->source === null => null,
-        $planIndicator->source_type === 'annual_plan' && Route::has('annual-plans.show') => route('annual-plans.show', $planIndicator->source),
-        $planIndicator->source_type !== 'annual_plan' && Route::has('proposals.show') && auth()->user()->can('proposals.view') => route('proposals.show', $planIndicator->source),
+        $planIndicator->source_type === 'annual_plan' => route('annual-plans.show', $planIndicator->source),
+        $planIndicator->source_type !== 'annual_plan' && auth()->user()->can('proposals.view') => route('proposals.show', $planIndicator->source),
         default => null,
     };
 

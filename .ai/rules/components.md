@@ -9,7 +9,7 @@ paths:
 ## Brand logo: wordmark expanded, round mark collapsed, start-aligned
 x-app-logo renders flux:sidebar.brand with NO `name`. The wordmark SVG already reads "HOPE CENTER Tracking", so passing a name printed the words twice.
 
-Three assets sit at the public root beside favicon.svg (no new directory): logo-tracking.svg (red, #be1f24 + #6d6e71), logo-tracking-white.svg for dark, logo-tracking-icon.svg (self-contained red circle, used collapsed in both themes). They are the designer's files, unmodified — do not inline them as Blade SVGs: both wordmark and icon use generic .cls-1/.cls-2 with OPPOSITE meanings, and inlined <style> blocks are document-global, so the two would overwrite each other's fills.
+Three assets sit at the public root (no new directory): logo-tracking.svg (red, #be1f24 + #6d6e71), logo-tracking-white.svg for dark, logo-tracking-icon.svg (self-contained red circle, used collapsed in both themes). They are the designer's files, unmodified — do not inline them as Blade SVGs: both wordmark and icon use generic .cls-1/.cls-2 with OPPOSITE meanings, and inlined <style> blocks are document-global, so the two would overwrite each other's fills.
 
 Collapse and theme are switched on separate elements: outer spans choose wordmark-vs-icon, inner imgs choose red-vs-white. Putting both on one element leaves `dark:block` and `in-data-flux-sidebar-collapsed-desktop:hidden` at equal specificity, where stylesheet order decides the winner.
 

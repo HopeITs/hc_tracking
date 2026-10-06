@@ -4,11 +4,9 @@ use App\Enums\Currency;
 use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\TaskStatus;
-use App\Models\Result;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Blade;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\MessageBag;
 use Illuminate\Support\ViewErrorBag;
@@ -248,51 +246,6 @@ test('the relation tabs mark the active tab', function () {
     expect($html)->toContain('Milestones')
         ->and($html)->toContain('Risks')
         ->and($html)->toContain('aria-selected="true"');
-});
-
-test('the tree renderer indents a loaded subtree without querying per node', function () {
-    $firstRoot = Result::factory()->create(['statement' => 'Root impact']);
-    $secondRoot = Result::factory()->create(['statement' => 'Second impact']);
-    Result::factory()->create(['statement' => 'Child outcome', 'parent_id' => $firstRoot->id]);
-    Result::factory()->create(['statement' => 'Second child outcome', 'parent_id' => $secondRoot->id]);
-
-    $loaded = Result::query()
-        ->whereKey([$firstRoot->id, $secondRoot->id])
-        ->with('childrenRecursive')
-        ->get();
-
-    expect($loaded)->toHaveCount(2);
-
-    DB::connection()->flushQueryLog();
-    DB::connection()->enableQueryLog();
-
-    $html = Blade::render('<x-ui.tree-rows :nodes="$nodes" :label="$label" />', [
-        'nodes' => $loaded,
-        'label' => fn (Result $result): string => $result->statement,
-    ]);
-
-    $queries = DB::connection()->getQueryLog();
-    DB::connection()->disableQueryLog();
-
-    expect($queries)->toBeEmpty()
-        ->and($html)->toContain('Root impact')
-        ->and($html)->toContain('Second impact')
-        ->and($html)->toContain('Child outcome')
-        ->and($html)->toContain('Second child outcome')
-        ->and($html)->toContain('data-tree-depth="1"');
-});
-
-test('the tree renderer shows a subtitle when one is supplied', function () {
-    $root = Result::factory()->create(['statement' => 'Root impact']);
-
-    $html = Blade::render('<x-ui.tree-rows :nodes="$nodes" :label="$label" :subtitle="$subtitle" />', [
-        'nodes' => Result::query()->whereKey($root->id)->with('childrenRecursive')->get(),
-        'label' => fn (Result $result): string => $result->statement,
-        'subtitle' => fn (Result $result): string => 'Extra detail',
-    ]);
-
-    expect($html)->toContain('Root impact')
-        ->and($html)->toContain('Extra detail');
 });
 
 test('the progress ring shows a rounded percentage and an em dash when unset', function () {

@@ -396,14 +396,10 @@ new #[Title('titles.annual_plan')] class extends Component {
         :subtitle="$plan->program->strategy?->name ?? __('common.strategy_not_assigned')"
     >
         <x-slot:meta>
-            @if (Route::has('programs.show'))
-                <a href="{{ route('programs.show', $plan->program) }}" wire:navigate class="font-medium hover:text-secondary-dark hover:underline dark:hover:text-ink">
-                    {{ $plan->program->name }}
-                </a>
-            @else
-                <span class="font-medium">{{ $plan->program->name }}</span>
-            @endif
-            @if ($plan->program->strategy !== null && Route::has('strategies.show'))
+            <a href="{{ route('programs.show', $plan->program) }}" wire:navigate class="font-medium hover:text-secondary-dark hover:underline dark:hover:text-ink">
+                {{ $plan->program->name }}
+            </a>
+            @if ($plan->program->strategy !== null)
                 <a href="{{ route('strategies.show', $plan->program->strategy) }}" wire:navigate class="hover:text-secondary-dark hover:underline dark:hover:text-ink">
                     {{ $plan->program->strategy->name }}
                 </a>
@@ -535,20 +531,18 @@ new #[Title('titles.annual_plan')] class extends Component {
                         <div class="flex flex-wrap items-start gap-x-2.5 gap-y-1.5 bg-board-head px-4 py-2.5">
                             <x-ui.enum-badge :case="$result->type" />
                             <p class="min-w-0 flex-1 text-sm font-semibold">{{ $result->statement }}</p>
-                            @if (Route::has('results.index'))
-                                <a href="{{ route('results.index', ['program' => $plan->program_id]) }}" wire:navigate class="shrink-0 type-meta font-semibold text-secondary-medium hover:underline dark:text-ink-muted">
-                                    {{ __('annual_plans.open_in_logframe') }}
-                                </a>
-                            @endif
+                            <a href="{{ route('results.index', ['program' => $plan->program_id]) }}" wire:navigate class="shrink-0 type-meta font-semibold text-secondary-medium hover:underline dark:text-ink-muted">
+                                {{ __('annual_plans.open_in_logframe') }}
+                            </a>
                         </div>
 
                         <div class="divide-y divide-board-line">
                             @foreach ($group['targets'] as $target)
                                 @php
-                                    $targetHref = $target->project !== null ? route('projects.show', ['project' => $target->project, 'tab' => 'targets']) : (Route::has('indicators.index') ? route('indicators.index', ['result' => $result->id]) : null);
+                                    $targetHref = $target->project !== null ? route('projects.show', ['project' => $target->project, 'tab' => 'targets']) : route('indicators.index', ['result' => $result->id]);
                                 @endphp
                                 <a
-                                    @if ($targetHref) href="{{ $targetHref }}" wire:navigate @endif
+                                    href="{{ $targetHref }}" wire:navigate
                                     class="grid grid-cols-1 gap-x-4 gap-y-1.5 px-4 py-3 transition-colors @2xl/detail:grid-cols-[minmax(0,1fr)_7rem_8rem_6rem] @2xl/detail:items-center hover:bg-board-head focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
                                     wire:key="plan-target-{{ $target->id }}"
                                 >
@@ -609,11 +603,7 @@ new #[Title('titles.annual_plan')] class extends Component {
                     </span>
                     <span class="min-w-0 flex-1">
                         <span class="block type-meta text-secondary-medium dark:text-ink-muted">{{ __('common.program') }}</span>
-                        @if (Route::has('programs.show'))
-                            <a href="{{ route('programs.show', $plan->program) }}" wire:navigate class="block truncate text-sm font-semibold hover:underline">{{ $plan->program->name }}</a>
-                        @else
-                            <span class="block truncate text-sm font-semibold">{{ $plan->program->name }}</span>
-                        @endif
+                        <a href="{{ route('programs.show', $plan->program) }}" wire:navigate class="block truncate text-sm font-semibold hover:underline">{{ $plan->program->name }}</a>
                     </span>
                 </li>
 
@@ -625,10 +615,8 @@ new #[Title('titles.annual_plan')] class extends Component {
                         <span class="block type-meta text-secondary-medium dark:text-ink-muted">{{ __('common.strategy') }}</span>
                         @if ($plan->program->strategy === null)
                             <span class="block truncate text-sm font-semibold text-secondary-light">{{ __('common.strategy_not_assigned') }}</span>
-                        @elseif (Route::has('strategies.show'))
-                            <a href="{{ route('strategies.show', $plan->program->strategy) }}" wire:navigate class="block truncate text-sm font-semibold hover:underline">{{ $plan->program->strategy->name }}</a>
                         @else
-                            <span class="block truncate text-sm font-semibold">{{ $plan->program->strategy->name }}</span>
+                            <a href="{{ route('strategies.show', $plan->program->strategy) }}" wire:navigate class="block truncate text-sm font-semibold hover:underline">{{ $plan->program->strategy->name }}</a>
                         @endif
                     </span>
                 </li>
@@ -684,7 +672,7 @@ new #[Title('titles.annual_plan')] class extends Component {
                         @endphp
                         <li wire:key="activity-{{ $report->id }}">
                             <a
-                                @if (Route::has('reports.show')) href="{{ route('reports.show', $report) }}" wire:navigate @endif
+                                href="{{ route('reports.show', $report) }}" wire:navigate
                                 class="flex items-start gap-3 p-3.5 transition-colors hover:bg-board-head focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
                             >
                                 <span

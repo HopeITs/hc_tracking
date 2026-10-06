@@ -232,15 +232,6 @@ class TransfersTracking extends Model implements TracksActivity
      * @param  Builder<static>  $query
      */
     #[Scope]
-    protected function landedShort(Builder $query): void
-    {
-        $query->whereRaw(self::landedShortSql());
-    }
-
-    /**
-     * @param  Builder<static>  $query
-     */
-    #[Scope]
     protected function missingNet(Builder $query): void
     {
         $query->whereRaw(self::missingNetSql());

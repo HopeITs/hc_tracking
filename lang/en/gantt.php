@@ -20,7 +20,6 @@ return [
     'chart' => 'Gantt chart',
     'clear_filters' => 'Clear filters',
     'collapse' => 'Collapse',
-    'collapse_all' => 'Collapse all',
     'columns' => [
         'duration' => 'Duration',
         'heading' => 'Columns',
@@ -61,7 +60,6 @@ return [
     'edit_refused' => 'That change could not be saved.',
     'edit_tools' => 'Edit tools',
     'expand' => 'Expand',
-    'expand_all' => 'Expand all',
     'export' => 'Export',
     'export_csv' => 'Excel (CSV)',
     'export_pdf' => 'Print / PDF',

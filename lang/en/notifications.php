@@ -22,7 +22,7 @@ return [
     'mark_selected_read' => 'Mark selected read',
     'load_more' => 'Load more',
     'empty_body' => 'New activity and alerts will appear here.',
-    'filters' => ['module' => 'Module', 'all_modules' => 'All modules', 'kind' => 'Type', 'all_kinds' => 'All types', 'priority' => 'Priority', 'all_priorities' => 'All priorities', 'state' => 'Status'],
+    'filters' => ['all_modules' => 'All modules'],
     'states' => ['all' => 'All', 'unread' => 'Unread', 'read' => 'Read', 'snoozed' => 'Snoozed'],
     'unsnooze' => 'Unsnooze',
     'module_muted' => 'Notifications for this module are muted.',

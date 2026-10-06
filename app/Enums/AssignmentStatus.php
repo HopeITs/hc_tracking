@@ -26,14 +26,6 @@ enum AssignmentStatus: string
     case Superseded = 'superseded';
 
     /**
-     * Whether the assignee still has to decide.
-     */
-    public function isAwaitingDecision(): bool
-    {
-        return $this === self::Pending;
-    }
-
-    /**
      * All status values, for validation rules.
      *
      * @return array<int, string>

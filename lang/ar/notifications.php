@@ -22,7 +22,7 @@ return [
     'mark_selected_read' => 'تعليم المحدد كمقروء',
     'load_more' => 'تحميل المزيد',
     'empty_body' => 'سيظهر هنا كل نشاط أو تنبيه جديد.',
-    'filters' => ['module' => 'الوحدة', 'all_modules' => 'كل الوحدات', 'kind' => 'النوع', 'all_kinds' => 'كل الأنواع', 'priority' => 'الأولوية', 'all_priorities' => 'كل الأولويات', 'state' => 'الحالة'],
+    'filters' => ['all_modules' => 'كل الوحدات'],
     'states' => ['all' => 'الكل', 'unread' => 'غير المقروءة', 'read' => 'المقروءة', 'snoozed' => 'المؤجَّلة'],
     'unsnooze' => 'إلغاء التأجيل',
     'module_muted' => 'تم إسكات إشعارات هذه الوحدة.',

@@ -65,18 +65,15 @@ test('an agreement row prints every money column exactly', function () {
         ->and($html)->toContain('1 donor report overdue');
 });
 
-test('the row, the head and the foot always print the same number of cells', function (array $arguments) {
+test('the row and the head always print the same number of cells', function (array $arguments) {
     $agreement = componentAgreement();
     $columns = AgreementMoney::columns(...$arguments);
-    $lines = AgreementMoney::totals([$agreement]);
 
     $head = Blade::render('<table><thead><tr><x-funding.agreement-head :columns="$columns" /></tr></thead></table>', compact('columns'));
     $row = Blade::render('<table><tbody><x-funding.agreement-row :agreement="$agreement" :columns="$columns" /></tbody></table>', compact('agreement', 'columns'));
-    $foot = Blade::render('<table><tfoot><x-funding.agreement-foot :lines="$lines" :columns="$columns" :lead="0" /></tfoot></table>', compact('lines', 'columns'));
 
     expect(substr_count($head, '<th scope='))->toBe(count($columns) + 1)
-        ->and(substr_count($row, '<td'))->toBe(count($columns))
-        ->and(substr_count($foot, '<td'))->toBe(count($columns) + 1);
+        ->and(substr_count($row, '<td'))->toBe(count($columns));
 })->with([
     'every column' => [['withFailed' => true]],
     'a year beside the lifetime figures' => [['year' => 2026]],
@@ -94,21 +91,4 @@ test('without the transfers columns a row shows the budget and nothing derived f
     expect($html)->toContain('1,000.00')
         ->and($html)->not->toContain('390.00')
         ->and($html)->not->toContain('data-cell="received"');
-});
-
-test('the foot prints one row per currency with its own percentage', function () {
-    $lines = [
-        ['currency' => 'EUR', 'agreements' => 1, 'tranches' => 0, 'budget' => 500.0, 'scheduled' => 0.0, 'received' => 0.0, 'in_transit' => 0.0, 'overdue' => 0.0, 'failed' => 0.0, 'unscheduled' => 500.0, 'outstanding' => 500.0, 'due_in_year' => 0.0, 'received_in_year' => 0.0],
-        ['currency' => 'USD', 'agreements' => 2, 'tranches' => 3, 'budget' => 2000.0, 'scheduled' => 600.0, 'received' => 390.0, 'in_transit' => 0.0, 'overdue' => 200.0, 'failed' => 0.0, 'unscheduled' => 1400.0, 'outstanding' => 1600.0, 'due_in_year' => 0.0, 'received_in_year' => 0.0],
-    ];
-    $columns = AgreementMoney::columns();
-
-    $html = Blade::render('<table><tfoot><x-funding.agreement-foot :lines="$lines" :columns="$columns" :lead="1" /></tfoot></table>', compact('lines', 'columns'));
-
-    expect($html)->toContain('data-register-total="EUR"')
-        ->and($html)->toContain('data-register-total="USD"')
-        ->and($html)->toContain('2,000.00')
-        ->and($html)->toContain('19%')
-        ->and($html)->toContain('2 agreements')
-        ->and($html)->not->toContain('2,500.00');
 });

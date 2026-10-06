@@ -49,51 +49,6 @@ final class Tranches
     }
 
     /**
-     * One line per currency sent. Shortfall and overage are summed per
-     * tranche and never netted against each other.
-     *
-     * @param  iterable<TransfersTracking>  $transfers
-     * @return list<array{currency: string, tranches: int, sent: float, fees: float, gross: float, net: float, shortfall: float, overage: float}>
-     */
-    public static function totals(iterable $transfers): array
-    {
-        $lines = [];
-
-        foreach ($transfers as $transfer) {
-            $currency = $transfer->amount_transfered_currency->value;
-            $payment = (float) $transfer->payment_amount;
-            $line = $lines[$currency] ?? ['currency' => $currency, 'tranches' => 0, 'sent' => 0.0, 'fees' => 0.0, 'gross' => 0.0, 'net' => 0.0, 'shortfall' => 0.0, 'overage' => 0.0];
-
-            $line['tranches']++;
-            $line['sent'] += $payment;
-
-            if ($transfer->fees_currency === $transfer->amount_transfered_currency) {
-                $line['fees'] += (float) $transfer->fees;
-            }
-
-            if ($transfer->state() === 'received' && $transfer->amount_received_currency === $transfer->amount_transfered_currency) {
-                $line['gross'] += (float) $transfer->amount_received;
-            }
-
-            if ($transfer->isSettled()) {
-                $net = (float) $transfer->net_amount_received;
-                $line['net'] += $net;
-                $line['shortfall'] += max(0.0, $payment - $net);
-                $line['overage'] += max(0.0, $net - $payment);
-            }
-
-            $lines[$currency] = $line;
-        }
-
-        ksort($lines);
-
-        return array_values(array_map(
-            fn (array $line): array => array_map(fn (mixed $value): mixed => is_float($value) ? round($value, 2) : $value, $line),
-            $lines,
-        ));
-    }
-
-    /**
      * @return list<string>
      */
     public static function csvHeadings(): array

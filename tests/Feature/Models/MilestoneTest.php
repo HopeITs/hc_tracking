@@ -68,9 +68,7 @@ test('a milestone tree traverses through parent_milestone_id', function () {
     expect($grandchild->ancestors()->pluck('id')->all())->toBe([$child->id, $root->id])
         ->and($root->descendants()->pluck('id')->sort()->values()->all())
         ->toBe(collect([$child->id, $grandchild->id])->sort()->values()->all())
-        ->and($grandchild->depth())->toBe(2)
-        ->and($root->isRoot())->toBeTrue()
-        ->and($grandchild->isLeaf())->toBeTrue();
+        ->and($grandchild->depth())->toBe(2);
 });
 
 test('the roots scope returns only top-level milestones', function () {

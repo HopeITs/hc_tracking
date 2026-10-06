@@ -4,7 +4,6 @@ return [
     'add_passkey' => 'إضافة مفتاح مرور',
     'authenticating' => 'جارٍ التحقق...',
     'breadcrumb' => 'مسار التنقل',
-    'clear_filters' => 'مسح عوامل التصفية',
     'e_g_macbook_pro_iphone' => 'مثال: MacBook Pro أو iPhone',
     'give_this_passkey_a_name_to_help_you_identify_it_later' => 'أعطِ مفتاح المرور هذا اسمًا لتتعرف عليه لاحقًا.',
     'no_records' => 'لا توجد سجلات بعد',

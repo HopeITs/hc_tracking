@@ -88,7 +88,7 @@ test('settled, landed short, missing net and converted tranches are told apart',
     $pending = TransfersTracking::factory()->create(['ar_status' => ArStatus::Pending, 'net_amount_received' => '5.00']);
 
     expect(TransfersTracking::query()->settled()->pluck('id')->all())->toBe([$settled->id])
-        ->and(TransfersTracking::query()->landedShort()->pluck('id')->all())->toBe([$settled->id])
+        ->and(TransfersTracking::query()->whereRaw(TransfersTracking::landedShortSql())->pluck('id')->all())->toBe([$settled->id])
         ->and(TransfersTracking::query()->missingNet()->pluck('id')->all())->toBe([$missing->id])
         ->and(TransfersTracking::query()->converted()->pluck('id')->all())->toBe([$converted->id])
         ->and($settled->fresh()->isSettled())->toBeTrue()

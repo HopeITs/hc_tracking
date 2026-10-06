@@ -88,21 +88,6 @@ class AnnualPlan extends Model implements TracksActivity
     }
 
     /**
-     * Restrict the query to plans whose fiscal year falls inside an inclusive
-     * range.
-     *
-     * The bounds are ordered here rather than trusted, so a caller that hands
-     * over a reversed range gets the years between them instead of nothing.
-     *
-     * @param  Builder<static>  $query
-     */
-    #[Scope]
-    protected function forYears(Builder $query, int $from, int $to): void
-    {
-        $query->whereBetween('year', [min($from, $to), max($from, $to)]);
-    }
-
-    /**
      * Restrict the query to plans written for any of the given fiscal years.
      *
      * The years need not be contiguous: the matrix lets a reader pick an

@@ -19,21 +19,6 @@ test('timing reads overdue, in transit and landed days', function () {
         ->and(Tranches::stateLabel('received', true))->toBe('Net not recorded');
 });
 
-test('totals stay per currency and never net an overage against a shortfall', function () {
-    $received = ['ar_status' => ArStatus::Received, 'amount_transfered_currency' => Currency::Usd, 'amount_received_currency' => Currency::Usd, 'fees_currency' => Currency::Usd];
-
-    $lines = Tranches::totals(collect([
-        TransfersTracking::factory()->make([...$received, 'payment_amount' => '100.00', 'fees' => '2.00', 'amount_received' => '95.00', 'net_amount_received' => '90.00']),
-        TransfersTracking::factory()->make([...$received, 'payment_amount' => '50.00', 'fees' => '0.00', 'amount_received' => '80.00', 'net_amount_received' => '80.00']),
-        TransfersTracking::factory()->make(['payment_amount' => '70.00', 'amount_transfered_currency' => Currency::Eur, 'net_amount_received' => '70.00']),
-    ]));
-
-    expect($lines)->toBe([
-        ['currency' => 'EUR', 'tranches' => 1, 'sent' => 70.0, 'fees' => 0.0, 'gross' => 0.0, 'net' => 0.0, 'shortfall' => 0.0, 'overage' => 0.0],
-        ['currency' => 'USD', 'tranches' => 2, 'sent' => 150.0, 'fees' => 2.0, 'gross' => 175.0, 'net' => 170.0, 'shortfall' => 10.0, 'overage' => 30.0],
-    ]);
-});
-
 test('a csv row holds plain values and hides what has not landed', function () {
     $settled = TransfersTracking::factory()->create(['ar_status' => ArStatus::Received, 'payment_amount' => '1000.00', 'fees' => '10.00', 'amount_received' => '995.00', 'net_amount_received' => '985.00', 'exchange_rate' => '0.925000', 'scheduled_date' => '2026-03-01', 'transfer_date' => '2026-03-02', 'receive_date' => '2026-03-05'])->fresh();
     $pending = TransfersTracking::factory()->create(['payment_amount' => '500.00', 'net_amount_received' => '777.00', 'scheduled_date' => '2026-07-01', 'transfer_date' => null])->fresh();

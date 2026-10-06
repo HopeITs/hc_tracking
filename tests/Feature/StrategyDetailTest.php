@@ -174,7 +174,7 @@ test('an active strategy is shown with the good/green status tone, not the brand
     $this->actingAs($user)
         ->get(route('strategies.show', $strategy))
         ->assertOk()
-        ->assertSee('bg-status-good text-white', false)
+        ->assertSee('bg-status-good dark:bg-status-good-soft dark:text-status-good text-white', false)
         ->assertDontSee('bg-primary text-white', false);
 });
 

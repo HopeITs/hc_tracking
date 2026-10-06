@@ -26,14 +26,6 @@ test('the sign-in layout leaves light or dark to the stored or system appearance
     expect(openingHtmlTag($html))->toBe('<html lang="en" dir="ltr">');
 });
 
-test('the layouts no route uses leave light or dark to the stored or system appearance', function (string $layout) {
-    $this->actingAs(User::factory()->create());
-
-    $html = (string) $this->blade("<x-layouts::{$layout}>Body</x-layouts::{$layout}>");
-
-    expect(openingHtmlTag($html))->toBe('<html lang="en" dir="ltr">');
-})->with(['app.header', 'auth.card', 'auth.split']);
-
 test('error pages leave light or dark to the stored or system appearance', function () {
     $html = (string) $this->view('errors.404');
 

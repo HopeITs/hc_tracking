@@ -147,31 +147,6 @@ trait HasTree
     }
 
     /**
-     * Whether this node sits at the top of its tree.
-     */
-    public function isRoot(): bool
-    {
-        return $this->getAttribute(static::parentKeyName()) === null;
-    }
-
-    /**
-     * Whether nothing is nested under this node.
-     *
-     * Answers from a loaded relation when there is one, so rendering a tree
-     * eager-loaded through childrenRecursive does not fire a query per node.
-     */
-    public function isLeaf(): bool
-    {
-        foreach (['children', 'childrenRecursive'] as $relation) {
-            if ($this->relationLoaded($relation)) {
-                return $this->getRelation($relation)->isEmpty();
-            }
-        }
-
-        return $this->children()->doesntExist();
-    }
-
-    /**
      * Whether adopting the given node as parent would close a loop.
      *
      * Walks UP from the candidate parent rather than down from this node: that

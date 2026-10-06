@@ -102,23 +102,6 @@ test('the row prints its lead and actions slots around the shared cells', functi
         ->and(strpos($html, 'ACTION CELL'))->toBeGreaterThan(strpos($html, 'data-cell="difference"'));
 });
 
-test('the foot prints one row per currency and never nets an overage against a shortfall', function () {
-    $lines = [
-        ['currency' => 'EUR', 'tranches' => 1, 'sent' => 500.0, 'fees' => 0.0, 'gross' => 500.0, 'net' => 500.0, 'shortfall' => 0.0, 'overage' => 0.0],
-        ['currency' => 'USD', 'tranches' => 2, 'sent' => 150000.0, 'fees' => 35.0, 'gross' => 170000.0, 'net' => 170000.0, 'shortfall' => 10000.0, 'overage' => 30000.0],
-    ];
-
-    $html = Blade::render('<table><tfoot><x-funding.tranche-foot :lines="$lines" :lead="1" /></tfoot></table>', ['lines' => $lines]);
-
-    expect($html)->toContain('data-register-total="EUR"')
-        ->and($html)->toContain('data-register-total="USD"')
-        ->and($html)->toContain('150,000.00')
-        ->and($html)->toContain('−10,000.00')
-        ->and($html)->toContain('+30,000.00')
-        ->and($html)->not->toContain('150,500.00')
-        ->and($html)->toContain('colspan="6"');
-});
-
 test('a group row carries its label and a subtotal line per currency', function () {
     $lines = [
         ['currency' => 'USD', 'tranches' => 26, 'sent' => 2600.0, 'fees' => 0.0, 'gross' => 0.0, 'net' => 0.0, 'shortfall' => 0.0, 'overage' => 0.0],

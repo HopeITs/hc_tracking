@@ -20,7 +20,6 @@ return [
     'chart' => 'مخطط جانت',
     'clear_filters' => 'مسح عوامل التصفية',
     'collapse' => 'طي',
-    'collapse_all' => 'طي الكل',
     'columns' => [
         'duration' => 'المدة',
         'heading' => 'الأعمدة',
@@ -61,7 +60,6 @@ return [
     'edit_refused' => 'تعذّر حفظ هذا التغيير.',
     'edit_tools' => 'أدوات التحرير',
     'expand' => 'توسيع',
-    'expand_all' => 'توسيع الكل',
     'export' => 'تصدير',
     'export_csv' => 'Excel (CSV)',
     'export_pdf' => 'طباعة / PDF',

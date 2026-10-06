@@ -13,7 +13,6 @@ return [
     'group_strategy_planning' => 'Strategy & Planning',
     'group_workspace' => 'My Workspace',
     'guideline' => 'User guideline',
-    'manage_your_profile_and_account_settings' => 'Manage your profile and account settings',
     'platform' => 'Platform',
     'primary_navigation' => 'Primary navigation',
     'repository' => 'Repository',
@@ -21,6 +20,5 @@ return [
     'switch_language' => 'Switch language',
     'toggle_sidebar' => 'Collapse or expand the sidebar',
     'report_a_problem' => 'Report a problem or bug',
-    'roles_and_permissions' => 'Roles & Permissions',
     'user_directory' => 'User Directory',
 ];

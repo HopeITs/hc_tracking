@@ -6,9 +6,9 @@ paths:
 # Enums
 
 ## Registration is off; accounts come from user:create; roles are a backed enum
-`Features::registration()` is deliberately removed from config/fortify.php. This is an internal system holding donor budgets — re-enabling it exposes /register to anyone on the internet. tests/Feature/Auth/RegistrationDisabledTest.php fails if it comes back; tests/Feature/Auth/RegistrationTest.php skips itself automatically, so it is NOT proof either way.
+`Features::registration()` is deliberately removed from config/fortify.php. This is an internal system holding donor budgets — re-enabling it exposes /register to anyone on the internet. tests/Feature/Auth/RegistrationDisabledTest.php fails if it comes back.
 
-TRAP: disabling it broke the login page. resources/views/pages/auth/login.blade.php called route('register') unguarded and threw RouteNotFoundException, 500ing /login. It is now wrapped in @if (Route::has('register')), matching welcome.blade.php which was already guarded. Guard any new link to an optional Fortify route the same way.
+TRAP: disabling it once broke the login page, which called route('register') unguarded and 500'd /login. The register and password-reset links, views and actions (CreateNewUser, ResetUserPassword) have since been deleted outright, so the login page links to neither. Guard any new link to an optional Fortify route with Route::has().
 
 Accounts are created with `php artisan user:create` (interactive, or fully scripted with --name --email --role --password --no-interaction). It marks the address verified unless --unverified is passed, although the `verified` middleware and email verification were removed in 2026-09 (User is not MustVerifyEmail; emails come from HR).
 

@@ -13,7 +13,6 @@ return [
     'group_strategy_planning' => 'الاستراتيجية والتخطيط',
     'group_workspace' => 'مساحة عملي',
     'guideline' => 'دليل الاستخدام',
-    'manage_your_profile_and_account_settings' => 'إدارة ملفك الشخصي وإعدادات حسابك',
     'platform' => 'المنصة',
     'primary_navigation' => 'التنقل الرئيسي',
     'repository' => 'المستودع',
@@ -21,6 +20,5 @@ return [
     'switch_language' => 'تغيير اللغة',
     'toggle_sidebar' => 'طي القائمة الجانبية أو توسيعها',
     'report_a_problem' => 'الإبلاغ عن مشكلة أو خطأ',
-    'roles_and_permissions' => 'الأدوار والصلاحيات',
     'user_directory' => 'دليل المستخدمين',
 ];

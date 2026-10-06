@@ -75,14 +75,6 @@ class Proposal extends Model implements TracksActivity
     }
 
     /**
-     * Whether this proposal still holds its migration placeholder number.
-     */
-    public function hasPlaceholderInternalNumber(): bool
-    {
-        return static::isPlaceholderNumber($this->internal_project_number);
-    }
-
-    /**
      * Mirror the column default so an unrefreshed model can still report a
      * phase.
      *
