@@ -302,6 +302,7 @@ return [
             'baseline_saved' => 'حفظ :actor خط الأساس الزمني «:baseline» للمشروع «:subject»',
             'assignment_acknowledged' => 'أكّد :actor استلامه مسؤولية المشروع «:subject»',
             'assignment_rejected' => 'رفض :actor مسؤولية المشروع «:subject»: :note',
+            'assignment_unblocked' => 'رفع :actor الحظر عن المشروع «:subject» وطلب من :employee الإقرار بمسؤوليته مرة أخرى',
             'updated' => 'حدّث :actor المشروع «:subject»',
             'deleted' => 'حذف :actor المشروع «:subject»',
         ],

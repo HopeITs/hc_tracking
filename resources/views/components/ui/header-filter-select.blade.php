@@ -4,10 +4,16 @@
     'searchable' => null,
     'searchLabel' => null,
     'value' => '',
+<<<<<<< HEAD
     'deferred' => false,
+=======
+    'employees' => false,
+>>>>>>> gitlab/fixes-mai
 ])
 
 @php
+    use App\Models\HrEmployee;
+
     /* Flux's menu type-ahead listens on the whole menu; single-character keys stop at the search box so typing filters instead of jumping. */
     $model = $attributes->wire('model')->value();
 
@@ -34,12 +40,16 @@
         ];
     }
 
+    /* `employees` filters list every employee from the shared employeeOptions store (form-fields.js) instead of server-rendered options. */
+    $employeeLabels = $employees ? HrEmployee::pickerLabels()->pluck('label', 'value') : collect();
     $selectedValue = (string) $value;
     $selectedLabel = collect($options)->firstWhere('value', $selectedValue)['label']
+        ?? $employeeLabels->get($selectedValue)
         ?? ($options[0]['label'] ?? '');
     $id ??= 'header-filter-'.substr(md5($model.'|'.$label), 0, 12);
-    $searchable ??= count($options) > 7;
+    $searchable ??= $employees || count($options) > 7;
     $searchLabel ??= $label;
+    $employeesUrl = $employees ? route('employees.picker-options', ['l' => app()->getLocale()]) : null;
 
     /* flux:menu.item's own default-variant classes (vendor/livewire/flux/stubs/resources/views/flux/menu/item.blade.php). */
     $menuItemClasses = 'flex items-center px-2 py-1.5 w-full focus:outline-hidden select-none rounded-md text-start text-sm font-medium [&[disabled]]:opacity-50 text-zinc-800 data-active:bg-zinc-50 dark:text-white dark:data-active:bg-zinc-600 **:data-flux-menu-item-icon:text-zinc-400 dark:**:data-flux-menu-item-icon:text-white/60 [&[data-active]_[data-flux-menu-item-icon]]:text-current';
@@ -51,13 +61,14 @@
         {{ $label }}
     </label>
 
-    <flux:dropdown position="bottom" align="start" class="program-filter-picker block! w-full!" x-data="{ optionSearch: '' }">
+    <flux:dropdown position="bottom" align="start" class="program-filter-picker block! w-full!" x-data="filterMenu" :data-employees-url="$employeesUrl" data-model="{{ $model }}">
         <flux:button
             :id="$id"
             variant="outline"
             icon:trailing="chevron-up-down"
             class="program-filter-trigger w-full! justify-between!"
             :aria-label="$label"
+            x-on:click="openEmployees()"
         >
             @if ($deferred)
                 <span class="truncate" x-text="{{ Illuminate\Support\Js::from(collect($options)->pluck('label', 'value')) }}[String($wire.{{ $model }} ?? '')] ?? {{ Illuminate\Support\Js::from($options[0]['label'] ?? '') }}">{{ $selectedLabel }}</span>
@@ -109,6 +120,10 @@
                     @endif
                 </button>
             @endforeach
+            @if ($employees)
+                <div wire:ignore x-ref="employeeList" class="contents" x-on:click="pickEmployee($event)" data-item-class="{{ $menuItemClasses }}" data-check-class="ms-auto size-4 shrink-0 text-secondary-medium"></div>
+            @endif
+
         </flux:menu>
     </flux:dropdown>
 </div>

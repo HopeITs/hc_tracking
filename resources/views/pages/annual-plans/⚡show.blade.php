@@ -234,17 +234,6 @@ new #[Title('titles.annual_plan')] class extends Component {
     }
 
     /**
-     * Every HR employee the plan can be made accountable to.
-     *
-     * @return Collection<int, HrEmployee>
-     */
-    #[Computed]
-    public function employeeOptions(): Collection
-    {
-        return HrEmployee::pickerOptions();
-    }
-
-    /**
      * The fiscal years the form offers.
      *
      * This plan's own year is always among them, so an older plan stays
@@ -735,11 +724,7 @@ new #[Title('titles.annual_plan')] class extends Component {
                     @endforeach
                 </x-ui.form-select>
 
-                <x-ui.form-select wire:model="planManagerId" :label="__('annual_plans.assigned_manager')" :placeholder="__('annual_plans.select_a_manager')" required>
-                    @foreach ($this->employeeOptions as $employeeOption)
-                        <option value="{{ $employeeOption->id }}">{{ $employeeOption->name }} · {{ $employeeOption->secondary_name }}</option>
-                    @endforeach
-                </x-ui.form-select>
+                <x-ui.form-select wire:model="planManagerId" :label="__('annual_plans.assigned_manager')" :placeholder="__('annual_plans.select_a_manager')" required employees />
             </div>
         @endif
 

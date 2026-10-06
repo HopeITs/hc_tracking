@@ -53,3 +53,22 @@ test('HrDepartment::employeeIdsInDepartment resolves every active employee in th
     expect(HrDepartment::employeeIdsInDepartment($departmentId))
         ->toBe([$inDepartment]);
 });
+
+test('pickerOptions serves the cached list until it is forgotten', function () {
+    $firstId = insertHrEmployee(firstNameEn: 'Amal', lastNameEn: 'Nasser');
+
+    expect(HrEmployee::pickerOptions()->pluck('id')->all())->toBe([$firstId]);
+
+    $secondId = insertHrEmployee(firstNameEn: 'Basel', lastNameEn: 'Omar');
+    DB::connection('hr')->table('employees')->where('id', $secondId)->update(['first_name_en' => 'Basel']);
+
+    expect(HrEmployee::pickerOptions()->pluck('id')->all())->toBe([$firstId]);
+
+    HrEmployee::forgetPickerOptions();
+
+    $options = HrEmployee::pickerOptions();
+
+    expect($options->pluck('id')->all())->toBe([$firstId, $secondId])
+        ->and($options->first())->toBeInstanceOf(HrEmployee::class)
+        ->and($options->first()->name)->toBe('Amal Nasser');
+});

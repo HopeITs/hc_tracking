@@ -101,13 +101,6 @@ new #[Title('titles.milestone')] class extends Component {
             ->get();
     }
 
-    /** @return Collection<int, HrEmployee> */
-    #[Computed]
-    public function userOptions(): Collection
-    {
-        return HrEmployee::pickerOptions();
-    }
-
     /** @return Collection<int, Milestone> */
     #[Computed]
     public function parentOptions(): Collection
@@ -365,7 +358,6 @@ new #[Title('titles.milestone')] class extends Component {
     $canMoveMilestone = $canEditMilestone || auth()->user()->can('updateProgress', $this->milestone);
     $canAddRelated = auth()->user()->can('create', [App\Models\Milestone::class, $this->milestone->project_id]);
     $selectedParentMilestone = $parentMilestoneId === '' ? null : $this->parentOptions->firstWhere('id', (int) $parentMilestoneId);
-    $selectedResponsibleOption = $responsibleUserId === '' ? null : $this->userOptions->firstWhere('id', (int) $responsibleUserId);
 @endphp
 
 <section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="milestone-detail-heading">
@@ -446,26 +438,7 @@ new #[Title('titles.milestone')] class extends Component {
                 </div>
 
                 <div class="min-w-0">
-                    <label for="milestone-edit-responsible" class="{{ $dropdownLabelClasses }}">{{ __('milestones.responsible') }}</label>
-                    <flux:dropdown position="bottom" align="start" class="filter-picker block! w-full!" x-data="{ optionSearch: '' }">
-                        <flux:button id="milestone-edit-responsible" type="button" variant="outline" icon:trailing="chevron-up-down" class="w-full! justify-between!" :aria-label="__('milestones.responsible')" :disabled="! $canEditMilestone">
-                            <span class="truncate">{{ $selectedResponsibleOption ? $selectedResponsibleOption->name.' · '.$selectedResponsibleOption->secondary_name : __('common.select') }}</span>
-                        </flux:button>
-                        <flux:menu class="filter-menu">
-                            @if ($this->userOptions->count() > 6)
-                                <div class="border-b border-secondary-soft p-1.5 dark:border-line">
-                                    <x-ui.input type="search" size="sm" icon="magnifying-glass" x-model="optionSearch" :aria-label="__('milestones.search_responsible')" :placeholder="__('milestones.search_responsible')" />
-                                </div>
-                            @endif
-                            @foreach ($this->userOptions as $userOption)
-                                <flux:menu.item wire:click="$set('responsibleUserId', {{ $userOption->id }})" x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())" :wire:key="'milestone-edit-responsible-option-'.$userOption->id">
-                                    <span class="min-w-0 truncate">{{ $userOption->name }} · {{ $userOption->secondary_name }}</span>
-                                    @if ((int) $responsibleUserId === $userOption->id)<flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" />@endif
-                                </flux:menu.item>
-                            @endforeach
-                        </flux:menu>
-                    </flux:dropdown>
-                    <flux:error name="responsibleUserId" class="mt-1.5" />
+                    <x-ui.form-select id="milestone-edit-responsible" wire:model="responsibleUserId" :label="__('milestones.responsible')" :placeholder="__('common.select')" :search-label="__('milestones.search_responsible')" :disabled="! $canEditMilestone" employees />
                 </div>
 
                 <div class="min-w-0 sm:max-w-xs">
@@ -565,7 +538,7 @@ new #[Title('titles.milestone')] class extends Component {
         @endif
     </x-ui.panel>
 
-    <x-tasks.add-task-modal test-prefix="new-milestone-task" :user-options="$this->userOptions" />
+    <x-tasks.add-task-modal test-prefix="new-milestone-task" />
 
     <section aria-labelledby="record-activity-heading" class="grid gap-3" data-record-activity>
         <h2 id="record-activity-heading" class="text-base font-bold">{{ __('activity.title') }}</h2>
@@ -596,11 +569,7 @@ new #[Title('titles.milestone')] class extends Component {
                     @endforeach
                 </x-ui.form-select>
 
-                <x-ui.form-select wire:model="relatedResponsibleUserId" :label="__('milestones.responsible')" :placeholder="__('common.select')" :search-label="__('milestones.search_responsible')">
-                    @foreach ($this->userOptions as $userOption)
-                        <option value="{{ $userOption->id }}">{{ $userOption->name }} · {{ $userOption->secondary_name }}</option>
-                    @endforeach
-                </x-ui.form-select>
+                <x-ui.form-select wire:model="relatedResponsibleUserId" :label="__('milestones.responsible')" :placeholder="__('common.select')" :search-label="__('milestones.search_responsible')" employees />
             </div>
         </x-ui.form-section>
 

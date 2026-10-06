@@ -1,6 +1,5 @@
 @props([
     'testPrefix',
-    'userOptions',
 ])
 
 {{--
@@ -45,11 +44,7 @@
 
         <x-ui.form-input wire:model="newTaskDueDate" :label="__('tasks.due_date_2')" type="date" />
 
-        <x-ui.form-multiselect wire:model="newTaskAssignedTo" :label="__('tasks.assignees')" :placeholder="__('common.select')" class="col-span-2" :data-test="$testPrefix.'-assignee-picker'">
-            @foreach ($userOptions as $userOption)
-                <option value="{{ $userOption->id }}">{{ $userOption->name }} · {{ $userOption->secondary_name }}</option>
-            @endforeach
-        </x-ui.form-multiselect>
+        <x-ui.form-multiselect wire:model="newTaskAssignedTo" :label="__('tasks.assignees')" :placeholder="__('common.select')" class="col-span-2" :data-test="$testPrefix.'-assignee-picker'" employees />
     </div>
 
     <x-slot:actions>

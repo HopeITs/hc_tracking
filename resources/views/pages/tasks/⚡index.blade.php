@@ -29,6 +29,8 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Renderless;
+use Livewire\Attributes\Session;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -94,6 +96,14 @@ new #[Title('titles.tasks')] class extends Component
 
     #[Url(except: 'none')]
     public string $group = 'none';
+
+    /**
+     * Which list layout this screen needs, reported by the browser from the
+     * list's width ('wide' table or 'narrow' cards) and remembered for the
+     * session. null until the first report: both layouts are rendered then.
+     */
+    #[Session]
+    public ?string $listLayout = null;
 
     #[Url(except: '')]
     public string $month = '';
@@ -251,6 +261,25 @@ new #[Title('titles.tasks')] class extends Component
      * Toggles direction when the same column is clicked again, otherwise
      * switches to the new column with a predictable ascending default.
      */
+    /**
+     * The success toast of the quick inline actions (move, prioritise, assign,
+     * reschedule, quick-add). The board is worked in bursts, and a toast per
+     * action piles up over the cards, so it stays silent there. Moving a card to
+     * another status (quickSetStatus) is the exception and always toasts, and
+     * refusals still toast everywhere.
+     */
+    private function toastQuickSuccess(string $text): void
+    {
+        if ($this->view !== 'board') {
+            Flux::toast(variant: 'success', text: $text);
+        }
+    }
+
+    public function setListLayout(string $layout): void
+    {
+        $this->listLayout = in_array($layout, ['wide', 'narrow'], true) ? $layout : null;
+    }
+
     public function setSort(string $field): void
     {
         if (! in_array($field, ['title', 'status', 'priority', 'due', 'assignee', 'created'], true)) {
@@ -973,7 +1002,7 @@ new #[Title('titles.tasks')] class extends Component
 
         $this->resetPage();
 
-        Flux::toast(variant: 'success', text: __('tasks.task_created'));
+        $this->toastQuickSuccess(__('tasks.task_created'));
     }
 
     /**
@@ -1003,6 +1032,7 @@ new #[Title('titles.tasks')] class extends Component
      * — mirrors toggleSubtaskDraftAssignee() but for a not-yet-created
      * top-level task instead of a subtask.
      */
+    #[Renderless]
     public function toggleTaskDraftAssignee(string $rowKey, int $employeeId): void
     {
         $ids = $this->taskDraft($rowKey)['assignees'];
@@ -1073,6 +1103,7 @@ new #[Title('titles.tasks')] class extends Component
      * the "add subtask" row's own assignee popover — mirrors toggleAssignee()
      * but writes to the not-yet-saved draft instead of a real task.
      */
+    #[Renderless]
     public function toggleSubtaskDraftAssignee(int $parentTaskId, int $employeeId): void
     {
         $parent = Task::query()->with('taskAssignees:id,task_id,employee_id')->find($parentTaskId);
@@ -1148,7 +1179,7 @@ new #[Title('titles.tasks')] class extends Component
 
         unset($this->subtaskDrafts[$parentTaskId]);
 
-        Flux::toast(variant: 'success', text: __('tasks.subtask_added'));
+        $this->toastQuickSuccess(__('tasks.subtask_added'));
     }
 
     public function openEditDrawer(int $taskId): void
@@ -1340,7 +1371,7 @@ new #[Title('titles.tasks')] class extends Component
             return;
         }
 
-        Flux::toast(variant: 'success', text: __('tasks.task_marked_done'));
+        $this->toastQuickSuccess(__('tasks.task_marked_done'));
     }
 
     public function quickSetStatus(int $taskId, string $status): void
@@ -1385,7 +1416,7 @@ new #[Title('titles.tasks')] class extends Component
         $task->priority = $newPriority;
         $task->save();
 
-        Flux::toast(variant: 'success', text: __('tasks.task_priority_changed', ['priority' => $newPriority->label()]));
+        $this->toastQuickSuccess(__('tasks.task_priority_changed', ['priority' => $newPriority->label()]));
     }
 
     /**
@@ -1394,6 +1425,9 @@ new #[Title('titles.tasks')] class extends Component
      * covers the same ground for a full edit, this is the quick path. A
      * task must always keep at least one assignee, matching saveTask()'s
      * own validation, so the last one can't be toggled off here either.
+     *
+     * This one re-renders: the avatar "x" calls it directly and needs the row
+     * to show the removal. The popover uses togglePickedAssignee() instead.
      */
     public function toggleAssignee(int $taskId, int $employeeId): void
     {
@@ -1416,14 +1450,27 @@ new #[Title('titles.tasks')] class extends Component
 
             $existing->delete();
 
-            Flux::toast(variant: 'success', text: __('tasks.assignee_removed'));
+            $this->toastQuickSuccess(__('tasks.assignee_removed'));
 
             return;
         }
 
         $task->taskAssignees()->create(['employee_id' => $employeeId]);
 
-        Flux::toast(variant: 'success', text: __('tasks.assignee_added'));
+        $this->toastQuickSuccess(__('tasks.assignee_added'));
+    }
+
+    /**
+     * toggleAssignee() for the shared assignee popover.
+     *
+     * Renderless: re-rendering the whole list for every click cost ~700 ms,
+     * so the popover's check marks move client-side and the list refreshes
+     * once when the popover closes (see assignee-picker.js).
+     */
+    #[Renderless]
+    public function togglePickedAssignee(int $taskId, int $employeeId): void
+    {
+        $this->toggleAssignee($taskId, $employeeId);
     }
 
     public function rescheduleTask(int $taskId, string $date): void
@@ -1449,7 +1496,7 @@ new #[Title('titles.tasks')] class extends Component
         $task->due_date = $date === '' ? null : CarbonImmutable::parse($date);
         $task->save();
 
-        Flux::toast(variant: 'success', text: __('tasks.task_rescheduled'));
+        $this->toastQuickSuccess(__('tasks.task_rescheduled'));
     }
 
     public function closeTaskDrawer(): void
@@ -1506,11 +1553,8 @@ new #[Title('titles.tasks')] class extends Component
                     <option value="{{ $priorityCase->value }}">{{ $priorityCase->label() }}</option>
                 @endforeach
             </x-ui.header-filter-select>
-            <x-ui.header-filter-select :label="__('tasks.assignee')" wire:model.live="assignee" :value="$assignee">
+            <x-ui.header-filter-select :label="__('tasks.assignee')" wire:model.live="assignee" :value="$assignee" employees>
                 <option value="">{{ __('common.anyone') }}</option>
-                @foreach ($this->userOptions as $userOption)
-                    <option value="{{ $userOption['id'] }}">{{ $userOption['name'] }} · {{ $userOption['secondary_name'] }}</option>
-                @endforeach
             </x-ui.header-filter-select>
             @if ($canPickDepartment)
                 <x-ui.header-filter-select :label="__('tasks.department')" wire:model.live="departmentId" :value="$departmentId" data-test="task-department-filter">
@@ -1735,6 +1779,7 @@ new #[Title('titles.tasks')] class extends Component
         @endswitch
 
         @include('pages.tasks._assignee-popover')
+        @include('pages.tasks._task-option-menu')
     @endif
 
     @php
@@ -1809,11 +1854,7 @@ new #[Title('titles.tasks')] class extends Component
 
                 <x-ui.form-input wire:model="progressPercentage" :label="__('tasks.progress_2')" type="number" min="0" max="100" suffix="%" required data-test="task-drawer-progress-input" />
 
-                <x-ui.form-multiselect wire:model="assignedTo" :label="__('tasks.assignees')" :placeholder="__('common.select')" class="col-span-2" data-test="task-assignee-picker">
-                    @foreach ($this->userOptions as $userOption)
-                        <option value="{{ $userOption['id'] }}">{{ $userOption['name'] }} · {{ $userOption['secondary_name'] }}</option>
-                    @endforeach
-                </x-ui.form-multiselect>
+                <x-ui.form-multiselect wire:model="assignedTo" :label="__('tasks.assignees')" :placeholder="__('common.select')" class="col-span-2" data-test="task-assignee-picker" employees />
             </div>
         </x-ui.form-section>
 

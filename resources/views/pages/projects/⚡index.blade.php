@@ -89,6 +89,14 @@ new #[Title('titles.projects')] class extends Component {
      */
     public bool $showArchiveModal = false;
 
+    /** The unblock dialog the top level opens from a Blocked badge. */
+    #[Locked]
+    public ?int $unblockingProjectId = null;
+
+    public bool $showUnblockModal = false;
+
+    public string $unblockNote = '';
+
     public string $name = '';
 
     public string $description = '';
@@ -875,6 +883,47 @@ new #[Title('titles.projects')] class extends Component {
         $this->resetProjectForm();
     }
 
+    public function openUnblockModal(int $projectId): void
+    {
+        $assignment = Project::query()->findOrFail($projectId)->ownerAssignment;
+        abort_if($assignment === null, 404);
+        Gate::authorize('unblock', $assignment);
+
+        $this->resetValidation();
+        $this->unblockingProjectId = $projectId;
+        $this->unblockNote = '';
+        $this->showUnblockModal = true;
+    }
+
+    public function closeUnblockModal(): void
+    {
+        $this->showUnblockModal = false;
+        $this->unblockingProjectId = null;
+        $this->unblockNote = '';
+        $this->resetValidation();
+    }
+
+    /**
+     * Lift the block (note optional). Authorized again here: the dialog may
+     * have been open for a while.
+     */
+    public function unblockProject(): void
+    {
+        abort_if($this->unblockingProjectId === null, 404);
+
+        $assignment = Project::query()->findOrFail($this->unblockingProjectId)->ownerAssignment;
+        abort_if($assignment === null, 404);
+        Gate::authorize('unblock', $assignment);
+
+        $validated = $this->validate(['unblockNote' => ['nullable', 'string', 'max:1000']]);
+
+        $assignment->unblock(Auth::user(), $validated['unblockNote']);
+
+        $this->closeUnblockModal();
+
+        Flux::toast(variant: 'success', text: __('projects.unblock_done'));
+    }
+
     public function confirmArchive(int $projectId): void
     {
         Gate::authorize('delete', Project::query()->findOrFail($projectId));
@@ -1164,11 +1213,8 @@ new #[Title('titles.projects')] class extends Component {
                 @endforeach
             </x-ui.header-filter-select>
 
-            <x-ui.header-filter-select :label="__('projects.owner')" wire:model.live="owner" :value="$owner">
+            <x-ui.header-filter-select :label="__('projects.owner')" wire:model.live="owner" :value="$owner" employees>
                 <option value="">{{ __('projects.all_owners') }}</option>
-                @foreach ($this->userOptions as $userOption)
-                    <option value="{{ $userOption->id }}">{{ $userOption->name }} · {{ $userOption->secondary_name }}</option>
-                @endforeach
             </x-ui.header-filter-select>
 
             <x-ui.header-filter-select :label="__('projects.sort_by')" wire:model.live="sort" :value="$sort">
@@ -1417,6 +1463,7 @@ new #[Title('titles.projects')] class extends Component {
                                                 <flux:icon.eye class="size-4.5" />
                                             </a>
 
+                                            <x-ui.blocked-badge :project="$project" />
                                             @can('update', $project)<x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation @3xl/directory:size-8!" wire:click="openEditModal({{ $project->id }})" :aria-label="__('common.edit_name', ['name' => $project->name])" />@endcan
                                             @if ($project->status === ProjectStatus::Archived)
                                                 @can('delete', $project)<x-ui.button tone="ghost" size="sm" icon="arrow-uturn-left" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="restoreProject({{ $project->id }})" :aria-label="__('projects.restore_name', ['name' => $project->name])" />@endcan
@@ -1657,6 +1704,7 @@ new #[Title('titles.projects')] class extends Component {
                                     >
                                         <flux:icon.eye class="size-4.5" />
                                     </a>
+                                    <x-ui.blocked-badge :project="$project" />
                                     @can('update', $project)<x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="openEditModal({{ $project->id }})" :aria-label="__('common.edit_name', ['name' => $project->name])" />@endcan
                                     @if ($project->status === ProjectStatus::Archived)
                                         @can('delete', $project)<x-ui.button tone="ghost" size="sm" icon="arrow-uturn-left" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="restoreProject({{ $project->id }})" :aria-label="__('projects.restore_name', ['name' => $project->name])" />@endcan
@@ -1746,6 +1794,7 @@ new #[Title('titles.projects')] class extends Component {
                                             >
                                                 <flux:icon.eye class="size-4.5" />
                                             </a>
+                                            <x-ui.blocked-badge :project="$project" />
                                             @can('update', $project)<x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="openEditModal({{ $project->id }})" :aria-label="__('common.edit_name', ['name' => $project->name])" />@endcan
                                                 @if ($project->status === ProjectStatus::Archived)
                                                     @can('delete', $project)<x-ui.button tone="ghost" size="sm" icon="arrow-uturn-left" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="restoreProject({{ $project->id }})" :aria-label="__('projects.restore_name', ['name' => $project->name])" />@endcan
@@ -2023,6 +2072,28 @@ new #[Title('titles.projects')] class extends Component {
             <x-ui.button type="submit" tone="primary" data-test="save-project-button">
                 {{ $editingProjectId === null ? __('projects.create_project') : __('common.save_changes') }}
             </x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
+
+    <x-ui.modal
+        wire:model="showUnblockModal"
+        size="md"
+        :title="__('projects.unblock_title')"
+        submit="unblockProject"
+        close="closeUnblockModal"
+    >
+        @if ($showUnblockModal)
+            <p class="mb-3 text-sm text-secondary-medium dark:text-ink-muted">{{ __('projects.unblock_help') }}</p>
+            <x-ui.form-textarea
+                wire:model="unblockNote"
+                :label="__('projects.assignment_note_optional')"
+                rows="4"
+                data-test="unblock-note"
+            />
+        @endif
+
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="unblock-submit-button">{{ __('projects.unblock') }}</x-ui.button>
         </x-slot:actions>
     </x-ui.modal>
 

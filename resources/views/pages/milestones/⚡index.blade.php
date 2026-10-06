@@ -374,13 +374,6 @@ new #[Title('titles.milestones')] class extends Component {
         return Project::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get();
     }
 
-    /** @return Collection<int, HrEmployee> */
-    #[Computed]
-    public function userOptions(): Collection
-    {
-        return HrEmployee::pickerOptions();
-    }
-
     /** @return Collection<int, Milestone> */
     #[Computed]
     public function parentOptions(): Collection
@@ -643,11 +636,8 @@ new #[Title('titles.milestones')] class extends Component {
                 @endforeach
             </x-ui.header-filter-select>
 
-            <x-ui.header-filter-select id="milestone-responsible-filter" :label="__('milestones.responsible')" wire:model.live="responsible" :value="$responsible">
+            <x-ui.header-filter-select id="milestone-responsible-filter" :label="__('milestones.responsible')" wire:model.live="responsible" :value="$responsible" employees>
                 <option value="">{{ __('common.anyone') }}</option>
-                @foreach ($this->userOptions as $userOption)
-                    <option value="{{ $userOption->id }}">{{ $userOption->name }} · {{ $userOption->secondary_name }}</option>
-                @endforeach
             </x-ui.header-filter-select>
         </x-slot:filters>
 
@@ -756,11 +746,7 @@ new #[Title('titles.milestones')] class extends Component {
                     @endforeach
                 </x-ui.form-select>
 
-                <x-ui.form-select wire:model="responsibleUserId" :label="__('milestones.responsible')" :placeholder="__('common.select')" :search-label="__('milestones.search_responsible')">
-                    @foreach ($this->userOptions as $userOption)
-                        <option value="{{ $userOption->id }}">{{ $userOption->name }} · {{ $userOption->secondary_name }}</option>
-                    @endforeach
-                </x-ui.form-select>
+                <x-ui.form-select wire:model="responsibleUserId" :label="__('milestones.responsible')" :placeholder="__('common.select')" :search-label="__('milestones.search_responsible')" employees />
             </div>
         </x-ui.form-section>
 
