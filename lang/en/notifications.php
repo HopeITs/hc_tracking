@@ -302,6 +302,7 @@ return [
             'baseline_saved' => ':actor saved the schedule baseline “:baseline” for “:subject”',
             'assignment_acknowledged' => ':actor acknowledged being the owner of “:subject”',
             'assignment_rejected' => ':actor rejected being the owner of “:subject”: :note',
+            'assignment_unblocked' => ':actor unblocked “:subject” and asked :employee to acknowledge being its owner again',
             'updated' => ':actor updated the project “:subject”',
             'deleted' => ':actor deleted the project “:subject”',
         ],

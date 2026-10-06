@@ -144,6 +144,7 @@ return [
             ...$viewEverything, ...$fundraisingViews, ...$taskWriter, ...$reportWriter,
             'donors.create', 'donors.update',
             'proposals.create', 'proposals.update',
+            'projects.create',
         ],
         'MEAL' => [
             ...$viewEverything, ...$taskWriter, ...$reportWriter, 'reports.approve', 'reports.mark-seen',
@@ -164,7 +165,7 @@ return [
             'strategies.create', 'strategies.update', 'strategies.delete',
             'programs.update',
             'annual-plans.create', 'annual-plans.update', 'annual-plans.delete',
-            'projects.create', 'projects.update', 'projects.delete',
+            'projects.update', 'projects.delete',
             'milestones.create', 'milestones.update', 'milestones.delete',
             'risks.create', 'risks.update', 'risks.delete',
             'indicators.create', 'indicators.update',

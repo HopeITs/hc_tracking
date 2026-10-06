@@ -239,6 +239,43 @@ test('the projects page badges a rejected owner and nothing else', function () {
     Livewire::actingAs($assigner)->test('pages::projects.index')->assertSeeHtml('data-test="owner-rejected-badge"')->assertSee('Rejected');
 });
 
+test('a rejected project shows Blocked instead of edit, and only the CEO can unblock it with a note', function () {
+    $department = insertHrDepartment();
+    $topEmployee = insertHrEmployee(firstNameEn: 'Fredy', lastNameEn: 'Top');
+    $top = userWithRole('General Manager', $topEmployee);
+    insertHrContract($topEmployee, insertHrPosition($department, 'Chief Executive Officer'));
+
+    ['project' => $project, 'owner' => $owner, 'assigner' => $assigner] = projectAssignedToANewOwner();
+    $project->currentAssignment('user_id')->reject($owner, 'Already running three projects');
+
+    Livewire::actingAs($assigner)->test('pages::projects.index')
+        ->assertSeeHtml('data-test="blocked-badge"')
+        ->assertDontSeeHtml('data-test="blocked-badge-unblock"')
+        ->assertDontSeeHtml('wire:click="openEditModal('.$project->id.')"')
+        ->call('openUnblockModal', $project->id)->assertForbidden();
+
+    $rejected = $project->fresh()->ownerAssignment;
+    expect($assigner->can('unblock', $rejected))->toBeFalse();
+
+    Livewire::actingAs($top)->test('pages::projects.index')
+        ->assertSeeHtml('data-test="blocked-badge-unblock"')
+        ->assertDontSeeHtml('wire:click="openEditModal('.$project->id.')"')
+        ->call('openUnblockModal', $project->id)
+        ->set('unblockNote', 'Talked to Omar, he will take it')
+        ->call('unblockProject')
+        ->assertHasNoErrors()
+        ->assertDontSeeHtml('data-test="blocked-badge"')
+        ->assertSeeHtml('wire:click="openEditModal('.$project->id.')"');
+
+    $current = $project->fresh()->currentAssignment('user_id');
+
+    expect($rejected->fresh()->status)->toBe(AssignmentStatus::Superseded)
+        ->and($current->status)->toBe(AssignmentStatus::Pending)
+        ->and($current->employee_id)->toBe($owner->employee_id)
+        ->and($assigner->can('update', $project->fresh()))->toBeTrue()
+        ->and(Activity::query()->where('event', 'project.assignment_unblocked')->sole()->properties['note'])->toBe('Talked to Omar, he will take it');
+});
+
 test('the top level is the holder of the configured position title, and hears only a program manager rejecting', function () {
     $department = insertHrDepartment();
     $topEmployee = insertHrEmployee(firstNameEn: 'Fredy', lastNameEn: 'Top');
