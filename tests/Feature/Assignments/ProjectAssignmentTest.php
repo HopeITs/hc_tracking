@@ -177,26 +177,6 @@ test('the quick actions acknowledge in one click and send rejection to the reaso
         ->and($again['message'])->toBe('notifications.quick.already_done');
 });
 
-test('a draft cannot leave draft until its owner acknowledged', function () {
-    ['project' => $project, 'owner' => $owner] = projectAssignedToANewOwner();
-    $manager = userWithRole('General Manager');
-
-    $page = Livewire::actingAs($manager)
-        ->test('pages::projects.index')
-        ->call('openEditModal', $project->id)
-        ->set('projectStatus', ProjectStatus::Submitted->value)
-        ->call('saveProject')
-        ->assertHasErrors('projectStatus');
-
-    expect($project->fresh()->status)->toBe(ProjectStatus::Draft);
-
-    $project->currentAssignment('user_id')->acknowledge($owner);
-
-    $page->call('saveProject')->assertHasNoErrors();
-
-    expect($project->fresh()->status)->toBe(ProjectStatus::Submitted);
-});
-
 test('a rejection locks the project for everyone: no edit, no new owner', function () {
     ['project' => $project, 'owner' => $owner, 'assigner' => $assigner, 'programManager' => $programManager] = projectAssignedToANewOwner();
     $superAdmin = userWithRole('Super Admin');
@@ -289,17 +269,15 @@ test('the top level is the holder of the configured position title, and hears on
     expect(sentencesFor($deputy))->toBe([]);
 });
 
-test('a new project starts as a draft with a read-only status', function () {
+test('a new project starts as a draft whatever the form is sent', function () {
     $user = userWithRole('General Manager');
     $owner = insertHrEmployee();
     $program = Program::factory()->create(['manager_id' => $owner]);
 
-    $page = Livewire::actingAs($user)->test('pages::projects.index')->call('openCreateModal');
-
-    expect($page->instance()->statusLocked)->toBeTrue();
-
-    $page->set('name', 'Draft by default')
-        ->set('projectStatus', ProjectStatus::Active->value)
+    Livewire::actingAs($user)
+        ->test('pages::projects.index')
+        ->call('openCreateModal')
+        ->set('name', 'Draft by default')
         ->set('cityId', (string) insertHrCity())
         ->set('programId', (string) $program->id)
         ->set('userId', (string) $owner)
@@ -309,32 +287,21 @@ test('a new project starts as a draft with a read-only status', function () {
     expect(Project::query()->where('name', 'Draft by default')->sole()->status)->toBe(ProjectStatus::Draft);
 });
 
-test('the status opens up for a draft only after its owner acknowledged', function () {
+test('editing a project through the form leaves its status alone', function () {
     ['project' => $project, 'owner' => $owner] = projectAssignedToANewOwner();
-    $manager = userWithRole('General Manager');
-
-    $page = Livewire::actingAs($manager)->test('pages::projects.index')->call('openEditModal', $project->id);
-
-    expect($page->instance()->statusLocked)->toBeTrue();
-
     $project->currentAssignment('user_id')->acknowledge($owner);
+    $project->update(['status' => ProjectStatus::Active]);
 
-    $page = Livewire::actingAs($manager)->test('pages::projects.index')->call('openEditModal', $project->id);
+    Livewire::actingAs(userWithRole('General Manager'))
+        ->test('pages::projects.index')
+        ->call('openEditModal', $project->id)
+        ->set('name', 'Renamed through the form')
+        ->call('saveProject')
+        ->assertHasNoErrors();
 
-    expect($page->instance()->statusLocked)->toBeFalse();
-
-    $page->set('projectStatus', ProjectStatus::Active->value)->call('saveProject')->assertHasNoErrors();
-
-    expect($project->fresh()->status)->toBe(ProjectStatus::Active);
-});
-
-test('a project already past draft keeps a free status dropdown', function () {
-    $manager = userWithRole('General Manager');
-    $project = Activity::withoutRecording(fn () => Project::factory()->status(ProjectStatus::Active)->create());
-
-    $page = Livewire::actingAs($manager)->test('pages::projects.index')->call('openEditModal', $project->id);
-
-    expect($page->instance()->statusLocked)->toBeFalse();
+    expect($project->fresh())
+        ->name->toBe('Renamed through the form')
+        ->status->toBe(ProjectStatus::Active);
 });
 
 test('answering on the page reads the notification and takes its buttons away', function () {

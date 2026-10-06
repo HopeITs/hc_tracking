@@ -1,11 +1,13 @@
 <?php
 
+use App\Actions\Projects\ChangeProjectStatus;
 use App\Actions\Projects\DeleteProjectFile;
 use App\Actions\Projects\SaveProjectFile;
 use App\Enums\FileType;
 use App\Enums\IndicatorMeasure;
 use App\Enums\MediaCollection;
 use App\Enums\MilestoneStatus;
+use App\Enums\ProjectStatus;
 use App\Enums\ProposalPhase;
 use App\Enums\ResultType;
 use App\Enums\TaskPriority;
@@ -34,6 +36,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
@@ -122,6 +125,30 @@ new #[Title('titles.project')] class extends Component {
     public function ownerAssignment(): ?Assignment
     {
         return Project::query()->findOrFail($this->projectId)->currentAssignment('user_id')?->load('assigner');
+    }
+
+    /**
+     * Move the project to another status; the action enforces who may.
+     */
+    public function changeStatus(string $status): void
+    {
+        $target = ProjectStatus::tryFrom($status);
+
+        if ($target === null) {
+            return;
+        }
+
+        try {
+            app(ChangeProjectStatus::class)->handle(Project::query()->findOrFail($this->projectId), $target);
+        } catch (ValidationException $exception) {
+            Flux::toast(variant: 'danger', text: $exception->validator->errors()->first());
+
+            return;
+        }
+
+        unset($this->project);
+
+        Flux::toast(variant: 'success', text: __('projects.status_changed', ['status' => $target->label()]));
     }
 
     public function openAssignmentModal(string $mode): void
@@ -908,7 +935,32 @@ new #[Title('titles.project')] class extends Component {
 
         <x-slot:actions>
             <div class="flex flex-wrap items-center gap-2">
-                <x-ui.enum-badge :case="$this->project->status" />
+                @can('update', $this->project)
+                    @php
+                        $mayArchive = auth()->user()->can('delete', $this->project);
+                        $currentStatus = $this->project->status;
+                    @endphp
+                    <flux:dropdown position="bottom" align="end">
+                        <button type="button" class="inline-flex items-center gap-1 rounded-full focus-visible:outline-2 focus-visible:outline-primary" aria-label="{{ __('projects.change_status') }}" data-test="project-status-trigger">
+                            <x-ui.enum-badge :case="$currentStatus" />
+                            <flux:icon name="chevron-down" variant="micro" class="size-4 text-secondary-medium dark:text-ink-muted" />
+                        </button>
+
+                        <flux:menu>
+                            @foreach (ProjectStatus::cases() as $statusOption)
+                                @continue(! $mayArchive && $statusOption !== $currentStatus && ($statusOption === ProjectStatus::Archived || $currentStatus === ProjectStatus::Archived))
+                                <flux:menu.item
+                                    :icon="$statusOption === $currentStatus ? 'check' : null"
+                                    wire:click="changeStatus('{{ $statusOption->value }}')"
+                                    wire:key="project-status-option-{{ $statusOption->value }}"
+                                    data-test="project-status-option-{{ $statusOption->value }}"
+                                >{{ $statusOption->label() }}</flux:menu.item>
+                            @endforeach
+                        </flux:menu>
+                    </flux:dropdown>
+                @else
+                    <x-ui.enum-badge :case="$this->project->status" />
+                @endcan
                 <x-ui.employee-chip :employee="$this->project->user" class="rounded-lg border border-secondary-soft p-2.5 dark:border-line" />
             </div>
         </x-slot:actions>

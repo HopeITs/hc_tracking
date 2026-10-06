@@ -92,7 +92,6 @@ test('a project can be created with lifecycle dates and independent beneficiary 
         ->call('openCreateModal')
         ->set('name', '  Idlib Water Network  ')
         ->set('description', '  Restores reliable household water access.  ')
-        ->set('projectStatus', ProjectStatus::Approved->value) // read-only in the form: ignored on create
         ->set('startDate', '2026-09-01')
         ->set('endDate', '2027-08-31')
         ->set('targetBeneficiaries', '1000')
@@ -204,19 +203,7 @@ test('project lifecycle dates and targets reject invalid values', function () {
     expect(Project::query()->count())->toBe(0);
 });
 
-test('an unknown status is rejected when editing a project past draft', function () {
-    $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->status(ProjectStatus::Active)->create();
-
-    Livewire::actingAs($user)
-        ->test('pages::projects.index')
-        ->call('openEditModal', $project->id)
-        ->set('projectStatus', 'ACTIVE')
-        ->call('saveProject')
-        ->assertHasErrors(['projectStatus']);
-});
-
-test('a project can be renamed relocated and moved through its lifecycle', function () {
+test('a project can be renamed and relocated while keeping its status', function () {
     $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create([
         'name' => 'Old Name',
@@ -237,7 +224,6 @@ test('a project can be renamed relocated and moved through its lifecycle', funct
         ->call('openEditModal', $project->id)
         ->assertSet('name', 'Old Name')
         ->assertSet('description', 'Original scope')
-        ->assertSet('projectStatus', ProjectStatus::Approved->value)
         ->assertSet('startDate', '2026-01-01')
         ->assertSet('endDate', '2026-12-31')
         ->assertSet('targetBeneficiaries', '500')
@@ -247,7 +233,6 @@ test('a project can be renamed relocated and moved through its lifecycle', funct
         ->assertSet('targetGirls', '90')
         ->set('name', 'New Name')
         ->set('description', '  Updated scope  ')
-        ->set('projectStatus', ProjectStatus::Active->value)
         ->set('startDate', '2026-02-01')
         ->set('endDate', '2027-01-31')
         ->set('cityId', (string) $newCity)
@@ -263,7 +248,7 @@ test('a project can be renamed relocated and moved through its lifecycle', funct
 
     expect($project->name)->toBe('New Name')
         ->and($project->description)->toBe('Updated scope')
-        ->and($project->status)->toBe(ProjectStatus::Active)
+        ->and($project->status)->toBe(ProjectStatus::Approved)
         ->and($project->start_date?->toDateString())->toBe('2026-02-01')
         ->and($project->end_date?->toDateString())->toBe('2027-01-31')
         ->and($project->city_id)->toBe($newCity)
@@ -719,7 +704,7 @@ test('the project form lays its fields along a three-section rail with no native
     expect($xpath->query($dialog)->length)->toBe(1)
         ->and($headings)->toBe(['Details', 'Placement', 'Beneficiaries'])
         ->and($xpath->query($dialog.'//select')->length)->toBe(0)
-        ->and($xpath->query($dialog.'//*[@data-form-select]')->length)->toBe(4)
+        ->and($xpath->query($dialog.'//*[@data-form-select]')->length)->toBe(3)
         ->and($xpath->query($dialog.'[@*[name()="wire:close"]="closeProjectModal"]')->length)->toBe(1)
         ->and($xpath->query($dialog.'//form[@*[name()="wire:submit"]="saveProject"]')->length)->toBe(1);
 });
@@ -756,8 +741,7 @@ test('editing a project shows its saved choices in the form pickers', function (
     $xpath = new DOMXPath($document);
     $triggerLabel = fn (string $model): string => trim($xpath->query('//*[@data-form-select="'.$model.'"]//*[@data-trigger-label]')->item(0)->textContent);
 
-    expect($triggerLabel('projectStatus'))->toBe('Active')
-        ->and($triggerLabel('cityId'))->toBe('Idlib · إدلب')
+    expect($triggerLabel('cityId'))->toBe('Idlib · إدلب')
         ->and($triggerLabel('programId'))->toBe($program->name)
         ->and($triggerLabel('userId'))->toBe('Lina Haddad · لينا حداد');
 });

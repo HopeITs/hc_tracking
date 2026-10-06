@@ -18,11 +18,9 @@ use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
@@ -93,7 +91,6 @@ new #[Title('titles.projects')] class extends Component {
 
     public string $description = '';
 
-    public string $projectStatus = 'draft';
 
     public string $startDate = '';
 
@@ -712,7 +709,6 @@ new #[Title('titles.projects')] class extends Component {
         $this->editingProjectId = $project->id;
         $this->name = $project->name;
         $this->description = $project->description ?? '';
-        $this->projectStatus = $project->status->value;
         $this->startDate = $project->start_date?->toDateString() ?? '';
         $this->endDate = $project->end_date?->toDateString() ?? '';
         $this->targetBeneficiaries = self::formInteger($project->target_beneficiaries);
@@ -737,12 +733,6 @@ new #[Title('titles.projects')] class extends Component {
         $this->name = trim($this->name);
         $this->description = trim($this->description);
 
-        // A new project always starts as a draft; the status only opens up
-        // once its owner has acknowledged (see statusLocked()).
-        if ($this->editingProjectId === null) {
-            $this->projectStatus = ProjectStatus::Draft->value;
-        }
-
         // Only someone who may change the owner has to pick a program manager;
         // for anyone else the submitted owner is ignored below.
         $mustPickProgramManager = $this->editingProjectId === null
@@ -751,7 +741,6 @@ new #[Title('titles.projects')] class extends Component {
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
-            'projectStatus' => ['required', Rule::enum(ProjectStatus::class)],
             'startDate' => ['nullable', 'date'],
             'endDate' => [
                 'nullable',
@@ -786,16 +775,15 @@ new #[Title('titles.projects')] class extends Component {
         // program or owner, and archiving goes through archiveProject().
         $mayReassign = ! $project->exists || Gate::allows('reassign', $project);
 
-        if ($project->exists && ProjectStatus::from($validated['projectStatus']) === ProjectStatus::Archived && $project->status !== ProjectStatus::Archived) {
-            Gate::authorize('delete', $project);
+        // A new project always starts as a draft; an existing one keeps its
+        // status, which changes only from the project page.
+        if (! $project->exists) {
+            $project->status = ProjectStatus::Draft;
         }
-
-        $this->ensureOwnerAcknowledgedToLeaveDraft($project, ProjectStatus::from($validated['projectStatus']), $mayReassign ? (int) $validated['userId'] : (int) $project->user_id);
 
         $project->fill([
             'name' => $validated['name'],
             'description' => $validated['description'] === '' ? null : $validated['description'],
-            'status' => ProjectStatus::from($validated['projectStatus']),
             'start_date' => self::nullableString($validated['startDate']),
             'end_date' => self::nullableString($validated['endDate']),
             'target_beneficiaries' => self::nullableInteger($validated['targetBeneficiaries']),
@@ -818,48 +806,6 @@ new #[Title('titles.projects')] class extends Component {
             variant: 'success',
             text: $wasRecentlyCreated ? __('projects.project_created') : __('projects.project_updated'),
         );
-    }
-
-    /**
-     * Whether the status dropdown in the project form is read-only: always for
-     * a new project, and for a draft until its owner has acknowledged (and the
-     * form still names that same owner). Other states move freely.
-     */
-    #[Computed]
-    public function statusLocked(): bool
-    {
-        if ($this->editingProjectId === null) {
-            return true;
-        }
-
-        $project = Project::query()->find($this->editingProjectId);
-
-        if ($project === null || $project->status !== ProjectStatus::Draft) {
-            return false;
-        }
-
-        return ! ($project->isAssignmentAcknowledged('user_id') && (int) $this->userId === (int) $project->user_id);
-    }
-
-    /**
-     * A draft stays a draft until its owner has acknowledged being in charge
-     * (see Assignment). Putting yourself in charge counts as acknowledging.
-     */
-    protected function ensureOwnerAcknowledgedToLeaveDraft(Project $project, ProjectStatus $target, int $ownerEmployeeId): void
-    {
-        $leavesDraft = ! $project->exists || $project->status === ProjectStatus::Draft;
-
-        if (! $leavesDraft || in_array($target, [ProjectStatus::Draft, ProjectStatus::Archived], true)) {
-            return;
-        }
-
-        $acknowledged = $project->exists && $ownerEmployeeId === (int) $project->user_id
-            ? $project->isAssignmentAcknowledged('user_id')
-            : (int) Auth::user()?->employee_id === $ownerEmployeeId;
-
-        if (! $acknowledged) {
-            throw ValidationException::withMessages(['projectStatus' => __('projects.owner_must_acknowledge_first')]);
-        }
     }
 
     /**
@@ -974,7 +920,6 @@ new #[Title('titles.projects')] class extends Component {
         $this->editingProjectId = null;
         $this->name = '';
         $this->description = '';
-        $this->projectStatus = ProjectStatus::Draft->value;
         $this->startDate = '';
         $this->endDate = '';
         $this->targetBeneficiaries = '';
@@ -1946,23 +1891,10 @@ new #[Title('titles.projects')] class extends Component {
             <x-ui.form-section
                 :title="__('projects.section_details')"
                 :hint="__('projects.section_details_hint')"
-                :fields="['name', 'projectStatus', 'startDate', 'endDate', 'description']"
+                :fields="['name', 'startDate', 'endDate', 'description']"
             >
                 <div class="grid grid-cols-2 gap-x-4 gap-y-3 @4xl/modal:grid-cols-3">
                     <x-ui.form-input wire:model="name" :label="__('projects.project_name')" maxlength="255" required autofocus class="col-span-2" />
-
-                    <x-ui.form-select
-                        wire:model="projectStatus"
-                        :label="__('common.status')"
-                        required
-                        :disabled="$this->statusLocked"
-                        :locked-reason="$this->statusLocked ? ($editingProjectId === null ? __('projects.status_locked_new') : __('projects.status_locked_until_acknowledged')) : null"
-                        class="col-span-2 @4xl/modal:col-span-1"
-                    >
-                        @foreach (ProjectStatus::cases() as $statusOption)
-                            <option value="{{ $statusOption->value }}">{{ $statusOption->label() }}</option>
-                        @endforeach
-                    </x-ui.form-select>
 
                     <x-ui.form-input wire:model="startDate" :label="__('common.start_date')" type="date" />
                     <x-ui.form-input wire:model="endDate" :label="__('projects.end_date')" type="date" />

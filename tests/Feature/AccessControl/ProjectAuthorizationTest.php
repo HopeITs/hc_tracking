@@ -54,11 +54,9 @@ test('an owner\'s edit keeps the project\'s program and owner', function () {
         ->user_id->toBe($this->ownerEmployee);
 });
 
-test('an owner cannot archive through the edit form', function () {
-    ($this->index)($this->owner)
-        ->call('openEditModal', $this->project->id)
-        ->set('projectStatus', ProjectStatus::Archived->value)
-        ->call('saveProject')
+test('an owner cannot archive from the project page', function () {
+    ($this->show)($this->owner)
+        ->call('changeStatus', ProjectStatus::Archived->value)
         ->assertForbidden();
 
     expect($this->project->fresh()->status)->not->toBe(ProjectStatus::Archived);
