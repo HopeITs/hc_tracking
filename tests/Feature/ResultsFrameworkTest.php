@@ -77,6 +77,24 @@ test('results can be filtered by program and type', function () {
         ->assertSee('Second output.');
 });
 
+test('a program with a purely numeric name does not break either view', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $program = Program::factory()->create(['name' => '2024']);
+
+    Result::factory()->create([
+        'program_id' => $program->id,
+        'statement' => 'Numeric program statement.',
+    ]);
+
+    Livewire::actingAs($user)
+        ->test('pages::results.index')
+        ->assertOk()
+        ->assertSee('Numeric program statement.')
+        ->set('view', 'matrix')
+        ->assertOk()
+        ->assertSee('Numeric program statement.');
+});
+
 test('a result can be created under a parent', function () {
     $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create();

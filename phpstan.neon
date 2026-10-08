@@ -316,3 +316,37 @@ parameters:
             identifier: return.type
             path: app/Livewire/Concerns/Proposals/ReadsProposalRegister.php
             count: 3
+
+        # The results/index traits below hold code moved unchanged from the page.
+        # PHPStan could not read the page, so these are new findings; each needs a
+        # logic change, so each entry waits for its own task.
+        -
+            # describeTarget() takes the source label from __() (typed string|array,
+            # though common.fy_year is always a string) or Proposal::$name, and the
+            # donors from pluck('name')->values()->all() (untyped). The docblock
+            # states the exact shape the page relies on, so it stays.
+            identifier: return.type
+            path: app/Livewire/Concerns/Results/BuildsResultsFramework.php
+            count: 1
+        -
+            # groupedRoots() reads a statement's program as `program?->name ??
+            # unassigned`. results.program_id IS nullable (nullOnDelete), so the
+            # fallback is what puts program-less statements in the Unassigned
+            # group; PHPStan only flags the `?->` as redundant on the left of `??`.
+            identifier: nullsafe.neverNull
+            path: app/Livewire/Concerns/Results/BuildsResultsTree.php
+            count: 1
+        -
+            # overview() bumps $levels[$level][...] for a string $level; PHPStan
+            # cannot tell that every ResultType value was seeded with all three
+            # counters, so it reports the keys as possibly missing.
+            identifier: offsetAccess.notFound
+            path: app/Livewire/Concerns/Results/SummarisesResults.php
+            count: 2
+        -
+            # The same $levels array: after those increments PHPStan reads
+            # `measured` / `indicators` as optional, so the declared `levels` shape
+            # in the return docblock no longer matches.
+            identifier: return.type
+            path: app/Livewire/Concerns/Results/SummarisesResults.php
+            count: 1
