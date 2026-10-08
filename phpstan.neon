@@ -391,3 +391,40 @@ parameters:
             identifier: method.unresolvableReturnType
             path: app/Livewire/Concerns/Projects/ReadsProjectDelivery.php
             count: 1
+
+        # The targets/index traits below hold code moved unchanged from the page,
+        # which PHPStan could not read before. Same rule as above.
+        -
+            # matchingTargets() and pulse() pass statusSql() (PlanIndicator::
+            # achievementStatusSql()) to whereRaw()/selectRaw(). That builder
+            # returns one of three fixed fragments chosen by the status (the
+            # caller also checks it against STATUSES), with only the fixed
+            # ReportStatus::Approved value inlined; no user input reaches it, but
+            # its return type is plain string.
+            message: '#expects (.+\|)?literal-string, .+ given#'
+            identifier: argument.type
+            path: app/Livewire/Concerns/Targets/FiltersTargets.php
+            count: 3
+        -
+            # targets() selects PlanIndicator::achievedValueSql() and
+            # pendingValueSql(): fixed subqueries with only ReportStatus values
+            # inlined, typed plain string.
+            message: '#expects (.+\|)?literal-string, .+ given#'
+            identifier: argument.type
+            path: app/Livewire/Concerns/Targets/ReadsTargets.php
+            count: 2
+        -
+            # targets() eager-loads `source` with a callback typed for the MorphTo
+            # it receives (it calls morphWith()); Larastan types every with()
+            # callback as taking any Relation.
+            message: '#MorphTo#'
+            identifier: argument.type
+            path: app/Livewire/Concerns/Targets/ReadsTargets.php
+            count: 1
+        -
+            # saveTarget() loads the original row's `source` the same way, to
+            # compare its chain issues with the edited ones.
+            message: '#MorphTo#'
+            identifier: argument.type
+            path: app/Livewire/Concerns/Targets/ManagesTargetForm.php
+            count: 1
