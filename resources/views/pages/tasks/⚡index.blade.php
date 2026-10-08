@@ -3,17 +3,18 @@
 use App\Support\Like;
 use App\Actions\Tasks\ChangeTaskStatus;
 use App\Actions\Tasks\CompleteTask;
+use App\Actions\Tasks\DeleteTask;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Livewire\Concerns\ManagesTaskVisibility;
 use App\Livewire\Concerns\NavigatesCalendarPeriods;
+use App\Livewire\Concerns\SavesTaskForm;
 use App\Models\HrDepartment;
 use App\Models\HrEmployee;
 use App\Models\Milestone;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
-use App\Models\Scopes\TaskVisibilityScope;
 use App\Models\Task;
 use App\Models\TaskAssignee;
 use App\Notifications\UnreadSubjects;
@@ -22,12 +23,9 @@ use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
@@ -39,6 +37,7 @@ new #[Title('titles.tasks')] class extends Component
 {
     use ManagesTaskVisibility, WithPagination;
     use NavigatesCalendarPeriods;
+    use SavesTaskForm;
 
     #[Url(except: '')]
     public string $search = '';
@@ -745,25 +744,6 @@ new #[Title('titles.tasks')] class extends Component
         };
     }
 
-    /**
-     * The Eloquent class backing one of the five task source types, or null
-     * for an unrecognized type — used both to validate a submitted
-     * taskSourceId and to build each type's own option list.
-     *
-     * @return class-string<Model>|null
-     */
-    protected function sourceModelClassFor(string $type): ?string
-    {
-        return match ($type) {
-            'milestone' => Milestone::class,
-            'proposal' => Proposal::class,
-            'project' => Project::class,
-            'program' => Program::class,
-            'department' => HrDepartment::class,
-            default => null,
-        };
-    }
-
     #[Computed]
     public function deletingTask(): ?Task
     {
@@ -1083,105 +1063,6 @@ new #[Title('titles.tasks')] class extends Component
         $this->showTaskDrawer = true;
     }
 
-    public function saveTask(): void
-    {
-        if ($this->editingTaskId === null) {
-            Gate::authorize('create', Task::class);
-        } else {
-            Gate::authorize('update', Task::query()->findOrFail($this->editingTaskId));
-        }
-
-        $this->trimTaskForm();
-
-        $validated = $this->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'taskStatus' => ['required', new Enum(TaskStatus::class)],
-            'taskPriority' => ['required', new Enum(TaskPriority::class)],
-            'startDate' => ['nullable', 'date'],
-            'dueDate' => ['nullable', 'date', Rule::when($this->startDate !== '', ['after_or_equal:startDate'])],
-            'completedDate' => ['nullable', 'date'],
-            'progressPercentage' => ['required', 'integer', 'min:0', 'max:100'],
-            'assignedTo' => ['required', 'array', 'min:1'],
-            'assignedTo.*' => ['integer', Rule::exists(HrEmployee::class, 'id')],
-            'taskSourceType' => ['required', Rule::in(['milestone', 'proposal', 'project', 'program', 'department'])],
-            'taskSourceId' => [
-                'required',
-                'integer',
-                function (string $attribute, mixed $value, \Closure $fail): void {
-                    $modelClass = $this->sourceModelClassFor($this->taskSourceType);
-
-                    if ($modelClass !== null && ! $modelClass::query()->whereKey((int) $value)->exists()) {
-                        $fail(__('tasks.the_selected_source_is_no_longer_available'));
-                    }
-                },
-            ],
-        ], [
-            'title.required' => __('tasks.enter_a_task_title'),
-            'assignedTo.required' => __('tasks.assign_this_task_to_someone'),
-            'assignedTo.min' => __('tasks.assign_this_task_to_someone'),
-            'assignedTo.*.exists' => __('tasks.the_selected_assignee_is_no_longer_available'),
-            'taskSourceType.required' => __('tasks.select_the_source_this_task_is_raised_against'),
-            'taskSourceId.required' => __('tasks.select_the_source_this_task_is_raised_against'),
-            'dueDate.after_or_equal' => __('tasks.the_due_date_cannot_fall_before_the_start_date'),
-            'progressPercentage.min' => __('tasks.progress_cannot_be_negative'),
-            'progressPercentage.max' => __('tasks.progress_cannot_exceed_100_percent'),
-        ]);
-
-        $isCreate = $this->editingTaskId === null;
-        $task = $isCreate ? new Task : Task::query()->findOrFail($this->editingTaskId);
-
-        if (! $isCreate && $task->status === TaskStatus::Done) {
-            Flux::toast(variant: 'danger', text: __('tasks.completed_tasks_cannot_change_status'));
-
-            return;
-        }
-
-        $dueDate = $validated['dueDate'] === '' ? null : $validated['dueDate'];
-
-        if (! $isCreate && $task->created_by !== auth()->id() && $dueDate !== $task->due_date?->toDateString()) {
-            Flux::toast(variant: 'danger', text: __('tasks.only_the_task_creator_can_change_the_due_date'));
-
-            $dueDate = $task->due_date?->toDateString();
-        }
-
-        $attributes = [
-            'title' => $validated['title'],
-            'description' => $validated['description'] === '' ? null : $validated['description'],
-            'status' => $validated['taskStatus'],
-            'priority' => $validated['taskPriority'],
-            'start_date' => $validated['startDate'] === '' ? null : $validated['startDate'],
-            'due_date' => $dueDate,
-            'completed_date' => $validated['completedDate'] === '' ? null : $validated['completedDate'],
-            'progress_percentage' => (int) $validated['progressPercentage'],
-            'source_type' => $validated['taskSourceType'],
-            'source_id' => (int) $validated['taskSourceId'],
-        ];
-
-        if ($isCreate) {
-            $attributes['created_by'] = (int) auth()->id();
-        }
-
-        DB::transaction(function () use ($task, $attributes, $validated): void {
-            $task->fill($attributes)->save();
-
-            $employeeIds = collect($validated['assignedTo'])->map(fn ($id): int => (int) $id)->unique()->values();
-
-            $task->taskAssignees()->whereNotIn('employee_id', $employeeIds)->delete();
-            $existingIds = $task->taskAssignees()->pluck('employee_id');
-
-            $employeeIds->diff($existingIds)->each(fn (int $employeeId) => $task->taskAssignees()->create([
-                'employee_id' => $employeeId,
-            ]));
-        });
-
-        $this->showTaskDrawer = false;
-        $this->resetTaskForm();
-        $this->resetPage();
-
-        Flux::toast(variant: 'success', text: $isCreate ? __('tasks.task_created') : __('tasks.task_updated'));
-    }
-
     public function confirmDelete(int $taskId): void
     {
         Gate::authorize('delete', Task::query()->findOrFail($taskId));
@@ -1205,17 +1086,7 @@ new #[Title('titles.tasks')] class extends Component
         }
 
         $taskId = $this->deletingTaskId;
-        $deleted = DB::transaction(function () use ($taskId): bool {
-            $task = Task::query()->lockForUpdate()->find($taskId);
-
-            if ($task === null || $task->subtasks()->withoutGlobalScope(TaskVisibilityScope::class)->exists()) {
-                return false;
-            }
-
-            Gate::authorize('delete', $task);
-
-            return (bool) $task->delete();
-        });
+        $deleted = app(DeleteTask::class)->handle($taskId);
 
         $this->showDeleteModal = false;
         $this->deletingTaskId = null;
@@ -1332,32 +1203,12 @@ new #[Title('titles.tasks')] class extends Component
         Flux::toast(variant: 'success', text: __('tasks.assignee_added'));
     }
 
-    public function rescheduleTask(int $taskId, string $date): void
+    protected function taskFormSaved(): void
     {
-        if ($date !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) !== 1) {
-            return;
-        }
-
-        $task = Task::query()->find($taskId);
-
-        if ($task === null) {
-            return;
-        }
-
-        Gate::authorize('update', $task);
-
-        if ($task->created_by !== auth()->id()) {
-            Flux::toast(variant: 'danger', text: __('tasks.only_the_task_creator_can_change_the_due_date'));
-
-            return;
-        }
-
-        $task->due_date = $date === '' ? null : CarbonImmutable::parse($date);
-        $task->save();
-
-        Flux::toast(variant: 'success', text: __('tasks.task_rescheduled'));
+        $this->showTaskDrawer = false;
+        $this->resetTaskForm();
+        $this->resetPage();
     }
-
     public function closeTaskDrawer(): void
     {
         $this->showTaskDrawer = false;
@@ -1380,13 +1231,6 @@ new #[Title('titles.tasks')] class extends Component
         $this->assignedTo = [];
         $this->taskSourceType = '';
         $this->taskSourceId = '';
-    }
-
-    protected function trimTaskForm(): void
-    {
-        foreach (['title', 'description', 'taskStatus', 'taskPriority', 'startDate', 'dueDate', 'completedDate', 'progressPercentage', 'taskSourceType', 'taskSourceId'] as $property) {
-            $this->{$property} = trim($this->{$property});
-        }
     }
 };
 ?>

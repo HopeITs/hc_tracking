@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\TaskStatus;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\DonorReport;
@@ -322,6 +323,33 @@ test('a task can be edited and deleted from the calendar', function () {
         ->call('deleteTask');
 
     $this->assertDatabaseMissing('tasks', ['id' => $task->id]);
+});
+
+test('a completed task cannot be reopened from the calendar edit form', function () {
+    $employeeId = insertHrEmployee();
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
+    $task = Task::factory()->create([
+        'title' => 'Finished task',
+        'status' => TaskStatus::Done,
+        'created_by' => $user->id,
+        'due_date' => Carbon::create(2026, 6, 15),
+    ]);
+    $task->taskAssignees()->delete();
+    $task->taskAssignees()->create(['employee_id' => $employeeId]);
+
+    $component = Livewire::actingAs($user)
+        ->test('pages::calendar.index')
+        ->set('month', '2026-06')
+        ->call('openEditTaskModal', $task->id)
+        ->set('taskStatus', TaskStatus::Todo->value)
+        ->call('saveTask');
+
+    expect($task->refresh()->status)->toBe(TaskStatus::Done);
+
+    $component
+        ->assertDispatched('toast-show', fn (string $event, array $params) => ($params['slots']['text'] ?? null) === __('tasks.completed_tasks_cannot_change_status')
+            && ($params['dataset']['variant'] ?? null) === 'danger')
+        ->assertSet('showTaskModal', true);
 });
 
 test('turning off a type filter hides that type\'s chips without affecting the others', function () {
