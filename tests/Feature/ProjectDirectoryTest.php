@@ -745,3 +745,13 @@ test('editing a project shows its saved choices in the form pickers', function (
         ->and($triggerLabel('programId'))->toBe($program->name)
         ->and($triggerLabel('userId'))->toBe('Lina Haddad · لينا حداد');
 });
+
+test('the project form is rendered only while its modal is open', function () {
+    $user = User::factory()->role('General Manager')->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::projects.index')
+        ->assertDontSeeHtml('wire:model="targetBeneficiaries"')
+        ->call('openCreateModal')
+        ->assertSeeHtml('wire:model="targetBeneficiaries"');
+});
