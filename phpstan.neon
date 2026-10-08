@@ -39,6 +39,16 @@ parameters:
             identifier: nullsafe.neverNull
             path: database/seeders/NotificationDemoSeeder.php
             count: 2
+        -
+            # activeAnchor() and activeMonth() were moved here unchanged from the
+            # calendar, milestones and tasks pages. They still test
+            # createFromFormat() against false (Carbon 2 style); Carbon 3 returns
+            # null instead, and the regex before each call already rules out a
+            # failed parse. Switching the check to null is a logic change, so it
+            # waits for its own task.
+            identifier: notIdentical.alwaysTrue
+            path: app/Livewire/Concerns/NavigatesCalendarPeriods.php
+            count: 2
 
         # Raw SQL that cannot be a literal string but carries no user input.
         # Checked 2026-10-05: every value inside is an enum value, a date this

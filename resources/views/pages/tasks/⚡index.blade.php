@@ -6,6 +6,7 @@ use App\Actions\Tasks\CompleteTask;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Livewire\Concerns\ManagesTaskVisibility;
+use App\Livewire\Concerns\NavigatesCalendarPeriods;
 use App\Models\HrDepartment;
 use App\Models\HrEmployee;
 use App\Models\Milestone;
@@ -37,6 +38,7 @@ use Livewire\WithPagination;
 new #[Title('titles.tasks')] class extends Component
 {
     use ManagesTaskVisibility, WithPagination;
+    use NavigatesCalendarPeriods;
 
     #[Url(except: '')]
     public string $search = '';
@@ -279,102 +281,6 @@ new #[Title('titles.tasks')] class extends Component
         $this->myTasksOnly = false;
         $this->dueFilter = '';
         $this->resetPage();
-    }
-
-    public function previousMonth(): void
-    {
-        $this->month = $this->activeMonth()->subMonthNoOverflow()->format('Y-m');
-    }
-
-    public function nextMonth(): void
-    {
-        $this->month = $this->activeMonth()->addMonthNoOverflow()->format('Y-m');
-    }
-
-    public function goToToday(): void
-    {
-        $this->month = '';
-        $this->anchorDate = '';
-    }
-
-    /**
-     * Switch between the month grid and the ClickUp-style day/4-days/week
-     * time-grid views, mirroring the "My Calendar" page. Only the four
-     * values below are valid view modes; any other value (e.g. a stale
-     * bookmarked URL) is silently ignored so the component falls back to
-     * whatever $viewMode already holds.
-     */
-    public function setViewMode(string $viewMode): void
-    {
-        if (! in_array($viewMode, ['day', 'four_days', 'week', 'month'], true)) {
-            return;
-        }
-
-        $this->viewMode = $viewMode;
-    }
-
-    public function previousPeriod(): void
-    {
-        $this->anchorDate = $this->activeAnchor()->subDays($this->periodLengthInDays())->format('Y-m-d');
-    }
-
-    public function nextPeriod(): void
-    {
-        $this->anchorDate = $this->activeAnchor()->addDays($this->periodLengthInDays())->format('Y-m-d');
-    }
-
-    protected function periodLengthInDays(): int
-    {
-        return match ($this->viewMode) {
-            'day' => 1,
-            'four_days' => 4,
-            'week' => 7,
-            default => 1,
-        };
-    }
-
-    protected function activeAnchor(): CarbonImmutable
-    {
-        if ($this->anchorDate !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $this->anchorDate) === 1) {
-            $parsed = CarbonImmutable::createFromFormat('Y-m-d', $this->anchorDate);
-
-            if ($parsed !== false) {
-                return $parsed->startOfDay();
-            }
-        }
-
-        return CarbonImmutable::now()->startOfDay();
-    }
-
-    /**
-     * The visible days for the day/4-days/week views. Week always starts on
-     * the anchor's Sunday, so navigating never lands mid-week.
-     *
-     * @return array<int, CarbonImmutable>
-     */
-    protected function periodDays(): array
-    {
-        $anchor = $this->viewMode === 'week'
-            ? $this->activeAnchor()->startOfWeek(CarbonImmutable::SUNDAY)
-            : $this->activeAnchor();
-
-        return array_map(
-            fn (int $i): CarbonImmutable => $anchor->addDays($i),
-            range(0, $this->periodLengthInDays() - 1),
-        );
-    }
-
-    protected function activeMonth(): CarbonImmutable
-    {
-        if ($this->month !== '' && preg_match('/^\d{4}-\d{2}$/', $this->month) === 1) {
-            $parsed = CarbonImmutable::createFromFormat('Y-m-d', $this->month.'-01');
-
-            if ($parsed !== false) {
-                return $parsed->startOfMonth();
-            }
-        }
-
-        return CarbonImmutable::now()->startOfMonth();
     }
 
     /**
