@@ -119,6 +119,58 @@ parameters:
             path: app/Livewire/Concerns/Proposals/ReadsProposalDelivery.php
             count: 1
 
+        # The calendar/index traits below hold code moved unchanged from the
+        # page, which PHPStan could not read before. Changing any of it is a
+        # logic change, so each entry waits for its own task.
+        -
+            # calendar() takes the period's last day with `end($days)`, typed
+            # CarbonImmutable|false. periodDays() maps range(0, n - 1), which is
+            # never empty, so false cannot happen; its docblock only says array.
+            identifier: method.nonObject
+            path: app/Livewire/Concerns/Calendar/BuildsCalendarGrid.php
+            count: 9
+        -
+            # typeProperty() matches the seven known type keys with no default.
+            # Every caller passes one of them, except toggleType(), a public
+            # action: an unknown key from the browser throws UnhandledMatchError.
+            identifier: match.unhandled
+            path: app/Livewire/Concerns/Calendar/FiltersCalendarTypes.php
+            count: 1
+        -
+            # focusedItems() reads `planIndicator?->indicator?->name ?? fallback`.
+            # The fallback is wanted (a report's indicator can be gone); PHPStan
+            # flags only the last `?->`, redundant on the left of `??`.
+            identifier: nullsafe.neverNull
+            path: app/Livewire/Concerns/Calendar/FindsFocusedTypeDates.php
+            count: 1
+        -
+            # focusedItems() documents title as string and date as non-null.
+            # The rows put __() (string|array to PHPStan) in title/subLabel and
+            # read due_date/next_step_due_on, nullable casts the queries already
+            # filter with whereNotNull().
+            identifier: return.type
+            path: app/Livewire/Concerns/Calendar/FindsFocusedTypeDates.php
+            count: 1
+        -
+            # saveMilestone() reads `$existingMilestone?->project_id ?? (int) ...`;
+            # the `?->` is redundant on the left of `??`.
+            identifier: nullsafe.neverNull
+            path: app/Livewire/Concerns/Calendar/ManagesCalendarMilestones.php
+            count: 1
+        -
+            # saveMilestone() passes Rule::in(...) to Rule::when(). Rules\In is a
+            # valid rule object at runtime, but Rule::when()'s signature does not
+            # list it.
+            identifier: argument.type
+            path: app/Livewire/Concerns/Calendar/ManagesCalendarMilestones.php
+            count: 1
+        -
+            # dayDetailItems() reads `planIndicator?->indicator?->name ?? fallback`;
+            # same as focusedItems() above.
+            identifier: nullsafe.neverNull
+            path: app/Livewire/Concerns/Calendar/ShowsCalendarDay.php
+            count: 1
+
         # Raw SQL that cannot be a literal string but carries no user input.
         # Checked 2026-10-05: every value inside is an enum value, a date this
         # code formats itself, or a whitelisted sort direction. Bind anything

@@ -792,3 +792,26 @@ test('the today button resets both the month grid and the day/week anchor', func
         ->assertSet('anchorDate', '')
         ->assertSet('month', '');
 });
+
+test('the milestone, task and day-detail forms are rendered only while their modals are open', function () {
+    $employeeId = insertHrEmployee();
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
+
+    Livewire::actingAs($user)
+        ->test('pages::calendar.index')
+        ->assertDontSeeHtml('data-test="calendar-form-planned-date"')
+        ->call('openCreateModal')
+        ->assertSeeHtml('data-test="calendar-form-planned-date"');
+
+    Livewire::actingAs($user)
+        ->test('pages::calendar.index')
+        ->assertDontSeeHtml('data-test="calendar-task-form-due-date"')
+        ->call('openCreateTaskModal')
+        ->assertSeeHtml('data-test="calendar-task-form-due-date"');
+
+    Livewire::actingAs($user)
+        ->test('pages::calendar.index')
+        ->assertDontSeeHtml('data-test="calendar-daydetail-list"')
+        ->call('openDayDetail', now()->toDateString())
+        ->assertSeeHtml('data-test="calendar-daydetail-list"');
+});
