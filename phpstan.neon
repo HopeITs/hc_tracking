@@ -230,3 +230,31 @@ parameters:
             identifier: argument.type
             path: app/Livewire/Concerns/FiltersFinanceRegister.php
             count: 1
+        -
+            # orderByEnumSequence() builds a CASE from the fixed value lists
+            # applySort() passes (priority and status cases) and a direction it
+            # limits to asc/desc. orderByAssigneeName() builds one from task ids
+            # cast to int and list positions.
+            message: '#expects (.+\|)?literal-string, .+ given#'
+            identifier: argument.type
+            path: app/Livewire/Concerns/Tasks/FiltersTaskDirectory.php
+            count: 3
+        -
+            # taskStats() inlines two dates it formats itself (toDateString())
+            # into one aggregate select; there is no user input in it.
+            message: '#expects (.+\|)?literal-string, .+ given#'
+            identifier: argument.type
+            path: app/Livewire/Concerns/Tasks/ReadsTaskViews.php
+            count: 1
+
+        # The tasks/index traits hold code moved unchanged from the page, which
+        # PHPStan could not read before. Changing any of it is a logic change.
+        -
+            # calendarGrid() takes the period's last day with `end($days)`, typed
+            # CarbonImmutable|false, and passes it to between(). periodDays() maps
+            # range(0, n - 1), which is never empty, so false cannot happen; its
+            # docblock only says array.
+            message: '#CarbonImmutable\|false#'
+            identifier: argument.type
+            path: app/Livewire/Concerns/Tasks/ReadsTaskViews.php
+            count: 1

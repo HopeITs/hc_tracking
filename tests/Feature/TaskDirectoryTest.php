@@ -1287,3 +1287,13 @@ test('rescheduleTask refuses to change the due date for anyone but the task crea
 
     expect($task->refresh()->due_date?->toDateString())->toBe('2026-05-01');
 });
+
+test('the task form is rendered only while its drawer is open', function () {
+    $user = User::factory()->role('General Manager')->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->assertDontSeeHtml('wire:model="progressPercentage"')
+        ->call('openCreateDrawer')
+        ->assertSeeHtml('wire:model="progressPercentage"');
+});
