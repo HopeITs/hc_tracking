@@ -350,3 +350,44 @@ parameters:
             identifier: return.type
             path: app/Livewire/Concerns/Results/SummarisesResults.php
             count: 1
+
+        # The projects/show traits below hold code moved unchanged from the page,
+        # which PHPStan could not read before. Eloquent\Collection::map() types
+        # its callback argument from TModel, so after groupBy() each group (itself
+        # a Collection) reads as a Model and `$group->first()->…` is mixed; a
+        # typed @param on the closure does not clear it. `->toBase()` between
+        # groupBy() and map() would, but that is a code change, so each entry
+        # waits for its own task.
+        -
+            # fundingByCurrency() and proposalFunding(): with each group read as
+            # a Model, `$group->first()->currency` is mixed, so the docblock's
+            # Currency shape is reported. Clearable later by `->toBase()` before
+            # map() (or a typed `@var \Illuminate\Support\Collection<string,
+            # Collection<int, DonorProposal>>` local); every group holds one
+            # currency, so the shape is right.
+            identifier: return.type
+            path: app/Livewire/Concerns/Projects/ReadsProjectFunding.php
+            count: 2
+        -
+            # targetsByResult(): the same Eloquent groupBy()/map() typing makes
+            # `first()->indicator(->result)` mixed, so the declared Result /
+            # Indicator / PlanIndicator shape is reported. Fixing the types with
+            # `->toBase()` would surface real findings that need logic changes:
+            # result/indicator are nullable (BelongsTo + first()), and the
+            # `$resultOrder[...] ?? 99` fallback is dead (ResultType has only
+            # those three cases).
+            identifier: return.type
+            path: app/Livewire/Concerns/Projects/ReadsProjectDelivery.php
+            count: 1
+        -
+            # The same chain: sortBy()'s callback reads `$group['result']->type`
+            # from that mis-typed shape, which PHPStan cannot resolve.
+            identifier: argument.unresolvableType
+            path: app/Livewire/Concerns/Projects/ReadsProjectDelivery.php
+            count: 1
+        -
+            # The same chain: values() after that sortBy() returns the
+            # unresolvable type.
+            identifier: method.unresolvableReturnType
+            path: app/Livewire/Concerns/Projects/ReadsProjectDelivery.php
+            count: 1
