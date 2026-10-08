@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Milestones\SaveMilestone;
 use App\Enums\MilestoneStatus;
 use App\Livewire\Concerns\AddsQuickTask;
 use App\Models\HrEmployee;
@@ -170,7 +171,7 @@ new #[Title('titles.milestone')] class extends Component {
             'weightPercentage.max' => __('milestones.weight_cannot_exceed_100_percent'),
         ]);
 
-        $milestone->fill($canEdit ? [
+        app(SaveMilestone::class)->handle($milestone, $canEdit ? [
             'name' => $validated['name'],
             'description' => $validated['description'] === '' ? null : $validated['description'],
             'planned_start_date' => $validated['plannedStartDate'],
@@ -183,7 +184,7 @@ new #[Title('titles.milestone')] class extends Component {
                 : (int) $validated['parentMilestoneId'],
         ] : [
             'status' => $validated['milestoneStatus'],
-        ])->save();
+        ]);
 
         unset($this->milestone);
         unset($this->parentOptions);
@@ -245,7 +246,7 @@ new #[Title('titles.milestone')] class extends Component {
             'relatedWeightPercentage.max' => __('milestones.weight_cannot_exceed_100_percent'),
         ]);
 
-        Milestone::query()->create([
+        app(SaveMilestone::class)->handle(null, [
             'project_id' => $projectId,
             'name' => $validated['relatedName'],
             'description' => $validated['relatedDescription'] === '' ? null : $validated['relatedDescription'],

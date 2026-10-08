@@ -1,5 +1,7 @@
 <?php
 
+use App\Actions\Milestones\DeleteMilestone;
+use App\Actions\Milestones\SaveMilestone;
 use App\Enums\MilestoneStatus;
 use App\Livewire\Concerns\NavigatesCalendarPeriods;
 use App\Models\HrEmployee;
@@ -390,7 +392,7 @@ new #[Title('titles.milestones')] class extends Component {
 
         Gate::authorize('create', [Milestone::class, (int) $validated['milestoneProjectId']]);
 
-        Milestone::query()->create([
+        app(SaveMilestone::class)->handle(null, [
             'project_id' => (int) $validated['milestoneProjectId'],
             'name' => $validated['name'],
             'description' => $validated['description'] === '' ? null : $validated['description'],
@@ -452,17 +454,7 @@ new #[Title('titles.milestones')] class extends Component {
         }
 
         $milestoneId = $this->deletingMilestoneId;
-        $deleted = DB::transaction(function () use ($milestoneId): bool {
-            $milestone = Milestone::query()->lockForUpdate()->find($milestoneId);
-
-            if ($milestone === null || $milestone->children()->exists() || $milestone->tasks()->withoutGlobalScope(TaskVisibilityScope::class)->exists()) {
-                return false;
-            }
-
-            Gate::authorize('delete', $milestone);
-
-            return (bool) $milestone->delete();
-        });
+        $deleted = app(DeleteMilestone::class)->handle($milestoneId);
 
         $this->showDeleteModal = false;
         $this->deletingMilestoneId = null;

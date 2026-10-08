@@ -152,6 +152,27 @@ test('a milestone can be edited and deleted from the calendar', function () {
     $this->assertDatabaseMissing('milestones', ['id' => $milestone->id]);
 });
 
+test('deleting a milestone that still has a task from the calendar is refused', function () {
+    $employeeId = insertHrEmployee();
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
+    $milestone = Milestone::factory()->create([
+        'responsible_user_id' => $employeeId,
+        'planned_start_date' => Carbon::create(2026, 6, 15),
+    ]);
+    Task::factory()->create(['source_type' => 'milestone', 'source_id' => $milestone->id]);
+
+    Livewire::actingAs($user)
+        ->test('pages::calendar.index')
+        ->set('month', '2026-06')
+        ->call('confirmDelete', $milestone->id)
+        ->call('deleteMilestone')
+        ->assertSet('showDeleteModal', false)
+        ->assertDispatched('toast-show', fn (string $event, array $params) => ($params['slots']['text'] ?? null) === __('milestones.this_milestone_still_has_nested_milestones_or_tasks_move_or')
+            && ($params['dataset']['variant'] ?? null) === 'danger');
+
+    $this->assertDatabaseHas('milestones', ['id' => $milestone->id]);
+});
+
 test('a linked user sees their own assigned tasks on the correct day, and not another employee\'s', function () {
     $employeeId = insertHrEmployee();
     $otherEmployeeId = insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Nassar');

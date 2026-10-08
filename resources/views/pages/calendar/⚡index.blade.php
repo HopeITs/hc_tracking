@@ -5,6 +5,8 @@ use App\Enums\MilestoneStatus;
 use App\Enums\ReportStatus;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Actions\Milestones\DeleteMilestone;
+use App\Actions\Milestones\SaveMilestone;
 use App\Actions\Tasks\DeleteTask;
 use App\Livewire\Concerns\NavigatesCalendarPeriods;
 use App\Livewire\Concerns\SavesTaskForm;
@@ -501,7 +503,6 @@ new #[Title('titles.calendar')] class extends Component {
             'weightPercentage.max' => __('milestones.weight_cannot_exceed_100_percent'),
         ]);
 
-        $milestone = $existingMilestone ?? new Milestone;
         $attributes = [
             'name' => $validated['name'],
             'planned_start_date' => $validated['plannedStartDate'],
@@ -519,7 +520,7 @@ new #[Title('titles.calendar')] class extends Component {
             $attributes['project_id'] = (int) $validated['milestoneProjectId'];
         }
 
-        $milestone->fill($attributes)->save();
+        $milestone = app(SaveMilestone::class)->handle($existingMilestone, $attributes);
         $wasRecentlyCreated = $milestone->wasRecentlyCreated;
 
         $this->showMilestoneModal = false;
@@ -546,15 +547,7 @@ new #[Title('titles.calendar')] class extends Component {
             return;
         }
 
-        $milestone = Milestone::query()->find($this->deletingMilestoneId);
-
-        if ($milestone !== null) {
-            Gate::authorize('delete', $milestone);
-        }
-
-        $deleted = $milestone !== null && $milestone->children()->doesntExist() && $milestone->tasks()->withoutGlobalScope(TaskVisibilityScope::class)->doesntExist()
-            ? $milestone->delete()
-            : false;
+        $deleted = app(DeleteMilestone::class)->handle($this->deletingMilestoneId);
 
         $this->deletingMilestoneId = null;
         $this->showDeleteModal = false;
