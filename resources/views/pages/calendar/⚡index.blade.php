@@ -8,6 +8,7 @@ use App\Enums\TaskStatus;
 use App\Actions\Milestones\DeleteMilestone;
 use App\Actions\Milestones\SaveMilestone;
 use App\Actions\Tasks\DeleteTask;
+use App\Livewire\Concerns\ChecksFinanceVisibility;
 use App\Livewire\Concerns\NavigatesCalendarPeriods;
 use App\Livewire\Concerns\SavesTaskForm;
 use App\Models\Donor;
@@ -38,6 +39,7 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 
 new #[Title('titles.calendar')] class extends Component {
+    use ChecksFinanceVisibility;
     use NavigatesCalendarPeriods;
     use SavesTaskForm;
 
@@ -882,36 +884,11 @@ new #[Title('titles.calendar')] class extends Component {
     }
 
     /**
-     * Whether the viewer may see proposal deadlines and the proposals behind them.
-     */
-    protected function canViewProposals(): bool
-    {
-        return auth()->user()?->can('proposals.view') ?? false;
-    }
-
-    /**
-     * Whether the viewer may see transfer dates and the amounts on them.
-     */
-    protected function canViewTransfers(): bool
-    {
-        return auth()->user()?->can('transfers.view') ?? false;
-    }
-
-    /**
      * Whether the viewer may see donors and their follow-up dates.
      */
     protected function canViewDonors(): bool
     {
         return auth()->user()?->can('donors.view') ?? false;
-    }
-
-    /**
-     * Whether the viewer may see funding agreements, and so donor reports and
-     * the agreement page a transfer or donor report links to.
-     */
-    protected function canViewAgreements(): bool
-    {
-        return auth()->user()?->can('funding-agreements.view') ?? false;
     }
 
     /**

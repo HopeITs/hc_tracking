@@ -3,6 +3,7 @@
 use App\Enums\ProjectStatus;
 use App\Enums\ProposalPhase;
 use App\Livewire\Concerns\BuildsPortfolioGantt;
+use App\Livewire\Concerns\ChecksFinanceVisibility;
 use App\Models\Program;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
@@ -29,6 +30,7 @@ use Livewire\Component;
  */
 new #[Title('titles.timeline')] class extends Component {
     use BuildsPortfolioGantt;
+    use ChecksFinanceVisibility;
 
     /** The lenses the page offers, in tab order. */
     public const VIEWS = ['portfolio', 'connected', 'pipeline'];
@@ -65,14 +67,6 @@ new #[Title('titles.timeline')] class extends Component {
         }
 
         return $this->view;
-    }
-
-    /**
-     * Whether the viewer may see proposals, which the pipeline lens is made of.
-     */
-    protected function canViewProposals(): bool
-    {
-        return auth()->user()?->can('proposals.view') ?? false;
     }
 
     /**

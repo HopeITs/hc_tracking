@@ -3,6 +3,7 @@
 use App\Support\Like;
 use App\Enums\IndicatorMeasure;
 use App\Enums\Period;
+use App\Livewire\Concerns\ChecksFinanceVisibility;
 use App\Models\AnnualPlan;
 use App\Models\Donor;
 use App\Models\Indicator;
@@ -28,6 +29,7 @@ use Livewire\Component;
 use Livewire\WithPagination;
 
 new #[Title('titles.targets')] class extends Component {
+    use ChecksFinanceVisibility;
     use WithPagination;
 
     /**
@@ -378,14 +380,6 @@ new #[Title('titles.targets')] class extends Component {
             ->distinct()
             ->orderBy('result_id')
             ->paginate(6, ['result_id']);
-    }
-
-    /**
-     * Whether the viewer may see the budgets funders committed to a proposal.
-     */
-    protected function canViewAgreements(): bool
-    {
-        return auth()->user()?->can('funding-agreements.view') ?? false;
     }
 
     /**

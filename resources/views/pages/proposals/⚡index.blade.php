@@ -8,6 +8,7 @@ use App\Enums\Currency;
 use App\Enums\ProposalPhase;
 use App\Enums\ProposalStatus;
 use App\Enums\TaskStatus;
+use App\Livewire\Concerns\ChecksFinanceVisibility;
 use App\Livewire\Concerns\FiltersFinanceRegister;
 use App\Models\Donor;
 use App\Models\DonorProposal;
@@ -38,6 +39,7 @@ use Livewire\WithPagination;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 new #[Title('titles.proposals')] class extends Component {
+    use ChecksFinanceVisibility;
     use FiltersFinanceRegister;
     use WithPagination;
 
@@ -186,22 +188,6 @@ new #[Title('titles.proposals')] class extends Component {
 
         $this->donor = $this->donor === (string) $donorId ? '' : (string) $donorId;
         $this->resetPage();
-    }
-
-    /**
-     * Whether the viewer may see funding agreements and the budgets on them.
-     */
-    protected function canViewAgreements(): bool
-    {
-        return auth()->user()?->can('funding-agreements.view') ?? false;
-    }
-
-    /**
-     * Whether the viewer may see transfers and the amounts sent and received.
-     */
-    protected function canViewTransfers(): bool
-    {
-        return auth()->user()?->can('transfers.view') ?? false;
     }
 
     /**

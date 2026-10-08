@@ -12,6 +12,7 @@ use App\Enums\ProposalStatus;
 use App\Enums\ReportStatus;
 use App\Enums\TaskStatus;
 use App\Livewire\Concerns\AddsQuickTask;
+use App\Livewire\Concerns\ChecksFinanceVisibility;
 use App\Livewire\Concerns\ManagesAgreementForm;
 use App\Livewire\Concerns\ManagesTransferForm;
 use App\Livewire\Concerns\PreviewsFiles;
@@ -51,6 +52,7 @@ use Livewire\WithFileUploads;
 new #[Title('titles.proposal')] class extends Component
 {
     use AddsQuickTask;
+    use ChecksFinanceVisibility;
     use ManagesAgreementForm;
     use ManagesTransferForm;
     use PreviewsFiles;
@@ -134,22 +136,6 @@ new #[Title('titles.proposal')] class extends Component
         if (! in_array($this->tab, self::TABS, true) || ($this->tab === 'funding' && ! $this->canViewAgreements())) {
             $this->tab = 'status';
         }
-    }
-
-    /**
-     * Whether the viewer may see funding agreements and the budgets on them.
-     */
-    protected function canViewAgreements(): bool
-    {
-        return auth()->user()?->can('funding-agreements.view') ?? false;
-    }
-
-    /**
-     * Whether the viewer may see transfers and the amounts sent and received.
-     */
-    protected function canViewTransfers(): bool
-    {
-        return auth()->user()?->can('transfers.view') ?? false;
     }
 
     /**

@@ -7,6 +7,7 @@ use App\Support\Like;
 use App\Enums\ArStatus;
 use App\Enums\Currency;
 use App\Enums\DonorType;
+use App\Livewire\Concerns\ChecksFinanceVisibility;
 use App\Livewire\Concerns\FiltersFinanceRegister;
 use App\Livewire\Concerns\ManagesDonorForm;
 use App\Models\Donor;
@@ -29,6 +30,7 @@ use Livewire\WithPagination;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 new #[Title('titles.donors')] class extends Component {
+    use ChecksFinanceVisibility;
     use FiltersFinanceRegister;
     use ManagesDonorForm;
     use WithPagination;
@@ -209,22 +211,6 @@ new #[Title('titles.donors')] class extends Component {
             ->when(! $yearOnly, fn (Builder $query) => $query->orWhere(fn (Builder $query) => $query
                 ->where('ar_status', ArStatus::Received)
                 ->whereBetween('receive_date', $bounds)))));
-    }
-
-    /**
-     * Whether the viewer may see funding agreements and the budgets on them.
-     */
-    protected function canViewAgreements(): bool
-    {
-        return auth()->user()?->can('funding-agreements.view') ?? false;
-    }
-
-    /**
-     * Whether the viewer may see transfers and the amounts sent and received.
-     */
-    protected function canViewTransfers(): bool
-    {
-        return auth()->user()?->can('transfers.view') ?? false;
     }
 
     /** @return LengthAwarePaginator<int, Donor> */

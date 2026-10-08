@@ -13,6 +13,7 @@ use App\Enums\ResultType;
 use App\Enums\TaskStatus;
 use App\Livewire\Concerns\AddsQuickTask;
 use App\Livewire\Concerns\BuildsProjectGantt;
+use App\Livewire\Concerns\ChecksFinanceVisibility;
 use App\Livewire\Concerns\EditsProjectGantt;
 use App\Enums\AssignmentStatus;
 use App\Models\Assignment;
@@ -46,6 +47,7 @@ use Livewire\WithFileUploads;
 new #[Title('titles.project')] class extends Component {
     use AddsQuickTask;
     use BuildsProjectGantt;
+    use ChecksFinanceVisibility;
     use EditsProjectGantt;
     use WithFileUploads;
 
@@ -206,14 +208,6 @@ new #[Title('titles.project')] class extends Component {
     }
 
     /**
-     * Whether the viewer may see funding agreements and the budgets on them.
-     */
-    protected function canViewAgreements(): bool
-    {
-        return auth()->user()?->can('funding-agreements.view') ?? false;
-    }
-
-    /**
      * Whether the viewer may see the money on this page: committed and
      * received figures need both the agreements (budgets) and the transfers
      * (amounts received).
@@ -221,14 +215,6 @@ new #[Title('titles.project')] class extends Component {
     protected function canViewMoney(): bool
     {
         return $this->canViewAgreements() && (auth()->user()?->can('transfers.view') ?? false);
-    }
-
-    /**
-     * Whether the viewer may open a proposal's page, so its name links there.
-     */
-    protected function canViewProposals(): bool
-    {
-        return auth()->user()?->can('proposals.view') ?? false;
     }
 
     /**
