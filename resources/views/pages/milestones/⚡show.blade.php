@@ -1,15 +1,12 @@
 <?php
 
 use App\Enums\MilestoneStatus;
-use App\Enums\TaskPriority;
-use App\Enums\TaskStatus;
+use App\Livewire\Concerns\AddsQuickTask;
 use App\Models\HrEmployee;
 use App\Models\Milestone;
 use App\Models\Task;
-use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
@@ -19,6 +16,8 @@ use Livewire\Attributes\Title;
 use Livewire\Component;
 
 new #[Title('titles.milestone')] class extends Component {
+    use AddsQuickTask;
+
     #[Locked]
     public int $milestoneId;
 
@@ -40,15 +39,6 @@ new #[Title('titles.milestone')] class extends Component {
     public string $relatedWeightPercentage = '0';
     public string $relatedResponsibleUserId = '';
     public string $relatedParentMilestoneId = '';
-
-    public bool $showAddTaskModal = false;
-    public string $newTaskTitle = '';
-    public string $newTaskStatus = 'todo';
-    public string $newTaskPriority = 'medium';
-    public string $newTaskDueDate = '';
-
-    /** @var array<int, string> */
-    public array $newTaskAssignedTo = [];
 
     public function mount(Milestone $milestone): void
     {
@@ -276,70 +266,15 @@ new #[Title('titles.milestone')] class extends Component {
         Flux::toast(variant: 'success', text: __('milestones.milestone_created'));
     }
 
-    public function openAddTaskModal(): void
+    /** @return array{type: string, id: int} */
+    protected function quickTaskSource(): array
     {
-        Gate::authorize('create', Task::class);
-
-        $this->resetValidation();
-        $this->newTaskTitle = '';
-        $this->newTaskStatus = TaskStatus::Todo->value;
-        $this->newTaskPriority = TaskPriority::Medium->value;
-        $this->newTaskDueDate = '';
-        $this->newTaskAssignedTo = [];
-        $this->showAddTaskModal = true;
+        return ['type' => 'milestone', 'id' => $this->milestoneId];
     }
 
-    public function closeAddTaskModal(): void
+    protected function quickTaskCreated(): void
     {
-        $this->showAddTaskModal = false;
-    }
-
-    public function addTask(): void
-    {
-        Gate::authorize('create', Task::class);
-
-        $this->newTaskTitle = trim($this->newTaskTitle);
-
-        $validated = $this->validate([
-            'newTaskTitle' => ['required', 'string', 'max:255'],
-            'newTaskStatus' => ['required', new Enum(TaskStatus::class)],
-            'newTaskPriority' => ['required', new Enum(TaskPriority::class)],
-            'newTaskDueDate' => ['nullable', 'date'],
-            'newTaskAssignedTo' => ['required', 'array', 'min:1'],
-            'newTaskAssignedTo.*' => ['integer', Rule::exists(HrEmployee::class, 'id')],
-        ], [
-            'newTaskTitle.required' => __('tasks.enter_a_task_title'),
-            'newTaskAssignedTo.required' => __('tasks.assign_this_task_to_someone'),
-            'newTaskAssignedTo.min' => __('tasks.assign_this_task_to_someone'),
-            'newTaskAssignedTo.*.exists' => __('tasks.the_selected_assignee_is_no_longer_available'),
-        ]);
-
-        $milestoneId = $this->milestoneId;
-        $statusCase = TaskStatus::from($validated['newTaskStatus']);
-        $employeeIds = collect($validated['newTaskAssignedTo'])->map(fn ($id): int => (int) $id)->unique()->values();
-
-        DB::transaction(function () use ($milestoneId, $validated, $statusCase, $employeeIds): void {
-            $task = Task::query()->create([
-                'source_type' => 'milestone',
-                'source_id' => $milestoneId,
-                'title' => $validated['newTaskTitle'],
-                'status' => $statusCase,
-                'priority' => $validated['newTaskPriority'],
-                'due_date' => $validated['newTaskDueDate'] === '' ? null : $validated['newTaskDueDate'],
-                'progress_percentage' => $statusCase === TaskStatus::Done ? 100 : 0,
-                'completed_date' => $statusCase === TaskStatus::Done ? CarbonImmutable::today() : null,
-                'created_by' => (int) auth()->id(),
-            ]);
-
-            foreach ($employeeIds as $employeeId) {
-                $task->taskAssignees()->create(['employee_id' => $employeeId]);
-            }
-        });
-
-        $this->showAddTaskModal = false;
         unset($this->relatedTasks);
-
-        Flux::toast(variant: 'success', text: __('tasks.task_created'));
     }
 
     /** @return array<int, int> */

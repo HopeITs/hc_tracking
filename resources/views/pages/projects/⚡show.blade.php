@@ -10,8 +10,8 @@ use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\ProposalPhase;
 use App\Enums\ResultType;
-use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Livewire\Concerns\AddsQuickTask;
 use App\Livewire\Concerns\BuildsProjectGantt;
 use App\Livewire\Concerns\EditsProjectGantt;
 use App\Enums\AssignmentStatus;
@@ -28,16 +28,13 @@ use App\Models\Result;
 use App\Models\Risk;
 use App\Models\Task;
 use App\Rules\SecureUpload;
-use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
@@ -47,6 +44,7 @@ use Livewire\Component;
 use Livewire\WithFileUploads;
 
 new #[Title('titles.project')] class extends Component {
+    use AddsQuickTask;
     use BuildsProjectGantt;
     use EditsProjectGantt;
     use WithFileUploads;
@@ -76,19 +74,6 @@ new #[Title('titles.project')] class extends Component {
     public string $fileCategory = '';
 
     public string $fileDisplayName = '';
-
-    public bool $showAddTaskModal = false;
-
-    public string $newTaskTitle = '';
-
-    public string $newTaskStatus = 'todo';
-
-    public string $newTaskPriority = 'medium';
-
-    public string $newTaskDueDate = '';
-
-    /** @var array<int, string> */
-    public array $newTaskAssignedTo = [];
 
     /** The owner assignment dialog: the owner acknowledges or rejects. */
     #[Url(as: 'respond', except: '')]
@@ -405,75 +390,21 @@ new #[Title('titles.project')] class extends Component {
         return HrEmployee::pickerOptions();
     }
 
-    public function openAddTaskModal(): void
-    {
-        Gate::authorize('create', Task::class);
-
-        $this->resetValidation();
-        $this->newTaskTitle = '';
-        $this->newTaskStatus = TaskStatus::Todo->value;
-        $this->newTaskPriority = TaskPriority::Medium->value;
-        $this->newTaskDueDate = '';
-        $this->newTaskAssignedTo = [];
-        $this->showAddTaskModal = true;
-    }
-
-    public function closeAddTaskModal(): void
-    {
-        $this->showAddTaskModal = false;
-    }
-
     /**
      * Raise a task straight against this project — the source is always this
      * project, never a milestone: a task tied to one milestone's delivery is
      * added from the milestone's own page instead.
+     *
+     * @return array{type: string, id: int}
      */
-    public function addTask(): void
+    protected function quickTaskSource(): array
     {
-        Gate::authorize('create', Task::class);
+        return ['type' => 'project', 'id' => $this->projectId];
+    }
 
-        $this->newTaskTitle = trim($this->newTaskTitle);
-
-        $validated = $this->validate([
-            'newTaskTitle' => ['required', 'string', 'max:255'],
-            'newTaskStatus' => ['required', new Enum(TaskStatus::class)],
-            'newTaskPriority' => ['required', new Enum(TaskPriority::class)],
-            'newTaskDueDate' => ['nullable', 'date'],
-            'newTaskAssignedTo' => ['required', 'array', 'min:1'],
-            'newTaskAssignedTo.*' => ['integer', Rule::exists(HrEmployee::class, 'id')],
-        ], [
-            'newTaskTitle.required' => __('tasks.enter_a_task_title'),
-            'newTaskAssignedTo.required' => __('tasks.assign_this_task_to_someone'),
-            'newTaskAssignedTo.min' => __('tasks.assign_this_task_to_someone'),
-            'newTaskAssignedTo.*.exists' => __('tasks.the_selected_assignee_is_no_longer_available'),
-        ]);
-
-        $projectId = $this->projectId;
-        $statusCase = TaskStatus::from($validated['newTaskStatus']);
-        $employeeIds = collect($validated['newTaskAssignedTo'])->map(fn ($id): int => (int) $id)->unique()->values();
-
-        DB::transaction(function () use ($projectId, $validated, $statusCase, $employeeIds): void {
-            $task = Task::query()->create([
-                'source_type' => 'project',
-                'source_id' => $projectId,
-                'title' => $validated['newTaskTitle'],
-                'status' => $statusCase,
-                'priority' => $validated['newTaskPriority'],
-                'due_date' => $validated['newTaskDueDate'] === '' ? null : $validated['newTaskDueDate'],
-                'progress_percentage' => $statusCase === TaskStatus::Done ? 100 : 0,
-                'completed_date' => $statusCase === TaskStatus::Done ? CarbonImmutable::today() : null,
-                'created_by' => (int) auth()->id(),
-            ]);
-
-            foreach ($employeeIds as $employeeId) {
-                $task->taskAssignees()->create(['employee_id' => $employeeId]);
-            }
-        });
-
-        $this->showAddTaskModal = false;
+    protected function quickTaskCreated(): void
+    {
         unset($this->tasks);
-
-        Flux::toast(variant: 'success', text: __('tasks.task_created'));
     }
 
     /**
