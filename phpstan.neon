@@ -171,6 +171,31 @@ parameters:
             path: app/Livewire/Concerns/Calendar/ShowsCalendarDay.php
             count: 1
 
+        # The indicators/index traits below hold code moved unchanged from the
+        # page, which PHPStan could not read before. Same rule as above.
+        -
+            # allIndicators() eager-loads `planIndicators.source` with a callback
+            # typed for the MorphTo it receives (it calls morphWith()); Larastan
+            # types every with() callback as taking any Relation.
+            message: '#MorphTo#'
+            identifier: argument.type
+            path: app/Livewire/Concerns/Indicators/BuildsIndicatorRows.php
+            count: 1
+        -
+            # describeTarget() documents sourceLabel as string|null and donors as
+            # list<string>. sourceLabel holds __() (string|array to PHPStan) and
+            # donors pluck('name')->values()->all() (array<int, mixed>).
+            identifier: return.type
+            path: app/Livewire/Concerns/Indicators/BuildsIndicatorRows.php
+            count: 1
+        -
+            # changeKeepsTargetsInChain() eager-loads `source` with a callback
+            # typed for the MorphTo it receives; same as allIndicators() above.
+            message: '#MorphTo#'
+            identifier: argument.type
+            path: app/Livewire/Concerns/Indicators/ManagesIndicatorForm.php
+            count: 1
+
         # Raw SQL that cannot be a literal string but carries no user input.
         # Checked 2026-10-05: every value inside is an enum value, a date this
         # code formats itself, or a whitelisted sort direction. Bind anything
