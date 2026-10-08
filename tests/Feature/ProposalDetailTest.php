@@ -649,3 +649,20 @@ test('the add-task form is rendered only while its modal is open', function () {
         ->call('openAddTaskModal')
         ->assertSeeHtml('data-test="new-proposal-task-assignee-picker"');
 });
+
+test('the status and details forms are rendered only while their modals are open', function () {
+    $user = User::factory()->role('Financial')->create();
+    $proposal = Proposal::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::proposals.show', ['proposal' => $proposal])
+        ->assertDontSeeHtml('wire:model="statusContext"')
+        ->call('openStatusModal')
+        ->assertSeeHtml('wire:model="statusContext"');
+
+    Livewire::actingAs($user)
+        ->test('pages::proposals.show', ['proposal' => $proposal])
+        ->assertDontSeeHtml('wire:model="detailsNotes"')
+        ->call('openDetailsModal')
+        ->assertSeeHtml('wire:model="detailsNotes"');
+});

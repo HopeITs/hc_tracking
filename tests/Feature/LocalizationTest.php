@@ -74,6 +74,7 @@ test('every translation key used in the code exists in english and arabic', func
         glob(resource_path('views/*/*/*/*.blade.php')) ?: [],
         glob(app_path('**/*.php')) ?: [],
         glob(app_path('*/*/*.php')) ?: [],
+        glob(app_path('*/*/*/*.php')) ?: [],
     );
 
     $keys = [];

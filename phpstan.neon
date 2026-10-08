@@ -50,6 +50,75 @@ parameters:
             path: app/Livewire/Concerns/NavigatesCalendarPeriods.php
             count: 2
 
+        # The proposals/show traits below hold code moved unchanged from the
+        # page, which PHPStan could not read before. Changing any of it is a
+        # logic change, so each entry waits for its own task.
+        -
+            # chronology() reads a tranche currency as `(...)?->value ?? ''`.
+            # transfers_tracking.amount_*_currency are NOT NULL (default USD), so
+            # PHPStan calls the `?? ''` fallback dead.
+            identifier: nullCoalesce.expr
+            path: app/Livewire/Concerns/Proposals/ChartsProposalChronology.php
+            count: 1
+        -
+            # chronology() skips a status note whose date is null;
+            # proposal_status_notes.date is NOT NULL (useCurrent()), so the check
+            # can never be true.
+            identifier: identical.alwaysFalse
+            path: app/Livewire/Concerns/Proposals/ChartsProposalChronology.php
+            count: 1
+        -
+            # laneLabels() returns its labels with a lane and an anchor added.
+            # PHPStan cannot express "template T plus two keys", so the docblock
+            # says list<T> and the added keys are reported as breaking T.
+            identifier: return.type
+            path: app/Livewire/Concerns/Proposals/ChartsProposalChronology.php
+            count: 1
+        -
+            # openDetailsModal() reads planned_date_begin/end as
+            # `?->toDateString() ?? ''`; proposals.planned_date_* are NOT NULL, so
+            # PHPStan calls the `?? ''` fallback dead.
+            identifier: nullCoalesce.expr
+            path: app/Livewire/Concerns/Proposals/ManagesProposalRecord.php
+            count: 2
+        -
+            # The same two lines in openDetailsModal(): the `?->` on a NOT NULL
+            # planned date is reported as never meeting null.
+            identifier: nullsafe.neverNull
+            path: app/Livewire/Concerns/Proposals/ManagesProposalRecord.php
+            count: 2
+        -
+            # agreementMoney() compares `amount_received_currency?->value` and
+            # `amount_transfered_currency?->value`; both columns are NOT NULL
+            # (default USD), so the `?->` is reported as never meeting null.
+            identifier: nullsafe.neverNull
+            path: app/Livewire/Concerns/Proposals/ReadsProposalFunding.php
+            count: 4
+        -
+            # deadlines() has two: `amount_transfered_currency?->value` (NOT NULL
+            # column), and `planIndicator->project?->name ?? organisation_wide`.
+            # plan_indicators.project_id IS nullable and that fallback names an
+            # organisation-wide target on purpose: keep it. PHPStan flags only
+            # the `?->`, which is redundant on the left of `??`.
+            identifier: nullsafe.neverNull
+            path: app/Livewire/Concerns/Proposals/ReadsProposalHealth.php
+            count: 2
+        -
+            # deadlines() tests $grantEnd (actual end ?? planned end) and
+            # warnings() tests planned_date_end against null;
+            # proposals.planned_date_end is NOT NULL, so both are always true.
+            identifier: notIdentical.alwaysTrue
+            path: app/Livewire/Concerns/Proposals/ReadsProposalHealth.php
+            count: 2
+        -
+            # tasks() eager-loads `source` with a callback typed for the MorphTo
+            # it receives (it calls morphWith()); Larastan types every with()
+            # callback as taking any Relation.
+            message: '#MorphTo#'
+            identifier: argument.type
+            path: app/Livewire/Concerns/Proposals/ReadsProposalDelivery.php
+            count: 1
+
         # Raw SQL that cannot be a literal string but carries no user input.
         # Checked 2026-10-05: every value inside is an enum value, a date this
         # code formats itself, or a whitelisted sort direction. Bind anything
