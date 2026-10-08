@@ -428,3 +428,20 @@ parameters:
             identifier: argument.type
             path: app/Livewire/Concerns/Targets/ManagesTargetForm.php
             count: 1
+
+        # The executive-summary/index traits hold code moved unchanged from the
+        # page, which PHPStan could not read before. Changing any of it is a
+        # logic change.
+        -
+            # Eleven redundant `?->`. Nine sit on the left of `??`, which already
+            # covers null: targetsByProgram() (`?->program_id ?? 0`,
+            # `$program?->name ?? …`), and the `?->id ?? 0` / `?->name ?? …`
+            # pairs in moneyByAgreement(), milestonesByProject() and
+            # reportsByIndicator() (which also reads `planIndicator?->indicator_id
+            # ?? 0`). The other two are moneyByAgreement()'s
+            # `amount_transfered_currency?->value` and
+            # `amount_received_currency?->value`; both columns are NOT NULL
+            # (default USD), so the `?->` is reported as never meeting null.
+            identifier: nullsafe.neverNull
+            path: app/Livewire/Concerns/ExecutiveSummary/LoadsSummarySources.php
+            count: 11
