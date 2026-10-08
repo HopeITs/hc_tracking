@@ -749,9 +749,10 @@ new #[Title('titles.donor')] class extends Component {
     @endif
     @endcan
 
-    <x-donors.form-modal :editing="true" :type-options="$this->donorTypeOptions" />
+    <x-donors.form-modal :open="$showDonorModal" :editing="true" :type-options="$this->donorTypeOptions" />
 
     <x-funding.agreement-modal
+        :open="$showAgreementModal"
         :editing="$editingAgreementId !== null"
         :locked-donor-name="$donor->name"
         :proposal-options="$showAgreementModal ? $this->proposalOptions : []"

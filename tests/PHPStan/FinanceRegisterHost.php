@@ -17,4 +17,9 @@ use Livewire\Component;
 abstract class FinanceRegisterHost extends Component
 {
     use FiltersFinanceRegister;
+
+    /** One placeholder flag: an empty list would make toggleFlag()'s in_array() always false. */
+    public const FLAGS = ['flag'];
+
+    public string $flag = '';
 }

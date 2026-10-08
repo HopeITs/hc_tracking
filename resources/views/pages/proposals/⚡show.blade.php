@@ -2962,6 +2962,7 @@ new #[Title('titles.proposal')] class extends Component
     </x-ui.modal>
 
     <x-funding.agreement-modal
+        :open="$showAgreementModal"
         :editing="$editingAgreementId !== null"
         :donor-options="$showAgreementModal ? $this->donorOptions : []"
         :warning="$showAgreementModal ? $this->agreementProposalWarning : null"
@@ -2973,6 +2974,7 @@ new #[Title('titles.proposal')] class extends Component
 
     @canany(['transfers.create', 'transfers.update'])
         <x-funding.transfer-modal
+            :open="$showTransferModal"
             :editing="$editingTransferId !== null"
             :agreement-options="$showTransferModal ? $this->agreementOptions : []"
             :account-options="$showTransferModal ? $this->accountOptions : []"
@@ -3062,5 +3064,5 @@ new #[Title('titles.proposal')] class extends Component
         confirm-test="confirm-delete-proposal-file"
     />
 
-    <x-tasks.add-task-modal test-prefix="new-proposal-task" :user-options="$this->userOptions" />
+    <x-tasks.add-task-modal :open="$showAddTaskModal" test-prefix="new-proposal-task" :user-options="$this->userOptions" />
 </section>

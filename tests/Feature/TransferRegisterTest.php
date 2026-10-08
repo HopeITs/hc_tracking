@@ -468,3 +468,10 @@ test('exporting needs the transfers view permission', function () {
         ->call('exportCsv')
         ->assertForbidden();
 });
+
+test('the tranche form is rendered only while its modal is open', function () {
+    transferRegister()
+        ->assertDontSeeHtml('wire:model="paymentAmount"')
+        ->call('openTransferCreate')
+        ->assertSeeHtml('wire:model="paymentAmount"');
+});

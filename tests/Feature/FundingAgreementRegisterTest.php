@@ -318,3 +318,10 @@ test('exporting needs the funding agreements view permission', function () {
         ->call('exportCsv')
         ->assertForbidden();
 });
+
+test('the agreement form is rendered only while its modal is open', function () {
+    agreementRegister()
+        ->assertDontSeeHtml('wire:model="budget"')
+        ->call('openAgreementCreate')
+        ->assertSeeHtml('wire:model="budget"');
+});

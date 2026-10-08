@@ -5,7 +5,7 @@
     pinned to one donor passes lockedDonorName the same way.
 --}}
 @props([
-    'open' => false,
+    'open' => true,
     'editing' => false,
     'donorOptions' => [],
     'proposalOptions' => [],
@@ -26,82 +26,84 @@
     close="closeAgreementModal"
     :required-note="! $editing"
 >
-    <x-ui.form-section :title="__('funding_agreements.section_parties')" :fields="['agreementDonorId', 'agreementProposalId']">
-        <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
-            @if ($lockedDonorName !== null)
-                <x-ui.form-field :label="__('funding_agreements.donor')" for="agreement-locked-donor">
-                    <div id="agreement-locked-donor" class="form-box" data-locked data-locked-donor>
-                        <flux:icon.lock-closed variant="micro" class="size-3.5 shrink-0 text-secondary-light" />
-                        <span class="truncate">{{ $lockedDonorName }}</span>
-                    </div>
-                </x-ui.form-field>
-            @else
-                {{-- Options are only passed while the modal is open: the form is not the
-                     filtered directory, but its full names would still satisfy an
-                     assertDontSee() against the directory list if always rendered. --}}
-                <x-ui.form-select wire:model="agreementDonorId" :label="__('funding_agreements.donor')" :placeholder="__('funding_agreements.select_a_donor')" required autofocus>
-                    @foreach ($donorOptions as $donorOption)
-                        <option value="{{ $donorOption->id }}">{{ $donorOption->name }}</option>
-                    @endforeach
-                </x-ui.form-select>
-            @endif
+    @if ($open)
+        <x-ui.form-section :title="__('funding_agreements.section_parties')" :fields="['agreementDonorId', 'agreementProposalId']">
+            <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                @if ($lockedDonorName !== null)
+                    <x-ui.form-field :label="__('funding_agreements.donor')" for="agreement-locked-donor">
+                        <div id="agreement-locked-donor" class="form-box" data-locked data-locked-donor>
+                            <flux:icon.lock-closed variant="micro" class="size-3.5 shrink-0 text-secondary-light" />
+                            <span class="truncate">{{ $lockedDonorName }}</span>
+                        </div>
+                    </x-ui.form-field>
+                @else
+                    {{-- Options are only passed while the modal is open: the form is not the
+                         filtered directory, but its full names would still satisfy an
+                         assertDontSee() against the directory list if always rendered. --}}
+                    <x-ui.form-select wire:model="agreementDonorId" :label="__('funding_agreements.donor')" :placeholder="__('funding_agreements.select_a_donor')" required autofocus>
+                        @foreach ($donorOptions as $donorOption)
+                            <option value="{{ $donorOption->id }}">{{ $donorOption->name }}</option>
+                        @endforeach
+                    </x-ui.form-select>
+                @endif
 
-            @if ($lockedProposalName !== null)
-                <x-ui.form-field :label="__('common.proposal')" for="agreement-locked-proposal">
-                    <div id="agreement-locked-proposal" class="form-box" data-locked data-locked-proposal>
-                        <flux:icon.lock-closed variant="micro" class="size-3.5 shrink-0 text-secondary-light" />
-                        <span class="truncate">{{ $lockedProposalName }}</span>
-                    </div>
-                </x-ui.form-field>
-            @else
-                <x-ui.form-select wire:model.live="agreementProposalId" :label="__('common.proposal')" :placeholder="__('common.select_a_proposal')" required>
-                    @foreach ($proposalOptions as $proposalOption)
-                        <option value="{{ $proposalOption->id }}">{{ $proposalOption->name }} · {{ $proposalOption->internal_project_number }}</option>
-                    @endforeach
-                </x-ui.form-select>
-            @endif
-        </div>
-    </x-ui.form-section>
-
-    <x-ui.form-section :title="__('funding_agreements.section_amount')" :fields="['budget', 'agreementCurrency', 'externalProjectNumber']">
-        <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-3">
-            <x-ui.form-input wire:model="budget" :label="__('funding_agreements.agreed_budget')" type="number" step="0.01" min="0" required />
-
-            @if ($lockedCurrency !== null)
-                <x-ui.form-field :label="__('common.currency')" for="agreement-locked-currency" :help="__('funding_agreements.currency_is_fixed_once_tranches_exist')" data-locked-currency>
-                    <div id="agreement-locked-currency" class="form-box" data-locked>
-                        <flux:icon.lock-closed variant="micro" class="size-3.5 shrink-0 text-secondary-light" />
-                        <span>{{ $lockedCurrency }}</span>
-                    </div>
-                </x-ui.form-field>
-            @else
-                <x-ui.form-segmented
-                    wire:model="agreementCurrency"
-                    :label="__('common.currency')"
-                    required
-                    :options="collect(App\Enums\Currency::cases())->map(fn (App\Enums\Currency $currencyCase): array => ['value' => $currencyCase->value, 'label' => $currencyCase->value])->all()"
-                />
-            @endif
-
-            <x-ui.form-input wire:model="externalProjectNumber" :label="__('funding_agreements.external_project_number')" maxlength="50" />
-        </div>
-    </x-ui.form-section>
-
-    @if ($warning !== null)
-        <div class="mb-3 flex items-start gap-2.5 rounded-lg border border-status-warn/40 bg-status-warn/10 p-3 text-sm text-secondary-dark dark:text-ink" role="status" data-agreement-proposal-warning>
-            <flux:icon.exclamation-triangle class="mt-0.5 size-4 shrink-0 text-status-warn" />
-            <p>{{ $warning }}</p>
-        </div>
-    @endif
-
-    @if ($editing && $confirmingDelete)
-        <div class="mb-3 flex flex-col gap-3 rounded-lg border border-primary/40 bg-primary/5 p-3 text-sm sm:flex-row sm:items-center sm:justify-between" role="alert" data-confirm-agreement-delete>
-            <p class="text-secondary-dark dark:text-ink">{{ __('funding_agreements.delete_this_agreement_confirm') }}</p>
-            <div class="flex shrink-0 gap-2">
-                <x-ui.button type="button" size="sm" wire:click="cancelAgreementDelete">{{ __('common.cancel') }}</x-ui.button>
-                <x-ui.button type="button" size="sm" tone="primary" wire:click="deleteAgreement" data-test="confirm-delete-agreement">{{ __('funding_agreements.delete_agreement') }}</x-ui.button>
+                @if ($lockedProposalName !== null)
+                    <x-ui.form-field :label="__('common.proposal')" for="agreement-locked-proposal">
+                        <div id="agreement-locked-proposal" class="form-box" data-locked data-locked-proposal>
+                            <flux:icon.lock-closed variant="micro" class="size-3.5 shrink-0 text-secondary-light" />
+                            <span class="truncate">{{ $lockedProposalName }}</span>
+                        </div>
+                    </x-ui.form-field>
+                @else
+                    <x-ui.form-select wire:model.live="agreementProposalId" :label="__('common.proposal')" :placeholder="__('common.select_a_proposal')" required>
+                        @foreach ($proposalOptions as $proposalOption)
+                            <option value="{{ $proposalOption->id }}">{{ $proposalOption->name }} · {{ $proposalOption->internal_project_number }}</option>
+                        @endforeach
+                    </x-ui.form-select>
+                @endif
             </div>
-        </div>
+        </x-ui.form-section>
+
+        <x-ui.form-section :title="__('funding_agreements.section_amount')" :fields="['budget', 'agreementCurrency', 'externalProjectNumber']">
+            <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-3">
+                <x-ui.form-input wire:model="budget" :label="__('funding_agreements.agreed_budget')" type="number" step="0.01" min="0" required />
+
+                @if ($lockedCurrency !== null)
+                    <x-ui.form-field :label="__('common.currency')" for="agreement-locked-currency" :help="__('funding_agreements.currency_is_fixed_once_tranches_exist')" data-locked-currency>
+                        <div id="agreement-locked-currency" class="form-box" data-locked>
+                            <flux:icon.lock-closed variant="micro" class="size-3.5 shrink-0 text-secondary-light" />
+                            <span>{{ $lockedCurrency }}</span>
+                        </div>
+                    </x-ui.form-field>
+                @else
+                    <x-ui.form-segmented
+                        wire:model="agreementCurrency"
+                        :label="__('common.currency')"
+                        required
+                        :options="collect(App\Enums\Currency::cases())->map(fn (App\Enums\Currency $currencyCase): array => ['value' => $currencyCase->value, 'label' => $currencyCase->value])->all()"
+                    />
+                @endif
+
+                <x-ui.form-input wire:model="externalProjectNumber" :label="__('funding_agreements.external_project_number')" maxlength="50" />
+            </div>
+        </x-ui.form-section>
+
+        @if ($warning !== null)
+            <div class="mb-3 flex items-start gap-2.5 rounded-lg border border-status-warn/40 bg-status-warn/10 p-3 text-sm text-secondary-dark dark:text-ink" role="status" data-agreement-proposal-warning>
+                <flux:icon.exclamation-triangle class="mt-0.5 size-4 shrink-0 text-status-warn" />
+                <p>{{ $warning }}</p>
+            </div>
+        @endif
+
+        @if ($editing && $confirmingDelete)
+            <div class="mb-3 flex flex-col gap-3 rounded-lg border border-primary/40 bg-primary/5 p-3 text-sm sm:flex-row sm:items-center sm:justify-between" role="alert" data-confirm-agreement-delete>
+                <p class="text-secondary-dark dark:text-ink">{{ __('funding_agreements.delete_this_agreement_confirm') }}</p>
+                <div class="flex shrink-0 gap-2">
+                    <x-ui.button type="button" size="sm" wire:click="cancelAgreementDelete">{{ __('common.cancel') }}</x-ui.button>
+                    <x-ui.button type="button" size="sm" tone="primary" wire:click="deleteAgreement" data-test="confirm-delete-agreement">{{ __('funding_agreements.delete_agreement') }}</x-ui.button>
+                </div>
+            </div>
+        @endif
     @endif
 
     @if ($editing)

@@ -1373,5 +1373,5 @@ new #[Title('titles.project')] class extends Component {
         confirm-test="confirm-delete-project-file"
     />
 
-    <x-tasks.add-task-modal test-prefix="new-project-task" :user-options="$this->userOptions" />
+    <x-tasks.add-task-modal :open="$showAddTaskModal" test-prefix="new-project-task" :user-options="$this->userOptions" />
 </section>

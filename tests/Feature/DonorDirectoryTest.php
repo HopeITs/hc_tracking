@@ -518,3 +518,13 @@ test('a money calendar lane puts the internal number and the external number on 
         ->and($lane)->toContain('MCC-86')
         ->and($lane)->not->toContain('<span aria-hidden="true">·</span>');
 });
+
+test('the donor form is rendered only while its modal is open', function () {
+    $user = User::factory()->role('Financial')->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::donors.index')
+        ->assertDontSeeHtml('data-follow-up-fields')
+        ->call('openCreateModal')
+        ->assertSeeHtml('data-follow-up-fields');
+});

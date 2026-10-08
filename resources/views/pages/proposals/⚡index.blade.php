@@ -145,15 +145,6 @@ new #[Title('titles.proposals')] class extends Component {
     }
 
     /**
-     * Narrow to one flag, or clear it by choosing it again.
-     */
-    public function toggleFlag(string $flag): void
-    {
-        $this->flag = $this->flag === $flag || ! in_array($flag, self::FLAGS, true) ? '' : $flag;
-        $this->resetPage();
-    }
-
-    /**
      * The donors that hold an agreement, for the donor picker. Empty for a
      * viewer who may not see agreements: a donor's name next to a proposal is
      * what that permission protects.

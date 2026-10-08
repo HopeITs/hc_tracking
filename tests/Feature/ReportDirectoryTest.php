@@ -406,3 +406,13 @@ test('reports can be narrowed to overdue drafts, a project and a single target',
         ->assertSee(route('reports.show', $onTime))
         ->assertDontSee(route('reports.show', $late));
 });
+
+test('the report form is rendered only while its modal is open', function () {
+    $user = User::factory()->role('Media Team')->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::reports.index')
+        ->assertDontSeeHtml('wire:model="executiveSummary"')
+        ->call('openCreateModal')
+        ->assertSeeHtml('wire:model="executiveSummary"');
+});

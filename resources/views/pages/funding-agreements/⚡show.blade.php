@@ -1184,6 +1184,7 @@ new #[Title('titles.funding_agreement')] class extends Component {
     </section>
 
     <x-funding.agreement-modal
+        :open="$showAgreementModal"
         :editing="$editingAgreementId !== null"
         :donor-options="$showAgreementModal ? $this->donorOptions : []"
         :warning="$showAgreementModal ? $this->agreementProposalWarning : null"
@@ -1235,6 +1236,7 @@ new #[Title('titles.funding_agreement')] class extends Component {
     />
 
     <x-funding.transfer-modal
+        :open="$showTransferModal"
         :editing="$editingTransferId !== null"
         :agreement-options="$showTransferModal ? $this->agreementOptions : []"
         :account-options="$showTransferModal ? $this->accountOptions : []"

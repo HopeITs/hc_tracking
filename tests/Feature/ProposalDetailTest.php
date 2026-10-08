@@ -638,3 +638,14 @@ test('the proposal header shows its internal number and the agreement form names
         ->call('openAgreementCreate')
         ->assertSee('Winter Shelter Kit · TEMP-0012');
 });
+
+test('the add-task form is rendered only while its modal is open', function () {
+    $user = User::factory()->role('Financial')->create();
+    $proposal = Proposal::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::proposals.show', ['proposal' => $proposal])
+        ->assertDontSeeHtml('data-test="new-proposal-task-assignee-picker"')
+        ->call('openAddTaskModal')
+        ->assertSeeHtml('data-test="new-proposal-task-assignee-picker"');
+});

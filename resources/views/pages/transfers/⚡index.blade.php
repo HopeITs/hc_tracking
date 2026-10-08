@@ -301,15 +301,6 @@ new #[Title('titles.transfers')] class extends Component {
     }
 
     /**
-     * Narrow to one flag, or clear it by choosing it again.
-     */
-    public function toggleFlag(string $flag): void
-    {
-        $this->flag = $this->flag === $flag || ! in_array($flag, self::FLAGS, true) ? '' : $flag;
-        $this->resetPage();
-    }
-
-    /**
      * The Overview ladder's order.
      */
     public function setSort(string $sort): void
@@ -1230,6 +1221,7 @@ new #[Title('titles.transfers')] class extends Component {
     @endif
 
     <x-funding.transfer-modal
+        :open="$showTransferModal"
         :editing="$editingTransferId !== null"
         :agreement-options="$showTransferModal ? $this->agreementOptions : []"
         :account-options="$showTransferModal ? $this->accountOptions : []"

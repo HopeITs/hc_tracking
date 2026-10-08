@@ -3,7 +3,7 @@
     Its wire:model bindings resolve against that page's component.
 --}}
 @props([
-    'open' => false,
+    'open' => true,
     'editing' => false,
     'targetOptions' => [],
     'formTarget' => null,

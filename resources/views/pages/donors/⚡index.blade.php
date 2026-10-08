@@ -134,15 +134,6 @@ new #[Title('titles.donors')] class extends Component {
     }
 
     /**
-     * Narrow to one flag, or clear it by choosing it again.
-     */
-    public function toggleFlag(string $flag): void
-    {
-        $this->flag = $this->flag === $flag || ! in_array($flag, self::FLAGS, true) ? '' : $flag;
-        $this->resetPage();
-    }
-
-    /**
      * The countries donors are in, for the country picker.
      *
      * @return list<string>
@@ -1186,7 +1177,7 @@ new #[Title('titles.donors')] class extends Component {
         <x-funding.pager :paginator="$this->rows" :per-page="(string) $this->registerPerPage()" :sizes="$this->registerPageSizes()" scroll-to="#donor-directory-heading" />
     @endif
 
-    <x-donors.form-modal :editing="$editingDonorId !== null" :type-options="$this->donorTypeOptions" />
+    <x-donors.form-modal :open="$showDonorModal" :editing="$editingDonorId !== null" :type-options="$this->donorTypeOptions" />
 
     <x-ui.confirm-modal
         wire:model="showDeleteModal"

@@ -678,5 +678,5 @@ new #[Title('titles.program')] class extends Component {
         <livewire:activity.timeline :subjects="['program' => [$this->program->id]]" :key="'program-activity-'.$this->program->id" />
     </section>
 
-    <x-tasks.add-task-modal test-prefix="new-program-task" :user-options="$this->userOptions" />
+    <x-tasks.add-task-modal :open="$showAddTaskModal" test-prefix="new-program-task" :user-options="$this->userOptions" />
 </section>

@@ -13,6 +13,11 @@ use Livewire\Attributes\Url;
 /**
  * Year, figures mode, column sort and page size for a Funding register.
  * Every value arrives from the URL, so each is normalised on the way in.
+ *
+ * The using page defines `public const FLAGS` (the flags its filter chips
+ * offer) and a `public string $flag` that holds the chosen one.
+ *
+ * @property string $flag
  */
 trait FiltersFinanceRegister
 {
@@ -83,6 +88,15 @@ trait FiltersFinanceRegister
             ? ($this->activeSortDir() === 'asc' ? 'desc' : 'asc')
             : $sorts[$key]['dir'];
         $this->sortBy = $key;
+        $this->resetRegisterPage();
+    }
+
+    /**
+     * Narrow to one flag, or clear it by choosing it again.
+     */
+    public function toggleFlag(string $flag): void
+    {
+        $this->flag = $this->flag === $flag || ! in_array($flag, self::FLAGS, true) ? '' : $flag;
         $this->resetRegisterPage();
     }
 
