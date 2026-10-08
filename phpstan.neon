@@ -226,10 +226,12 @@ parameters:
         -
             # Sort terms are SQL each register page writes in its own code; only
             # the direction varies and activeSortDir() limits it to asc/desc.
+            # Counted once per host class that uses the trait (FinanceRegisterHost
+            # and ProposalsIndexPageHost).
             message: '#expects (.+\|)?literal-string, .+ given#'
             identifier: argument.type
             path: app/Livewire/Concerns/FiltersFinanceRegister.php
-            count: 1
+            count: 2
         -
             # orderByEnumSequence() builds a CASE from the fixed value lists
             # applySort() passes (priority and status cases) and a direction it
@@ -258,3 +260,59 @@ parameters:
             identifier: argument.type
             path: app/Livewire/Concerns/Tasks/ReadsTaskViews.php
             count: 1
+
+        # The proposals/index traits hold code moved unchanged from the page,
+        # which PHPStan could not read before. Changing any of it is a logic
+        # change.
+        -
+            # agreementMoney() compares `amount_received_currency?->value` and
+            # `amount_transfered_currency?->value`; both columns are NOT NULL
+            # (default USD), so the `?->` is reported as never meeting null.
+            identifier: nullsafe.neverNull
+            path: app/Livewire/Concerns/Proposals/ChartsProposalPipeline.php
+            count: 5
+        -
+            # openEditModal() reads planned_date_begin/end as
+            # `?->toDateString() ?? ''`; proposals.planned_date_* are NOT NULL, so
+            # PHPStan calls the `?? ''` fallback dead.
+            identifier: nullCoalesce.expr
+            path: app/Livewire/Concerns/Proposals/ManagesProposalForm.php
+            count: 2
+        -
+            # The same two lines in openEditModal(): the `?->` on a NOT NULL
+            # planned date is reported as never meeting null.
+            identifier: nullsafe.neverNull
+            path: app/Livewire/Concerns/Proposals/ManagesProposalForm.php
+            count: 2
+        -
+            # togglePhase() reads `ProposalPhase::tryFrom($phase)?->value ?? ''`.
+            # tryFrom() does return null; PHPStan only objects that `??` already
+            # covers null, so the `?->` is redundant.
+            identifier: nullsafe.neverNull
+            path: app/Livewire/Concerns/Proposals/ReadsProposalRegister.php
+            count: 1
+        -
+            # selectLine() and totals() pass AgreementMoney::ownerSelect() and
+            # ownerTotalsSelect('proposals.id') to selectRaw(). Both build the
+            # list from fixed column names; ownerTotalsSelect() also checks its
+            # key against a pattern.
+            message: '#expects (.+\|)?literal-string, .+ given#'
+            identifier: argument.type
+            path: app/Livewire/Concerns/Proposals/ReadsProposalRegister.php
+            count: 2
+        -
+            # flow() maps each funded proposal and project through
+            # `collect($row)->except('projects')->all()` (and 'row'), which
+            # PHPStan reads as array<string, mixed>; the docblock states the exact
+            # shapes the Overview view relies on, so it stays.
+            identifier: return.type
+            path: app/Livewire/Concerns/Proposals/ChartsProposalPipeline.php
+            count: 1
+        -
+            # registerSorts() builds its date columns with a closure whose $dir is
+            # a plain string; every call passes 'desc', but PHPStan cannot see that
+            # and reports it against the declared 'asc'|'desc'. Reported once per
+            # return statement.
+            identifier: return.type
+            path: app/Livewire/Concerns/Proposals/ReadsProposalRegister.php
+            count: 3

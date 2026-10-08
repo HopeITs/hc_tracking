@@ -310,3 +310,19 @@ test('exporting needs the proposals view permission', function () {
         ->call('exportCsv')
         ->assertForbidden();
 });
+
+test('the proposal form is rendered only while its modal is open', function () {
+    proposalRegister()
+        ->assertDontSeeHtml('wire:model="plannedDateBegin"')
+        ->call('openCreateModal')
+        ->assertSeeHtml('wire:model="plannedDateBegin"');
+});
+
+test('the stage form is rendered only while its modal is open', function () {
+    $proposal = registerFundedProposal();
+
+    proposalRegister()
+        ->assertDontSeeHtml('wire:model="statusContext"')
+        ->call('openStageModal', $proposal->id)
+        ->assertSeeHtml('wire:model="statusContext"');
+});
