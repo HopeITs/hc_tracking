@@ -8,6 +8,7 @@ use App\Enums\TaskStatus;
 use App\Models\Task;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * Raise a task straight against one record (a program, project, proposal or
@@ -21,6 +22,8 @@ class CreateTask
      */
     public function handle(string $sourceType, int $sourceId, array $validated, int $createdBy): Task
     {
+        Gate::authorize('create', Task::class);
+
         $statusCase = TaskStatus::from($validated['newTaskStatus']);
         $employeeIds = collect($validated['newTaskAssignedTo'])->map(fn ($id): int => (int) $id)->unique()->values();
 
