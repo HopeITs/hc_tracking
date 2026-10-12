@@ -102,6 +102,8 @@ trait FiltersCalendarTypes
      * Whether the viewer may see any occurrence of $type. The 'donor' type
      * covers follow-ups (donors.view) and donor reports (funding-agreements.view),
      * so it is open when either half is; each half is still gated on its own.
+     * An unknown $type (toggleType() and focusOnlyType() are browser-callable)
+     * is never visible, so both return before touching any toggle.
      */
     protected function canSeeType(string $type): bool
     {
@@ -109,7 +111,8 @@ trait FiltersCalendarTypes
             'proposal' => $this->canViewProposals(),
             'transfer' => $this->canViewTransfers(),
             'donor' => $this->canViewDonors() || $this->canViewAgreements(),
-            default => true,
+            'milestone', 'task', 'report', 'project' => true,
+            default => false,
         };
     }
 

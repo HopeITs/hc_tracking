@@ -158,6 +158,8 @@ class PlanIndicator extends Model implements TracksActivity
 
     /**
      * achievedValue() as a correlated SQL expression over `plan_indicators`.
+     *
+     * @return literal-string
      */
     public static function achievedValueSql(): string
     {
@@ -170,6 +172,8 @@ class PlanIndicator extends Model implements TracksActivity
 
     /**
      * pendingValue() as a correlated SQL expression over `plan_indicators`.
+     *
+     * @return literal-string
      */
     public static function pendingValueSql(): string
     {
@@ -180,6 +184,8 @@ class PlanIndicator extends Model implements TracksActivity
 
     /**
      * The SQL condition for one achievementStatus() value.
+     *
+     * @return literal-string
      */
     public static function achievementStatusSql(string $status): string
     {
@@ -269,6 +275,9 @@ class PlanIndicator extends Model implements TracksActivity
         return $indicator?->measure === IndicatorMeasure::Percentage;
     }
 
+    /**
+     * @return literal-string
+     */
     private static function measureSql(): string
     {
         return '(select i.measure from indicators i where i.id = plan_indicators.indicator_id)';

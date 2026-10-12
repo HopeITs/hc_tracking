@@ -722,6 +722,55 @@ test('narrowing to a single type via toggleType jumps the grid to its nearest oc
         ->assertSet('month', $targetDate->format('Y-m'));
 });
 
+test('an unknown type sent to toggleType or focusOnlyType changes no type filter', function (string $method) {
+    $employeeId = insertHrEmployee();
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
+
+    Livewire::actingAs($user)
+        ->test('pages::calendar.index')
+        ->set('showTasks', false)
+        ->set('showTypeFilterMenu', true)
+        ->call($method, 'unknown')
+        ->assertOk()
+        ->assertSet('showMilestones', true)
+        ->assertSet('showTasks', false)
+        ->assertSet('showReports', true)
+        ->assertSet('showProposals', true)
+        ->assertSet('showTransfers', true)
+        ->assertSet('showDonors', true)
+        ->assertSet('showProjects', true)
+        ->assertSet('showTypeFilterMenu', true);
+})->with(['toggleType', 'focusOnlyType']);
+
+test('an impossible month in the URL falls back to the current month', function (string $month) {
+    $this->travelTo(Carbon::create(2026, 6, 15, 9));
+    $employeeId = insertHrEmployee();
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
+
+    Livewire::actingAs($user)
+        ->test('pages::calendar.index')
+        ->set('month', $month)
+        ->assertOk()
+        ->assertSee('data-test="calendar-day-2026-06-15"', false)
+        ->call('nextMonth')
+        ->assertSet('month', '2026-07');
+})->with(['2026-13', '2026-00']);
+
+test('an impossible anchor date in the URL falls back to today', function (string $anchorDate) {
+    $this->travelTo(Carbon::create(2026, 6, 15, 9));
+    $employeeId = insertHrEmployee();
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
+
+    Livewire::actingAs($user)
+        ->test('pages::calendar.index')
+        ->set('viewMode', 'day')
+        ->set('anchorDate', $anchorDate)
+        ->assertOk()
+        ->assertSee('data-test="calendar-allday-2026-06-15"', false)
+        ->call('nextPeriod')
+        ->assertSet('anchorDate', '2026-06-16');
+})->with(['2026-13-45', '2026-02-31', '2026-00-10']);
+
 test('the related-dates panel lists both occurrences of a composite type with click-through', function () {
     $employeeId = insertHrEmployee();
     $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);

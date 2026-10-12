@@ -737,3 +737,13 @@ test('a milestone shows on its planned date in the week calendar view', function
         ->set('anchorDate', '2026-04-15')
         ->assertSee('data-test="milestone-calendar-period-chip-'.$milestone->id.'"', false);
 });
+
+test('the milestone form is rendered only while its modal is open', function () {
+    $user = User::factory()->role('General Manager')->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.index')
+        ->assertDontSeeHtml('wire:model="plannedStartDate"')
+        ->call('openCreateModal')
+        ->assertSeeHtml('wire:model="plannedStartDate"');
+});

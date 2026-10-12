@@ -226,3 +226,14 @@ test('the status can be changed from the edit form', function () {
 
     expect($milestone->refresh()->status)->toBe(MilestoneStatus::Reached);
 });
+
+test('the related milestone form is rendered only while its modal is open', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $milestone = Milestone::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.show', ['milestone' => $milestone])
+        ->assertDontSeeHtml('wire:model="relatedName"')
+        ->call('openRelatedModal')
+        ->assertSeeHtml('wire:model="relatedName"');
+});

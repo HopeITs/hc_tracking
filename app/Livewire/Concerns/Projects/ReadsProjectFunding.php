@@ -61,6 +61,7 @@ trait ReadsProjectFunding
             ->with(['transfers:id,donor_proposal_id,net_amount_received'])
             ->get()
             ->groupBy(fn (DonorProposal $donorProposal) => $donorProposal->currency->value)
+            ->toBase()
             ->map(fn (Collection $group) => [
                 'currency' => $group->first()->currency,
                 'committed' => (float) $group->sum('budget'),
@@ -108,6 +109,7 @@ trait ReadsProjectFunding
 
         return $proposal->donorProposals
             ->groupBy(fn (DonorProposal $donorProposal) => $donorProposal->currency->value)
+            ->toBase()
             ->map(fn (Collection $group) => [
                 'currency' => $group->first()->currency,
                 'committed' => (float) $group->sum('budget'),

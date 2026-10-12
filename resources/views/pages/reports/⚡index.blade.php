@@ -3,6 +3,7 @@
 use App\Support\Like;
 use App\Enums\ReportStatus;
 use App\Livewire\Concerns\ManagesReportForm;
+use App\Livewire\Concerns\Reports\ReadsReportPortfolio;
 use App\Models\AnnualPlan;
 use App\Models\PlanIndicator;
 use App\Models\Project;
@@ -14,7 +15,6 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
-use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
@@ -24,6 +24,7 @@ use Livewire\WithPagination;
 
 new #[Title('titles.reports')] class extends Component {
     use ManagesReportForm;
+    use ReadsReportPortfolio;
     use WithPagination;
 
     #[Url(except: '')]
@@ -220,118 +221,6 @@ new #[Title('titles.reports')] class extends Component {
             ->paginate(15);
     }
 
-    /**
-     * The portfolio pulse: how the reports matching the filters break down by
-     * status and MEAL visibility, how many drafts are late, and the average
-     * achievement of the targets they report against.
-     *
-     * Achievement is averaged per target, not per report — a target reported
-     * quarterly must not weigh four times as much as one reported yearly — and
-     * each target is capped at 150% first, so one wildly over-achieved target
-     * cannot drag the average somewhere meaningless.
-     *
-     * @return array{total: int, statusCounts: SupportCollection<string, int>, seen: int, unseen: int, overdue: int, avgAchievement: int|null}
-     */
-    #[Computed]
-    public function insights(): array
-    {
-        $statusCounts = $this->scopedReports()
-            ->selectRaw('status, count(*) as total')
-            ->groupBy('status')
-            ->pluck('total', 'status');
-
-        $total = (int) $statusCounts->sum();
-        $unseen = (int) $this->scopedReports()->where('is_seen_by_meal', false)->count();
-        $overdue = (int) $this->scopedReports()->overdue()->count();
-
-        $achievements = PlanIndicator::query()
-            ->whereIn('id', $this->scopedReports()->select('plan_indicator_id'))
-            ->where('target', '>', 0)
-            ->selectRaw('target, '.PlanIndicator::achievedValueSql().' as achieved')
-            ->toBase()
-            ->get()
-            ->map(fn (object $row): float => min(150.0, (float) $row->achieved / (float) $row->target * 100));
-
-        return [
-            'total' => $total,
-            'statusCounts' => $statusCounts,
-            'seen' => $total - $unseen,
-            'unseen' => $unseen,
-            'overdue' => $overdue,
-            'avgAchievement' => $achievements->isEmpty() ? null : (int) round($achievements->avg()),
-        ];
-    }
-
-    /**
-     * Reports grouped by project, then by target, for the portfolio view.
-     *
-     * Both levels sort worst-achievement-first: a manager opening the
-     * portfolio should see what needs attention before anything else,
-     * without having to hunt for it. A project or target with no scorable
-     * achievement (no positive target) sorts after every scored one, then
-     * alphabetically, so it is never mistaken for a top performer.
-     *
-     * Only queried when that view is active: the list view's paginated
-     * `reports()` stays the cheap default. Every filter the list respects
-     * applies here too, so switching views never changes what is being looked
-     * at, only how it is shaped.
-     *
-     * @return SupportCollection<int, array{project: Project|null, reportCount: int, avgAchievement: int|null, indicators: SupportCollection<int, array{planIndicator: PlanIndicator, reports: SupportCollection<int, Report>, latest: Report, achievement: int|null, trend: array<int, float>}>}>
-     */
-    #[Computed]
-    public function portfolio(): SupportCollection
-    {
-        if ($this->view !== 'portfolio') {
-            return collect();
-        }
-
-        $reports = $this->visibleReports()
-            ->select(['id', 'plan_indicator_id', 'user_id', 'status', 'planned_date', 'value', 'submit_date', 'is_seen_by_meal'])
-            ->with($this->targetRelations())
-            ->orderByDesc('planned_date')
-            ->orderByDesc('id')
-            ->get();
-
-        return $reports
-            ->groupBy(fn (Report $report): int => $report->planIndicator->project_id ?? 0)
-            ->map(function (Collection $projectReports): array {
-                $indicators = $projectReports
-                    ->groupBy('plan_indicator_id')
-                    ->map(function (Collection $rows): array {
-                        /** @var PlanIndicator $planIndicator */
-                        $planIndicator = $rows->first()->planIndicator;
-                        $percent = $planIndicator->percentAchieved();
-
-                        return [
-                            'planIndicator' => $planIndicator,
-                            'reports' => $rows->values(),
-                            'latest' => $rows->first(),
-                            // Oldest first, for a sparkline that reads left-to-right in time.
-                            'trend' => $rows->sortBy('planned_date')->pluck('value')->map(fn ($value): float => (float) $value)->values()->all(),
-                            'achievement' => $percent === null ? null : (int) floor($percent),
-                        ];
-                    })
-                    // A stable sort: the alphabetical pass runs first so ties in
-                    // achievement (including every unscored target) fall back
-                    // to it, then the achievement pass reorders around that.
-                    ->sortBy(fn (array $group): string => $group['planIndicator']->indicator->name)
-                    ->sortBy(fn (array $group): int => $group['achievement'] ?? PHP_INT_MAX)
-                    ->values();
-
-                $scored = $indicators->pluck('achievement')->filter(fn (?int $value): bool => $value !== null);
-
-                return [
-                    'project' => $projectReports->first()->planIndicator->project,
-                    'reportCount' => $projectReports->count(),
-                    'avgAchievement' => $scored->isEmpty() ? null : (int) round($scored->average()),
-                    'indicators' => $indicators,
-                ];
-            })
-            ->sortBy(fn (array $group): string => $group['project']->name ?? '')
-            ->sortBy(fn (array $group): int => $group['avgAchievement'] ?? PHP_INT_MAX)
-            ->values();
-    }
-
     /** @return Collection<int, User> */
     #[Computed]
     public function authorOptions(): Collection
@@ -349,23 +238,6 @@ new #[Title('titles.reports')] class extends Component {
             ->orderBy('name')
             ->orderBy('id')
             ->get();
-    }
-
-    /**
-     * The target the feed is narrowed to, labelled as the form labels it.
-     */
-    #[Computed]
-    public function scopedTargetLabel(): ?string
-    {
-        if ($this->target === '') {
-            return null;
-        }
-
-        $target = PlanIndicator::query()
-            ->with(['indicator:id,name,measure', 'project:id,name', 'source'])
-            ->find((int) $this->target);
-
-        return $target === null ? null : $this->targetLabel($target);
     }
 
     protected function reportSaved(Report $report, bool $isCreate): void
@@ -577,219 +449,9 @@ new #[Title('titles.reports')] class extends Component {
     @endif
 
     @if ($view === 'portfolio')
-        <x-ui.panel :subtitle="__('reports.reports_grouped_by_project_and_indicator_so_the_connection_b')">
-            <x-slot:toolbar>
-                @if ($filtersAreActive)
-                    <flux:button size="sm" variant="ghost" class="text-secondary-medium! dark:text-ink-muted!" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
-                @endif
-            </x-slot:toolbar>
-
-            @if ($this->portfolio->isEmpty())
-                <x-ui.empty-state
-                    icon="rectangle-group"
-                    :heading="$filtersAreActive ? __('reports.no_matching_reports') : __('reports.no_reports_yet')"
-                    :body="$filtersAreActive ? __('common.change_the_search_or_filters_and_try_again') : __('reports.record_the_first_figure_against_a_target')"
-                />
-            @else
-                <div class="divide-y-4 divide-ground dark:divide-surface-0">
-                    @foreach ($this->portfolio as $group)
-                        <div wire:key="portfolio-project-{{ $group['project']?->id ?? 'org' }}">
-                            {{-- Project header: name, indicator count, and a rollup badge so the manager can triage projects before opening one. --}}
-                            <div class="flex flex-wrap items-center justify-between gap-3 bg-board-head px-4 py-3 dark:bg-surface-2">
-                                <div class="flex items-baseline gap-2">
-                                    @if ($group['project'] !== null)
-                                        <a href="{{ route('projects.show', $group['project']) }}" wire:navigate class="text-base font-extrabold tracking-tight hover:underline">{{ $group['project']->name }}</a>
-                                    @else
-                                        <p class="text-base font-extrabold tracking-tight">{{ __('common.organisation_wide') }}</p>
-                                    @endif
-                                    <span class="type-meta text-secondary-medium dark:text-ink-muted">
-                                        {{ trans_choice('projects.count_indicator', $group['indicators']->count(), ['count' => $group['indicators']->count()]) }}
-                                        · {{ trans_choice('common.count_report', $group['reportCount'], ['count' => $group['reportCount']]) }}
-                                    </span>
-                                </div>
-
-                                @if ($group['avgAchievement'] !== null)
-                                    <span class="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold tabular-nums {{ $achievementBadgeClass($group['avgAchievement']) }}">
-                                        {{ __('reports.avg_target_achievement') }} {{ $group['avgAchievement'] }}%
-                                    </span>
-                                @endif
-                            </div>
-
-                            <div class="divide-y divide-secondary-soft dark:divide-line">
-                                @foreach ($group['indicators'] as $indicatorGroup)
-                                    @php
-                                        $planIndicator = $indicatorGroup['planIndicator'];
-                                        $latest = $indicatorGroup['latest'];
-                                        $achievement = $indicatorGroup['achievement'];
-                                        $points = $sparklinePoints($indicatorGroup['trend']);
-                                        $barWidth = $achievement === null ? 0 : max(2, min(100, $achievement));
-                                        $unit = $unitOf($planIndicator);
-                                    @endphp
-                                    <div
-                                        wire:key="portfolio-indicator-{{ $planIndicator->id }}"
-                                        class="group grid grid-cols-1 gap-3 px-4 py-4 transition-colors duration-150 hover:bg-board-head @lg/directory:grid-cols-[1fr_auto] @lg/directory:items-center @lg/directory:gap-6"
-                                    >
-                                        <div class="min-w-0">
-                                            <p class="type-meta text-secondary-medium dark:text-ink-muted">
-                                                {{ $sourceLabel($planIndicator) }} · {{ $planIndicator->period->label() }} · {{ trans_choice('common.count_report', $indicatorGroup['reports']->count(), ['count' => $indicatorGroup['reports']->count()]) }}
-                                            </p>
-                                            <p class="truncate text-base font-bold">{{ $planIndicator->indicator->name }}</p>
-
-                                            <div class="mt-2.5 flex items-center gap-3">
-                                                <div
-                                                    class="h-1.5 w-full max-w-64 overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2"
-                                                    role="progressbar"
-                                                    aria-valuemin="0"
-                                                    aria-valuemax="100"
-                                                    aria-valuenow="{{ $barWidth }}"
-                                                    aria-label="{{ __('reports.achievement') }}"
-                                                >
-                                                    <div class="h-full rounded-full {{ $achievementBarClass($achievement) }}" style="width: {{ $barWidth }}%"></div>
-                                                </div>
-
-                                                @if ($points !== null)
-                                                    <svg viewBox="0 0 100 28" preserveAspectRatio="none" class="h-5 w-16 shrink-0" aria-hidden="true">
-                                                        <polyline
-                                                            points="{{ $points }}"
-                                                            fill="none"
-                                                            stroke-width="2.5"
-                                                            stroke-linecap="round"
-                                                            stroke-linejoin="round"
-                                                            class="{{ str_replace('bg-', 'stroke-', $achievementBarClass($achievement)) }}"
-                                                        />
-                                                    </svg>
-                                                @endif
-                                            </div>
-                                        </div>
-
-                                        <div class="flex items-center justify-between gap-4 @lg/directory:flex-col @lg/directory:items-end @lg/directory:justify-center @lg/directory:gap-1.5">
-                                            <div class="text-end">
-                                                <p class="text-xl leading-none font-extrabold tabular-nums {{ $achievementTextClass($achievement) }}">{{ $achievement === null ? '—' : $achievement.'%' }}</p>
-                                                <p class="text-xs tabular-nums text-secondary-medium dark:text-ink-muted">
-                                                    {{ __('reports.achieved_of_target', ['value' => $formatFigure($planIndicator->achievedValue()).$unit, 'target' => $formatFigure((float) $planIndicator->target).$unit]) }}
-                                                </p>
-                                            </div>
-
-                                            <div class="flex shrink-0 items-center gap-1.5">
-                                                <x-ui.enum-badge :case="$latest->status" />
-                                                <x-ui.button tone="ghost" size="sm" icon="eye" class="size-9!" :href="route('reports.show', $latest)" wire:navigate :aria-label="__('common.view_name', ['name' => $planIndicator->indicator->name])" />
-                                                @if ($latest->is_seen_by_meal)
-                                                    <flux:tooltip :content="__('reports.seen_by_meal')">
-                                                        <flux:icon.eye variant="micro" class="size-4 text-status-good" />
-                                                    </flux:tooltip>
-                                                @endif
-                                                <flux:icon.chevron-right variant="micro" class="size-4 shrink-0 text-secondary-light transition-transform duration-200 group-hover:translate-x-0.5 rtl:-scale-x-100 rtl:group-hover:-translate-x-0.5" />
-                                            </div>
-                                        </div>
-                                    </div>
-                                @endforeach
-                            </div>
-                        </div>
-                    @endforeach
-                </div>
-            @endif
-        </x-ui.panel>
+        @include('pages.reports._index-portfolio')
     @else
-        <x-ui.panel :subtitle="trans_choice('reports.count_matching_report', $this->reports->total(), ['count' => $this->reports->total()])">
-            <x-slot:toolbar>
-                @if ($filtersAreActive)
-                    <flux:button size="sm" variant="ghost" class="text-secondary-medium! dark:text-ink-muted!" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
-                @endif
-            </x-slot:toolbar>
-
-            @if ($this->reports->isEmpty())
-                <x-ui.empty-state
-                    icon="document-chart-bar"
-                    :heading="$filtersAreActive ? __('reports.no_matching_reports') : __('reports.no_reports_yet')"
-                    :body="$filtersAreActive ? __('common.change_the_search_or_filters_and_try_again') : __('reports.record_the_first_figure_against_a_target')"
-                />
-            @else
-                <div class="divide-y divide-secondary-soft dark:divide-line">
-                    @foreach ($this->reports as $report)
-                        @php
-                            $rowTarget = $report->planIndicator;
-                            $rowUnit = $unitOf($rowTarget);
-                            // The target's own achievement (approved reports only), not this one figure against it.
-                            $rowPercent = $rowTarget->percentAchieved();
-                            $rowAchievement = $rowPercent === null ? null : (int) floor($rowPercent);
-                            $rowIsOverdue = $report->isOverdue();
-                        @endphp
-                        <article class="group flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-4 transition-colors duration-150 hover:bg-board-head" wire:key="report-{{ $report->id }}">
-                            <div class="min-w-0 flex-1">
-                                <p class="flex flex-wrap items-center gap-x-1.5 type-meta text-secondary-medium dark:text-ink-muted">
-                                    <span>{{ $sourceLabel($rowTarget) }}</span>
-                                    <span aria-hidden="true">·</span>
-                                    <span>{{ $report->planned_date?->translatedFormat(__('formats.date')) }}</span>
-                                    @if ($rowIsOverdue)
-                                        <span class="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-status-critical-soft px-1.5 text-[11px] font-semibold text-primary dark:text-brand-text">
-                                            <flux:icon.clock variant="micro" class="size-3" aria-hidden="true" />
-                                            {{ __('reports.overdue') }}
-                                        </span>
-                                    @endif
-                                </p>
-                                <p class="flex items-center gap-1.5 text-base font-bold">
-                                    @if (in_array($report->id, $this->unreadIds, true))
-                                        <span class="size-2 shrink-0 rounded-full bg-primary dark:bg-ink" data-unread-dot="report-{{ $report->id }}" title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
-                                    @endif
-                                    {{ $rowTarget->indicator->name }}
-                                </p>
-                                <p class="truncate text-xs text-secondary-medium dark:text-ink-muted">
-                                    @if ($rowTarget->project !== null)
-                                        <a href="{{ route('projects.show', $rowTarget->project) }}" wire:navigate class="hover:text-secondary-dark hover:underline dark:hover:text-ink">{{ $rowTarget->project->name }}</a>
-                                    @else
-                                        {{ __('common.organisation_wide') }}
-                                    @endif
-                                    · {{ trans_choice('reports.count_file', $report->files_count, ['count' => $report->files_count]) }}
-                                </p>
-                            </div>
-
-                            <div class="text-end">
-                                <p class="text-xl leading-none font-extrabold tabular-nums">{{ $formatFigure((float) $report->value) }}{{ $rowUnit }}</p>
-                                <p class="text-xs tabular-nums text-secondary-medium dark:text-ink-muted">
-                                    {{ __('reports.of_target', ['target' => $formatFigure((float) $rowTarget->target).$rowUnit]) }}
-                                    @if ($rowAchievement !== null)
-                                        <span class="font-semibold {{ $achievementTextClass($rowAchievement) }}" title="{{ __('reports.target_achieved_approved_only') }}">· {{ __('reports.percent_achieved', ['percent' => $rowAchievement]) }}</span>
-                                    @endif
-                                </p>
-                            </div>
-
-                            <div class="flex flex-wrap items-center gap-1.5">
-                                <x-ui.enum-badge :case="$report->status" />
-
-                                @if ($report->is_seen_by_meal)
-                                    <span class="rounded-md border border-secondary-light px-2 py-0.5 text-[11px] font-semibold text-secondary-medium dark:text-ink-muted">{{ __('reports.meal') }}</span>
-                                @endif
-                            </div>
-
-                            <x-ui.user-chip :user="$report->user" compact class="w-40" />
-
-                            {{-- Only a draft can change or go: a reviewed or approved figure is the record. --}}
-                            <div class="flex items-center gap-0.5">
-                                <x-ui.button tone="ghost" size="sm" icon="eye" class="size-9!" :href="route('reports.show', $report)" wire:navigate :aria-label="__('common.view_name', ['name' => $rowTarget->indicator->name])" />
-                                @if ($report->isEditable())
-                                    @can('update', $report)
-                                        <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $report->id }})" :aria-label="__('reports.edit_report')" />
-                                    @endcan
-                                    @can('delete', $report)
-                                        <x-ui.button tone="ghost" size="sm" icon="trash" class="size-9!" wire:click="confirmDeleteReport({{ $report->id }})" :aria-label="__('reports.delete_report')" data-test="delete-report-{{ $report->id }}" />
-                                    @endcan
-                                @else
-                                    <flux:tooltip :content="__('reports.only_draft_reports_can_be_edited')">
-                                        <span class="inline-flex size-9 cursor-not-allowed items-center justify-center text-secondary-light" aria-disabled="true">
-                                            <flux:icon.lock-closed class="size-4" />
-                                        </span>
-                                    </flux:tooltip>
-                                @endif
-                            </div>
-                        </article>
-                    @endforeach
-                </div>
-            @endif
-
-            <x-slot:footer>
-                <flux:pagination :paginator="$this->reports" class="text-secondary-medium! dark:text-ink-muted!" scroll-to="#report-directory-heading" />
-            </x-slot:footer>
-        </x-ui.panel>
+        @include('pages.reports._index-list')
     @endif
 
     <x-reports.form-modal

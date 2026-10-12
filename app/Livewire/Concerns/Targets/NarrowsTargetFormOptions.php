@@ -18,8 +18,9 @@ use Livewire\Attributes\Computed;
  * choice that no longer fits; plus the project list the header filter reads.
  *
  * Used by targets/index only. Reads the form properties ManagesTargetForm
- * declares; ManagesTargetForm and FiltersTargets::updatedTargetSourceType()
- * unset these computed values and call syncFormProject().
+ * declares. ManagesTargetForm unsets these computed values;
+ * FiltersTargets::updatedTargetSourceType() unsets sourceOptions and
+ * formProjectOptions and calls syncFormProject().
  *
  * @property string $targetSourceType
  * @property string $targetSourceId

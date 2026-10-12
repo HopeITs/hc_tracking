@@ -1,8 +1,5 @@
 <?php
 
-use App\Enums\MilestoneStatus;
-use App\Enums\TaskPriority;
-use App\Enums\TaskStatus;
 use App\Livewire\Concerns\Calendar\BuildsCalendarGrid;
 use App\Livewire\Concerns\Calendar\FiltersCalendarTypes;
 use App\Livewire\Concerns\Calendar\FindsFocusedTypeDates;

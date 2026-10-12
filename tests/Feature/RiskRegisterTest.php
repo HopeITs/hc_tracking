@@ -383,3 +383,13 @@ test('the state picker in the risk form saves the string values it sends as the 
     'materialised' => ['1', true],
     'potential' => ['0', false],
 ]);
+
+test('the risk form is rendered only while its modal is open', function () {
+    $user = User::factory()->role('General Manager')->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::risks.index')
+        ->assertDontSeeHtml('wire:model="impact"')
+        ->call('openCreateModal')
+        ->assertSeeHtml('wire:model="impact"');
+});

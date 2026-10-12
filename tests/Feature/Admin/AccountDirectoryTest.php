@@ -150,3 +150,13 @@ test('the directory finds an account by the last four characters of its number',
         ->assertSee('Ends Eleven')
         ->assertDontSee('Ends Other');
 });
+
+test('the account form is rendered only while its modal is open', function () {
+    $user = User::factory()->role('Financial')->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::admin.accounts')
+        ->assertDontSeeHtml('wire:model="accountNumber"')
+        ->call('openCreateModal')
+        ->assertSeeHtml('wire:model="accountNumber"');
+});

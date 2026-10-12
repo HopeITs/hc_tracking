@@ -131,6 +131,8 @@ trait FiltersTargets
      * Achievement is PlanIndicator's one shared rule — approved reports only;
      * numeric summed, percentage the latest level — in its SQL form, so the
      * status filter and the pulse can count on it.
+     *
+     * @return literal-string
      */
     private function statusSql(string $status): string
     {

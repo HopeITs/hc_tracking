@@ -478,11 +478,13 @@ new #[Title('titles.strategies')] class extends Component {
             close="closeStrategyModal"
             required-note
         >
-            <div class="grid grid-cols-2 gap-x-4 gap-y-4">
-                <x-ui.form-input wire:model="name" :label="__('strategies.strategy_name')" maxlength="255" required autofocus class="col-span-2" />
-                <x-ui.form-input wire:model="startYear" :label="__('strategies.period_start')" type="number" min="1900" max="2100" required />
-                <x-ui.form-input wire:model="endYear" :label="__('strategies.period_end')" type="number" min="1900" max="2100" required />
-            </div>
+            @if ($showStrategyModal)
+                <div class="grid grid-cols-2 gap-x-4 gap-y-4">
+                    <x-ui.form-input wire:model="name" :label="__('strategies.strategy_name')" maxlength="255" required autofocus class="col-span-2" />
+                    <x-ui.form-input wire:model="startYear" :label="__('strategies.period_start')" type="number" min="1900" max="2100" required />
+                    <x-ui.form-input wire:model="endYear" :label="__('strategies.period_end')" type="number" min="1900" max="2100" required />
+                </div>
+            @endif
 
             <x-slot:actions>
                 <x-ui.button type="submit" tone="primary" data-test="save-strategy-button">

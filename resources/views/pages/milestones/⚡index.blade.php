@@ -1,8 +1,7 @@
 <?php
 
-use App\Actions\Milestones\DeleteMilestone;
-use App\Actions\Milestones\SaveMilestone;
 use App\Enums\MilestoneStatus;
+use App\Livewire\Concerns\Milestones\ManagesMilestoneDirectoryForm;
 use App\Livewire\Concerns\NavigatesCalendarPeriods;
 use App\Models\HrEmployee;
 use App\Models\Milestone;
@@ -10,20 +9,15 @@ use App\Models\Project;
 use App\Models\Scopes\TaskVisibilityScope;
 use App\Notifications\UnreadSubjects;
 use Carbon\CarbonImmutable;
-use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
-use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
 new #[Title('titles.milestones')] class extends Component {
+    use ManagesMilestoneDirectoryForm;
     use NavigatesCalendarPeriods;
 
     #[Url(except: '')]
@@ -46,20 +40,6 @@ new #[Title('titles.milestones')] class extends Component {
 
     #[Url(as: 'period', except: 'month')]
     public string $viewMode = 'month';
-
-    public bool $showMilestoneModal = false;
-    #[Locked]
-    public ?int $deletingMilestoneId = null;
-    public bool $showDeleteModal = false;
-    public string $name = '';
-    public string $description = '';
-    public string $plannedStartDate = '';
-    public string $plannedEndDate = '';
-    public string $milestoneStatus = 'planned';
-    public string $weightPercentage = '0';
-    public string $responsibleUserId = '';
-    public string $milestoneProjectId = '';
-    public string $parentMilestoneId = '';
 
     public function clearFilters(): void
     {
@@ -169,13 +149,6 @@ new #[Title('titles.milestones')] class extends Component {
         $this->responsible = $responsibleId === null ? '' : (string) $responsibleId;
     }
 
-    public function updatedMilestoneProjectId(): void
-    {
-        $this->parentMilestoneId = '';
-
-        unset($this->parentOptions);
-    }
-
     /**
      * Projects carrying matching milestones, with ancestors retained so every
      * result remains understandable in its hierarchy.
@@ -276,222 +249,11 @@ new #[Title('titles.milestones')] class extends Component {
         ];
     }
 
-    /** @return Collection<int, Project> */
-    #[Computed]
-    public function projectOptions(): Collection
-    {
-        return Project::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get();
-    }
-
     /** @return Collection<int, HrEmployee> */
     #[Computed]
     public function userOptions(): Collection
     {
         return HrEmployee::pickerOptions();
-    }
-
-    /** @return Collection<int, Milestone> */
-    #[Computed]
-    public function parentOptions(): Collection
-    {
-        if ($this->milestoneProjectId === '') {
-            return new Collection;
-        }
-
-        return Milestone::query()
-            ->select(['id', 'name', 'project_id', 'sequence'])
-            ->where('project_id', (int) $this->milestoneProjectId)
-            ->orderBy('sequence')
-            ->orderBy('name')
-            ->orderBy('id')
-            ->get();
-    }
-
-    #[Computed]
-    public function deletingMilestone(): ?Milestone
-    {
-        if ($this->deletingMilestoneId === null) {
-            return null;
-        }
-
-        return Milestone::query()->select(['id', 'name'])->find($this->deletingMilestoneId);
-    }
-
-    protected function canDelete(int $milestoneId): bool
-    {
-        $milestone = Milestone::query()
-            ->select(['id'])
-            ->withCount(['children', 'tasks' => fn ($query) => $query->withoutGlobalScope(TaskVisibilityScope::class)])
-            ->find($milestoneId);
-
-        return $milestone !== null
-            && $milestone->children_count === 0
-            && $milestone->tasks_count === 0;
-    }
-
-    public function openCreateModal(?string $date = null, ?string $status = null, ?int $projectId = null, ?int $parentId = null): void
-    {
-        Gate::authorize('create', [Milestone::class, $projectId]);
-
-        $this->resetMilestoneForm();
-
-        if ($date !== null) {
-            $this->plannedStartDate = $date;
-        }
-
-        if ($status !== null && MilestoneStatus::tryFrom($status) !== null) {
-            $this->milestoneStatus = $status;
-        }
-
-        if ($parentId !== null) {
-            $parent = Milestone::query()->select(['id', 'project_id'])->find($parentId);
-
-            if ($parent !== null) {
-                $this->milestoneProjectId = (string) $parent->project_id;
-                $this->parentMilestoneId = (string) $parent->id;
-            }
-        } elseif ($projectId !== null && Project::query()->whereKey($projectId)->exists()) {
-            $this->milestoneProjectId = (string) $projectId;
-        }
-
-        unset($this->parentOptions);
-
-        $this->showMilestoneModal = true;
-    }
-
-    public function saveMilestone(): void
-    {
-        $this->name = trim($this->name);
-        $this->description = trim($this->description);
-
-        $validated = $this->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'plannedStartDate' => ['required', 'date'],
-            'plannedEndDate' => ['nullable', 'date', 'after_or_equal:plannedStartDate'],
-            'milestoneStatus' => ['required', new Enum(MilestoneStatus::class)],
-            'weightPercentage' => ['required', 'numeric', 'min:0', 'max:100'],
-            'responsibleUserId' => ['required', 'integer', Rule::exists(HrEmployee::class, 'id')],
-            'milestoneProjectId' => ['required', 'integer', Rule::exists(Project::class, 'id')],
-            'parentMilestoneId' => [
-                'nullable',
-                'integer',
-                Rule::exists(Milestone::class, 'id')->where(
-                    fn ($query) => $query->where('project_id', (int) $this->milestoneProjectId),
-                ),
-            ],
-        ], [
-            'name.required' => __('milestones.enter_a_milestone_name'),
-            'plannedStartDate.required' => __('milestones.set_the_planned_start_date'),
-            'plannedEndDate.after_or_equal' => __('milestones.planned_end_date_must_be_on_or_after_the_planned_start_date'),
-            'responsibleUserId.required' => __('milestones.select_the_responsible_staff_member'),
-            'milestoneProjectId.required' => __('milestones.select_the_project'),
-            'parentMilestoneId.exists' => __('milestones.select_a_milestone_from_this_project'),
-            'weightPercentage.max' => __('milestones.weight_cannot_exceed_100_percent'),
-        ]);
-
-        Gate::authorize('create', [Milestone::class, (int) $validated['milestoneProjectId']]);
-
-        app(SaveMilestone::class)->handle(null, [
-            'project_id' => (int) $validated['milestoneProjectId'],
-            'name' => $validated['name'],
-            'description' => $validated['description'] === '' ? null : $validated['description'],
-            'planned_start_date' => $validated['plannedStartDate'],
-            'planned_end_date' => $validated['plannedEndDate'] === '' ? null : $validated['plannedEndDate'],
-            'status' => $validated['milestoneStatus'],
-            'weight_percentage' => $validated['weightPercentage'],
-            'responsible_user_id' => (int) $validated['responsibleUserId'],
-            'parent_milestone_id' => $validated['parentMilestoneId'] === '' || $validated['parentMilestoneId'] === null
-                ? null
-                : (int) $validated['parentMilestoneId'],
-        ]);
-
-        $this->showMilestoneModal = false;
-        $this->resetMilestoneForm();
-        unset($this->projectsWithMilestones);
-
-        Flux::toast(variant: 'success', text: __('milestones.milestone_created'));
-    }
-
-    public function quickSetStatus(int $milestoneId, string $status): void
-    {
-        $newStatus = MilestoneStatus::tryFrom($status);
-        $milestone = Milestone::query()->find($milestoneId);
-
-        if ($newStatus === null || $milestone === null) {
-            return;
-        }
-
-        Gate::authorize('updateProgress', $milestone);
-
-        $milestone->status = $newStatus;
-        $milestone->save();
-        unset($this->projectsWithMilestones);
-
-        Flux::toast(variant: 'success', text: __('milestones.milestone_updated'));
-    }
-
-    public function confirmDelete(int $milestoneId): void
-    {
-        Gate::authorize('delete', Milestone::query()->findOrFail($milestoneId));
-
-        $this->deletingMilestoneId = $milestoneId;
-        $this->showDeleteModal = true;
-        unset($this->deletingMilestone);
-    }
-
-    public function cancelDelete(): void
-    {
-        $this->showDeleteModal = false;
-        $this->deletingMilestoneId = null;
-        unset($this->deletingMilestone);
-    }
-
-    public function deleteMilestone(): void
-    {
-        if ($this->deletingMilestoneId === null) {
-            return;
-        }
-
-        $milestoneId = $this->deletingMilestoneId;
-        $deleted = app(DeleteMilestone::class)->handle($milestoneId);
-
-        $this->showDeleteModal = false;
-        $this->deletingMilestoneId = null;
-        unset($this->deletingMilestone);
-        unset($this->projectsWithMilestones);
-
-        if (! $deleted) {
-            Flux::toast(
-                variant: 'danger',
-                text: __('milestones.this_milestone_still_has_nested_milestones_or_tasks_move_or'),
-            );
-
-            return;
-        }
-
-        Flux::toast(variant: 'success', text: __('milestones.milestone_deleted'));
-    }
-
-    public function closeMilestoneModal(): void
-    {
-        $this->showMilestoneModal = false;
-        $this->resetMilestoneForm();
-    }
-
-    protected function resetMilestoneForm(): void
-    {
-        $this->resetValidation();
-        $this->name = '';
-        $this->description = '';
-        $this->plannedStartDate = '';
-        $this->plannedEndDate = '';
-        $this->milestoneStatus = 'planned';
-        $this->weightPercentage = '0';
-        $this->responsibleUserId = '';
-        $this->milestoneProjectId = '';
-        $this->parentMilestoneId = '';
-        unset($this->parentOptions);
     }
 
     /**
@@ -625,63 +387,7 @@ new #[Title('titles.milestones')] class extends Component {
         @endswitch
     @endif
 
-    <x-ui.modal
-        wire:model="showMilestoneModal"
-        size="xl"
-        :title="__('milestones.add_milestone')"
-        submit="saveMilestone"
-        close="closeMilestoneModal"
-        required-note
-    >
-        <x-ui.form-section :title="__('common.section_details')" :fields="['name', 'description']">
-            <div class="grid gap-y-3">
-                <x-ui.form-input wire:model="name" :label="__('milestones.milestone_name')" maxlength="255" required autofocus />
-                <x-ui.form-textarea wire:model="description" :label="__('common.description')" rows="2" />
-            </div>
-        </x-ui.form-section>
-
-        <x-ui.form-section :title="__('common.section_placement')" :fields="['milestoneProjectId', 'parentMilestoneId', 'responsibleUserId']">
-            <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-3">
-                <x-ui.form-select wire:model.live="milestoneProjectId" id="milestone-form-project" :label="__('common.project')" :placeholder="__('common.select_a_project')" :search-label="__('milestones.search_projects')" required>
-                    @foreach ($this->projectOptions as $projectOption)
-                        <option value="{{ $projectOption->id }}">{{ $projectOption->name }}</option>
-                    @endforeach
-                </x-ui.form-select>
-
-                <x-ui.form-select wire:model="parentMilestoneId" :label="__('milestones.nest_under')" :search-label="__('milestones.search_milestones')">
-                    <option value="">{{ __('common.top_level') }}</option>
-                    @foreach ($this->parentOptions as $parentOption)
-                        <option value="{{ $parentOption->id }}">{{ $parentOption->name }}</option>
-                    @endforeach
-                </x-ui.form-select>
-
-                <x-ui.form-select wire:model="responsibleUserId" :label="__('milestones.responsible')" :placeholder="__('common.select')" :search-label="__('milestones.search_responsible')">
-                    @foreach ($this->userOptions as $userOption)
-                        <option value="{{ $userOption->id }}">{{ $userOption->name }} · {{ $userOption->secondary_name }}</option>
-                    @endforeach
-                </x-ui.form-select>
-            </div>
-        </x-ui.form-section>
-
-        <x-ui.form-section :title="__('common.section_schedule')" :fields="['plannedStartDate', 'plannedEndDate', 'milestoneStatus', 'weightPercentage']">
-            <div class="grid grid-cols-2 gap-x-4 gap-y-3 @4xl/modal:grid-cols-4">
-                <x-ui.form-input wire:model="plannedStartDate" :label="__('milestones.planned_start_date')" type="date" required />
-                <x-ui.form-input wire:model="plannedEndDate" :label="__('milestones.planned_end_date')" type="date" />
-
-                <x-ui.form-select wire:model="milestoneStatus" :label="__('common.status')" required>
-                    @foreach (MilestoneStatus::cases() as $statusCase)
-                        <option value="{{ $statusCase->value }}">{{ $statusCase->label() }}</option>
-                    @endforeach
-                </x-ui.form-select>
-
-                <x-ui.form-input wire:model="weightPercentage" :label="__('milestones.weight')" type="number" min="0" max="100" step="0.01" suffix="%" required />
-            </div>
-        </x-ui.form-section>
-
-        <x-slot:actions>
-            <x-ui.button type="submit" tone="primary" data-test="save-milestone-button">{{ __('milestones.create_milestone') }}</x-ui.button>
-        </x-slot:actions>
-    </x-ui.modal>
+    @include('pages.milestones._index-milestone-modal')
 
     <x-ui.confirm-modal
         wire:model="showDeleteModal"

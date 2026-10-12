@@ -71,12 +71,17 @@ trait NavigatesCalendarPeriods
         };
     }
 
+    /**
+     * The anchorDate day, or today when it is empty or not a real date.
+     * Carbon 3 rolls an impossible date over (2026-02-31 becomes 2026-03-03)
+     * instead of failing, so the parsed day must format back to the input.
+     */
     protected function activeAnchor(): CarbonImmutable
     {
         if ($this->anchorDate !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $this->anchorDate) === 1) {
             $parsed = CarbonImmutable::createFromFormat('Y-m-d', $this->anchorDate);
 
-            if ($parsed !== false) {
+            if ($parsed !== null && $parsed->format('Y-m-d') === $this->anchorDate) {
                 return $parsed->startOfDay();
             }
         }
@@ -88,7 +93,7 @@ trait NavigatesCalendarPeriods
      * The visible days for the day/4-days/week views. Week always starts on
      * the anchor's Sunday, so navigating never lands mid-week.
      *
-     * @return array<int, CarbonImmutable>
+     * @return non-empty-array<int, CarbonImmutable>
      */
     protected function periodDays(): array
     {
@@ -102,12 +107,16 @@ trait NavigatesCalendarPeriods
         );
     }
 
+    /**
+     * The first day of month, or of the current month when it is empty or
+     * not a real month ('2026-13' would otherwise roll over to January 2027).
+     */
     protected function activeMonth(): CarbonImmutable
     {
         if ($this->month !== '' && preg_match('/^\d{4}-\d{2}$/', $this->month) === 1) {
             $parsed = CarbonImmutable::createFromFormat('Y-m-d', $this->month.'-01');
 
-            if ($parsed !== false) {
+            if ($parsed !== null && $parsed->format('Y-m') === $this->month) {
                 return $parsed->startOfMonth();
             }
         }

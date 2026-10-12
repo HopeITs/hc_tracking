@@ -588,33 +588,35 @@ new #[Title('titles.risks')] class extends Component {
         close="closeRiskModal"
         required-note
     >
-        <x-ui.form-section :title="__('common.section_details')" :fields="['name', 'riskProjectId', 'happened']">
-            <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
-                <x-ui.form-input wire:model="name" :label="__('risks.risk_name')" maxlength="255" required autofocus class="@2xl/modal:col-span-2" />
+        @if ($showRiskModal)
+            <x-ui.form-section :title="__('common.section_details')" :fields="['name', 'riskProjectId', 'happened']">
+                <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                    <x-ui.form-input wire:model="name" :label="__('risks.risk_name')" maxlength="255" required autofocus class="@2xl/modal:col-span-2" />
 
-                <x-ui.form-select wire:model="riskProjectId" :label="__('common.project')" :placeholder="__('common.select_a_project')" required>
-                    @foreach ($this->projectOptions as $projectOption)
-                        <option value="{{ $projectOption->id }}">{{ $projectOption->name }}</option>
-                    @endforeach
-                </x-ui.form-select>
+                    <x-ui.form-select wire:model="riskProjectId" :label="__('common.project')" :placeholder="__('common.select_a_project')" required>
+                        @foreach ($this->projectOptions as $projectOption)
+                            <option value="{{ $projectOption->id }}">{{ $projectOption->name }}</option>
+                        @endforeach
+                    </x-ui.form-select>
 
-                <x-ui.form-segmented
-                    wire:model="happened"
-                    :label="__('common.state')"
-                    :options="[
-                        ['value' => '0', 'label' => __('risks.potential_risk'), 'dot' => 'border border-secondary-light bg-transparent'],
-                        ['value' => '1', 'label' => __('common.materialised'), 'dot' => 'bg-primary dark:bg-status-critical', 'test' => 'form-materialised-option'],
-                    ]"
-                />
-            </div>
-        </x-ui.form-section>
+                    <x-ui.form-segmented
+                        wire:model="happened"
+                        :label="__('common.state')"
+                        :options="[
+                            ['value' => '0', 'label' => __('risks.potential_risk'), 'dot' => 'border border-secondary-light bg-transparent'],
+                            ['value' => '1', 'label' => __('common.materialised'), 'dot' => 'bg-primary dark:bg-status-critical', 'test' => 'form-materialised-option'],
+                        ]"
+                    />
+                </div>
+            </x-ui.form-section>
 
-        <x-ui.form-section :title="__('risks.section_assessment')" :fields="['impact', 'solution']">
-            <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
-                <x-ui.form-textarea wire:model="impact" :label="__('common.impact')" required />
-                <x-ui.form-textarea wire:model="solution" :label="__('common.mitigation')" />
-            </div>
-        </x-ui.form-section>
+            <x-ui.form-section :title="__('risks.section_assessment')" :fields="['impact', 'solution']">
+                <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                    <x-ui.form-textarea wire:model="impact" :label="__('common.impact')" required />
+                    <x-ui.form-textarea wire:model="solution" :label="__('common.mitigation')" />
+                </div>
+            </x-ui.form-section>
+        @endif
 
         <x-slot:actions>
             <x-ui.button type="submit" tone="primary" data-test="save-risk-button">

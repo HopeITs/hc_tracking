@@ -39,20 +39,10 @@ parameters:
             identifier: nullsafe.neverNull
             path: database/seeders/NotificationDemoSeeder.php
             count: 2
-        -
-            # activeAnchor() and activeMonth() were moved here unchanged from the
-            # calendar, milestones and tasks pages. They still test
-            # createFromFormat() against false (Carbon 2 style); Carbon 3 returns
-            # null instead, and the regex before each call already rules out a
-            # failed parse. Switching the check to null is a logic change, so it
-            # waits for its own task.
-            identifier: notIdentical.alwaysTrue
-            path: app/Livewire/Concerns/NavigatesCalendarPeriods.php
-            count: 2
 
         # The proposals/show traits below hold code moved unchanged from the
         # page, which PHPStan could not read before. Changing any of it is a
-        # logic change, so each entry waits for its own task.
+        # logic change, so each entry stays.
         -
             # chronology() reads a tranche currency as `(...)?->value ?? ''`.
             # transfers_tracking.amount_*_currency are NOT NULL (default USD), so
@@ -121,18 +111,12 @@ parameters:
 
         # The calendar/index traits below hold code moved unchanged from the
         # page, which PHPStan could not read before. Changing any of it is a
-        # logic change, so each entry waits for its own task.
-        -
-            # calendar() takes the period's last day with `end($days)`, typed
-            # CarbonImmutable|false. periodDays() maps range(0, n - 1), which is
-            # never empty, so false cannot happen; its docblock only says array.
-            identifier: method.nonObject
-            path: app/Livewire/Concerns/Calendar/BuildsCalendarGrid.php
-            count: 9
+        # logic change, so each entry stays.
         -
             # typeProperty() matches the seven known type keys with no default.
-            # Every caller passes one of them, except toggleType(), a public
-            # action: an unknown key from the browser throws UnhandledMatchError.
+            # Every caller passes one of them: toggleType(), the one public
+            # action that reaches it, returns first when canSeeType() rejects
+            # the key, and canSeeType() rejects any key outside the seven.
             identifier: match.unhandled
             path: app/Livewire/Concerns/Calendar/FiltersCalendarTypes.php
             count: 1
@@ -183,8 +167,11 @@ parameters:
             count: 1
         -
             # describeTarget() documents sourceLabel as string|null and donors as
-            # list<string>. sourceLabel holds __() (string|array to PHPStan) and
-            # donors pluck('name')->values()->all() (array<int, mixed>).
+            # list<string>. sourceLabel can hold __('common.fy_year', ...), which
+            # PHPStan types as string|array (that key always resolves to a
+            # string), and donors is pluck('name')->values()->all(), which PHPStan
+            # types as array<int, mixed> (not a list, values untyped). The
+            # docblock states the exact shape the page relies on, so it stays.
             identifier: return.type
             path: app/Livewire/Concerns/Indicators/BuildsIndicatorRows.php
             count: 1
@@ -226,12 +213,13 @@ parameters:
         -
             # Sort terms are SQL each register page writes in its own code; only
             # the direction varies and activeSortDir() limits it to asc/desc.
-            # Counted once per host class that uses the trait (FinanceRegisterHost
-            # and ProposalsIndexPageHost).
+            # Counted once per host class that uses the trait (FinanceRegisterHost,
+            # ProposalsIndexPageHost, TransfersIndexPageHost, DonorsIndexPageHost,
+            # FundingAgreementsIndexPageHost and AdminAccountsPageHost).
             message: '#expects (.+\|)?literal-string, .+ given#'
             identifier: argument.type
             path: app/Livewire/Concerns/FiltersFinanceRegister.php
-            count: 2
+            count: 6
         -
             # orderByEnumSequence() builds a CASE from the fixed value lists
             # applySort() passes (priority and status cases) and a direction it
@@ -245,18 +233,6 @@ parameters:
             # taskStats() inlines two dates it formats itself (toDateString())
             # into one aggregate select; there is no user input in it.
             message: '#expects (.+\|)?literal-string, .+ given#'
-            identifier: argument.type
-            path: app/Livewire/Concerns/Tasks/ReadsTaskViews.php
-            count: 1
-
-        # The tasks/index traits hold code moved unchanged from the page, which
-        # PHPStan could not read before. Changing any of it is a logic change.
-        -
-            # calendarGrid() takes the period's last day with `end($days)`, typed
-            # CarbonImmutable|false, and passes it to between(). periodDays() maps
-            # range(0, n - 1), which is never empty, so false cannot happen; its
-            # docblock only says array.
-            message: '#CarbonImmutable\|false#'
             identifier: argument.type
             path: app/Livewire/Concerns/Tasks/ReadsTaskViews.php
             count: 1
@@ -319,12 +295,14 @@ parameters:
 
         # The results/index traits below hold code moved unchanged from the page.
         # PHPStan could not read the page, so these are new findings; each needs a
-        # logic change, so each entry waits for its own task.
+        # logic change, so each entry stays.
         -
-            # describeTarget() takes the source label from __() (typed string|array,
-            # though common.fy_year is always a string) or Proposal::$name, and the
-            # donors from pluck('name')->values()->all() (untyped). The docblock
-            # states the exact shape the page relies on, so it stays.
+            # describeTarget() documents sourceLabel as string|null and donors as
+            # list<string>. sourceLabel can hold __('common.fy_year', ...), which
+            # PHPStan types as string|array (that key always resolves to a
+            # string), and donors is pluck('name')->values()->all(), which PHPStan
+            # types as array<int, mixed> (not a list, values untyped). The
+            # docblock states the exact shape the page relies on, so it stays.
             identifier: return.type
             path: app/Livewire/Concerns/Results/BuildsResultsFramework.php
             count: 1
@@ -356,18 +334,9 @@ parameters:
         # its callback argument from TModel, so after groupBy() each group (itself
         # a Collection) reads as a Model and `$group->first()->…` is mixed; a
         # typed @param on the closure does not clear it. `->toBase()` between
-        # groupBy() and map() would, but that is a code change, so each entry
-        # waits for its own task.
-        -
-            # fundingByCurrency() and proposalFunding(): with each group read as
-            # a Model, `$group->first()->currency` is mixed, so the docblock's
-            # Currency shape is reported. Clearable later by `->toBase()` before
-            # map() (or a typed `@var \Illuminate\Support\Collection<string,
-            # Collection<int, DonorProposal>>` local); every group holds one
-            # currency, so the shape is right.
-            identifier: return.type
-            path: app/Livewire/Concerns/Projects/ReadsProjectFunding.php
-            count: 2
+        # groupBy() and map() does (ReadsProjectFunding uses it); the entries
+        # below stay because there it would surface findings that need logic
+        # changes.
         -
             # targetsByResult(): the same Eloquent groupBy()/map() typing makes
             # `first()->indicator(->result)` mixed, so the declared Result /
@@ -395,24 +364,16 @@ parameters:
         # The targets/index traits below hold code moved unchanged from the page,
         # which PHPStan could not read before. Same rule as above.
         -
-            # matchingTargets() and pulse() pass statusSql() (PlanIndicator::
-            # achievementStatusSql()) to whereRaw()/selectRaw(). That builder
-            # returns one of three fixed fragments chosen by the status (the
-            # caller also checks it against STATUSES), with only the fixed
-            # ReportStatus::Approved value inlined; no user input reaches it, but
-            # its return type is plain string.
-            message: '#expects (.+\|)?literal-string, .+ given#'
-            identifier: argument.type
-            path: app/Livewire/Concerns/Targets/FiltersTargets.php
-            count: 3
-        -
-            # targets() selects PlanIndicator::achievedValueSql() and
-            # pendingValueSql(): fixed subqueries with only ReportStatus values
-            # inlined, typed plain string.
-            message: '#expects (.+\|)?literal-string, .+ given#'
-            identifier: argument.type
-            path: app/Livewire/Concerns/Targets/ReadsTargets.php
-            count: 2
+            # portfolio() groups Reports with groupBy() and maps each group in a
+            # closure typed with the bare Eloquent Collection (element type
+            # Model), so the returned shape degrades: project is mixed, reports
+            # is Collection<int, Model> and latest is Model|null (first() is
+            # nullable, though a group is never empty). The docblock states the
+            # real shape the partial relies on, so it stays.
+            message: '#portfolio\(\) should return#'
+            identifier: return.type
+            path: app/Livewire/Concerns/Reports/ReadsReportPortfolio.php
+            count: 1
         -
             # targets() eager-loads `source` with a callback typed for the MorphTo
             # it receives (it calls morphWith()); Larastan types every with()
@@ -445,3 +406,332 @@ parameters:
             identifier: nullsafe.neverNull
             path: app/Livewire/Concerns/ExecutiveSummary/LoadsSummarySources.php
             count: 11
+
+        # The funding-agreements/show traits hold code moved unchanged from the
+        # page, which PHPStan could not read before. Changing any of it is a
+        # logic change, so each entry stays.
+        -
+            # term() reads begin/end as `actual_date_* ?? planned_date_*` and
+            # returns early when either is null. proposals.planned_date_begin and
+            # planned_date_end are NOT NULL, so after the `??` neither can be null
+            # and both `=== null` checks are reported as always false.
+            identifier: identical.alwaysFalse
+            path: app/Livewire/Concerns/FundingAgreements/ReadsAgreementMoney.php
+            count: 2
+        -
+            # journeys() documents each stop label and the timing line as
+            # string. Both can hold a __() result, which PHPStan types as
+            # string|array (the keys used always resolve to strings), so the
+            # declared shape is reported.
+            identifier: return.type
+            path: app/Livewire/Concerns/FundingAgreements/ReadsAgreementMoney.php
+            count: 1
+
+        # The transfers/index traits hold code moved unchanged from the page,
+        # which PHPStan could not read before. Changing any of it is a logic
+        # change, so each entry stays.
+        -
+            # filteredQuery(), groupOrder() and applySort() pass SQL built from
+            # TransfersTracking's own state fragments (one definition, with only
+            # today's date inlined) and, for the month grouping, a column name
+            # looked up in TransfersTracking::DATE_COLUMNS by dateBasis, which
+            # normaliseFilters() limits to the three known bases. Anything the
+            # user types is bound with ? placeholders. Typed plain string.
+            message: '#expects (.+\|)?literal-string, .+ given#'
+            identifier: argument.type
+            path: app/Livewire/Concerns/Transfers/ReadsTransferRegister.php
+            count: 5
+        -
+            # ledgerLines(), stageCounts() and groupTotals() inline the same
+            # state fragments, the group key from groupKeySql() (a fixed match on
+            # the whitelisted group property) and fixed column names into their
+            # aggregate selects; there is no user input in them.
+            message: '#expects (.+\|)?literal-string, .+ given#'
+            identifier: argument.type
+            path: app/Livewire/Concerns/Transfers/ReadsTransferLedger.php
+            count: 4
+        -
+            # amount(), percent() and amountAtLeast() return Number::format(),
+            # which Laravel documents as string|false; percent() can also return
+            # __('transfers.under_a_tenth_of_a_percent'), which PHPStan types as
+            # string|array (that key always resolves to a string). Number::format()
+            # is false only when the intl formatter fails;
+            # ensureIntlExtensionIsInstalled() already throws when the extension
+            # is missing. The closures they came from declared string too, so
+            # declaring a wider type would be a change.
+            identifier: return.type
+            path: app/Livewire/Concerns/Transfers/PresentsTransferRegister.php
+            count: 3
+        -
+            # percent() hands that same Number::format() result (string|false)
+            # to str_replace().
+            identifier: argument.type
+            path: app/Livewire/Concerns/Transfers/PresentsTransferRegister.php
+            count: 1
+        -
+            # groupLabelOf() reads an account name as `account?->account_name ??
+            # no_account`. transfers_tracking.account_id IS nullable (a tranche
+            # may be scheduled before an account exists) and that fallback labels
+            # those rows on purpose: keep it. PHPStan types the BelongsTo as
+            # never null and flags only the `?->`, redundant on the left of `??`.
+            identifier: nullsafe.neverNull
+            path: app/Livewire/Concerns/Transfers/ReadsTransferRegister.php
+            count: 1
+
+        # The donors/index traits hold code moved unchanged from the page, which
+        # PHPStan could not read before. Changing any of it is a logic change, so
+        # each entry stays.
+        -
+            # rows() passes AgreementMoney::ownerSelect(), and totals() passes
+            # ownerTotalsSelect('donors.id'), to selectRaw(). Both
+            # build the list from fixed column names; ownerTotalsSelect() also
+            # checks its key against a pattern. Typed plain string.
+            message: '#expects (.+\|)?literal-string, .+ given#'
+            identifier: argument.type
+            path: app/Livewire/Concerns/Donors/ReadsDonorRegister.php
+            count: 2
+        -
+            # exportCsv() passes AgreementMoney::ownerSelect() to selectRaw(); same
+            # fixed column list as rows() above.
+            message: '#expects (.+\|)?literal-string, .+ given#'
+            identifier: argument.type
+            path: app/Livewire/Concerns/Donors/ExportsDonorRegister.php
+            count: 1
+        -
+            # wallet() reads donor_id, currency and total off tranches fetched
+            # with selectRaw('donor_proposal.donor_id as donor_id, ... as currency,
+            # sum(...) as total'). They are aliases, not TransfersTracking
+            # properties, and a closure parameter cannot carry a type that
+            # overrides the one inferred from the collection (a @param on the
+            # closure is ignored), so the three reads are reported.
+            identifier: property.notFound
+            path: app/Livewire/Concerns/Donors/ChartsDonorPortfolio.php
+            count: 3
+        -
+            # upcomingTransfers() documents each row's date as non-null. The query
+            # filters whereNotNull('scheduled_date'), but transfers_tracking.
+            # scheduled_date is nullable (migration 2026_09_14_111851) and PHPStan
+            # cannot see the filter, so the nullable cast is reported.
+            identifier: return.type
+            path: app/Livewire/Concerns/Donors/ChartsDonorPortfolio.php
+            count: 1
+        -
+            # donorMoney() compares `amount_received_currency?->value` and
+            # `amount_transfered_currency?->value`; both columns are NOT NULL
+            # (default USD, never made nullable), so the `?->` is reported as
+            # never meeting null.
+            identifier: nullsafe.neverNull
+            path: app/Livewire/Concerns/Donors/ChartsDonorPortfolio.php
+            count: 2
+        -
+            # moneyByCurrency() adds every value of agreementMoney()'s array shape
+            # to the matching key of its running total, so PHPStan widens the
+            # total's int `missingNet` to float|int and rejects the documented
+            # `missingNet: int`. The loop does not tell it that key only ever
+            # receives an int; splitting the sum per key is a logic change.
+            identifier: return.type
+            path: app/Livewire/Concerns/Donors/ReadsDonorMoney.php
+            count: 1
+        -
+            # receivedElsewhere() tests `amount_received_currency !== null`, but
+            # transfers_tracking.amount_received_currency is NOT NULL (default USD,
+            # never made nullable) and TransfersTracking documents it as
+            # `@property Currency` (non-null, from the enum cast), so PHPStan
+            # takes the test as always true. Dropping it is a logic change.
+            identifier: notIdentical.alwaysTrue
+            path: app/Livewire/Concerns/Donors/ReadsDonorMoney.php
+            count: 1
+        -
+            # amount() and shortAmount() return Number::format() and
+            # Number::abbreviate(), which Laravel documents as string|false. They
+            # are false only when the intl formatter fails;
+            # ensureIntlExtensionIsInstalled() already throws when the extension
+            # is missing. The closures they came from declared string too, so
+            # declaring string|false would be a change.
+            identifier: return.type
+            path: app/Livewire/Concerns/Donors/PresentsDonorRegister.php
+            count: 2
+
+        # The admin/accounts traits hold code moved unchanged from the page, which
+        # PHPStan could not read before. Changing any of it is a logic change.
+        -
+            # registerQuery() passes AccountMoney::select(), and totals() passes
+            # AccountMoney::totalsSelect(), to selectRaw(). Both implode a fixed list
+            # of column expressions with no input; they are typed plain string in
+            # app/Support/AccountMoney.php, outside this page.
+            message: '#expects (.+\|)?literal-string, .+ given#'
+            identifier: argument.type
+            path: app/Livewire/Concerns/Admin/ReadsAccountRegister.php
+            count: 2
+
+        # The dashboard/index traits hold code moved unchanged from the page,
+        # which PHPStan could not read before. Changing any of it is a logic
+        # change.
+        -
+            # Five redundant `?->`, each the last one on the left of a `??`, which
+            # already covers null: `milestone->project?->name`, `transfer->
+            # donorProposal?->donor?->name`, `donorProposal?->proposal?->name`,
+            # `risk->project?->name` and `task->source->project?->name` (source is
+            # a Milestone there). The '—' fallback is a defensive label for a
+            # dangling reference: keep it.
+            identifier: nullsafe.neverNull
+            path: app/Livewire/Concerns/Dashboard/ReadsDashboardAttention.php
+            count: 5
+        -
+            # attentionItems() eager-loads `source` with a callback typed for the
+            # MorphTo it receives (it calls morphWith()); Larastan types every
+            # with() callback as taking any Relation.
+            message: '#MorphTo#'
+            identifier: argument.type
+            path: app/Livewire/Concerns/Dashboard/ReadsDashboardAttention.php
+            count: 1
+        -
+            # attentionItems() titles a transfer row with a `__()` call that
+            # passes the Currency enum cast (`amount_transfered_currency`) as a
+            # replacement. The stub accepts only scalars and closures;
+            # Translator::makeReplacements() applies enum_value() to an object.
+            message: '#\$replace of function __#'
+            identifier: argument.type
+            path: app/Livewire/Concerns/Dashboard/ReadsDashboardAttention.php
+            count: 1
+        -
+            # Six redundant `?->`, each the last one on the left of a `??`, which
+            # already covers null: `milestone->project?->name`, `donorProposal?->
+            # donor?->name`, `report->planIndicator?->indicator?->name` (in
+            # upcoming() and activity()), `note->proposal?->name` and `report->
+            # user?->name`. The '—' fallback is a defensive label for a dangling
+            # reference: keep it.
+            identifier: nullsafe.neverNull
+            path: app/Livewire/Concerns/Dashboard/ReadsDashboardWork.php
+            count: 6
+        -
+            # upcoming() eager-loads `source` with a callback typed for the MorphTo
+            # it receives (it calls morphWith()); same as attentionItems().
+            message: '#MorphTo#'
+            identifier: argument.type
+            path: app/Livewire/Concerns/Dashboard/ReadsDashboardWork.php
+            count: 1
+        -
+            # upcoming() titles a transfer row with a `__()` call that passes the
+            # Currency enum cast as a replacement, which the stub rejects; same as
+            # attentionItems().
+            message: '#\$replace of function __#'
+            identifier: argument.type
+            path: app/Livewire/Concerns/Dashboard/ReadsDashboardWork.php
+            count: 1
+        -
+            # upcoming() and activity() document title/context/sentence as string
+            # and date/at as non-null. The rows put __() (string|array to PHPStan)
+            # in those fields and read milestones.planned_end_date, transfers_
+            # tracking.scheduled_date, tasks.due_date and reports.submit_date,
+            # which are nullable casts the queries already filter with
+            # whereBetween() / whereNotNull().
+            identifier: return.type
+            path: app/Livewire/Concerns/Dashboard/ReadsDashboardWork.php
+            count: 2
+
+        # The funding-agreements/index traits hold code moved unchanged from the
+        # page, which PHPStan could not read before. Changing any of it is a
+        # logic change.
+        -
+            # applyStage() builds its two whereRaw() conditions with the
+            # $sameCurrencyTotal arrow function (fixed SQL around the agreement's
+            # currency column, and the Received enum value for the received
+            # stage), and totals() passes AgreementMoney::totalsSelect() to
+            # selectRaw(); that list is built from fixed column names. Neither
+            # holds user input. The arrow function's result is a plain string
+            # because it concatenates its native `string $condition` parameter,
+            # and a `@var Closure(literal-string): literal-string` is rejected:
+            # closure parameters are contravariant, so narrowing the native
+            # string parameter does not give a subtype of the inferred closure.
+            message: '#expects (.+\|)?literal-string, .+ given#'
+            identifier: argument.type
+            path: app/Livewire/Concerns/FundingAgreements/ReadsAgreementRegister.php
+            count: 3
+        -
+            # calendar() reads ar_status, transfer_date and scheduled_date off the
+            # native `object $tranche` parameter of the three arrow functions it
+            # hands to $sum(). They are stdClass rows from a toBase() query with
+            # those columns selected, so the properties are real. But $sum() takes
+            # a plain callable, so PHPStan knows only the native `object` type,
+            # which declares no properties; it does not read a @param docblock on
+            # an arrow function, and a typed @var on $sum is rejected because it
+            # narrows the native callable parameter.
+            identifier: property.notFound
+            path: app/Livewire/Concerns/FundingAgreements/ChartsAgreementCalendar.php
+            count: 5
+
+        # The admin/users traits hold code moved unchanged from the page, which
+        # PHPStan could not read before. The entries below are typing gaps in
+        # Laravel and Spatie. Some could be retired by hoisting a local, but the
+        # moved code is deliberately kept verbatim.
+        -
+            # saveUserAccess() records the role and permission change from
+            # `$user->roles()->pluck('name')->all()` (and the permissions
+            # twin). Builder::pluck() returns Collection<array-key, mixed>, so
+            # ->all() is array<mixed> and PHPStan cannot prove the
+            # list<string> recordRoleChange() / recordPermissionChange() ask
+            # for. The values are Spatie's name column, a plain string.
+            message: '#expects list<string>, array<mixed> given#'
+            identifier: argument.type
+            path: app/Livewire/Concerns/Admin/ManagesUserAccess.php
+            count: 4
+        -
+            # selectedRoleUsers() calls $this->selectedRole->users(). Spatie's
+            # Role::users() builds its morphedByMany from the guard's user
+            # model at run time (getModelForGuard()), so PHPStan types the
+            # relation as Model rather than App\Models\User; the docblock and
+            # the closure's User type hint state what the guard really holds.
+            message: '#should return .*Collection<int, App.Models.User> but returns#'
+            identifier: return.type
+            path: app/Livewire/Concerns/Admin/ManagesRoles.php
+            count: 1
+        -
+            # The sortBy() closure in selectedRoleUsers() is typed for
+            # App\Models\User, but Spatie's Role::users() relation is typed
+            # Model (the user model comes from the guard at run time).
+            message: '#sortBy\(\) expects#'
+            identifier: argument.type
+            path: app/Livewire/Concerns/Admin/ManagesRoles.php
+            count: 1
+        -
+            # showAssignedUsers() passes the nullable int $selectedRoleId to
+            # abort_unless(). Laravel's helper declares the parameter untyped
+            # (`@param bool $boolean` in its docblock, helpers.php) and only
+            # tests `! $boolean`, so an int works at run time even under
+            # strict_types; PHPStan reads the docblock's bool.
+            message: '#abort_unless expects bool#'
+            identifier: argument.type
+            path: app/Livewire/Concerns/Admin/ManagesRoles.php
+            count: 1
+        -
+            # resultGroups() maps each group through a closure whose parameter is
+            # the bare class `Collection $targets`, with no template types, so
+            # PHPStan reads the group's `result` as mixed and `targets` as an
+            # untyped Collection. The docblock states the exact shape the page
+            # relies on, so it stays; an inline @param on the closure was tried
+            # and PHPStan does not apply it there. Loosening the @return does not
+            # help either: matching what PHPStan infers means `result: mixed` and
+            # a bare Collection, which drops the shape instead of fixing it.
+            identifier: return.type
+            path: app/Livewire/Concerns/AnnualPlans/ReadsAnnualPlanSummary.php
+            count: 1
+        -
+            # deliveryWindow() reads `$project?->start_date ?? $project?->end_date`
+            # and the mirror `$project?->end_date ?? $project?->start_date`. The
+            # project can be missing (a milestone bound whose project is not in
+            # the program's list) and both dates are nullable, so the fallbacks
+            # are wanted; PHPStan flags only the last `?->` on the left of each
+            # `??`, which is redundant because `??` already covers null.
+            identifier: nullsafe.neverNull
+            path: app/Livewire/Concerns/Programs/ReadsProgramDelivery.php
+            count: 2
+        -
+            # planTimeline() tests `$strategy->start_year !== null` and
+            # `$strategy->end_year !== null`, but strategies.start_year and
+            # end_year are NOT NULL (create_strategies_table, never altered) and
+            # Strategy documents both as `@property int`, so PHPStan takes each
+            # test as always true. Dropping them is a logic change.
+            identifier: notIdentical.alwaysTrue
+            path: app/Livewire/Concerns/Programs/ReadsProgramDelivery.php
+            count: 2

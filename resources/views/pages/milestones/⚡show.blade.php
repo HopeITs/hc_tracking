@@ -516,44 +516,46 @@ new #[Title('titles.milestone')] class extends Component {
         close="closeRelatedModal"
         required-note
     >
-        <x-ui.form-section :title="__('common.section_details')" :fields="['relatedName', 'relatedDescription']">
-            <div class="grid gap-y-3">
-                <x-ui.form-input wire:model="relatedName" :label="__('milestones.milestone_name')" maxlength="255" required autofocus />
-                <x-ui.form-textarea wire:model="relatedDescription" :label="__('common.description')" rows="2" />
-            </div>
-        </x-ui.form-section>
+        @if ($showRelatedModal)
+            <x-ui.form-section :title="__('common.section_details')" :fields="['relatedName', 'relatedDescription']">
+                <div class="grid gap-y-3">
+                    <x-ui.form-input wire:model="relatedName" :label="__('milestones.milestone_name')" maxlength="255" required autofocus />
+                    <x-ui.form-textarea wire:model="relatedDescription" :label="__('common.description')" rows="2" />
+                </div>
+            </x-ui.form-section>
 
-        <x-ui.form-section :title="__('common.section_placement')" :fields="['relatedParentMilestoneId', 'relatedResponsibleUserId']">
-            <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
-                <x-ui.form-select wire:model="relatedParentMilestoneId" :label="__('milestones.nest_under')" :search-label="__('milestones.search_milestones')">
-                    <option value="">{{ __('common.top_level') }}</option>
-                    @foreach ($this->relatedParentOptions as $relatedParentOption)
-                        <option value="{{ $relatedParentOption->id }}">{{ $relatedParentOption->name }}</option>
-                    @endforeach
-                </x-ui.form-select>
+            <x-ui.form-section :title="__('common.section_placement')" :fields="['relatedParentMilestoneId', 'relatedResponsibleUserId']">
+                <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                    <x-ui.form-select wire:model="relatedParentMilestoneId" :label="__('milestones.nest_under')" :search-label="__('milestones.search_milestones')">
+                        <option value="">{{ __('common.top_level') }}</option>
+                        @foreach ($this->relatedParentOptions as $relatedParentOption)
+                            <option value="{{ $relatedParentOption->id }}">{{ $relatedParentOption->name }}</option>
+                        @endforeach
+                    </x-ui.form-select>
 
-                <x-ui.form-select wire:model="relatedResponsibleUserId" :label="__('milestones.responsible')" :placeholder="__('common.select')" :search-label="__('milestones.search_responsible')">
-                    @foreach ($this->userOptions as $userOption)
-                        <option value="{{ $userOption->id }}">{{ $userOption->name }} · {{ $userOption->secondary_name }}</option>
-                    @endforeach
-                </x-ui.form-select>
-            </div>
-        </x-ui.form-section>
+                    <x-ui.form-select wire:model="relatedResponsibleUserId" :label="__('milestones.responsible')" :placeholder="__('common.select')" :search-label="__('milestones.search_responsible')">
+                        @foreach ($this->userOptions as $userOption)
+                            <option value="{{ $userOption->id }}">{{ $userOption->name }} · {{ $userOption->secondary_name }}</option>
+                        @endforeach
+                    </x-ui.form-select>
+                </div>
+            </x-ui.form-section>
 
-        <x-ui.form-section :title="__('common.section_schedule')" :fields="['relatedPlannedStartDate', 'relatedPlannedEndDate', 'relatedStatus', 'relatedWeightPercentage']">
-            <div class="grid grid-cols-2 gap-x-4 gap-y-3 @4xl/modal:grid-cols-4">
-                <x-ui.form-input wire:model="relatedPlannedStartDate" :label="__('milestones.planned_start_date')" type="date" required />
-                <x-ui.form-input wire:model="relatedPlannedEndDate" :label="__('milestones.planned_end_date')" type="date" />
+            <x-ui.form-section :title="__('common.section_schedule')" :fields="['relatedPlannedStartDate', 'relatedPlannedEndDate', 'relatedStatus', 'relatedWeightPercentage']">
+                <div class="grid grid-cols-2 gap-x-4 gap-y-3 @4xl/modal:grid-cols-4">
+                    <x-ui.form-input wire:model="relatedPlannedStartDate" :label="__('milestones.planned_start_date')" type="date" required />
+                    <x-ui.form-input wire:model="relatedPlannedEndDate" :label="__('milestones.planned_end_date')" type="date" />
 
-                <x-ui.form-select wire:model="relatedStatus" :label="__('common.status')" required>
-                    @foreach (MilestoneStatus::cases() as $statusCase)
-                        <option value="{{ $statusCase->value }}">{{ $statusCase->label() }}</option>
-                    @endforeach
-                </x-ui.form-select>
+                    <x-ui.form-select wire:model="relatedStatus" :label="__('common.status')" required>
+                        @foreach (MilestoneStatus::cases() as $statusCase)
+                            <option value="{{ $statusCase->value }}">{{ $statusCase->label() }}</option>
+                        @endforeach
+                    </x-ui.form-select>
 
-                <x-ui.form-input wire:model="relatedWeightPercentage" :label="__('milestones.weight')" type="number" min="0" max="100" step="0.01" suffix="%" required />
-            </div>
-        </x-ui.form-section>
+                    <x-ui.form-input wire:model="relatedWeightPercentage" :label="__('milestones.weight')" type="number" min="0" max="100" step="0.01" suffix="%" required />
+                </div>
+            </x-ui.form-section>
+        @endif
 
         <x-slot:actions>
             <x-ui.button type="submit" tone="primary" data-test="save-related-milestone-button">{{ __('milestones.create_milestone') }}</x-ui.button>

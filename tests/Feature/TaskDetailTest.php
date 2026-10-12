@@ -321,3 +321,14 @@ test('a subtask is edited from its own detail page, not from the parent', functi
         ->and($subtask->status)->toBe(TaskStatus::Done)
         ->and($subtask->taskAssignees->pluck('employee_id')->all())->toBe([$newAssignee]);
 });
+
+test('the add subtask form is rendered only while its modal is open', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $task = Task::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.show', ['task' => $task])
+        ->assertDontSeeHtml('data-test="new-subtask-title-input"')
+        ->call('openAddSubtaskModal')
+        ->assertSeeHtml('data-test="new-subtask-title-input"');
+});

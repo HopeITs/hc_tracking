@@ -304,21 +304,23 @@ new #[Title('titles.programs')] class extends Component {
         submit="saveProgram"
         close="closeProgramModal"
     >
-        <div class="grid gap-y-4">
-            <x-ui.form-select wire:model="strategyId" :label="__('programs.linked_strategy')" autofocus>
-                <option value="">{{ __('common.not_assigned') }}</option>
-                @foreach ($this->strategyOptions as $strategyOption)
-                    <option value="{{ $strategyOption->id }}">{{ $strategyOption->name }} ({{ $strategyOption->start_year }}–{{ $strategyOption->end_year }})</option>
-                @endforeach
-            </x-ui.form-select>
+        @if ($showProgramModal)
+            <div class="grid gap-y-4">
+                <x-ui.form-select wire:model="strategyId" :label="__('programs.linked_strategy')" autofocus>
+                    <option value="">{{ __('common.not_assigned') }}</option>
+                    @foreach ($this->strategyOptions as $strategyOption)
+                        <option value="{{ $strategyOption->id }}">{{ $strategyOption->name }} ({{ $strategyOption->start_year }}–{{ $strategyOption->end_year }})</option>
+                    @endforeach
+                </x-ui.form-select>
 
-            <x-ui.form-select wire:model="managerId" :label="__('programs.direct_manager')" :help="__('programs.the_assigned_manager_is_the_hr_employee_directly_accountable')">
-                <option value="">{{ __('common.not_assigned') }}</option>
-                @foreach ($this->managerOptions as $managerOption)
-                    <option value="{{ $managerOption->id }}">{{ $managerOption->name }} · {{ $managerOption->secondary_name }}</option>
-                @endforeach
-            </x-ui.form-select>
-        </div>
+                <x-ui.form-select wire:model="managerId" :label="__('programs.direct_manager')" :help="__('programs.the_assigned_manager_is_the_hr_employee_directly_accountable')">
+                    <option value="">{{ __('common.not_assigned') }}</option>
+                    @foreach ($this->managerOptions as $managerOption)
+                        <option value="{{ $managerOption->id }}">{{ $managerOption->name }} · {{ $managerOption->secondary_name }}</option>
+                    @endforeach
+                </x-ui.form-select>
+            </div>
+        @endif
 
         <x-slot:actions>
             <x-ui.button type="submit" tone="primary" data-test="save-program-button">{{ __('common.save_changes') }}</x-ui.button>

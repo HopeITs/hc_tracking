@@ -243,3 +243,14 @@ test('visiting the app mirrors new hr programs as unassigned', function () {
         ->strategy_id->toBeNull()
         ->manager_id->toBeNull();
 });
+
+test('the assignment form is rendered only while its modal is open', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $program = Program::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::programs.index')
+        ->assertDontSeeHtml('wire:model="managerId"')
+        ->call('openEditModal', $program->id)
+        ->assertSeeHtml('wire:model="managerId"');
+});

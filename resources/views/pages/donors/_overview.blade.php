@@ -1,8 +1,9 @@
 {{--
     The Overview view of the donors page: the pulse strip, who funds us, the
     transfers ahead, the donor mix and the donor list. Included by
-    ⚡index.blade.php, which defines $amount, $shortAmount, $initials,
-    $canAgreements, $canTransfers, $mutedText, $inkText and $hairline. The
+    ⚡index.blade.php, which provides amount(), shortAmount() and initials()
+    (PresentsDonorRegister) and defines $canAgreements, $canTransfers,
+    $mutedText, $inkText and $hairline. The
     Alpine state it reads (focus, lit) lives on the page's root <section>.
 --}}
 @php
@@ -52,11 +53,11 @@
                             <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-1">
                                 <p class="flex items-baseline gap-2.5">
                                     <span class="rounded-md bg-funding-soft px-1.5 py-0.5 text-xs font-extrabold tracking-wide text-funding">{{ $line['currency'] }}</span>
-                                    <span class="text-3xl leading-none font-extrabold tracking-tight tabular-nums {{ $inkText }}" x-data="countUp({{ (int) round($line['committed']) }})" x-text="new Intl.NumberFormat('en-US').format(display)">{{ $amount($line['committed']) }}</span>
+                                    <span class="text-3xl leading-none font-extrabold tracking-tight tabular-nums {{ $inkText }}" x-data="countUp({{ (int) round($line['committed']) }})" x-text="new Intl.NumberFormat('en-US').format(display)">{{ $this->amount($line['committed']) }}</span>
                                     <span class="text-xs font-semibold {{ $mutedText }}">{{ __('donors.committed_lower') }}</span>
                                 </p>
                                 <p class="text-sm tabular-nums {{ $mutedText }}">
-                                    <span class="font-extrabold text-funding">{{ $amount($line['received']) }}</span> {{ __('donors.received_lower') }} · <span class="font-bold {{ $inkText }}">{{ $currencyShare }}%</span>
+                                    <span class="font-extrabold text-funding">{{ $this->amount($line['received']) }}</span> {{ __('donors.received_lower') }} · <span class="font-bold {{ $inkText }}">{{ $currencyShare }}%</span>
                                 </p>
                             </div>
 
@@ -74,7 +75,7 @@
                                             x-on:mouseleave="focus = null"
                                             :class="lit({{ $segment['donorId'] ?? 'null' }}) ? '' : 'opacity-40'"
                                             class="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 {{ $isRoomy ? 'py-2.5' : 'py-1.5' }} transition-[background-color,opacity] duration-200 hover:bg-board-head focus-visible:outline-2 focus-visible:outline-primary @3xl/directory:grid-cols-[minmax(0,10rem)_minmax(0,1fr)_8rem] dark:hover:bg-white/5"
-                                            aria-label="{{ __('donors.segment_label', ['name' => $segment['name'], 'currency' => $line['currency'], 'committed' => $amount($segment['committed']), 'received' => $amount($segment['received']), 'percent' => (int) round($segment['share'])]) }}"
+                                            aria-label="{{ __('donors.segment_label', ['name' => $segment['name'], 'currency' => $line['currency'], 'committed' => $this->amount($segment['committed']), 'received' => $this->amount($segment['received']), 'percent' => (int) round($segment['share'])]) }}"
                                             data-wallet-segment="{{ $segment['donorId'] ?? 'rest' }}"
                                         >
                                             <span class="truncate text-sm font-semibold {{ $isRest ? $mutedText : $inkText }}">{{ $segment['name'] }}</span>
@@ -84,7 +85,7 @@
                                                 </span>
                                             </span>
                                             <span class="text-end text-sm tabular-nums">
-                                                <span class="font-bold {{ $inkText }}">{{ $shortAmount($segment['committed']) }}</span>
+                                                <span class="font-bold {{ $inkText }}">{{ $this->shortAmount($segment['committed']) }}</span>
                                                 <span class="ms-1 inline-block w-9 text-xs {{ $mutedText }}">{{ (int) round($segment['share']) }}%</span>
                                             </span>
                                         </a>
@@ -118,7 +119,7 @@
                                                     · {{ __('donors.overdue') }}
                                                 @endif
                                             </p>
-                                            <p class="shrink-0 text-sm font-extrabold tabular-nums {{ $inkText }}">{{ $shortAmount($transfer['amount']) }} <span class="text-[11px] font-semibold {{ $mutedText }}">{{ $transfer['currency'] }}</span></p>
+                                            <p class="shrink-0 text-sm font-extrabold tabular-nums {{ $inkText }}">{{ $this->shortAmount($transfer['amount']) }} <span class="text-[11px] font-semibold {{ $mutedText }}">{{ $transfer['currency'] }}</span></p>
                                         </div>
                                         <p class="mt-0.5 truncate text-sm">
                                             <a href="{{ route('donors.show', tap(new \App\Models\Donor, fn ($donor) => $donor->id = $transfer['donorId'])) }}" wire:navigate class="font-semibold underline-offset-4 hover:underline {{ $inkText }}">{{ $transfer['donor'] }}</a>
@@ -237,7 +238,7 @@
                                     'flex size-10 shrink-0 items-center justify-center rounded-full text-xs font-extrabold',
                                     'bg-secondary-dark text-white dark:bg-ink dark:text-surface-0' => ! $isProspect,
                                     'border border-dashed border-secondary-light text-secondary-medium dark:text-ink-muted' => $isProspect,
-                                ]) aria-hidden="true">{{ $initials($donor->name) }}</span>
+                                ]) aria-hidden="true">{{ $this->initials($donor->name) }}</span>
                                 <div class="min-w-0">
                                     <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
                                         <span class="text-base leading-tight font-bold {{ $inkText }}">{{ $donor->name }}</span>
@@ -284,17 +285,17 @@
                                 @forelse ($money['lines'] as $currency => $line)
                                     <div class="[&+&]:mt-3" wire:key="donor-{{ $donor->id }}-money-{{ $currency }}">
                                         <p class="flex items-baseline justify-between gap-3">
-                                            <span class="text-lg leading-none font-extrabold tracking-tight tabular-nums {{ $inkText }}">{{ $amount($line['committed']) }} <span class="text-[11px] font-semibold tracking-normal {{ $mutedText }}">{{ $currency }}</span></span>
+                                            <span class="text-lg leading-none font-extrabold tracking-tight tabular-nums {{ $inkText }}">{{ $this->amount($line['committed']) }} <span class="text-[11px] font-semibold tracking-normal {{ $mutedText }}">{{ $currency }}</span></span>
                                             <span class="text-xs font-bold tabular-nums text-funding">{{ App\Models\DonorProposal::percentLabel($line['received'], $line['committed']) }}%</span>
                                         </p>
-                                        <div class="mt-2 flex h-1.5 w-full gap-0.5 overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2" role="img" aria-label="{{ __('donors.money_bar_label', ['currency' => $currency, 'received' => $amount($line['received']), 'pending' => $amount($line['pending']), 'committed' => $amount($line['committed'])]) }}">
+                                        <div class="mt-2 flex h-1.5 w-full gap-0.5 overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2" role="img" aria-label="{{ __('donors.money_bar_label', ['currency' => $currency, 'received' => $this->amount($line['received']), 'pending' => $this->amount($line['pending']), 'committed' => $this->amount($line['committed'])]) }}">
                                             <span class="money-grow h-full rounded-s-full bg-funding" style="width: {{ $line['committed'] > 0 ? min(100, round($line['received'] / $line['committed'] * 100, 2)) : 0 }}%"></span>
                                             <span class="money-grow money-pending h-full" style="width: {{ $line['committed'] > 0 ? min(100, round($line['pending'] / $line['committed'] * 100, 2)) : 0 }}%"></span>
                                         </div>
                                         <p class="mt-1 text-[11px] tabular-nums {{ $mutedText }}">
-                                            <span class="font-bold text-funding">{{ $shortAmount($line['received']) }}</span> {{ __('donors.received_lower') }}
+                                            <span class="font-bold text-funding">{{ $this->shortAmount($line['received']) }}</span> {{ __('donors.received_lower') }}
                                             @if ($line['pending'] > 0)
-                                                · <span class="font-bold text-status-warn">{{ $shortAmount($line['pending']) }}</span> {{ __('donors.pending_lower') }}
+                                                · <span class="font-bold text-status-warn">{{ $this->shortAmount($line['pending']) }}</span> {{ __('donors.pending_lower') }}
                                             @endif
                                         </p>
                                     </div>
@@ -329,7 +330,7 @@
                                                     </span>
                                                 </span>
                                                 @if ($canAgreements)
-                                                    <a href="{{ route('funding-agreements.show', $agreement) }}" wire:navigate class="shrink-0 pt-px text-xs font-bold tabular-nums underline-offset-4 hover:underline {{ $inkText }}" aria-label="{{ __('donors.view_agreement_for', ['name' => $agreement->proposal?->name]) }}">{{ $shortAmount((float) $agreement->budget) }} <span class="font-semibold {{ $mutedText }}">{{ $agreement->currency->value }}</span></a>
+                                                    <a href="{{ route('funding-agreements.show', $agreement) }}" wire:navigate class="shrink-0 pt-px text-xs font-bold tabular-nums underline-offset-4 hover:underline {{ $inkText }}" aria-label="{{ __('donors.view_agreement_for', ['name' => $agreement->proposal?->name]) }}">{{ $this->shortAmount((float) $agreement->budget) }} <span class="font-semibold {{ $mutedText }}">{{ $agreement->currency->value }}</span></a>
                                                 @endif
                                             </li>
                                         @endforeach
@@ -348,7 +349,7 @@
                                 <p class="type-label mb-1 {{ $mutedText }} @4xl/directory:hidden">{{ __('donors.next_transfer') }}</p>
                                 @if ($money['next'] !== null)
                                     <p @class(['text-sm font-bold', 'text-status-critical' => $money['next']['overdue'], $inkText => ! $money['next']['overdue']])>{{ $money['next']['date']->translatedFormat(__('formats.date')) }}</p>
-                                    <p class="text-xs tabular-nums {{ $mutedText }}">{{ $money['next']['currency'] }} {{ $shortAmount($money['next']['amount']) }}</p>
+                                    <p class="text-xs tabular-nums {{ $mutedText }}">{{ $money['next']['currency'] }} {{ $this->shortAmount($money['next']['amount']) }}</p>
                                     @if ($money['overdue'] > 0)
                                         <p class="mt-1 text-[11px] font-semibold text-status-critical">{{ trans_choice('donors.count_transfers_overdue', $money['overdue'], ['count' => $money['overdue']]) }}</p>
                                     @endif

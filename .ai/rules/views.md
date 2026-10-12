@@ -28,3 +28,6 @@ This same wrapper-vs-control split likely applies to other `flux:with-field`-bas
 
 ## Dark mode classes use the Graphite tokens
 Behind `dark:` use only the Graphite tokens (`surface-0..3`, `ink*`, `line*`, `field-line`, `brand*`, `shadow-raised`), never raw `secondary-*`/`zinc-*` greys — see .ai/rules/css.md. Never change a light (non-`dark:`) class when restyling dark mode: light mode stays pixel-identical.
+
+## Guard modal bodies behind their flag
+Every `x-ui.modal` body sits behind `@if ($flag)`; shared modal components take `:open`.

@@ -865,3 +865,14 @@ test('the agreements search hint names the project number', function () {
         ->test('pages::funding-agreements.index')
         ->assertSeeHtml('placeholder="Project number, donor, or proposal"');
 });
+
+test('the donor report form is rendered only while its modal is open', function () {
+    $user = User::factory()->role('Financial')->create();
+    $agreement = DonorProposal::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::funding-agreements.show', ['donorProposal' => $agreement])
+        ->assertDontSeeHtml('wire:model="reportTitle"')
+        ->call('openReportCreate')
+        ->assertSeeHtml('wire:model="reportTitle"');
+});

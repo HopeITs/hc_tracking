@@ -486,3 +486,20 @@ test('a user the database refuses to delete keeps their roles', function () {
 
     expect($user->refresh()->roles->pluck('name')->all())->toBe(['Managers']);
 });
+
+test('the add-user form is rendered only while its modal is open', function () {
+    Livewire::actingAs(accessAdmin())
+        ->test('pages::admin.users')
+        ->assertDontSeeHtml('wire:model="initialRoleId"')
+        ->call('openCreateModal')
+        ->assertSeeHtml('wire:model="initialRoleId"');
+});
+
+test('the assigned users list is rendered only while its modal is open', function () {
+    Livewire::actingAs(accessAdmin())
+        ->test('pages::admin.users')
+        ->call('showTab', 'roles')
+        ->assertDontSee(__('access.no-assigned-users'))
+        ->call('showAssignedUsers')
+        ->assertSee(__('access.no-assigned-users'));
+});

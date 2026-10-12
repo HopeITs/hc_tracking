@@ -9,7 +9,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Notifications/Alerts/** | .ai/rules/alerts.md |
 | resources/views/pages/annual-plans/** | .ai/rules/annual-plans.md |
 | app/** | .ai/rules/app-2.md |
-| app/Livewire/Concerns/FiltersFinanceRegister.php | .ai/rules/app-livewire-concerns.md |
+| app/Livewire/Concerns/FiltersFinanceRegister.php, app/Livewire/Concerns/** | .ai/rules/app-livewire-concerns.md |
 | resources/views/{components/navigation/**,layouts/app/sidebar.blade.php}, resources/views/{components/navigation/sidebar.blade.php,components/desktop-user-menu.blade.php,layouts/app/sidebar.blade.php} | .ai/rules/app.md |
 | resources/views/pages/auth/login.blade.php | .ai/rules/auth.md |
 | {app/Actions/Fortify/**,app/Console/Commands/**,config/auth.php,database/seeders/**} | .ai/rules/commands-seeders.md |

@@ -2,22 +2,15 @@
 
 use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
-use App\Enums\ReportStatus;
-use App\Enums\ResultType;
-use App\Enums\TaskStatus;
 use App\Livewire\Concerns\AddsQuickTask;
-use App\Models\AnnualPlan;
+use App\Livewire\Concerns\Programs\ReadsProgramDelivery;
 use App\Models\HrEmployee;
 use App\Models\Milestone;
-use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
-use App\Models\Report;
-use App\Models\Result;
 use App\Models\Risk;
 use App\Models\Task;
 use App\Support\Like;
-use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -31,6 +24,7 @@ use Livewire\WithPagination;
 
 new #[Title('titles.program')] class extends Component {
     use AddsQuickTask;
+    use ReadsProgramDelivery;
     use WithPagination;
 
     #[Locked]
@@ -141,226 +135,6 @@ new #[Title('titles.program')] class extends Component {
     }
 
     /**
-     * The date range every project bar is plotted against: the program's
-     * project dates, today, and each project's milestone dates.
-     *
-     * A milestone only stretches the range when it falls within a year of its
-     * own project's dates, so one mistyped date cannot squash every bar. Such
-     * milestones are still drawn, pinned to the edge and flagged as outside
-     * the delivery window.
-     *
-     * @return array{start: CarbonImmutable, end: CarbonImmutable}|null
-     */
-    #[Computed]
-    public function deliveryWindow(): ?array
-    {
-        $projects = Project::query()
-            ->select(['id', 'start_date', 'end_date'])
-            ->where('program_id', $this->programId)
-            ->get()
-            ->keyBy('id');
-
-        $milestoneBounds = Milestone::query()
-            ->whereIn('project_id', $projects->keys())
-            ->where('status', '!=', MilestoneStatus::Cancelled->value)
-            ->groupBy('project_id')
-            ->selectRaw('project_id, min(planned_start_date) as first_planned, max(planned_start_date) as last_planned')
-            ->toBase()
-            ->get();
-
-        $dates = $projects
-            ->flatMap(fn (Project $project): array => [$project->start_date, $project->end_date])
-            ->filter()
-            ->map(fn ($date): CarbonImmutable => CarbonImmutable::parse($date));
-
-        foreach ($milestoneBounds as $bounds) {
-            $project = $projects->get($bounds->project_id);
-            $earliest = $project?->start_date ?? $project?->end_date;
-            $latest = $project?->end_date ?? $project?->start_date;
-
-            foreach ([$bounds->first_planned, $bounds->last_planned] as $planned) {
-                $plannedDate = CarbonImmutable::parse($planned);
-
-                if ($earliest === null || $plannedDate->betweenIncluded(CarbonImmutable::parse($earliest)->subYear(), CarbonImmutable::parse($latest)->addYear())) {
-                    $dates->push($plannedDate);
-                }
-            }
-        }
-
-        if ($dates->isEmpty()) {
-            return null;
-        }
-
-        $dates->push(CarbonImmutable::today());
-
-        return [
-            'start' => $dates->min()->startOfMonth(),
-            'end' => $dates->max()->endOfMonth(),
-        ];
-    }
-
-    /** @return Collection<int, AnnualPlan> */
-    #[Computed]
-    public function annualPlans(): Collection
-    {
-        return AnnualPlan::query()
-            ->select(['id', 'program_id', 'manager_id', 'year'])
-            ->where('program_id', $this->programId)
-            ->with(['manager:id,first_name_en,last_name_en,first_name_ar,last_name_ar'])
-            ->withCount('planIndicators')
-            ->orderByDesc('year')
-            ->get();
-    }
-
-    /**
-     * One slot per fiscal year across the strategy window and every planned
-     * year, each carrying its plan (or null for a gap) and the plan's target
-     * and reporting totals.
-     *
-     * Totals come from two grouped reads over all of the program's plans, so
-     * the slot count never adds queries.
-     *
-     * @return array<int, array{year: int, plan: AnnualPlan|null, targets: int, attributed: int, levels: array<string, int>, reports: int, approved: int}>
-     */
-    #[Computed]
-    public function planTimeline(): array
-    {
-        $plans = $this->annualPlans->keyBy('year');
-        $planIds = $this->annualPlans->pluck('id');
-
-        $targetTotals = PlanIndicator::query()
-            ->where('plan_indicators.source_type', 'annual_plan')
-            ->whereIn('plan_indicators.source_id', $planIds)
-            ->leftJoin('indicators', 'indicators.id', '=', 'plan_indicators.indicator_id')
-            ->leftJoin('results', 'results.id', '=', 'indicators.result_id')
-            ->groupBy('plan_indicators.source_id')
-            ->selectRaw('plan_indicators.source_id as plan_id, count(*) as targets')
-            ->selectRaw('sum(case when plan_indicators.project_id is not null then 1 else 0 end) as attributed')
-            ->selectRaw('sum(case when results.type = ? then 1 else 0 end) as impact', [ResultType::Impact->value])
-            ->selectRaw('sum(case when results.type = ? then 1 else 0 end) as outcome', [ResultType::Outcome->value])
-            ->selectRaw('sum(case when results.type = ? then 1 else 0 end) as output', [ResultType::Output->value])
-            ->toBase()
-            ->get()
-            ->keyBy('plan_id');
-
-        $reportTotals = Report::query()
-            ->join('plan_indicators', 'plan_indicators.id', '=', 'reports.plan_indicator_id')
-            ->where('plan_indicators.source_type', 'annual_plan')
-            ->whereIn('plan_indicators.source_id', $planIds)
-            ->groupBy('plan_indicators.source_id')
-            ->selectRaw('plan_indicators.source_id as plan_id, count(*) as reports')
-            ->selectRaw('sum(case when reports.status = ? then 1 else 0 end) as approved', [ReportStatus::Approved->value])
-            ->toBase()
-            ->get()
-            ->keyBy('plan_id');
-
-        $years = $plans->keys()->all();
-        $strategy = $this->program->strategy;
-
-        if ($strategy !== null && $strategy->start_year !== null && $strategy->end_year !== null && $strategy->end_year - $strategy->start_year < 15) {
-            $years = [...$years, ...range((int) $strategy->start_year, (int) $strategy->end_year)];
-        }
-
-        if ($years === []) {
-            return [];
-        }
-
-        return collect(range(min($years), max($years)))
-            ->map(function (int $year) use ($plans, $targetTotals, $reportTotals): array {
-                $plan = $plans->get($year);
-                $targets = $plan === null ? null : $targetTotals->get($plan->id);
-                $reports = $plan === null ? null : $reportTotals->get($plan->id);
-
-                return [
-                    'year' => $year,
-                    'plan' => $plan,
-                    'targets' => (int) ($targets->targets ?? 0),
-                    'attributed' => (int) ($targets->attributed ?? 0),
-                    'levels' => [
-                        ResultType::Impact->value => (int) ($targets->impact ?? 0),
-                        ResultType::Outcome->value => (int) ($targets->outcome ?? 0),
-                        ResultType::Output->value => (int) ($targets->output ?? 0),
-                    ],
-                    'reports' => (int) ($reports->reports ?? 0),
-                    'approved' => (int) ($reports->approved ?? 0),
-                ];
-            })
-            ->all();
-    }
-
-    /**
-     * The program's logframe as root results with their subtrees attached.
-     *
-     * Loads every statement in one query with its indicator count, then wires
-     * childrenRecursive in memory so every level carries the count.
-     *
-     * @return Collection<int, Result>
-     */
-    #[Computed]
-    public function resultRoots(): Collection
-    {
-        $results = Result::query()
-            ->select(['id', 'statement', 'parent_id', 'program_id', 'type', 'checkout_period'])
-            ->where('program_id', $this->programId)
-            ->withCount('indicators')
-            ->orderBy('id')
-            ->get();
-
-        $childrenByParent = $results->groupBy('parent_id');
-
-        foreach ($results as $result) {
-            $result->setRelation('childrenRecursive', new Collection($childrenByParent->get($result->id, [])));
-        }
-
-        return $results
-            ->filter(fn (Result $result): bool => $result->parent_id === null || ! $results->contains('id', $result->parent_id))
-            ->values();
-    }
-
-    /**
-     * Statement and indicator totals across the program's logframe.
-     *
-     * @return array{levels: array<string, int>, indicators: int, unmeasured: int}
-     */
-    #[Computed]
-    public function resultSummary(): array
-    {
-        $all = $this->resultRoots->flatMap(fn (Result $root) => collect([$root])->merge($root->descendants()));
-
-        return [
-            'levels' => collect(ResultType::cases())
-                ->mapWithKeys(fn (ResultType $type): array => [$type->value => $all->where('type', $type)->count()])
-                ->all(),
-            'indicators' => (int) $all->sum('indicators_count'),
-            'unmeasured' => $all->where('indicators_count', 0)->count(),
-        ];
-    }
-
-    /** @return array{percentage: float|null, reached: float, total: float} */
-    #[Computed]
-    public function milestoneProgress(): array
-    {
-        $weights = Milestone::query()
-            ->whereIn('project_id', Project::query()->select('id')->where('program_id', $this->programId))
-            ->where('status', '!=', MilestoneStatus::Cancelled->value)
-            ->selectRaw(
-                'coalesce(sum(case when status = ? then weight_percentage else 0 end), 0) as reached_weight, coalesce(sum(weight_percentage), 0) as total_weight',
-                [MilestoneStatus::Reached->value],
-            )
-            ->toBase()
-            ->first();
-
-        $reached = (float) ($weights->reached_weight ?? 0);
-        $total = (float) ($weights->total_weight ?? 0);
-
-        return [
-            'percentage' => $total > 0 ? round(($reached / $total) * 100, 1) : null,
-            'reached' => $reached,
-            'total' => $total,
-        ];
-    }
-
-    /**
      * Every project under this program, unpaginated and unfiltered — used to
      * name and group tasks on the Tasks tab, distinct from {@see projects()}
      * which is the paginated, search/status-filtered delivery timeline.
@@ -444,29 +218,6 @@ new #[Title('titles.program')] class extends Component {
     protected function quickTaskCreated(): void
     {
         unset($this->tasks);
-    }
-
-    /** @return array<int, array{label: string, count: int, tone: string}> */
-    #[Computed]
-    public function projectStatusSegments(): array
-    {
-        $counts = Project::query()
-            ->where('program_id', $this->programId)
-            ->selectRaw('status, count(*) as total')
-            ->groupBy('status')
-            ->pluck('total', 'status');
-
-        return collect(ProjectStatus::cases())
-            ->map(fn (ProjectStatus $status): array => [
-                'label' => $status->label(),
-                'count' => (int) ($counts[$status->value] ?? 0),
-                'tone' => match ($status) {
-                    ProjectStatus::Active => 'bg-status-good',
-                    ProjectStatus::Submitted, ProjectStatus::Approved => 'bg-status-warn',
-                    default => 'bg-secondary-light',
-                },
-            ])
-            ->all();
     }
 
     /** @return array<int, array{key: string, label: string, count: int, icon: string}> */
@@ -589,84 +340,7 @@ new #[Title('titles.program')] class extends Component {
             :status="$projectStatus"
         />
     @elseif ($tab === 'tasks')
-        <x-ui.panel :title="__('common.tasks')" :count="$this->tasks->count()" :subtitle="__('programs.tasks_across_the_program_its_projects_and_their_milestones')">
-            <x-slot:toolbar>
-                @can('create', App\Models\Task::class)<x-ui.button tone="primary" size="sm" icon="plus" wire:click="openAddTaskModal" data-test="add-program-task-button">{{ __('tasks.add_task') }}</x-ui.button>@endcan
-            </x-slot:toolbar>
-
-            @if ($this->tasks->isEmpty())
-                <x-ui.empty-state icon="clipboard-document-list" :heading="__('common.no_tasks_yet')" :body="__('programs.tasks_for_this_program_will_appear_here')">
-                    <x-slot:action>
-                        @can('create', App\Models\Task::class)<x-ui.button size="sm" tone="primary" icon="plus" wire:click="openAddTaskModal">{{ __('tasks.add_task') }}</x-ui.button>@endcan
-                    </x-slot:action>
-                </x-ui.empty-state>
-            @else
-                @php
-                    $taskDone = $this->tasks->where('status', TaskStatus::Done)->count();
-                    $taskTotal = $this->tasks->count();
-                    $taskOverdue = $this->tasks->filter(fn (Task $task): bool => $task->status !== TaskStatus::Done && $task->due_date !== null && $task->due_date->lt(today()))->count();
-                    $taskUnassigned = $this->tasks->filter(fn (Task $task): bool => $task->taskAssignees->isEmpty())->count();
-                    $taskInkText = 'text-secondary-dark dark:text-ink';
-                    $taskMutedText = 'text-secondary-medium dark:text-ink-muted';
-
-                    $ordered = $this->tasks->sortBy([
-                        fn (Task $a, Task $b): int => ($a->status === TaskStatus::Done) <=> ($b->status === TaskStatus::Done),
-                        fn (Task $a, Task $b): int => ($a->due_date === null) <=> ($b->due_date === null),
-                        fn (Task $a, Task $b): int => ($a->due_date?->getTimestamp() ?? 0) <=> ($b->due_date?->getTimestamp() ?? 0),
-                        fn (Task $a, Task $b): int => $a->id <=> $b->id,
-                    ]);
-                    $taskGroups = $this->allProjects
-                        ->map(fn (Project $project): array => [
-                            'project' => $project,
-                            'tasks' => $ordered->filter(fn (Task $task): bool => $this->taskProjectId($task) === $project->id)->values(),
-                        ])
-                        ->filter(fn (array $group): bool => $group['tasks']->isNotEmpty())
-                        ->values();
-                    $looseTasks = $ordered->filter(fn (Task $task): bool => $this->taskProjectId($task) === null)->values();
-                @endphp
-
-                <div class="grid gap-3 border-b border-secondary-soft p-3.5 @lg/detail:grid-cols-3 dark:border-line">
-                    <x-ui.stat-tile :label="__('programs.stat_tasks_done')" :value="$taskDone" :denominator="$taskTotal" />
-                    <x-ui.stat-tile :label="__('tasks.overdue')" :value="$taskOverdue" :tone="$taskOverdue > 0 ? 'warn' : null" />
-                    <x-ui.stat-tile :label="__('common.unassigned')" :value="$taskUnassigned" />
-                </div>
-
-                <div class="hidden grid-cols-[1.25rem_minmax(0,1fr)_11rem_6rem_7.5rem_8rem_7rem] gap-x-4 px-3.5 pt-4 @3xl/detail:grid" aria-hidden="true">
-                    <span></span>
-                    @foreach ([__('tasks.task'), __('tasks.assignee'), __('tasks.priority'), __('tasks.due'), __('tasks.progress'), __('common.status')] as $column)
-                        <span @class(['type-label', $taskMutedText, 'text-end' => $loop->last])>{{ $column }}</span>
-                    @endforeach
-                </div>
-
-                <div class="flex flex-col gap-8 px-3.5 pb-3.5 @6xl/detail:px-5 @6xl/detail:pb-5">
-                    @foreach ($taskGroups as $group)
-                        <section class="min-w-0" wire:key="program-task-group-{{ $group['project']->id }}">
-                            <header class="border-b border-secondary-soft pt-4 pb-3 dark:border-line">
-                                <a href="{{ route('projects.show', $group['project']) }}" wire:navigate class="min-w-0 truncate text-base font-bold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary {{ $taskInkText }}">{{ $group['project']->name }}</a>
-                            </header>
-                            <ul class="divide-y divide-secondary-soft dark:divide-line">
-                                @foreach ($group['tasks'] as $task)
-                                    @include('pages.programs._task-row', ['task' => $task, 'inkText' => $taskInkText, 'mutedText' => $taskMutedText])
-                                @endforeach
-                            </ul>
-                        </section>
-                    @endforeach
-
-                    @if ($looseTasks->isNotEmpty())
-                        <section class="min-w-0" data-loose-tasks>
-                            <header class="border-b border-secondary-soft pt-4 pb-3 dark:border-line">
-                                <p class="text-base font-bold {{ $taskInkText }}">{{ __('programs.work_not_tied_to_a_project') }}</p>
-                            </header>
-                            <ul class="divide-y divide-secondary-soft dark:divide-line">
-                                @foreach ($looseTasks as $task)
-                                    @include('pages.programs._task-row', ['task' => $task, 'inkText' => $taskInkText, 'mutedText' => $taskMutedText])
-                                @endforeach
-                            </ul>
-                        </section>
-                    @endif
-                </div>
-            @endif
-        </x-ui.panel>
+        @include('pages.programs._show-tasks-tab')
     @elseif ($tab === 'plans')
         <x-ui.plan-years :slots="$this->planTimeline" :strategy="$this->program->strategy" />
     @else

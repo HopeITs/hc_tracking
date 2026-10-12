@@ -253,3 +253,13 @@ test('the strategy buttons follow their own permission, not create alone', funct
     'update only' => ['strategies.update', ['edit-strategy-button'], ['create-strategy-button', 'delete-strategy-button']],
     'delete only' => ['strategies.delete', ['delete-strategy-button'], ['create-strategy-button', 'edit-strategy-button']],
 ]);
+
+test('the strategy form is rendered only while its modal is open', function () {
+    $manager = User::factory()->role('Managers')->create();
+
+    Livewire::actingAs($manager)
+        ->test('pages::strategies.index')
+        ->assertDontSeeHtml('wire:model="startYear"')
+        ->call('openCreateModal')
+        ->assertSeeHtml('wire:model="startYear"');
+});
