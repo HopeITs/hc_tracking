@@ -8,6 +8,12 @@
             "port": 8000
         },
         {
+            "name": "hc-tracking-web",
+            "runtimeExecutable": "C:\\php85\\php.exe",
+            "runtimeArgs": ["artisan", "serve", "--host=127.0.0.1", "--port=8001"],
+            "port": 8001
+        },
+        {
             "name": "static-preview",
             "runtimeExecutable": "C:\\php85\\php.exe",
             "runtimeArgs": ["-S", "127.0.0.1:8010", "-t", "storage/app"],

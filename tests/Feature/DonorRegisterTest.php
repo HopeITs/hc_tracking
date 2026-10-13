@@ -210,7 +210,7 @@ test('the table opens by donor name and a heading sorts it', function () {
 test('someone who may not see agreements gets the donors with no money columns and no money query', function () {
     registerFundingDonor();
 
-    $page = Livewire::actingAs(userWithRole('Public Relations Manager'))->test('pages::donors.index');
+    $page = Livewire::actingAs(userWithRole(fundraiserWithoutAgreements()))->test('pages::donors.index');
 
     $page->assertOk()
         ->assertSee('UNICEF')
@@ -322,8 +322,8 @@ test('the export holds every filtered line and only the columns the viewer may s
         ->and($unicef[15])->toBe('200.00')
         ->and($unicef[17])->toBe('2026-06-05');
 
-    $publicRelations = Livewire::actingAs(userWithRole('Public Relations Manager'))->test('pages::donors.index')->call('exportCsv');
-    $plain = downloadedCsv($publicRelations);
+    $fundraiser = Livewire::actingAs(userWithRole(fundraiserWithoutAgreements()))->test('pages::donors.index')->call('exportCsv');
+    $plain = downloadedCsv($fundraiser);
 
     expect($plain[0])->toHaveCount(9)
         ->and(collect($plain)->flatten()->contains('1000.00'))->toBeFalse();

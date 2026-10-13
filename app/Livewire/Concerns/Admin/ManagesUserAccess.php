@@ -13,7 +13,6 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Stringable;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
@@ -35,7 +34,7 @@ use Livewire\Attributes\Locked;
  * @property-read LengthAwarePaginator<int, User> $users  #[Computed] users()
  * @property-read Collection<int, Role> $roleOptions  #[Computed] roleOptions()
  * @property-read User|null $selectedUser  #[Computed] selectedUser()
- * @property-read array<int, array{label: Stringable, permissions: Collection<int, Permission>}> $permissionGroups  #[Computed] permissionGroups()
+ * @property-read array<int, array{label: string, permissions: Collection<int, Permission>}> $permissionGroups  #[Computed] permissionGroups()
  * @property-read Collection<int, HrUser> $hrAccountOptions  #[Computed] hrAccountOptions()
  */
 trait ManagesUserAccess
@@ -104,7 +103,7 @@ trait ManagesUserAccess
     /**
      * Permissions grouped by module, in config('access-control.groups') order.
      *
-     * @return array<int, array{label: Stringable, permissions: Collection<int, Permission>}>
+     * @return array<int, array{label: string, permissions: Collection<int, Permission>}>
      */
     #[Computed]
     public function permissionGroups(): array
@@ -123,7 +122,7 @@ trait ManagesUserAccess
             }
 
             $groups[] = [
-                'label' => str($module)->replace('-', ' ')->headline(),
+                'label' => __('access.modules.'.$module),
                 'permissions' => $permissions->values(),
             ];
         }

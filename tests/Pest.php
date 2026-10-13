@@ -18,6 +18,7 @@ use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Report;
 use App\Models\Result;
+use App\Models\Role;
 use App\Models\Strategy;
 use App\Models\Task;
 use App\Models\TaskAssignee;
@@ -553,6 +554,27 @@ function userWithRole(string $role, ?int $employeeId = null): User
     }
 
     return Activity::withoutRecording(fn (): User => User::factory()->role($role)->create(['employee_id' => $employeeId]));
+}
+
+/**
+ * A fixture role for the "hide money, keep names" tests. It holds Public
+ * Relations Manager's baseline without the funding agreement permissions
+ * that role gained in T02 (D-31b), so no built-in role fits any more: it sees
+ * donors and proposals but no agreement, budget or transfer. Pass the name to
+ * userWithRole().
+ */
+function fundraiserWithoutAgreements(): string
+{
+    if (! Permission::query()->exists()) {
+        test()->seed(RolesAndPermissionsSeeder::class);
+    }
+
+    Role::findOrCreate('Fundraiser', 'web')->syncPermissions(array_values(array_diff(
+        config('access-control.role_baselines.Public Relations Manager'),
+        ['funding-agreements.view', 'funding-agreements.create', 'funding-agreements.update'],
+    )));
+
+    return 'Fundraiser';
 }
 
 /**

@@ -67,3 +67,27 @@ test('an up to date database is left alone', function () {
 
     $this->artisan('permissions:sync')->expectsOutputToContain('already up to date')->assertSuccessful();
 });
+
+test('a lifecycle permission new to the database reaches exactly its baseline roles and Super Admin', function () {
+    (new RolesAndPermissionsSeeder)->run();
+    Permission::findByName('reports.reopen', 'web')->delete();
+
+    $this->artisan('permissions:sync')
+        ->expectsOutputToContain('Permission added: reports.reopen')
+        ->assertSuccessful();
+
+    $holders = Role::query()->whereHas('permissions', fn ($query) => $query->where('name', 'reports.reopen'))->pluck('name')->all();
+
+    expect($holders)->toEqualCanonicalizing(['Super Admin', 'MEAL', 'Public Relations Manager']);
+});
+
+test('a lifecycle permission granted by hand outside its baseline survives a sync', function () {
+    (new RolesAndPermissionsSeeder)->run();
+    Role::findByName('Managers', 'web')->givePermissionTo('supervisions.manage');
+    Permission::findByName('sectors.manage', 'web')->delete();
+
+    $this->artisan('permissions:sync')->assertSuccessful();
+
+    expect(rolePermissionNames('Managers'))->toContain('supervisions.manage')
+        ->and(rolePermissionNames('MEAL'))->toContain('sectors.manage');
+});

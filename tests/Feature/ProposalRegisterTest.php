@@ -225,7 +225,7 @@ test('the table opens newest planned start first and a heading sorts it', functi
 test('someone who may not see agreements gets the proposals with no donor, no money and no money query', function () {
     registerFundedProposal();
 
-    $page = Livewire::actingAs(userWithRole('Public Relations Manager'))->test('pages::proposals.index');
+    $page = Livewire::actingAs(userWithRole(fundraiserWithoutAgreements()))->test('pages::proposals.index');
 
     $page->assertOk()
         ->assertSee('Water Response')
@@ -294,8 +294,8 @@ test('the export holds every filtered line and only the columns the viewer may s
         ->and($dollars[13])->toBe('200.00')
         ->and($dollars[14])->toBe('2026-06-05');
 
-    $publicRelations = Livewire::actingAs(userWithRole('Public Relations Manager'))->test('pages::proposals.index')->call('exportCsv');
-    $plain = downloadedCsv($publicRelations);
+    $fundraiser = Livewire::actingAs(userWithRole(fundraiserWithoutAgreements()))->test('pages::proposals.index')->call('exportCsv');
+    $plain = downloadedCsv($fundraiser);
 
     expect($plain[0])->toHaveCount(6)
         ->and(collect($plain)->flatten()->contains('ECHO'))->toBeFalse()

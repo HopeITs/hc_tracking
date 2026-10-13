@@ -19,16 +19,23 @@ $groups = [
     'projects' => ['view', 'create', 'update', 'delete'],
     'milestones' => ['view', 'create', 'update', 'delete'],
     'indicators' => ['view', 'create', 'update', 'delete'],
+    'indicator-library' => ['view', 'create', 'update', 'delete'],
     'results' => ['view', 'create', 'update', 'delete'],
     'risks' => ['view', 'create', 'update', 'delete'],
     'targets' => ['view', 'create', 'update', 'delete'],
     'donors' => ['view', 'create', 'update', 'delete'],
-    'proposals' => ['view', 'create', 'update', 'delete'],
+    'proposals' => ['view', 'create', 'update', 'delete', 'manage-reviewers', 'correct-status'],
     'funding-agreements' => ['view', 'create', 'update', 'delete'],
     'transfers' => ['view', 'create', 'update', 'delete'],
     'strategies' => ['view', 'create', 'update', 'delete'],
     'annual-plans' => ['view', 'create', 'update', 'delete'],
-    'reports' => ['view', 'create', 'update', 'delete', 'approve', 'mark-seen'],
+    'reports' => ['view', 'create', 'update', 'delete', 'approve', 'mark-seen', 'reopen', 'aggregate'],
+    'meal-coverage' => ['manage'],
+    'supervisions' => ['manage'],
+    'sectors' => ['view', 'manage'],
+    'report-templates' => ['manage'],
+    'evidence-types' => ['manage'],
+    'narrative-questions' => ['manage'],
     'tasks' => ['view', 'create', 'update', 'delete'],
     'calendar' => ['view'],
     'executive-summary' => ['view'],
@@ -64,6 +71,11 @@ $twoFactorEnforced = ! in_array(is_string($twoFactorSetting) ? strtolower(trim($
 
 $taskWriter = ['tasks.create', 'tasks.update'];
 $reportWriter = ['reports.create', 'reports.update'];
+
+// MEAL's own work, kept from the General Manager (contracts §8). Targets are
+// entered by MEAL only (D-23).
+$mealOnly = ['meal-coverage.manage', 'report-templates.manage', 'evidence-types.manage', 'narrative-questions.manage'];
+$targetWriter = ['targets.create', 'targets.update'];
 
 return [
 
@@ -143,19 +155,24 @@ return [
         'Public Relations Manager' => [
             ...$viewEverything, ...$fundraisingViews, ...$taskWriter, ...$reportWriter,
             'donors.create', 'donors.update',
-            'proposals.create', 'proposals.update',
+            'proposals.create', 'proposals.update', 'proposals.manage-reviewers', 'proposals.correct-status',
             'projects.create',
+            'funding-agreements.view', 'funding-agreements.create', 'funding-agreements.update',
+            'reports.reopen', 'reports.aggregate',
         ],
         'MEAL' => [
             ...$viewEverything, ...$taskWriter, ...$reportWriter, 'reports.approve', 'reports.mark-seen',
             'indicators.create', 'indicators.update', 'indicators.delete',
             'results.create', 'results.update', 'results.delete',
             'targets.create', 'targets.update', 'targets.delete',
+            'indicator-library.create', 'indicator-library.update', 'indicator-library.delete',
+            'reports.reopen', 'reports.aggregate',
+            ...$mealOnly, 'sectors.manage',
         ],
         'Financial' => [
             ...$viewEverything, ...$financeViews, ...$fundraisingViews, ...$taskWriter,
             'donors.create', 'donors.update', 'donors.delete',
-            'proposals.create', 'proposals.update', 'proposals.delete',
+            'proposals.create', 'proposals.update', 'proposals.delete', 'proposals.manage-reviewers',
             'funding-agreements.create', 'funding-agreements.update', 'funding-agreements.delete',
             'transfers.create', 'transfers.update', 'transfers.delete',
             'accounts.create', 'accounts.update', 'accounts.delete',
@@ -170,13 +187,15 @@ return [
             'risks.create', 'risks.update', 'risks.delete',
             'indicators.create', 'indicators.update',
             'results.create', 'results.update',
-            'targets.create', 'targets.update',
         ],
         'General Manager' => array_values(array_diff($allPermissions, [
             'access-management.manage-roles',
             'access-management.manage-permissions',
             'reports.mark-seen',
             'notification-settings.manage',
+            'reports.reopen',
+            ...$mealOnly,
+            ...$targetWriter,
         ])),
     ],
 ];

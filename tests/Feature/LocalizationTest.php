@@ -79,7 +79,9 @@ test('every translation key used in the code exists in english and arabic', func
 
     $keys = [];
     foreach (array_unique($files) as $file) {
-        preg_match_all("/(?:__|trans_choice)\\('([a-z_]+\\.[a-z0-9_.]+)'/", file_get_contents($file), $matches);
+        // A literal ending in "." is a prefix joined to a runtime value
+        // (__('access.actions.'.$action)), not a key of its own.
+        preg_match_all("/(?:__|trans_choice)\\('([a-z_]+\\.[a-z0-9_.]*[a-z0-9_])'/", file_get_contents($file), $matches);
         foreach ($matches[1] as $key) {
             $keys[$key] = true;
         }

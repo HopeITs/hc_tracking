@@ -38,11 +38,11 @@ function seedMoneyPagesFixture(): array
     return compact('donor', 'proposal', 'agreement');
 }
 
-test('Public Relations Manager sees donor names on the donor directory but no money', function () {
+test('a fundraiser without agreements sees donor names on the donor directory but no money', function () {
     seedMoneyPagesFixture();
     $page = fn (string $role) => Livewire::actingAs(userWithRole($role))->test('pages::donors.index')->set('view', 'overview');
 
-    $page('Public Relations Manager')->assertOk()
+    $page(fundraiserWithoutAgreements())->assertOk()
         ->assertSee('Aurora Foundation')
         ->assertSee('Harbour Clean Water')
         ->assertDontSee('731,942')
@@ -61,12 +61,12 @@ test('Public Relations Manager sees donor names on the donor directory but no mo
         ->assertSeeHtml('data-upcoming-transfers');
 });
 
-test('Public Relations Manager sees the donor page without agreements, budgets or tranches', function () {
+test('a fundraiser without agreements sees the donor page without agreements, budgets or tranches', function () {
     ['donor' => $donor] = seedMoneyPagesFixture();
     $page = fn (string $role) => Livewire::actingAs(userWithRole($role))->test('pages::donors.show', ['donor' => $donor])->set('view', 'overview');
 
-    $publicRelations = $page('Public Relations Manager');
-    $publicRelations->assertOk()
+    $fundraiser = $page(fundraiserWithoutAgreements());
+    $fundraiser->assertOk()
         ->assertSee('Aurora Foundation')
         ->assertDontSee('731,942')
         ->assertDontSee('123,457')
@@ -74,7 +74,7 @@ test('Public Relations Manager sees the donor page without agreements, budgets o
         ->assertDontSeeHtml('data-money-river')
         ->assertDontSeeHtml('data-agreements');
 
-    $instance = $publicRelations->instance();
+    $instance = $fundraiser->instance();
     expect($instance->agreements)->toBeEmpty()
         ->and($instance->moneyByCurrency)->toBe([])
         ->and($instance->receivedElsewhere)->toBe([])
@@ -90,12 +90,12 @@ test('Public Relations Manager sees the donor page without agreements, budgets o
         ->assertSeeHtml('data-money-river');
 });
 
-test('Public Relations Manager sees proposal names on the proposal directory but no money', function () {
+test('a fundraiser without agreements sees proposal names on the proposal directory but no money', function () {
     seedMoneyPagesFixture();
     $page = fn (string $role) => Livewire::actingAs(userWithRole($role))->test('pages::proposals.index')->set('view', 'overview');
 
-    $publicRelations = $page('Public Relations Manager');
-    $publicRelations->assertOk()
+    $fundraiser = $page(fundraiserWithoutAgreements());
+    $fundraiser->assertOk()
         ->assertSee('Harbour Clean Water')
         ->assertDontSee('Aurora Foundation')
         ->assertDontSee('731,942')
@@ -104,7 +104,7 @@ test('Public Relations Manager sees proposal names on the proposal directory but
         ->assertDontSeeHtml('data-funding-flow')
         ->assertDontSeeHtml('data-connection="funding"');
 
-    $instance = $publicRelations->instance();
+    $instance = $fundraiser->instance();
     expect($instance->fundingPosition)->toBeEmpty()
         ->and($instance->flow)->toBe(['currencies' => [], 'unfunded' => []])
         ->and(collect($instance->pipeline)->pluck('money')->filter()->all())->toBe([]);
@@ -121,7 +121,7 @@ test('the proposal directory ignores the donor filter for someone who cannot see
     ['donor' => $donor] = seedMoneyPagesFixture();
     Proposal::factory()->create(['name' => 'Unfunded Clinic Rebuild']);
 
-    Livewire::actingAs(userWithRole('Public Relations Manager'))
+    Livewire::actingAs(userWithRole(fundraiserWithoutAgreements()))
         ->test('pages::proposals.index')
         ->call('toggleDonor', $donor->id)
         ->assertSet('donor', '')
@@ -129,12 +129,12 @@ test('the proposal directory ignores the donor filter for someone who cannot see
         ->assertDontSee('Aurora Foundation');
 });
 
-test('Public Relations Manager sees the proposal page without a funding tab or any money', function () {
+test('a fundraiser without agreements sees the proposal page without a funding tab or any money', function () {
     ['proposal' => $proposal] = seedMoneyPagesFixture();
     $page = fn (string $role) => Livewire::actingAs(userWithRole($role))->test('pages::proposals.show', ['proposal' => $proposal]);
 
-    $publicRelations = $page('Public Relations Manager');
-    $publicRelations->assertOk()
+    $fundraiser = $page(fundraiserWithoutAgreements());
+    $fundraiser->assertOk()
         ->assertSee('Harbour Clean Water')
         ->assertDontSee('Aurora Foundation')
         ->assertDontSee('731,942')
@@ -142,9 +142,9 @@ test('Public Relations Manager sees the proposal page without a funding tab or a
         ->assertDontSeeHtml('data-vital="money"')
         ->assertSeeHtml('data-vital="work"');
 
-    expect(collect($publicRelations->instance()->tabs)->pluck('key')->all())->not->toContain('funding');
+    expect(collect($fundraiser->instance()->tabs)->pluck('key')->all())->not->toContain('funding');
 
-    $funding = $page('Public Relations Manager')->set('tab', 'funding');
+    $funding = $page(fundraiserWithoutAgreements())->set('tab', 'funding');
     $funding->assertSet('tab', 'status')
         ->assertDontSee('731,942.00')
         ->assertDontSee('123,457.00');
@@ -165,9 +165,9 @@ test('Public Relations Manager sees the proposal page without a funding tab or a
         ->assertSeeHtml('data-vital="money"');
 });
 
-test('someone who may see agreements but not transfers gets budgets without tranches', function () {
+test('Public Relations Manager sees agreement budgets but no tranches', function () {
     ['donor' => $donor, 'proposal' => $proposal] = seedMoneyPagesFixture();
-    $viewer = fn () => userWithRole('Public Relations Manager')->givePermissionTo('funding-agreements.view');
+    $viewer = fn () => userWithRole('Public Relations Manager');
 
     $donorPage = Livewire::actingAs($viewer())->test('pages::donors.show', ['donor' => $donor]);
     $donorPage->assertSee('731,942.00')->assertDontSee('123,457');
@@ -223,23 +223,23 @@ function seedProposalPaperwork(): array
     return $paperwork;
 }
 
-test('Public Relations Manager does not see agreement or MOU files on the proposal page', function () {
+test('a fundraiser without agreements does not see agreement or MOU files on the proposal page', function () {
     $paperwork = seedProposalPaperwork();
     $page = fn (string $role) => Livewire::actingAs(userWithRole($role))
         ->test('pages::proposals.show', ['proposal' => $paperwork['proposal']])
         ->set('tab', 'documents');
 
-    $publicRelations = $page('Public Relations Manager');
-    $publicRelations->assertSee('concept-note.pdf')
+    $fundraiser = $page(fundraiserWithoutAgreements());
+    $fundraiser->assertSee('concept-note.pdf')
         ->assertDontSee('signed-agreement.pdf')
         ->assertDontSee('signed-mou.pdf');
 
-    $documents = $publicRelations->instance()->documents;
+    $documents = $fundraiser->instance()->documents;
     expect($documents->pluck('id')->all())->toBe([$paperwork['note']->id])
-        ->and(collect($publicRelations->instance()->tabs)->firstWhere('key', 'documents')['count'])->toBe(1);
+        ->and(collect($fundraiser->instance()->tabs)->firstWhere('key', 'documents')['count'])->toBe(1);
 
-    $publicRelations->call('openPreview', $paperwork['agreement']->id)->assertSet('previewingFileId', null);
-    $publicRelations->call('openPreview', $paperwork['mou']->id)->assertSet('previewingFileId', null);
+    $fundraiser->call('openPreview', $paperwork['agreement']->id)->assertSet('previewingFileId', null);
+    $fundraiser->call('openPreview', $paperwork['mou']->id)->assertSet('previewingFileId', null);
 
     $page('Financial')
         ->assertSee('concept-note.pdf')
@@ -247,9 +247,9 @@ test('Public Relations Manager does not see agreement or MOU files on the propos
         ->assertSee('signed-mou.pdf');
 });
 
-test('Public Relations Manager cannot upload, edit or delete agreement or MOU files', function () {
+test('a fundraiser without agreements cannot upload, edit or delete agreement or MOU files', function () {
     $paperwork = seedProposalPaperwork();
-    $fresh = fn () => Livewire::actingAs(userWithRole('Public Relations Manager'))
+    $fresh = fn () => Livewire::actingAs(userWithRole(fundraiserWithoutAgreements()))
         ->test('pages::proposals.show', ['proposal' => $paperwork['proposal']]);
 
     $fresh()->call('openEditFileModal', $paperwork['agreement']->id)->assertForbidden();
@@ -277,22 +277,22 @@ test('Public Relations Manager cannot upload, edit or delete agreement or MOU fi
     expect(Media::query()->where('mediable_type', 'proposal')->where('collection', MediaCollection::Proposal->value)->count())->toBe(2);
 });
 
-test('the proposal file routes refuse agreement and MOU files to Public Relations Manager only', function () {
+test('the proposal file routes refuse agreement and MOU files to a fundraiser without agreements only', function () {
     $paperwork = seedProposalPaperwork();
-    $publicRelations = userWithRole('Public Relations Manager');
+    $fundraiser = userWithRole(fundraiserWithoutAgreements());
     $financial = userWithRole('Financial');
     $proposal = $paperwork['proposal'];
 
     foreach (['agreement', 'mou'] as $key) {
-        $this->actingAs($publicRelations)->get(route('proposals.files.preview', [$proposal, $paperwork[$key]]))->assertForbidden();
+        $this->actingAs($fundraiser)->get(route('proposals.files.preview', [$proposal, $paperwork[$key]]))->assertForbidden();
         $this->actingAs($financial)->get(route('proposals.files.preview', [$proposal, $paperwork[$key]]))->assertOk();
     }
 
-    $this->actingAs($publicRelations)->get(route('proposals.files.download', [$proposal, $paperwork['agreement']]))->assertForbidden();
+    $this->actingAs($fundraiser)->get(route('proposals.files.download', [$proposal, $paperwork['agreement']]))->assertForbidden();
     $this->actingAs($financial)->get(route('proposals.files.download', [$proposal, $paperwork['agreement']]))->assertOk();
 
-    $this->actingAs($publicRelations)->get(route('proposals.files.download', [$proposal, $paperwork['note']]))->assertOk();
-    $this->actingAs($publicRelations)->get(route('proposals.files.preview', [$proposal, $paperwork['note']]))->assertOk();
+    $this->actingAs($fundraiser)->get(route('proposals.files.download', [$proposal, $paperwork['note']]))->assertOk();
+    $this->actingAs($fundraiser)->get(route('proposals.files.preview', [$proposal, $paperwork['note']]))->assertOk();
 });
 
 test('the proposal page transfer modal builds no budgets or account names for someone who cannot record transfers', function () {
@@ -300,12 +300,12 @@ test('the proposal page transfer modal builds no budgets or account names for so
     Account::factory()->create(['account_name' => 'Zephyr Escrow Account']);
     $page = fn (string $role) => Livewire::actingAs(userWithRole($role))->test('pages::proposals.show', ['proposal' => $proposal]);
 
-    $publicRelations = $page('Public Relations Manager')->set('showTransferModal', true);
-    $publicRelations->assertDontSee('731,942')
+    $fundraiser = $page(fundraiserWithoutAgreements())->set('showTransferModal', true);
+    $fundraiser->assertDontSee('731,942')
         ->assertDontSee('Zephyr Escrow Account');
 
-    expect($publicRelations->instance()->agreementOptions)->toBeEmpty()
-        ->and($publicRelations->instance()->accountOptions)->toBeEmpty();
+    expect($fundraiser->instance()->agreementOptions)->toBeEmpty()
+        ->and($fundraiser->instance()->accountOptions)->toBeEmpty();
 
     $page('Financial')->set('showTransferModal', true)
         ->assertSee('731,942')

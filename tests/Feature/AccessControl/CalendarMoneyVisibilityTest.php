@@ -136,11 +136,11 @@ test('financial sees every money item, the transfer with its amount, linked to i
         ->assertSee('123,457.89');
 });
 
-test('public relations manager sees proposals and donor follow-ups but no transfers or donor reports', function () {
+test('a fundraiser without agreements sees proposals and donor follow-ups but no transfers or donor reports', function () {
     $employeeId = insertHrEmployee();
     $fixture = seedCalendarMoneyFixture($employeeId);
 
-    $component = Livewire::actingAs(userWithRole('Public Relations Manager', $employeeId))->test('pages::calendar.index')
+    $component = Livewire::actingAs(userWithRole(fundraiserWithoutAgreements(), $employeeId))->test('pages::calendar.index')
         ->set('month', '2026-06')
         ->assertSee(calendarChip('proposal', $fixture['proposal']->id), false)
         ->assertSee(calendarChip('donor-followup', $fixture['donor']->id), false)
