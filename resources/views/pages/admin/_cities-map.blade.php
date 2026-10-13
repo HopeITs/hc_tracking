@@ -15,6 +15,7 @@
     @var bool $mapFiltersActive
     @var array<int, string> $avatarTones
     @var string $mapOutlinePath
+    @var bool $canManageMealCoverage
 --}}
 
 @if ($mapFiltersActive)
@@ -174,6 +175,16 @@
                 @else
                     <p class="type-meta text-secondary-light italic dark:text-ink-faint">{{ $city['noProjectsLabel'] }}</p>
                 @endif
+
+                <div class="border-t border-secondary-soft pt-3 dark:border-line">
+                    @include('pages.admin._cities-meal-officer', [
+                        'officer' => $city['officer'],
+                        'inherited' => false,
+                        'canManage' => $canManageMealCoverage,
+                        'scope' => 'city',
+                        'targetId' => $city['id'],
+                    ])
+                </div>
 
                 <a
                     href="{{ $city['href'] }}"

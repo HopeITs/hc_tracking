@@ -78,6 +78,7 @@ final class SubjectLinks
             'account' => route('admin.accounts.index'),
             'user' => route('admin.users.index'),
             'role' => route('admin.users.index', ['tab' => 'roles']),
+            'meal_coverage' => route('admin.cities.index'),
             default => null,
         };
     }

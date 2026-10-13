@@ -61,12 +61,11 @@ test('a proposal is deletable once its funding agreements are removed', function
     $this->assertDatabaseHas('donors', ['id' => $donorId]);
 });
 
-test('one donor may fund the same proposal under several agreements', function () {
+test('one donor may fund several proposals, each under its own agreement', function () {
     $donorId = insertDonor();
-    $proposalId = insertProposal();
 
-    insertDonorProposal($donorId, $proposalId, '500000.00', Currency::Usd);
-    insertDonorProposal($donorId, $proposalId, '120000.00', Currency::Eur);
+    insertDonorProposal($donorId, insertProposal(), '500000.00', Currency::Usd);
+    insertDonorProposal($donorId, insertProposal('Second Proposal'), '120000.00', Currency::Eur);
 
     $this->assertDatabaseCount('donor_proposal', 2);
 });
@@ -84,10 +83,8 @@ test('an agreement stores the donor project reference verbatim', function () {
 });
 
 test('two agreements may carry the same project number', function () {
-    $proposalId = insertProposal();
-
-    insertDonorProposal(insertDonor(), $proposalId, '500000.00', Currency::Usd, 'SYR-2026-014');
-    insertDonorProposal(insertDonor('WFP'), $proposalId, '120000.00', Currency::Usd, 'SYR-2026-014');
+    insertDonorProposal(insertDonor(), insertProposal(), '500000.00', Currency::Usd, 'SYR-2026-014');
+    insertDonorProposal(insertDonor('WFP'), insertProposal('Second Proposal'), '120000.00', Currency::Usd, 'SYR-2026-014');
 
     expect(DB::table('donor_proposal')->where('external_project_number', 'SYR-2026-014')->count())->toBe(2);
 });

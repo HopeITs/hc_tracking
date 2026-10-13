@@ -73,6 +73,8 @@ return [
     'effective_date' => 'Effective date',
     'enter_a_file_name' => 'Enter a name for the file.',
     'enter_a_proposal_name' => 'Enter a proposal name.',
+    'choose_the_donor' => 'Choose the donor.',
+    'the_donor_is_fixed_by_the_funding_agreement' => 'The donor cannot change while a funding agreement exists. Remove the agreement first.',
     'every_proposal_and_its_connections' => 'Every proposal and what it is connected to',
     'fees_amount' => ':amount :currency fees',
     'fees_of' => ':amount :currency in fees',

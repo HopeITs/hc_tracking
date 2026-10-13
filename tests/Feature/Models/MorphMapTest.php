@@ -8,6 +8,7 @@ use App\Models\DonorReport;
 use App\Models\HrDepartment;
 use App\Models\Indicator;
 use App\Models\LibraryIndicator;
+use App\Models\MealCoverageAssignment;
 use App\Models\Milestone;
 use App\Models\PlanIndicator;
 use App\Models\Program;
@@ -48,6 +49,7 @@ test('the morph map registers exactly the target sources, task sources, media ow
         'account' => Account::class,
         'role' => Role::class,
         'library_indicator' => LibraryIndicator::class,
+        'meal_coverage' => MealCoverageAssignment::class,
     ]);
 });
 

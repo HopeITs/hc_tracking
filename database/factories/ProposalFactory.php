@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Enums\ProposalStatus;
+use App\Models\Donor;
 use App\Models\Proposal;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -30,6 +31,7 @@ class ProposalFactory extends Factory
 
         return [
             'name' => fake()->randomElement(['Emergency WASH Response', 'Winterization Support', 'Rapid Shelter Repair']),
+            'donor_id' => Donor::factory(),
             'internal_project_number' => 'HC-2026-'.fake()->unique()->numberBetween(100, 899),
             'planned_date_begin' => $begin->format('Y-m-d'),
             'planned_date_end' => fn (array $attributes): string => CarbonImmutable::parse($attributes['planned_date_begin'])

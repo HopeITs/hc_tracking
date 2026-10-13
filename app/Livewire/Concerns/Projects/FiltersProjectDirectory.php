@@ -12,6 +12,7 @@ use App\Models\HrProgram;
 use App\Models\Project;
 use App\Support\Like;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
 
 /**
@@ -44,6 +45,17 @@ trait FiltersProjectDirectory
 
     /** The single-select triage lenses of the cockpit strip. */
     private const LENSES = ['unfunded', 'overdue', 'slipping', 'risks'];
+
+    /**
+     * The cities the directory can be filtered by.
+     *
+     * @return Collection<int, HrCity>
+     */
+    #[Computed]
+    public function cityOptions(): Collection
+    {
+        return HrCity::query()->select(['id', 'name_en', 'name_ar'])->orderBy(HrCity::nameColumn())->orderBy('id')->get();
+    }
 
     public function updatedSearch(): void
     {

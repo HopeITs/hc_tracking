@@ -13,6 +13,7 @@ test('a donor proposal belongs to a donor and a proposal', function () {
     $donor = Donor::factory()->create();
     $proposal = Proposal::factory()->create();
 
+    Proposal::query()->whereKey($proposal->id)->update(['donor_id' => $donor->id]);
     $agreement = DonorProposal::factory()->create([
         'donor_id' => $donor->id,
         'proposal_id' => $proposal->id,

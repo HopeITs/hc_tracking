@@ -5,15 +5,18 @@ declare(strict_types=1);
 namespace App\Livewire\Concerns\Proposals;
 
 use App\Enums\ProposalStatus;
+use App\Models\Donor;
 use App\Models\Proposal;
 use App\Models\ProposalStatusNote;
 use Closure;
 use Flux\Flux;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 
 /**
@@ -36,6 +39,8 @@ trait ManagesProposalForm
     public ?int $deletingProposalId = null;
 
     public string $name = '';
+
+    public string $proposalDonorId = '';
 
     public string $internalProjectNumber = '';
 
@@ -69,6 +74,19 @@ trait ManagesProposalForm
         return $proposal !== null && $proposal->donor_proposals_count === 0;
     }
 
+    /**
+     * The donors a proposal can be assigned to.
+     *
+     * Interim: the v2 proposal form replaces this select.
+     *
+     * @return Collection<int, Donor>
+     */
+    #[Computed]
+    public function proposalDonors(): Collection
+    {
+        return Donor::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get();
+    }
+
     public function openCreateModal(): void
     {
         Gate::authorize('create', Proposal::class);
@@ -80,7 +98,7 @@ trait ManagesProposalForm
     public function openEditModal(int $proposalId): void
     {
         $proposal = Proposal::query()
-            ->select(['id', 'name', 'internal_project_number', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end', 'notes'])
+            ->select(['id', 'name', 'donor_id', 'internal_project_number', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end', 'notes'])
             ->findOrFail($proposalId);
 
         Gate::authorize('update', $proposal);
@@ -88,6 +106,7 @@ trait ManagesProposalForm
         $this->resetValidation();
         $this->editingProposalId = $proposal->id;
         $this->name = $proposal->name;
+        $this->proposalDonorId = (string) $proposal->donor_id;
         $this->internalProjectNumber = $proposal->internal_project_number;
         $this->plannedDateBegin = $proposal->planned_date_begin?->toDateString() ?? '';
         $this->plannedDateEnd = $proposal->planned_date_end?->toDateString() ?? '';
@@ -109,6 +128,7 @@ trait ManagesProposalForm
 
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:255'],
+            'proposalDonorId' => ['required', 'integer', Rule::exists(Donor::class, 'id')],
             'internalProjectNumber' => [
                 'required',
                 'string',
@@ -130,6 +150,7 @@ trait ManagesProposalForm
             'notes' => ['nullable', 'string'],
         ], [
             'name.required' => __('proposals.enter_a_proposal_name'),
+            'proposalDonorId.required' => __('proposals.choose_the_donor'),
             'plannedDateBegin.required' => __('proposals.set_the_planned_start_date'),
             'plannedDateEnd.required' => __('proposals.set_the_planned_end_date'),
             'plannedDateEnd.after_or_equal' => __('proposals.the_planned_end_cannot_fall_before_the_planned_start'),
@@ -142,6 +163,14 @@ trait ManagesProposalForm
 
         Gate::authorize($proposal->exists ? 'update' : 'create', $proposal->exists ? $proposal : Proposal::class);
 
+        // The agreement's donor must stay the proposal's donor, so the donor
+        // is locked once an agreement exists (the composite key would refuse).
+        if ($proposal->exists && (int) $validated['proposalDonorId'] !== $proposal->donor_id && $proposal->donorProposals()->exists()) {
+            $this->addError('proposalDonorId', __('proposals.the_donor_is_fixed_by_the_funding_agreement'));
+
+            return;
+        }
+
         // Status is only chosen when the proposal is first recorded. After that
         // it moves through recordStageChange(), which writes the audit note
         // alongside it, so the edit form never touches it.
@@ -149,6 +178,7 @@ trait ManagesProposalForm
             DB::transaction(function () use ($proposal, $validated): void {
                 $proposal->fill([
                     'name' => $validated['name'],
+                    'donor_id' => (int) $validated['proposalDonorId'],
                     'internal_project_number' => $validated['internalProjectNumber'],
                     'planned_date_begin' => $validated['plannedDateBegin'],
                     'planned_date_end' => $validated['plannedDateEnd'],
@@ -250,6 +280,7 @@ trait ManagesProposalForm
         $this->resetValidation();
         $this->editingProposalId = null;
         $this->name = '';
+        $this->proposalDonorId = '';
         $this->internalProjectNumber = '';
         $this->plannedDateBegin = '';
         $this->plannedDateEnd = '';

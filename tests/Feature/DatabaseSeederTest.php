@@ -8,6 +8,7 @@ use App\Models\HrEmployee;
 use App\Models\Indicator;
 use App\Models\IndicatorProgress;
 use App\Models\LibraryIndicator;
+use App\Models\MealCoverageAssignment;
 use App\Models\Media;
 use App\Models\Milestone;
 use App\Models\PlanIndicator;
@@ -58,6 +59,7 @@ test('the seeders populate every table in the schema', function () {
         ProposalStatusNote::class,
         Account::class,
         TransfersTracking::class,
+        MealCoverageAssignment::class,
     ];
 
     foreach ($models as $model) {
@@ -101,7 +103,8 @@ test('lookup seeding reuses existing named donors', function () {
     $this->seed(CoreDataSeeder::class);
     $this->seed(CoreDataSeeder::class);
 
-    $this->assertDatabaseCount('donors', 10);
+    // 10 named lookups + 2 donors of the seeded proposals + the internal self-funding donor.
+    $this->assertDatabaseCount('donors', 13);
     expect(Donor::query()->where('name', 'UNICEF')->sole()->id)->toBe($donor->id);
 });
 
@@ -182,5 +185,6 @@ test('seeding uses active hr employees only', function () {
     expect(User::query()->where('hr_user_id', $goneId)->exists())->toBeFalse()
         ->and(TaskAssignee::query()->where('employee_id', $inactiveId)->exists())->toBeFalse()
         ->and(Program::query()->where('manager_id', $inactiveId)->exists())->toBeFalse()
-        ->and(Project::query()->where('user_id', $inactiveId)->exists())->toBeFalse();
+        ->and(Project::query()->where('user_id', $inactiveId)->exists())->toBeFalse()
+        ->and(MealCoverageAssignment::query()->where('employee_id', $inactiveId)->exists())->toBeFalse();
 });

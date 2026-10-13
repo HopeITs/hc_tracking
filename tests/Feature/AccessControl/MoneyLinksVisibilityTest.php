@@ -25,6 +25,7 @@ function seedProposalSourcedWork(): array
 {
     $donor = Donor::factory()->create(['name' => 'Aurora Foundation']);
     $proposal = Proposal::factory()->create(['name' => 'Harbour Clean Water']);
+    Proposal::query()->whereKey($proposal->id)->update(['donor_id' => $donor->id]);
     DonorProposal::factory()->create([
         'donor_id' => $donor->id,
         'proposal_id' => $proposal->id,
@@ -141,9 +142,11 @@ test('a report filed against a proposal target names the proposal, and links to 
 function seedDashboardMoney(): array
 {
     $proposal = Proposal::factory()->create(['name' => 'Harbour Clean Water', 'status' => ProposalStatus::Submitted]);
+    $fundingDonorId = Donor::factory()->create(['name' => 'Aurora Foundation'])->id;
+    Proposal::query()->whereKey($proposal->id)->update(['donor_id' => $fundingDonorId]);
     $agreement = DonorProposal::factory()->create([
         'proposal_id' => $proposal->id,
-        'donor_id' => Donor::factory()->create(['name' => 'Aurora Foundation'])->id,
+        'donor_id' => $fundingDonorId,
         'budget' => '731942.00',
         'currency' => Currency::Usd,
     ]);

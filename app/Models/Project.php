@@ -9,6 +9,7 @@ use App\Concerns\HasSlug;
 use App\Concerns\RecordsActivity;
 use App\Enums\AssignmentStatus;
 use App\Enums\ProjectStatus;
+use App\Enums\ProposalStatus;
 use App\Notifications\TracksActivity;
 use App\Observers\MediaOwnerObserver;
 use Carbon\CarbonImmutable;
@@ -17,6 +18,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -39,9 +41,11 @@ use Illuminate\Database\Eloquent\Relations\MorphOne;
  * @property int|null $target_boys
  * @property int|null $target_girls
  * @property int $city_id
+ * @property int|null $center_id
  * @property int $program_id
  * @property int $user_id
  * @property string $schedule_weekend
+ * @property list<int>|null $working_days
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
@@ -57,6 +61,7 @@ use Illuminate\Database\Eloquent\Relations\MorphOne;
     'target_boys',
     'target_girls',
     'city_id',
+    'center_id',
     'program_id',
     'user_id',
     'schedule_weekend',
@@ -98,6 +103,44 @@ class Project extends Model implements TracksActivity
     }
 
     /**
+     * The HR center this project runs from (D-30), read from the in-memory
+     * HR lookup rather than a relation, since centers live on another
+     * connection. Null while the project is not mapped to a center.
+     */
+    public function center(): ?HrCenter
+    {
+        $centerId = $this->activityAttribute('center_id');
+
+        return $centerId === null ? null : HrCenter::remembered((int) $centerId);
+    }
+
+    /**
+     * The open (draft, approved, active) project already holding a center and
+     * program, if any: there is at most one per pair (D-30a).
+     *
+     * Locks the program row first, so a caller inside a transaction holds off
+     * every other create, restore or relink for the same program until it
+     * commits. Call it inside the transaction that writes the project.
+     */
+    public static function openProjectFor(int $centerId, int $programId, ?int $exceptId = null): ?self
+    {
+        Program::query()->whereKey($programId)->lockForUpdate()->value('id');
+
+        $openStatuses = array_values(array_map(
+            fn (ProjectStatus $status): string => $status->value,
+            array_filter(ProjectStatus::cases(), fn (ProjectStatus $status): bool => $status->isOpen()),
+        ));
+
+        return static::query()
+            ->where('center_id', $centerId)
+            ->where('program_id', $programId)
+            ->whereIn('status', $openStatuses)
+            ->when($exceptId !== null, fn (Builder $query) => $query->whereKeyNot($exceptId))
+            ->orderBy('id')
+            ->first(['id', 'slug', 'name', 'status', 'center_id', 'program_id']);
+    }
+
+    /**
      * The program this project belongs to.
      *
      * @return BelongsTo<Program, $this>
@@ -126,7 +169,31 @@ class Project extends Model implements TracksActivity
      */
     public function proposals(): BelongsToMany
     {
-        return $this->belongsToMany(Proposal::class)->withTimestamps();
+        return $this->belongsToMany(Proposal::class)->withPivot('target_beneficiaries')->withTimestamps();
+    }
+
+    /**
+     * The proposals the donor has approved for this project, each with its donor.
+     *
+     * Funding is official at donor approval, not at submission. The query
+     * never selects an amount unless asked, so a caller without a money
+     * permission keeps the figures out of memory, not just out of the view;
+     * pass $withAmounts only after authorizing it.
+     *
+     * @return Collection<int, Proposal>
+     */
+    public function fundingSources(bool $withAmounts = false): Collection
+    {
+        $statuses = array_values(array_filter(ProposalStatus::cases(), fn (ProposalStatus $status): bool => $status->isApprovedByDonor()));
+
+        $columns = ['proposals.id', 'proposals.name', 'proposals.slug', 'proposals.status', 'proposals.donor_id'];
+
+        return $this->proposals()
+            ->whereIn('proposals.status', $statuses)
+            ->select($withAmounts ? [...$columns, 'proposals.requested_budget', 'proposals.requested_currency'] : $columns)
+            ->with(['donor:id,name,slug,is_internal', ...($withAmounts ? ['donorProposals:id,proposal_id,budget,currency'] : [])])
+            ->orderBy('proposals.name')
+            ->get();
     }
 
     /**
@@ -233,6 +300,7 @@ class Project extends Model implements TracksActivity
             'target_women' => 'integer',
             'target_boys' => 'integer',
             'target_girls' => 'integer',
+            'working_days' => 'array',
         ];
     }
 

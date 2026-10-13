@@ -66,7 +66,7 @@ trait ReadsAgreementRegister
                             ->orWhere('internal_project_number', 'like', Like::contains($search))));
                 });
             })
-            ->when($this->donor !== '', fn (Builder $query) => $query->where('donor_id', (int) $this->donor))
+            ->when($this->donor !== '', fn (Builder $query) => $query->where('donor_proposal.donor_id', (int) $this->donor))
             ->when(Currency::tryFrom($this->currency), fn (Builder $query, Currency $currency) => $query->where('currency', $currency))
             ->when($this->min !== '', fn (Builder $query) => $query->where('donor_proposal.budget', '>=', (float) $this->min))
             ->when($this->max !== '', fn (Builder $query) => $query->where('donor_proposal.budget', '<=', (float) $this->max))

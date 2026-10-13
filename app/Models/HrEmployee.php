@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\Locale;
+use App\Support\EmployeeProfile;
 use App\Support\Like;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -125,10 +126,12 @@ class HrEmployee extends HrModel
     }
 
     /**
-     * The picker list as plain `{value, label}` rows, label being the main and
-     * secondary name together, in the order pickerOptions() sorts them.
+     * The picker list as plain `{value, label, detail, inactive}` rows, label
+     * being the main and secondary name together and detail the person's
+     * current position, in the order pickerOptions() sorts them. Someone with
+     * no active contract (or inactive in HR) is flagged inactive.
      *
-     * @return SupportCollection<int, array{value: string, label: string}>
+     * @return SupportCollection<int, array{value: string, label: string, detail: string, inactive: bool}>
      */
     public static function pickerLabels(): SupportCollection
     {
@@ -140,8 +143,35 @@ class HrEmployee extends HrModel
             fn (): array => static::pickerOptions()->map(fn (self $employee): array => [
                 'value' => (string) $employee->id,
                 'label' => $employee->name.' · '.$employee->secondary_name,
+                'detail' => static::positionSummary($employee->id) ?? (string) __('common.no_active_position'),
+                'inactive' => ! (EmployeeProfile::for($employee->id)['is_active'] ?? false),
             ])->all(),
         ));
+    }
+
+    /**
+     * Where an employee sits now, for chips and pickers: «position · job level ·
+     * department · center» in the interface language, null without an active
+     * contract. Reads EmployeeProfile and the in-memory HR lookups only.
+     */
+    public static function positionSummary(int $employeeId): ?string
+    {
+        $profile = EmployeeProfile::for($employeeId);
+
+        if ($profile === null) {
+            return null;
+        }
+
+        $title = Locale::current() === Locale::Arabic && trim((string) $profile['position_title_ar']) !== ''
+            ? $profile['position_title_ar']
+            : $profile['position_title_en'];
+
+        return collect([
+            $title,
+            $profile['job_level'],
+            $profile['department_id'] === null ? null : HrDepartment::nameOf($profile['department_id']),
+            $profile['center_id'] === null ? null : HrCenter::remembered($profile['center_id'])?->name,
+        ])->map(fn (?string $part): string => trim((string) $part))->filter()->implode(' · ');
     }
 
     /**
@@ -315,21 +345,12 @@ class HrEmployee extends HrModel
      *
      * There is no department_id on the employee row itself — department is
      * only reachable via employees -> contracts (is_active) -> positions ->
-     * departments. Kept as a plain query rather than a hasOneThrough chain
-     * across two intermediate tables, matching the "resolve ids first"
-     * convention the rest of this class uses for cross-connection lookups.
-     * An employee with more than one active contract (should not happen)
-     * resolves to the most recently started one.
+     * departments, which EmployeeProfile reads (never a contract's pay
+     * columns). An employee with more than one active contract resolves to
+     * the most recently started one.
      */
     public function currentDepartmentId(): ?int
     {
-        return HrContract::query()
-            ->where('employee_id', $this->id)
-            ->where('is_active', true)
-            ->orderByDesc('start_date')
-            ->with('position')
-            ->first()
-            ?->position
-            ?->department_id;
+        return EmployeeProfile::for($this->id)['department_id'] ?? null;
     }
 }

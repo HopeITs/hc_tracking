@@ -27,8 +27,7 @@ beforeEach(function () {
 function detailAgreement(): DonorProposal
 {
     $agreement = DonorProposal::factory()->create([
-        'donor_id' => Donor::factory()->create(['name' => 'ECHO'])->id,
-        'proposal_id' => Proposal::factory()->create(['name' => 'Water Response'])->id,
+        'proposal_id' => Proposal::factory()->create(['name' => 'Water Response', 'donor_id' => Donor::factory()->create(['name' => 'ECHO'])->id])->id,
         'budget' => '1000.00',
         'currency' => Currency::Usd,
         'external_project_number' => 'WR-9',
@@ -150,8 +149,7 @@ test('the agreement page exports its tranches', function () {
 test('the donor page opens on its agreements and all its tranches as tables', function () {
     $agreement = detailAgreement();
     $second = DonorProposal::factory()->create([
-        'donor_id' => $agreement->donor_id,
-        'proposal_id' => Proposal::factory()->create(['name' => 'Winter Appeal'])->id,
+        'proposal_id' => Proposal::factory()->create(['name' => 'Winter Appeal', 'donor_id' => $agreement->donor_id])->id,
         'budget' => '500.00',
         'currency' => Currency::Eur,
     ]);

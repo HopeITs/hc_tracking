@@ -14,6 +14,7 @@ use App\Notifications\Recipients\FundingAgreementRecipients;
 use App\Notifications\Recipients\IndicatorRecipients;
 use App\Notifications\Recipients\LibraryIndicatorRecipients;
 use App\Notifications\Recipients\ManagedRecipients;
+use App\Notifications\Recipients\MealCoverageRecipients;
 use App\Notifications\Recipients\MilestoneRecipients;
 use App\Notifications\Recipients\ProjectRecipients;
 use App\Notifications\Recipients\ProposalRecipients;
@@ -55,6 +56,7 @@ return [
         'transfers' => TransferRecipients::class,
         'accounts' => AccountRecipients::class,
         'access-management' => UserRecipients::class,
+        'cities' => MealCoverageRecipients::class,
     ],
 
     /*
@@ -139,6 +141,7 @@ return [
         'transfers' => 'arrow-right-circle',
         'accounts' => 'credit-card',
         'access-management' => 'users',
+        'cities' => 'map-pin',
         'system' => 'bell',
     ],
 

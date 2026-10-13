@@ -24,6 +24,7 @@ use App\Models\Task;
 use App\Models\TaskAssignee;
 use App\Models\User;
 use App\Models\UserNotification;
+use App\Notifications\Alerts\NotificationSettings;
 use App\Notifications\NotificationPresenter;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Database\Schema\Blueprint;
@@ -114,12 +115,14 @@ function insertProgram(int $strategyId, int $managerId, string $name = 'WASH'): 
  * Insert a proposal with only its required columns, and return its id.
  *
  * `status` and the actual dates are left out so the column defaults decide
- * them.
+ * them. A proposal always has a donor: pass one to pair it with an agreement,
+ * otherwise the factory creates one.
  */
-function insertProposal(string $name = 'Emergency WASH Response'): int
+function insertProposal(string $name = 'Emergency WASH Response', ?int $donorId = null): int
 {
     return Proposal::factory()->create([
         'name' => $name,
+        ...($donorId === null ? [] : ['donor_id' => $donorId]),
         'planned_date_begin' => '2026-01-01',
         'planned_date_end' => '2026-12-31',
     ])->id;
@@ -176,6 +179,14 @@ function insertDonorProposal(int $donorId, int $proposalId, string $budget = '50
 
     if ($externalProjectNumber !== null) {
         $agreement['external_project_number'] = $externalProjectNumber;
+    }
+
+    // An agreement's donor is its proposal's: point a still-unfunded proposal
+    // at the donor funding it, so a second agreement fails at the constraint.
+    $hasAgreement = DB::table('donor_proposal')->where('proposal_id', $proposalId)->exists();
+
+    if (! $hasAgreement) {
+        DB::table('proposals')->where('id', $proposalId)->update(['donor_id' => $donorId]);
     }
 
     return DonorProposal::factory()->create($agreement)->id;
@@ -392,11 +403,32 @@ function createHrSchema(): void
         $table->timestamps();
     });
 
+    $schema->create('centers', function (Blueprint $table): void {
+        $table->id();
+        $table->string('name_en');
+        $table->string('name_ar');
+        $table->unsignedBigInteger('city_id');
+        $table->boolean('is_active')->default(true);
+        $table->timestamps();
+    });
+
+    $schema->create('job_levels', function (Blueprint $table): void {
+        $table->id();
+        $table->string('name_en');
+        $table->string('name_ar');
+        $table->integer('grade')->nullable();
+        $table->timestamps();
+    });
+
     $schema->create('positions', function (Blueprint $table): void {
         $table->id();
         $table->unsignedBigInteger('department_id');
         $table->unsignedBigInteger('program_id')->nullable();
+        $table->unsignedBigInteger('center_id')->nullable();
+        $table->unsignedBigInteger('city_id')->nullable();
+        $table->unsignedBigInteger('job_level_id')->nullable();
         $table->unsignedBigInteger('direct_manager_id')->nullable();
+        $table->unsignedBigInteger('tech_manager_id')->nullable();
         $table->string('title_en');
         $table->string('title_ar');
         $table->boolean('is_active')->default(true);
@@ -408,6 +440,8 @@ function createHrSchema(): void
         $table->unsignedBigInteger('employee_id');
         $table->unsignedBigInteger('position_id');
         $table->dateTime('start_date')->nullable();
+        $table->text('salary')->nullable();
+        $table->unsignedTinyInteger('currency')->nullable();
         $table->boolean('is_active')->default(true);
         $table->timestamps();
     });
@@ -484,6 +518,31 @@ function insertHrDepartment(string $name = 'Water, Sanitation & Hygiene'): int
 }
 
 /**
+ * Insert an HR center (a building in a city) and return its id.
+ */
+function insertHrCenter(int $cityId, string $nameEn = 'Hope Center Aleppo', string $nameAr = 'مركز الأمل حلب', bool $isActive = true): int
+{
+    return DB::connection('hr')->table('centers')->insertGetId([
+        'name_en' => $nameEn,
+        'name_ar' => $nameAr,
+        'city_id' => $cityId,
+        'is_active' => $isActive,
+    ]);
+}
+
+/**
+ * Insert an HR job level and return its id.
+ */
+function insertHrJobLevel(string $nameEn = 'Senior', string $nameAr = 'أول', ?int $grade = 3): int
+{
+    return DB::connection('hr')->table('job_levels')->insertGetId([
+        'name_en' => $nameEn,
+        'name_ar' => $nameAr,
+        'grade' => $grade,
+    ]);
+}
+
+/**
  * Insert an HR employee and return its id.
  */
 function insertHrEmployee(?int $cityId = null, string $firstNameEn = 'Sami', string $lastNameEn = 'Haddad', string $firstNameAr = 'سامي', string $lastNameAr = 'حداد', bool $isActive = true): int
@@ -514,11 +573,14 @@ function insertHrUser(?int $employeeId, string $email, string $password = 'passw
 /**
  * Insert an HR position (within a department) and return its id.
  */
-function insertHrPosition(int $departmentId, string $titleEn = 'Officer', ?int $programId = null, bool $isActive = true, ?int $directManagerId = null): int
+function insertHrPosition(int $departmentId, string $titleEn = 'Officer', ?int $programId = null, bool $isActive = true, ?int $directManagerId = null, ?int $centerId = null, ?int $cityId = null, ?int $jobLevelId = null): int
 {
     return DB::connection('hr')->table('positions')->insertGetId([
         'department_id' => $departmentId,
         'program_id' => $programId,
+        'center_id' => $centerId,
+        'city_id' => $cityId,
+        'job_level_id' => $jobLevelId,
         'direct_manager_id' => $directManagerId,
         'title_en' => $titleEn,
         'title_ar' => $titleEn,
@@ -589,6 +651,35 @@ function libraryIndicatorInput(array $overrides = []): array
         'means_of_verification' => null,
         ...$overrides,
     ];
+}
+
+/**
+ * Point the MEAL Manager slot (contracts §9) at a position held by the given
+ * employee, or a new one, and return the holder's employee id.
+ */
+function holdMealManagerSlot(?int $employeeId = null): int
+{
+    $employeeId ??= insertHrEmployee(firstNameEn: 'Maha', lastNameEn: 'Manager');
+    $positionId = insertHrPosition(insertHrDepartment('Monitoring & Evaluation'), 'MEAL Manager');
+    insertHrContract($employeeId, $positionId);
+
+    app(NotificationSettings::class)->save(['proposal_default_reviewers' => [
+        'meal_manager' => $positionId, 'finance_manager' => null, 'fundraising_manager' => null, 'ceo' => null,
+    ]]);
+
+    return $employeeId;
+}
+
+/**
+ * A MEAL user who holds the MEAL Manager slot: the one person who may assign
+ * MEAL officers (contracts §12.3).
+ */
+function mealManager(): User
+{
+    $employeeId = insertHrEmployee(firstNameEn: 'Maha', lastNameEn: 'Manager');
+    holdMealManagerSlot($employeeId);
+
+    return userWithRole('MEAL', $employeeId);
 }
 
 /**

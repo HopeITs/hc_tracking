@@ -143,6 +143,7 @@ return [
         'transfers' => 'Transfers',
         'accounts' => 'Accounts',
         'access-management' => 'Users & roles',
+        'cities' => 'Cities',
         'system' => 'System',
     ],
 
@@ -327,6 +328,15 @@ return [
             'created' => ':actor created the strategy “:subject”',
             'updated' => ':actor updated the strategy “:subject”',
             'deleted' => ':actor deleted the strategy “:subject”',
+        ],
+        'meal_coverage' => [
+            'assigned' => ':actor made :employee the MEAL officer for “:subject”',
+            'assigned_you' => ':actor made you the MEAL officer for “:subject”',
+            'responsible_changed' => ':actor made :employee the MEAL officer for “:subject” instead of :from',
+            'responsible_changed_you' => ':actor made you the MEAL officer for “:subject”',
+            'project_assigned' => ':actor made :employee the MEAL officer for the project “:subject”',
+            'project_assigned_you' => ':actor made you the MEAL officer for the project “:subject”',
+            'updated' => ':actor updated the MEAL coverage of “:subject”',
         ],
         'risk' => [
             'created' => ':actor logged the risk “:subject”',

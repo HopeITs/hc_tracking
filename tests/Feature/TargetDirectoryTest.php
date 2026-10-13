@@ -276,6 +276,7 @@ test('a target shows the program behind its plan and the donors behind its propo
     $plan = AnnualPlan::factory()->create(['program_id' => $program->id]);
     $proposal = Proposal::factory()->create(['name' => 'Winter Response Proposal']);
     $donor = Donor::factory()->create(['name' => 'Northern Relief Fund']);
+    Proposal::query()->whereKey($proposal->id)->update(['donor_id' => $donor->id]);
     $proposal->donors()->attach($donor, ['budget' => 125000, 'currency' => 'EUR']);
 
     PlanIndicator::factory()->create(['source_type' => 'annual_plan', 'source_id' => $plan->id]);
@@ -335,6 +336,7 @@ test('targets can be filtered by donor, program and year', function () {
     $plan2025 = AnnualPlan::factory()->create(['year' => 2025]);
     $proposal = Proposal::factory()->create(['planned_date_begin' => '2025-06-01', 'planned_date_end' => '2027-05-31']);
     $donor = Donor::factory()->create();
+    Proposal::query()->whereKey($proposal->id)->update(['donor_id' => $donor->id]);
     $proposal->donors()->attach($donor, ['budget' => 5000, 'currency' => 'USD']);
 
     $make = fn (string $name, string $type, int $sourceId) => PlanIndicator::factory()->create([

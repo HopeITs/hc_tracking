@@ -24,6 +24,7 @@ function seedCalendarMoneyFixture(int $employeeId): array
     $proposal->projects()->attach($project);
 
     $donor = Donor::factory()->create(['name' => 'Aurora Foundation', 'next_step_due_on' => '2026-06-15']);
+    Proposal::query()->whereKey($proposal->id)->update(['donor_id' => $donor->id]);
     $agreement = DonorProposal::factory()->create(['proposal_id' => $proposal->id, 'donor_id' => $donor->id]);
 
     $transfer = TransfersTracking::factory()->create([

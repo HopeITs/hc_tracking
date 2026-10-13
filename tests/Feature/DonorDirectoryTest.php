@@ -82,8 +82,7 @@ test('a donor holding an agreement is not deleted', function () {
     $user = User::factory()->role('Financial')->create();
     $donor = Donor::factory()->create();
     DonorProposal::factory()->create([
-        'donor_id' => $donor->id,
-        'proposal_id' => Proposal::factory()->create()->id,
+        'proposal_id' => Proposal::factory()->create(['donor_id' => $donor->id])->id,
     ]);
 
     Livewire::actingAs($user)
@@ -99,14 +98,12 @@ test('donor detail totals committed budget per currency', function () {
     $donor = Donor::factory()->create(['name' => 'UNICEF']);
 
     DonorProposal::factory()->create([
-        'donor_id' => $donor->id,
-        'proposal_id' => Proposal::factory()->create(['name' => 'First Proposal'])->id,
+        'proposal_id' => Proposal::factory()->create(['name' => 'First Proposal', 'donor_id' => $donor->id])->id,
         'budget' => '500000.00',
         'currency' => Currency::Usd,
     ]);
     DonorProposal::factory()->create([
-        'donor_id' => $donor->id,
-        'proposal_id' => Proposal::factory()->create(['name' => 'Second Proposal'])->id,
+        'proposal_id' => Proposal::factory()->create(['name' => 'Second Proposal', 'donor_id' => $donor->id])->id,
         'budget' => '250000.00',
         'currency' => Currency::Eur,
     ]);
@@ -138,6 +135,7 @@ test('donor detail shows total disbursed and reports submitted separately from t
     $donor = Donor::factory()->create(['name' => 'UNICEF']);
 
     $proposal = Proposal::factory()->create(['name' => 'First Proposal']);
+    Proposal::query()->whereKey($proposal->id)->update(['donor_id' => $donor->id]);
     $agreement = DonorProposal::factory()->create([
         'donor_id' => $donor->id,
         'proposal_id' => $proposal->id,
@@ -183,8 +181,7 @@ test('donor detail counts only received tranches as money in and flags overdue o
     $user = User::factory()->role('Financial')->create();
     $donor = Donor::factory()->create();
     $agreement = DonorProposal::factory()->create([
-        'donor_id' => $donor->id,
-        'proposal_id' => Proposal::factory()->create(['name' => 'Late Grant'])->id,
+        'proposal_id' => Proposal::factory()->create(['name' => 'Late Grant', 'donor_id' => $donor->id])->id,
         'budget' => '1000.00',
         'currency' => Currency::Usd,
     ]);
@@ -242,7 +239,7 @@ test('donors can be filtered by type from the rail and by relationship', functio
     $funder = Donor::factory()->create(['name' => 'Funding Foundation', 'type' => DonorType::Foundation]);
     Donor::factory()->create(['name' => 'Quiet Foundation', 'type' => DonorType::Foundation]);
     Donor::factory()->create(['name' => 'Unclassified Office', 'type' => null]);
-    DonorProposal::factory()->create(['donor_id' => $funder->id, 'proposal_id' => Proposal::factory()->create()->id]);
+    DonorProposal::factory()->create(['donor_id' => $funder->id]);
 
     Livewire::actingAs($user)
         ->test('pages::donors.index')
@@ -265,9 +262,9 @@ test('the share of wallet splits each currency by donor and never adds currencie
     $echo = Donor::factory()->create(['name' => 'ECHO']);
     $giz = Donor::factory()->create(['name' => 'GIZ']);
 
-    $agreement = DonorProposal::factory()->create(['donor_id' => $echo->id, 'proposal_id' => Proposal::factory()->create()->id, 'budget' => '300000.00', 'currency' => Currency::Usd]);
-    DonorProposal::factory()->create(['donor_id' => $giz->id, 'proposal_id' => Proposal::factory()->create()->id, 'budget' => '100000.00', 'currency' => Currency::Usd]);
-    DonorProposal::factory()->create(['donor_id' => $giz->id, 'proposal_id' => Proposal::factory()->create()->id, 'budget' => '50000.00', 'currency' => Currency::Eur]);
+    $agreement = DonorProposal::factory()->create(['donor_id' => $echo->id, 'budget' => '300000.00', 'currency' => Currency::Usd]);
+    DonorProposal::factory()->create(['donor_id' => $giz->id, 'budget' => '100000.00', 'currency' => Currency::Usd]);
+    DonorProposal::factory()->create(['donor_id' => $giz->id, 'budget' => '50000.00', 'currency' => Currency::Eur]);
     TransfersTracking::factory()->create([
         'donor_proposal_id' => $agreement->id,
         'ar_status' => ArStatus::Received,
@@ -294,7 +291,7 @@ test('sorting by next transfer due puts the soonest scheduled donor first', func
 
     foreach ([[$later, now()->addMonths(3)], [$sooner, now()->addWeek()]] as [$donor, $date]) {
         TransfersTracking::factory()->create([
-            'donor_proposal_id' => DonorProposal::factory()->create(['donor_id' => $donor->id, 'proposal_id' => Proposal::factory()->create()->id])->id,
+            'donor_proposal_id' => DonorProposal::factory()->create(['donor_id' => $donor->id])->id,
             'ar_status' => ArStatus::Pending,
             'scheduled_date' => $date,
         ]);
@@ -311,7 +308,7 @@ test('sorting by next transfer due puts the soonest scheduled donor first', func
 test('the overview sizes itself to the funders on screen', function () {
     $user = User::factory()->role('Financial')->create();
     $donor = Donor::factory()->create(['type' => DonorType::Bilateral]);
-    DonorProposal::factory()->create(['donor_id' => $donor->id, 'proposal_id' => Proposal::factory()->create()->id, 'currency' => Currency::Usd]);
+    DonorProposal::factory()->create(['donor_id' => $donor->id, 'currency' => Currency::Usd]);
 
     $component = Livewire::actingAs($user)->test('pages::donors.index')->set('view', 'overview');
 
@@ -445,6 +442,7 @@ test('donor detail lists each tranche in full and each report against its target
     $user = User::factory()->role('Financial')->create();
     $donor = Donor::factory()->create();
     $proposal = Proposal::factory()->create();
+    Proposal::query()->whereKey($proposal->id)->update(['donor_id' => $donor->id]);
     $agreement = DonorProposal::factory()->create(['donor_id' => $donor->id, 'proposal_id' => $proposal->id, 'currency' => Currency::Usd]);
 
     TransfersTracking::factory()->create([
@@ -476,8 +474,7 @@ test('the donor page shows each agreement\'s internal number beside its external
     $user = User::factory()->role('Financial')->create();
     $donor = Donor::factory()->create();
     $agreement = DonorProposal::factory()->create([
-        'donor_id' => $donor->id,
-        'proposal_id' => Proposal::factory()->create(['internal_project_number' => 'HC-2026-085'])->id,
+        'proposal_id' => Proposal::factory()->create(['internal_project_number' => 'HC-2026-085', 'donor_id' => $donor->id])->id,
         'external_project_number' => 'MCC-85',
     ]);
     TransfersTracking::factory()->create([
@@ -498,8 +495,7 @@ test('a money calendar lane puts the internal number and the external number on 
     $user = User::factory()->role('Financial')->create();
     $donor = Donor::factory()->create();
     $agreement = DonorProposal::factory()->create([
-        'donor_id' => $donor->id,
-        'proposal_id' => Proposal::factory()->create(['internal_project_number' => 'TEMP-0086'])->id,
+        'proposal_id' => Proposal::factory()->create(['internal_project_number' => 'TEMP-0086', 'donor_id' => $donor->id])->id,
         'external_project_number' => 'MCC-86',
     ]);
     TransfersTracking::factory()->create([

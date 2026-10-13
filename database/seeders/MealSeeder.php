@@ -11,6 +11,7 @@ use App\Models\AnnualPlan;
 use App\Models\Indicator;
 use App\Models\IndicatorProgress;
 use App\Models\LibraryIndicator;
+use App\Models\MealCoverageAssignment;
 use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
@@ -19,18 +20,21 @@ use App\Models\ReportFile;
 use App\Models\Result;
 use App\Models\User;
 use App\Support\IndicatorCode;
+use Database\Seeders\Concerns\PicksHrRecords;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
- * The MEAL layer: the logframe, the targets planned against it, and the
- * actuals reported back.
+ * The MEAL layer: the logframe, the targets planned against it, the
+ * actuals reported back, and the MEAL officers who validate them.
  *
  * Depends on DemoDeliverySeeder.
  */
 class MealSeeder extends Seeder
 {
+    use PicksHrRecords;
+
     /**
      * Seed the MEAL tables.
      */
@@ -70,6 +74,7 @@ class MealSeeder extends Seeder
         });
 
         $this->seedIndicatorLibrary();
+        $this->seedMealCoverage();
     }
 
     /**
@@ -90,6 +95,30 @@ class MealSeeder extends Seeder
 
         foreach ($entries as $entry) {
             DB::transaction(fn (): LibraryIndicator => LibraryIndicator::factory()->create([...$entry, ...IndicatorCode::next(null, $entry['level_ref'])]));
+        }
+    }
+
+    /**
+     * One active employee per governorate that has projects, and one project
+     * with an officer of its own from another governorate (D-12/D-12a).
+     */
+    protected function seedMealCoverage(): void
+    {
+        $employeeIds = $this->hrEmployeeIds()->values();
+        $cityIds = Project::query()->whereNotNull('city_id')->distinct()->orderBy('city_id')->pluck('city_id');
+
+        foreach ($cityIds as $index => $cityId) {
+            MealCoverageAssignment::factory()->forCity((int) $cityId)->create([
+                'employee_id' => $employeeIds[$index % $employeeIds->count()],
+            ]);
+        }
+
+        $project = Project::query()->orderBy('id')->first(['id']);
+
+        if ($project !== null) {
+            MealCoverageAssignment::factory()->forProject($project->id)->create([
+                'employee_id' => $employeeIds->last(),
+            ]);
         }
     }
 

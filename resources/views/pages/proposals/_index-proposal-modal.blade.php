@@ -16,10 +16,16 @@
             <x-ui.form-section
                 :title="__('common.section_details')"
                 :hint="$editingProposalId === null ? __('proposals.the_starting_status_opens_the_status_history') : __('proposals.status_moves_only_through_change_status')"
-                :fields="['name', 'internalProjectNumber', 'proposalStatus', 'notes']"
+                :fields="['name', 'proposalDonorId', 'internalProjectNumber', 'proposalStatus', 'notes']"
             >
                 <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
                     <x-ui.form-input wire:model="name" :label="__('proposals.proposal_name')" maxlength="255" required autofocus :class="$editingProposalId !== null ? '@2xl/modal:col-span-2' : null" />
+
+                    <x-ui.form-select wire:model="proposalDonorId" :label="__('funding_agreements.donor')" :placeholder="__('funding_agreements.select_a_donor')" required>
+                        @foreach ($this->proposalDonors as $donor)
+                            <option value="{{ $donor->id }}">{{ $donor->name }}</option>
+                        @endforeach
+                    </x-ui.form-select>
 
                     @if ($editingProposalId === null)
                         <x-ui.form-select wire:model="proposalStatus" :label="__('proposals.starting_status')" required>

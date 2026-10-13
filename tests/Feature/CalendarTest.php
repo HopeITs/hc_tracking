@@ -593,12 +593,14 @@ test('a linked user sees donor follow-ups and donor report deadlines tied to the
     $myProposal = Proposal::factory()->create();
     $myProposal->projects()->attach($myProject);
     $myDonor = Donor::factory()->create(['next_step_due_on' => Carbon::create(2026, 6, 15)]);
+    Proposal::query()->whereKey($myProposal->id)->update(['donor_id' => $myDonor->id]);
     $myAgreement = DonorProposal::factory()->create(['proposal_id' => $myProposal->id, 'donor_id' => $myDonor->id]);
     $myReport = DonorReport::factory()->create(['donor_proposal_id' => $myAgreement->id, 'due_on' => Carbon::create(2026, 6, 15)]);
 
     $theirProposal = Proposal::factory()->create();
     $theirProposal->projects()->attach($theirProject);
     $theirDonor = Donor::factory()->create(['next_step_due_on' => Carbon::create(2026, 6, 15)]);
+    Proposal::query()->whereKey($theirProposal->id)->update(['donor_id' => $theirDonor->id]);
     $theirAgreement = DonorProposal::factory()->create(['proposal_id' => $theirProposal->id, 'donor_id' => $theirDonor->id]);
     $theirReport = DonorReport::factory()->create(['donor_proposal_id' => $theirAgreement->id, 'due_on' => Carbon::create(2026, 6, 15)]);
 

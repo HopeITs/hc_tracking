@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Livewire\Concerns\Projects;
 
 use App\Enums\ProjectStatus;
-use App\Models\HrCity;
+use App\Models\HrCenter;
 use App\Models\HrEmployee;
 use App\Models\Program;
 use App\Models\Project;
+use Closure;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
@@ -18,8 +20,14 @@ use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 
 /**
- * The create/edit project dialog: its form properties, the city and owner
+ * The create/edit project dialog: its form properties, the center and owner
  * pickers, opening, saving and closing it.
+ *
+ * A project runs from an HR center (D-30): the center is required for a new
+ * project, the city is always the center's and is written here, and only one
+ * open project may hold a (center, program) pair, checked under a lock by
+ * Project::openProjectFor(). A project not yet mapped to a center keeps its
+ * city and can still be edited until one is chosen.
  *
  * Used by projects/index only. The page provides the program and user pickers
  * (`programOptions()`, `userOptions()`), which `ownerOptions()` reads, and
@@ -54,17 +62,42 @@ trait ManagesProjectForm
 
     public string $targetGirls = '';
 
-    public string $cityId = '';
+    public string $centerId = '';
 
     public string $programId = '';
 
     public string $userId = '';
 
-    /** @return Collection<int, HrCity> */
+    /**
+     * The «Program — Center» name last proposed, so a name the person typed
+     * themselves is never replaced.
+     */
+    #[Locked]
+    public string $proposedName = '';
+
+    /**
+     * The center the edited project already has: it stays choosable after HR
+     * deactivates it, and makes the center required on edit.
+     */
+    #[Locked]
+    public ?int $savedCenterId = null;
+
+    /**
+     * Active centers, plus the edited project's own center when it is inactive.
+     *
+     * @return Collection<int, HrCenter>
+     */
     #[Computed]
-    public function cityOptions(): Collection
+    public function centerOptions(): Collection
     {
-        return HrCity::query()->select(['id', 'name_en', 'name_ar'])->orderBy(HrCity::nameColumn())->orderBy('id')->get();
+        $centers = HrCenter::options();
+        $savedCenter = $this->savedCenterId === null ? null : HrCenter::remembered($this->savedCenterId);
+
+        if ($savedCenter !== null && ! $savedCenter->is_active) {
+            $centers->push($savedCenter);
+        }
+
+        return $centers;
     }
 
     /**
@@ -102,6 +135,33 @@ trait ManagesProjectForm
         if ($managerId !== null) {
             $this->userId = (string) $managerId;
         }
+
+        $this->proposeName();
+    }
+
+    public function updatedCenterId(): void
+    {
+        $this->proposeName();
+    }
+
+    /**
+     * Name a new project «Program — Center» once both are chosen, unless the
+     * person already typed a name of their own.
+     */
+    protected function proposeName(): void
+    {
+        if ($this->editingProjectId !== null || ! ctype_digit($this->programId) || ! ctype_digit($this->centerId)) {
+            return;
+        }
+
+        $center = HrCenter::remembered((int) $this->centerId);
+        $program = Program::query()->find((int) $this->programId, ['id']);
+
+        if ($center === null || $program === null || ($this->name !== '' && $this->name !== $this->proposedName)) {
+            return;
+        }
+
+        $this->name = $this->proposedName = $program->name.' — '.$center->name;
     }
 
     public function openCreateModal(): void
@@ -128,6 +188,7 @@ trait ManagesProjectForm
                 'target_boys',
                 'target_girls',
                 'city_id',
+                'center_id',
                 'program_id',
                 'user_id',
             ])
@@ -146,7 +207,8 @@ trait ManagesProjectForm
         $this->targetWomen = self::formInteger($project->target_women);
         $this->targetBoys = self::formInteger($project->target_boys);
         $this->targetGirls = self::formInteger($project->target_girls);
-        $this->cityId = (string) $project->city_id;
+        $this->centerId = $project->center_id === null ? '' : (string) $project->center_id;
+        $this->savedCenterId = $project->center_id;
         $this->programId = (string) $project->program_id;
         $this->userId = (string) $project->user_id;
         $this->showProjectModal = true;
@@ -182,13 +244,23 @@ trait ManagesProjectForm
             'targetWomen' => ['nullable', 'integer', 'min:0', 'max:4294967295'],
             'targetBoys' => ['nullable', 'integer', 'min:0', 'max:4294967295'],
             'targetGirls' => ['nullable', 'integer', 'min:0', 'max:4294967295'],
-            'cityId' => ['required', 'integer', Rule::exists(HrCity::class, 'id')],
+            'centerId' => [
+                Rule::when($this->editingProjectId === null || $this->savedCenterId !== null, ['required'], ['nullable']),
+                'integer',
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    $center = HrCenter::remembered((int) $value);
+
+                    if ($center === null || (! $center->is_active && $center->id !== $this->savedCenterId)) {
+                        $fail(__('projects.choose_the_center'));
+                    }
+                },
+            ],
             'programId' => ['required', 'integer', Rule::exists(Program::class, 'id')],
             'userId' => ['required', 'integer', Rule::exists(HrEmployee::class, 'id'), Rule::when($mustPickProgramManager, [Rule::in($this->ownerOptions->pluck('id')->all())])],
         ], [
             'name.required' => __('projects.enter_a_project_name'),
-            'cityId.required' => __('projects.select_a_city_2'),
-            'cityId.exists' => __('projects.the_selected_city_is_no_longer_available'),
+            'centerId.required' => __('projects.choose_the_center'),
+            'centerId.integer' => __('projects.choose_the_center'),
             'programId.required' => __('projects.select_a_program_2'),
             'programId.exists' => __('projects.the_selected_program_is_no_longer_available'),
             'userId.required' => __('projects.select_a_project_owner'),
@@ -211,6 +283,8 @@ trait ManagesProjectForm
             $project->status = ProjectStatus::Draft;
         }
 
+        $center = $validated['centerId'] === null || $validated['centerId'] === '' ? null : HrCenter::remembered((int) $validated['centerId']);
+
         $project->fill([
             'name' => $validated['name'],
             'description' => $validated['description'] === '' ? null : $validated['description'],
@@ -221,10 +295,33 @@ trait ManagesProjectForm
             'target_women' => self::nullableInteger($validated['targetWomen']),
             'target_boys' => self::nullableInteger($validated['targetBoys']),
             'target_girls' => self::nullableInteger($validated['targetGirls']),
-            'city_id' => (int) $validated['cityId'],
+            'center_id' => $center?->id,
+            'city_id' => $center === null ? $project->city_id : $center->city_id,
             'program_id' => $mayReassign ? (int) $validated['programId'] : $project->program_id,
             'user_id' => $mayReassign ? (int) $validated['userId'] : $project->user_id,
-        ])->save();
+        ]);
+
+        $openProject = DB::transaction(function () use ($project): ?Project {
+            $claimsPair = $project->center_id !== null
+                && $project->status->isOpen()
+                && (! $project->exists || $project->isDirty(['center_id', 'program_id']));
+
+            $openProject = $claimsPair
+                ? Project::openProjectFor($project->center_id, $project->program_id, $project->exists ? $project->id : null)
+                : null;
+
+            if ($openProject === null) {
+                $project->save();
+            }
+
+            return $openProject;
+        });
+
+        if ($openProject !== null) {
+            $this->addError('centerId', __('projects.open_project_exists', ['name' => $openProject->name]));
+
+            return;
+        }
 
         $wasRecentlyCreated = $project->wasRecentlyCreated;
 
@@ -264,7 +361,9 @@ trait ManagesProjectForm
         $this->targetWomen = '';
         $this->targetBoys = '';
         $this->targetGirls = '';
-        $this->cityId = '';
+        $this->centerId = '';
+        $this->savedCenterId = null;
+        $this->proposedName = '';
         $this->programId = '';
         $this->userId = '';
     }

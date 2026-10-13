@@ -110,34 +110,25 @@ test('a status change with no context is rejected and changes nothing', function
         ->and(ProposalStatusNote::query()->where('proposal_id', $proposal->id)->count())->toBe(0);
 });
 
-test('funding is totalled per currency and never summed across them', function () {
+test('funding shows the agreement in its own currency', function () {
     $user = User::factory()->role('Financial')->create();
     $proposal = Proposal::factory()->create();
 
+    $fundingDonorId = Donor::factory()->create(['name' => 'UNICEF'])->id;
+    Proposal::query()->whereKey($proposal->id)->update(['donor_id' => $fundingDonorId]);
     DonorProposal::factory()->create([
         'proposal_id' => $proposal->id,
-        'donor_id' => Donor::factory()->create(['name' => 'UNICEF'])->id,
+        'donor_id' => $fundingDonorId,
         'budget' => '500000.00',
         'currency' => Currency::Usd,
-    ]);
-    DonorProposal::factory()->create([
-        'proposal_id' => $proposal->id,
-        'donor_id' => Donor::factory()->create(['name' => 'ECHO'])->id,
-        'budget' => '200000.00',
-        'currency' => Currency::Eur,
     ]);
 
     Livewire::actingAs($user)
         ->test('pages::proposals.show', ['proposal' => $proposal])
         ->set('tab', 'funding')
         ->assertSee('UNICEF')
-        ->assertSee('ECHO')
         ->assertSee('500,000.00')
-        ->assertSee('200,000.00')
-        ->assertSee('USD')
-        ->assertSee('EUR')
-        // 700,000 would be the forbidden cross-currency sum.
-        ->assertDontSee('700,000.00');
+        ->assertSee('USD');
 });
 
 test('proposal detail shows targets committed in this proposal', function () {
@@ -384,9 +375,11 @@ test('each tab shows only its own content and the strip counts its records', fun
     $proposal = Proposal::factory()->create();
 
     ProposalStatusNote::factory()->create(['proposal_id' => $proposal->id, 'context' => 'Board signed off']);
+    $fundingDonorId = Donor::factory()->create(['name' => 'UNICEF'])->id;
+    Proposal::query()->whereKey($proposal->id)->update(['donor_id' => $fundingDonorId]);
     DonorProposal::factory()->create([
         'proposal_id' => $proposal->id,
-        'donor_id' => Donor::factory()->create(['name' => 'UNICEF'])->id,
+        'donor_id' => $fundingDonorId,
     ]);
     Task::factory()->create(['source_type' => 'proposal', 'source_id' => $proposal->id, 'title' => 'Draft the budget narrative']);
 
@@ -494,18 +487,10 @@ test('the arrivals climb accumulates only received tranches, in the order they l
         ->and($climb['area'])->toEndWith('L1000,100 Z');
 });
 
-test('each currency climbs against its own commitment and is never combined', function () {
+test('the climb is drawn against the commitment in the agreement currency', function () {
     $user = User::factory()->role('Financial')->create();
     $proposal = Proposal::factory()->create();
-
-    foreach ([['USD', Currency::Usd, '100000.00'], ['EUR', Currency::Eur, '50000.00']] as [$code, $currency, $budget]) {
-        DonorProposal::factory()->create([
-            'proposal_id' => $proposal->id,
-            'donor_id' => Donor::factory()->create()->id,
-            'budget' => $budget,
-            'currency' => $currency,
-        ]);
-    }
+    DonorProposal::factory()->create(['proposal_id' => $proposal->id, 'budget' => '100000.00', 'currency' => Currency::Usd]);
 
     $climbs = collect(Livewire::actingAs($user)
         ->test('pages::proposals.show', ['proposal' => $proposal])
@@ -513,11 +498,8 @@ test('each currency climbs against its own commitment and is never combined', fu
         ->arrivals['climbs'])
         ->keyBy('currency');
 
-    expect($climbs->keys()->all())->toBe(['USD', 'EUR'])
-        ->and($climbs['USD']['committed'])->toBe(100000.0)
-        ->and($climbs['EUR']['committed'])->toBe(50000.0)
-        // 150,000 would be the forbidden cross-currency total.
-        ->and($climbs->sum('committed'))->not->toBe(0.0);
+    expect($climbs->keys()->all())->toBe(['USD'])
+        ->and($climbs['USD']['committed'])->toBe(100000.0);
 });
 
 test('the scrubber payload dates a project that began before the scale with a negative offset', function () {
