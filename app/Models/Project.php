@@ -39,6 +39,7 @@ use Illuminate\Database\Eloquent\Relations\MorphOne;
  * @property int|null $target_boys
  * @property int|null $target_girls
  * @property int $city_id
+ * @property int|null $center_id
  * @property int $program_id
  * @property int $user_id
  * @property string $schedule_weekend
@@ -57,6 +58,7 @@ use Illuminate\Database\Eloquent\Relations\MorphOne;
     'target_boys',
     'target_girls',
     'city_id',
+    'center_id',
     'program_id',
     'user_id',
     'schedule_weekend',
@@ -95,6 +97,44 @@ class Project extends Model implements TracksActivity
     public function city(): BelongsTo
     {
         return $this->belongsTo(HrCity::class, 'city_id');
+    }
+
+    /**
+     * The HR center this project runs from (D-30), read from the in-memory
+     * HR lookup rather than a relation, since centers live on another
+     * connection. Null while the project is not mapped to a center.
+     */
+    public function center(): ?HrCenter
+    {
+        $centerId = $this->activityAttribute('center_id');
+
+        return $centerId === null ? null : HrCenter::remembered((int) $centerId);
+    }
+
+    /**
+     * The open (draft, approved, active) project already holding a center and
+     * program, if any: there is at most one per pair (D-30a).
+     *
+     * Locks the program row first, so a caller inside a transaction holds off
+     * every other create, restore or relink for the same program until it
+     * commits. Call it inside the transaction that writes the project.
+     */
+    public static function openProjectFor(int $centerId, int $programId, ?int $exceptId = null): ?self
+    {
+        Program::query()->whereKey($programId)->lockForUpdate()->value('id');
+
+        $openStatuses = array_values(array_map(
+            fn (ProjectStatus $status): string => $status->value,
+            array_filter(ProjectStatus::cases(), fn (ProjectStatus $status): bool => $status->isOpen()),
+        ));
+
+        return static::query()
+            ->where('center_id', $centerId)
+            ->where('program_id', $programId)
+            ->whereIn('status', $openStatuses)
+            ->when($exceptId !== null, fn (Builder $query) => $query->whereKeyNot($exceptId))
+            ->orderBy('id')
+            ->first(['id', 'slug', 'name', 'status', 'center_id', 'program_id']);
     }
 
     /**

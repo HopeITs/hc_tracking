@@ -134,4 +134,6 @@ return [
     'zoom_out' => 'تصغير',
     'delete' => 'حذف',
     'close' => 'إغلاق',
+    'hr_unavailable' => 'تعذّر تحميل بيانات HR',
+    'no_active_position' => 'لا منصب نشط',
 ];

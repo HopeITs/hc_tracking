@@ -99,7 +99,7 @@ test('a project can be created with lifecycle dates and independent beneficiary 
         ->set('targetWomen', '220')
         ->set('targetBoys', '140')
         ->set('targetGirls', '160')
-        ->set('cityId', (string) $city)
+        ->set('centerId', (string) insertHrCenter($city))
         ->set('programId', (string) $program->id)
         ->set('userId', (string) $owner)
         ->call('saveProject')
@@ -130,7 +130,7 @@ test('nullable project details are normalized before saving', function () {
         ->call('openCreateModal')
         ->set('name', 'Project without targets')
         ->set('description', '   ')
-        ->set('cityId', (string) $city)
+        ->set('centerId', (string) insertHrCenter($city))
         ->set('programId', (string) $program->id)
         ->set('userId', (string) $owner)
         ->call('saveProject')
@@ -145,34 +145,34 @@ test('nullable project details are normalized before saving', function () {
         ->and($project->targetDemographicTotal())->toBeNull();
 });
 
-test('creating a project requires a name a city a program and an owner', function () {
+test('creating a project requires a name a center a program and an owner', function () {
     $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
         ->test('pages::projects.index')
         ->call('openCreateModal')
         ->set('name', '')
-        ->set('cityId', '')
+        ->set('centerId', '')
         ->set('programId', '')
         ->set('userId', '')
         ->call('saveProject')
-        ->assertHasErrors(['name', 'cityId', 'programId', 'userId']);
+        ->assertHasErrors(['name', 'centerId', 'programId', 'userId']);
 
     expect(Project::query()->count())->toBe(0);
 });
 
-test('a project cannot be placed in a city that does not exist in hr', function () {
+test('a project cannot be placed at a center that does not exist in hr', function () {
     $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
         ->test('pages::projects.index')
         ->call('openCreateModal')
-        ->set('name', 'Ghost City Project')
-        ->set('cityId', '999999')
+        ->set('name', 'Ghost Center Project')
+        ->set('centerId', '999999')
         ->set('programId', (string) Program::factory()->create()->id)
         ->set('userId', (string) $user->id)
         ->call('saveProject')
-        ->assertHasErrors(['cityId' => 'exists']);
+        ->assertHasErrors(['centerId']);
 
     expect(Project::query()->count())->toBe(0);
 });
@@ -187,7 +187,7 @@ test('project lifecycle dates and targets reject invalid values', function () {
         ->test('pages::projects.index')
         ->call('openCreateModal')
         ->set('name', 'Invalid Project')
-        ->set('cityId', (string) $city)
+        ->set('centerId', (string) insertHrCenter($city))
         ->set('programId', (string) $program->id)
         ->set('userId', (string) $owner)
         ->set('startDate', '2026-09-10')
@@ -203,7 +203,7 @@ test('project lifecycle dates and targets reject invalid values', function () {
     expect(Project::query()->count())->toBe(0);
 });
 
-test('a project can be renamed and relocated while keeping its status', function () {
+test('a project can be renamed and moved to another center while keeping its status', function () {
     $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create([
         'name' => 'Old Name',
@@ -235,7 +235,7 @@ test('a project can be renamed and relocated while keeping its status', function
         ->set('description', '  Updated scope  ')
         ->set('startDate', '2026-02-01')
         ->set('endDate', '2027-01-31')
-        ->set('cityId', (string) $newCity)
+        ->set('centerId', (string) insertHrCenter($newCity))
         ->set('targetBeneficiaries', '450')
         ->set('targetMen', '100')
         ->set('targetWomen', '120')
@@ -506,8 +506,10 @@ test('the project directory renders within its query budget', function () {
 
     Livewire::actingAs($user)->test('pages::projects.index');
 
-    // 17 + one query that loads every owner assignment for the Rejected badge.
-    expect($queries)->toBeLessThanOrEqual(18);
+    // 17 + one query that loads every owner assignment for the Rejected badge
+    // + one count of the projects without a center (shown to managers)
+    // + the two HR queries of EmployeeProfile behind the owner chips' positions.
+    expect($queries)->toBeLessThanOrEqual(21);
 });
 
 test('a board card hides relations it has none of and keeps a materialised risk', function () {
@@ -716,7 +718,7 @@ test('a failed project save points at the rail sections that hold the problems',
         ->test('pages::projects.index')
         ->call('openCreateModal')
         ->call('saveProject')
-        ->assertHasErrors(['name', 'cityId', 'programId', 'userId'])
+        ->assertHasErrors(['name', 'centerId', 'programId', 'userId'])
         ->assertSeeText('1 field needs attention')
         ->assertSeeText('3 fields need attention')
         ->assertSeeHtml('aria-invalid="true"');
@@ -730,6 +732,7 @@ test('editing a project shows its saved choices in the form pickers', function (
     $project = Project::factory()->create([
         'status' => ProjectStatus::Active,
         'city_id' => $city,
+        'center_id' => insertHrCenter($city, 'Hope Center Idlib', 'مركز الأمل إدلب'),
         'program_id' => $program->id,
         'user_id' => $owner,
     ]);
@@ -741,7 +744,7 @@ test('editing a project shows its saved choices in the form pickers', function (
     $xpath = new DOMXPath($document);
     $triggerLabel = fn (string $model): string => trim($xpath->query('//*[@data-form-select="'.$model.'"]//*[@data-trigger-label]')->item(0)->textContent);
 
-    expect($triggerLabel('cityId'))->toBe('Idlib · إدلب')
+    expect($triggerLabel('centerId'))->toBe('Hope Center Idlib')
         ->and($triggerLabel('programId'))->toBe($program->name)
         ->and($triggerLabel('userId'))->toBe('Lina Haddad · لينا حداد');
 });

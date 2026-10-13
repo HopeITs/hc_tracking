@@ -391,11 +391,32 @@ function createHrSchema(): void
         $table->timestamps();
     });
 
+    $schema->create('centers', function (Blueprint $table): void {
+        $table->id();
+        $table->string('name_en');
+        $table->string('name_ar');
+        $table->unsignedBigInteger('city_id');
+        $table->boolean('is_active')->default(true);
+        $table->timestamps();
+    });
+
+    $schema->create('job_levels', function (Blueprint $table): void {
+        $table->id();
+        $table->string('name_en');
+        $table->string('name_ar');
+        $table->integer('grade')->nullable();
+        $table->timestamps();
+    });
+
     $schema->create('positions', function (Blueprint $table): void {
         $table->id();
         $table->unsignedBigInteger('department_id');
         $table->unsignedBigInteger('program_id')->nullable();
+        $table->unsignedBigInteger('center_id')->nullable();
+        $table->unsignedBigInteger('city_id')->nullable();
+        $table->unsignedBigInteger('job_level_id')->nullable();
         $table->unsignedBigInteger('direct_manager_id')->nullable();
+        $table->unsignedBigInteger('tech_manager_id')->nullable();
         $table->string('title_en');
         $table->string('title_ar');
         $table->boolean('is_active')->default(true);
@@ -407,6 +428,8 @@ function createHrSchema(): void
         $table->unsignedBigInteger('employee_id');
         $table->unsignedBigInteger('position_id');
         $table->dateTime('start_date')->nullable();
+        $table->text('salary')->nullable();
+        $table->unsignedTinyInteger('currency')->nullable();
         $table->boolean('is_active')->default(true);
         $table->timestamps();
     });
@@ -483,6 +506,31 @@ function insertHrDepartment(string $name = 'Water, Sanitation & Hygiene'): int
 }
 
 /**
+ * Insert an HR center (a building in a city) and return its id.
+ */
+function insertHrCenter(int $cityId, string $nameEn = 'Hope Center Aleppo', string $nameAr = 'مركز الأمل حلب', bool $isActive = true): int
+{
+    return DB::connection('hr')->table('centers')->insertGetId([
+        'name_en' => $nameEn,
+        'name_ar' => $nameAr,
+        'city_id' => $cityId,
+        'is_active' => $isActive,
+    ]);
+}
+
+/**
+ * Insert an HR job level and return its id.
+ */
+function insertHrJobLevel(string $nameEn = 'Senior', string $nameAr = 'أول', ?int $grade = 3): int
+{
+    return DB::connection('hr')->table('job_levels')->insertGetId([
+        'name_en' => $nameEn,
+        'name_ar' => $nameAr,
+        'grade' => $grade,
+    ]);
+}
+
+/**
  * Insert an HR employee and return its id.
  */
 function insertHrEmployee(?int $cityId = null, string $firstNameEn = 'Sami', string $lastNameEn = 'Haddad', string $firstNameAr = 'سامي', string $lastNameAr = 'حداد', bool $isActive = true): int
@@ -513,11 +561,14 @@ function insertHrUser(?int $employeeId, string $email, string $password = 'passw
 /**
  * Insert an HR position (within a department) and return its id.
  */
-function insertHrPosition(int $departmentId, string $titleEn = 'Officer', ?int $programId = null, bool $isActive = true, ?int $directManagerId = null): int
+function insertHrPosition(int $departmentId, string $titleEn = 'Officer', ?int $programId = null, bool $isActive = true, ?int $directManagerId = null, ?int $centerId = null, ?int $cityId = null, ?int $jobLevelId = null): int
 {
     return DB::connection('hr')->table('positions')->insertGetId([
         'department_id' => $departmentId,
         'program_id' => $programId,
+        'center_id' => $centerId,
+        'city_id' => $cityId,
+        'job_level_id' => $jobLevelId,
         'direct_manager_id' => $directManagerId,
         'title_en' => $titleEn,
         'title_ar' => $titleEn,

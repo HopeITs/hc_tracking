@@ -141,6 +141,41 @@ new #[Title('titles.projects')] class extends Component {
     {
         return HrEmployee::pickerOptions();
     }
+
+    /** Whether the list behind the "projects without a center" warning is open. */
+    public bool $showProjectsWithoutCenter = false;
+
+    /**
+     * How many projects are not yet mapped to an HR center (D-30c), counted
+     * only for those who manage the portfolio; nobody else pays for the query.
+     */
+    #[Computed]
+    public function projectsWithoutCenterCount(): int
+    {
+        if (! (auth()->user()?->can('projects.delete') ?? false)) {
+            return 0;
+        }
+
+        return Project::query()->whereNull('center_id')->count();
+    }
+
+    /**
+     * The unmapped projects themselves, loaded only once the warning is opened.
+     *
+     * @return Collection<int, Project>
+     */
+    #[Computed]
+    public function projectsWithoutCenter(): Collection
+    {
+        if (! $this->showProjectsWithoutCenter || $this->projectsWithoutCenterCount === 0) {
+            return new Collection;
+        }
+
+        return Project::query()
+            ->whereNull('center_id')
+            ->orderBy('name')
+            ->get(['id', 'slug', 'name']);
+    }
 };
 ?>
 
@@ -272,6 +307,25 @@ new #[Title('titles.projects')] class extends Component {
             </x-ui.button>@endcan
         </x-slot:actions>
     </x-ui.page-header>
+
+    @if ($this->projectsWithoutCenterCount > 0)
+        <flux:callout variant="warning" icon="building-office" data-test="projects-without-center">
+            <flux:callout.heading>{{ __('projects.projects_without_center') }} ({{ $this->projectsWithoutCenterCount }})</flux:callout.heading>
+            <flux:callout.text>
+                {{ __('projects.projects_without_center_hint') }}
+                <button type="button" wire:click="$toggle('showProjectsWithoutCenter')" class="ms-1 font-medium underline" aria-expanded="{{ $showProjectsWithoutCenter ? 'true' : 'false' }}">
+                    {{ $showProjectsWithoutCenter ? __('projects.hide_projects_without_center') : __('projects.show_projects_without_center') }}
+                </button>
+                @if ($showProjectsWithoutCenter)
+                    <span class="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                        @foreach ($this->projectsWithoutCenter as $unmappedProject)
+                            <a href="{{ route('projects.show', $unmappedProject) }}" wire:navigate class="font-medium hover:underline">{{ $unmappedProject->name }}</a>
+                        @endforeach
+                    </span>
+                @endif
+            </flux:callout.text>
+        </flux:callout>
+    @endif
 
     @include('pages.projects._index-summary')
 

@@ -49,7 +49,12 @@ window.hcEmployeeList = {
         const role = container.dataset.role ? ` role="${this.escape(container.dataset.role)}"` : '';
 
         container.innerHTML = items
-            .map((item) => `<button type="button"${role} class="${this.escape(container.dataset.itemClass)}" data-flux-menu-item data-option-value="${this.escape(item.value)}" data-option-label="${this.escape(item.label)}"><span class="min-w-0 flex-1 truncate">${this.escape(item.label)}</span>${check}</button>`)
+            .map((item) => {
+                const detail = item.detail ? `<span class="block truncate text-xs text-secondary-medium dark:text-ink-muted">${this.escape(item.detail)}</span>` : '';
+                const inactive = item.inactive ? ' data-inactive' : '';
+
+                return `<button type="button"${role} class="${this.escape(container.dataset.itemClass)}" data-flux-menu-item data-option-value="${this.escape(item.value)}" data-option-label="${this.escape(item.label)}"${inactive}><span class="min-w-0 flex-1"><span class="block truncate${item.inactive ? ' opacity-60' : ''}">${this.escape(item.label)}</span>${detail}</span>${check}</button>`;
+            })
             .join('');
         container.dataset.count = String(items.length);
     },

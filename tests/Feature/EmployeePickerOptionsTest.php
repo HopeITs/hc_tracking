@@ -1,7 +1,9 @@
 <?php
 
+use App\Models\HrEmployee;
 use App\Models\User;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
 
 test('guests are redirected away from the employee picker options', function () {
@@ -131,4 +133,39 @@ test('a person dropdown with the empty option selected is labelled by that optio
         ->__toString();
 
     expect($html)->toMatch('/data-trigger-label[^>]*>\s*Not assigned\s*</');
+});
+
+test('the employee picker options carry each person\'s current position and flag those without one', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $centerId = insertHrCenter(insertHrCity(), 'Hope Center Idlib');
+    $levelId = insertHrJobLevel('Senior', 'أول');
+    $placed = insertHrEmployee(firstNameEn: 'Pia', lastNameEn: 'Placed');
+    insertHrContract($placed, insertHrPosition(insertHrDepartment('Media'), 'Field Officer', centerId: $centerId, jobLevelId: $levelId));
+    $unplaced = insertHrEmployee(firstNameEn: 'Uma', lastNameEn: 'Unplaced');
+
+    $rows = collect($this->actingAs($user)
+        ->withSession(['locale' => 'en'])
+        ->getJson(route('employees.picker-options', ['l' => 'en']))
+        ->assertOk()
+        ->json())->keyBy('value');
+
+    expect($rows[(string) $placed])->toMatchArray(['detail' => 'Field Officer · Senior · Media · Hope Center Idlib', 'inactive' => false])
+        ->and($rows[(string) $unplaced])->toMatchArray(['detail' => 'No active position', 'inactive' => true]);
+});
+
+test('an employee chip shows the person\'s current position', function () {
+    $employeeId = insertHrEmployee(firstNameEn: 'Pia', lastNameEn: 'Placed');
+    insertHrContract($employeeId, insertHrPosition(insertHrDepartment('Media'), 'Field Officer'));
+
+    $this->blade('<x-ui.employee-chip :employee="$employee" />', ['employee' => HrEmployee::query()->findOrFail($employeeId)])
+        ->assertSee('Field Officer · Media');
+});
+
+test('an employee chip still renders, with the HR id, when HR positions cannot be read', function () {
+    $employee = HrEmployee::query()->findOrFail(insertHrEmployee(firstNameEn: 'Pia', lastNameEn: 'Placed'));
+    Schema::connection('hr')->drop('contracts');
+
+    $this->blade('<x-ui.employee-chip :employee="$employee" />', ['employee' => $employee])
+        ->assertSee('Pia Placed')
+        ->assertSee('#'.$employee->id.' · Could not load HR data');
 });

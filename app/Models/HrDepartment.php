@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Concerns\RemembersHrLookup;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -21,7 +22,24 @@ use Illuminate\Database\Eloquent\Collection;
  */
 class HrDepartment extends HrModel
 {
+    use RemembersHrLookup;
+
     protected $table = 'departments';
+
+    /**
+     * The name of one HR department, empty when HR no longer has it.
+     *
+     * Read from an in-memory lookup (see RemembersHrLookup), so labelling many
+     * employees by department costs one HR query.
+     */
+    public static function nameOf(int $id): string
+    {
+        return self::rememberedHrLookupEntry($id, fn (): array => static::query()
+            ->toBase()
+            ->pluck('name', 'id')
+            ->map(fn (?string $name): string => trim((string) $name))
+            ->all()) ?? '';
+    }
 
     /**
      * The ids of every employee currently holding a position in this

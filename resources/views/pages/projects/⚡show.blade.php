@@ -14,6 +14,7 @@ use App\Livewire\Concerns\Projects\ReadsProjectFunding;
 use App\Enums\AssignmentStatus;
 use App\Models\Project;
 use Flux\Flux;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
@@ -105,6 +106,7 @@ new #[Title('titles.project')] class extends Component {
                 'target_boys',
                 'target_girls',
                 'city_id',
+                'center_id',
                 'program_id',
                 'user_id',
                 'updated_at',
@@ -152,6 +154,30 @@ new #[Title('titles.project')] class extends Component {
     }
 
     /**
+     * The project's HR center for the header: its name, whether HR has
+     * deactivated it, and whether HR could not be reached (the id is shown then).
+     *
+     * @return array{id: int, name: string|null, inactive: bool, unavailable: bool}|null
+     */
+    #[Computed]
+    public function centerSummary(): ?array
+    {
+        $centerId = $this->project->center_id;
+
+        if ($centerId === null) {
+            return null;
+        }
+
+        try {
+            $center = $this->project->center();
+        } catch (QueryException) {
+            return ['id' => $centerId, 'name' => null, 'inactive' => false, 'unavailable' => true];
+        }
+
+        return ['id' => $centerId, 'name' => $center?->name, 'inactive' => $center !== null && ! $center->is_active, 'unavailable' => $center === null];
+    }
+
+    /**
      * The Plan tab's Gantt payload: fundraising, delivery and donor
      * obligations for this project as one WBS row list.
      *
@@ -192,6 +218,21 @@ new #[Title('titles.project')] class extends Component {
         :subtitle="$this->project->city?->name ?? __('common.unknown_city')"
     >
         <x-slot:meta>
+            @if ($this->centerSummary !== null)
+                <span class="inline-flex items-center gap-1.5" data-test="project-center">
+                    @if ($this->centerSummary['unavailable'])
+                        <span>#{{ $this->centerSummary['id'] }} · {{ __('common.hr_unavailable') }}</span>
+                    @else
+                        <span>{{ $this->centerSummary['name'] }}</span>
+                    @endif
+                    @if ($this->centerSummary['inactive'])
+                        <span class="inline-flex items-center gap-1 rounded-full bg-status-critical-soft px-2 text-[11px] font-bold text-status-critical">
+                            <flux:icon name="no-symbol" variant="micro" class="size-3 shrink-0" aria-hidden="true" />
+                            {{ __('projects.center_inactive') }}
+                        </span>
+                    @endif
+                </span>
+            @endif
             <a href="{{ route('programs.show', $this->project->program) }}" wire:navigate class="font-medium hover:underline">{{ $this->project->program->name }}</a>
             <span>{{ $this->project->program->strategy?->name ?? __('common.strategy_not_assigned') }}</span>
             <span>{{ __('common.updated_date', ['date' => $this->project->updated_at?->translatedFormat(__('formats.date'))]) }}</span>

@@ -95,11 +95,11 @@
                 </div>
             </x-ui.form-section>
 
-            <x-ui.form-section :title="__('projects.section_placement')" :fields="['cityId', 'programId', 'userId']">
+            <x-ui.form-section :title="__('projects.section_placement')" :fields="['centerId', 'programId', 'userId']">
                 <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-3">
-                    <x-ui.form-select wire:model="cityId" :label="__('common.city')" :placeholder="__('projects.select_a_city')" required>
-                        @foreach ($this->cityOptions as $cityOption)
-                            <option value="{{ $cityOption->id }}">{{ $cityOption->name }} · {{ $cityOption->secondary_name }}</option>
+                    <x-ui.form-select wire:model.live="centerId" :label="__('projects.center')" :placeholder="__('projects.select_a_center')" :required="$editingProjectId === null || $savedCenterId !== null">
+                        @foreach ($this->centerOptions as $centerOption)
+                            <option value="{{ $centerOption->id }}">{{ $centerOption->name }}@unless ($centerOption->is_active) · {{ __('projects.center_inactive') }}@endunless</option>
                         @endforeach
                     </x-ui.form-select>
 

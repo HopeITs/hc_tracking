@@ -315,7 +315,7 @@ test('a new project starts as a draft whatever the form is sent', function () {
         ->test('pages::projects.index')
         ->call('openCreateModal')
         ->set('name', 'Draft by default')
-        ->set('cityId', (string) insertHrCity())
+        ->set('centerId', (string) insertHrCenter(insertHrCity()))
         ->set('programId', (string) $program->id)
         ->set('userId', (string) $owner)
         ->call('saveProject')
@@ -403,7 +403,7 @@ test('the owner dropdown lists only the managers of programs', function () {
     expect($page->instance()->ownerOptions->pluck('id')->all())->toBe([$managerEmployee]);
 
     $page->set('name', 'Wrong owner')
-        ->set('cityId', (string) insertHrCity())
+        ->set('centerId', (string) insertHrCenter(insertHrCity()))
         ->set('programId', (string) $unmanaged->id)
         ->set('userId', (string) $plainEmployee)
         ->call('saveProject')
@@ -430,7 +430,7 @@ test('choosing a program picks its manager, who can be swapped for another progr
     $page->set('programId', (string) $noManager->id)->assertSet('userId', (string) $firstManager);
 
     $page->set('name', 'Swapped owner')
-        ->set('cityId', (string) insertHrCity())
+        ->set('centerId', (string) insertHrCenter(insertHrCity()))
         ->set('programId', (string) $second->id)
         ->set('userId', (string) $firstManager)
         ->call('saveProject')

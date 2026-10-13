@@ -11,13 +11,16 @@ use Illuminate\Database\Query\JoinClause;
 /**
  * A position from the HR database (hchr_positions).
  *
- * Only the columns tracking needs are documented; the rest (job level,
- * technical manager, qualifications, staffing counts) exist in the table but are not
+ * Only the columns tracking needs are documented; the rest (technical
+ * manager, qualifications, staffing counts) exist in the table but are not
  * read here.
  *
  * @property int $id
  * @property int $department_id
  * @property int|null $program_id
+ * @property int|null $center_id
+ * @property int|null $city_id
+ * @property int|null $job_level_id
  * @property int|null $direct_manager_id
  * @property string $title_en
  * @property string $title_ar
@@ -73,6 +76,47 @@ class HrPosition extends HrModel
     public function program(): BelongsTo
     {
         return $this->belongsTo(HrProgram::class, 'program_id');
+    }
+
+    /**
+     * The center this position works from, when it has one.
+     *
+     * @return BelongsTo<HrCenter, $this>
+     */
+    public function center(): BelongsTo
+    {
+        return $this->belongsTo(HrCenter::class, 'center_id');
+    }
+
+    /**
+     * The job level of this position.
+     *
+     * @return BelongsTo<HrJobLevel, $this>
+     */
+    public function jobLevel(): BelongsTo
+    {
+        return $this->belongsTo(HrJobLevel::class, 'job_level_id');
+    }
+
+    /**
+     * The city of this position.
+     *
+     * @return BelongsTo<HrCity, $this>
+     */
+    public function city(): BelongsTo
+    {
+        return $this->belongsTo(HrCity::class, 'city_id');
+    }
+
+    /**
+     * The position this one reports to (positions.direct_manager_id); its
+     * holder is the HR direct manager (see EmployeeProfile::managerOf()).
+     *
+     * @return BelongsTo<self, $this>
+     */
+    public function directManager(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'direct_manager_id');
     }
 
     /**
