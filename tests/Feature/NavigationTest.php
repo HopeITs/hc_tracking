@@ -74,7 +74,7 @@ test('the sidebar carries a funding group for Financial, who holds every funding
         ->assertSeeText('Accounts');
 });
 
-test('the sidebar shows Public Relations Manager proposals and donors but not agreements or transfers', function () {
+test('the sidebar shows Public Relations Manager proposals, donors and agreements but not transfers', function () {
     $user = User::factory()->role('Public Relations Manager')->create();
 
     $this->actingAs($user)
@@ -83,7 +83,7 @@ test('the sidebar shows Public Relations Manager proposals and donors but not ag
         ->assertSeeText('Funding & Finance')
         ->assertSeeText('Proposals')
         ->assertSeeText('Donors')
-        ->assertDontSeeText('Funding Agreements')
+        ->assertSeeText('Funding Agreements')
         ->assertDontSeeText('Transfers');
 });
 

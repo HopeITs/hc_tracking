@@ -144,9 +144,9 @@ test('the project Plan gantt shows transfer and donor report rows only to viewer
         ->and($managers['proposal-'.$proposal->id]['name'])->toBe('Harbour Clean Water')
         ->and($managers['proposal-'.$proposal->id]['url'])->toBeNull();
 
-    $publicRelationsManager = $rows('Public Relations Manager');
-    expect($publicRelationsManager)->not->toHaveKeys(['obligations', 'transfer-'.$transfer->id, 'report-'.$report->id])
-        ->and($publicRelationsManager['proposal-'.$proposal->id]['url'])->toBe(route('proposals.show', $proposal));
+    $fundraiser = $rows(fundraiserWithoutAgreements());
+    expect($fundraiser)->not->toHaveKeys(['obligations', 'transfer-'.$transfer->id, 'report-'.$report->id])
+        ->and($fundraiser['proposal-'.$proposal->id]['url'])->toBe(route('proposals.show', $proposal));
 
     foreach (['Financial', 'General Manager'] as $role) {
         $money = $rows($role);
@@ -213,10 +213,10 @@ test('a Managers user sees no proposal rows and no pipeline lens on the timeline
         ->assertDontSee('Harbour Clean Water');
 });
 
-test('Public Relations Manager sees the proposals and donor names on the timeline but no amounts or obligations', function () {
+test('a fundraiser without agreements sees the proposals and donor names on the timeline but no amounts or obligations', function () {
     ['project' => $project, 'proposal' => $proposal, 'transfer' => $transfer] = seedProjectMoneyFixture();
 
-    $connected = Livewire::actingAs(userWithRole('Public Relations Manager'))
+    $connected = Livewire::actingAs(userWithRole(fundraiserWithoutAgreements()))
         ->test('pages::timeline.index')
         ->set('view', 'connected')
         ->set('program', (string) $project->program_id);
@@ -225,7 +225,7 @@ test('Public Relations Manager sees the proposals and donor names on the timelin
     expect($rows['proposal-'.$proposal->id])->toMatchArray(['owner' => 'Aurora Foundation', 'money' => null])
         ->and($rows)->not->toHaveKey('transfer-'.$transfer->id);
 
-    $pipeline = Livewire::actingAs(userWithRole('Public Relations Manager'))
+    $pipeline = Livewire::actingAs(userWithRole(fundraiserWithoutAgreements()))
         ->test('pages::timeline.index')
         ->set('view', 'pipeline')
         ->assertSet('view', 'pipeline')
@@ -450,6 +450,6 @@ test('the timeline never reads a budget pivot for a viewer without funding agree
 
     expect(str_contains($queries, 'pivot_budget'))->toBe($readsBudget);
 })->with([
-    'Public Relations Manager' => ['Public Relations Manager', false],
+    'a fundraiser without agreements' => [fn (): string => fundraiserWithoutAgreements(), false],
     'Financial' => ['Financial', true],
 ]);

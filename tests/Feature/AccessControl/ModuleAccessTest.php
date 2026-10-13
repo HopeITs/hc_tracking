@@ -37,8 +37,8 @@ dataset('module pages', [
 
 /*
 | The money pages (user decision 2026-09-29): Financial, General Manager and
-| Super Admin open all of them; Public Relations Manager opens donors and
-| proposals only.
+| Super Admin open all of them; Public Relations Manager opens donors,
+| proposals and the funding agreements (D-31b), but no other finance page.
 */
 dataset('fundraising pages', [
     'proposals' => [fn (): string => route('proposals.index')],
@@ -91,9 +91,20 @@ test('Public Relations Manager opens donors and proposals', function (Closure $u
     $this->actingAs(userWithRole('Public Relations Manager'))->get($url())->assertOk();
 })->with('fundraising pages');
 
-test('Public Relations Manager is refused the finance pages', function (Closure $url) {
+test('Public Relations Manager opens the funding agreements', function (Closure $url) {
+    $this->actingAs(userWithRole('Public Relations Manager'))->get($url())->assertOk();
+})->with([
+    'funding agreements' => [fn (): string => route('funding-agreements.index')],
+    'funding agreement' => [fn (): string => route('funding-agreements.show', DonorProposal::factory()->create())],
+]);
+
+test('Public Relations Manager is refused the other finance pages', function (Closure $url) {
     $this->actingAs(userWithRole('Public Relations Manager'))->get($url())->assertForbidden();
-})->with('finance pages');
+})->with([
+    'executive summary' => [fn (): string => route('executive-summary.index')],
+    'transfers' => [fn (): string => route('transfers.index')],
+    'accounts' => [fn (): string => route('admin.accounts.index')],
+]);
 
 test('a Team Member opens a task they created', function () {
     $member = userWithRole('Team Member');

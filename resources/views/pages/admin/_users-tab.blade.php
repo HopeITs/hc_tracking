@@ -130,7 +130,7 @@
                                                 @foreach ($group['permissions'] as $permission)
                                                     <flux:checkbox
                                                         value="{{ $permission->id }}"
-                                                        :label="(string) str($permission->name)->afterLast('.')->replace('-', ' ')"
+                                                        :label="__('access.actions.'.str($permission->name)->afterLast('.'))"
                                                         :disabled="! Gate::check('update', $selectedUser) || ! Gate::check('grantPermission', [App\Models\User::class, $permission])"
                                                         wire:key="user-permission-{{ $permission->id }}"
                                                     />

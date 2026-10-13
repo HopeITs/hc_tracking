@@ -439,6 +439,28 @@ test('the assigned users modal lists holders of the selected role', function () 
         ->assertSee('Role Holder');
 });
 
+test('the assigned users modal title counts the holders in the chosen language', function (string $locale, int $holders, string $title) {
+    app()->setLocale($locale);
+    $admin = accessAdmin();
+    $role = Role::query()->where('name', 'MEAL')->sole();
+    User::factory()->count($holders)->create()->each->assignRole($role);
+
+    Livewire::actingAs($admin)
+        ->test('pages::admin.users')
+        ->call('showTab', 'roles')
+        ->call('selectRole', $role->id)
+        ->call('showAssignedUsers')
+        ->assertSeeText($title)
+        ->assertDontSeeText('|');
+})->with([
+    'english, none' => ['en', 0, 'No assigned users'],
+    'english, one' => ['en', 1, '1 assigned user'],
+    'english, two' => ['en', 2, '2 assigned users'],
+    'arabic, none' => ['ar', 0, 'لا يوجد مستخدمون مُسندون'],
+    'arabic, one' => ['ar', 1, 'مستخدم واحد مُسند'],
+    'arabic, two' => ['ar', 2, 'مستخدمان مُسندان'],
+]);
+
 test('administrators can filter the directory by hr account status', function () {
     $admin = accessAdmin();
     User::factory()->create(['name' => 'Active Person']);
@@ -503,3 +525,21 @@ test('the assigned users list is rendered only while its modal is open', functio
         ->call('showAssignedUsers')
         ->assertSee(__('access.no-assigned-users'));
 });
+
+test('the roles tab labels every module and action in the chosen language', function (string $locale, array $labels) {
+    app()->setLocale($locale);
+    Permission::query()->firstOrCreate(['name' => 'meal-coverage.manage', 'guard_name' => 'web']);
+    Permission::query()->firstOrCreate(['name' => 'reports.reopen', 'guard_name' => 'web']);
+    $admin = accessAdmin();
+    $superAdmin = Role::query()->where('name', 'Super Admin')->sole();
+
+    Livewire::actingAs($admin)
+        ->test('pages::admin.users')
+        ->call('showTab', 'roles')
+        ->call('selectRole', $superAdmin->id)
+        ->assertSeeText($labels)
+        ->assertDontSeeText(['Meal Coverage', 'Access Management']);
+})->with([
+    'english' => ['en', ['Access management', 'Manage users', 'MEAL coverage', 'Manage', 'Reports', 'Reopen']],
+    'arabic' => ['ar', ['إدارة الصلاحيات', 'إدارة المستخدمين', 'تغطية المتابعة والتقييم', 'إدارة', 'التقارير', 'إعادة فتح']],
+]);

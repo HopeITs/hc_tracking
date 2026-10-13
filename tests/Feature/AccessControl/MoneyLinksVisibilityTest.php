@@ -79,10 +79,10 @@ test('Financial sees the same target with the proposal link, the donor link and 
         ->assertSeeHtml(hrefTo(route('donors.show', $donor)));
 });
 
-test('Public Relations Manager gets the proposal and donor links on targets but not the budget', function () {
+test('a fundraiser without agreements gets the proposal and donor links on targets but not the budget', function () {
     ['donor' => $donor, 'proposal' => $proposal] = seedProposalSourcedWork();
 
-    Livewire::actingAs(userWithRole('Public Relations Manager'))->test('pages::targets.index')
+    Livewire::actingAs(userWithRole(fundraiserWithoutAgreements()))->test('pages::targets.index')
         ->assertOk()
         ->assertSee('Aurora Foundation')
         ->assertDontSee('731,942')
@@ -221,11 +221,11 @@ test('Financial sees the funding position, the pipeline, the receipts and every 
         ->assertSeeHtml(route('funding-agreements.show', $agreement));
 });
 
-test('Public Relations Manager sees the proposal pipeline on the dashboard but nothing from agreements or transfers', function () {
+test('a fundraiser without agreements sees the proposal pipeline on the dashboard but nothing from agreements or transfers', function () {
     $this->travelTo('2026-09-15 09:00:00');
     ['proposal' => $proposal, 'agreement' => $agreement] = seedDashboardMoney();
 
-    Livewire::actingAs(userWithRole('Public Relations Manager'))->test('pages::dashboard.index')
+    Livewire::actingAs(userWithRole(fundraiserWithoutAgreements()))->test('pages::dashboard.index')
         ->assertOk()
         ->assertSeeHtml('wire:key="pulse-open-proposals"')
         ->assertSee(__('dashboard.proposal_pipeline'))

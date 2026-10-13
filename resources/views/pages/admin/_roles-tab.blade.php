@@ -93,7 +93,7 @@
                                         @foreach ($group['permissions'] as $permission)
                                             <flux:checkbox
                                                 value="{{ $permission->id }}"
-                                                :label="(string) str($permission->name)->afterLast('.')->replace('-', ' ')"
+                                                :label="__('access.actions.'.str($permission->name)->afterLast('.'))"
                                                 :disabled="! $this->canEditSelectedRolePermissions || ! in_array($permission->id, $this->grantablePermissionIds, true)"
                                                 :title="in_array($permission->id, $this->grantablePermissionIds, true) ? null : __('roles.admin_only_permission_help')"
                                                 wire:key="role-permission-{{ $permission->id }}"
@@ -117,7 +117,7 @@
         <x-ui.modal
             wire:model="showAssignedUsersModal"
             size="lg"
-            :title="__('access.assigned-users', ['count' => $this->selectedRole?->users_count ?? 0])"
+            :title="trans_choice('access.assigned-users', $this->selectedRole?->users_count ?? 0)"
             :description="$this->selectedRole?->name"
             close="closeAssignedUsersModal"
             :cancel-label="__('roles.close')"
