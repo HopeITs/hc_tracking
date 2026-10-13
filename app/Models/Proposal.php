@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Concerns\HasSlug;
 use App\Concerns\RecordsActivity;
+use App\Enums\Currency;
 use App\Enums\ProposalPhase;
 use App\Enums\ProposalStatus;
 use App\Notifications\TracksActivity;
@@ -18,6 +19,7 @@ use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
@@ -28,6 +30,14 @@ use Illuminate\Support\Facades\DB;
  * @property string $name
  * @property string $slug
  * @property string $internal_project_number
+ * @property int $donor_id
+ * @property string|null $requested_budget
+ * @property Currency|null $requested_currency
+ * @property CarbonImmutable|null $status_remind_on
+ * @property string|null $approval_note
+ * @property CarbonImmutable|null $final_report_accepted_on
+ * @property int|null $final_report_accepted_by
+ * @property int|null $previous_proposal_id
  * @property CarbonImmutable $planned_date_begin
  * @property CarbonImmutable $planned_date_end
  * @property CarbonImmutable|null $actual_date_begin
@@ -40,6 +50,7 @@ use Illuminate\Support\Facades\DB;
  */
 #[Fillable([
     'name',
+    'donor_id',
     'internal_project_number',
     'planned_date_begin',
     'planned_date_end',
@@ -47,6 +58,13 @@ use Illuminate\Support\Facades\DB;
     'actual_date_end',
     'status',
     'notes',
+    'requested_budget',
+    'requested_currency',
+    'status_remind_on',
+    'approval_note',
+    'final_report_accepted_on',
+    'final_report_accepted_by',
+    'previous_proposal_id',
 ])]
 #[ObservedBy([PlanIndicatorSourceObserver::class, MediaOwnerObserver::class])]
 class Proposal extends Model implements TracksActivity
@@ -120,7 +138,30 @@ class Proposal extends Model implements TracksActivity
      */
     public function projects(): BelongsToMany
     {
-        return $this->belongsToMany(Project::class)->withTimestamps();
+        return $this->belongsToMany(Project::class)->withPivot('target_beneficiaries')->withTimestamps();
+    }
+
+    /**
+     * The one donor that funds this proposal.
+     *
+     * A co-funder is a separate proposal. The funding agreement, if any, must
+     * name this same donor: the database enforces it.
+     *
+     * @return BelongsTo<Donor, $this>
+     */
+    public function donor(): BelongsTo
+    {
+        return $this->belongsTo(Donor::class);
+    }
+
+    /**
+     * The user who recorded the donor's acceptance of the final report.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function finalReportAcceptedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'final_report_accepted_by');
     }
 
     /**
@@ -238,7 +279,21 @@ class Proposal extends Model implements TracksActivity
             'planned_date_end' => 'date',
             'actual_date_begin' => 'date',
             'actual_date_end' => 'date',
+            'requested_budget' => 'decimal:2',
+            'requested_currency' => Currency::class,
+            'status_remind_on' => 'date',
+            'final_report_accepted_on' => 'date',
         ];
+    }
+
+    /**
+     * The requested budget is money: it never reaches the activity log.
+     *
+     * @return list<string>
+     */
+    protected function activityExcludedFields(): array
+    {
+        return ['requested_budget'];
     }
 
     public function activityModule(): string

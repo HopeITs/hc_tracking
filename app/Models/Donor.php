@@ -26,13 +26,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $phone
  * @property string|null $country
  * @property string|null $notes
+ * @property bool $is_internal
  * @property CarbonImmutable|null $last_contacted_on
  * @property string|null $next_step
  * @property CarbonImmutable|null $next_step_due_on
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['name', 'type', 'contact_person', 'email', 'phone', 'country', 'notes', 'last_contacted_on', 'next_step', 'next_step_due_on'])]
+#[Fillable(['name', 'is_internal', 'type', 'contact_person', 'email', 'phone', 'country', 'notes', 'last_contacted_on', 'next_step', 'next_step_due_on'])]
 class Donor extends Model implements TracksActivity
 {
     /** @use HasFactory<DonorFactory> */
@@ -41,6 +42,14 @@ class Donor extends Model implements TracksActivity
     protected function slugSource(): string
     {
         return $this->name;
+    }
+
+    /**
+     * Whether this is the internal donor that stands for self-funding.
+     */
+    public function isInternal(): bool
+    {
+        return $this->is_internal;
     }
 
     /**
@@ -87,6 +96,7 @@ class Donor extends Model implements TracksActivity
     protected function casts(): array
     {
         return [
+            'is_internal' => 'boolean',
             'type' => DonorType::class,
             'last_contacted_on' => 'date',
             'next_step_due_on' => 'date',

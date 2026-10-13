@@ -47,10 +47,20 @@ class RealProposalsSeeder extends Seeder
 {
     public function run(): void
     {
-        $proposalIds = collect($this->proposals())->mapWithKeys(function (array $proposal): array {
+        $donorIds = Donor::query()->pluck('id', 'name');
+        $agreementDonors = collect($this->donorProposals())->pluck('donor', 'proposal');
+
+        $proposalIds = collect($this->proposals())->mapWithKeys(function (array $proposal) use ($donorIds, $agreementDonors): array {
+            $donorId = $donorIds->get($agreementDonors->get($proposal['name']));
+
+            if ($donorId === null) {
+                throw new RuntimeException("Proposal \"{$proposal['name']}\" has no agreement donor — run RealDonorsSeeder and check the donor list first.");
+            }
+
             $created = Proposal::query()->firstOrCreate(
                 ['name' => $proposal['name']],
                 [
+                    'donor_id' => $donorId,
                     'internal_project_number' => $proposal['internal_project_number'],
                     'planned_date_begin' => $proposal['planned_date_begin'],
                     'planned_date_end' => $proposal['planned_date_end'],
@@ -64,7 +74,6 @@ class RealProposalsSeeder extends Seeder
             return [$proposal['name'] => $created->id];
         });
 
-        $donorIds = Donor::query()->pluck('id', 'name');
         $projectIds = Project::query()->pluck('id', 'name');
 
         foreach ($this->donorProposals() as $row) {

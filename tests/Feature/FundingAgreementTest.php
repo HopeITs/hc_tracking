@@ -30,13 +30,11 @@ test('agreements can be filtered by donor and currency', function () {
     $echo = Donor::factory()->create(['name' => 'ECHO']);
 
     DonorProposal::factory()->create([
-        'donor_id' => $unicef->id,
-        'proposal_id' => Proposal::factory()->create(['name' => 'Dollar Proposal'])->id,
+        'proposal_id' => Proposal::factory()->create(['name' => 'Dollar Proposal', 'donor_id' => $unicef->id])->id,
         'currency' => Currency::Usd,
     ]);
     DonorProposal::factory()->create([
-        'donor_id' => $echo->id,
-        'proposal_id' => Proposal::factory()->create(['name' => 'Euro Proposal'])->id,
+        'proposal_id' => Proposal::factory()->create(['name' => 'Euro Proposal', 'donor_id' => $echo->id])->id,
         'currency' => Currency::Eur,
     ]);
 
@@ -461,18 +459,14 @@ test('agreement detail counts only received tranches as landed and adds the prom
     ])->and($money['landed'] + $money['lost'] + $money['unrecorded'] + $money['late'] + $money['upcoming'] + $money['transit'] + $money['failed'] + $money['unscheduled'])->toBe(1000.0);
 });
 
-test('agreement detail links the donor, proposal, co-funders, the donor\'s other agreements and funded projects', function () {
+test('agreement detail links the donor, proposal, the donor\'s other agreements and funded projects', function () {
     $user = User::factory()->role('Financial')->create();
     $donor = Donor::factory()->create(['name' => 'ECHO']);
     $proposal = Proposal::factory()->create(['name' => 'Relief Response']);
+    Proposal::query()->whereKey($proposal->id)->update(['donor_id' => $donor->id]);
     $agreement = DonorProposal::factory()->create(['donor_id' => $donor->id, 'proposal_id' => $proposal->id]);
-    $coFunder = DonorProposal::factory()->create([
-        'donor_id' => Donor::factory()->create(['name' => 'GIZ'])->id,
-        'proposal_id' => $proposal->id,
-    ]);
     $sibling = DonorProposal::factory()->create([
-        'donor_id' => $donor->id,
-        'proposal_id' => Proposal::factory()->create(['name' => 'Winter Appeal'])->id,
+        'proposal_id' => Proposal::factory()->create(['name' => 'Winter Appeal', 'donor_id' => $donor->id])->id,
     ]);
     $project = Project::factory()->create(['name' => 'Mobile Clinic Expansion']);
     $proposal->projects()->attach($project);
@@ -482,10 +476,8 @@ test('agreement detail links the donor, proposal, co-funders, the donor\'s other
         ->assertOk()
         ->assertSee(route('donors.show', $donor), false)
         ->assertSee(route('proposals.show', $proposal), false)
-        ->assertSee(route('funding-agreements.show', $coFunder), false)
         ->assertSee(route('funding-agreements.show', $sibling), false)
         ->assertSee(route('projects.show', $project), false)
-        ->assertSeeText('GIZ')
         ->assertSeeText('Winter Appeal')
         ->assertSeeText('Mobile Clinic Expansion');
 });

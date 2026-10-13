@@ -9,6 +9,7 @@ use App\Concerns\HasSlug;
 use App\Concerns\RecordsActivity;
 use App\Enums\AssignmentStatus;
 use App\Enums\ProjectStatus;
+use App\Enums\ProposalStatus;
 use App\Notifications\TracksActivity;
 use App\Observers\MediaOwnerObserver;
 use Carbon\CarbonImmutable;
@@ -17,6 +18,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -43,6 +45,7 @@ use Illuminate\Database\Eloquent\Relations\MorphOne;
  * @property int $program_id
  * @property int $user_id
  * @property string $schedule_weekend
+ * @property list<int>|null $working_days
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
@@ -166,7 +169,31 @@ class Project extends Model implements TracksActivity
      */
     public function proposals(): BelongsToMany
     {
-        return $this->belongsToMany(Proposal::class)->withTimestamps();
+        return $this->belongsToMany(Proposal::class)->withPivot('target_beneficiaries')->withTimestamps();
+    }
+
+    /**
+     * The proposals the donor has approved for this project, each with its donor.
+     *
+     * Funding is official at donor approval, not at submission. The query
+     * never selects an amount unless asked, so a caller without a money
+     * permission keeps the figures out of memory, not just out of the view;
+     * pass $withAmounts only after authorizing it.
+     *
+     * @return Collection<int, Proposal>
+     */
+    public function fundingSources(bool $withAmounts = false): Collection
+    {
+        $statuses = array_values(array_filter(ProposalStatus::cases(), fn (ProposalStatus $status): bool => $status->isApprovedByDonor()));
+
+        $columns = ['proposals.id', 'proposals.name', 'proposals.slug', 'proposals.status', 'proposals.donor_id'];
+
+        return $this->proposals()
+            ->whereIn('proposals.status', $statuses)
+            ->select($withAmounts ? [...$columns, 'proposals.requested_budget', 'proposals.requested_currency'] : $columns)
+            ->with(['donor:id,name,slug,is_internal', ...($withAmounts ? ['donorProposals:id,proposal_id,budget,currency'] : [])])
+            ->orderBy('proposals.name')
+            ->get();
     }
 
     /**
@@ -273,6 +300,7 @@ class Project extends Model implements TracksActivity
             'target_women' => 'integer',
             'target_boys' => 'integer',
             'target_girls' => 'integer',
+            'working_days' => 'array',
         ];
     }
 

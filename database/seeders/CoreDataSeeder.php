@@ -76,6 +76,8 @@ class CoreDataSeeder extends Seeder
                 'email' => 'pcsulak@mfa.gov.hu / youssef.fakhouri@hungaryhelps.gov.hu',
                 'notes' => 'Consul / Regional Project Manager (Middle East)',
             ],
+            'Centre de crise et de soutien (CDCS)' => ['type' => DonorType::Bilateral, 'country' => 'France'],
+            'MISSIO Munikh' => ['type' => DonorType::Foundation, 'country' => 'Germany'],
             'Pro Terra Sancta' => [
                 'type' => DonorType::Foundation,
                 'country' => 'Italy',
@@ -85,6 +87,11 @@ class CoreDataSeeder extends Seeder
                 'notes' => 'coordinator aleppo / Project Manager',
             ],
         ];
+
+        Donor::firstOrCreate(
+            ['is_internal' => true],
+            ['name' => 'تمويل ذاتي — Hope'],
+        );
 
         foreach ($donors as $name => $profile) {
             Donor::firstOrCreate(
@@ -108,6 +115,7 @@ class CoreDataSeeder extends Seeder
         // the same proposal, so seeding both never assigns two numbers.
         $proposals = [
             'Family to Family - CP' => [
+                'donor' => 'Caritas Poland',
                 'internal_project_number' => 'HC-2026-001',
                 'planned_date_begin' => '2026-01-01',
                 'planned_date_end' => '2026-12-31',
@@ -115,6 +123,7 @@ class CoreDataSeeder extends Seeder
                 'notes' => 'Donor: CP, Budget: €854,470.00',
             ],
             'Micro Projects - CP' => [
+                'donor' => 'Caritas Poland',
                 'internal_project_number' => 'HC-2026-002',
                 'planned_date_begin' => '2026-01-01',
                 'planned_date_end' => '2026-12-31',
@@ -122,6 +131,7 @@ class CoreDataSeeder extends Seeder
                 'notes' => 'Donor: CP, Budget: €817,032.00',
             ],
             'Leadership Aleppo - MCC' => [
+                'donor' => 'Mennonite Central Committee',
                 'internal_project_number' => 'HC-2026-005',
                 'planned_date_begin' => '2026-04-01',
                 'planned_date_end' => '2027-03-31',
@@ -129,6 +139,7 @@ class CoreDataSeeder extends Seeder
                 'notes' => 'Donor: MCC, Budget: $50,010.00',
             ],
             'Study Zone Syria - CDCS' => [
+                'donor' => 'Centre de crise et de soutien (CDCS)',
                 'internal_project_number' => 'HC-2026-011',
                 'planned_date_begin' => '2025-11-01',
                 'planned_date_end' => '2026-12-31',
@@ -136,6 +147,7 @@ class CoreDataSeeder extends Seeder
                 'notes' => 'Donor: CDCS, Budget: €322,180.00',
             ],
             'Children University - Missio Munich' => [
+                'donor' => 'MISSIO Munikh',
                 'internal_project_number' => 'HC-2026-012',
                 'planned_date_begin' => '2026-01-01',
                 'planned_date_end' => '2026-12-31',
@@ -144,10 +156,13 @@ class CoreDataSeeder extends Seeder
             ],
         ];
 
+        $donorIds = Donor::query()->pluck('id', 'name');
+
         foreach ($proposals as $name => $profile) {
             Proposal::firstOrCreate(
                 ['name' => $name],
                 [
+                    'donor_id' => $donorIds->get($profile['donor']),
                     'internal_project_number' => $profile['internal_project_number'],
                     'planned_date_begin' => $profile['planned_date_begin'],
                     'planned_date_end' => $profile['planned_date_end'],

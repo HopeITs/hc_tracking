@@ -2,7 +2,6 @@
 
 use App\Enums\ArStatus;
 use App\Enums\Currency;
-use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\DonorReport;
 use App\Models\Proposal;
@@ -281,9 +280,9 @@ test('a viewer without the update permission gets the table with no edit buttons
 });
 
 test('the export holds every filtered agreement with plain numbers', function () {
-    $donor = Donor::factory()->create(['name' => 'Alpha Fund']);
     $agreement = registerMixedAgreement('Water Response');
-    $agreement->update(['donor_id' => $donor->id, 'external_project_number' => 'AF-01']);
+    $agreement->donor->update(['name' => 'Alpha Fund']);
+    $agreement->update(['external_project_number' => 'AF-01']);
     DonorProposal::factory()->count(30)->create(['currency' => Currency::Usd, 'budget' => '10.00']);
     DonorProposal::factory()->create(['currency' => Currency::Eur]);
 

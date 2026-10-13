@@ -73,6 +73,8 @@ return [
     'effective_date' => 'تاريخ السريان',
     'enter_a_file_name' => 'أدخل اسمًا للملف.',
     'enter_a_proposal_name' => 'أدخل اسم المقترح.',
+    'choose_the_donor' => 'اختر المانح.',
+    'the_donor_is_fixed_by_the_funding_agreement' => 'لا يمكن تغيير المانح ما دامت هناك اتفاقية تمويل. احذف الاتفاقية أولًا.',
     'every_proposal_and_its_connections' => 'كل مقترح وما يرتبط به',
     'fees_amount' => 'رسوم :amount :currency',
     'fees_of' => 'رسوم :amount :currency',

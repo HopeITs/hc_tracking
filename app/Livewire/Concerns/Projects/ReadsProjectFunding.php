@@ -95,6 +95,19 @@ trait ReadsProjectFunding
     }
 
     /**
+     * The proposals a donor has approved for this project, with their donors.
+     * The agreement budgets are loaded only for a viewer holding
+     * funding-agreements.view; everyone else gets names alone.
+     *
+     * @return Collection<int, Proposal>
+     */
+    #[Computed]
+    public function fundingSources(): Collection
+    {
+        return $this->project->fundingSources($this->canViewAgreements());
+    }
+
+    /**
      * Committed vs. received funding for one linked proposal, grouped by
      * currency — the same read as fundingByCurrency() but scoped to a single
      * proposal's already eager loaded agreements.

@@ -142,7 +142,9 @@ test('the funding view ties proposals, transfers and reports to the projects the
     $foreign = Proposal::factory()->create();
     $project->proposals()->attach($proposal);
     $elsewhere->proposals()->attach($foreign);
-    $agreement = DonorProposal::factory()->create(['proposal_id' => $proposal->id, 'donor_id' => Donor::factory()->create(['name' => 'Aid Fund'])->id, 'budget' => 120000, 'currency' => 'USD']);
+    $fundingDonorId = Donor::factory()->create(['name' => 'Aid Fund'])->id;
+    Proposal::query()->whereKey($proposal->id)->update(['donor_id' => $fundingDonorId]);
+    $agreement = DonorProposal::factory()->create(['proposal_id' => $proposal->id, 'donor_id' => $fundingDonorId, 'budget' => 120000, 'currency' => 'USD']);
     $transfer = TransfersTracking::factory()->create(['donor_proposal_id' => $agreement->id, 'scheduled_date' => '2026-11-01', 'payment_amount' => 40000]);
     $report = DonorReport::factory()->create(['donor_proposal_id' => $agreement->id, 'due_on' => '2027-01-15']);
 
@@ -184,7 +186,7 @@ test('an unknown view falls back to the portfolio', function () {
 test('the funding agreement page shows the agreement on one gantt', function () {
     $proposal = Proposal::factory()->create(['planned_date_begin' => '2026-06-01', 'planned_date_end' => '2026-08-31']);
     $agreement = DonorProposal::factory()->create(['proposal_id' => $proposal->id]);
-    $otherAgreement = DonorProposal::factory()->create(['proposal_id' => $proposal->id]);
+    $otherAgreement = DonorProposal::factory()->create();
     $project = Project::factory()->create(['start_date' => '2026-10-01', 'end_date' => '2027-03-31']);
     $project->proposals()->attach($proposal);
     $report = DonorReport::factory()->create(['donor_proposal_id' => $agreement->id, 'due_on' => '2027-01-15']);

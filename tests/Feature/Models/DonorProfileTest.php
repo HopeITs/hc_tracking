@@ -45,14 +45,12 @@ test('a donor commitment is totalled per currency and never across them', functi
     $donor = Donor::factory()->create();
 
     DonorProposal::factory()->create([
-        'donor_id' => $donor->id,
-        'proposal_id' => Proposal::factory()->create()->id,
+        'proposal_id' => Proposal::factory()->create(['donor_id' => $donor->id])->id,
         'budget' => '500000.00',
         'currency' => Currency::Usd,
     ]);
     DonorProposal::factory()->create([
-        'donor_id' => $donor->id,
-        'proposal_id' => Proposal::factory()->create()->id,
+        'proposal_id' => Proposal::factory()->create(['donor_id' => $donor->id])->id,
         'budget' => '250000.00',
         'currency' => Currency::Eur,
     ]);
@@ -70,6 +68,7 @@ test('a donor agreement currency is a case here and a raw string through the piv
     $donor = Donor::factory()->create();
     $proposal = Proposal::factory()->create();
 
+    Proposal::query()->whereKey($proposal->id)->update(['donor_id' => $donor->id]);
     DonorProposal::factory()->create([
         'donor_id' => $donor->id,
         'proposal_id' => $proposal->id,

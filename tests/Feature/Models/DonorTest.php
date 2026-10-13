@@ -17,6 +17,7 @@ test('a donor reaches its proposals through the donor_proposal table', function 
     $donor = Donor::factory()->create();
     $proposal = Proposal::factory()->create();
 
+    Proposal::query()->whereKey($proposal->id)->update(['donor_id' => $donor->id]);
     DonorProposal::factory()->create([
         'donor_id' => $donor->id,
         'proposal_id' => $proposal->id,
