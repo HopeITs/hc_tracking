@@ -75,20 +75,6 @@ trait ManagesAnnualPlanForm
     }
 
     /**
-     * Every HR employee the plan can be made accountable to.
-     *
-     * managerOptions() is the grid's filter and lists only employees who
-     * already own a plan; the form must reach the ones who do not yet.
-     *
-     * @return Collection<int, HrEmployee>
-     */
-    #[Computed]
-    public function employeeOptions(): Collection
-    {
-        return HrEmployee::pickerOptions();
-    }
-
-    /**
      * The fiscal years the form offers.
      *
      * Built from the years already planned, plus this year and the next, so a

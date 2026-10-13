@@ -31,11 +31,7 @@
                         @endforeach
                     </x-ui.form-select>
 
-                    <x-ui.form-select wire:model="responsibleUserId" :label="__('milestones.responsible')" :placeholder="__('common.select')" :search-label="__('milestones.search_responsible')">
-                        @foreach ($this->userOptions as $userOption)
-                            <option value="{{ $userOption->id }}">{{ $userOption->name }} · {{ $userOption->secondary_name }}</option>
-                        @endforeach
-                    </x-ui.form-select>
+                    <x-ui.form-select wire:model="responsibleUserId" :label="__('milestones.responsible')" :placeholder="__('common.select')" :search-label="__('milestones.search_responsible')" employees />
                 </div>
             </x-ui.form-section>
 

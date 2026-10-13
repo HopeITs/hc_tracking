@@ -1,4 +1,5 @@
 @php
+    use App\Support\FluxMarkup;
     use App\Enums\TaskPriority;
     use App\Enums\TaskStatus;
 
@@ -17,7 +18,7 @@
 
 <div class="flex flex-col gap-1.5 p-3.5" data-test="task-add-row-mobile-{{ $group }}-{{ $groupKeyString }}">
     <label class="flex items-center gap-2">
-        <flux:icon.plus variant="micro" class="size-4 shrink-0 text-primary dark:text-brand-text" aria-hidden="true" />
+        {{ FluxMarkup::icon('plus', 'micro', 'size-4 shrink-0 text-primary dark:text-brand-text') }}
         <span class="sr-only">{{ __('tasks.add_task') }}</span>
         <input
             type="text"
@@ -43,7 +44,7 @@
         >
                 @if ($draftAssignees->isEmpty())
                     <span class="inline-flex size-7 items-center justify-center rounded-full border border-dashed border-secondary-light text-secondary-light">
-                        <flux:icon.user-plus variant="micro" class="size-3.5" />
+                        {{ FluxMarkup::icon('user-plus', 'micro', 'size-3.5') }}
                     </span>
                 @else
                     @foreach ($draftAssignees->take(3) as $userOption)

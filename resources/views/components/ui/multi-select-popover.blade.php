@@ -37,6 +37,7 @@
 <div
     x-data="{
         open: false,
+        touched: false,
         optionSearch: '',
         top: 0,
         bottom: null,
@@ -44,6 +45,7 @@
         toggle() {
             this.open = ! this.open;
             if (this.open) {
+                this.touched = true;
                 const rect = this.$refs.trigger.getBoundingClientRect();
                 this.top = rect.bottom + 4;
                 this.left = rect.left;

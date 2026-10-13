@@ -98,7 +98,8 @@ test('the scanner finds the Livewire components it guards', function () {
 
     expect($sources)->toHaveKey('resources/views/pages/admin/⚡users.blade.php')
         ->and($sources)->toHaveKey('app/Livewire/Concerns/ManagesDonorForm.php')
-        ->and(collect(livewireMethods($sources['resources/views/pages/admin/⚡users.blade.php']))->pluck('name'))
+        ->and($sources)->toHaveKey('app/Livewire/Concerns/Admin/ManagesRoles.php')
+        ->and(collect(livewireMethods($sources['app/Livewire/Concerns/Admin/ManagesRoles.php']))->pluck('name'))
         ->toContain('saveRolePermissions');
 });
 

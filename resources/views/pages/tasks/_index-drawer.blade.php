@@ -78,11 +78,7 @@
 
                     <x-ui.form-input wire:model="progressPercentage" :label="__('tasks.progress_2')" type="number" min="0" max="100" suffix="%" required data-test="task-drawer-progress-input" />
 
-                    <x-ui.form-multiselect wire:model="assignedTo" :label="__('tasks.assignees')" :placeholder="__('common.select')" class="col-span-2" data-test="task-assignee-picker">
-                        @foreach ($this->userOptions as $userOption)
-                            <option value="{{ $userOption['id'] }}">{{ $userOption['name'] }} · {{ $userOption['secondary_name'] }}</option>
-                        @endforeach
-                    </x-ui.form-multiselect>
+                    <x-ui.form-multiselect wire:model="assignedTo" :label="__('tasks.assignees')" :placeholder="__('common.select')" class="col-span-2" data-test="task-assignee-picker" employees />
                 </div>
             </x-ui.form-section>
 

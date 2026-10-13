@@ -11,9 +11,9 @@ use App\Models\Milestone;
 use App\Models\Task;
 use App\Models\User;
 use Carbon\CarbonImmutable;
-use Flux\Flux;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Livewire\Attributes\Renderless;
 
 /**
  * The tasks list's inline composers: the "+ Add task" row under each group
@@ -139,7 +139,7 @@ trait ComposesInlineTasks
 
         $this->resetPage();
 
-        Flux::toast(variant: 'success', text: __('tasks.task_created'));
+        $this->toastQuickSuccess(__('tasks.task_created'));
     }
 
     /**
@@ -169,6 +169,7 @@ trait ComposesInlineTasks
      * — mirrors toggleSubtaskDraftAssignee() but for a not-yet-created
      * top-level task instead of a subtask.
      */
+    #[Renderless]
     public function toggleTaskDraftAssignee(string $rowKey, int $employeeId): void
     {
         $ids = $this->taskDraft($rowKey)['assignees'];
@@ -239,6 +240,7 @@ trait ComposesInlineTasks
      * the "add subtask" row's own assignee popover — mirrors toggleAssignee()
      * but writes to the not-yet-saved draft instead of a real task.
      */
+    #[Renderless]
     public function toggleSubtaskDraftAssignee(int $parentTaskId, int $employeeId): void
     {
         $parent = Task::query()->with('taskAssignees:id,task_id,employee_id')->find($parentTaskId);
@@ -314,6 +316,6 @@ trait ComposesInlineTasks
 
         unset($this->subtaskDrafts[$parentTaskId]);
 
-        Flux::toast(variant: 'success', text: __('tasks.subtask_added'));
+        $this->toastQuickSuccess(__('tasks.subtask_added'));
     }
 }

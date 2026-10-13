@@ -24,3 +24,6 @@ yarn-error.log
 /.zed
 /graphify-out
 /.superpowers/brainstorm/
+
+# Microsoft Office lock files (created while a .docx/.xlsx is open)
+~$*

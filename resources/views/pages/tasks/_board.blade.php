@@ -1,9 +1,11 @@
 @php
     use App\Enums\TaskPriority;
     use App\Enums\TaskStatus;
+    use App\Support\FluxMarkup;
 
     /** @var \Illuminate\Database\Eloquent\Collection<int, \App\Models\Task> $allTasks */
     $allTasks = $this->boardTasks;
+    $canCreateTask = auth()->user()->can('create', App\Models\Task::class);
 
     $columnAccent = fn (TaskStatus $case): string => match ($case) {
         TaskStatus::Todo => 'bg-secondary-light',
@@ -56,7 +58,7 @@
 
             <div class="flex items-center justify-between px-3.5">
                 <div class="flex items-center gap-1.5">
-                    <flux:icon :name="$columnIcon($case)" variant="micro" class="size-4 shrink-0 {{ $columnAccent($case) }} rounded-full text-white" />
+                    {{ FluxMarkup::icon($columnIcon($case), 'micro', 'size-4 shrink-0 '.$columnAccent($case).' rounded-full text-white') }}
                     <span class="text-xs font-bold tracking-wide text-secondary-dark uppercase dark:text-ink">{{ $case->label() }}</span>
                 </div>
                 <span class="inline-flex min-w-6 items-center justify-center rounded-full bg-white px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-secondary-medium shadow-sm dark:bg-surface-1 dark:text-ink-muted">{{ $columnTasks->count() }}</span>

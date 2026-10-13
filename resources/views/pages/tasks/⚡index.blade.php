@@ -9,6 +9,7 @@ use App\Livewire\Concerns\Tasks\FiltersTaskDirectory;
 use App\Livewire\Concerns\Tasks\ManagesTaskDrawer;
 use App\Livewire\Concerns\Tasks\ProvidesTaskOptions;
 use App\Livewire\Concerns\Tasks\ReadsTaskViews;
+use Livewire\Attributes\Session;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -81,6 +82,14 @@ new #[Title('titles.tasks')] class extends Component
     #[Url(except: 'none')]
     public string $group = 'none';
 
+    /**
+     * Which list layout this screen needs, reported by the browser from the
+     * list's width ('wide' table or 'narrow' cards) and remembered for the
+     * session. null until the first report: both layouts are rendered then.
+     */
+    #[Session]
+    public ?string $listLayout = null;
+
     #[Url(except: '')]
     public string $month = '';
 
@@ -113,11 +122,8 @@ new #[Title('titles.tasks')] class extends Component
                     <option value="{{ $priorityCase->value }}">{{ $priorityCase->label() }}</option>
                 @endforeach
             </x-ui.header-filter-select>
-            <x-ui.header-filter-select :label="__('tasks.assignee')" wire:model.live="assignee" :value="$assignee">
+            <x-ui.header-filter-select :label="__('tasks.assignee')" wire:model.live="assignee" :value="$assignee" employees>
                 <option value="">{{ __('common.anyone') }}</option>
-                @foreach ($this->userOptions as $userOption)
-                    <option value="{{ $userOption['id'] }}">{{ $userOption['name'] }} · {{ $userOption['secondary_name'] }}</option>
-                @endforeach
             </x-ui.header-filter-select>
             @if ($canPickDepartment)
                 <x-ui.header-filter-select :label="__('tasks.department')" wire:model.live="departmentId" :value="$departmentId" data-test="task-department-filter">
@@ -178,6 +184,7 @@ new #[Title('titles.tasks')] class extends Component
         @endswitch
 
         @include('pages.tasks._assignee-popover')
+        @include('pages.tasks._task-option-menu')
     @endif
 
     @include('pages.tasks._index-drawer')

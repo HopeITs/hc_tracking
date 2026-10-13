@@ -1,4 +1,83 @@
 /**
+ * Every person dropdown (assignees, responsible, owner filters) lists the same
+ * 270+ employees. Rather than the server rendering them into each dropdown on
+ * every Livewire response, they are fetched once as JSON and shared: dropdowns
+ * built with the `employees` prop draw their options from this store.
+ */
+document.addEventListener('alpine:init', () => {
+    window.Alpine.store('employeeOptions', {
+        items: [],
+        requests: {},
+
+        load(url) {
+            this.requests[url] ??= fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
+                .then((response) => (response.ok ? response.json() : Promise.reject(response)))
+                .then((items) => {
+                    this.items = items;
+                })
+                .catch(() => {
+                    delete this.requests[url];
+                });
+
+            return this.requests[url];
+        },
+
+        labelFor(value) {
+            return this.items.find((item) => item.value === value)?.label ?? null;
+        },
+    });
+});
+
+/**
+ * Draws the employee list into a menu container in one pass. Giving each of the
+ * 270+ items its own Alpine bindings (x-for) cost ~150 ms to open a dropdown and
+ * ~30 ms per keystroke while searching; plain DOM writes cost a few ms. The
+ * container is `wire:ignore`d, so Livewire's morph leaves what is drawn here alone.
+ */
+window.hcEmployeeList = {
+    escape(text) {
+        return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    },
+
+    /** Draw the items once per list: `data-count` remembers what is already there. */
+    render(container, items) {
+        if (container.dataset.count === String(items.length)) {
+            return;
+        }
+
+        const check = `<svg class="${this.escape(container.dataset.checkClass)}" style="display: none" data-flux-icon xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" data-slot="icon"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>`;
+        const role = container.dataset.role ? ` role="${this.escape(container.dataset.role)}"` : '';
+
+        container.innerHTML = items
+            .map((item) => `<button type="button"${role} class="${this.escape(container.dataset.itemClass)}" data-flux-menu-item data-option-value="${this.escape(item.value)}" data-option-label="${this.escape(item.label)}"><span class="min-w-0 flex-1 truncate">${this.escape(item.label)}</span>${check}</button>`)
+            .join('');
+        container.dataset.count = String(items.length);
+    },
+
+    /** Show the check mark on the selected items only. */
+    mark(container, isSelected) {
+        for (const button of container.children) {
+            const selected = isSelected(button.dataset.optionValue);
+
+            button.lastElementChild.style.display = selected ? '' : 'none';
+            button.setAttribute('aria-selected', selected ? 'true' : 'false');
+        }
+    },
+
+    /** Hide (and disable, so arrow keys skip them) the items the search does not match. */
+    filter(container, query) {
+        const needle = query.trim().toLowerCase();
+
+        for (const button of container.children) {
+            const hit = needle === '' || button.dataset.optionLabel.toLowerCase().includes(needle);
+
+            button.style.display = hit ? '' : 'none';
+            button.disabled = ! hit;
+        }
+    },
+};
+
+/**
  * Form dropdowns (x-ui.form-select, x-ui.form-multiselect).
  *
  * The menu is Flux's own ui-dropdown + ui-menu, so it looks and positions
@@ -20,11 +99,54 @@
  *   with the menu open closes only the menu and returns focus to the trigger.
  */
 document.addEventListener('alpine:init', () => {
-    window.Alpine.data('formPicker', ({ value = '', multiple = false, placeholder = '', countTemplate = '' } = {}) => ({
+    /**
+     * The header filter dropdown (x-ui.header-filter-select). Person filters
+     * start loading the employee list with the page and draw it on first open.
+     */
+    window.Alpine.data('filterMenu', () => ({
+        optionSearch: '',
+
+        init() {
+            if (this.$root.dataset.employeesUrl) {
+                window.Alpine.store('employeeOptions').load(this.$root.dataset.employeesUrl);
+                this.$watch('optionSearch', () => this.paintEmployees());
+            }
+        },
+
+        async openEmployees() {
+            if (! this.$root.dataset.employeesUrl) {
+                return;
+            }
+
+            await window.Alpine.store('employeeOptions').load(this.$root.dataset.employeesUrl);
+            this.paintEmployees();
+        },
+
+        paintEmployees() {
+            const list = this.$refs.employeeList;
+            const current = String(this.$wire.$get(this.$root.dataset.model) ?? '');
+
+            window.hcEmployeeList.render(list, window.Alpine.store('employeeOptions').items);
+            window.hcEmployeeList.mark(list, (value) => value === current);
+            window.hcEmployeeList.filter(list, this.optionSearch);
+        },
+
+        pickEmployee(event) {
+            const button = event.target.closest('[data-option-value]');
+
+            if (button !== null && ! button.disabled) {
+                this.$wire.$set(this.$root.dataset.model, button.dataset.optionValue);
+            }
+        },
+    }));
+
+    window.Alpine.data('formPicker', ({ value = '', multiple = false, placeholder = '', countTemplate = '', employeesUrl = null, knownLabels = {} } = {}) => ({
         value,
         multiple,
         placeholder,
         countTemplate,
+        employeesUrl,
+        knownLabels,
         search: '',
 
         normalize(item) {
@@ -44,6 +166,14 @@ document.addEventListener('alpine:init', () => {
         },
 
         labelFor(optionValue) {
+            if (this.employeesUrl !== null) {
+                const employeeLabel = window.Alpine.store('employeeOptions').labelFor(optionValue) ?? this.knownLabels[optionValue] ?? null;
+
+                if (employeeLabel !== null) {
+                    return employeeLabel;
+                }
+            }
+
             const option = Array.from(this.$root.querySelectorAll('[data-option-value]'))
                 .find((element) => element.dataset.optionValue === optionValue);
 
@@ -87,7 +217,39 @@ document.addEventListener('alpine:init', () => {
             this.closeMenu();
         },
 
+        init() {
+            if (this.employeesUrl !== null) {
+                this.$watch('search', () => this.paintEmployees());
+                this.$watch('value', () => this.paintEmployees());
+            }
+        },
+
+        paintEmployees() {
+            const list = this.$refs.employeeList;
+            const items = window.Alpine.store('employeeOptions').items;
+
+            if (! list || items.length === 0) {
+                return;
+            }
+
+            window.hcEmployeeList.render(list, items);
+            window.hcEmployeeList.mark(list, (optionValue) => this.isSelected(optionValue));
+            window.hcEmployeeList.filter(list, this.search);
+        },
+
+        pickEmployee(event) {
+            const button = event.target.closest('[data-option-value]');
+
+            if (button !== null && ! button.disabled) {
+                this.choose(button.dataset.optionValue);
+            }
+        },
+
         prepareMenu() {
+            if (this.employeesUrl !== null) {
+                window.Alpine.store('employeeOptions').load(this.employeesUrl).then(() => this.paintEmployees());
+            }
+
             this.search = '';
             this.$refs.menu.style.minWidth = `${this.$refs.trigger.offsetWidth}px`;
         },
@@ -251,6 +413,52 @@ document.addEventListener('alpine:init', () => {
             }
 
             this.cleared();
+        },
+    }));
+});
+
+/**
+ * A checklist of employees bound to an array property (the calendar's
+ * "filter by responsible" popover). It draws the same shared list as every
+ * other person dropdown, in one pass, and toggles ids in the Livewire array.
+ * The popover's own x-data owns the search text and whether it has been opened;
+ * `x-effect="paint(optionSearch, touched)"` passes both in.
+ */
+document.addEventListener('alpine:init', () => {
+    window.Alpine.data('employeeCheckList', () => ({
+        selected() {
+            return (this.$wire.$get(this.$root.dataset.model) ?? []).map(String);
+        },
+
+        async paint(search, touched) {
+            if (! touched) {
+                return;
+            }
+
+            const employees = window.Alpine.store('employeeOptions');
+
+            await employees.load(this.$root.dataset.employeesUrl);
+
+            const selected = this.selected();
+
+            window.hcEmployeeList.render(this.$root, employees.items);
+            window.hcEmployeeList.mark(this.$root, (value) => selected.includes(value));
+            window.hcEmployeeList.filter(this.$root, search);
+        },
+
+        pick(event) {
+            const button = event.target.closest('[data-option-value]');
+
+            if (button === null || button.disabled) {
+                return;
+            }
+
+            const value = button.dataset.optionValue;
+            const current = this.selected();
+            const next = current.includes(value) ? current.filter((id) => id !== value) : [...current, value];
+
+            this.$wire.$set(this.$root.dataset.model, next);
+            window.hcEmployeeList.mark(this.$root, (id) => next.includes(id));
         },
     }));
 });

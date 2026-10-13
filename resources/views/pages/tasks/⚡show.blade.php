@@ -102,13 +102,6 @@ new #[Title('titles.task')] class extends Component
             ->findOrFail($this->taskId);
     }
 
-    /** @return Collection<int, HrEmployee> */
-    #[Computed]
-    public function userOptions(): Collection
-    {
-        return HrEmployee::pickerOptions();
-    }
-
     /**
      * Save the task. Editors (tasks.update, or the task's creator) change
      * every field; its assignees may only move status and progress, so for
@@ -257,15 +250,6 @@ new #[Title('titles.task')] class extends Component
     @php
         $canEditTask = auth()->user()->can('update', $this->task);
         $canUpdateTaskStatus = $canEditTask || auth()->user()->can('updateStatus', $this->task);
-
-        if ($canEditTask) {
-            $selectedAssigneeOptions = $this->userOptions->whereIn('id', collect($assignedTo)->map(fn ($id) => (int) $id));
-            $assigneeTriggerLabel = match (true) {
-                $selectedAssigneeOptions->isEmpty() => __('common.select'),
-                $selectedAssigneeOptions->count() <= 2 => $selectedAssigneeOptions->pluck('name')->implode(', '),
-                default => __('common.count_selected', ['count' => $selectedAssigneeOptions->count()]),
-            };
-        }
     @endphp
 
     @if ($canUpdateTaskStatus)

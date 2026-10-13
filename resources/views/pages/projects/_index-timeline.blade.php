@@ -83,6 +83,7 @@
                                             >
                                                 <flux:icon.eye class="size-4.5" />
                                             </a>
+                                            <x-ui.blocked-badge :project="$project" />
                                             @can('update', $project)<x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="openEditModal({{ $project->id }})" :aria-label="__('common.edit_name', ['name' => $project->name])" />@endcan
                                                 @if ($project->status === ProjectStatus::Archived)
                                                     @can('delete', $project)<x-ui.button tone="ghost" size="sm" icon="arrow-uturn-left" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="restoreProject({{ $project->id }})" :aria-label="__('projects.restore_name', ['name' => $project->name])" />@endcan

@@ -5,7 +5,7 @@ use App\Models\Role;
 
 test('the permission catalog config drives permission names', function () {
     expect(config('access-control.groups'))->toHaveKey('programs')
-        ->and(config('access-control.groups.programs'))->toBe(['view', 'create', 'update', 'delete']);
+        ->and(config('access-control.groups.programs'))->toBe(['view', 'update']);
 });
 
 test('creating the Super Admin role grants it every permission that exists', function () {

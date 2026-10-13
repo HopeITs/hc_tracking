@@ -56,7 +56,7 @@
     };
 @endphp
 
-<div class="relative">
+<div class="relative" x-data="listLayoutSync">
     {{-- Skeleton, shown only while a filter/sort/group change is in flight. --}}
     <div wire:loading wire:target="search,status,priority,assignee,sourceType,sourceId,sort,group" class="overflow-hidden rounded-xl border border-secondary-soft bg-white dark:border-line dark:bg-surface-1">
         <div class="animate-pulse divide-y divide-secondary-soft p-3.5 motion-reduce:animate-none dark:divide-line">

@@ -8,6 +8,7 @@ use App\Livewire\Concerns\Projects\FiltersProjectDirectory;
 use App\Livewire\Concerns\Projects\ManagesProjectForm;
 use App\Livewire\Concerns\Projects\PresentsProjectDirectory;
 use App\Livewire\Concerns\Projects\SummarisesProjectFunding;
+use App\Livewire\Concerns\Projects\UnblocksProjects;
 use App\Models\HrEmployee;
 use App\Models\Program;
 use App\Models\Project;
@@ -28,6 +29,7 @@ new #[Title('titles.projects')] class extends Component {
     use ManagesProjectForm;
     use PresentsProjectDirectory;
     use SummarisesProjectFunding;
+    use UnblocksProjects;
     use WithPagination;
 
     /** Cards are smaller than rows, so the board shows more of them. */
@@ -253,11 +255,8 @@ new #[Title('titles.projects')] class extends Component {
                 @endforeach
             </x-ui.header-filter-select>
 
-            <x-ui.header-filter-select :label="__('projects.owner')" wire:model.live="owner" :value="$owner">
+            <x-ui.header-filter-select :label="__('projects.owner')" wire:model.live="owner" :value="$owner" employees>
                 <option value="">{{ __('projects.all_owners') }}</option>
-                @foreach ($this->userOptions as $userOption)
-                    <option value="{{ $userOption->id }}">{{ $userOption->name }} · {{ $userOption->secondary_name }}</option>
-                @endforeach
             </x-ui.header-filter-select>
 
             <x-ui.header-filter-select :label="__('projects.sort_by')" wire:model.live="sort" :value="$sort">
@@ -313,6 +312,28 @@ new #[Title('titles.projects')] class extends Component {
     @endif
 
     @include('pages.projects._index-project-modal')
+
+    <x-ui.modal
+        wire:model="showUnblockModal"
+        size="md"
+        :title="__('projects.unblock_title')"
+        submit="unblockProject"
+        close="closeUnblockModal"
+    >
+        @if ($showUnblockModal)
+            <p class="mb-3 text-sm text-secondary-medium dark:text-ink-muted">{{ __('projects.unblock_help') }}</p>
+            <x-ui.form-textarea
+                wire:model="unblockNote"
+                :label="__('projects.assignment_note_optional')"
+                rows="4"
+                data-test="unblock-note"
+            />
+        @endif
+
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" data-test="unblock-submit-button">{{ __('projects.unblock') }}</x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
 
     {{-- Archiving is reversible, so the dialog explains where the work goes, not what is lost. --}}
     <x-ui.confirm-modal

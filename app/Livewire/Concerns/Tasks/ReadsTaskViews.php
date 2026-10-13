@@ -25,10 +25,16 @@ use Livewire\Attributes\Computed;
  * NavigatesCalendarPeriods.
  *
  * @property string $viewMode
+ * @property ?string $listLayout
  * @property-read EloquentCollection<int, Task> $boardTasks  #[Computed] boardTasks() below
  */
 trait ReadsTaskViews
 {
+    public function setListLayout(string $layout): void
+    {
+        $this->listLayout = in_array($layout, ['wide', 'narrow'], true) ? $layout : null;
+    }
+
     /**
      * Records with unread notifications for me, for the row dots.
      *

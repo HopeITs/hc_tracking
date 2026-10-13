@@ -1,6 +1,7 @@
 @php
     use App\Enums\TaskPriority;
     use App\Enums\TaskStatus;
+    use App\Support\FluxMarkup;
     use Illuminate\Support\Js;
 
     /**
@@ -64,7 +65,7 @@
             class="inline-flex size-6 cursor-pointer touch-manipulation items-center justify-center rounded-full text-secondary-medium hover:bg-secondary-soft disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent dark:text-ink-muted dark:hover:bg-surface-2"
             data-test="task-toggle-complete-{{ $task->id }}"
         >
-            <flux:icon.check-circle :variant="$isDone ? 'solid' : 'outline'" class="size-4.5 {{ $isDone ? 'text-status-good' : '' }}" />
+            {{ FluxMarkup::icon('check-circle', $isDone ? 'solid' : 'outline', 'size-4.5 '.($isDone ? 'text-status-good' : '')) }}
         </button>
     </td>
     <td class="min-w-0 px-2 py-2.5">
@@ -78,9 +79,9 @@
                     :aria-label="subtasksOpen[{{ $task->id }}] ? {{ Js::from(__('tasks.hide_subtasks')) }} : {{ Js::from(__('tasks.show_subtasks')) }}"
                     data-test="task-subtasks-toggle-{{ $task->id }}"
                 >
-                    <flux:icon.chevron-right variant="micro" class="size-3.5 transition-transform rtl:rotate-180" x-bind:class="subtasksOpen[{{ $task->id }}] ? 'rotate-90 rtl:rotate-90' : ''" aria-hidden="true" />
+                    <span class="inline-flex transition-transform rtl:rotate-180" x-bind:class="subtasksOpen[{{ $task->id }}] ? 'rotate-90 rtl:rotate-90' : ''">{{ FluxMarkup::icon('chevron-right', 'micro', 'size-3.5') }}</span>
                     @if ($task->subtasks_count > 0)
-                        <flux:icon.rectangle-stack variant="micro" class="size-3.5" aria-hidden="true" />
+                        {{ FluxMarkup::icon('rectangle-stack', 'micro', 'size-3.5') }}
                         {{ $task->subtasks_count }}
                     @endif
                 </button>
@@ -127,7 +128,7 @@
         >
             @if ($assignees->isEmpty())
                 <span class="inline-flex size-7 items-center justify-center rounded-full border border-dashed border-secondary-light text-secondary-light">
-                    <flux:icon.user-plus variant="micro" class="size-3.5" />
+                    {{ FluxMarkup::icon('user-plus', 'micro', 'size-3.5') }}
                 </span>
             @else
                 @foreach ($assignees->take(3) as $employee)
@@ -143,7 +144,7 @@
                             aria-label="{{ __('tasks.remove_assignee_name', ['name' => $employee->name]) }}"
                             data-test="task-assignee-remove-{{ $task->id }}-{{ $employee->id }}"
                         >
-                            <flux:icon.x-mark variant="micro" class="size-2.5" />
+                            {{ FluxMarkup::icon('x-mark', 'micro', 'size-2.5') }}
                         </button>
                         @endif
                     </div>
@@ -177,59 +178,46 @@
     <td class="px-2">
         @if (! $canUpdate)
             <span class="inline-flex size-7 items-center justify-center" aria-label="{{ __('tasks.priority') }}: {{ $task->priority->label() }}" data-test="task-priority-{{ $task->id }}">
-                <flux:icon.flag :variant="$task->priority === TaskPriority::Low ? 'outline' : 'solid'" class="size-4 {{ $priorityIconClasses($task->priority) }}" />
+                {{ FluxMarkup::priorityFlag($task->priority) }}
             </span>
         @else
-        <flux:dropdown position="bottom" align="start">
-            <button type="button" aria-label="{{ __('tasks.priority') }}: {{ $task->priority->label() }}" class="inline-flex size-7 cursor-pointer items-center justify-center rounded hover:bg-secondary-soft dark:hover:bg-surface-2" data-test="task-priority-trigger-{{ $task->id }}">
-                <flux:icon.flag :variant="$task->priority === TaskPriority::Low ? 'outline' : 'solid'" class="size-4 {{ $priorityIconClasses($task->priority) }}" />
+            {{-- Trigger only — the menu lives once per page in _task-option-menu.blade.php (see task-menu.js). --}}
+            <button
+                type="button"
+                x-data
+                aria-haspopup="menu"
+                x-on:click="$store.taskMenu.openFor('priority', 'priority-{{ $task->id }}', '{{ $task->priority->value }}', $el.getBoundingClientRect(), 'quickSetPriority', [{{ $task->id }}])"
+                aria-label="{{ __('tasks.priority') }}: {{ $task->priority->label() }}"
+                class="inline-flex size-7 cursor-pointer items-center justify-center rounded hover:bg-secondary-soft dark:hover:bg-surface-2"
+                data-test="task-priority-trigger-{{ $task->id }}"
+            >
+                {{ FluxMarkup::priorityFlag($task->priority) }}
             </button>
-            <flux:menu>
-                @foreach (TaskPriority::cases() as $priorityCase)
-                    <flux:menu.item wire:click="quickSetPriority({{ $task->id }}, '{{ $priorityCase->value }}')" :wire:key="'task-'.$task->id.'-priority-'.$priorityCase->value">
-                        <flux:icon.flag :variant="$priorityCase === TaskPriority::Low ? 'outline' : 'solid'" class="size-4 shrink-0 {{ $priorityIconClasses($priorityCase) }}" />
-                        <span class="min-w-0 truncate">{{ $priorityCase->label() }}</span>
-                        @if ($task->priority === $priorityCase)<flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" />@endif
-                    </flux:menu.item>
-                @endforeach
-            </flux:menu>
-        </flux:dropdown>
         @endif
     </td>
     <td class="px-2">
         @if (! $canMove)
-            <x-ui.status-pill :case="$task->status" />
+            {{ FluxMarkup::statusPill($task->status) }}
         @else
-        <flux:dropdown position="bottom" align="start">
-            <button type="button" class="cursor-pointer" data-test="task-status-trigger-{{ $task->id }}">
-                <x-ui.status-pill :case="$task->status" />
+            <button
+                type="button"
+                x-data
+                aria-haspopup="menu"
+                x-on:click="$store.taskMenu.openFor('status', 'status-{{ $task->id }}', '{{ $task->status->value }}', $el.getBoundingClientRect(), 'quickSetStatus', [{{ $task->id }}])"
+                class="cursor-pointer"
+                data-test="task-status-trigger-{{ $task->id }}"
+            >
+                {{ FluxMarkup::statusPill($task->status) }}
             </button>
-            <flux:menu>
-                @foreach (TaskStatus::cases() as $statusCase)
-                    <flux:menu.item wire:click="quickSetStatus({{ $task->id }}, '{{ $statusCase->value }}')" :wire:key="'task-'.$task->id.'-status-'.$statusCase->value" :data-test="'task-status-option-'.$task->id.'-'.$statusCase->value">
-                        <x-ui.status-pill :case="$statusCase" />
-                        @if ($task->status === $statusCase)<flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" />@endif
-                    </flux:menu.item>
-                @endforeach
-            </flux:menu>
-        </flux:dropdown>
         @endif
     </td>
     <td class="pe-3 text-end opacity-0 group-hover/row:opacity-100 group-focus-within/row:opacity-100 focus-within:opacity-100">
         <div class="inline-flex items-center gap-0.5">
             @if (! $isSubtask && $canCreate)
-                <x-ui.button
-                    tone="ghost"
-                    size="sm"
-                    icon="plus"
-                    class="size-8!"
-                    x-on:click="subtasksOpen[{{ $task->id }}] = true; $nextTick(() => $refs['subtaskAddInput{{ $task->id }}']?.focus())"
-                    :aria-label="__('tasks.add_subtask')"
-                    data-test="task-add-subtask-{{ $task->id }}"
-                />
+                {{ FluxMarkup::ghostIconButton('plus', __('tasks.add_subtask'), 'x-on:click="subtasksOpen['.$task->id.'] = true; $nextTick(() => $refs[\'subtaskAddInput'.$task->id.'\']?.focus())" data-test="task-add-subtask-'.$task->id.'"') }}
             @endif
             @if ($canDelete)
-                <x-ui.button tone="ghost" size="sm" icon="trash" class="size-8!" wire:click="confirmDelete({{ $task->id }})" :aria-label="__('tasks.delete_title', ['title' => $task->title])" />
+                {{ FluxMarkup::ghostIconButton('trash', __('tasks.delete_title', ['title' => $task->title]), 'wire:click="confirmDelete('.$task->id.')"') }}
             @endif
         </div>
     </td>

@@ -12,10 +12,8 @@ use App\Livewire\Concerns\Projects\ManagesProjectFiles;
 use App\Livewire\Concerns\Projects\ReadsProjectDelivery;
 use App\Livewire\Concerns\Projects\ReadsProjectFunding;
 use App\Enums\AssignmentStatus;
-use App\Models\HrEmployee;
 use App\Models\Project;
 use Flux\Flux;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
@@ -134,13 +132,6 @@ new #[Title('titles.project')] class extends Component {
             ->withSum(['milestones as milestones_reached_weight' => fn ($query) => $query->where('status', MilestoneStatus::Reached->value)], 'weight_percentage')
             ->withSum(['milestones as milestones_planned_weight' => fn ($query) => $query->where('status', '!=', MilestoneStatus::Cancelled->value)], 'weight_percentage')
             ->findOrFail($this->projectId);
-    }
-
-    /** @return Collection<int, HrEmployee> */
-    #[Computed]
-    public function userOptions(): Collection
-    {
-        return HrEmployee::pickerOptions();
     }
 
     /**

@@ -39,6 +39,12 @@ test('the money pages are open only to the finance-facing roles', function (stri
     'proposals' => ['proposals.view', ['Super Admin', 'General Manager', 'Financial', 'Public Relations Manager']],
 ]);
 
+test('only Super Admin, General Manager and Public Relations Manager may add projects by default', function () {
+    $holders = Role::query()->whereHas('permissions', fn ($query) => $query->where('name', 'projects.create'))->pluck('name')->all();
+
+    expect($holders)->toEqualCanonicalizing(['Super Admin', 'General Manager', 'Public Relations Manager']);
+});
+
 test('only Super Admin manages organisation notification settings by default', function () {
     $holders = Role::query()->whereHas('permissions', fn ($query) => $query->where('name', 'notification-settings.manage'))->pluck('name')->all();
 
@@ -63,6 +69,7 @@ test('each role holds every view permission plus exactly its approved write perm
         ...FUNDRAISING_VIEWS,
         'tasks.create', 'tasks.update', 'reports.create', 'reports.update',
         'donors.create', 'donors.update', 'proposals.create', 'proposals.update',
+        'projects.create',
     ]],
     'MEAL' => ['MEAL', [
         'tasks.create', 'tasks.update', 'reports.create', 'reports.update', 'reports.approve', 'reports.mark-seen',
@@ -84,7 +91,7 @@ test('each role holds every view permission plus exactly its approved write perm
         'strategies.create', 'strategies.update', 'strategies.delete',
         'programs.update',
         'annual-plans.create', 'annual-plans.update', 'annual-plans.delete',
-        'projects.create', 'projects.update', 'projects.delete',
+        'projects.update', 'projects.delete',
         'milestones.create', 'milestones.update', 'milestones.delete',
         'risks.create', 'risks.update', 'risks.delete',
         'indicators.create', 'indicators.update',

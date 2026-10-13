@@ -89,7 +89,7 @@ final class ProjectRecipients extends ModuleRecipients
 
     private function isAssignmentDecision(Activity $activity): bool
     {
-        return in_array($activity->event, ['project.assignment_acknowledged', 'project.assignment_rejected'], true);
+        return in_array($activity->event, ['project.assignment_acknowledged', 'project.assignment_rejected', 'project.assignment_unblocked'], true);
     }
 
     /**

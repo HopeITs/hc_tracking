@@ -2,7 +2,7 @@
     The toolbar of calendar/index: today, the view-mode picker, previous and
     next, the period heading, the type and responsible filters, and the add
     menu. Included by ⚡index.blade.php, whose top PHP block defines
-    $periodHeading, $typeDotClasses and $selectedFilterEmployees.
+    $periodHeading, $typeDotClasses and $selectedFilterCount.
 --}}
     <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex flex-wrap items-center gap-3">
@@ -110,8 +110,8 @@
                 <x-slot:trigger>
                     <flux:icon.user variant="micro" class="size-4" />
                     <span class="hidden text-sm sm:inline">{{ __('calendar.filter_by_responsible') }}</span>
-                    @if ($selectedFilterEmployees->isNotEmpty())
-                        <span class="inline-flex min-w-4 items-center justify-center rounded-full bg-primary dark:bg-white/10 dark:text-ink px-1 text-[10px] font-semibold text-white" data-test="calendar-responsible-filter-count">{{ $selectedFilterEmployees->count() }}</span>
+                    @if ($selectedFilterCount > 0)
+                        <span class="inline-flex min-w-4 items-center justify-center rounded-full bg-primary dark:bg-white/10 dark:text-ink px-1 text-[10px] font-semibold text-white" data-test="calendar-responsible-filter-count">{{ $selectedFilterCount }}</span>
                     @endif
                 </x-slot:trigger>
 
@@ -120,16 +120,18 @@
                     @if ($filterEmployeeIds === [])<flux:icon.check class="ms-auto size-4 shrink-0 text-primary dark:text-brand-text" />@endif
                 </button>
                 <div class="my-1 border-t border-secondary-soft dark:border-line"></div>
-                @foreach ($this->userOptions as $userOption)
-                    <label
-                        x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
-                        class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-secondary-soft dark:hover:bg-white/[0.06]"
-                        data-test="calendar-responsible-filter-option-{{ $userOption->id }}"
-                    >
-                        <input type="checkbox" wire:model.live="filterEmployeeIds" value="{{ $userOption->id }}" class="rounded border-secondary-light text-primary dark:text-brand-text focus:ring-primary" />
-                        <span class="min-w-0 truncate">{{ $userOption->name }} · {{ $userOption->secondary_name }}</span>
-                    </label>
-                @endforeach
+                <div
+                    wire:ignore
+                    x-data="employeeCheckList"
+                    x-effect="paint(optionSearch, touched)"
+                    x-on:click="pick($event)"
+                    class="contents"
+                    data-employees-url="{{ route('employees.picker-options', ['l' => app()->getLocale()]) }}"
+                    data-model="filterEmployeeIds"
+                    data-role="option"
+                    data-item-class="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm hover:bg-secondary-soft dark:hover:bg-white/[0.06]"
+                    data-check-class="ms-auto size-4 shrink-0 text-primary dark:text-brand-text"
+                ></div>
             </x-ui.multi-select-popover>
             </div>
 

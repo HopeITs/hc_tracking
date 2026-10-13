@@ -4,7 +4,6 @@ use App\Livewire\Concerns\AnnualPlans\ReadsAnnualPlanSummary;
 use App\Models\AnnualPlan;
 use App\Models\HrEmployee;
 use Flux\Flux;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
@@ -43,17 +42,6 @@ new #[Title('titles.annual_plan')] class extends Component {
             ])
             ->withCount('planIndicators')
             ->findOrFail($this->annualPlanId);
-    }
-
-    /**
-     * Every HR employee the plan can be made accountable to.
-     *
-     * @return Collection<int, HrEmployee>
-     */
-    #[Computed]
-    public function employeeOptions(): Collection
-    {
-        return HrEmployee::pickerOptions();
     }
 
     /**
@@ -375,11 +363,7 @@ new #[Title('titles.annual_plan')] class extends Component {
                     @endforeach
                 </x-ui.form-select>
 
-                <x-ui.form-select wire:model="planManagerId" :label="__('annual_plans.assigned_manager')" :placeholder="__('annual_plans.select_a_manager')" required>
-                    @foreach ($this->employeeOptions as $employeeOption)
-                        <option value="{{ $employeeOption->id }}">{{ $employeeOption->name }} · {{ $employeeOption->secondary_name }}</option>
-                    @endforeach
-                </x-ui.form-select>
+                <x-ui.form-select wire:model="planManagerId" :label="__('annual_plans.assigned_manager')" :placeholder="__('annual_plans.select_a_manager')" required employees />
             </div>
         @endif
 

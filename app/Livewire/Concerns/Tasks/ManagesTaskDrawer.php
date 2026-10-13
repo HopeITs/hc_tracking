@@ -17,6 +17,7 @@ use Flux\Flux;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Renderless;
 
 /**
  * The tasks page's task drawer and delete confirmation, and the quick row
@@ -26,6 +27,8 @@ use Livewire\Attributes\Locked;
  *
  * Used by tasks/index only. The page uses WithPagination (resetPage); do not
  * `use SavesTaskForm` on the page as well.
+ *
+ * @property string $view
  */
 trait ManagesTaskDrawer
 {
@@ -189,7 +192,7 @@ trait ManagesTaskDrawer
             return;
         }
 
-        Flux::toast(variant: 'success', text: __('tasks.task_marked_done'));
+        $this->toastQuickSuccess(__('tasks.task_marked_done'));
     }
 
     public function quickSetStatus(int $taskId, string $status): void
@@ -234,7 +237,7 @@ trait ManagesTaskDrawer
         $task->priority = $newPriority;
         $task->save();
 
-        Flux::toast(variant: 'success', text: __('tasks.task_priority_changed', ['priority' => $newPriority->label()]));
+        $this->toastQuickSuccess(__('tasks.task_priority_changed', ['priority' => $newPriority->label()]));
     }
 
     /**
@@ -243,6 +246,9 @@ trait ManagesTaskDrawer
      * covers the same ground for a full edit, this is the quick path. A
      * task must always keep at least one assignee, matching saveTask()'s
      * own validation, so the last one can't be toggled off here either.
+     *
+     * This one re-renders: the avatar "x" calls it directly and needs the row
+     * to show the removal. The popover uses togglePickedAssignee() instead.
      */
     public function toggleAssignee(int $taskId, int $employeeId): void
     {
@@ -265,14 +271,41 @@ trait ManagesTaskDrawer
 
             $existing->delete();
 
-            Flux::toast(variant: 'success', text: __('tasks.assignee_removed'));
+            $this->toastQuickSuccess(__('tasks.assignee_removed'));
 
             return;
         }
 
         $task->taskAssignees()->create(['employee_id' => $employeeId]);
 
-        Flux::toast(variant: 'success', text: __('tasks.assignee_added'));
+        $this->toastQuickSuccess(__('tasks.assignee_added'));
+    }
+
+    /**
+     * toggleAssignee() for the shared assignee popover.
+     *
+     * Renderless: re-rendering the whole list for every click cost ~700 ms,
+     * so the popover's check marks move client-side and the list refreshes
+     * once when the popover closes (see assignee-picker.js).
+     */
+    #[Renderless]
+    public function togglePickedAssignee(int $taskId, int $employeeId): void
+    {
+        $this->toggleAssignee($taskId, $employeeId);
+    }
+
+    /**
+     * The success toast of the quick inline actions (move, prioritise, assign,
+     * reschedule, quick-add). The board is worked in bursts, and a toast per
+     * action piles up over the cards, so it stays silent there. Moving a card to
+     * another status (quickSetStatus) is the exception and always toasts, and
+     * refusals still toast everywhere.
+     */
+    protected function toastQuickSuccess(string $text): void
+    {
+        if ($this->view !== 'board') {
+            Flux::toast(variant: 'success', text: $text);
+        }
     }
 
     protected function taskFormSaved(): void

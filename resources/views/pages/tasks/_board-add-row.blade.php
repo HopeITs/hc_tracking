@@ -1,4 +1,5 @@
 @use('App\Enums\TaskPriority')
+@use('App\Support\FluxMarkup')
 @use('Illuminate\Support\Js')
             @can('create', App\Models\Task::class)
             @php
@@ -9,7 +10,7 @@
             @endphp
             <div class="mx-3 flex flex-col gap-1.5 rounded-xl border border-dashed border-secondary-light bg-white/60 px-2.5 py-2 transition-colors focus-within:border-primary hover:border-secondary-medium dark:border-line dark:bg-surface-1" data-test="task-board-add-row-{{ $case->value }}">
                 <label class="flex items-center gap-2">
-                    <flux:icon.plus variant="micro" class="size-4 shrink-0 text-primary dark:text-brand-text" aria-hidden="true" />
+                    {{ FluxMarkup::icon('plus', 'micro', 'size-4 shrink-0 text-primary dark:text-brand-text') }}
                     <span class="sr-only">{{ __('tasks.add_task') }}</span>
                     <input
                         type="text"
@@ -37,7 +38,7 @@
                     >
                             @if ($boardTaskDraftAssignees->isEmpty())
                                 <span class="inline-flex size-6 items-center justify-center rounded-full border border-dashed border-secondary-light text-secondary-light">
-                                    <flux:icon.user-plus variant="micro" class="size-3" />
+                                    {{ FluxMarkup::icon('user-plus', 'micro', 'size-3') }}
                                 </span>
                             @else
                                 @foreach ($boardTaskDraftAssignees->take(3) as $userOption)
@@ -62,20 +63,9 @@
                         data-test="task-board-add-due-date-{{ $case->value }}"
                     />
 
-                    <flux:dropdown position="bottom" align="start">
-                        <button type="button" aria-label="{{ __('tasks.priority') }}: {{ $boardDraftPriority->label() }}" class="inline-flex size-6 cursor-pointer items-center justify-center rounded hover:bg-secondary-soft dark:hover:bg-surface-2" data-test="task-board-add-priority-trigger-{{ $case->value }}">
-                            <flux:icon.flag :variant="$boardDraftPriority === TaskPriority::Low ? 'outline' : 'solid'" class="size-3.5 {{ $priorityIconClasses($boardDraftPriority) }}" />
-                        </button>
-                        <flux:menu>
-                            @foreach (TaskPriority::cases() as $priorityCase)
-                                <flux:menu.item wire:click="$set('taskDrafts.{{ $boardRowKey }}.priority', '{{ $priorityCase->value }}')" :wire:key="'task-board-add-'.$case->value.'-priority-'.$priorityCase->value">
-                                    <flux:icon.flag :variant="$priorityCase === TaskPriority::Low ? 'outline' : 'solid'" class="size-4 shrink-0 {{ $priorityIconClasses($priorityCase) }}" />
-                                    <span class="min-w-0 truncate">{{ $priorityCase->label() }}</span>
-                                    @if ($boardDraftPriority === $priorityCase)<flux:icon.check class="ms-auto size-4 shrink-0 text-secondary-medium" />@endif
-                                </flux:menu.item>
-                            @endforeach
-                        </flux:menu>
-                    </flux:dropdown>
+                    <button type="button" x-data aria-haspopup="menu" x-on:click="$store.taskMenu.openFor('priority', {{ Js::from('taskDrafts.'.$boardRowKey.'.priority') }}, '{{ $boardDraftPriority->value }}', $el.getBoundingClientRect(), '$set', [{{ Js::from('taskDrafts.'.$boardRowKey.'.priority') }}])" aria-label="{{ __('tasks.priority') }}: {{ $boardDraftPriority->label() }}" class="inline-flex size-6 cursor-pointer items-center justify-center rounded hover:bg-secondary-soft dark:hover:bg-surface-2" data-test="task-board-add-priority-trigger-{{ $case->value }}">
+                                {{ FluxMarkup::icon('flag', $boardDraftPriority === TaskPriority::Low ? 'outline' : 'solid', 'size-3.5 '.$priorityIconClasses($boardDraftPriority)) }}
+                            </button>
                 </div>
             </div>
             @endcan

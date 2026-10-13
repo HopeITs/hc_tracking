@@ -4,7 +4,6 @@ use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
 use App\Livewire\Concerns\AddsQuickTask;
 use App\Livewire\Concerns\Programs\ReadsProgramDelivery;
-use App\Models\HrEmployee;
 use App\Models\Milestone;
 use App\Models\Program;
 use App\Models\Project;
@@ -195,13 +194,6 @@ new #[Title('titles.program')] class extends Component {
         };
     }
 
-    /** @return Collection<int, HrEmployee> */
-    #[Computed]
-    public function userOptions(): Collection
-    {
-        return HrEmployee::pickerOptions();
-    }
-
     /**
      * Raise a task straight against this program — the source is always this
      * program, never one of its projects or milestones: a task tied to a
@@ -352,5 +344,5 @@ new #[Title('titles.program')] class extends Component {
         <livewire:activity.timeline :subjects="['program' => [$this->program->id]]" :key="'program-activity-'.$this->program->id" />
     </section>
 
-    <x-tasks.add-task-modal :open="$showAddTaskModal" test-prefix="new-program-task" :user-options="$this->userOptions" />
+    <x-tasks.add-task-modal :open="$showAddTaskModal" test-prefix="new-program-task" />
 </section>

@@ -10,7 +10,6 @@ use App\Livewire\Concerns\Calendar\ScopesCalendarPeople;
 use App\Livewire\Concerns\Calendar\ShowsCalendarDay;
 use App\Livewire\Concerns\ChecksFinanceVisibility;
 use App\Livewire\Concerns\NavigatesCalendarPeriods;
-use App\Models\HrEmployee;
 use App\Models\Project;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
@@ -48,13 +47,6 @@ new #[Title('titles.calendar')] class extends Component {
     public function projectOptions(): Collection
     {
         return Project::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get();
-    }
-
-    /** @return Collection<int, HrEmployee> */
-    #[Computed]
-    public function userOptions(): Collection
-    {
-        return HrEmployee::pickerOptions();
     }
 };
 ?>
@@ -146,7 +138,7 @@ new #[Title('titles.calendar')] class extends Component {
 
     $focusedType = $this->focusedType();
 
-    $selectedFilterEmployees = $filterEmployeeIds === [] ? new \Illuminate\Support\Collection : $this->userOptions->whereIn('id', array_map('intval', $filterEmployeeIds))->values();
+    $selectedFilterCount = count($filterEmployeeIds);
 
     $periodHeading = match ($viewMode) {
         'month' => $calendar['month']->translatedFormat(__('formats.month_year')),

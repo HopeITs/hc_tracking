@@ -167,4 +167,4 @@
         confirm-test="confirm-delete-proposal-file"
     />
 
-    <x-tasks.add-task-modal :open="$showAddTaskModal" test-prefix="new-proposal-task" :user-options="$this->userOptions" />
+    <x-tasks.add-task-modal :open="$showAddTaskModal" test-prefix="new-proposal-task" />

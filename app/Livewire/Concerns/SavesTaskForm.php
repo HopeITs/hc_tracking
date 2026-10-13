@@ -119,6 +119,16 @@ trait SavesTaskForm
         //
     }
 
+    /**
+     * The success toast of the quick inline actions (reschedule here; the
+     * tasks page adds its own). Always shown by default; the tasks page
+     * silences it on the board.
+     */
+    protected function toastQuickSuccess(string $text): void
+    {
+        Flux::toast(variant: 'success', text: $text);
+    }
+
     public function saveTask(): void
     {
         if ($this->editingTaskId === null) {
@@ -173,6 +183,6 @@ trait SavesTaskForm
 
         $this->taskRescheduled();
 
-        Flux::toast(variant: 'success', text: __('tasks.task_rescheduled'));
+        $this->toastQuickSuccess(__('tasks.task_rescheduled'));
     }
 }

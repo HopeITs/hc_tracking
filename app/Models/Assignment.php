@@ -178,6 +178,28 @@ class Assignment extends Model
     }
 
     /**
+     * The top level lifts the block a rejection put on the record, with an
+     * optional note. The rejection stays as history; the same person is asked
+     * again, so the record is editable and the owner decides afresh.
+     */
+    public function unblock(User $user, ?string $note = null): void
+    {
+        $note = $note === null || trim($note) === '' ? null : trim($note);
+
+        $this->supersede();
+
+        static::query()->create([
+            'assignable_type' => $this->assignable_type,
+            'assignable_id' => $this->assignable_id,
+            'field' => $this->field,
+            'employee_id' => $this->employee_id,
+            'assigned_by' => $user->id,
+        ]);
+
+        $this->recordOnAssignable('assignment_unblocked', $note);
+    }
+
+    /**
      * Close this assignment because the field was given to someone else (or
      * emptied): the assignee's notification stops offering acknowledge / reject.
      */

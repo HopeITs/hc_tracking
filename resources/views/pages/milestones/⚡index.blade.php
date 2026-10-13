@@ -3,7 +3,6 @@
 use App\Enums\MilestoneStatus;
 use App\Livewire\Concerns\Milestones\ManagesMilestoneDirectoryForm;
 use App\Livewire\Concerns\NavigatesCalendarPeriods;
-use App\Models\HrEmployee;
 use App\Models\Milestone;
 use App\Models\Project;
 use App\Models\Scopes\TaskVisibilityScope;
@@ -249,13 +248,6 @@ new #[Title('titles.milestones')] class extends Component {
         ];
     }
 
-    /** @return Collection<int, HrEmployee> */
-    #[Computed]
-    public function userOptions(): Collection
-    {
-        return HrEmployee::pickerOptions();
-    }
-
     /**
      * Flattens a filtered milestone tree (as returned by projectsWithMilestones)
      * into a single ordered list for the timeline and board views.
@@ -304,11 +296,8 @@ new #[Title('titles.milestones')] class extends Component {
                 @endforeach
             </x-ui.header-filter-select>
 
-            <x-ui.header-filter-select id="milestone-responsible-filter" :label="__('milestones.responsible')" wire:model.live="responsible" :value="$responsible">
+            <x-ui.header-filter-select id="milestone-responsible-filter" :label="__('milestones.responsible')" wire:model.live="responsible" :value="$responsible" employees>
                 <option value="">{{ __('common.anyone') }}</option>
-                @foreach ($this->userOptions as $userOption)
-                    <option value="{{ $userOption->id }}">{{ $userOption->name }} · {{ $userOption->secondary_name }}</option>
-                @endforeach
             </x-ui.header-filter-select>
         </x-slot:filters>
 

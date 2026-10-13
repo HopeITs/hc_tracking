@@ -14,6 +14,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Collection as SupportCollection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
 /**
@@ -51,6 +53,10 @@ class HrEmployee extends HrModel
      * @var list<string>
      */
     public const NameColumns = ['id', 'first_name_en', 'last_name_en', 'first_name_ar', 'last_name_ar'];
+
+    private const PickerCacheKeyPrefix = 'hr.employees.picker.';
+
+    private const PickerCacheSeconds = 300;
 
     protected $table = 'employees';
 
@@ -90,18 +96,63 @@ class HrEmployee extends HrModel
      *
      * Every employee is offered, active or not, exactly as HR holds them.
      *
+     * Every assignee dropdown on every page asks for this list on each request,
+     * so the raw rows are cached for five minutes per sort language instead of
+     * hitting the HR database each time, and held in memory for the rest of the
+     * request so a page with several dropdowns reads the cache once.
+     *
      * @return Collection<int, static>
      */
     public static function pickerOptions(): Collection
     {
         $suffix = Locale::current() === Locale::Arabic ? 'ar' : 'en';
 
-        return static::query()
-            ->select(self::NameColumns)
-            ->orderBy('first_name_'.$suffix)
-            ->orderBy('last_name_'.$suffix)
-            ->orderBy('id')
-            ->get();
+        $rows = Cache::memo()->remember(
+            self::PickerCacheKeyPrefix.$suffix,
+            self::PickerCacheSeconds,
+            fn (): array => static::query()
+                ->select(self::NameColumns)
+                ->orderBy('first_name_'.$suffix)
+                ->orderBy('last_name_'.$suffix)
+                ->orderBy('id')
+                ->toBase()
+                ->get()
+                ->map(fn (object $row): array => (array) $row)
+                ->all(),
+        );
+
+        return static::hydrate($rows);
+    }
+
+    /**
+     * The picker list as plain `{value, label}` rows, label being the main and
+     * secondary name together, in the order pickerOptions() sorts them.
+     *
+     * @return SupportCollection<int, array{value: string, label: string}>
+     */
+    public static function pickerLabels(): SupportCollection
+    {
+        $suffix = Locale::current() === Locale::Arabic ? 'ar' : 'en';
+
+        return collect(Cache::memo()->remember(
+            self::PickerCacheKeyPrefix.'labels.'.$suffix,
+            self::PickerCacheSeconds,
+            fn (): array => static::pickerOptions()->map(fn (self $employee): array => [
+                'value' => (string) $employee->id,
+                'label' => $employee->name.' · '.$employee->secondary_name,
+            ])->all(),
+        ));
+    }
+
+    /**
+     * Drop the cached picker lists so the next request reloads them from HR.
+     */
+    public static function forgetPickerOptions(): void
+    {
+        foreach (['en', 'ar'] as $suffix) {
+            Cache::memo()->forget(self::PickerCacheKeyPrefix.$suffix);
+            Cache::memo()->forget(self::PickerCacheKeyPrefix.'labels.'.$suffix);
+        }
     }
 
     /**

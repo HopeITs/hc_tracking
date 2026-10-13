@@ -78,28 +78,7 @@
 
                 @if ($canEditTask)
                     <div class="min-w-0">
-                        <label class="mb-1.5 block text-[11px] font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-ink-muted">{{ __('tasks.assignees') }}</label>
-                        <x-ui.multi-select-popover
-                            :label="__('tasks.assignees')"
-                            class="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-secondary-light bg-white px-3 py-2 text-start text-sm dark:border-field-line dark:bg-surface-2"
-                            data-test="task-edit-assignee-picker"
-                        >
-                            <x-slot:trigger>
-                                <span class="min-w-0 truncate">{{ $assigneeTriggerLabel }}</span>
-                                <flux:icon.chevron-up-down class="size-4 shrink-0 text-secondary-medium dark:text-ink-muted" aria-hidden="true" />
-                            </x-slot:trigger>
-
-                            @foreach ($this->userOptions as $userOption)
-                                <label
-                                    x-show="optionSearch === '' || $el.textContent.toLowerCase().includes(optionSearch.toLowerCase())"
-                                    class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-secondary-soft dark:hover:bg-white/[0.06]"
-                                >
-                                    <input type="checkbox" wire:model.live="assignedTo" value="{{ $userOption->id }}" class="rounded border-secondary-light text-primary dark:text-brand-text focus:ring-primary" data-test="task-edit-assignee-checkbox-{{ $userOption->id }}" />
-                                    <span class="min-w-0 truncate">{{ $userOption->name }} · {{ $userOption->secondary_name }}</span>
-                                </label>
-                            @endforeach
-                        </x-ui.multi-select-popover>
-                        <flux:error name="assignedTo" class="mt-1.5" />
+                        <x-ui.form-multiselect wire:model="assignedTo" :label="__('tasks.assignees')" :placeholder="__('common.select')" data-test="task-edit-assignee-picker" employees />
                     </div>
                 @endif
 

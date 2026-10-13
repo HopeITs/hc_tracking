@@ -21,11 +21,7 @@
                     @endforeach
                 </x-ui.form-select>
 
-                <x-ui.form-select wire:model="planManagerId" :label="__('annual_plans.assigned_manager')" :placeholder="__('annual_plans.select_a_manager')" required>
-                    @foreach ($this->employeeOptions as $employeeOption)
-                        <option value="{{ $employeeOption->id }}">{{ $employeeOption->name }} · {{ $employeeOption->secondary_name }}</option>
-                    @endforeach
-                </x-ui.form-select>
+                <x-ui.form-select wire:model="planManagerId" :label="__('annual_plans.assigned_manager')" :placeholder="__('annual_plans.select_a_manager')" required employees />
             </div>
         @endif
 

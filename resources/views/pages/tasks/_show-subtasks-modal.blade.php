@@ -37,11 +37,7 @@
 
                     <x-ui.form-input wire:model="newSubtaskDueDate" :label="__('tasks.due_date_2')" type="date" />
 
-                    <x-ui.form-multiselect wire:model="newSubtaskAssignedTo" :label="__('tasks.assignees')" :placeholder="__('common.select')" class="col-span-2" data-test="new-subtask-assignee-picker">
-                        @foreach ($this->userOptions as $userOption)
-                            <option value="{{ $userOption->id }}">{{ $userOption->name }} · {{ $userOption->secondary_name }}</option>
-                        @endforeach
-                    </x-ui.form-multiselect>
+                    <x-ui.form-multiselect wire:model="newSubtaskAssignedTo" :label="__('tasks.assignees')" :placeholder="__('common.select')" class="col-span-2" data-test="new-subtask-assignee-picker" employees />
                 </div>
             @endif
 

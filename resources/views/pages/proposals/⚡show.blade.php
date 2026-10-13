@@ -14,7 +14,6 @@ use App\Livewire\Concerns\Proposals\ReadsProposalHealth;
 use App\Livewire\Concerns\Proposals\ReadsProposalVitals;
 use App\Livewire\Concerns\SwitchesFundingView;
 use App\Models\DonorProposal;
-use App\Models\HrEmployee;
 use App\Models\Media;
 use App\Models\Proposal;
 use App\Models\ProposalStatusNote;
@@ -113,13 +112,6 @@ new #[Title('titles.proposal')] class extends Component
             ->orderByDesc('date')
             ->orderByDesc('id')
             ->get();
-    }
-
-    /** @return Collection<int, HrEmployee> */
-    #[Computed]
-    public function userOptions(): Collection
-    {
-        return HrEmployee::pickerOptions();
     }
 
     /**
