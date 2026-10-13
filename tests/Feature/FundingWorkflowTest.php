@@ -120,7 +120,7 @@ test('a new proposal opens its status history, and editing it never changes the 
     $component = Livewire::actingAs($user)->test('pages::proposals.index')
         ->call('openCreateModal')
         ->set('name', 'Winter response')
-        ->set('internalProjectNumber', 'HC-2026-051')
+        ->set('proposalDonorId', (string) insertDonor())->set('internalProjectNumber', 'HC-2026-051')
         ->set('plannedDateBegin', '2026-01-01')
         ->set('plannedDateEnd', '2026-12-31')
         ->set('proposalStatus', ProposalStatus::Submitted->value)
@@ -213,7 +213,7 @@ test('an agreement recorded from a donor page always belongs to that donor', fun
     $user = User::factory()->role('Financial')->create();
     $donor = Donor::factory()->create();
     $otherDonor = Donor::factory()->create();
-    $proposal = Proposal::factory()->create();
+    $proposal = Proposal::factory()->create(['donor_id' => $donor->id]);
 
     Livewire::actingAs($user)->test('pages::donors.show', ['donor' => $donor])
         ->call('recordAgreementForDonor')

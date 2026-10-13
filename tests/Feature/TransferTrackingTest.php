@@ -619,14 +619,12 @@ test('each tranche shows its proposal\'s internal number beside the external one
 test('the transfer picker names each agreement by both project numbers', function () {
     $user = User::factory()->role('Financial')->create();
     DonorProposal::factory()->create([
-        'donor_id' => Donor::factory()->create(['name' => 'ECHO'])->id,
-        'proposal_id' => Proposal::factory()->create(['name' => 'Winter Shelter Kit', 'internal_project_number' => 'HC-2026-090'])->id,
+        'proposal_id' => Proposal::factory()->create(['name' => 'Winter Shelter Kit', 'internal_project_number' => 'HC-2026-090', 'donor_id' => Donor::factory()->create(['name' => 'ECHO'])->id])->id,
         'external_project_number' => 'ECHO-90',
         'budget' => '2000.00',
     ]);
     DonorProposal::factory()->create([
-        'donor_id' => Donor::factory()->create(['name' => 'UNICEF'])->id,
-        'proposal_id' => Proposal::factory()->create(['name' => 'Cash for Work', 'internal_project_number' => 'HC-2026-091'])->id,
+        'proposal_id' => Proposal::factory()->create(['name' => 'Cash for Work', 'internal_project_number' => 'HC-2026-091', 'donor_id' => Donor::factory()->create(['name' => 'UNICEF'])->id])->id,
         'budget' => '1000.00',
     ]);
 

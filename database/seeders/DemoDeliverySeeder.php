@@ -38,7 +38,7 @@ class DemoDeliverySeeder extends Seeder
         $strategy = Strategy::query()->latest('id')->firstOrFail();
         $employeeIds = $this->hrEmployeeIds();
         $cityIds = $this->hrCityIds();
-        $donors = Donor::query()->get();
+        $donors = Donor::query()->where('is_internal', false)->get();
 
         foreach ($this->programsToAssign() as $index => $program) {
             $name = $program->name;
@@ -66,6 +66,7 @@ class DemoDeliverySeeder extends Seeder
                 ]);
 
             $proposal = Proposal::factory()->running()->create([
+                'donor_id' => $donors->random()->id,
                 'name' => $name.' Emergency Response',
                 'internal_project_number' => 'HC-2026-'.(901 + $index),
                 'planned_date_begin' => $strategy->start_year.'-01-01',
@@ -75,7 +76,6 @@ class DemoDeliverySeeder extends Seeder
             $proposal->projects()->attach($projects->pluck('id'));
 
             DonorProposal::factory()->create([
-                'donor_id' => $donors->random()->id,
                 'proposal_id' => $proposal->id,
                 'external_project_number' => 'PRJ-'.str_pad((string) ($index + 1), 4, '0', STR_PAD_LEFT),
             ]);

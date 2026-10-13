@@ -69,7 +69,7 @@ test('a proposal can be created with a trimmed name', function () {
         ->test('pages::proposals.index')
         ->call('openCreateModal')
         ->set('name', '  Rapid Response Fund  ')
-        ->set('internalProjectNumber', 'HC-2026-041')
+        ->set('proposalDonorId', (string) insertDonor())->set('internalProjectNumber', 'HC-2026-041')
         ->set('proposalStatus', ProposalStatus::ConceptNote->value)
         ->set('plannedDateBegin', '2026-01-01')
         ->set('plannedDateEnd', '2026-12-31')
@@ -89,7 +89,7 @@ test('a proposal end date cannot fall before its begin date', function () {
         ->test('pages::proposals.index')
         ->call('openCreateModal')
         ->set('name', 'Backwards Proposal')
-        ->set('internalProjectNumber', 'HC-2026-042')
+        ->set('proposalDonorId', (string) insertDonor())->set('internalProjectNumber', 'HC-2026-042')
         ->set('proposalStatus', ProposalStatus::ConceptNote->value)
         ->set('plannedDateBegin', '2026-12-31')
         ->set('plannedDateEnd', '2026-01-01')
@@ -114,6 +114,7 @@ test('a proposal holding a funding agreement is not deleted and says why', funct
     $user = User::factory()->role('Financial')->create();
     $proposal = Proposal::factory()->create();
     $donor = Donor::factory()->create();
+    Proposal::query()->whereKey($proposal->id)->update(['donor_id' => $donor->id]);
     $agreement = DonorProposal::factory()->create([
         'donor_id' => $donor->id,
         'proposal_id' => $proposal->id,
@@ -202,7 +203,9 @@ test('selecting a donor shows only the proposals it funds, and selecting it agai
     $giz = Donor::factory()->create(['name' => 'GIZ']);
     $funded = Proposal::factory()->create(['name' => 'Water Response']);
     $other = Proposal::factory()->create(['name' => 'Shelter Response']);
+    Proposal::query()->whereKey($funded->id)->update(['donor_id' => $echo->id]);
     DonorProposal::factory()->create(['donor_id' => $echo->id, 'proposal_id' => $funded->id]);
+    Proposal::query()->whereKey($other->id)->update(['donor_id' => $giz->id]);
     DonorProposal::factory()->create(['donor_id' => $giz->id, 'proposal_id' => $other->id]);
 
     Livewire::actingAs($user)
@@ -239,10 +242,14 @@ test('the funding position splits committed, received and pending per currency f
     $user = User::factory()->role('Financial')->create();
     $donor = Donor::factory()->create();
     $shown = Proposal::factory()->create(['name' => 'Shown Proposal']);
+    $shownInEuro = Proposal::factory()->create(['name' => 'Shown Proposal Two']);
     $hidden = Proposal::factory()->create(['name' => 'Hidden Proposal']);
 
+    Proposal::query()->whereKey($shown->id)->update(['donor_id' => $donor->id]);
     $usd = DonorProposal::factory()->create(['donor_id' => $donor->id, 'proposal_id' => $shown->id, 'budget' => 1000, 'currency' => 'USD']);
-    DonorProposal::factory()->create(['donor_id' => $donor->id, 'proposal_id' => $shown->id, 'budget' => 500, 'currency' => 'EUR']);
+    Proposal::query()->whereKey($shownInEuro->id)->update(['donor_id' => $donor->id]);
+    DonorProposal::factory()->create(['donor_id' => $donor->id, 'proposal_id' => $shownInEuro->id, 'budget' => 500, 'currency' => 'EUR']);
+    Proposal::query()->whereKey($hidden->id)->update(['donor_id' => $donor->id]);
     DonorProposal::factory()->create(['donor_id' => $donor->id, 'proposal_id' => $hidden->id, 'budget' => 9000, 'currency' => 'USD']);
 
     TransfersTracking::factory()->create(['donor_proposal_id' => $usd->id, 'ar_status' => 'received', 'payment_amount' => 300, 'amount_transfered_currency' => 'USD', 'net_amount_received' => 300, 'amount_received_currency' => 'USD']);
@@ -271,8 +278,8 @@ test('the funding flow draws one graph per currency and lists unfunded proposals
     $unfunded = Proposal::factory()->create(['name' => 'Unfunded Proposal']);
     $project = Project::factory()->create(['name' => 'Water Network Expansion']);
     $funded->projects()->attach($project);
-    DonorProposal::factory()->create(['donor_id' => $donor->id, 'proposal_id' => $funded->id, 'budget' => 1000, 'currency' => 'USD']);
-    DonorProposal::factory()->create(['donor_id' => $donor->id, 'proposal_id' => $funded->id, 'budget' => 250, 'currency' => 'USD']);
+    Proposal::query()->whereKey($funded->id)->update(['donor_id' => $donor->id]);
+    DonorProposal::factory()->create(['donor_id' => $donor->id, 'proposal_id' => $funded->id, 'budget' => 1250, 'currency' => 'USD']);
 
     $flow = Livewire::actingAs($user)
         ->test('pages::proposals.index')
@@ -315,7 +322,7 @@ test('a user without proposal permissions sees no edit controls and cannot creat
         ->assertDontSeeHtml('data-test="advance-proposal-'.$proposal->id.'"');
 
     $fresh()->call('openCreateModal')->assertForbidden();
-    $fresh()->set('name', 'Sneaked in')->set('internalProjectNumber', 'HC-2026-043')->set('plannedDateBegin', '2026-01-01')->set('plannedDateEnd', '2026-12-31')->set('proposalStatus', 'concept note')->call('saveProposal')->assertForbidden();
+    $fresh()->set('name', 'Sneaked in')->set('proposalDonorId', (string) insertDonor())->set('internalProjectNumber', 'HC-2026-043')->set('plannedDateBegin', '2026-01-01')->set('plannedDateEnd', '2026-12-31')->set('proposalStatus', 'concept note')->call('saveProposal')->assertForbidden();
     $fresh()->call('openStageModal', $proposal->id)->assertForbidden();
     $fresh()->call('confirmDelete', $proposal->id)->assertForbidden();
     expect(fn () => $fresh()->set('deletingProposalId', $proposal->id))->toThrow(CannotUpdateLockedPropertyException::class);
@@ -331,7 +338,7 @@ test('a proposal cannot be created without an internal project number', function
         ->test('pages::proposals.index')
         ->call('openCreateModal')
         ->set('name', 'Rapid Response Fund')
-        ->set('internalProjectNumber', '   ')
+        ->set('proposalDonorId', (string) insertDonor())->set('internalProjectNumber', '   ')
         ->set('proposalStatus', ProposalStatus::ConceptNote->value)
         ->set('plannedDateBegin', '2026-01-01')
         ->set('plannedDateEnd', '2026-12-31')
@@ -349,7 +356,7 @@ test('a new proposal cannot reuse another proposal\'s internal number, whatever 
         ->test('pages::proposals.index')
         ->call('openCreateModal')
         ->set('name', 'Rapid Response Fund')
-        ->set('internalProjectNumber', 'hc-2026-044')
+        ->set('proposalDonorId', (string) insertDonor())->set('internalProjectNumber', 'hc-2026-044')
         ->set('proposalStatus', ProposalStatus::ConceptNote->value)
         ->set('plannedDateBegin', '2026-01-01')
         ->set('plannedDateEnd', '2026-12-31')
@@ -370,11 +377,11 @@ test('the internal project number is trimmed and limited to 50 characters', func
         ->set('proposalStatus', ProposalStatus::ConceptNote->value)
         ->set('plannedDateBegin', '2026-01-01')
         ->set('plannedDateEnd', '2026-12-31')
-        ->set('internalProjectNumber', str_repeat('A', 51))
+        ->set('proposalDonorId', (string) insertDonor())->set('internalProjectNumber', str_repeat('A', 51))
         ->call('saveProposal')
         ->assertHasErrors(['internalProjectNumber' => 'max']);
 
-    $component->set('internalProjectNumber', '  HC-2026-045  ')
+    $component->set('proposalDonorId', (string) insertDonor())->set('internalProjectNumber', '  HC-2026-045  ')
         ->call('saveProposal')
         ->assertHasNoErrors();
 
@@ -388,7 +395,7 @@ test('a new internal number cannot use the reserved placeholder prefix', functio
         ->test('pages::proposals.index')
         ->call('openCreateModal')
         ->set('name', 'Rapid Response Fund')
-        ->set('internalProjectNumber', $number)
+        ->set('proposalDonorId', (string) insertDonor())->set('internalProjectNumber', $number)
         ->set('proposalStatus', ProposalStatus::ConceptNote->value)
         ->set('plannedDateBegin', '2026-01-01')
         ->set('plannedDateEnd', '2026-12-31')
@@ -407,11 +414,11 @@ test('a proposal still holding its placeholder saves while the number is left al
         ->test('pages::proposals.index')
         ->call('openEditModal', $proposal->id)
         ->assertSet('internalProjectNumber', 'TEMP-0007')
-        ->set('internalProjectNumber', 'TEMP-0008')
+        ->set('proposalDonorId', (string) insertDonor())->set('internalProjectNumber', 'TEMP-0008')
         ->call('saveProposal')
         ->assertHasErrors('internalProjectNumber');
 
-    $component->set('internalProjectNumber', 'TEMP-0007')
+    $component->set('proposalDonorId', (string) insertDonor())->set('internalProjectNumber', 'TEMP-0007')
         ->set('name', 'Renamed proposal')
         ->call('saveProposal')
         ->assertHasNoErrors();
@@ -443,7 +450,7 @@ test('changing the internal number is recorded in the activity log and notifies'
     Livewire::actingAs($user)
         ->test('pages::proposals.index')
         ->call('openEditModal', $proposal->id)
-        ->set('internalProjectNumber', 'HC-2026-047')
+        ->set('proposalDonorId', (string) insertDonor())->set('internalProjectNumber', 'HC-2026-047')
         ->call('saveProposal')
         ->assertHasNoErrors();
 
@@ -469,7 +476,7 @@ test('a duplicate that slips past validation shows the duplicate error instead o
         ->test('pages::proposals.index')
         ->call('openCreateModal')
         ->set('name', 'Rapid Response Fund')
-        ->set('internalProjectNumber', 'HC-2026-049')
+        ->set('proposalDonorId', (string) insertDonor())->set('internalProjectNumber', 'HC-2026-049')
         ->set('proposalStatus', ProposalStatus::ConceptNote->value)
         ->set('plannedDateBegin', '2026-01-01')
         ->set('plannedDateEnd', '2026-12-31')

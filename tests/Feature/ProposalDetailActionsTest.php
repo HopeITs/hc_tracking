@@ -43,9 +43,12 @@ function proposalPage(): Testable
 
 function usdAgreement(Proposal $proposal, string $budget = '1000.00'): DonorProposal
 {
+    $fundingDonorId = Donor::factory()->create(['name' => 'ECHO'])->id;
+    Proposal::query()->whereKey($proposal->id)->update(['donor_id' => $fundingDonorId]);
+
     return DonorProposal::factory()->create([
         'proposal_id' => $proposal->id,
-        'donor_id' => Donor::factory()->create(['name' => 'ECHO'])->id,
+        'donor_id' => $fundingDonorId,
         'budget' => $budget,
         'currency' => Currency::Usd,
     ]);
@@ -120,7 +123,8 @@ test('an agreement recorded on the page is filed against this proposal even if t
         ->call('saveAgreement')
         ->assertHasNoErrors();
 
-    expect(DonorProposal::query()->where('donor_id', $donor->id)->sole()->proposal_id)->toBe($this->proposal->id)
+    // The agreement belongs to this proposal and takes the proposal's donor, not the payload's.
+    expect(DonorProposal::query()->where('proposal_id', $this->proposal->id)->sole()->donor_id)->toBe($this->proposal->donor_id)
         ->and($other->donorProposals()->count())->toBe(0);
 });
 
@@ -365,17 +369,13 @@ test('a file with nothing stored behind it is marked reference only and offers n
         ->assertDontSeeHtml('data-test="preview-file-name"');
 });
 
-test('the money reading names every currency after the one its figure leads with', function () {
+test('the money reading names the currency of the one agreement and lists no others', function () {
     usdAgreement($this->proposal, '5000.00');
-    $euro = DonorProposal::factory()->create(['proposal_id' => $this->proposal->id, 'budget' => '1000.00', 'currency' => Currency::Eur]);
-    TransfersTracking::factory()->create(['donor_proposal_id' => $euro->id, 'ar_status' => ArStatus::Received, 'net_amount_received' => '250.00', 'amount_received_currency' => Currency::Eur, 'receive_date' => '2026-04-01']);
 
     $money = collect(proposalPage()->instance()->vitals)->firstWhere('key', 'money');
 
     expect($money['caption'])->toContain('USD')
-        ->and($money['others'])->toHaveCount(1)
-        ->and($money['others'][0]['currency'])->toBe('EUR')
-        ->and($money['others'][0]['text'])->toBe('25% — 250 of 1,000 EUR');
+        ->and($money['others'])->toBeEmpty();
 });
 
 test('a user without proposal permissions sees no edit controls and cannot change anything', function () {

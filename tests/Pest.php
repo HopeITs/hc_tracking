@@ -113,12 +113,14 @@ function insertProgram(int $strategyId, int $managerId, string $name = 'WASH'): 
  * Insert a proposal with only its required columns, and return its id.
  *
  * `status` and the actual dates are left out so the column defaults decide
- * them.
+ * them. A proposal always has a donor: pass one to pair it with an agreement,
+ * otherwise the factory creates one.
  */
-function insertProposal(string $name = 'Emergency WASH Response'): int
+function insertProposal(string $name = 'Emergency WASH Response', ?int $donorId = null): int
 {
     return Proposal::factory()->create([
         'name' => $name,
+        ...($donorId === null ? [] : ['donor_id' => $donorId]),
         'planned_date_begin' => '2026-01-01',
         'planned_date_end' => '2026-12-31',
     ])->id;
@@ -175,6 +177,14 @@ function insertDonorProposal(int $donorId, int $proposalId, string $budget = '50
 
     if ($externalProjectNumber !== null) {
         $agreement['external_project_number'] = $externalProjectNumber;
+    }
+
+    // An agreement's donor is its proposal's: point a still-unfunded proposal
+    // at the donor funding it, so a second agreement fails at the constraint.
+    $hasAgreement = DB::table('donor_proposal')->where('proposal_id', $proposalId)->exists();
+
+    if (! $hasAgreement) {
+        DB::table('proposals')->where('id', $proposalId)->update(['donor_id' => $donorId]);
     }
 
     return DonorProposal::factory()->create($agreement)->id;

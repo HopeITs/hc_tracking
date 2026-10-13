@@ -30,8 +30,10 @@ function seedProjectMoneyFixture(): array
     ]);
     $project->proposals()->attach($proposal);
 
+    $fundingDonorId = Donor::factory()->create(['name' => 'Aurora Foundation'])->id;
+    Proposal::query()->whereKey($proposal->id)->update(['donor_id' => $fundingDonorId]);
     $agreement = DonorProposal::factory()->create([
-        'donor_id' => Donor::factory()->create(['name' => 'Aurora Foundation'])->id,
+        'donor_id' => $fundingDonorId,
         'proposal_id' => $proposal->id,
         'currency' => Currency::Usd,
         'budget' => '731942.00',

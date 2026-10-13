@@ -21,6 +21,7 @@ function seedMoneyPagesFixture(): array
 {
     $donor = Donor::factory()->create(['name' => 'Aurora Foundation']);
     $proposal = Proposal::factory()->create(['name' => 'Harbour Clean Water']);
+    Proposal::query()->whereKey($proposal->id)->update(['donor_id' => $donor->id]);
     $agreement = DonorProposal::factory()->create([
         'donor_id' => $donor->id,
         'proposal_id' => $proposal->id,

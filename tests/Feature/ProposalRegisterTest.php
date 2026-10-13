@@ -63,15 +63,25 @@ function registerFundedProposal(): Proposal
     ]);
     $proposal->projects()->attach(Project::factory()->create());
 
+    $fundingDonorId = Donor::factory()->create(['name' => 'ECHO'])->id;
+    Proposal::query()->whereKey($proposal->id)->update(['donor_id' => $fundingDonorId]);
     $dollars = DonorProposal::factory()->create([
         'proposal_id' => $proposal->id,
-        'donor_id' => Donor::factory()->create(['name' => 'ECHO'])->id,
+        'donor_id' => $fundingDonorId,
         'budget' => '1000.00',
         'currency' => Currency::Usd,
     ]);
-    DonorProposal::factory()->create([
-        'proposal_id' => $proposal->id,
+    // A proposal has one donor and one agreement, so the second currency is a
+    // sibling proposal (a co-funder is a separate proposal, D-24).
+    $coFunded = Proposal::factory()->create([
+        'name' => 'Water Response',
         'donor_id' => Donor::factory()->create(['name' => 'GIZ'])->id,
+        'status' => ProposalStatus::Active,
+        'planned_date_begin' => '2026-01-01',
+        'planned_date_end' => '2026-12-31',
+    ]);
+    DonorProposal::factory()->create([
+        'proposal_id' => $coFunded->id,
         'budget' => '500.00',
         'currency' => Currency::Eur,
     ]);
@@ -103,8 +113,8 @@ test('the page opens on the table with one row per proposal and currency', funct
     $rows = $page->instance()->rows->getCollection();
 
     expect($rows->map(fn (Proposal $row): string => $row->name.'|'.($row->money_currency ?? '-'))->all())
-        ->toBe(['Water Response|EUR', 'Water Response|USD', 'Shelter Response|-'])
-        ->and($page->instance()->proposalCount)->toBe(2);
+        ->toBe(['Water Response|USD', 'Water Response|EUR', 'Shelter Response|-'])
+        ->and($page->instance()->proposalCount)->toBe(3);
 
     $dollars = $rows->firstWhere('money_currency', 'USD');
 
@@ -213,10 +223,10 @@ test('the table opens newest planned start first and a heading sorts it', functi
     $lines = fn (Testable $page): array => $page->instance()->rows->getCollection()->map(fn (Proposal $row): string => $row->name.'|'.$row->money_currency)->all();
 
     $page = proposalRegister();
-    expect($lines($page))->toBe(['Water Response|EUR', 'Water Response|USD', 'Alpha Appeal|USD']);
+    expect($lines($page))->toBe(['Water Response|USD', 'Water Response|EUR', 'Alpha Appeal|USD']);
 
     $page->call('sortRegister', 'proposal');
-    expect($lines($page))->toBe(['Alpha Appeal|USD', 'Water Response|EUR', 'Water Response|USD']);
+    expect($lines($page))->toBe(['Alpha Appeal|USD', 'Water Response|USD', 'Water Response|EUR']);
 
     $page->call('sortRegister', 'committed');
     expect($lines($page))->toBe(['Water Response|EUR', 'Alpha Appeal|USD', 'Water Response|USD']);
@@ -234,7 +244,7 @@ test('someone who may not see agreements gets the proposals with no donor, no mo
         ->assertDontSeeHtml('data-cell="committed"')
         ->assertDontSeeHtml('data-register-totals');
 
-    expect($page->instance()->rows->getCollection())->toHaveCount(1)
+    expect($page->instance()->rows->getCollection())->toHaveCount(2)
         ->and($page->instance()->totals)->toBeEmpty()
         ->and($page->instance()->filterDonors)->toBeEmpty()
         ->and(array_key_exists('money_committed', $page->instance()->rows->first()->getAttributes()))->toBeFalse()

@@ -13,6 +13,7 @@ test('a proposal has its funding agreements and donors', function () {
     $proposal = Proposal::factory()->create();
     $donor = Donor::factory()->create();
 
+    Proposal::query()->whereKey($proposal->id)->update(['donor_id' => $donor->id]);
     DonorProposal::factory()->create([
         'proposal_id' => $proposal->id,
         'donor_id' => $donor->id,

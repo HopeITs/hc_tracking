@@ -23,6 +23,7 @@ test('a new proposal starts as a concept note', function () {
 test('the status column defaults to concept note without the model supplying it', function () {
     $id = DB::table('proposals')->insertGetId([
         'name' => 'Emergency WASH Response',
+        'donor_id' => insertDonor(),
         'internal_project_number' => 'HC-2026-001',
         'planned_date_begin' => '2026-01-01',
         'planned_date_end' => '2026-12-31',
@@ -36,6 +37,7 @@ test('the status column defaults to concept note without the model supplying it'
 test('a proposal that has run records its actual dates and notes', function () {
     $id = DB::table('proposals')->insertGetId([
         'name' => 'Emergency WASH Response',
+        'donor_id' => insertDonor(),
         'internal_project_number' => 'HC-2026-001',
         'planned_date_begin' => '2026-01-01',
         'planned_date_end' => '2026-12-31',
@@ -58,6 +60,7 @@ test('a proposal that has run records its actual dates and notes', function () {
 test('a proposal cannot be stored without its planned dates', function () {
     DB::table('proposals')->insert([
         'name' => 'Emergency WASH Response',
+        'donor_id' => insertDonor(),
         'internal_project_number' => 'HC-2026-001',
         'created_at' => now(),
         'updated_at' => now(),
@@ -67,6 +70,7 @@ test('a proposal cannot be stored without its planned dates', function () {
 test('a proposal cannot be stored without an internal project number', function () {
     DB::table('proposals')->insert([
         'name' => 'Emergency WASH Response',
+        'donor_id' => insertDonor(),
         'planned_date_begin' => '2026-01-01',
         'planned_date_end' => '2026-12-31',
         'created_at' => now(),
@@ -81,6 +85,7 @@ test('a proposal cannot be stored without an internal project number', function 
 test('two proposals cannot share an internal project number, whatever its case', function (string $second) {
     $proposal = fn (string $number): array => [
         'name' => 'Emergency WASH Response',
+        'donor_id' => insertDonor(),
         'internal_project_number' => $number,
         'planned_date_begin' => '2026-01-01',
         'planned_date_end' => '2026-12-31',

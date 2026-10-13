@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\FundingAgreements;
 
 use App\Models\DonorProposal;
+use App\Models\Proposal;
 use Illuminate\Support\Facades\Gate;
 
 /**
@@ -22,8 +23,12 @@ class SaveFundingAgreement
 
         $agreement = $existing ?? new DonorProposal;
 
+        // The agreement's donor is the proposal's, read from the proposal and
+        // never from the request: the database refuses a pair that differs.
+        $donorId = Proposal::query()->whereKey((int) $validated['agreementProposalId'])->value('donor_id');
+
         $agreement->fill([
-            'donor_id' => (int) $validated['agreementDonorId'],
+            'donor_id' => (int) $donorId,
             'proposal_id' => (int) $validated['agreementProposalId'],
             'budget' => $validated['budget'],
             'currency' => $validated['agreementCurrency'],
