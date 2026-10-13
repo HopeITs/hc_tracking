@@ -47,6 +47,8 @@ return [
         'photo' => 'صورة',
         'evidence' => 'دليل',
         'other' => 'أخرى',
+        'final_report' => 'التقرير الختامي',
+        'final_report_acceptance' => 'موافقة الممول على التقرير الختامي',
     ],
     'dependency_type' => [
         'fs' => 'من النهاية إلى البداية',
@@ -82,6 +84,7 @@ return [
         'archived' => 'مؤرشف',
     ],
     'proposal_phase' => [
+        'ideation' => 'بلورة الفكرة',
         'planning' => 'التخطيط',
         'implementation' => 'التنفيذ',
         'monitoring' => 'الرصد',
@@ -90,8 +93,12 @@ return [
     ],
     'proposal_status' => [
         'concept_note' => 'مذكرة مفاهيمية',
+        'concept_note_review' => 'مراجعة المذكرة المفاهيمية',
+        'concept_note_submitted' => 'مذكرة مفاهيمية مقدَّمة',
         'proposal_draft' => 'مسودة مقترح',
+        'proposal_review' => 'مراجعة المقترح',
         'submitted' => 'مقدَّم',
+        'on_hold' => 'معلّق',
         'approved' => 'معتمد',
         'rejected' => 'مرفوض',
         'active' => 'نشط',

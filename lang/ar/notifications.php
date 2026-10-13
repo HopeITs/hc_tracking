@@ -388,6 +388,7 @@ return [
             'created' => 'أنشأ :actor المقترح «:subject»',
             'status_changed' => 'نقل :actor المقترح «:subject» من :from إلى :to',
             'status_note_added' => 'أضاف :actor ملاحظة حالة إلى «:subject»: :note',
+            'final_report_accepted' => 'سجّل :actor موافقة الممول على التقرير الختامي لـ«:subject»',
             'updated' => 'حدّث :actor المقترح «:subject»',
             'deleted' => 'حذف :actor المقترح «:subject»',
         ],

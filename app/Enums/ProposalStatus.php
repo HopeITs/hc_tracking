@@ -19,13 +19,36 @@ enum ProposalStatus: string
     use HasTranslatedLabel;
 
     case ConceptNote = 'concept note';
+    case ConceptNoteReview = 'concept note review';
+    case ConceptNoteSubmitted = 'concept note submitted';
     case ProposalDraft = 'proposal draft';
+    case ProposalReview = 'proposal review';
     case Submitted = 'submitted';
+    case OnHold = 'on hold';
     case Approved = 'approved';
     case Rejected = 'rejected';
     case Active = 'active';
+
+    /**
+     * @deprecated Retired by D-02: the final report is a milestone now. Kept
+     *             only so old rows and notes still render; no transition
+     *             leads in or out, and T04 moved its proposals to active.
+     */
     case FinalReports = 'final reports';
     case Completed = 'completed';
+
+    /**
+     * Every status a proposal can hold today, in lifecycle order.
+     *
+     * Pickers, filters and charts iterate this, never cases(), so the retired
+     * FinalReports never reappears as a choice.
+     *
+     * @return list<self>
+     */
+    public static function live(): array
+    {
+        return array_values(array_filter(self::cases(), fn (self $status): bool => $status !== self::FinalReports));
+    }
 
     /**
      * The phase of work this status places the proposal in.
@@ -36,32 +59,65 @@ enum ProposalStatus: string
     public function phase(): ProposalPhase
     {
         return match ($this) {
-            self::ConceptNote, self::ProposalDraft => ProposalPhase::Planning,
-            self::Submitted, self::Approved, self::Rejected => ProposalPhase::Implementation,
+            self::ConceptNote, self::ConceptNoteReview, self::ConceptNoteSubmitted => ProposalPhase::Ideation,
+            self::ProposalDraft, self::ProposalReview, self::Submitted, self::OnHold => ProposalPhase::Planning,
+            self::Approved => ProposalPhase::Implementation,
             self::Active => ProposalPhase::Monitoring,
             self::FinalReports => ProposalPhase::Closure,
-            self::Completed => ProposalPhase::Archived,
+            self::Completed, self::Rejected => ProposalPhase::Archived,
         };
     }
 
     /**
-     * The stage a proposal normally moves on to, or null when there is none.
+     * The stage of the proposal's paperwork: concept_note, proposal or grant.
      *
-     * Rejected is a dead end and Completed ends the lifecycle. Submitted
-     * advances to Approved; a rejection is still recorded through the full
-     * status change, never proposed as the "next" step.
+     * On hold and rejected keep the stage of the status they left, so the
+     * caller passes that status as $before (see Proposal::stage()). Without
+     * one they fall back to the proposal stage.
+     *
+     * @return 'concept_note'|'proposal'|'grant'
+     */
+    public function stage(?self $before = null): string
+    {
+        return match ($this) {
+            self::ConceptNote, self::ConceptNoteReview, self::ConceptNoteSubmitted => 'concept_note',
+            self::ProposalDraft, self::ProposalReview, self::Submitted => 'proposal',
+            self::Approved, self::Active, self::FinalReports, self::Completed => 'grant',
+            self::OnHold, self::Rejected => $before === null || in_array($before, [self::OnHold, self::Rejected], true)
+                ? 'proposal'
+                : $before->stage(),
+        };
+    }
+
+    /**
+     * The status a proposal normally moves on to, or null when there is none.
+     *
+     * On hold has no single next step (it depends on the pre-hold status);
+     * rejected and completed end the lifecycle, and the retired final reports
+     * leads nowhere. ProposalTransitions holds every allowed move.
      */
     public function next(): ?self
     {
         return match ($this) {
-            self::ConceptNote => self::ProposalDraft,
-            self::ProposalDraft => self::Submitted,
+            self::ConceptNote => self::ConceptNoteReview,
+            self::ConceptNoteReview => self::ConceptNoteSubmitted,
+            self::ConceptNoteSubmitted => self::ProposalDraft,
+            self::ProposalDraft => self::ProposalReview,
+            self::ProposalReview => self::Submitted,
             self::Submitted => self::Approved,
             self::Approved => self::Active,
-            self::Active => self::FinalReports,
-            self::FinalReports => self::Completed,
-            self::Rejected, self::Completed => null,
+            self::Active => self::Completed,
+            self::OnHold, self::Rejected, self::FinalReports, self::Completed => null,
         };
+    }
+
+    /**
+     * Whether the proposal ended: rejected or completed. Only a correction
+     * moves it again.
+     */
+    public function isTerminal(): bool
+    {
+        return in_array($this, [self::Rejected, self::Completed], true);
     }
 
     /**
@@ -75,7 +131,7 @@ enum ProposalStatus: string
     }
 
     /**
-     * The lifecycle in order, without the Rejected branch.
+     * The main line in order, without the on hold and rejected branches.
      *
      * @return list<self>
      */
@@ -83,11 +139,13 @@ enum ProposalStatus: string
     {
         return [
             self::ConceptNote,
+            self::ConceptNoteReview,
+            self::ConceptNoteSubmitted,
             self::ProposalDraft,
+            self::ProposalReview,
             self::Submitted,
             self::Approved,
             self::Active,
-            self::FinalReports,
             self::Completed,
         ];
     }

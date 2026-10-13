@@ -25,6 +25,8 @@ enum MediaCollection: string
     case Photo = 'photo';
     case Evidence = 'evidence';
     case Other = 'other';
+    case FinalReport = 'final_report';
+    case FinalReportAcceptance = 'final_report_acceptance';
 
     /**
      * Whether this collection holds signed funding paperwork.

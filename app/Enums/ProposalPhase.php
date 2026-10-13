@@ -17,6 +17,7 @@ enum ProposalPhase: string
 {
     use HasTranslatedLabel;
 
+    case Ideation = 'ideation';
     case Planning = 'planning';
     case Implementation = 'implementation';
     case Monitoring = 'monitoring';

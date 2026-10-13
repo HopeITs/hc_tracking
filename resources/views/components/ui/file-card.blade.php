@@ -14,6 +14,7 @@
         \App\Enums\MediaCollection::Evidence => 'border-status-warn/25 bg-status-warn-soft text-status-warn',
         \App\Enums\MediaCollection::Photo => 'border-secondary-dark/20 bg-secondary-dark text-white dark:border-white/10 dark:bg-surface-2',
         \App\Enums\MediaCollection::Other => 'border-secondary-light text-secondary-medium dark:text-ink-muted',
+        \App\Enums\MediaCollection::FinalReport, \App\Enums\MediaCollection::FinalReportAcceptance => 'border-status-good/25 bg-status-good-soft text-status-good',
     };
 @endphp
 
