@@ -24,6 +24,7 @@ use App\Models\Task;
 use App\Models\TaskAssignee;
 use App\Models\User;
 use App\Models\UserNotification;
+use App\Notifications\Alerts\NotificationSettings;
 use App\Notifications\NotificationPresenter;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Database\Schema\Blueprint;
@@ -605,6 +606,35 @@ function userWithRole(string $role, ?int $employeeId = null): User
     }
 
     return Activity::withoutRecording(fn (): User => User::factory()->role($role)->create(['employee_id' => $employeeId]));
+}
+
+/**
+ * Point the MEAL Manager slot (contracts §9) at a position held by the given
+ * employee, or a new one, and return the holder's employee id.
+ */
+function holdMealManagerSlot(?int $employeeId = null): int
+{
+    $employeeId ??= insertHrEmployee(firstNameEn: 'Maha', lastNameEn: 'Manager');
+    $positionId = insertHrPosition(insertHrDepartment('Monitoring & Evaluation'), 'MEAL Manager');
+    insertHrContract($employeeId, $positionId);
+
+    app(NotificationSettings::class)->save(['proposal_default_reviewers' => [
+        'meal_manager' => $positionId, 'finance_manager' => null, 'fundraising_manager' => null, 'ceo' => null,
+    ]]);
+
+    return $employeeId;
+}
+
+/**
+ * A MEAL user who holds the MEAL Manager slot: the one person who may assign
+ * MEAL officers (contracts §12.3).
+ */
+function mealManager(): User
+{
+    $employeeId = insertHrEmployee(firstNameEn: 'Maha', lastNameEn: 'Manager');
+    holdMealManagerSlot($employeeId);
+
+    return userWithRole('MEAL', $employeeId);
 }
 
 /**

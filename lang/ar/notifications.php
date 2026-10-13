@@ -142,6 +142,7 @@ return [
         'transfers' => 'التحويلات',
         'accounts' => 'الحسابات',
         'access-management' => 'المستخدمون والأدوار',
+        'cities' => 'المدن',
         'system' => 'النظام',
     ],
 
@@ -326,6 +327,15 @@ return [
             'created' => 'أنشأ :actor الاستراتيجية «:subject»',
             'updated' => 'حدّث :actor الاستراتيجية «:subject»',
             'deleted' => 'حذف :actor الاستراتيجية «:subject»',
+        ],
+        'meal_coverage' => [
+            'assigned' => 'جعل :actor :employee مسؤول المتابعة والتقييم في «:subject»',
+            'assigned_you' => 'جعلك :actor مسؤول المتابعة والتقييم في «:subject»',
+            'responsible_changed' => 'جعل :actor :employee مسؤول المتابعة والتقييم في «:subject» بدلًا من :from',
+            'responsible_changed_you' => 'جعلك :actor مسؤول المتابعة والتقييم في «:subject»',
+            'project_assigned' => 'جعل :actor :employee مسؤول المتابعة والتقييم للمشروع «:subject»',
+            'project_assigned_you' => 'جعلك :actor مسؤول المتابعة والتقييم للمشروع «:subject»',
+            'updated' => 'حدّث :actor تغطية المتابعة والتقييم في «:subject»',
         ],
         'risk' => [
             'created' => 'سجّل :actor الخطر «:subject»',

@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Concerns\Admin\ManagesMealCoverage;
 use App\Support\Like;
 use App\Models\HrCity;
 use App\Models\Project;
@@ -13,6 +14,7 @@ use Livewire\Component;
 use Livewire\WithPagination;
 
 new #[Title('titles.city_directory')] class extends Component {
+    use ManagesMealCoverage;
     use WithPagination;
 
     private const PerPage = 12;
@@ -301,6 +303,7 @@ new #[Title('titles.city_directory')] class extends Component {
                     'noProjectsLabel' => __('cities.no_projects_here_yet'),
                     'href' => route('projects.index', ['city' => $city->id]),
                     'matches' => $matchesSearch && $matchesStatus,
+                    'officer' => $this->cityOfficers[$city->id] ?? null,
                 ];
             })
             ->values()
@@ -428,6 +431,7 @@ new #[Title('titles.city_directory')] class extends Component {
             'mapFiltersActive' => $mapFiltersActive,
             'avatarTones' => $avatarTones,
             'mapOutlinePath' => $this::MapOutlinePath,
+            'canManageMealCoverage' => $this->canManageMealCoverage,
         ])
     @else
     <div class="flex min-h-8 flex-wrap items-center justify-between gap-2">
@@ -475,13 +479,17 @@ new #[Title('titles.city_directory')] class extends Component {
                     $openPct = $cityStats['total'] > 0 ? ($cityStats['open'] / $cityStats['total']) * 100 : 0;
                     $avatarTone = $avatarTones[$city->id % count($avatarTones)];
                 @endphp
+                {{-- The card is a link to the city's projects; the MEAL officer line sits below it, outside the link, so its button never nests inside an anchor. --}}
+                <div
+                    wire:key="city-{{ $city->id }}"
+                    class="logframe-reveal relative flex flex-col overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-card transition-all hover:-translate-y-0.5 hover:border-secondary-light hover:shadow-card-hover dark:border-transparent dark:bg-surface-1 dark:shadow-raised dark:hover:shadow-raised"
+                    style="--logframe-order: {{ min($index, 11) }}"
+                >
                 <a
                     href="{{ route('projects.index', ['city' => $city->id]) }}"
                     wire:navigate
-                    wire:key="city-{{ $city->id }}"
                     aria-label="{{ __('cities.view_projects_in_name', ['name' => $city->name]) }}"
-                    class="logframe-reveal group relative flex flex-col gap-4 overflow-hidden rounded-xl border border-secondary-soft bg-white p-4 shadow-card transition-all hover:-translate-y-0.5 hover:border-secondary-light hover:shadow-card-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:border-transparent dark:bg-surface-1 dark:shadow-raised dark:hover:shadow-raised"
-                    style="--logframe-order: {{ min($index, 11) }}"
+                    class="group flex flex-1 flex-col gap-4 p-4 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
                 >
                     <span
                         aria-hidden="true"
@@ -550,6 +558,17 @@ new #[Title('titles.city_directory')] class extends Component {
                         <flux:icon.chevron-right variant="micro" class="size-3.5 shrink-0 transition-transform duration-200 group-hover:translate-x-0.5 rtl:-scale-x-100 rtl:group-hover:-translate-x-0.5" />
                     </span>
                 </a>
+
+                <div class="border-t border-secondary-soft px-4 py-3 dark:border-line">
+                    @include('pages.admin._cities-meal-officer', [
+                        'officer' => $this->cityOfficers[$city->id] ?? null,
+                        'inherited' => false,
+                        'canManage' => $this->canManageMealCoverage,
+                        'scope' => 'city',
+                        'targetId' => $city->id,
+                    ])
+                </div>
+                </div>
             @endforeach
         </div>
 
@@ -559,5 +578,16 @@ new #[Title('titles.city_directory')] class extends Component {
             scroll-to="#city-directory-heading"
         />
     @endif
+    @endif
+
+    @can('projects.view')
+        @include('pages.admin._cities-project-officers', [
+            'projectOfficers' => $this->projectOfficers,
+            'canManage' => $this->canManageMealCoverage,
+        ])
+    @endcan
+
+    @if ($this->canManageMealCoverage)
+        @include('pages.admin._cities-meal-modal', ['mealTarget' => $this->mealTarget])
     @endif
 </section>
