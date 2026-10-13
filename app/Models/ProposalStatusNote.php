@@ -22,14 +22,25 @@ use Illuminate\Support\Str;
  * @property ProposalStatus $status
  * @property string $context
  * @property CarbonImmutable $date
+ * @property bool $is_correction
+ * @property int|null $changed_by
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['proposal_id', 'status', 'context', 'date'])]
+#[Fillable(['proposal_id', 'status', 'context', 'date', 'is_correction', 'changed_by'])]
 class ProposalStatusNote extends Model
 {
     /** @use HasFactory<ProposalStatusNoteFactory> */
     use HasFactory, RecordsParentActivity;
+
+    /**
+     * Mirror the column default so an unrefreshed note still reports it.
+     *
+     * @var array<string, bool>
+     */
+    protected $attributes = [
+        'is_correction' => false,
+    ];
 
     /**
      * The proposal whose status changed.
@@ -42,6 +53,17 @@ class ProposalStatusNote extends Model
     }
 
     /**
+     * The user who made the move; null for notes older than T04 or when that
+     * account was deleted.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function changedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'changed_by');
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string|class-string>
@@ -51,6 +73,7 @@ class ProposalStatusNote extends Model
         return [
             'status' => ProposalStatus::class,
             'date' => 'date',
+            'is_correction' => 'boolean',
         ];
     }
 

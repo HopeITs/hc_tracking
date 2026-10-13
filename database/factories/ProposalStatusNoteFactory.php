@@ -23,7 +23,7 @@ class ProposalStatusNoteFactory extends Factory
     {
         return [
             'proposal_id' => Proposal::factory(),
-            'status' => fake()->randomElement(ProposalStatus::cases()),
+            'status' => fake()->randomElement(ProposalStatus::live()),
             'context' => fake()->sentence(),
         ];
     }

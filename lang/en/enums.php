@@ -27,6 +27,8 @@ return [
         'photo' => 'Photo',
         'evidence' => 'Evidence',
         'other' => 'Other',
+        'final_report' => 'Final report',
+        'final_report_acceptance' => 'Final report acceptance',
     ],
     'dependency_type' => [
         'fs' => 'Finish to start',
@@ -62,6 +64,7 @@ return [
         'archived' => 'Archived',
     ],
     'proposal_phase' => [
+        'ideation' => 'Ideation',
         'planning' => 'Planning',
         'implementation' => 'Implementation',
         'monitoring' => 'Monitoring',
@@ -70,8 +73,12 @@ return [
     ],
     'proposal_status' => [
         'concept_note' => 'Concept Note',
+        'concept_note_review' => 'Concept Note Review',
+        'concept_note_submitted' => 'Concept Note Submitted',
         'proposal_draft' => 'Proposal Draft',
+        'proposal_review' => 'Proposal Review',
         'submitted' => 'Submitted',
+        'on_hold' => 'On Hold',
         'approved' => 'Approved',
         'rejected' => 'Rejected',
         'active' => 'Active',

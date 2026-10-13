@@ -267,6 +267,47 @@ class Proposal extends Model implements TracksActivity
     }
 
     /**
+     * The status the proposal held before it last entered $status: the
+     * pre-hold status for on hold, the pre-rejection one for rejected.
+     *
+     * Read from the audit trail in insertion order, so a backdated note does
+     * not reorder it. Null when the trail does not show it.
+     */
+    public function statusBefore(ProposalStatus $status): ?ProposalStatus
+    {
+        $enteredAt = $this->statusNotes()->where('status', $status)->max('id');
+
+        if ($enteredAt === null) {
+            return null;
+        }
+
+        $before = $this->statusNotes()
+            ->where('id', '<', $enteredAt)
+            ->where('status', '!=', $status)
+            ->latest('id')
+            ->value('status');
+
+        return $before instanceof ProposalStatus ? $before : ProposalStatus::tryFrom((string) $before);
+    }
+
+    /**
+     * The paperwork stage this proposal is at: concept_note, proposal or grant.
+     *
+     * Derived, never stored. On hold and rejected keep the stage of the
+     * status they left.
+     *
+     * @return 'concept_note'|'proposal'|'grant'
+     */
+    public function stage(): string
+    {
+        $before = in_array($this->status, [ProposalStatus::OnHold, ProposalStatus::Rejected], true)
+            ? $this->statusBefore($this->status)
+            : null;
+
+        return $this->status->stage($before);
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string|class-string>

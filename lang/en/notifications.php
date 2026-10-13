@@ -380,6 +380,7 @@ return [
             'created' => ':actor created the proposal “:subject”',
             'status_changed' => ':actor moved “:subject” from :from to :to',
             'status_note_added' => ':actor added a status note to “:subject”: :note',
+            'final_report_accepted' => ':actor recorded the donor\'s acceptance of the final report for “:subject”',
             'updated' => ':actor updated the proposal “:subject”',
             'deleted' => ':actor deleted the proposal “:subject”',
         ],

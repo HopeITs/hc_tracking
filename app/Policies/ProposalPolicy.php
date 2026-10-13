@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
+use App\Enums\ProposalStatus;
 use App\Models\Proposal;
 use App\Models\User;
 
@@ -39,6 +40,24 @@ class ProposalPolicy
     public function update(User $user, Proposal $proposal): bool
     {
         return $user->can('proposals.update');
+    }
+
+    /**
+     * Determine whether the user can move the proposal to a status.
+     *
+     * The transition table, not this ability, decides which moves exist.
+     */
+    public function transition(User $user, Proposal $proposal, ProposalStatus $to): bool
+    {
+        return $user->can('proposals.update');
+    }
+
+    /**
+     * Determine whether the user can correct a rejected or completed status.
+     */
+    public function correctStatus(User $user, Proposal $proposal): bool
+    {
+        return $user->can('proposals.correct-status');
     }
 
     /**
