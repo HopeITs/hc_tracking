@@ -85,9 +85,9 @@ class PlanIndicator extends Model implements TracksActivity
      * How much of this target has been achieved, counting approved reports only.
      *
      * This is the one definition every page uses. A numeric indicator
-     * accumulates, so its approved values are summed; a percentage indicator is
-     * a level, so the latest approved value stands on its own — 40% then 55% is
-     * 55%, not 95%. Unapproved figures are not achievement until they clear
+     * accumulates, so its approved values are summed; a percentage or average
+     * indicator is a level, so the latest approved value stands on its own —
+     * 40% then 55% is 55%, not 95%. Unapproved figures are not achievement until they clear
      * review; pendingValue() reports them separately.
      *
      * Answers from loaded `reports` and `indicator` relations when present, so
@@ -98,7 +98,7 @@ class PlanIndicator extends Model implements TracksActivity
     {
         $approved = $this->loadedReports()->where('status', ReportStatus::Approved);
 
-        if ($this->measuresPercentage()) {
+        if ($this->measuresLevel()) {
             $latest = $approved
                 ->sortBy([['planned_date', 'desc'], ['id', 'desc']])
                 ->first();
@@ -112,12 +112,12 @@ class PlanIndicator extends Model implements TracksActivity
     /**
      * Value reported but not yet approved, shown as a lighter "pending" band.
      *
-     * Always zero for a percentage indicator: an unapproved level does not add
-     * to an approved one.
+     * Always zero for a percentage or average indicator: an unapproved level
+     * does not add to an approved one.
      */
     public function pendingValue(): float
     {
-        if ($this->measuresPercentage()) {
+        if ($this->measuresLevel()) {
             return 0.0;
         }
 
@@ -167,7 +167,7 @@ class PlanIndicator extends Model implements TracksActivity
         $sum = "(select coalesce(sum(r.value), 0) from reports r where r.plan_indicator_id = plan_indicators.id and r.status = '{$approved}')";
         $latest = "coalesce((select r.value from reports r where r.plan_indicator_id = plan_indicators.id and r.status = '{$approved}' order by r.planned_date desc, r.id desc limit 1), 0)";
 
-        return '(case when '.self::measureSql()." = 'percentage' then {$latest} else {$sum} end)";
+        return '(case when '.self::measureSql().' in ('.self::levelMeasuresSql().") then {$latest} else {$sum} end)";
     }
 
     /**
@@ -179,7 +179,7 @@ class PlanIndicator extends Model implements TracksActivity
     {
         $approved = ReportStatus::Approved->value;
 
-        return '(case when '.self::measureSql()." = 'percentage' then 0 else (select coalesce(sum(r.value), 0) from reports r where r.plan_indicator_id = plan_indicators.id and r.status <> '{$approved}') end)";
+        return '(case when '.self::measureSql().' in ('.self::levelMeasuresSql().") then 0 else (select coalesce(sum(r.value), 0) from reports r where r.plan_indicator_id = plan_indicators.id and r.status <> '{$approved}') end)";
     }
 
     /**
@@ -266,13 +266,40 @@ class PlanIndicator extends Model implements TracksActivity
         return $this->relationLoaded('reports') ? $this->getRelation('reports') : $this->reports()->get();
     }
 
-    private function measuresPercentage(): bool
+    /**
+     * Whether this target measures a level (percentage or average) rather
+     * than a running count. levelMeasuresSql() is the same list for SQL.
+     */
+    private function measuresLevel(): bool
     {
         $indicator = $this->relationLoaded('indicator')
             ? $this->getRelation('indicator')
             : $this->indicator()->select(['id', 'measure'])->first();
 
-        return $indicator?->measure === IndicatorMeasure::Percentage;
+        return in_array($indicator?->measure, self::levelMeasures(), true);
+    }
+
+    /**
+     * The measures read as a level: latest approved value, nothing pending.
+     *
+     * @return list<IndicatorMeasure>
+     */
+    private static function levelMeasures(): array
+    {
+        return [IndicatorMeasure::Percentage, IndicatorMeasure::Average];
+    }
+
+    /**
+     * levelMeasures() as a quoted SQL list.
+     *
+     * @return literal-string
+     */
+    private static function levelMeasuresSql(): string
+    {
+        $percentage = IndicatorMeasure::Percentage->value;
+        $average = IndicatorMeasure::Average->value;
+
+        return "'{$percentage}', '{$average}'";
     }
 
     /**

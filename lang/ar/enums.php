@@ -19,6 +19,26 @@ return [
     'indicator_measure' => [
         'numeric' => 'رقمي',
         'percentage' => 'نسبة مئوية',
+        'average' => 'متوسط',
+    ],
+    'collection_frequency' => [
+        'monthly' => 'شهري',
+        'quarterly' => 'ربع سنوي',
+        'semi_annual' => 'نصف سنوي',
+        'annual' => 'سنوي',
+        'per_event' => 'لكل فعالية',
+        'per_season' => 'لكل موسم',
+        'follow_up' => 'متابعة لاحقة',
+        'baseline_endline' => 'خط الأساس والقياس النهائي',
+        'one_time' => 'مرة واحدة',
+    ],
+    'indicator_collector' => [
+        'project_team' => 'فريق المشروع',
+        'meal' => 'المتابعة والتقييم',
+    ],
+    'denominator_basis' => [
+        'fixed' => 'ثابت (المستفيدون المستهدفون)',
+        'entered' => 'مُدخل (البسط والمقام)',
     ],
     'media_collection' => [
         'proposal' => 'مقترح',

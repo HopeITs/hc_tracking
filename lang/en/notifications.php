@@ -132,6 +132,7 @@ return [
         'annual-plans' => 'Annual plans',
         'strategies' => 'Strategies',
         'risks' => 'Risks',
+        'indicator-library' => 'Indicator Library',
         'indicators' => 'Indicators',
         'targets' => 'Targets',
         'results' => 'Results',
@@ -332,6 +333,13 @@ return [
             'updated' => ':actor updated the risk “:subject”',
             'happened' => ':actor marked the risk “:subject” as happened',
             'deleted' => ':actor deleted the risk “:subject”',
+        ],
+        'library_indicator' => [
+            'created' => ':actor added “:subject” to the Indicator Library',
+            'updated' => ':actor updated the library indicator “:subject”',
+            'deactivated' => ':actor deactivated the library indicator “:subject”',
+            'reactivated' => ':actor reactivated the library indicator “:subject”',
+            'deleted' => ':actor deleted the library indicator “:subject”',
         ],
         'indicator' => [
             'created' => ':actor created the indicator “:subject”',

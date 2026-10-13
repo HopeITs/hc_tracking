@@ -71,6 +71,7 @@ final class SubjectLinks
             'donor_report' => $this->donorReportRoute($id),
             'risk' => route('risks.index'),
             'indicator' => route('indicators.index', ['inspect' => $id]),
+            'library_indicator' => route('indicator-library.index', ['entry' => $id]),
             'plan_indicator' => route('targets.index'),
             'result' => route('results.index'),
             'transfer' => route('transfers.index'),

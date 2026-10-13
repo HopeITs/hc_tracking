@@ -13,6 +13,7 @@ return [
     'group_strategy_planning' => 'الاستراتيجية والتخطيط',
     'group_workspace' => 'مساحة عملي',
     'guideline' => 'دليل الاستخدام',
+    'indicator_library' => 'مكتبة المؤشرات',
     'platform' => 'المنصة',
     'primary_navigation' => 'التنقل الرئيسي',
     'repository' => 'المستودع',

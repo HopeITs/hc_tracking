@@ -38,7 +38,7 @@ test('the sidebar lists every page for a Super Admin with funding in the order m
         'dashboard', 'executive-summary.index',
         'strategies.index', 'programs.index', 'annual-plans.index',
         'projects.index', 'milestones.index', 'timeline.index', 'risks.index',
-        'results.index', 'indicators.index', 'targets.index', 'reports.index',
+        'results.index', 'indicator-library.index', 'indicators.index', 'targets.index', 'reports.index',
         'donors.index', 'proposals.index', 'funding-agreements.index', 'transfers.index', 'admin.accounts.index',
         'tasks.index', 'calendar.index',
         'admin.users.index', 'admin.notification-settings.edit', 'activity.index', 'admin.cities.index',
@@ -109,6 +109,7 @@ test('the sidebar carries a monitoring and evaluation group once its routes exis
         ->assertOk()
         ->assertSeeText('Monitoring & Evaluation')
         ->assertSeeText('Results Framework')
+        ->assertSeeText('Indicator Library')
         ->assertSeeText('Indicators')
         ->assertSeeText('Targets')
         ->assertSeeText('Reports');

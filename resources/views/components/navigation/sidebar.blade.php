@@ -218,7 +218,7 @@
             </flux:sidebar.group>
         @endcanany
 
-        @canany(['results.view', 'indicators.view', 'targets.view', 'reports.view'])
+        @canany(['results.view', 'indicator-library.view', 'indicators.view', 'targets.view', 'reports.view'])
             <flux:sidebar.group
                 :heading="__('navigation.group_monitoring_evaluation')"
                 :class="$navigationGroupClasses"
@@ -234,6 +234,21 @@
                         {{ __('common.results_framework') }}
                         <x-slot:icon-trailing>
                             <x-notifications.module-badge module="results" :count="$moduleCounts['results'] ?? 0" />
+                        </x-slot:icon-trailing>
+                    </flux:sidebar.item>
+                @endcan
+
+                @can('indicator-library.view')
+                    <flux:sidebar.item
+                        icon="book-open"
+                        :href="route('indicator-library.index')"
+                        :current="request()->routeIs('indicator-library.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate.hover
+                    >
+                        {{ __('navigation.indicator_library') }}
+                        <x-slot:icon-trailing>
+                            <x-notifications.module-badge module="indicator-library" :count="$moduleCounts['indicator-library'] ?? 0" />
                         </x-slot:icon-trailing>
                     </flux:sidebar.item>
                 @endcan

@@ -13,6 +13,7 @@ return [
     'funding_agreement' => 'اتفاقية التمويل',
     'funding_agreements' => 'اتفاقيات التمويل',
     'indicators' => 'المؤشرات',
+    'indicator_library' => 'مكتبة المؤشرات',
     'milestone' => 'المرحلة الرئيسية',
     'milestones' => 'المراحل الرئيسية',
     'program' => 'البرنامج',

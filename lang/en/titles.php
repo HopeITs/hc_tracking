@@ -13,6 +13,7 @@ return [
     'funding_agreement' => 'Funding Agreement',
     'funding_agreements' => 'Funding Agreements',
     'indicators' => 'Indicators',
+    'indicator_library' => 'Indicator Library',
     'milestone' => 'Milestone',
     'milestones' => 'Milestones',
     'program' => 'Program',

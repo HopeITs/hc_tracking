@@ -1,9 +1,12 @@
 <?php
 
 use App\Enums\ArStatus;
+use App\Enums\CollectionFrequency;
 use App\Enums\Currency;
+use App\Enums\DenominatorBasis;
 use App\Enums\DonorType;
 use App\Enums\FileType;
+use App\Enums\IndicatorCollector;
 use App\Enums\IndicatorMeasure;
 use App\Enums\MediaCollection;
 use App\Enums\MilestoneStatus;
@@ -17,6 +20,7 @@ use App\Enums\TaskStatus;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\Indicator;
+use App\Models\LibraryIndicator;
 use App\Models\Media;
 use App\Models\Milestone;
 use App\Models\PlanIndicator;
@@ -244,6 +248,56 @@ function enumColumns(): array
             'stored' => 'SYP',
             'default' => Currency::Usd,
             'badCasing' => 'syp',
+        ]],
+        'library_indicators.measure' => [[
+            'model' => LibraryIndicator::class,
+            'table' => 'library_indicators',
+            'column' => 'measure',
+            'width' => 50,
+            'assign' => IndicatorMeasure::Average,
+            'stored' => 'average',
+            'default' => IndicatorMeasure::Numeric,
+            'badCasing' => 'Average',
+        ]],
+        'library_indicators.collected_by' => [[
+            'model' => LibraryIndicator::class,
+            'table' => 'library_indicators',
+            'column' => 'collected_by',
+            'width' => 20,
+            'assign' => IndicatorCollector::Meal,
+            'stored' => 'meal',
+            'default' => IndicatorCollector::ProjectTeam,
+            'badCasing' => 'MEAL',
+        ]],
+        'library_indicators.denominator_basis' => [[
+            'model' => LibraryIndicator::class,
+            'table' => 'library_indicators',
+            'column' => 'denominator_basis',
+            'width' => 20,
+            'assign' => DenominatorBasis::Fixed,
+            'stored' => 'fixed',
+            'default' => null,
+            'badCasing' => 'Fixed',
+        ]],
+        'library_indicators.frequency' => [[
+            'model' => LibraryIndicator::class,
+            'table' => 'library_indicators',
+            'column' => 'frequency',
+            'width' => 50,
+            'assign' => CollectionFrequency::BaselineEndline,
+            'stored' => 'baseline-endline',
+            'default' => null,
+            'badCasing' => 'Monthly',
+        ]],
+        'library_indicators.suggested_level' => [[
+            'model' => LibraryIndicator::class,
+            'table' => 'library_indicators',
+            'column' => 'suggested_level',
+            'width' => 50,
+            'assign' => ResultType::Outcome,
+            'stored' => 'outcome',
+            'default' => null,
+            'badCasing' => 'Outcome',
         ]],
     ];
 }

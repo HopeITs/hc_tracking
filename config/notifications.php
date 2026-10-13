@@ -12,6 +12,7 @@ use App\Notifications\Recipients\AccountRecipients;
 use App\Notifications\Recipients\DonorRecipients;
 use App\Notifications\Recipients\FundingAgreementRecipients;
 use App\Notifications\Recipients\IndicatorRecipients;
+use App\Notifications\Recipients\LibraryIndicatorRecipients;
 use App\Notifications\Recipients\ManagedRecipients;
 use App\Notifications\Recipients\MilestoneRecipients;
 use App\Notifications\Recipients\ProjectRecipients;
@@ -43,6 +44,7 @@ return [
         'annual-plans' => ManagedRecipients::class,
         'strategies' => StrategyRecipients::class,
         'risks' => RiskRecipients::class,
+        'indicator-library' => LibraryIndicatorRecipients::class,
         'indicators' => IndicatorRecipients::class,
         'targets' => IndicatorRecipients::class,
         'results' => ResultRecipients::class,
@@ -126,6 +128,7 @@ return [
         'annual-plans' => 'calendar-days',
         'strategies' => 'chart-bar-square',
         'risks' => 'exclamation-triangle',
+        'indicator-library' => 'book-open',
         'indicators' => 'variable',
         'targets' => 'flag',
         'results' => 'chart-bar',

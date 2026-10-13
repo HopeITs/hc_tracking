@@ -7,6 +7,7 @@ use App\Models\DonorProposal;
 use App\Models\HrEmployee;
 use App\Models\Indicator;
 use App\Models\IndicatorProgress;
+use App\Models\LibraryIndicator;
 use App\Models\Media;
 use App\Models\Milestone;
 use App\Models\PlanIndicator;
@@ -50,6 +51,7 @@ test('the seeders populate every table in the schema', function () {
         Result::class,
         Indicator::class,
         IndicatorProgress::class,
+        LibraryIndicator::class,
         PlanIndicator::class,
         Report::class,
         ReportFile::class,

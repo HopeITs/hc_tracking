@@ -89,6 +89,26 @@ test('a percentage target takes the latest approved level rather than a sum', fu
         ->and($target->achievementStatus())->toBe('in_progress');
 });
 
+test('an average target takes the latest approved level, and the sql agrees', function () {
+    $target = PlanIndicator::factory()
+        ->for(Indicator::factory()->state(['measure' => IndicatorMeasure::Average]))
+        ->create(['target' => 150]);
+    Report::factory()->approved()->for($target)->create(['value' => 120, 'planned_date' => '2026-03-31']);
+    Report::factory()->approved()->for($target)->create(['value' => 140, 'planned_date' => '2026-06-30']);
+    Report::factory()->reviewed()->for($target)->create(['value' => 160, 'planned_date' => '2026-09-30']);
+
+    $row = PlanIndicator::query()
+        ->whereKey($target->id)
+        ->selectRaw(PlanIndicator::achievedValueSql().' as achieved, '.PlanIndicator::pendingValueSql().' as pending')
+        ->toBase()
+        ->first();
+
+    expect($target->achievedValue())->toBe(140.0)
+        ->and($target->pendingValue())->toBe(0.0)
+        ->and((float) $row->achieved)->toBe(140.0)
+        ->and((float) $row->pending)->toBe(0.0);
+});
+
 test('a target with nothing approved has not started, and a zero target has no percentage', function () {
     $target = PlanIndicator::factory()->create(['target' => 0]);
     Report::factory()->for($target)->create(['value' => 10]);

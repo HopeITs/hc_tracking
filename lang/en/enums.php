@@ -19,6 +19,26 @@ return [
     'indicator_measure' => [
         'numeric' => 'Numeric',
         'percentage' => 'Percentage',
+        'average' => 'Average',
+    ],
+    'collection_frequency' => [
+        'monthly' => 'Monthly',
+        'quarterly' => 'Quarterly',
+        'semi_annual' => 'Semi-Annual',
+        'annual' => 'Annual',
+        'per_event' => 'Per event',
+        'per_season' => 'Per season',
+        'follow_up' => 'Follow-up',
+        'baseline_endline' => 'Baseline and endline',
+        'one_time' => 'One time',
+    ],
+    'indicator_collector' => [
+        'project_team' => 'Project team',
+        'meal' => 'MEAL',
+    ],
+    'denominator_basis' => [
+        'fixed' => 'Fixed (target beneficiaries)',
+        'entered' => 'Entered (numerator and denominator)',
     ],
     'media_collection' => [
         'proposal' => 'Proposal',

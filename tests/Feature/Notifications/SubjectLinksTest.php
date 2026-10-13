@@ -26,6 +26,7 @@ test('every directory-only subject type leads to its directory', function (strin
 })->with([
     'risk' => ['risk', fn () => route('risks.index')],
     'indicator' => ['indicator', fn () => route('indicators.index', ['inspect' => 5])],
+    'library indicator' => ['library_indicator', fn () => route('indicator-library.index', ['entry' => 5])],
     'target' => ['plan_indicator', fn () => route('targets.index')],
     'result' => ['result', fn () => route('results.index')],
     'transfer' => ['transfer', fn () => route('transfers.index')],

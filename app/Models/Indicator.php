@@ -22,6 +22,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $id
  * @property string $name
  * @property int $result_id
+ * @property int|null $library_indicator_id
+ * @property string|null $code
  * @property int|null $project_id
  * @property IndicatorMeasure $measure
  * @property string|null $unit
@@ -31,7 +33,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['name', 'result_id', 'project_id', 'measure', 'unit', 'baseline', 'target', 'frequency'])]
+#[Fillable(['name', 'result_id', 'library_indicator_id', 'code', 'project_id', 'measure', 'unit', 'baseline', 'target', 'frequency'])]
 class Indicator extends Model implements TracksActivity
 {
     /** @use HasFactory<IndicatorFactory> */
@@ -61,6 +63,19 @@ class Indicator extends Model implements TracksActivity
     public function result(): BelongsTo
     {
         return $this->belongsTo(Result::class);
+    }
+
+    /**
+     * The Indicator Library entry this indicator was picked from, if any.
+     *
+     * `code` is a read-only copy of the entry's code and `measure` mirrors
+     * the entry's measure (SaveLibraryIndicator keeps it in step).
+     *
+     * @return BelongsTo<LibraryIndicator, $this>
+     */
+    public function libraryIndicator(): BelongsTo
+    {
+        return $this->belongsTo(LibraryIndicator::class);
     }
 
     /**

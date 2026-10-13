@@ -132,6 +132,7 @@ return [
         'annual-plans' => 'الخطط السنوية',
         'strategies' => 'الاستراتيجيات',
         'risks' => 'المخاطر',
+        'indicator-library' => 'مكتبة المؤشرات',
         'indicators' => 'المؤشرات',
         'targets' => 'المستهدفات',
         'results' => 'النتائج',
@@ -332,6 +333,13 @@ return [
             'updated' => 'حدّث :actor الخطر «:subject»',
             'happened' => 'أشار :actor إلى أن الخطر «:subject» قد وقع',
             'deleted' => 'حذف :actor الخطر «:subject»',
+        ],
+        'library_indicator' => [
+            'created' => 'أضاف :actor «:subject» إلى مكتبة المؤشرات',
+            'updated' => 'حدّث :actor مؤشر المكتبة «:subject»',
+            'deactivated' => 'أوقف :actor مؤشر المكتبة «:subject»',
+            'reactivated' => 'أعاد :actor تفعيل مؤشر المكتبة «:subject»',
+            'deleted' => 'حذف :actor مؤشر المكتبة «:subject»',
         ],
         'indicator' => [
             'created' => 'أنشأ :actor المؤشر «:subject»',

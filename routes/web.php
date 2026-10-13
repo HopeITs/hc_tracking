@@ -100,6 +100,10 @@ Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () 
         ->can('results.view')
         ->name('results.index');
 
+    Route::livewire('indicator-library', 'pages::indicator-library.index')
+        ->can('indicator-library.view')
+        ->name('indicator-library.index');
+
     Route::livewire('indicators', 'pages::indicators.index')
         ->can('indicators.view')
         ->name('indicators.index');

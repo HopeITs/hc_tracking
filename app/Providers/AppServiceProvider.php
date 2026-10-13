@@ -11,6 +11,7 @@ use App\Models\DonorProposal;
 use App\Models\DonorReport;
 use App\Models\HrDepartment;
 use App\Models\Indicator;
+use App\Models\LibraryIndicator;
 use App\Models\Milestone;
 use App\Models\PlanIndicator;
 use App\Models\Program;
@@ -267,6 +268,7 @@ class AppServiceProvider extends ServiceProvider
             'transfer' => TransfersTracking::class,
             'account' => Account::class,
             'role' => Role::class,
+            'library_indicator' => LibraryIndicator::class,
         ]);
     }
 

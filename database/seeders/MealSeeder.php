@@ -2,10 +2,15 @@
 
 namespace Database\Seeders;
 
+use App\Enums\CollectionFrequency;
+use App\Enums\DenominatorBasis;
+use App\Enums\IndicatorCollector;
+use App\Enums\IndicatorMeasure;
 use App\Enums\ResultType;
 use App\Models\AnnualPlan;
 use App\Models\Indicator;
 use App\Models\IndicatorProgress;
+use App\Models\LibraryIndicator;
 use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
@@ -13,8 +18,10 @@ use App\Models\Report;
 use App\Models\ReportFile;
 use App\Models\Result;
 use App\Models\User;
+use App\Support\IndicatorCode;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * The MEAL layer: the logframe, the targets planned against it, and the
@@ -61,6 +68,29 @@ class MealSeeder extends Seeder
                 $this->seedProgress($indicator, $users);
             }
         });
+
+        $this->seedIndicatorLibrary();
+    }
+
+    /**
+     * A few institutional (HC) Indicator Library entries: one per measure,
+     * plus an Arabic-only and an inactive one. Per-program entries are left
+     * out because their codes come from HR program codes, which can be
+     * duplicated in HR and are then refused (D-10a).
+     */
+    protected function seedIndicatorLibrary(): void
+    {
+        $entries = [
+            ['level_ref' => 'G', 'name_ar' => 'عدد الأسر التي تحسّن وضعها المعيشي', 'name_en' => 'Households whose living conditions improved', 'unit' => 'households', 'frequency' => CollectionFrequency::Annual],
+            ['level_ref' => 'OC1', 'name_ar' => 'نسبة المستفيدين الراضين عن الخدمات', 'name_en' => 'Share of beneficiaries satisfied with services', 'unit' => null, 'measure' => IndicatorMeasure::Percentage, 'denominator_basis' => DenominatorBasis::Entered, 'collected_by' => IndicatorCollector::Meal, 'frequency' => CollectionFrequency::Quarterly],
+            ['level_ref' => 'OP1', 'name_ar' => 'متوسط درجات الاختبار البعدي', 'name_en' => 'Average post-test score', 'unit' => 'points', 'measure' => IndicatorMeasure::Average, 'collected_by' => IndicatorCollector::Meal, 'frequency' => CollectionFrequency::PerEvent],
+            ['level_ref' => 'OP1', 'name_ar' => 'عدد الجلسات التوعوية المنفذة', 'name_en' => null, 'unit' => 'sessions', 'frequency' => CollectionFrequency::Monthly, 'definition' => 'تُعدّ الجلسات المنفذة فعليًا خلال الشهر.'],
+            ['level_ref' => 'AC1.1', 'name_ar' => 'عدد السلال الغذائية الموزعة', 'name_en' => 'Food baskets distributed', 'unit' => 'baskets', 'frequency' => CollectionFrequency::Monthly, 'is_active' => false],
+        ];
+
+        foreach ($entries as $entry) {
+            DB::transaction(fn (): LibraryIndicator => LibraryIndicator::factory()->create([...$entry, ...IndicatorCode::next(null, $entry['level_ref'])]));
+        }
     }
 
     /**

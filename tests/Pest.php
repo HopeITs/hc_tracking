@@ -462,11 +462,11 @@ function insertHrSeedReferenceData(): void
 /**
  * Insert an HR program and return its id.
  */
-function insertHrProgram(string $name = 'Hope Center', bool $isActive = true): int
+function insertHrProgram(string $name = 'Hope Center', bool $isActive = true, ?string $code = null): int
 {
     return DB::connection('hr')->table('programs')->insertGetId([
         'name' => $name,
-        'code' => fake()->bothify('??####'),
+        'code' => $code ?? fake()->bothify('??####'),
         'slug' => fake()->unique()->slug(),
         'is_active' => $isActive,
     ]);
@@ -554,6 +554,41 @@ function userWithRole(string $role, ?int $employeeId = null): User
     }
 
     return Activity::withoutRecording(fn (): User => User::factory()->role($role)->create(['employee_id' => $employeeId]));
+}
+
+/**
+ * A complete Indicator Library form submission for SaveLibraryIndicator: an
+ * institutional (HC), monthly, numeric entry at OP1 unless overridden.
+ *
+ * @param  array<string, mixed>  $overrides
+ * @return array<string, mixed>
+ */
+function libraryIndicatorInput(array $overrides = []): array
+{
+    return [
+        'institutional' => true,
+        'program_id' => null,
+        'level_ref' => 'OP1',
+        'name_ar' => 'عدد الأسر المستفيدة',
+        'name_en' => 'Number of households reached',
+        'definition' => null,
+        'calculation_method' => null,
+        'measure' => 'numeric',
+        'unit' => 'households',
+        'numerator_label' => null,
+        'denominator_label' => null,
+        'denominator_basis' => null,
+        'is_disaggregated' => false,
+        'collected_by' => 'project_team',
+        'is_cumulative' => false,
+        'frequency' => 'monthly',
+        'frequency_note' => null,
+        'follow_up_months' => null,
+        'suggested_level' => null,
+        'data_source' => null,
+        'means_of_verification' => null,
+        ...$overrides,
+    ];
 }
 
 /**

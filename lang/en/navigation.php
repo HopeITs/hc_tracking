@@ -13,6 +13,7 @@ return [
     'group_strategy_planning' => 'Strategy & Planning',
     'group_workspace' => 'My Workspace',
     'guideline' => 'User guideline',
+    'indicator_library' => 'Indicator Library',
     'platform' => 'Platform',
     'primary_navigation' => 'Primary navigation',
     'repository' => 'Repository',
