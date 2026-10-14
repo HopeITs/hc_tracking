@@ -161,6 +161,7 @@ return [
         'escalation' => [
             'manager' => '«:subject» ما زال متأخرًا بعد :days أيام عمل (كان موعده :date) — صُعّد إليك بصفتك مدير البرنامج',
             'top' => '«:subject» ما زال متأخرًا بعد :days أيام عمل (كان موعده :date) — صُعّد إلى الإدارة',
+            'supervisor' => '«:subject» ما زال متأخرًا بعد :days أيام عمل (كان موعده :date) — صُعّد إليك بصفتك المتابِع',
         ],
         'stalled' => [
             'task' => 'بقيت المهمة «:subject» في حالة :status مدة :days أيام عمل دون تغيير',
@@ -429,6 +430,10 @@ return [
             'renamed' => 'غيّر :actor اسم الدور من «:from» إلى «:to»',
             'permissions_changed' => 'غيّر :actor صلاحيات الدور «:subject» (أُضيف: :added؛ أُزيل: :removed)',
             'deleted' => 'حذف :actor الدور «:subject»',
+        ],
+        'supervision' => [
+            'added' => 'جعل :actor :supervisor متابِعًا لـ :supervisee',
+            'removed' => 'أزال :actor :supervisor من متابعة :supervisee',
         ],
     ],
 ];

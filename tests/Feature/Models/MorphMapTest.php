@@ -20,6 +20,7 @@ use App\Models\Result;
 use App\Models\Risk;
 use App\Models\Role;
 use App\Models\Strategy;
+use App\Models\Supervision;
 use App\Models\Task;
 use App\Models\TransfersTracking;
 use App\Models\User;
@@ -50,6 +51,7 @@ test('the morph map registers exactly the target sources, task sources, media ow
         'role' => Role::class,
         'library_indicator' => LibraryIndicator::class,
         'meal_coverage' => MealCoverageAssignment::class,
+        'supervision' => Supervision::class,
     ]);
 });
 

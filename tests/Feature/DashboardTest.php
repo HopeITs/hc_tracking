@@ -166,8 +166,8 @@ test('the proposal pipeline counts only open proposals', function () {
         ->instance()
         ->pipelineChart;
 
-    expect($pipeline['categories'])->toBe(['Planning', 'Implementation', 'Monitoring', 'Closure'])
-        ->and($pipeline['series'][0]['data'])->toBe([0, 1, 0, 0]);
+    expect($pipeline['categories'])->toBe(['Ideation', 'Planning', 'Implementation', 'Monitoring', 'Closure'])
+        ->and($pipeline['series'][0]['data'])->toBe([0, 1, 0, 0, 0]);
 });
 
 test('recent activity describes proposal status changes', function () {

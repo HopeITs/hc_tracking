@@ -5,10 +5,12 @@ use App\Models\Activity;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\DonorReport;
+use App\Models\HrCenter;
 use App\Models\HrCity;
 use App\Models\HrContract;
 use App\Models\HrDepartment;
 use App\Models\HrEmployee;
+use App\Models\HrJobLevel;
 use App\Models\HrPosition;
 use App\Models\HrProgram;
 use App\Models\HrUser;
@@ -56,10 +58,12 @@ function modelsGuardedWithoutPolicy(): array
         Donor::class => ['donors', 'donors.* permissions (ManagesDonorForm).'],
         DonorProposal::class => ['funding-agreements', 'funding-agreements.* permissions (ManagesAgreementForm).'],
         DonorReport::class => ['funding-agreements', 'Edited from the funding agreement page under funding-agreements.update.'],
+        HrCenter::class => [null, 'Read-only mirror of the HR database; never written here.'],
         HrCity::class => ['cities', 'cities.* permissions on the admin cities page.'],
         HrContract::class => [null, 'Read-only mirror of the HR database; never written here.'],
         HrDepartment::class => [null, 'Read-only mirror of the HR database; never written here.'],
         HrEmployee::class => [null, 'Read-only mirror of the HR database; never written here.'],
+        HrJobLevel::class => [null, 'Read-only mirror of the HR database; never written here.'],
         HrPosition::class => [null, 'Read-only mirror of the HR database; never written here.'],
         HrProgram::class => [null, 'Read-only mirror of the HR database; never written here.'],
         HrUser::class => [null, 'Read-only mirror of the HR database; never written here.'],

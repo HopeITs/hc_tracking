@@ -82,6 +82,14 @@ trait RecordsActivity
     }
 
     /**
+     * The event recorded when the row is deleted.
+     */
+    protected function activityDeletedEvent(): string
+    {
+        return $this->getMorphClass().'.deleted';
+    }
+
+    /**
      * Whether updates are logged at all (false for noisy bookkeeping models).
      */
     protected function activityRecordsUpdates(): bool
@@ -148,7 +156,7 @@ trait RecordsActivity
         }
 
         if ($hook === 'deleted') {
-            $event = $this->getMorphClass().'.deleted';
+            $event = $this->activityDeletedEvent();
             $recorder->record($this, $event, properties: [...$this->activityDeletionProperties, ...$this->activityProperties($event)]);
 
             return;

@@ -91,6 +91,8 @@ new #[Title('titles.dashboard')] class extends Component {
 <section class="@container/dashboard flex w-full flex-1 flex-col gap-5 pb-10" aria-labelledby="dashboard-heading" data-dashboard>
     @include('pages.dashboard._index-greeting')
 
+    @include('pages.dashboard._index-my-team')
+
     @include('pages.dashboard._index-row-one')
 
     @include('pages.dashboard._index-row-two')

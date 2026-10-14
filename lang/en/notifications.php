@@ -161,6 +161,7 @@ return [
         'escalation' => [
             'manager' => '“:subject” is still overdue after :days working days (due :date) — escalated to you as program manager',
             'top' => '“:subject” is still overdue after :days working days (due :date) — escalated to management',
+            'supervisor' => '“:subject” is still overdue after :days working days (due :date) — escalated to you as supervisor',
         ],
         'stalled' => [
             'task' => '“:subject” has been :status for :days working days without a status change',
@@ -429,6 +430,10 @@ return [
             'renamed' => ':actor renamed the role “:from” to “:to”',
             'permissions_changed' => ':actor changed the permissions of the role “:subject” (added: :added; removed: :removed)',
             'deleted' => ':actor deleted the role “:subject”',
+        ],
+        'supervision' => [
+            'added' => ':actor made :supervisor a supervisor of :supervisee',
+            'removed' => ':actor removed :supervisor as a supervisor of :supervisee',
         ],
     ],
 ];

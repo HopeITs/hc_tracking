@@ -2,35 +2,10 @@
 
 use App\Enums\NotificationPriority;
 use App\Models\Activity;
-use App\Models\Milestone;
 use App\Models\Program;
-use App\Models\Project;
-use App\Models\Task;
-use App\Models\User;
 use App\Models\UserNotification;
 use App\Notifications\Alerts\EscalationScanner;
 use App\Notifications\Alerts\OverdueScanner;
-use Carbon\CarbonImmutable;
-
-function overdueTaskFor(User $assignee, string $due, ?int $programId = null): Task
-{
-    return Activity::withoutRecording(function () use ($assignee, $due, $programId): Task {
-        $project = Project::factory()->create(['end_date' => '2027-12-31', ...($programId === null ? [] : ['program_id' => $programId])]);
-        $milestone = Milestone::factory()->create(['project_id' => $project->id, 'planned_end_date' => '2027-12-31']);
-        $task = Task::factory()->create(['due_date' => $due, 'title' => 'Plan', 'source_type' => 'milestone', 'source_id' => $milestone->id]);
-        $task->taskAssignees()->delete();
-        $task->taskAssignees()->create(['employee_id' => $assignee->employee_id]);
-
-        return $task;
-    });
-}
-
-function runScanner(string $class, string $at): int
-{
-    test()->travelTo(CarbonImmutable::parse($at));
-
-    return app($class)->scan(CarbonImmutable::now());
-}
 
 test('overdue fires on day one then every three working days', function () {
     $assignee = userWithRole('Managers', insertHrEmployee());

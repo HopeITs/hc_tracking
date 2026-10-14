@@ -8,11 +8,14 @@ use App\Enums\ArStatus;
 use App\Enums\MilestoneStatus;
 use App\Enums\ReportStatus;
 use App\Enums\TaskStatus;
+use App\Models\HrEmployee;
 use App\Models\Milestone;
 use App\Models\ProposalStatusNote;
 use App\Models\Report;
 use App\Models\Task;
+use App\Models\TaskAssignee;
 use App\Models\TransfersTracking;
+use App\Support\SupervisionMap;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Collection;
@@ -21,8 +24,8 @@ use Livewire\Attributes\Computed;
 
 /**
  * The dashboard's own-work and timeline sections: the signed-in person's
- * workload, what falls due in the next thirty days, the recent activity feed
- * and the time-of-day greeting.
+ * workload, their team's overdue tasks, what falls due in the next thirty
+ * days, the recent activity feed and the time-of-day greeting.
  *
  * Used by dashboard/index only. The page provides visible() and canView().
  * upcoming() also calls transferHref() and taskParentName() from
@@ -54,6 +57,56 @@ trait ReadsDashboardWork
             'dueThisWeek' => $employeeId === null ? 0 : $openTasks()->whereBetween('due_date', [$today->toDateString(), $today->addDays(7)->toDateString()])->count(),
             'draftReports' => $this->visible(Report::query(), 'reports')->where('user_id', $user->id)->where('status', ReportStatus::Draft)->count(),
         ];
+    }
+
+    /**
+     * The people the signed-in person supervises (SupervisionMap: HR direct
+     * reports plus local supervisions, active employees only) and how many
+     * open tasks each has overdue, most overdue first.
+     *
+     * Supervision grants no visibility: the count runs as the signed-in user,
+     * so TaskVisibilityScope still applies. A fixed number of queries however
+     * many people are listed; with nobody to supervise, only the map loads.
+     *
+     * @return list<array{employeeId: int, name: string, overdue: int}>
+     */
+    #[Computed]
+    public function myTeam(): array
+    {
+        $employeeId = auth()->user()->employee_id;
+
+        if ($employeeId === null) {
+            return [];
+        }
+
+        $superviseeIds = SupervisionMap::superviseesOf($employeeId);
+
+        if ($superviseeIds === []) {
+            return [];
+        }
+
+        $names = HrEmployee::query()->whereKey($superviseeIds)->get(HrEmployee::NameColumns)
+            ->mapWithKeys(fn (HrEmployee $employee): array => [$employee->id => $employee->name]);
+
+        $overdue = TaskAssignee::query()
+            ->whereIn('employee_id', $superviseeIds)
+            ->whereIn('task_id', $this->visible(Task::query(), 'tasks')
+                ->select('id')
+                ->where('status', '!=', TaskStatus::Done)
+                ->whereDate('due_date', '<', CarbonImmutable::today()))
+            ->groupBy('employee_id')
+            ->selectRaw('employee_id, count(*) as overdue')
+            ->pluck('overdue', 'employee_id');
+
+        return array_values(collect($superviseeIds)
+            ->filter(fn (int $id): bool => $names->has($id))
+            ->map(fn (int $id): array => [
+                'employeeId' => $id,
+                'name' => (string) $names->get($id),
+                'overdue' => (int) $overdue->get($id, 0),
+            ])
+            ->sortBy([['overdue', 'desc'], ['name', 'asc']])
+            ->all());
     }
 
     /**

@@ -23,6 +23,11 @@ final class ActivityParameters
     private const PassThrough = ['subtask', 'file', 'note', 'role', 'baseline', 'value', 'added', 'removed', 'action', 'ip'];
 
     /**
+     * Properties holding a person's {en, ar} names, rendered in the reader's language.
+     */
+    private const LocalizedNames = ['employee', 'supervisor', 'supervisee'];
+
+    /**
      * @return array<string, mixed>
      */
     public function for(Activity $activity): array
@@ -44,8 +49,10 @@ final class ActivityParameters
             $params['to'] = $this->typedChange($activity, $field, $new, 1);
         }
 
-        if (isset($activity->properties['employee'])) {
-            $params['employee'] = ['localized' => $activity->properties['employee']];
+        foreach (self::LocalizedNames as $key) {
+            if (isset($activity->properties[$key])) {
+                $params[$key] = ['localized' => $activity->properties[$key]];
+            }
         }
 
         foreach (self::PassThrough as $key) {

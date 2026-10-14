@@ -23,11 +23,13 @@ use App\Models\Result;
 use App\Models\Risk;
 use App\Models\Role;
 use App\Models\Strategy;
+use App\Models\Supervision;
 use App\Models\Task;
 use App\Models\TransfersTracking;
 use App\Models\User;
 use App\Notifications\Alerts\NotificationSettings;
 use App\Support\RouteSlugs;
+use App\Support\SupervisionMap;
 use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
@@ -59,6 +61,7 @@ class AppServiceProvider extends ServiceProvider
         // One instance per request or job, so queue workers never hold stale values.
         $this->app->scoped(NotificationSettings::class);
         $this->app->scoped(RouteSlugs::class);
+        $this->app->scoped(SupervisionMap::class);
 
         $this->registerDevCommands();
 
@@ -271,6 +274,7 @@ class AppServiceProvider extends ServiceProvider
             'role' => Role::class,
             'library_indicator' => LibraryIndicator::class,
             'meal_coverage' => MealCoverageAssignment::class,
+            'supervision' => Supervision::class,
         ]);
     }
 

@@ -31,6 +31,7 @@ test('every directory-only subject type leads to its directory', function (strin
     'result' => ['result', fn () => route('results.index')],
     'transfer' => ['transfer', fn () => route('transfers.index')],
     'account' => ['account', fn () => route('admin.accounts.index')],
+    'supervision' => ['supervision', fn () => route('admin.users.index', ['tab' => 'supervision'])],
 ]);
 
 test('routeFor returns null for a show-route subject that no longer exists', function () {
