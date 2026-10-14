@@ -212,7 +212,7 @@ final class SaveProposal
             $messages['skipReason.min'] = __('proposals.explain_why_the_concept_note_is_skipped');
         }
 
-        if ($this->canSeeMoney($actor)) {
+        if (self::canSeeMoney($actor)) {
             $rules['requestedBudget'] = ['nullable', 'numeric', 'min:0', 'max:999999999999.99'];
             $rules['requestedCurrency'] = ['nullable', 'required_with:requestedBudget', Rule::enum(Currency::class)];
             $messages['requestedBudget.min'] = __('proposals.the_budget_cannot_be_negative');
@@ -327,7 +327,7 @@ final class SaveProposal
 
         $sentMoney = array_key_exists('requestedBudget', $input) || array_key_exists('requestedCurrency', $input);
 
-        if ($this->canSeeMoney($actor) && ($sentMoney || ! $proposal->exists)) {
+        if (self::canSeeMoney($actor) && ($sentMoney || ! $proposal->exists)) {
             $budget = $input['requestedBudget'] ?? null;
             $currency = $input['requestedCurrency'] ?? null;
 
@@ -406,9 +406,11 @@ final class SaveProposal
     }
 
     /**
-     * Money visibility (contracts.md §8), decided from the acting user.
+     * Money visibility (contracts.md §8), decided from the acting user. The
+     * proposal form reads the same check to decide whether it renders and
+     * loads the budget.
      */
-    private function canSeeMoney(User $actor): bool
+    public static function canSeeMoney(User $actor): bool
     {
         return $actor->can('funding-agreements.view') || $actor->can('transfers.view') || $actor->can('accounts.view');
     }

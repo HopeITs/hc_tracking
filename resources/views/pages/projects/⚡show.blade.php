@@ -267,6 +267,9 @@ new #[Title('titles.project')] class extends Component {
                     <x-ui.enum-badge :case="$this->project->status" />
                 @endcan
                 <x-ui.employee-chip :employee="$this->project->user" class="rounded-lg border border-secondary-soft p-2.5 dark:border-line" />
+                @if ($this->canStartConceptNote)
+                    <x-ui.button tone="primary" size="sm" icon="document-plus" class="min-h-10 touch-manipulation" :href="route('proposals.index', ['for_project' => $this->project->id])" wire:navigate data-test="new-concept-note">{{ __('proposals.new_concept_note') }}</x-ui.button>
+                @endif
             </div>
         </x-slot:actions>
 

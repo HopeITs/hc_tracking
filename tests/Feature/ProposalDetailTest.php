@@ -387,7 +387,7 @@ test('each tab shows only its own content and the strip counts its records', fun
         ->test('pages::proposals.show', ['proposal' => $proposal]);
 
     expect(collect($component->instance()->tabs)->pluck('count', 'key')->all())
-        ->toBe(['status' => 1, 'deadlines' => 1, 'funding' => 1, 'projects' => 0, 'tasks' => 1, 'targets' => 0, 'reports' => 0, 'documents' => 0]);
+        ->toBe(['status' => 1, 'deadlines' => 1, 'funding' => 1, 'projects' => 0, 'logframe' => null, 'targets' => 0, 'plan' => null, 'tasks' => 1, 'reports' => 0, 'documents' => 0]);
 
     $component->assertSeeText('Board signed off')
         ->assertDontSeeText('UNICEF')
@@ -644,7 +644,37 @@ test('the status and details forms are rendered only while their modals are open
 
     Livewire::actingAs($user)
         ->test('pages::proposals.show', ['proposal' => $proposal])
-        ->assertDontSeeHtml('wire:model="detailsNotes"')
-        ->call('openDetailsModal')
-        ->assertSeeHtml('wire:model="detailsNotes"');
+        ->assertDontSeeHtml('wire:model="notes"')
+        ->call('openEditModal', $proposal->id)
+        ->assertSeeHtml('wire:model="notes"');
+});
+
+test('the team B tabs each render their own partial, under construction until their task lands', function (string $tab, string $label) {
+    $user = User::factory()->role('Financial')->create();
+    $proposal = Proposal::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::proposals.show', ['proposal' => $proposal])
+        ->assertSeeText($label)
+        ->set('tab', $tab)
+        ->assertSet('tab', $tab)
+        ->assertSeeHtml('data-tab-panel="'.$tab.'"')
+        ->assertSeeHtml('data-under-construction="'.$tab.'"')
+        ->assertSeeText(__('proposals.under_construction'));
+})->with([
+    'logical framework' => ['logframe', 'Logical Framework'],
+    'indicators and targets' => ['targets', 'Indicators & Targets'],
+    'plan' => ['plan', 'Plan'],
+]);
+
+test('the tab labels read in Arabic', function () {
+    $user = User::factory()->role('Financial')->create(['locale' => 'ar']);
+    app()->setLocale('ar');
+
+    Livewire::actingAs($user)
+        ->test('pages::proposals.show', ['proposal' => Proposal::factory()->create()])
+        ->assertSeeText('الإطار المنطقي')
+        ->assertSeeText('المؤشرات والمستهدفات')
+        ->set('tab', 'plan')
+        ->assertSeeText('قيد الإنشاء');
 });

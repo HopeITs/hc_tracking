@@ -443,3 +443,23 @@ test('the project page shows a linked proposal\'s internal number and lists atta
         ->assertSeeHtml('data-placeholder-chip="TEMP-0021"')
         ->assertSee('Cash for Work · HC-2026-093');
 });
+
+test('New Concept Note opens the proposal form for this project', function () {
+    $project = Project::factory()->create();
+
+    Livewire::actingAs(User::factory()->role('Financial')->create())
+        ->test('pages::projects.show', ['project' => $project])
+        ->assertSeeHtml('data-test="new-concept-note"')
+        ->assertSeeHtml(e(route('proposals.index', ['for_project' => $project->id])));
+});
+
+test('New Concept Note is offered only to proposal creators on a project that can take a proposal', function (string $role, ProjectStatus $status) {
+    $project = Project::factory()->status($status)->create();
+
+    Livewire::actingAs(User::factory()->role($role)->create())
+        ->test('pages::projects.show', ['project' => $project])
+        ->assertDontSeeHtml('data-test="new-concept-note"');
+})->with([
+    'no proposals.create' => ['Managers', ProjectStatus::Draft],
+    'archived project' => ['Financial', ProjectStatus::Archived],
+]);

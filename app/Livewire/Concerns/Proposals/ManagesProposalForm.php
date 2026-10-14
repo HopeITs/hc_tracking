@@ -4,80 +4,93 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Proposals;
 
+use App\Actions\Proposals\SaveProposal;
 use App\Enums\ProposalStatus;
 use App\Models\Donor;
+use App\Models\HrCenter;
+use App\Models\Project;
 use App\Models\Proposal;
-use App\Models\ProposalStatusNote;
-use Closure;
+use App\Models\User;
+use App\Support\Like;
 use Flux\Flux;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 
 /**
- * The register's add and edit form, and its delete confirmation. A starting
- * status is chosen only on create (it writes the first ProposalStatusNote);
- * later moves go through ManagesProposalStages.
+ * The proposal form v2 (T06): create from one or more projects, or edit the
+ * details, donor, budget and beneficiaries. Every save goes through
+ * SaveProposal, so the form writes no status and no links of its own: a new
+ * proposal starts at the concept note (or skips it with a reason), and an
+ * edit leaves links to the proposal page's Projects tab.
  *
- * Used by proposals/index only. The page uses WithPagination (resetPage).
+ * The property names are SaveProposal's `$data` keys, so a refusal from the
+ * action lands under the field that caused it.
+ *
+ * Used by proposals/index and proposals/show (Edit details). The page
+ * implements proposalSaved(); a page pinned to one proposal overrides
+ * proposalFormScope().
  */
 trait ManagesProposalForm
 {
+    /** How many matching projects the picker lists at a time. */
+    private const ProjectPickerLimit = 25;
+
     public bool $showProposalModal = false;
 
     #[Locked]
     public ?int $editingProposalId = null;
 
-    public bool $showDeleteModal = false;
-
-    #[Locked]
-    public ?int $deletingProposalId = null;
-
     public string $name = '';
 
-    public string $proposalDonorId = '';
-
     public string $internalProjectNumber = '';
+
+    public string $donorId = '';
+
+    /** @var list<string> */
+    public array $projectIds = [];
+
+    public string $projectSearch = '';
+
+    /** @var array<int|string, int|string|null> */
+    public array $beneficiaries = [];
+
+    public string $beneficiariesReason = '';
+
+    public string $requestedBudget = '';
+
+    public string $requestedCurrency = '';
 
     public string $plannedDateBegin = '';
 
     public string $plannedDateEnd = '';
 
-    public string $actualDateBegin = '';
-
-    public string $actualDateEnd = '';
-
-    public string $proposalStatus = 'concept note';
-
     public string $notes = '';
 
-    /**
-     * Whether this proposal may be deleted.
-     *
-     * donor_proposal.proposal_id RESTRICTs on delete, deliberately: without it
-     * one proposal delete would reach through the agreement into
-     * transfers_tracking and erase every record of money received. The UI
-     * refuses first so the user gets a reason instead of a query exception.
-     */
-    protected function canDelete(int $proposalId): bool
-    {
-        $proposal = Proposal::query()
-            ->select(['id'])
-            ->withCount('donorProposals')
-            ->find($proposalId);
+    public string $startingStage = 'concept note';
 
-        return $proposal !== null && $proposal->donor_proposals_count === 0;
+    public string $skipReason = '';
+
+    /**
+     * Called after a proposal is created or edited through the form.
+     */
+    abstract protected function proposalSaved(Proposal $proposal, bool $wasCreated): void;
+
+    /**
+     * The proposal this page's form may edit, or null when it may edit any.
+     */
+    protected function proposalFormScope(): ?int
+    {
+        return null;
     }
 
     /**
      * The donors a proposal can be assigned to.
-     *
-     * Interim: the v2 proposal form replaces this select.
      *
      * @return Collection<int, Donor>
      */
@@ -87,121 +100,198 @@ trait ManagesProposalForm
         return Donor::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get();
     }
 
-    public function openCreateModal(): void
+    /**
+     * Whether the acting user may see and set the budget (contracts.md §8).
+     */
+    #[Computed]
+    public function proposalFormShowsMoney(): bool
+    {
+        return SaveProposal::canSeeMoney($this->proposalActor());
+    }
+
+    /**
+     * The picker's rows while creating: linkable projects matching the
+     * search, at most ProjectPickerLimit of them, plus the ones already
+     * chosen so a narrowed search never hides a choice.
+     *
+     * @return list<array{id: int, name: string, place: string}>
+     */
+    #[Computed]
+    public function proposalPickerProjects(): array
+    {
+        if (! $this->showProposalModal || $this->editingProposalId !== null || ! $this->proposalActor()->can('projects.view')) {
+            return [];
+        }
+
+        $search = trim($this->projectSearch);
+
+        $matches = $this->linkableProjectQuery()
+            ->when($search !== '', fn (Builder $query) => $query->where('name', 'like', Like::contains($search)))
+            ->limit(self::ProjectPickerLimit)
+            ->get();
+
+        return $this->projectRows($matches->merge($this->chosenProjects())->sortBy([['name', 'asc'], ['id', 'asc']]));
+    }
+
+    /**
+     * The chosen projects while creating, each with its beneficiaries input.
+     *
+     * @return list<array{id: int, name: string, place: string}>
+     */
+    #[Computed]
+    public function proposalChosenProjects(): array
+    {
+        if (! $this->showProposalModal || $this->editingProposalId !== null) {
+            return [];
+        }
+
+        return $this->projectRows($this->chosenProjects());
+    }
+
+    /**
+     * The projects already linked to the proposal being edited, each with its
+     * beneficiaries input. Links themselves change on the proposal page.
+     *
+     * @return list<array{id: int, name: string, place: string}>
+     */
+    #[Computed]
+    public function proposalLinkedProjects(): array
+    {
+        if (! $this->showProposalModal || $this->editingProposalId === null) {
+            return [];
+        }
+
+        $projects = Project::query()
+            ->select(['projects.id', 'projects.name', 'projects.center_id', 'projects.city_id'])
+            ->whereHas('proposals', fn (Builder $query) => $query->whereKey($this->editingProposalId))
+            ->with('city:id,name_en,name_ar')
+            ->orderBy('projects.name')
+            ->orderBy('projects.id')
+            ->get();
+
+        return $this->projectRows($projects);
+    }
+
+    /**
+     * What the edit form must lock or ask for: the donor once the concept
+     * note has left the house or an agreement names it, and a reason for a
+     * beneficiary change once the donor approved.
+     *
+     * @return array{donorLocked: bool, approved: bool}
+     */
+    #[Computed]
+    public function proposalEditFacts(): array
+    {
+        if (! $this->showProposalModal || $this->editingProposalId === null) {
+            return ['donorLocked' => false, 'approved' => false];
+        }
+
+        $proposal = Proposal::query()->select(['id', 'status'])->withExists('donorProposals')->findOrFail($this->editingProposalId);
+        $isOpen = in_array($proposal->status, [ProposalStatus::ConceptNote, ProposalStatus::ConceptNoteReview], true);
+
+        return [
+            'donorLocked' => ! $isOpen || (bool) $proposal->getAttribute('donor_proposals_exists'),
+            'approved' => $proposal->status->isApprovedByDonor(),
+        ];
+    }
+
+    /**
+     * Open an empty create form. A project id (New Concept Note on the
+     * project page) is pre-selected only when it may take a proposal; the
+     * save checks it again.
+     */
+    public function openCreateModal(?int $projectId = null): void
     {
         Gate::authorize('create', Proposal::class);
 
         $this->resetProposalForm();
+
+        if ($projectId !== null && $this->proposalActor()->can('projects.view') && $this->linkableProjectQuery()->whereKey($projectId)->exists()) {
+            $this->projectIds = [(string) $projectId];
+        }
+
         $this->showProposalModal = true;
     }
 
     public function openEditModal(int $proposalId): void
     {
+        $scope = $this->proposalFormScope();
+
+        abort_if($scope !== null && $scope !== $proposalId, 404);
+
+        $showsMoney = SaveProposal::canSeeMoney($this->proposalActor());
+        $columns = ['id', 'name', 'donor_id', 'internal_project_number', 'planned_date_begin', 'planned_date_end', 'notes', 'status'];
+
+        // The budget is read only for someone who may see money (contracts.md §8).
         $proposal = Proposal::query()
-            ->select(['id', 'name', 'donor_id', 'internal_project_number', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end', 'notes'])
+            ->select($showsMoney ? [...$columns, 'requested_budget', 'requested_currency'] : $columns)
             ->findOrFail($proposalId);
 
         Gate::authorize('update', $proposal);
 
-        $this->resetValidation();
+        $this->resetProposalForm();
         $this->editingProposalId = $proposal->id;
         $this->name = $proposal->name;
-        $this->proposalDonorId = (string) $proposal->donor_id;
         $this->internalProjectNumber = $proposal->internal_project_number;
+        $this->donorId = (string) $proposal->donor_id;
         $this->plannedDateBegin = $proposal->planned_date_begin?->toDateString() ?? '';
         $this->plannedDateEnd = $proposal->planned_date_end?->toDateString() ?? '';
-        $this->actualDateBegin = $proposal->actual_date_begin?->toDateString() ?? '';
-        $this->actualDateEnd = $proposal->actual_date_end?->toDateString() ?? '';
         $this->notes = $proposal->notes ?? '';
+
+        if ($showsMoney) {
+            $this->requestedBudget = $proposal->requested_budget ?? '';
+            $this->requestedCurrency = $proposal->requested_currency?->value ?? '';
+        }
+
+        foreach ($proposal->projects()->select(['projects.id'])->get() as $project) {
+            /** @var int|string|null $stored */
+            $stored = $project->getRelation('pivot')->getAttribute('target_beneficiaries');
+            $this->beneficiaries[$project->id] = $stored === null ? '' : (string) $stored;
+        }
+
         $this->showProposalModal = true;
+    }
+
+    /**
+     * Keep the chosen ids distinct and drop the beneficiaries of a project
+     * that was unticked, so the save never sends a stale key.
+     */
+    public function updatedProjectIds(): void
+    {
+        $this->projectIds = array_values(array_unique(array_map('strval', array_filter($this->projectIds, 'is_scalar'))));
+        $this->beneficiaries = array_intersect_key($this->beneficiaries, array_flip($this->projectIds));
+    }
+
+    public function removeChosenProject(int $projectId): void
+    {
+        $this->projectIds = array_values(array_filter($this->projectIds, fn (string $id): bool => $id !== (string) $projectId));
+        unset($this->beneficiaries[$projectId]);
+    }
+
+    /**
+     * Fill the skip reason with the standard one (D-03).
+     */
+    public function useSkipPreset(): void
+    {
+        $this->skipReason = __('proposals.skip_reason_preset');
     }
 
     public function saveProposal(): void
     {
-        $this->name = trim($this->name);
-        $this->internalProjectNumber = trim($this->internalProjectNumber);
-        $this->notes = trim($this->notes);
+        $existing = null;
 
-        $storedNumber = $this->editingProposalId === null
-            ? null
-            : Proposal::query()->whereKey($this->editingProposalId)->value('internal_project_number');
+        if ($this->editingProposalId !== null) {
+            $scope = $this->proposalFormScope();
 
-        $validated = $this->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'proposalDonorId' => ['required', 'integer', Rule::exists(Donor::class, 'id')],
-            'internalProjectNumber' => [
-                'required',
-                'string',
-                'max:50',
-                Rule::unique('proposals', 'internal_project_number')->ignore($this->editingProposalId),
-                // TEMP- marks the placeholders the migration wrote. A proposal
-                // still holding one saves unchanged, but nobody types a new one.
-                function (string $attribute, mixed $value, Closure $fail) use ($storedNumber): void {
-                    if (Proposal::isPlaceholderNumber((string) $value) && $value !== $storedNumber) {
-                        $fail(__('proposals.internal_project_number_prefix_reserved'));
-                    }
-                },
-            ],
-            'plannedDateBegin' => ['required', 'date'],
-            'plannedDateEnd' => ['required', 'date', 'after_or_equal:plannedDateBegin'],
-            'actualDateBegin' => ['nullable', 'date'],
-            'actualDateEnd' => ['nullable', 'date', 'after_or_equal:actualDateBegin'],
-            'proposalStatus' => [$this->editingProposalId === null ? 'required' : 'nullable', new Enum(ProposalStatus::class)],
-            'notes' => ['nullable', 'string'],
-        ], [
-            'name.required' => __('proposals.enter_a_proposal_name'),
-            'proposalDonorId.required' => __('proposals.choose_the_donor'),
-            'plannedDateBegin.required' => __('proposals.set_the_planned_start_date'),
-            'plannedDateEnd.required' => __('proposals.set_the_planned_end_date'),
-            'plannedDateEnd.after_or_equal' => __('proposals.the_planned_end_cannot_fall_before_the_planned_start'),
-            'actualDateEnd.after_or_equal' => __('proposals.the_actual_end_cannot_fall_before_the_actual_start'),
-        ]);
+            abort_if($scope !== null && $scope !== $this->editingProposalId, 404);
 
-        $proposal = $this->editingProposalId === null
-            ? new Proposal
-            : Proposal::query()->findOrFail($this->editingProposalId);
-
-        Gate::authorize($proposal->exists ? 'update' : 'create', $proposal->exists ? $proposal : Proposal::class);
-
-        // The agreement's donor must stay the proposal's donor, so the donor
-        // is locked once an agreement exists (the composite key would refuse).
-        if ($proposal->exists && (int) $validated['proposalDonorId'] !== $proposal->donor_id && $proposal->donorProposals()->exists()) {
-            $this->addError('proposalDonorId', __('proposals.the_donor_is_fixed_by_the_funding_agreement'));
-
-            return;
+            $existing = Proposal::query()->findOrFail($this->editingProposalId);
         }
 
-        // Status is only chosen when the proposal is first recorded. After that
-        // it moves through recordStageChange(), which writes the audit note
-        // alongside it, so the edit form never touches it.
+        $this->resetValidation();
+
         try {
-            DB::transaction(function () use ($proposal, $validated): void {
-                $proposal->fill([
-                    'name' => $validated['name'],
-                    'donor_id' => (int) $validated['proposalDonorId'],
-                    'internal_project_number' => $validated['internalProjectNumber'],
-                    'planned_date_begin' => $validated['plannedDateBegin'],
-                    'planned_date_end' => $validated['plannedDateEnd'],
-                    'actual_date_begin' => $validated['actualDateBegin'] === '' ? null : $validated['actualDateBegin'],
-                    'actual_date_end' => $validated['actualDateEnd'] === '' ? null : $validated['actualDateEnd'],
-                    'notes' => $validated['notes'] === '' ? null : $validated['notes'],
-                ]);
-
-                if (! $proposal->exists) {
-                    $proposal->status = ProposalStatus::from($validated['proposalStatus']);
-                }
-
-                $proposal->save();
-
-                if ($proposal->wasRecentlyCreated) {
-                    ProposalStatusNote::query()->create([
-                        'proposal_id' => $proposal->id,
-                        'status' => $proposal->status,
-                        'context' => __('proposals.proposal_recorded_note'),
-                        'date' => now()->toDateString(),
-                    ]);
-                }
-            });
+            $proposal = app(SaveProposal::class)->handle($existing, $this->proposalFormData($existing === null), $this->proposalActor());
         } catch (UniqueConstraintViolationException $exception) {
             // Two people saved the same new number at the same moment: both
             // passed validation and the unique index refused the second.
@@ -214,59 +304,14 @@ trait ManagesProposalForm
             return;
         }
 
-        $wasRecentlyCreated = $proposal->wasRecentlyCreated;
-
         $this->showProposalModal = false;
         $this->resetProposalForm();
-        $this->resetPage();
+        $this->proposalSaved($proposal, $existing === null);
 
         Flux::toast(
             variant: 'success',
-            text: $wasRecentlyCreated ? __('proposals.proposal_created') : __('proposals.proposal_updated'),
+            text: $existing === null ? __('proposals.proposal_created') : __('proposals.proposal_updated'),
         );
-    }
-
-    public function confirmDelete(int $proposalId): void
-    {
-        Gate::authorize('delete', Proposal::query()->findOrFail($proposalId));
-
-        $this->deletingProposalId = $proposalId;
-        $this->showDeleteModal = true;
-    }
-
-    public function cancelDelete(): void
-    {
-        $this->deletingProposalId = null;
-        $this->showDeleteModal = false;
-    }
-
-    public function deleteProposal(): void
-    {
-        if ($this->deletingProposalId === null) {
-            return;
-        }
-
-        if (! $this->canDelete($this->deletingProposalId)) {
-            $this->cancelDelete();
-
-            Flux::toast(
-                variant: 'danger',
-                text: __('proposals.this_proposal_has_a_funding_agreement_remove_the_agreement_f'),
-            );
-
-            return;
-        }
-
-        $proposal = Proposal::query()->findOrFail($this->deletingProposalId);
-
-        Gate::authorize('delete', $proposal);
-
-        $proposal->delete();
-
-        $this->cancelDelete();
-        $this->resetPage();
-
-        Flux::toast(variant: 'success', text: __('proposals.proposal_deleted'));
     }
 
     public function closeProposalModal(): void
@@ -280,13 +325,133 @@ trait ManagesProposalForm
         $this->resetValidation();
         $this->editingProposalId = null;
         $this->name = '';
-        $this->proposalDonorId = '';
         $this->internalProjectNumber = '';
+        $this->donorId = '';
+        $this->projectIds = [];
+        $this->projectSearch = '';
+        $this->beneficiaries = [];
+        $this->beneficiariesReason = '';
+        $this->requestedBudget = '';
+        $this->requestedCurrency = '';
         $this->plannedDateBegin = '';
         $this->plannedDateEnd = '';
-        $this->actualDateBegin = '';
-        $this->actualDateEnd = '';
-        $this->proposalStatus = 'concept note';
         $this->notes = '';
+        $this->startingStage = ProposalStatus::ConceptNote->value;
+        $this->skipReason = '';
+    }
+
+    /**
+     * The form as SaveProposal's `$data`. Create sends the chosen projects,
+     * their beneficiaries and the starting stage; edit sends the linked
+     * projects' beneficiaries. The budget is sent only by a money holder.
+     *
+     * @return array<string, mixed>
+     */
+    private function proposalFormData(bool $isCreate): array
+    {
+        $beneficiaries = $isCreate
+            ? array_intersect_key($this->beneficiaries, array_flip($this->projectIds))
+            : $this->beneficiaries;
+
+        $data = [
+            'name' => $this->name,
+            'internalProjectNumber' => $this->internalProjectNumber,
+            'donorId' => $this->donorId === '' ? null : $this->donorId,
+            'beneficiaries' => array_map(fn (int|string|null $count): int|string|null => $count === '' ? null : $count, $beneficiaries),
+            'beneficiariesReason' => $this->beneficiariesReason === '' ? null : $this->beneficiariesReason,
+            'plannedDateBegin' => $this->plannedDateBegin === '' ? null : $this->plannedDateBegin,
+            'plannedDateEnd' => $this->plannedDateEnd === '' ? null : $this->plannedDateEnd,
+            'notes' => $this->notes,
+        ];
+
+        if ($isCreate) {
+            $data['projectIds'] = $this->projectIds;
+            $data['startingStage'] = $this->startingStage;
+            $data['skipReason'] = $this->startingStage === ProposalStatus::ProposalDraft->value ? $this->skipReason : null;
+        }
+
+        if (SaveProposal::canSeeMoney($this->proposalActor())) {
+            $data['requestedBudget'] = $this->requestedBudget === '' ? null : $this->requestedBudget;
+            $data['requestedCurrency'] = $this->requestedCurrency === '' ? null : $this->requestedCurrency;
+        }
+
+        return $data;
+    }
+
+    /**
+     * Projects a proposal may be linked to (Project::linkableToProposals()),
+     * with only what the picker shows.
+     *
+     * @return Builder<Project>
+     */
+    private function linkableProjectQuery(): Builder
+    {
+        return Project::query()
+            ->linkableToProposals()
+            ->select(['id', 'name', 'center_id', 'city_id'])
+            ->with('city:id,name_en,name_ar')
+            ->orderBy('name')
+            ->orderBy('id');
+    }
+
+    /**
+     * The chosen projects that are still linkable. One that is no longer
+     * linkable drops out of the list; the save refuses it by name.
+     *
+     * @return Collection<int, Project>
+     */
+    private function chosenProjects(): Collection
+    {
+        $ids = array_map('intval', array_filter($this->projectIds, 'ctype_digit'));
+
+        if ($ids === [] || ! $this->proposalActor()->can('projects.view')) {
+            return new Collection;
+        }
+
+        return $this->linkableProjectQuery()->whereKey($ids)->get();
+    }
+
+    /**
+     * Each project as a picker row: its name and where it runs, the HR
+     * center and the city. A center HR cannot answer for shows its id.
+     *
+     * @param  iterable<Project>  $projects
+     * @return list<array{id: int, name: string, place: string}>
+     */
+    private function projectRows(iterable $projects): array
+    {
+        $rows = [];
+
+        foreach ($projects as $project) {
+            $rows[] = [
+                'id' => $project->id,
+                'name' => $project->name,
+                'place' => $this->centerName($project->center_id).' · '.($project->city?->name ?? __('common.unknown_city')),
+            ];
+        }
+
+        return $rows;
+    }
+
+    private function centerName(?int $centerId): string
+    {
+        if ($centerId === null) {
+            return __('proposals.no_center');
+        }
+
+        try {
+            return HrCenter::remembered($centerId)->name ?? '#'.$centerId;
+        } catch (QueryException) {
+            return '#'.$centerId;
+        }
+    }
+
+    private function proposalActor(): User
+    {
+        $user = Auth::user();
+
+        abort_unless($user instanceof User, 403);
+
+        return $user;
     }
 }

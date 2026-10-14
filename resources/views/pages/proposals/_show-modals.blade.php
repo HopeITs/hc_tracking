@@ -1,5 +1,5 @@
 {{--
-    Every dialog of proposals/show, in page order: status, details,
+    Every dialog of proposals/show, in page order: status, proposal form,
     agreement, tranche, unlink, file, file preview, file delete and add
     task. Included by ⚡show.blade.php.
 --}}
@@ -33,36 +33,7 @@
         </x-slot:actions>
     </x-ui.modal>
 
-    <x-ui.modal
-        wire:model="showDetailsModal"
-        size="xl"
-        :title="__('proposals.edit_details')"
-        :description="__('proposals.status_moves_through_change_status_so_it_is_always_recorded')"
-        submit="saveDetails"
-        required-note
-    >
-        @if ($showDetailsModal)
-            <x-ui.form-section :title="__('common.section_details')" :fields="['detailsName', 'detailsNotes']">
-                <div class="grid gap-y-3">
-                    <x-ui.form-input wire:model="detailsName" :label="__('proposals.proposal_name')" maxlength="255" required autofocus />
-                    <x-ui.form-textarea wire:model="detailsNotes" :label="__('common.notes')" />
-                </div>
-            </x-ui.form-section>
-
-            <x-ui.form-section :title="__('common.section_schedule')" :fields="['detailsPlannedBegin', 'detailsPlannedEnd', 'detailsActualBegin', 'detailsActualEnd']">
-                <div class="grid grid-cols-2 gap-x-4 gap-y-3 @4xl/modal:grid-cols-4">
-                    <x-ui.form-input wire:model="detailsPlannedBegin" :label="__('proposals.planned_start')" type="date" required />
-                    <x-ui.form-input wire:model="detailsPlannedEnd" :label="__('proposals.planned_end')" type="date" required />
-                    <x-ui.form-input wire:model="detailsActualBegin" :label="__('proposals.actual_start')" type="date" />
-                    <x-ui.form-input wire:model="detailsActualEnd" :label="__('proposals.actual_end')" type="date" />
-                </div>
-            </x-ui.form-section>
-        @endif
-
-        <x-slot:actions>
-            <x-ui.button type="submit" tone="primary" data-test="save-details-button">{{ __('common.save_changes') }}</x-ui.button>
-        </x-slot:actions>
-    </x-ui.modal>
+    @include('pages.proposals._proposal-form')
 
     <x-funding.agreement-modal
         :open="$showAgreementModal"

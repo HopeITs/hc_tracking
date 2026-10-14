@@ -22,8 +22,8 @@ use Livewire\Attributes\Locked;
 
 /**
  * The proposal's own record on proposals/show: the status modal (a move
- * always writes its audit note), the details modal, and linking or
- * unlinking the projects it funds.
+ * always writes its audit note) and linking or unlinking the projects it
+ * funds. Edit details is the shared proposal form (ManagesProposalForm).
  *
  * Used by proposals/show only. The page provides proposalId, the
  * #[Computed] proposal() and forgetReadings(); projects comes from
@@ -42,20 +42,6 @@ trait ManagesProposalRecord
     public string $statusContext = '';
 
     public string $statusDate = '';
-
-    public bool $showDetailsModal = false;
-
-    public string $detailsName = '';
-
-    public string $detailsPlannedBegin = '';
-
-    public string $detailsPlannedEnd = '';
-
-    public string $detailsActualBegin = '';
-
-    public string $detailsActualEnd = '';
-
-    public string $detailsNotes = '';
 
     public string $projectToLink = '';
 
@@ -118,65 +104,6 @@ trait ManagesProposalRecord
         $this->forgetReadings();
 
         Flux::toast(variant: 'success', text: __('proposals.status_changed_and_recorded'));
-    }
-
-    /**
-     * Open the details form: name, dates and notes.
-     *
-     * Status is deliberately absent. It moves only through changeStatus(),
-     * which writes the audit note alongside it.
-     */
-    public function openDetailsModal(): void
-    {
-        Gate::authorize('update', $this->proposal);
-
-        $proposal = $this->proposal;
-
-        $this->resetValidation();
-        $this->detailsName = $proposal->name;
-        $this->detailsPlannedBegin = $proposal->planned_date_begin?->toDateString() ?? '';
-        $this->detailsPlannedEnd = $proposal->planned_date_end?->toDateString() ?? '';
-        $this->detailsActualBegin = $proposal->actual_date_begin?->toDateString() ?? '';
-        $this->detailsActualEnd = $proposal->actual_date_end?->toDateString() ?? '';
-        $this->detailsNotes = $proposal->notes ?? '';
-        $this->showDetailsModal = true;
-    }
-
-    public function saveDetails(): void
-    {
-        Gate::authorize('update', $this->proposal);
-
-        $this->detailsName = trim($this->detailsName);
-        $this->detailsNotes = trim($this->detailsNotes);
-
-        $validated = $this->validate([
-            'detailsName' => ['required', 'string', 'max:255'],
-            'detailsPlannedBegin' => ['required', 'date'],
-            'detailsPlannedEnd' => ['required', 'date', 'after_or_equal:detailsPlannedBegin'],
-            'detailsActualBegin' => ['nullable', 'date'],
-            'detailsActualEnd' => ['nullable', 'date', 'after_or_equal:detailsActualBegin'],
-            'detailsNotes' => ['nullable', 'string'],
-        ], [
-            'detailsName.required' => __('proposals.enter_a_proposal_name'),
-            'detailsPlannedBegin.required' => __('proposals.set_the_planned_start_date'),
-            'detailsPlannedEnd.required' => __('proposals.set_the_planned_end_date'),
-            'detailsPlannedEnd.after_or_equal' => __('proposals.the_planned_end_cannot_fall_before_the_planned_start'),
-            'detailsActualEnd.after_or_equal' => __('proposals.the_actual_end_cannot_fall_before_the_actual_start'),
-        ]);
-
-        Proposal::query()->findOrFail($this->proposalId)->fill([
-            'name' => $validated['detailsName'],
-            'planned_date_begin' => $validated['detailsPlannedBegin'],
-            'planned_date_end' => $validated['detailsPlannedEnd'],
-            'actual_date_begin' => $validated['detailsActualBegin'] === '' ? null : $validated['detailsActualBegin'],
-            'actual_date_end' => $validated['detailsActualEnd'] === '' ? null : $validated['detailsActualEnd'],
-            'notes' => $validated['detailsNotes'] === '' ? null : $validated['detailsNotes'],
-        ])->save();
-
-        $this->showDetailsModal = false;
-        $this->forgetReadings();
-
-        Flux::toast(variant: 'success', text: __('proposals.proposal_updated'));
     }
 
     /**

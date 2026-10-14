@@ -86,13 +86,14 @@ test('a tranche received in another currency is left out of the agreement money 
 
 test('the details form edits name, dates and notes but never the status', function () {
     proposalPage()
-        ->call('openDetailsModal')
-        ->set('detailsName', '  Renamed grant  ')
-        ->set('detailsPlannedEnd', '2027-03-31')
-        ->set('detailsNotes', 'Extension agreed by phone')
-        ->call('saveDetails')
+        ->call('openEditModal', $this->proposal->id)
+        ->assertDontSeeHtml('wire:model="actualDateBegin"')
+        ->set('name', '  Renamed grant  ')
+        ->set('plannedDateEnd', '2027-03-31')
+        ->set('notes', 'Extension agreed by phone')
+        ->call('saveProposal')
         ->assertHasNoErrors()
-        ->assertSet('showDetailsModal', false);
+        ->assertSet('showProposalModal', false);
 
     $this->proposal->refresh();
 
@@ -104,10 +105,20 @@ test('the details form edits name, dates and notes but never the status', functi
 
 test('the details form rejects an end before its start', function () {
     proposalPage()
-        ->call('openDetailsModal')
-        ->set('detailsPlannedEnd', '2025-01-01')
-        ->call('saveDetails')
-        ->assertHasErrors(['detailsPlannedEnd']);
+        ->call('openEditModal', $this->proposal->id)
+        ->set('plannedDateEnd', '2025-01-01')
+        ->call('saveProposal')
+        ->assertHasErrors(['plannedDateEnd']);
+});
+
+test('the details form edits only this page\'s proposal', function () {
+    $other = Proposal::factory()->create(['name' => 'Someone else\'s grant']);
+
+    proposalPage()
+        ->call('openEditModal', $other->id)
+        ->assertNotFound();
+
+    expect($other->fresh()->name)->toBe('Someone else\'s grant');
 });
 
 test('an agreement recorded on the page is filed against this proposal even if the payload names another', function () {

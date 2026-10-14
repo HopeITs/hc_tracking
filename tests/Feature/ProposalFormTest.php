@@ -18,6 +18,8 @@ use App\Models\UserNotification;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Livewire\Features\SupportTesting\Testable;
+use Livewire\Livewire;
 
 /**
  * Valid create data for SaveProposal: one donor, the given projects, planned
@@ -176,8 +178,8 @@ test('a project that cannot take a proposal is refused and nothing is created', 
         ->and(DB::table('proposals')->count())->toBe(0)
         ->and(DB::table('proposal_status_notes')->count())->toBe(0);
 })->with([
-    'archived' => fn () => fn (): int => Project::factory()->status(ProjectStatus::Archived)->create()->id,
-    'owner rejected' => fn () => function (): int {
+    'archived' => fn (): int => Project::factory()->status(ProjectStatus::Archived)->create()->id,
+    'owner rejected' => function (): int {
         $project = Project::factory()->create();
         Assignment::query()->create([
             'assignable_type' => 'project',
@@ -189,7 +191,7 @@ test('a project that cannot take a proposal is refused and nothing is created', 
 
         return $project->id;
     },
-    'tampered id' => fn () => fn (): int => 999999,
+    'tampered id' => fn (): int => 999999,
 ]);
 
 test('creating a proposal without any project is refused', function () {
@@ -391,4 +393,170 @@ test('a creator without proposals.update starting at the proposal draft gets not
     expect(DB::table('proposals')->count())->toBe(0)
         ->and(DB::table('proposal_status_notes')->count())->toBe(0)
         ->and(DB::table('project_proposal')->count())->toBe(0);
+});
+
+/*
+| The v2 form on the pages (slice 2): the register's create/edit modal and
+| the proposal page's Edit details both save through SaveProposal.
+*/
+
+/**
+ * The register with its create form open, as the given user.
+ */
+function openProposalCreateForm(User $actor): Testable
+{
+    return Livewire::actingAs($actor)->test('pages::proposals.index')->call('openCreateModal');
+}
+
+/**
+ * Fill every required create field except the projects.
+ */
+function fillProposalBasics(Testable $form): Testable
+{
+    return $form
+        ->set('name', 'Winter Shelter Response')
+        ->set('internalProjectNumber', 'HC-2026-951')
+        ->set('donorId', (string) Donor::factory()->create()->id)
+        ->set('plannedDateBegin', '2026-11-01')
+        ->set('plannedDateEnd', '2027-10-31');
+}
+
+test('the register creates a proposal with its projects and beneficiaries at the concept note', function () {
+    $project = Project::factory()->create();
+
+    fillProposalBasics(openProposalCreateForm(userWithRole('Financial')))
+        ->set('projectIds', [(string) $project->id])
+        ->set("beneficiaries.{$project->id}", '320')
+        ->call('saveProposal')
+        ->assertHasNoErrors()
+        ->assertSet('showProposalModal', false);
+
+    $proposal = Proposal::query()->sole();
+
+    expect($proposal->status)->toBe(ProposalStatus::ConceptNote)
+        ->and(DB::table('project_proposal')->where('proposal_id', $proposal->id)->pluck('target_beneficiaries', 'project_id')->all())->toBe([$project->id => 320])
+        ->and(DB::table('proposal_status_notes')->where('proposal_id', $proposal->id)->count())->toBe(1);
+});
+
+test('the form offers no free status, only the concept note or a skip to the proposal draft', function () {
+    $project = Project::factory()->create();
+
+    fillProposalBasics(openProposalCreateForm(userWithRole('Financial')))
+        ->assertDontSeeHtml('wire:model="proposalStatus"')
+        ->assertDontSeeHtml('wire:model="skipReason"')
+        ->set('projectIds', [(string) $project->id])
+        ->set('startingStage', 'approved')
+        ->call('saveProposal')
+        ->assertHasErrors(['startingStage']);
+
+    expect(DB::table('proposals')->count())->toBe(0);
+});
+
+test('the project picker lists linkable projects with their center and city, and searches by name', function () {
+    $cityId = insertHrCity('Idlib', 'إدلب');
+    $centerId = insertHrCenter($cityId, 'Hope Center Idlib', 'مركز الأمل إدلب');
+    Project::factory()->create(['name' => 'Water Network Rehabilitation', 'city_id' => $cityId, 'center_id' => $centerId]);
+    Project::factory()->status(ProjectStatus::Closed)->create(['name' => 'Bakery Support']);
+    Project::factory()->status(ProjectStatus::Archived)->create(['name' => 'Old Mobile Clinic']);
+
+    openProposalCreateForm(userWithRole('Financial'))
+        ->assertSeeText('Water Network Rehabilitation')
+        ->assertSeeText('Hope Center Idlib · Idlib')
+        ->assertSeeText('Bakery Support')
+        ->assertDontSeeText('Old Mobile Clinic')
+        ->set('projectSearch', 'Water')
+        ->assertSeeText('Water Network Rehabilitation')
+        ->assertDontSeeText('Bakery Support');
+});
+
+test('a skipped concept note asks for the reason in Arabic and the preset reason saves the proposal draft', function () {
+    $project = Project::factory()->create();
+    $actor = userWithRole('Financial');
+    $actor->forceFill(['locale' => 'ar'])->save();
+    app()->setLocale('ar');
+
+    $form = fillProposalBasics(openProposalCreateForm($actor))
+        ->set('projectIds', [(string) $project->id])
+        ->set('startingStage', 'proposal draft')
+        ->assertSeeHtml('wire:model="skipReason"')
+        ->call('saveProposal')
+        ->assertHasErrors(['skipReason'])
+        ->assertSeeText('اكتب سبب تخطّي المذكرة المفاهيمية (10 أحرف على الأقل)');
+
+    $form->call('useSkipPreset')
+        ->assertSet('skipReason', 'المقترح موجود مسبقًا')
+        ->call('saveProposal')
+        ->assertHasNoErrors();
+
+    $proposal = Proposal::query()->sole();
+
+    expect($proposal->status)->toBe(ProposalStatus::ProposalDraft)
+        ->and(DB::table('proposal_status_notes')->where('proposal_id', $proposal->id)->orderBy('id')->pluck('context')->all())
+        ->toBe([__('proposals.proposal_recorded_note'), 'المقترح موجود مسبقًا']);
+});
+
+test('the budget fields are offered only to someone who may see money', function (Closure $role, bool $seesBudget) {
+    $proposal = linkedProposal();
+    $form = Livewire::actingAs(userWithRole($role()))->test('pages::proposals.index')->call('openEditModal', $proposal->id);
+
+    $seesBudget
+        ? $form->assertSeeHtml('wire:model="requestedBudget"')->assertSet('requestedBudget', '120000.00')
+        : $form->assertDontSeeHtml('wire:model="requestedBudget"')->assertSet('requestedBudget', '');
+})->with([
+    'Financial' => [fn () => 'Financial', true],
+    'fundraiser without agreements' => [fn () => fundraiserWithoutAgreements(), false],
+]);
+
+test('New Concept Note opens the create form with its project already chosen', function () {
+    $project = Project::factory()->create();
+
+    Livewire::withQueryParams(['for_project' => (string) $project->id])
+        ->actingAs(userWithRole('Financial'))
+        ->test('pages::proposals.index')
+        ->assertSet('showProposalModal', true)
+        ->assertSet('projectIds', [(string) $project->id])
+        ->assertSet('forProject', '');
+});
+
+test('New Concept Note ignores a project that cannot take a proposal', function (Closure $makeProjectId) {
+    Livewire::withQueryParams(['for_project' => (string) $makeProjectId()])
+        ->actingAs(userWithRole('Financial'))
+        ->test('pages::proposals.index')
+        ->assertSet('showProposalModal', true)
+        ->assertSet('projectIds', []);
+})->with([
+    'archived' => fn (): int => Project::factory()->status(ProjectStatus::Archived)->create()->id,
+    'unknown id' => fn (): int => 999999,
+]);
+
+test('New Concept Note opens nothing for a user who cannot create proposals', function () {
+    $project = Project::factory()->create();
+
+    Livewire::withQueryParams(['for_project' => (string) $project->id])
+        ->actingAs(userWithRole('Team Member'))
+        ->test('pages::proposals.index')
+        ->assertSet('showProposalModal', false)
+        ->assertSet('projectIds', []);
+});
+
+test('editing from the register changes the beneficiaries and asks for a reason after approval', function () {
+    $proposal = linkedProposal(ProposalStatus::Approved);
+    $projectId = (int) $proposal->projects()->value('projects.id');
+
+    $form = Livewire::actingAs(userWithRole('Financial'))
+        ->test('pages::proposals.index')
+        ->call('openEditModal', $proposal->id)
+        ->assertSet("beneficiaries.{$projectId}", '400')
+        ->assertSeeText('Water Network Rehabilitation')
+        ->assertSeeHtml('wire:model="beneficiariesReason"')
+        ->set("beneficiaries.{$projectId}", '450')
+        ->call('saveProposal')
+        ->assertHasErrors(['beneficiariesReason']);
+
+    $form->set('beneficiariesReason', 'The donor widened the target group.')
+        ->call('saveProposal')
+        ->assertHasNoErrors()
+        ->assertSet('showProposalModal', false);
+
+    expect(DB::table('project_proposal')->where('proposal_id', $proposal->id)->value('target_beneficiaries'))->toBe(450);
 });

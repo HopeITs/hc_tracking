@@ -7,6 +7,7 @@ namespace Tests\PHPStan;
 use App\Livewire\Concerns\ChecksFinanceVisibility;
 use App\Livewire\Concerns\FiltersFinanceRegister;
 use App\Livewire\Concerns\Proposals\ChartsProposalPipeline;
+use App\Livewire\Concerns\Proposals\DeletesProposals;
 use App\Livewire\Concerns\Proposals\ExportsProposalRegister;
 use App\Livewire\Concerns\Proposals\ManagesProposalForm;
 use App\Livewire\Concerns\Proposals\ManagesProposalStages;
@@ -26,6 +27,7 @@ abstract class ProposalsIndexPageHost extends Component
 {
     use ChartsProposalPipeline;
     use ChecksFinanceVisibility;
+    use DeletesProposals;
     use ExportsProposalRegister;
     use FiltersFinanceRegister;
     use ManagesProposalForm;
@@ -47,4 +49,6 @@ abstract class ProposalsIndexPageHost extends Component
     public string $currency = '';
 
     public string $flag = '';
+
+    public string $forProject = '';
 }

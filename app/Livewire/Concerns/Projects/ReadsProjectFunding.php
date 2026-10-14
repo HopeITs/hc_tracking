@@ -181,6 +181,22 @@ trait ReadsProjectFunding
     }
 
     /**
+     * Whether New Concept Note is offered: the viewer may create proposals
+     * and see projects, and this project may take a proposal
+     * (Project::linkableToProposals()). The proposal form checks both again.
+     */
+    #[Computed]
+    public function canStartConceptNote(): bool
+    {
+        $user = auth()->user();
+
+        return $user !== null
+            && $user->can('create', Proposal::class)
+            && $user->can('projects.view')
+            && Project::query()->linkableToProposals()->whereKey($this->projectId)->exists();
+    }
+
+    /**
      * Link the chosen proposal to this project through LinkProposalProject,
      * which authorizes on the proposal. A refusal is shown under the picker.
      */

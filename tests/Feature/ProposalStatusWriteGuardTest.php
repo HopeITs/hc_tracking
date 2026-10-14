@@ -37,7 +37,6 @@ function legacyProposalStatusWriters(): array
     return [
         'app/Actions/Proposals/ChangeProposalStatus.php', // TODO T04 slice 2
         'app/Livewire/Concerns/Proposals/ManagesProposalStages.php', // TODO T04 slice 2
-        'app/Livewire/Concerns/Proposals/ManagesProposalForm.php', // TODO T04 slice 2
     ];
 }
 
