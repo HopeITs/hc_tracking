@@ -39,7 +39,9 @@ it('authorizes inside every sensitive action', function (string $directory) {
             continue;
         }
 
-        expect(File::get($file->getPathname()))->toContain('Gate::authorize(');
+        // Gate::forUser($actor)->authorize( counts too: actions that take the
+        // acting user as an argument (SaveProposal) authorize that user.
+        expect(File::get($file->getPathname()))->toMatch('/Gate::(forUser\([^)]*\)->)?authorize\(/');
     }
 })->with(['Reports', 'Transfers', 'Donors', 'FundingAgreements', 'Tasks', 'Projects', 'Proposals']);
 
