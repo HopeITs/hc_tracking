@@ -109,7 +109,7 @@
                 </div>
             </x-ui.form-section>
 
-            <x-ui.form-section :title="__('projects.section_placement')" :fields="['centerId', 'programId', 'userId']">
+            <x-ui.form-section :title="__('projects.section_placement')" :fields="['centerId', 'programId', 'userId', 'sectorIds']">
                 <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-3">
                     <x-ui.form-select wire:model.live="centerId" :label="__('projects.center')" :placeholder="__('projects.select_a_center')" :required="$editingProjectId === null || $savedCenterId !== null">
                         @foreach ($this->centerOptions as $centerOption)
@@ -128,6 +128,9 @@
                             <option value="{{ $userOption->id }}">{{ $userOption->name }} · {{ $userOption->secondary_name }}</option>
                         @endforeach
                     </x-ui.form-select>
+
+                    {{-- Required for a new project (D-47); an older project without sectors can still be saved as it is. --}}
+                    <x-projects.sector-picker wire:model="sectorIds" :required="$editingProjectId === null" class="@2xl/modal:col-span-3" />
                 </div>
             </x-ui.form-section>
 

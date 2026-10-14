@@ -314,6 +314,7 @@ test('a new project starts as a draft whatever the form is sent', function () {
     Livewire::actingAs($user)
         ->test('pages::projects.index')
         ->call('openCreateModal')
+        ->set('sectorIds', newProjectSectorIds())
         ->set('name', 'Draft by default')
         ->set('centerId', (string) insertHrCenter(insertHrCity()))
         ->set('programId', (string) $program->id)
@@ -419,6 +420,7 @@ test('choosing a program picks its manager, who can be swapped for another progr
 
     $page = Livewire::actingAs(userWithRole('General Manager'))->test('pages::projects.index')
         ->call('openCreateModal')
+        ->set('sectorIds', newProjectSectorIds())
         ->set('programId', (string) $first->id)
         ->assertSet('userId', (string) $firstManager)
         ->set('programId', (string) $second->id)

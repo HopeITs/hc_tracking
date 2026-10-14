@@ -29,7 +29,7 @@ test('the sidebar groups navigation in the application workflow order', function
         ->assertSeeTextInOrder(['Overview', 'Strategy & Planning', 'Projects & Delivery', 'Monitoring & Evaluation', 'My Workspace', 'Administration']);
 });
 
-test('the sidebar lists every page for a Super Admin with funding in the order money arrives, daily work after it and cities last', function () {
+test('the sidebar lists every page for a Super Admin with funding in the order money arrives, daily work after it and the reference lists last', function () {
     $user = User::factory()->role('Super Admin')->create();
 
     $html = $this->actingAs($user)->get(route('dashboard'))->assertOk()->getContent();
@@ -41,16 +41,16 @@ test('the sidebar lists every page for a Super Admin with funding in the order m
         'results.index', 'indicator-library.index', 'indicators.index', 'targets.index', 'reports.index',
         'donors.index', 'proposals.index', 'funding-agreements.index', 'transfers.index', 'admin.accounts.index',
         'tasks.index', 'calendar.index',
-        'admin.users.index', 'admin.notification-settings.edit', 'activity.index', 'admin.cities.index',
+        'admin.users.index', 'admin.notification-settings.edit', 'activity.index', 'admin.cities.index', 'admin.sectors.index',
     ]);
 });
 
-test('the sidebar leaves a Team Member only cities under administration', function () {
+test('the sidebar leaves a Team Member only the read-only cities and sectors under administration', function () {
     $user = User::factory()->role('Team Member')->create();
 
     $html = $this->actingAs($user)->get(route('dashboard'))->assertOk()->getContent();
 
-    expect(array_slice(sidebarRouteNames($html), -3))->toBe(['tasks.index', 'calendar.index', 'admin.cities.index']);
+    expect(array_slice(sidebarRouteNames($html), -4))->toBe(['tasks.index', 'calendar.index', 'admin.cities.index', 'admin.sectors.index']);
 });
 
 test('the sidebar drops the administration heading for someone who holds none of its pages', function () {

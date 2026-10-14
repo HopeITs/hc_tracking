@@ -53,6 +53,9 @@ new #[Title('titles.projects')] class extends Component {
     public string $owner = '';
 
     #[Url(except: '')]
+    public string $sector = '';
+
+    #[Url(except: '')]
     public string $status = '';
 
     #[Url(except: 'board')]
@@ -104,6 +107,10 @@ new #[Title('titles.projects')] class extends Component {
                 'user:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
                 'ownerAssignment',
             ])
+            // Only the table view shows the sectors column.
+            ->when($this->view === 'table', fn (Builder $query) => $query->with([
+                'sectors' => fn ($query) => $query->select(['sectors.id', 'sectors.name_ar', 'sectors.name_en', 'sectors.is_active'])->ordered(),
+            ]))
             ->when($this->view === 'timeline', fn (Builder $query) => $query->with([
                 'milestones' => fn ($query) => $query
                     ->select(['id', 'project_id', 'name', 'planned_start_date', 'planned_end_date', 'actual_end_date', 'status'])
@@ -183,7 +190,7 @@ new #[Title('titles.projects')] class extends Component {
     /* The class block above already imports every symbol this view uses; a
        single-file page compiles both halves into one PHP file, so repeating
        the `use` statements here would be a redeclaration. */
-    $filtersAreActive = $search !== '' || $city !== '' || $program !== '' || $owner !== '' || $status !== '' || $lens !== '';
+    $filtersAreActive = $search !== '' || $city !== '' || $program !== '' || $owner !== '' || $sector !== '' || $status !== '' || $lens !== '';
     $today = CarbonImmutable::today();
 
     $statusCounts = $this->statusCounts;
@@ -292,6 +299,13 @@ new #[Title('titles.projects')] class extends Component {
 
             <x-ui.header-filter-select :label="__('projects.owner')" wire:model.live="owner" :value="$owner" employees>
                 <option value="">{{ __('projects.all_owners') }}</option>
+            </x-ui.header-filter-select>
+
+            <x-ui.header-filter-select :label="__('sectors.sectors')" wire:model.live="sector" :value="$sector">
+                <option value="">{{ __('sectors.all_sectors') }}</option>
+                @foreach ($this->sectorOptions as $sectorOption)
+                    <option value="{{ $sectorOption->id }}">{{ $sectorOption->localizedName() }}@unless ($sectorOption->is_active) · {{ __('sectors.inactive') }}@endunless</option>
+                @endforeach
             </x-ui.header-filter-select>
 
             <x-ui.header-filter-select :label="__('projects.sort_by')" wire:model.live="sort" :value="$sort">

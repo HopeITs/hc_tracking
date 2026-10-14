@@ -35,9 +35,10 @@ final class SaveProject
     /**
      * `startDate` and `endDate` are only accepted for a project that is no
      * longer a draft. `name` may be blank on create: it defaults to
-     * «Program — Center».
+     * «Program — Center». `sectorIds` (T34) is required on create; on edit
+     * the sectors change only when the key is sent.
      *
-     * @param  array{name?: ?string, description?: ?string, startDate?: ?string, endDate?: ?string, targetBeneficiaries?: int|string|null, targetMen?: int|string|null, targetWomen?: int|string|null, targetBoys?: int|string|null, targetGirls?: int|string|null, centerId?: int|string|null, programId?: int|string|null, userId?: int|string|null}  $data
+     * @param  array{name?: ?string, description?: ?string, startDate?: ?string, endDate?: ?string, targetBeneficiaries?: int|string|null, targetMen?: int|string|null, targetWomen?: int|string|null, targetBoys?: int|string|null, targetGirls?: int|string|null, centerId?: int|string|null, programId?: int|string|null, userId?: int|string|null, sectorIds?: list<int|string>}  $data
      */
     public function handle(?Project $existing, array $data, User $actor): Project
     {
@@ -94,7 +95,12 @@ final class SaveProject
 
             $project->save();
 
-            // T34 hook: SyncProjectSectors::handle($project, $sectorIds, requireOne: ! $existing) is called here once sectors land.
+            // A new project needs at least one sector (D-47); an edit syncs
+            // only when the caller sends the sectors, so a caller that does
+            // not know about them never clears them.
+            if ($existing === null || $input['sectorIds'] !== null) {
+                app(SyncProjectSectors::class)->handle($project, $input['sectorIds'] ?? [], requireOne: $existing === null);
+            }
 
             return $project;
         });
@@ -116,7 +122,10 @@ final class SaveProject
 
         $keys = ['name', 'description', 'startDate', 'endDate', 'targetBeneficiaries', 'targetMen', 'targetWomen', 'targetBoys', 'targetGirls', 'centerId', 'programId', 'userId'];
 
-        return array_combine($keys, array_map(fn (string $key): mixed => $blank($data[$key] ?? null), $keys));
+        $normalized = array_combine($keys, array_map(fn (string $key): mixed => $blank($data[$key] ?? null), $keys));
+        $normalized['sectorIds'] = array_key_exists('sectorIds', $data) ? array_values((array) $data['sectorIds']) : null;
+
+        return $normalized;
     }
 
     /**
@@ -158,6 +167,9 @@ final class SaveProject
             'userId' => $mayReassign
                 ? ['required', 'integer', Rule::exists(HrEmployee::class, 'id'), Rule::in($this->ownerCandidates($project))]
                 : ['nullable'],
+            // Reported with the other fields; SyncProjectSectors checks it again
+            // (and which sectors are usable) under the project lock.
+            'sectorIds' => $project->exists ? ['nullable', 'array'] : ['required', 'array', 'min:1'],
         ];
 
         /** @var array<string, mixed> $validated */
@@ -175,6 +187,9 @@ final class SaveProject
             'userId.exists' => __('projects.the_selected_owner_is_no_longer_available'),
             'userId.in' => __('projects.owner_must_be_program_manager'),
             'endDate.after_or_equal' => __('projects.the_end_date_must_be_on_or_after_the_start_date'),
+            'sectorIds.required' => __('sectors.choose_at_least_one'),
+            'sectorIds.min' => __('sectors.choose_at_least_one'),
+            'sectorIds.array' => __('sectors.unavailable'),
         ])->validate();
 
         return [...$input, ...$validated];

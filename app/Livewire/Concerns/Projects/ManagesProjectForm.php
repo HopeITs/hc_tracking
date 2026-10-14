@@ -67,6 +67,13 @@ trait ManagesProjectForm
     public string $userId = '';
 
     /**
+     * The chosen sector ids (T34), as strings from the picker's checkboxes.
+     *
+     * @var list<string>
+     */
+    public array $sectorIds = [];
+
+    /**
      * The «Program — Center» name last proposed, so a name the person typed
      * themselves is never replaced.
      */
@@ -228,6 +235,7 @@ trait ManagesProjectForm
         $this->savedCenterId = $project->center_id;
         $this->programId = (string) $project->program_id;
         $this->userId = (string) $project->user_id;
+        $this->sectorIds = array_values($project->sectors()->ordered()->pluck('sectors.id')->map(fn (mixed $id): string => (string) $id)->all());
         $this->showProjectModal = true;
     }
 
@@ -252,6 +260,7 @@ trait ManagesProjectForm
             'centerId' => $this->centerId,
             'programId' => $this->programId,
             'userId' => $this->userId,
+            'sectorIds' => $this->sectorIds,
         ], auth()->user());
 
         $wasRecentlyCreated = $saved->wasRecentlyCreated;
@@ -298,6 +307,7 @@ trait ManagesProjectForm
         $this->proposedName = '';
         $this->programId = '';
         $this->userId = '';
+        $this->sectorIds = [];
     }
 
     protected static function nullableString(mixed $value): ?string

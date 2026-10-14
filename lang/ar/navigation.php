@@ -14,6 +14,7 @@ return [
     'group_workspace' => 'مساحة عملي',
     'guideline' => 'دليل الاستخدام',
     'indicator_library' => 'مكتبة المؤشرات',
+    'sectors' => 'القطاعات',
     'platform' => 'المنصة',
     'primary_navigation' => 'التنقل الرئيسي',
     'repository' => 'المستودع',

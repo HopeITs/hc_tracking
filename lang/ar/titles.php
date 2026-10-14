@@ -14,6 +14,7 @@ return [
     'funding_agreements' => 'اتفاقيات التمويل',
     'indicators' => 'المؤشرات',
     'indicator_library' => 'مكتبة المؤشرات',
+    'sectors' => 'القطاعات',
     'milestone' => 'المرحلة الرئيسية',
     'milestones' => 'المراحل الرئيسية',
     'program' => 'البرنامج',

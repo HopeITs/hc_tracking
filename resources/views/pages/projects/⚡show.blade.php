@@ -125,6 +125,7 @@ new #[Title('titles.project')] class extends Component {
                 'program.strategy:id,name',
                 'user:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
                 'proposals:proposals.id,proposals.status',
+                'sectors' => fn ($query) => $query->select(['sectors.id', 'sectors.name_ar', 'sectors.name_en', 'sectors.is_active'])->ordered(),
                 'media' => fn ($query) => $query
                     ->select(['id', 'mediable_type', 'mediable_id', 'collection', 'original_name', 'type', 'size', 'uploaded_at', 'uploaded_by'])
                     ->whereNotIn('collection', $hiddenCollections)
@@ -245,6 +246,7 @@ new #[Title('titles.project')] class extends Component {
             <a href="{{ route('programs.show', $this->project->program) }}" wire:navigate class="font-medium hover:underline">{{ $this->project->program->name }}</a>
             <span>{{ $this->project->program->strategy?->name ?? __('common.strategy_not_assigned') }}</span>
             <span>{{ __('common.updated_date', ['date' => $this->project->updated_at?->translatedFormat(__('formats.date'))]) }}</span>
+            <x-projects.sector-chips :sectors="$this->project->sectors" data-test="project-sectors" />
         </x-slot:meta>
 
         <x-slot:actions>
