@@ -64,6 +64,16 @@ class ProjectPolicy
     }
 
     /**
+     * Determine whether the user can reopen a closed project as a draft by
+     * linking it to a proposal (contracts.md §3). The proposal side decides,
+     * so this follows proposals.update, never projects.update.
+     */
+    public function reopenAsDraft(User $user, Project $project): bool
+    {
+        return ! $project->isOwnerRejected() && $user->can('proposals.update');
+    }
+
+    /**
      * Determine whether the user can archive or restore the project.
      */
     public function delete(User $user, Project $project): bool

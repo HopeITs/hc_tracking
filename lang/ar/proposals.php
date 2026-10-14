@@ -277,4 +277,13 @@ return [
     'stale_status' => 'تغيّرت حالة المقترح للتو، أعد التحميل',
     'status_moved_standard_note' => 'نُقل من :from إلى :to',
     'final_reports_status_retired' => 'أُلغيت حالة التقارير النهائية؛ نُقل إلى نشط',
+    'link_at_least_one_project' => 'اربط المقترح بمشروع واحد على الأقل',
+    'enter_at_least_one_beneficiary' => 'أدخل مستفيدًا واحدًا على الأقل',
+    'the_budget_cannot_be_negative' => 'الميزانية لا تكون سالبة',
+    'explain_why_the_concept_note_is_skipped' => 'اكتب سبب تخطّي المذكرة المفاهيمية (10 أحرف على الأقل)',
+    'the_donor_cannot_change_after_the_concept_note' => 'لا يتغير المانح بعد إرسال المذكرة المفاهيمية أو تسجيل اتفاقية',
+    'the_last_linked_project_cannot_be_unlinked' => 'لا يمكن فك آخر مشروع مرتبط بالمقترح',
+    'this_project_has_reported_targets_in_this_proposal' => 'لهذا المشروع مستهدفات عليها تقارير في هذا المقترح',
+    'explain_why_the_beneficiaries_changed' => 'اكتب سبب تغيير عدد المستفيدين',
+    'unlink_project_unreported_targets' => '{1} لهذا المقترح مستهدف واحد على :name بلا تقارير بعد، سيبقى مع إشارة عدم اتساق|[2,*] لهذا المقترح :count مستهدفات على :name بلا تقارير بعد، ستبقى مع إشارة عدم اتساق',
 ];

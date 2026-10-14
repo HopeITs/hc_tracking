@@ -277,4 +277,13 @@ return [
     'stale_status' => 'The proposal status just changed. Reload the page.',
     'status_moved_standard_note' => 'Moved from :from to :to.',
     'final_reports_status_retired' => 'Final reports status retired; moved to Active.',
+    'link_at_least_one_project' => 'Link the proposal to at least one project.',
+    'enter_at_least_one_beneficiary' => 'Enter at least 1 beneficiary.',
+    'the_budget_cannot_be_negative' => 'The budget cannot be negative.',
+    'explain_why_the_concept_note_is_skipped' => 'Explain why the concept note is skipped (at least 10 characters).',
+    'the_donor_cannot_change_after_the_concept_note' => 'The donor cannot change after the concept note was sent or an agreement exists.',
+    'the_last_linked_project_cannot_be_unlinked' => 'The last linked project cannot be unlinked.',
+    'this_project_has_reported_targets_in_this_proposal' => 'This project has reported targets in this proposal.',
+    'explain_why_the_beneficiaries_changed' => 'Explain why the number of beneficiaries changed.',
+    'unlink_project_unreported_targets' => '{1} :count target of this proposal on :name has no reports yet. It stays, flagged as inconsistent.|[2,*] :count targets of this proposal on :name have no reports yet. They stay, flagged as inconsistent.',
 ];

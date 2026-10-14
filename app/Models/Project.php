@@ -285,6 +285,29 @@ class Project extends Model implements TracksActivity
     }
 
     /**
+     * Limit the query to projects a proposal may be linked to: draft,
+     * approved, active or closed (a closed one is reopened as a draft on
+     * link), never archived, and never one whose owner rejected it.
+     *
+     * The one server-side rule behind every project picker and every link,
+     * so a tampered id is refused by the same query that built the list.
+     *
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function linkableToProposals(Builder $query): void
+    {
+        $query
+            ->whereIn('status', [
+                ProjectStatus::Draft->value,
+                ProjectStatus::Approved->value,
+                ProjectStatus::Active->value,
+                ProjectStatus::Closed->value,
+            ])
+            ->whereDoesntHave('ownerAssignment', fn (Builder $assignment) => $assignment->where('status', AssignmentStatus::Rejected->value));
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
