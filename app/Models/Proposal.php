@@ -294,7 +294,8 @@ class Proposal extends Model implements TracksActivity
      * The paperwork stage this proposal is at: concept_note, proposal or grant.
      *
      * Derived, never stored. On hold and rejected keep the stage of the
-     * status they left.
+     * status they left; a rejection during a hold looks past the hold to the
+     * status before it.
      *
      * @return 'concept_note'|'proposal'|'grant'
      */
@@ -303,6 +304,10 @@ class Proposal extends Model implements TracksActivity
         $before = in_array($this->status, [ProposalStatus::OnHold, ProposalStatus::Rejected], true)
             ? $this->statusBefore($this->status)
             : null;
+
+        if ($this->status === ProposalStatus::Rejected && $before === ProposalStatus::OnHold) {
+            $before = $this->statusBefore(ProposalStatus::OnHold);
+        }
 
         return $this->status->stage($before);
     }

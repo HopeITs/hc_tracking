@@ -109,6 +109,7 @@ test('a missing requirement refuses the move with its message and writes nothing
         ->and($proposal->statusNotes()->count())->toBe(0);
 })->with([
     'linked_project' => [ProposalStatus::ConceptNote, ProposalStatus::ConceptNoteReview, [], fn (Proposal $p) => $p->projects()->detach(), 'linked_project', 'proposals.link_project_first'],
+    'planned_dates' => [ProposalStatus::ConceptNote, ProposalStatus::ConceptNoteReview, [], fn (Proposal $p) => $p->forceFill(['planned_date_end' => null])->save(), 'planned_dates', 'proposals.planned_dates_required'],
     'reason' => [ProposalStatus::ConceptNoteReview, ProposalStatus::ConceptNote, ['reason' => '  '], fn () => null, 'reason', 'proposals.reason_required'],
     'reason_min_10' => [ProposalStatus::Submitted, ProposalStatus::Rejected, ['reason' => 'No fit.', 'effective_date' => '2026-10-13'], fn () => null, 'reason', 'proposals.rejection_reason'],
     'effective_date' => [ProposalStatus::ProposalReview, ProposalStatus::Submitted, ['effective_date' => '2026-10-14'], fn () => null, 'effective_date', 'proposals.date_not_future'],
@@ -265,6 +266,19 @@ test('on hold and rejected keep the stage of the status they left', function (Pr
     'on hold after the proposal was sent' => [ProposalStatus::OnHold, ProposalStatus::Submitted, 'proposal'],
     'rejected after the concept note was sent' => [ProposalStatus::Rejected, ProposalStatus::ConceptNoteSubmitted, 'concept_note'],
     'rejected after the proposal was sent' => [ProposalStatus::Rejected, ProposalStatus::Submitted, 'proposal'],
+]);
+
+test('a rejection during a hold keeps the stage of the status before the hold', function (ProposalStatus $preHold, string $stage) {
+    $proposal = Proposal::factory()->create(['status' => ProposalStatus::Rejected]);
+
+    foreach ([$preHold, ProposalStatus::OnHold, ProposalStatus::Rejected] as $status) {
+        ProposalStatusNote::factory()->create(['proposal_id' => $proposal->id, 'status' => $status, 'context' => 'Move.']);
+    }
+
+    expect($proposal->stage())->toBe($stage);
+})->with([
+    'held after the concept note was sent' => [ProposalStatus::ConceptNoteSubmitted, 'concept_note'],
+    'held after the proposal was sent' => [ProposalStatus::Submitted, 'proposal'],
 ]);
 
 test('the retired final reports status moves to active with one note per proposal', function () {
