@@ -455,13 +455,13 @@ test('the form offers no free status, only the concept note or a skip to the pro
 test('the project picker lists linkable projects with their center and city, and searches by name', function () {
     $cityId = insertHrCity('Idlib', 'إدلب');
     $centerId = insertHrCenter($cityId, 'Hope Center Idlib', 'مركز الأمل إدلب');
-    Project::factory()->create(['name' => 'Water Network Rehabilitation', 'city_id' => $cityId, 'center_id' => $centerId]);
+    $water = Project::factory()->create(['name' => 'Water Network Rehabilitation', 'city_id' => $cityId, 'center_id' => $centerId]);
     Project::factory()->status(ProjectStatus::Closed)->create(['name' => 'Bakery Support']);
     Project::factory()->status(ProjectStatus::Archived)->create(['name' => 'Old Mobile Clinic']);
 
     openProposalCreateForm(userWithRole('Financial'))
         ->assertSeeText('Water Network Rehabilitation')
-        ->assertSeeText('Hope Center Idlib · Idlib')
+        ->assertSeeText('Hope Center Idlib · '.$water->program->name.' · Idlib')
         ->assertSeeText('Bakery Support')
         ->assertDontSeeText('Old Mobile Clinic')
         ->set('projectSearch', 'Water')
@@ -481,7 +481,9 @@ test('a skipped concept note asks for the reason in Arabic and the preset reason
         ->assertSeeHtml('wire:model="skipReason"')
         ->call('saveProposal')
         ->assertHasErrors(['skipReason'])
-        ->assertSeeText('اكتب سبب تخطّي المذكرة المفاهيمية (10 أحرف على الأقل)');
+        ->assertSeeText('اكتب سبب تخطّي المذكرة المفاهيمية (10 أحرف على الأقل)')
+        ->assertSeeHtml('data-form-error-summary')
+        ->assertSeeText('حقل واحد يحتاج إلى مراجعة');
 
     $form->call('useSkipPreset')
         ->assertSet('skipReason', 'المقترح موجود مسبقًا')

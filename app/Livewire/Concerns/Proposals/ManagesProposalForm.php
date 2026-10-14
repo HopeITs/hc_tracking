@@ -8,6 +8,7 @@ use App\Actions\Proposals\SaveProposal;
 use App\Enums\ProposalStatus;
 use App\Models\Donor;
 use App\Models\HrCenter;
+use App\Models\HrProgram;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\User;
@@ -162,7 +163,7 @@ trait ManagesProposalForm
         }
 
         $projects = Project::query()
-            ->select(['projects.id', 'projects.name', 'projects.center_id', 'projects.city_id'])
+            ->select(['projects.id', 'projects.name', 'projects.center_id', 'projects.program_id', 'projects.city_id'])
             ->whereHas('proposals', fn (Builder $query) => $query->whereKey($this->editingProposalId))
             ->with('city:id,name_en,name_ar')
             ->orderBy('projects.name')
@@ -234,13 +235,13 @@ trait ManagesProposalForm
         $this->name = $proposal->name;
         $this->internalProjectNumber = $proposal->internal_project_number;
         $this->donorId = (string) $proposal->donor_id;
-        $this->plannedDateBegin = $proposal->planned_date_begin?->toDateString() ?? '';
-        $this->plannedDateEnd = $proposal->planned_date_end?->toDateString() ?? '';
+        $this->plannedDateBegin = $proposal->planned_date_begin->toDateString();
+        $this->plannedDateEnd = $proposal->planned_date_end->toDateString();
         $this->notes = $proposal->notes ?? '';
 
         if ($showsMoney) {
             $this->requestedBudget = $proposal->requested_budget ?? '';
-            $this->requestedCurrency = $proposal->requested_currency?->value ?? '';
+            $this->requestedCurrency = $proposal->requested_currency->value ?? '';
         }
 
         foreach ($proposal->projects()->select(['projects.id'])->get() as $project) {
@@ -345,7 +346,7 @@ trait ManagesProposalForm
      * their beneficiaries and the starting stage; edit sends the linked
      * projects' beneficiaries. The budget is sent only by a money holder.
      *
-     * @return array<string, mixed>
+     * @return array{name: string, internalProjectNumber: string, donorId: string|null, beneficiaries: array<int|string, int|string|null>, beneficiariesReason: string|null, plannedDateBegin: string|null, plannedDateEnd: string|null, notes: string, projectIds?: list<string>, startingStage?: string, skipReason?: string|null, requestedBudget?: string|null, requestedCurrency?: string|null}
      */
     private function proposalFormData(bool $isCreate): array
     {
@@ -388,7 +389,7 @@ trait ManagesProposalForm
     {
         return Project::query()
             ->linkableToProposals()
-            ->select(['id', 'name', 'center_id', 'city_id'])
+            ->select(['id', 'name', 'center_id', 'program_id', 'city_id'])
             ->with('city:id,name_en,name_ar')
             ->orderBy('name')
             ->orderBy('id');
@@ -413,7 +414,8 @@ trait ManagesProposalForm
 
     /**
      * Each project as a picker row: its name and where it runs, the HR
-     * center and the city. A center HR cannot answer for shows its id.
+     * center, the program and the city. A center or program HR cannot answer
+     * for shows its id.
      *
      * @param  iterable<Project>  $projects
      * @return list<array{id: int, name: string, place: string}>
@@ -426,7 +428,11 @@ trait ManagesProposalForm
             $rows[] = [
                 'id' => $project->id,
                 'name' => $project->name,
-                'place' => $this->centerName($project->center_id).' · '.($project->city?->name ?? __('common.unknown_city')),
+                'place' => implode(' · ', [
+                    $this->centerName($project->center_id),
+                    $this->programName($project->program_id),
+                    $project->city->name ?? __('common.unknown_city'),
+                ]),
             ];
         }
 
@@ -444,6 +450,17 @@ trait ManagesProposalForm
         } catch (QueryException) {
             return '#'.$centerId;
         }
+    }
+
+    private function programName(int $programId): string
+    {
+        try {
+            $name = HrProgram::nameOf($programId);
+        } catch (QueryException) {
+            $name = '';
+        }
+
+        return $name !== '' ? $name : '#'.$programId;
     }
 
     private function proposalActor(): User
