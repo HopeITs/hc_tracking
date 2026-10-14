@@ -22,8 +22,6 @@ function lifecycleActionStubs(): array
         'Proposals/ApproveProposal.php', // TODO T08
         'Projects/ApproveProjectFromProposal.php', // TODO T08
         'Projects/ActivateProject.php', // TODO T08
-        'Projects/SaveProject.php', // TODO T05
-        'Projects/CloseProject.php', // TODO T05
         'FundingAgreements/SaveAgreementInstallments.php', // TODO T09
     ];
 }

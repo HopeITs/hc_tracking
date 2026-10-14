@@ -146,7 +146,6 @@ trait ChartsDashboard
         $counts = $this->visible(Project::query(), 'projects')->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
         $tones = [
             ProjectStatus::Draft->value => 'muted',
-            ProjectStatus::Submitted->value => 'neutral',
             ProjectStatus::Approved->value => 'funding',
             ProjectStatus::Active->value => 'good',
             ProjectStatus::Closed->value => 'strong',
@@ -154,8 +153,8 @@ trait ChartsDashboard
         ];
 
         return [
-            'series' => array_map(fn (ProjectStatus $status): int => (int) ($counts[$status->value] ?? 0), ProjectStatus::cases()),
-            'categories' => array_map(fn (ProjectStatus $status): string => $status->label(), ProjectStatus::cases()),
+            'series' => array_map(fn (ProjectStatus $status): int => (int) ($counts[$status->value] ?? 0), ProjectStatus::live()),
+            'categories' => array_map(fn (ProjectStatus $status): string => $status->label(), ProjectStatus::live()),
             'tones' => array_values($tones),
         ];
     }

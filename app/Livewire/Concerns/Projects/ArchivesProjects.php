@@ -9,6 +9,7 @@ use App\Actions\Projects\RestoreProject;
 use App\Models\Project;
 use Flux\Flux;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 
@@ -106,19 +107,28 @@ trait ArchivesProjects
     }
 
     /**
-     * Put an archived project back into the portfolio as a draft, which is the
-     * one lifecycle state that carries no claim about where the work stands.
+     * Take an archived project out of the archive (D-27): closed when it has
+     * dates, else a draft, and only while no other open project holds its
+     * center and program. RestoreProject enforces both.
      */
     public function restoreProject(int $projectId): void
     {
         $project = Project::query()->find($projectId);
 
-        if ($project === null || ! app(RestoreProject::class)->handle($project)) {
+        if ($project === null) {
+            return;
+        }
+
+        try {
+            $status = app(RestoreProject::class)->handle($project);
+        } catch (ValidationException $exception) {
+            Flux::toast(variant: 'danger', text: $exception->validator->errors()->first());
+
             return;
         }
 
         $this->resetPage();
 
-        Flux::toast(variant: 'success', text: __('projects.project_restored'));
+        Flux::toast(variant: 'success', text: __('projects.project_restored_as', ['status' => $status->label()]));
     }
 }

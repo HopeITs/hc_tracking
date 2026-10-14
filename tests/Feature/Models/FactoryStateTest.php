@@ -1,9 +1,11 @@
 <?php
 
 use App\Enums\ArStatus;
+use App\Enums\ProjectStatus;
 use App\Models\Account;
 use App\Models\DonorReport;
 use App\Models\Milestone;
+use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Report;
 use App\Models\Strategy;
@@ -118,3 +120,18 @@ test('a submitted donor report takes its submission date from the due date passe
 
     expect($report->submitted_on->toDateString())->toBe('2035-03-31');
 });
+
+test('a default project is a dateless draft', function () {
+    $project = Project::factory()->create()->fresh();
+
+    expect($project->status)->toBe(ProjectStatus::Draft)
+        ->and($project->start_date)->toBeNull()
+        ->and($project->end_date)->toBeNull();
+});
+
+test('the dated project states end after the start passed in', function (string $state) {
+    $project = Project::factory()->{$state}()->create(['start_date' => '2030-05-01'])->fresh();
+
+    expect($project->status)->toBe(ProjectStatus::from($state))
+        ->and($project->end_date->toDateString())->toBeGreaterThan('2030-05-01');
+})->with(['approved', 'active', 'closed']);

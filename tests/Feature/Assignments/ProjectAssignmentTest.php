@@ -327,7 +327,7 @@ test('a new project starts as a draft whatever the form is sent', function () {
 test('editing a project through the form leaves its status alone', function () {
     ['project' => $project, 'owner' => $owner] = projectAssignedToANewOwner();
     $project->currentAssignment('user_id')->acknowledge($owner);
-    $project->update(['status' => ProjectStatus::Active]);
+    $project->update(['status' => ProjectStatus::Active, 'start_date' => '2026-01-01', 'end_date' => '2026-12-31']);
 
     Livewire::actingAs(userWithRole('General Manager'))
         ->test('pages::projects.index')
