@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Enums\FileType;
+use App\Exceptions\UnreadableStoredFile;
 use App\Models\Report;
 use App\Models\ReportFile;
+use App\Support\StoredFiles;
 use App\Support\UploadName;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportFilePreviewController extends Controller
@@ -29,14 +30,7 @@ class ReportFilePreviewController extends Controller
         abort_unless($reportFile->report_id === $report->id, 404);
         abort_unless($reportFile->isPreviewable() && $reportFile->isStored(), 404);
 
-        $contentType = match ($reportFile->type) {
-            FileType::Pdf => 'application/pdf',
-            FileType::Png => 'image/png',
-            default => 'image/jpeg',
-        };
-
         $headers = [
-            'Content-Type' => $contentType,
             'X-Content-Type-Options' => 'nosniff',
             'Cross-Origin-Resource-Policy' => 'same-origin',
             'Cache-Control' => 'private, max-age=300',
@@ -49,6 +43,10 @@ class ReportFilePreviewController extends Controller
             $headers['Content-Security-Policy'] = 'sandbox';
         }
 
-        return Storage::disk($reportFile->disk)->response($reportFile->path, UploadName::clean($reportFile->displayName()), $headers, 'inline');
+        try {
+            return StoredFiles::stream($reportFile->disk, $reportFile->path, $reportFile->encryption_key_id, UploadName::clean($reportFile->displayName()), $reportFile->type, $headers, 'inline');
+        } catch (UnreadableStoredFile $exception) {
+            throw $exception->forRow('report_files', $reportFile->id);
+        }
     }
 }

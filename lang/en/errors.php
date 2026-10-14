@@ -21,4 +21,7 @@ return [
 
     '503_heading' => 'HC Tracking is being improved right now',
     '503_body' => "We're carrying out scheduled maintenance. This should only take a few minutes.",
+
+    'file_unreadable' => 'The file could not be opened. Please contact IT.',
+    'file_storage_not_configured' => 'File storage is not configured. Please contact IT.',
 ];

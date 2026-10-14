@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\UnreadableStoredFile;
 use App\Models\Media;
 use App\Models\Project;
+use App\Support\StoredFiles;
 use App\Support\UploadName;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
@@ -39,8 +41,12 @@ class ProjectFileDownloadController extends Controller
         // via a Flysystem UnableToRetrieveMetadata exception. 404 instead.
         abort_unless(Storage::disk($media->disk)->exists($media->path), 404);
 
-        return Storage::disk($media->disk)->download($media->path, UploadName::clean($media->original_name), [
-            'X-Content-Type-Options' => 'nosniff',
-        ]);
+        try {
+            return StoredFiles::stream($media->disk, $media->path, $media->encryption_key_id, UploadName::clean($media->original_name), $media->type, [
+                'X-Content-Type-Options' => 'nosniff',
+            ]);
+        } catch (UnreadableStoredFile $exception) {
+            throw $exception->forRow('media', $media->id);
+        }
     }
 }

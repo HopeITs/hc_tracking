@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Enums\FileType;
+use App\Exceptions\UnreadableStoredFile;
 use App\Models\Media;
 use App\Models\Proposal;
+use App\Support\StoredFiles;
 use App\Support\UploadName;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProposalFilePreviewController extends Controller
@@ -42,14 +43,7 @@ class ProposalFilePreviewController extends Controller
         );
         abort_unless($media->isPreviewable() && $media->isStored(), 404);
 
-        $contentType = match ($media->type) {
-            FileType::Pdf => 'application/pdf',
-            FileType::Png => 'image/png',
-            default => 'image/jpeg',
-        };
-
         $headers = [
-            'Content-Type' => $contentType,
             'X-Content-Type-Options' => 'nosniff',
             'Cross-Origin-Resource-Policy' => 'same-origin',
             'Cache-Control' => 'private, max-age=300',
@@ -62,6 +56,10 @@ class ProposalFilePreviewController extends Controller
             $headers['Content-Security-Policy'] = 'sandbox';
         }
 
-        return Storage::disk($media->disk)->response($media->path, UploadName::clean($media->original_name), $headers, 'inline');
+        try {
+            return StoredFiles::stream($media->disk, $media->path, $media->encryption_key_id, UploadName::clean($media->original_name), $media->type, $headers, 'inline');
+        } catch (UnreadableStoredFile $exception) {
+            throw $exception->forRow('media', $media->id);
+        }
     }
 }

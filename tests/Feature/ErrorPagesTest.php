@@ -13,7 +13,14 @@ test('each custom error view renders its status, heading and a single dashboard 
     ['errors.429', 'errors.429_heading'],
     ['errors.500', 'errors.500_heading'],
     ['errors.503', 'errors.503_heading'],
+    ['errors.file-unreadable', 'errors.500_heading'],
 ]);
+
+test('the unreadable stored file page tells the person to contact IT and nothing more', function () {
+    $this->view('errors.file-unreadable')
+        ->assertSee(__('errors.file_unreadable'))
+        ->assertDontSee(config('files.encryption.key') ?? 'no-key-configured-in-tests');
+});
 
 test('a request for a route that does not exist renders the custom 404 page', function () {
     config(['app.debug' => false]);
