@@ -101,8 +101,8 @@ class NotificationDemoSeeder extends Seeder
         $this->at($now->subDays(3), fn () => $risk?->update(['happened' => true]));
 
         $openProposals = Proposal::query()->whereNotIn('status', [ProposalStatus::Approved->value, ProposalStatus::Rejected->value])->inRandomOrder()->limit(2)->get();
-        $this->at($now->subDays(2)->subHours(3), fn () => $openProposals->get(0)?->update(['status' => ProposalStatus::Approved]));
-        $this->at($now->subDay()->subHours(2), fn () => $openProposals->get(1)?->update(['status' => ProposalStatus::Rejected]));
+        $this->at($now->subDays(2)->subHours(3), fn () => $openProposals->get(0)?->forceFill(['status' => ProposalStatus::Approved])->save());
+        $this->at($now->subDay()->subHours(2), fn () => $openProposals->get(1)?->forceFill(['status' => ProposalStatus::Rejected])->save());
 
         $tranche = TransfersTracking::query()->where('ar_status', ArStatus::Pending->value)->inRandomOrder()->first();
         $this->at($now->subDay(), fn () => $tranche?->update(['ar_status' => ArStatus::Failed]));

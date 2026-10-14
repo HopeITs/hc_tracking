@@ -9,7 +9,7 @@ use App\Livewire\Concerns\Proposals\ChartsProposalPipeline;
 use App\Livewire\Concerns\Proposals\DeletesProposals;
 use App\Livewire\Concerns\Proposals\ExportsProposalRegister;
 use App\Livewire\Concerns\Proposals\ManagesProposalForm;
-use App\Livewire\Concerns\Proposals\ManagesProposalStages;
+use App\Livewire\Concerns\Proposals\ManagesProposalStatus;
 use App\Livewire\Concerns\Proposals\ReadsProposalRegister;
 use App\Models\Proposal;
 use Illuminate\Support\Facades\Gate;
@@ -26,7 +26,7 @@ new #[Title('titles.proposals')] class extends Component {
     use ExportsProposalRegister;
     use FiltersFinanceRegister;
     use ManagesProposalForm;
-    use ManagesProposalStages;
+    use ManagesProposalStatus;
     use ReadsProposalRegister;
     use WithPagination;
 
@@ -95,6 +95,12 @@ new #[Title('titles.proposals')] class extends Component {
             $this->resetPage();
         }
     }
+
+    /**
+     * Nothing on this page is memoised across requests, so a write has
+     * nothing to forget (ManagesProposalStatus calls it after a move).
+     */
+    private function forgetReadings(): void {}
 
     protected function normaliseFilters(): void
     {
@@ -177,7 +183,7 @@ new #[Title('titles.proposals')] class extends Component {
     ];
     $statusPills = [
         ['default' => true, 'label' => __('finance_tables.all'), 'model' => 'status', 'value' => '', 'active' => $chosen['status'] === ''],
-        ...array_map(fn (ProposalStatus $case): array => $setPill('status', $case->value, $case->label()), ProposalStatus::cases()),
+        ...array_map(fn (ProposalStatus $case): array => $setPill('status', $case->value, $case->label()), ProposalStatus::live()),
     ];
     /* The pipeline counts ignore the phase filter itself, so every phase stays countable. */
     $phasePills = [
@@ -294,7 +300,7 @@ new #[Title('titles.proposals')] class extends Component {
 
     @include('pages.proposals._proposal-form')
 
-    @include('pages.proposals._index-stage-modal')
+    @include('pages.proposals._status-modals')
 
     <x-ui.confirm-modal
         wire:model="showDeleteModal"

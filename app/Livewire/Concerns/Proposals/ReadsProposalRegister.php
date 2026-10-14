@@ -159,7 +159,7 @@ trait ReadsProposalRegister
 
         $relations = [
             'projects' => fn ($query) => $query->select(['projects.id', 'projects.name', 'projects.status'])->orderBy('projects.name'),
-            'statusNotes' => fn ($query) => $query->select(['id', 'proposal_id', 'status', 'context', 'date'])->orderByDesc('date')->orderByDesc('id')->limit(1),
+            'statusNotes' => fn ($query) => $query->select(['id', 'proposal_id', 'status', 'context', 'date'])->orderByDesc('date')->orderByDesc('id'),
         ];
 
         // Agreements, and the tranches behind them, load only for a viewer who may see them.

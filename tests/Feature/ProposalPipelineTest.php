@@ -48,8 +48,8 @@ test('the phase filter selects every status belonging to that phase', function (
 
     // Monitoring holds exactly ProposalStatus::Active.
     Proposal::factory()->create(['name' => 'Monitored proposal', 'status' => ProposalStatus::Active]);
-    // Planning holds ConceptNote and ProposalDraft.
-    Proposal::factory()->create(['name' => 'Planned proposal', 'status' => ProposalStatus::ConceptNote]);
+    // Planning holds ProposalDraft, ProposalReview, Submitted and OnHold.
+    Proposal::factory()->create(['name' => 'Planned proposal', 'status' => ProposalStatus::ProposalDraft]);
 
     Livewire::actingAs($user)
         ->test('pages::proposals.index')
@@ -146,53 +146,57 @@ test('the delete confirmation opens and closes through its boolean', function ()
         ->assertSet('deletingProposalId', null);
 });
 
-test('moving a proposal to its next stage records the status and the reason together', function () {
+test('moving a proposal to its next stage records the status and the standard note together', function () {
+    $user = User::factory()->role('Financial')->create();
+    $proposal = Proposal::factory()->create(['status' => ProposalStatus::ProposalReview]);
+
+    Livewire::actingAs($user)
+        ->test('pages::proposals.index')
+        ->call('openStatusModal', $proposal->id)
+        ->assertSet('showStatusModal', true)
+        ->assertSet('newStatus', ProposalStatus::Submitted->value)
+        ->set('statusDate', '2026-09-01')
+        ->call('changeStatus')
+        ->assertHasNoErrors()
+        ->assertSet('showStatusModal', false);
+
+    expect(DB::table('proposals')->find($proposal->id)->status)->toBe('submitted');
+
+    $note = DB::table('proposal_status_notes')->where('proposal_id', $proposal->id)->sole();
+
+    expect($note->status)->toBe('submitted')
+        ->and($note->context)->toBe(__('proposals.status_moved_standard_note', ['from' => ProposalStatus::ProposalReview->label(), 'to' => ProposalStatus::Submitted->label()]))
+        ->and($note->date)->toBe('2026-09-01')
+        ->and($note->changed_by)->toBe($user->id);
+});
+
+test('a stage move without a reason changes nothing', function () {
     $user = User::factory()->role('Financial')->create();
     $proposal = Proposal::factory()->create(['status' => ProposalStatus::Submitted]);
 
     Livewire::actingAs($user)
         ->test('pages::proposals.index')
-        ->call('openStageModal', $proposal->id)
-        ->assertSet('showStageModal', true)
-        ->assertSet('newStatus', ProposalStatus::Approved->value)
-        ->set('statusContext', '  Donor signed off the budget.  ')
-        ->set('statusDate', '2026-09-01')
-        ->call('recordStageChange')
-        ->assertHasNoErrors()
-        ->assertSet('showStageModal', false);
-
-    expect(DB::table('proposals')->find($proposal->id)->status)->toBe('approved');
-
-    $note = DB::table('proposal_status_notes')->where('proposal_id', $proposal->id)->sole();
-
-    expect($note->status)->toBe('approved')
-        ->and($note->context)->toBe('Donor signed off the budget.')
-        ->and($note->date)->toBe('2026-09-01');
-});
-
-test('a stage move without a reason changes nothing', function () {
-    $user = User::factory()->role('Financial')->create();
-    $proposal = Proposal::factory()->create(['status' => ProposalStatus::Active]);
-
-    Livewire::actingAs($user)
-        ->test('pages::proposals.index')
-        ->call('openStageModal', $proposal->id)
+        ->call('openStatusModal', $proposal->id)
+        ->set('newStatus', ProposalStatus::ProposalDraft->value)
         ->set('statusContext', '   ')
-        ->call('recordStageChange')
+        ->call('changeStatus')
         ->assertHasErrors(['statusContext']);
 
-    expect(DB::table('proposals')->find($proposal->id)->status)->toBe('active')
+    expect(DB::table('proposals')->find($proposal->id)->status)->toBe('submitted')
         ->and(DB::table('proposal_status_notes')->where('proposal_id', $proposal->id)->count())->toBe(0);
 });
 
-test('a proposal with no next stage opens the stage move on its current status', function () {
+test('a proposal with no allowed move opens the status modal with an explanation and no targets', function () {
     $user = User::factory()->role('Financial')->create();
     $proposal = Proposal::factory()->create(['status' => ProposalStatus::Rejected]);
 
-    Livewire::actingAs($user)
+    $component = Livewire::actingAs($user)
         ->test('pages::proposals.index')
-        ->call('openStageModal', $proposal->id)
-        ->assertSet('newStatus', ProposalStatus::Rejected->value);
+        ->call('openStatusModal', $proposal->id)
+        ->assertSet('newStatus', '')
+        ->assertSee(__('proposals.no_status_moves_from_here'));
+
+    expect($component->instance()->statusTargets)->toBe([]);
 });
 
 test('selecting a donor shows only the proposals it funds, and selecting it again clears the filter', function () {
@@ -228,10 +232,10 @@ test('the pipeline rail toggles the phase filter and still counts the phases it 
         ->call('togglePhase', ProposalPhase::Monitoring->value)
         ->assertSet('phase', ProposalPhase::Monitoring->value);
 
-    $implementation = collect($component->instance()->pipeline)->firstWhere('phase', ProposalPhase::Implementation);
+    $archived = collect($component->instance()->pipeline)->firstWhere('phase', ProposalPhase::Archived);
 
-    expect($implementation['count'])->toBe(1)
-        ->and($implementation['rejected'])->toBe(1);
+    expect($archived['count'])->toBe(1)
+        ->and($archived['rejected'])->toBe(1);
 
     $component->call('togglePhase', ProposalPhase::Monitoring->value)->assertSet('phase', '');
 });
@@ -321,7 +325,7 @@ test('a user without proposal permissions sees no edit controls and cannot creat
 
     $fresh()->call('openCreateModal')->assertForbidden();
     $fresh()->set('name', 'Sneaked in')->set('donorId', (string) insertDonor())->set('internalProjectNumber', 'HC-2026-043')->set('plannedDateBegin', '2026-01-01')->set('plannedDateEnd', '2026-12-31')->call('saveProposal')->assertForbidden();
-    $fresh()->call('openStageModal', $proposal->id)->assertForbidden();
+    $fresh()->call('openStatusModal', $proposal->id)->assertForbidden();
     $fresh()->call('confirmDelete', $proposal->id)->assertForbidden();
     expect(fn () => $fresh()->set('deletingProposalId', $proposal->id))->toThrow(CannotUpdateLockedPropertyException::class);
 

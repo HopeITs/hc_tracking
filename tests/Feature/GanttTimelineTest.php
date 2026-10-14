@@ -76,7 +76,7 @@ test('the portfolio filters by program and status', function () {
 
 test('the pipeline groups proposals by phase with the projects they fund beneath them', function () {
     $proposal = Proposal::factory()->create(['name' => 'Winter response', 'status' => ProposalStatus::Active, 'planned_date_begin' => '2026-09-01', 'planned_date_end' => '2027-08-31']);
-    $draft = Proposal::factory()->create(['status' => ProposalStatus::ConceptNote, 'planned_date_begin' => '2020-01-01', 'planned_date_end' => '2020-02-01']);
+    $draft = Proposal::factory()->create(['status' => ProposalStatus::ProposalDraft, 'planned_date_begin' => '2020-01-01', 'planned_date_end' => '2020-02-01']);
     $project = Project::factory()->create(['start_date' => '2026-10-01', 'end_date' => '2027-06-30']);
     $project->proposals()->attach($proposal);
 

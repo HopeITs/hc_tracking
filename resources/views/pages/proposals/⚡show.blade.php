@@ -9,6 +9,7 @@ use App\Livewire\Concerns\Proposals\ChartsProposalChronology;
 use App\Livewire\Concerns\Proposals\ManagesProposalFiles;
 use App\Livewire\Concerns\Proposals\ManagesProposalForm;
 use App\Livewire\Concerns\Proposals\ManagesProposalRecord;
+use App\Livewire\Concerns\Proposals\ManagesProposalStatus;
 use App\Livewire\Concerns\Proposals\ReadsProposalDelivery;
 use App\Livewire\Concerns\Proposals\ReadsProposalFunding;
 use App\Livewire\Concerns\Proposals\ReadsProposalHealth;
@@ -36,6 +37,7 @@ new #[Title('titles.proposal')] class extends Component
     use ManagesProposalFiles;
     use ManagesProposalForm;
     use ManagesProposalRecord;
+    use ManagesProposalStatus;
     use ManagesTransferForm;
     use PreviewsFiles;
     use ReadsProposalDelivery;
@@ -251,7 +253,14 @@ new #[Title('titles.proposal')] class extends Component
                 </span>
                 @can('update', $this->proposal)
                 <x-ui.button size="sm" icon="pencil-square" class="min-h-10 touch-manipulation" wire:click="openEditModal({{ $this->proposal->id }})" data-test="open-details-modal">{{ __('proposals.edit_details') }}</x-ui.button>
-                <x-ui.button tone="primary" size="sm" icon="arrow-path" class="min-h-10 touch-manipulation" wire:click="openStatusModal" data-test="open-status-modal">{{ __('proposals.change_status') }}</x-ui.button>
+                @if ($this->proposal->transitionTargets() !== [])
+                <x-ui.button tone="primary" size="sm" icon="arrow-path" class="min-h-10 touch-manipulation" wire:click="openStatusModal({{ $this->proposal->id }})" data-test="open-status-modal">{{ __('proposals.change_status') }}</x-ui.button>
+                @endif
+                @endcan
+                @can('correctStatus', $this->proposal)
+                @if ($this->proposal->status->isTerminal())
+                <x-ui.button size="sm" icon="arrow-uturn-left" class="min-h-10 touch-manipulation" wire:click="openCorrectModal({{ $this->proposal->id }})" data-test="open-correct-status-modal">{{ __('proposals.correct_status') }}</x-ui.button>
+                @endif
                 @endcan
             </div>
         </x-slot:actions>

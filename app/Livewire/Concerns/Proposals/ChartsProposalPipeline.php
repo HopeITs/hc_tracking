@@ -104,7 +104,7 @@ trait ChartsProposalPipeline
     }
 
     /**
-     * The five phases with how many proposals sit in each and what they hold.
+     * The phases with how many proposals sit in each and what they hold.
      *
      * Ignores the phase filter itself so every stop stays selectable.
      *
@@ -137,7 +137,7 @@ trait ChartsProposalPipeline
             return [
                 'phase' => $phase,
                 'count' => (int) collect($statuses)->sum(fn (string $status): int => (int) ($counts[$status] ?? 0)),
-                'rejected' => $phase === ProposalPhase::Implementation ? (int) ($counts[ProposalStatus::Rejected->value] ?? 0) : 0,
+                'rejected' => $phase === ProposalPhase::Archived ? (int) ($counts[ProposalStatus::Rejected->value] ?? 0) : 0,
                 'money' => $money,
             ];
         }, ProposalPhase::cases());

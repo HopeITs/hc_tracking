@@ -159,7 +159,8 @@ class CoreDataSeeder extends Seeder
         $donorIds = Donor::query()->pluck('id', 'name');
 
         foreach ($proposals as $name => $profile) {
-            Proposal::firstOrCreate(
+            // Seed data sets the status directly: it is not mass assignable (contracts.md §4).
+            Proposal::unguarded(fn () => Proposal::firstOrCreate(
                 ['name' => $name],
                 [
                     'donor_id' => $donorIds->get($profile['donor']),
@@ -169,7 +170,7 @@ class CoreDataSeeder extends Seeder
                     'status' => $profile['status'],
                     'notes' => $profile['notes'],
                 ],
-            );
+            ));
         }
     }
 

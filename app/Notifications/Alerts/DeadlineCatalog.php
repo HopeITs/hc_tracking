@@ -131,7 +131,7 @@ final class DeadlineCatalog
     private function proposals(string $limit): array
     {
         return array_values(Proposal::query()
-            ->whereNotIn('status', [ProposalStatus::Completed->value, ProposalStatus::Rejected->value])
+            ->whereNotIn('status', [ProposalStatus::Completed->value, ProposalStatus::Rejected->value, ProposalStatus::OnHold->value])
             ->whereDate('planned_date_end', '<=', $limit)
             ->get(['id', 'name', 'planned_date_end', 'status'])
             ->map(fn (Proposal $proposal): DeadlineItem => new DeadlineItem(

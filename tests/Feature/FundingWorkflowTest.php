@@ -6,6 +6,7 @@ use App\Enums\ProposalStatus;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\DonorReport;
+use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalStatusNote;
 use App\Models\TransfersTracking;
@@ -120,24 +121,24 @@ test('a new proposal opens its status history, and editing it never changes the 
     $component = Livewire::actingAs($user)->test('pages::proposals.index')
         ->call('openCreateModal')
         ->set('name', 'Winter response')
-        ->set('proposalDonorId', (string) insertDonor())->set('internalProjectNumber', 'HC-2026-051')
+        ->set('donorId', (string) insertDonor())->set('projectIds', [(string) Project::factory()->create()->id])->set('internalProjectNumber', 'HC-2026-051')
         ->set('plannedDateBegin', '2026-01-01')
         ->set('plannedDateEnd', '2026-12-31')
-        ->set('proposalStatus', ProposalStatus::Submitted->value)
         ->call('saveProposal')
         ->assertHasNoErrors();
 
     $proposal = Proposal::query()->where('name', 'Winter response')->firstOrFail();
 
-    expect($proposal->status)->toBe(ProposalStatus::Submitted)
-        ->and(ProposalStatusNote::query()->where('proposal_id', $proposal->id)->pluck('status')->all())->toBe([ProposalStatus::Submitted]);
+    expect($proposal->status)->toBe(ProposalStatus::ConceptNote)
+        ->and(ProposalStatusNote::query()->where('proposal_id', $proposal->id)->pluck('status')->all())->toBe([ProposalStatus::ConceptNote]);
 
     $component->call('openEditModal', $proposal->id)
-        ->set('proposalStatus', ProposalStatus::Completed->value)
+        ->set('name', 'Winter response II')
         ->call('saveProposal')
         ->assertHasNoErrors();
 
-    expect($proposal->fresh()->status)->toBe(ProposalStatus::Submitted);
+    expect($proposal->fresh()->status)->toBe(ProposalStatus::ConceptNote)
+        ->and(ProposalStatusNote::query()->where('proposal_id', $proposal->id)->count())->toBe(1);
 });
 
 test('the funding flow opens a proposal that is not on the current page', function () {
