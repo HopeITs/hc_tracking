@@ -147,4 +147,13 @@ return [
         'alert' => 'تنبيه',
         'digest' => 'ملخص',
     ],
+    'event_importance' => [
+        'immediate' => 'فوري',
+        'digest' => 'ملخص يومي',
+    ],
+    'oversight_mode' => [
+        'all' => 'المتابعة والتقييم والإدارة العامة',
+        'management_only' => 'الإدارة العامة فقط',
+        'none' => 'بلا رقابة',
+    ],
 ];

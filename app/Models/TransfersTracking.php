@@ -291,12 +291,15 @@ class TransfersTracking extends Model implements TracksActivity
     }
 
     /**
-     * "Donor · Proposal · amount currency".
+     * "Donor · Proposal · scheduled date". Never the amount: labels travel
+     * into activities and notifications (contracts.md §15.1).
      */
     public function activityLabel(): string
     {
+        $scheduled = $this->activityAttribute('scheduled_date');
+
         return DonorProposal::labelFor($this->activityAttribute('donor_proposal_id'))
-            .' · '.number_format((float) $this->activityAttribute('payment_amount'), 2).' '.$this->getRawOriginal('amount_transfered_currency', $this->getAttributes()['amount_transfered_currency'] ?? '');
+            .($scheduled === null ? '' : ' · '.CarbonImmutable::parse($scheduled)->toDateString());
     }
 
     public function activityProgramId(): ?int

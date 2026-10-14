@@ -296,7 +296,10 @@ return [
             'deleted' => ':actor deleted the milestone “:subject”',
         ],
         'project' => [
-            'created' => ':actor created the project “:subject”',
+            'created' => [
+                'title' => 'Project created',
+                'body' => ':actor created the project “:subject”',
+            ],
             'created_you' => ':actor made you the owner of the new project “:subject”',
             'status_changed' => ':actor moved “:subject” from :from to :to',
             'owner_changed' => ':actor made :to the owner of “:subject”',
@@ -308,6 +311,46 @@ return [
             'assignment_unblocked' => ':actor unblocked “:subject” and asked :employee to acknowledge being its owner again',
             'updated' => ':actor updated the project “:subject”',
             'deleted' => ':actor deleted the project “:subject”',
+            'owner_acknowledged' => [
+                'title' => 'Owner acknowledged the project',
+                'body' => ':actor acknowledged being the owner of “:subject”',
+            ],
+            'owner_declined' => [
+                'title' => 'Owner declined the project',
+                'body' => ':actor declined being the owner of “:subject”',
+            ],
+            'approved' => [
+                'title' => 'Project approved',
+                'body' => '“:subject” is approved',
+            ],
+            'activated' => [
+                'title' => 'Project activated',
+                'body' => '“:subject” is now active',
+            ],
+            'period_changed' => [
+                'title' => 'Project period changed',
+                'body' => 'The period of “:subject” changed',
+            ],
+            'started' => [
+                'title' => 'Project started',
+                'body' => '“:subject” starts today',
+            ],
+            'ended' => [
+                'title' => 'Project ended',
+                'body' => '“:subject” ends today',
+            ],
+            'closed' => [
+                'title' => 'Project closed',
+                'body' => ':actor closed the project “:subject”',
+            ],
+            'archived' => [
+                'title' => 'Project archived',
+                'body' => ':actor archived the project “:subject”',
+            ],
+            'sectors_changed' => [
+                'title' => 'Project sectors changed',
+                'body' => ':actor changed the sectors of “:subject”',
+            ],
         ],
         'program' => [
             'created' => ':actor added the program “:subject”',
@@ -316,6 +359,10 @@ return [
             'manager_changed_you' => ':actor made you the manager of “:subject”',
             'updated' => ':actor updated the program “:subject”',
             'deleted' => ':actor deleted the program “:subject”',
+            'logframe_missing' => [
+                'title' => 'Logframe missing',
+                'body' => 'The program “:subject” has no logframe yet',
+            ],
         ],
         'annual_plan' => [
             'created' => ':actor created the annual plan “:subject”',
@@ -324,6 +371,10 @@ return [
             'manager_changed_you' => ':actor made you the manager of the annual plan “:subject”',
             'updated' => ':actor updated the annual plan “:subject”',
             'deleted' => ':actor deleted the annual plan “:subject”',
+            'missing' => [
+                'title' => 'Annual plan missing',
+                'body' => 'The program “:subject” has no annual plan for this year',
+            ],
         ],
         'strategy' => [
             'created' => ':actor created the strategy “:subject”',
@@ -331,11 +382,20 @@ return [
             'deleted' => ':actor deleted the strategy “:subject”',
         ],
         'meal_coverage' => [
-            'assigned' => ':actor made :employee the MEAL officer for “:subject”',
+            'assigned' => [
+                'title' => 'MEAL officer assigned',
+                'body' => ':actor made :employee the MEAL officer for “:subject”',
+            ],
             'assigned_you' => ':actor made you the MEAL officer for “:subject”',
-            'responsible_changed' => ':actor made :employee the MEAL officer for “:subject” instead of :from',
+            'responsible_changed' => [
+                'title' => 'MEAL officer changed',
+                'body' => ':actor made :employee the MEAL officer for “:subject” instead of :from',
+            ],
             'responsible_changed_you' => ':actor made you the MEAL officer for “:subject”',
-            'project_assigned' => ':actor made :employee the MEAL officer for the project “:subject”',
+            'project_assigned' => [
+                'title' => 'Project MEAL officer assigned',
+                'body' => ':actor made :employee the MEAL officer for the project “:subject”',
+            ],
             'project_assigned_you' => ':actor made you the MEAL officer for the project “:subject”',
             'updated' => ':actor updated the MEAL coverage of “:subject”',
         ],
@@ -346,10 +406,22 @@ return [
             'deleted' => ':actor deleted the risk “:subject”',
         ],
         'library_indicator' => [
-            'created' => ':actor added “:subject” to the Indicator Library',
-            'updated' => ':actor updated the library indicator “:subject”',
-            'deactivated' => ':actor deactivated the library indicator “:subject”',
-            'reactivated' => ':actor reactivated the library indicator “:subject”',
+            'created' => [
+                'title' => 'Library indicator added',
+                'body' => ':actor added “:subject” to the Indicator Library',
+            ],
+            'updated' => [
+                'title' => 'Library indicator updated',
+                'body' => ':actor updated the library indicator “:subject”',
+            ],
+            'deactivated' => [
+                'title' => 'Library indicator deactivated',
+                'body' => ':actor deactivated the library indicator “:subject”',
+            ],
+            'reactivated' => [
+                'title' => 'Library indicator reactivated',
+                'body' => ':actor reactivated the library indicator “:subject”',
+            ],
             'deleted' => ':actor deleted the library indicator “:subject”',
         ],
         'indicator' => [
@@ -386,15 +458,72 @@ return [
             'deleted' => ':actor deleted the donor “:subject”',
         ],
         'proposal' => [
-            'created' => ':actor created the proposal “:subject”',
-            'status_changed' => ':actor moved “:subject” from :from to :to',
+            'created' => [
+                'title' => 'Proposal created',
+                'body' => ':actor created the proposal “:subject”',
+            ],
+            'status_changed' => [
+                'title' => 'Proposal status changed',
+                'body' => ':actor moved “:subject” from :from to :to',
+            ],
             'status_note_added' => ':actor added a status note to “:subject”: :note',
-            'final_report_accepted' => ':actor recorded the donor\'s acceptance of the final report for “:subject”',
-            'beneficiaries_changed' => ':actor changed the beneficiaries of “:subject”',
-            'project_linked' => ':actor linked a project to “:subject”',
-            'project_unlinked' => ':actor unlinked a project from “:subject”',
+            'final_report_accepted' => [
+                'title' => 'Final report accepted',
+                'body' => ':actor recorded the donor\'s acceptance of the final report for “:subject”',
+            ],
+            'beneficiaries_changed' => [
+                'title' => 'Beneficiaries changed',
+                'body' => ':actor changed the beneficiaries of “:subject”',
+            ],
+            'project_linked' => [
+                'title' => 'Project linked',
+                'body' => ':actor linked a project to “:subject”',
+            ],
+            'project_unlinked' => [
+                'title' => 'Project unlinked',
+                'body' => ':actor unlinked a project from “:subject”',
+            ],
             'updated' => ':actor updated the proposal “:subject”',
-            'deleted' => ':actor deleted the proposal “:subject”',
+            'deleted' => [
+                'title' => 'Proposal deleted',
+                'body' => ':actor deleted the proposal “:subject”',
+            ],
+            'review_requested' => [
+                'title' => 'Review requested',
+                'body' => ':actor asked for your review of “:subject”',
+            ],
+            'reviewer_added' => [
+                'title' => 'Reviewer added',
+                'body' => ':actor added a reviewer to “:subject”',
+            ],
+            'reviewer_removed' => [
+                'title' => 'Reviewer removed',
+                'body' => ':actor removed a reviewer from “:subject”',
+            ],
+            'reviewer_seen' => [
+                'title' => 'Reviewer has seen the proposal',
+                'body' => ':actor has seen “:subject”',
+            ],
+            'need_assessment_added' => [
+                'title' => 'Need assessment added',
+                'body' => ':actor added a need assessment to “:subject”',
+            ],
+            'approved' => [
+                'title' => 'Proposal approved',
+                'body' => ':actor recorded the donor approval of “:subject”',
+            ],
+            'approved_without_agreement' => [
+                'title' => 'Approved without an agreement',
+                'body' => '“:subject” is approved but has no funding agreement yet',
+            ],
+            'on_hold_reminder' => [
+                'title' => 'On-hold reminder',
+                'body' => '“:subject” is still on hold',
+            ],
+            'targets_saved' => [
+                'title' => 'Targets saved',
+                'body' => ':actor saved the targets of “:subject”',
+            ],
         ],
         'donor_proposal' => [
             'created' => ':actor recorded the funding agreement “:subject”',
@@ -403,17 +532,43 @@ return [
         ],
         'donor_report' => [
             'created' => ':actor added the donor report “:subject”',
-            'submitted' => ':actor submitted the donor report “:subject”',
+            'submitted' => [
+                'title' => 'Donor report submitted',
+                'body' => ':actor submitted the donor report “:subject”',
+            ],
             'updated' => ':actor updated the donor report “:subject”',
             'deleted' => ':actor deleted the donor report “:subject”',
+            'saved' => [
+                'title' => 'Donor report saved',
+                'body' => ':actor saved the donor report “:subject”',
+            ],
+            'due' => [
+                'title' => 'Donor report due',
+                'body' => 'The donor report “:subject” is due',
+            ],
+            'overdue' => [
+                'title' => 'Donor report overdue',
+                'body' => 'The donor report “:subject” is overdue',
+            ],
         ],
         'transfer' => [
             'scheduled' => ':actor scheduled the tranche “:subject”',
-            'received' => ':actor recorded the tranche “:subject” as received',
+            'received' => [
+                'title' => 'Tranche received',
+                'body' => ':actor recorded the tranche “:subject” as received',
+            ],
             'failed' => ':actor recorded the tranche “:subject” as failed',
             'status_changed' => ':actor moved the tranche “:subject” from :from to :to',
             'updated' => ':actor updated the tranche “:subject”',
             'deleted' => ':actor deleted the tranche “:subject”',
+            'generated' => [
+                'title' => 'Expected tranches generated',
+                'body' => 'Expected tranches were generated for “:subject”',
+            ],
+            'late' => [
+                'title' => 'Tranche late',
+                'body' => 'The tranche “:subject” is late',
+            ],
         ],
         'account' => [
             'created' => ':actor opened the account “:subject”',
@@ -435,8 +590,96 @@ return [
             'deleted' => ':actor deleted the role “:subject”',
         ],
         'supervision' => [
-            'added' => ':actor made :supervisor a supervisor of :supervisee',
-            'removed' => ':actor removed :supervisor as a supervisor of :supervisee',
+            'added' => [
+                'title' => 'Supervisor added',
+                'body' => ':actor made :supervisor a supervisor of :supervisee',
+            ],
+            'removed' => [
+                'title' => 'Supervisor removed',
+                'body' => ':actor removed :supervisor as a supervisor of :supervisee',
+            ],
+        ],
+        'agreement' => [
+            'recorded' => [
+                'title' => 'Funding agreement recorded',
+                'body' => ':actor recorded the funding agreement of “:subject”',
+            ],
+        ],
+        'monthly_reports' => [
+            'generated' => [
+                'title' => 'Monthly reports generated',
+                'body' => 'The monthly reports of “:subject” are ready to prepare',
+            ],
+        ],
+        'monthly_report' => [
+            'due' => [
+                'title' => 'Monthly report due',
+                'body' => 'The monthly report “:subject” is due',
+            ],
+            'overdue' => [
+                'title' => 'Monthly report overdue',
+                'body' => 'The monthly report “:subject” is overdue',
+            ],
+            'submitted' => [
+                'title' => 'Monthly report submitted',
+                'body' => ':actor submitted the monthly report “:subject”',
+            ],
+            'validated' => [
+                'title' => 'Monthly report validated',
+                'body' => ':actor validated the monthly report “:subject”',
+            ],
+            'returned' => [
+                'title' => 'Monthly report returned',
+                'body' => ':actor returned the monthly report “:subject”',
+            ],
+            'reopen_requested' => [
+                'title' => 'Reopen requested',
+                'body' => ':actor asked to reopen the monthly report “:subject”',
+            ],
+            'reopen_decided' => [
+                'title' => 'Reopen request decided',
+                'body' => ':actor decided the reopen request for “:subject”',
+            ],
+            'reopen_escalated' => [
+                'title' => 'Reopen request escalated',
+                'body' => 'Nobody can decide the reopen request for “:subject”',
+            ],
+        ],
+        'report_template' => [
+            'pending' => [
+                'title' => 'Report template to confirm',
+                'body' => 'The report template of “:subject” waits for confirmation',
+            ],
+            'confirmed' => [
+                'title' => 'Report template confirmed',
+                'body' => ':actor confirmed the report template of “:subject”',
+            ],
+            'lines_added' => [
+                'title' => 'New indicators to report',
+                'body' => ':actor added indicators to the report template of “:subject”',
+            ],
+        ],
+        'department_task' => [
+            'created' => [
+                'title' => 'Department task created',
+                'body' => ':actor requested “:subject” from your department',
+            ],
+            'due' => [
+                'title' => 'Department task due',
+                'body' => 'The department task “:subject” is due',
+            ],
+            'overdue' => [
+                'title' => 'Department task overdue',
+                'body' => 'The department task “:subject” is overdue',
+            ],
+            'delivered' => [
+                'title' => 'Department task delivered',
+                'body' => ':actor delivered “:subject”',
+            ],
+            'returned' => [
+                'title' => 'Department task returned',
+                'body' => ':actor returned “:subject”',
+            ],
         ],
     ],
 ];

@@ -184,6 +184,8 @@ return [
         'off_track_pace_percent' => 80,
         'daily_brief_time' => '07:30',
         'weekly_digest_time' => '08:00',
+        // Admin overrides per EventCatalog key: enabled, importance, extra oversight roles.
+        'event_overrides' => [],
     ],
 
 ];

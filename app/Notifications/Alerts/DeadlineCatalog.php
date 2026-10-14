@@ -153,9 +153,9 @@ final class DeadlineCatalog
             ->whereNotNull('transfers_tracking.scheduled_date')
             ->whereDate('transfers_tracking.scheduled_date', '<=', $limit)
             ->toBase()
-            ->get(['transfers_tracking.id', 'transfers_tracking.scheduled_date', 'transfers_tracking.payment_amount', 'transfers_tracking.amount_transfered_currency', 'donors.name as donor', 'proposals.name as proposal'])
+            ->get(['transfers_tracking.id', 'transfers_tracking.scheduled_date', 'donors.name as donor', 'proposals.name as proposal'])
             ->map(fn (object $row): DeadlineItem => new DeadlineItem(
-                'transfer', (int) $row->id, 'transfers', $row->donor.' · '.$row->proposal.' · '.number_format((float) $row->payment_amount, 2).' '.$row->amount_transfered_currency,
+                'transfer', (int) $row->id, 'transfers', $row->donor.' · '.$row->proposal.' · '.CarbonImmutable::parse($row->scheduled_date)->toDateString(),
                 CarbonImmutable::parse($row->scheduled_date), [], ['Financial'],
             ))->all());
     }

@@ -4,31 +4,39 @@ declare(strict_types=1);
 
 namespace App\Notifications;
 
+use App\Enums\EventImportance;
 use App\Enums\NotificationPriority;
 use App\Models\Activity;
 use App\Models\Program;
 use App\Models\Role;
 use App\Models\User;
 use App\Notifications\Recipients\ModuleRecipients;
+use App\Notifications\Recipients\OversightRecipients;
 
 /**
  * Turns one activity into the users who hear about it:
- * direct ∪ program-manager cascade ∪ role watchers ∪ top (★ only),
- * then RecipientFilter removes the actor, users without the module's view
- * permission and users who muted it (unless direct).
+ * direct ∪ program-manager cascade ∪ role watchers ∪ top (★ only) ∪
+ * oversight (EventCatalog movements of immediate importance), then
+ * RecipientFilter removes the actor, users without the module's view
+ * permission and users who muted it (unless direct). A catalog event the
+ * admin disabled reaches nobody.
  */
 final class RecipientResolver
 {
     public function __construct(
         private EmployeeRecipients $employees,
         private RecipientFilter $filter,
+        private EventCatalog $catalog,
+        private OversightRecipients $oversight,
     ) {}
 
     public function resolve(Activity $activity): ResolvedRecipients
     {
         $map = $this->mapFor($activity->module);
+        $eventKey = EventCatalog::keyForActivity($activity->event);
+        $event = $eventKey === null ? null : $this->catalog->effective($eventKey);
 
-        if ($map === null) {
+        if ($map === null || ($event !== null && ! $event['enabled'])) {
             return new ResolvedRecipients([]);
         }
 
@@ -44,6 +52,9 @@ final class RecipientResolver
             ...$this->programManagerUserIds($activity->program_id),
             ...$this->usersWithRoles($map->watcherRoles($activity)),
             ...($map->isKeyEvent($activity) ? $this->usersWithRoles(config('notifications.top_roles')) : []),
+            ...($eventKey !== null && $event !== null && $event['importance'] === EventImportance::Immediate
+                ? $this->oversight->userIdsFor($eventKey, $this->projectIdOf($activity))
+                : []),
         ];
 
         $recipients = $this->filter->apply($candidates, $activity->module, $activity->actor_id, $direct, $map->permissionExemptUserIds($activity));
@@ -95,6 +106,21 @@ final class RecipientResolver
         $managerId = Program::query()->whereKey($programId)->value('manager_id');
 
         return $managerId === null ? [] : array_values($this->employees->usersFor([(int) $managerId]));
+    }
+
+    /**
+     * The project an activity is about, for the MEAL officer: the subject
+     * itself, or the `project_id` the recording module put in its properties.
+     */
+    private function projectIdOf(Activity $activity): ?int
+    {
+        if ($activity->subject_type === 'project') {
+            return $activity->subject_id;
+        }
+
+        $projectId = $activity->properties['project_id'] ?? null;
+
+        return is_numeric($projectId) ? (int) $projectId : null;
     }
 
     private function mapFor(string $module): ?ModuleRecipients

@@ -147,4 +147,13 @@ return [
         'alert' => 'Alert',
         'digest' => 'Digest',
     ],
+    'event_importance' => [
+        'immediate' => 'Immediate',
+        'digest' => 'Daily summary',
+    ],
+    'oversight_mode' => [
+        'all' => 'MEAL and General Management',
+        'management_only' => 'General Management only',
+        'none' => 'No oversight',
+    ],
 ];

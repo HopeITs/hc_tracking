@@ -296,7 +296,10 @@ return [
             'deleted' => 'حذف :actor المرحلة «:subject»',
         ],
         'project' => [
-            'created' => 'أنشأ :actor المشروع «:subject»',
+            'created' => [
+                'title' => 'إنشاء مشروع',
+                'body' => 'أنشأ :actor المشروع «:subject»',
+            ],
             'created_you' => 'جعلك :actor مالكًا للمشروع الجديد «:subject»',
             'status_changed' => 'نقل :actor المشروع «:subject» من :from إلى :to',
             'owner_changed' => 'جعل :actor :to مالكًا للمشروع «:subject»',
@@ -308,6 +311,46 @@ return [
             'assignment_unblocked' => 'رفع :actor الحظر عن المشروع «:subject» وطلب من :employee الإقرار بمسؤوليته مرة أخرى',
             'updated' => 'حدّث :actor المشروع «:subject»',
             'deleted' => 'حذف :actor المشروع «:subject»',
+            'owner_acknowledged' => [
+                'title' => 'إقرار مالك المشروع',
+                'body' => 'أقرّ :actor بأنه مالك المشروع «:subject»',
+            ],
+            'owner_declined' => [
+                'title' => 'اعتذار مالك المشروع',
+                'body' => 'اعتذر :actor عن ملكية المشروع «:subject»',
+            ],
+            'approved' => [
+                'title' => 'اعتماد مشروع',
+                'body' => 'اعتُمد المشروع «:subject»',
+            ],
+            'activated' => [
+                'title' => 'تفعيل مشروع',
+                'body' => 'أصبح المشروع «:subject» نشطًا',
+            ],
+            'period_changed' => [
+                'title' => 'تغيير مدة مشروع',
+                'body' => 'تغيّرت مدة المشروع «:subject»',
+            ],
+            'started' => [
+                'title' => 'بدء مشروع',
+                'body' => 'يبدأ المشروع «:subject» اليوم',
+            ],
+            'ended' => [
+                'title' => 'انتهاء مشروع',
+                'body' => 'ينتهي المشروع «:subject» اليوم',
+            ],
+            'closed' => [
+                'title' => 'إغلاق مشروع',
+                'body' => 'أغلق :actor المشروع «:subject»',
+            ],
+            'archived' => [
+                'title' => 'أرشفة مشروع',
+                'body' => 'أرشف :actor المشروع «:subject»',
+            ],
+            'sectors_changed' => [
+                'title' => 'تغيير قطاعات مشروع',
+                'body' => 'غيّر :actor قطاعات المشروع «:subject»',
+            ],
         ],
         'program' => [
             'created' => 'أضاف :actor البرنامج «:subject»',
@@ -316,6 +359,10 @@ return [
             'manager_changed_you' => 'جعلك :actor مديرًا للبرنامج «:subject»',
             'updated' => 'حدّث :actor البرنامج «:subject»',
             'deleted' => 'حذف :actor البرنامج «:subject»',
+            'logframe_missing' => [
+                'title' => 'إطار منطقي مفقود',
+                'body' => 'لا يوجد إطار منطقي للبرنامج «:subject» بعد',
+            ],
         ],
         'annual_plan' => [
             'created' => 'أنشأ :actor الخطة السنوية «:subject»',
@@ -324,6 +371,10 @@ return [
             'manager_changed_you' => 'جعلك :actor مديرًا للخطة السنوية «:subject»',
             'updated' => 'حدّث :actor الخطة السنوية «:subject»',
             'deleted' => 'حذف :actor الخطة السنوية «:subject»',
+            'missing' => [
+                'title' => 'خطة سنوية مفقودة',
+                'body' => 'لا توجد خطة سنوية للبرنامج «:subject» لهذا العام',
+            ],
         ],
         'strategy' => [
             'created' => 'أنشأ :actor الاستراتيجية «:subject»',
@@ -331,11 +382,20 @@ return [
             'deleted' => 'حذف :actor الاستراتيجية «:subject»',
         ],
         'meal_coverage' => [
-            'assigned' => 'جعل :actor :employee مسؤول المتابعة والتقييم في «:subject»',
+            'assigned' => [
+                'title' => 'تعيين مسؤول متابعة وتقييم',
+                'body' => 'جعل :actor :employee مسؤول المتابعة والتقييم في «:subject»',
+            ],
             'assigned_you' => 'جعلك :actor مسؤول المتابعة والتقييم في «:subject»',
-            'responsible_changed' => 'جعل :actor :employee مسؤول المتابعة والتقييم في «:subject» بدلًا من :from',
+            'responsible_changed' => [
+                'title' => 'تغيير مسؤول المتابعة والتقييم',
+                'body' => 'جعل :actor :employee مسؤول المتابعة والتقييم في «:subject» بدلًا من :from',
+            ],
             'responsible_changed_you' => 'جعلك :actor مسؤول المتابعة والتقييم في «:subject»',
-            'project_assigned' => 'جعل :actor :employee مسؤول المتابعة والتقييم للمشروع «:subject»',
+            'project_assigned' => [
+                'title' => 'تعيين مسؤول متابعة وتقييم لمشروع',
+                'body' => 'جعل :actor :employee مسؤول المتابعة والتقييم للمشروع «:subject»',
+            ],
             'project_assigned_you' => 'جعلك :actor مسؤول المتابعة والتقييم للمشروع «:subject»',
             'updated' => 'حدّث :actor تغطية المتابعة والتقييم في «:subject»',
         ],
@@ -346,10 +406,22 @@ return [
             'deleted' => 'حذف :actor الخطر «:subject»',
         ],
         'library_indicator' => [
-            'created' => 'أضاف :actor «:subject» إلى مكتبة المؤشرات',
-            'updated' => 'حدّث :actor مؤشر المكتبة «:subject»',
-            'deactivated' => 'أوقف :actor مؤشر المكتبة «:subject»',
-            'reactivated' => 'أعاد :actor تفعيل مؤشر المكتبة «:subject»',
+            'created' => [
+                'title' => 'إضافة مؤشر للمكتبة',
+                'body' => 'أضاف :actor «:subject» إلى مكتبة المؤشرات',
+            ],
+            'updated' => [
+                'title' => 'تحديث مؤشر المكتبة',
+                'body' => 'حدّث :actor مؤشر المكتبة «:subject»',
+            ],
+            'deactivated' => [
+                'title' => 'إيقاف مؤشر المكتبة',
+                'body' => 'أوقف :actor مؤشر المكتبة «:subject»',
+            ],
+            'reactivated' => [
+                'title' => 'إعادة تفعيل مؤشر المكتبة',
+                'body' => 'أعاد :actor تفعيل مؤشر المكتبة «:subject»',
+            ],
             'deleted' => 'حذف :actor مؤشر المكتبة «:subject»',
         ],
         'indicator' => [
@@ -386,15 +458,72 @@ return [
             'deleted' => 'حذف :actor المانح «:subject»',
         ],
         'proposal' => [
-            'created' => 'أنشأ :actor المقترح «:subject»',
-            'status_changed' => 'نقل :actor المقترح «:subject» من :from إلى :to',
+            'created' => [
+                'title' => 'إنشاء مقترح',
+                'body' => 'أنشأ :actor المقترح «:subject»',
+            ],
+            'status_changed' => [
+                'title' => 'تغيير حالة مقترح',
+                'body' => 'نقل :actor المقترح «:subject» من :from إلى :to',
+            ],
             'status_note_added' => 'أضاف :actor ملاحظة حالة إلى «:subject»: :note',
-            'final_report_accepted' => 'سجّل :actor موافقة الممول على التقرير الختامي لـ«:subject»',
-            'beneficiaries_changed' => 'غيّر :actor عدد المستفيدين في «:subject»',
-            'project_linked' => 'ربط :actor مشروعًا بـ«:subject»',
-            'project_unlinked' => 'فكّ :actor ربط مشروع من «:subject»',
+            'final_report_accepted' => [
+                'title' => 'قبول التقرير الختامي',
+                'body' => 'سجّل :actor موافقة الممول على التقرير الختامي لـ«:subject»',
+            ],
+            'beneficiaries_changed' => [
+                'title' => 'تغيير عدد المستفيدين',
+                'body' => 'غيّر :actor عدد المستفيدين في «:subject»',
+            ],
+            'project_linked' => [
+                'title' => 'ربط مشروع',
+                'body' => 'ربط :actor مشروعًا بـ«:subject»',
+            ],
+            'project_unlinked' => [
+                'title' => 'فكّ ربط مشروع',
+                'body' => 'فكّ :actor ربط مشروع من «:subject»',
+            ],
             'updated' => 'حدّث :actor المقترح «:subject»',
-            'deleted' => 'حذف :actor المقترح «:subject»',
+            'deleted' => [
+                'title' => 'حذف مقترح',
+                'body' => 'حذف :actor المقترح «:subject»',
+            ],
+            'review_requested' => [
+                'title' => 'طلب مراجعة',
+                'body' => 'طلب :actor مراجعتك للمقترح «:subject»',
+            ],
+            'reviewer_added' => [
+                'title' => 'إضافة مراجع',
+                'body' => 'أضاف :actor مراجعًا إلى المقترح «:subject»',
+            ],
+            'reviewer_removed' => [
+                'title' => 'إزالة مراجع',
+                'body' => 'أزال :actor مراجعًا من المقترح «:subject»',
+            ],
+            'reviewer_seen' => [
+                'title' => 'اطّلاع مراجع',
+                'body' => 'اطّلع :actor على المقترح «:subject»',
+            ],
+            'need_assessment_added' => [
+                'title' => 'إضافة تقييم احتياج',
+                'body' => 'أضاف :actor تقييم احتياج إلى المقترح «:subject»',
+            ],
+            'approved' => [
+                'title' => 'اعتماد مقترح',
+                'body' => 'سجّل :actor موافقة المانح على المقترح «:subject»',
+            ],
+            'approved_without_agreement' => [
+                'title' => 'اعتماد دون اتفاقية',
+                'body' => 'اعتُمد المقترح «:subject» ولا توجد له اتفاقية تمويل بعد',
+            ],
+            'on_hold_reminder' => [
+                'title' => 'تذكير بمقترح معلّق',
+                'body' => 'ما زال المقترح «:subject» معلّقًا',
+            ],
+            'targets_saved' => [
+                'title' => 'حفظ المستهدفات',
+                'body' => 'حفظ :actor مستهدفات المقترح «:subject»',
+            ],
         ],
         'donor_proposal' => [
             'created' => 'سجّل :actor اتفاقية التمويل «:subject»',
@@ -403,17 +532,43 @@ return [
         ],
         'donor_report' => [
             'created' => 'أضاف :actor تقرير المانح «:subject»',
-            'submitted' => 'قدّم :actor تقرير المانح «:subject»',
+            'submitted' => [
+                'title' => 'تقديم تقرير مانح',
+                'body' => 'قدّم :actor تقرير المانح «:subject»',
+            ],
             'updated' => 'حدّث :actor تقرير المانح «:subject»',
             'deleted' => 'حذف :actor تقرير المانح «:subject»',
+            'saved' => [
+                'title' => 'حفظ تقرير مانح',
+                'body' => 'حفظ :actor تقرير المانح «:subject»',
+            ],
+            'due' => [
+                'title' => 'موعد تقرير مانح',
+                'body' => 'حان موعد تقرير المانح «:subject»',
+            ],
+            'overdue' => [
+                'title' => 'تأخر تقرير مانح',
+                'body' => 'تأخر تقرير المانح «:subject»',
+            ],
         ],
         'transfer' => [
             'scheduled' => 'جدول :actor الدفعة «:subject»',
-            'received' => 'سجّل :actor استلام الدفعة «:subject»',
+            'received' => [
+                'title' => 'استلام دفعة',
+                'body' => 'سجّل :actor استلام الدفعة «:subject»',
+            ],
             'failed' => 'سجّل :actor فشل الدفعة «:subject»',
             'status_changed' => 'نقل :actor الدفعة «:subject» من :from إلى :to',
             'updated' => 'حدّث :actor الدفعة «:subject»',
             'deleted' => 'حذف :actor الدفعة «:subject»',
+            'generated' => [
+                'title' => 'توليد الدفعات المتوقعة',
+                'body' => 'وُلّدت الدفعات المتوقعة للاتفاقية «:subject»',
+            ],
+            'late' => [
+                'title' => 'تأخر دفعة',
+                'body' => 'تأخرت الدفعة «:subject»',
+            ],
         ],
         'account' => [
             'created' => 'فتح :actor الحساب «:subject»',
@@ -435,8 +590,96 @@ return [
             'deleted' => 'حذف :actor الدور «:subject»',
         ],
         'supervision' => [
-            'added' => 'جعل :actor :supervisor متابِعًا لـ :supervisee',
-            'removed' => 'أزال :actor :supervisor من متابعة :supervisee',
+            'added' => [
+                'title' => 'إضافة متابِع',
+                'body' => 'جعل :actor :supervisor متابِعًا لـ :supervisee',
+            ],
+            'removed' => [
+                'title' => 'إزالة متابِع',
+                'body' => 'أزال :actor :supervisor من متابعة :supervisee',
+            ],
+        ],
+        'agreement' => [
+            'recorded' => [
+                'title' => 'تسجيل اتفاقية تمويل',
+                'body' => 'سجّل :actor اتفاقية التمويل للمقترح «:subject»',
+            ],
+        ],
+        'monthly_reports' => [
+            'generated' => [
+                'title' => 'توليد التقارير الشهرية',
+                'body' => 'التقارير الشهرية للمشروع «:subject» جاهزة للإعداد',
+            ],
+        ],
+        'monthly_report' => [
+            'due' => [
+                'title' => 'موعد تقرير شهري',
+                'body' => 'حان موعد التقرير الشهري «:subject»',
+            ],
+            'overdue' => [
+                'title' => 'تأخر تقرير شهري',
+                'body' => 'تأخر التقرير الشهري «:subject»',
+            ],
+            'submitted' => [
+                'title' => 'تقديم تقرير شهري',
+                'body' => 'قدّم :actor التقرير الشهري «:subject»',
+            ],
+            'validated' => [
+                'title' => 'اعتماد تقرير شهري',
+                'body' => 'اعتمد :actor التقرير الشهري «:subject»',
+            ],
+            'returned' => [
+                'title' => 'إعادة تقرير شهري',
+                'body' => 'أعاد :actor التقرير الشهري «:subject»',
+            ],
+            'reopen_requested' => [
+                'title' => 'طلب إعادة فتح',
+                'body' => 'طلب :actor إعادة فتح التقرير الشهري «:subject»',
+            ],
+            'reopen_decided' => [
+                'title' => 'البتّ في طلب إعادة الفتح',
+                'body' => 'بتّ :actor في طلب إعادة فتح التقرير «:subject»',
+            ],
+            'reopen_escalated' => [
+                'title' => 'تصعيد طلب إعادة الفتح',
+                'body' => 'لا يوجد من يبتّ في طلب إعادة فتح التقرير «:subject»',
+            ],
+        ],
+        'report_template' => [
+            'pending' => [
+                'title' => 'قالب تقرير بانتظار التأكيد',
+                'body' => 'قالب تقرير المشروع «:subject» بانتظار التأكيد',
+            ],
+            'confirmed' => [
+                'title' => 'تأكيد قالب التقرير',
+                'body' => 'أكّد :actor قالب تقرير المشروع «:subject»',
+            ],
+            'lines_added' => [
+                'title' => 'مؤشرات جديدة للتقرير',
+                'body' => 'أضاف :actor مؤشرات إلى قالب تقرير المشروع «:subject»',
+            ],
+        ],
+        'department_task' => [
+            'created' => [
+                'title' => 'إنشاء مهمة قسم',
+                'body' => 'طلب :actor «:subject» من قسمك',
+            ],
+            'due' => [
+                'title' => 'موعد مهمة قسم',
+                'body' => 'حان موعد مهمة القسم «:subject»',
+            ],
+            'overdue' => [
+                'title' => 'تأخر مهمة قسم',
+                'body' => 'تأخرت مهمة القسم «:subject»',
+            ],
+            'delivered' => [
+                'title' => 'تسليم مهمة قسم',
+                'body' => 'سلّم :actor «:subject»',
+            ],
+            'returned' => [
+                'title' => 'إعادة مهمة قسم',
+                'body' => 'أعاد :actor «:subject»',
+            ],
         ],
     ],
 ];

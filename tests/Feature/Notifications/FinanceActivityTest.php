@@ -40,7 +40,7 @@ test('an approved proposal is important; a status note is recorded on the propos
         ->and(UserNotification::query()->forUser($financial)->sole()->priority)->toBe(NotificationPriority::Important);
 });
 
-test('a failed transfer is critical and a received one is not key', function () {
+test('a failed transfer is critical; a received one reaches General Management as oversight only', function () {
     $financial = userWithRole('Financial');
     $generalManager = userWithRole('General Manager');
     [$failing, $landing] = Activity::withoutRecording(fn () => TransfersTracking::factory()->count(2)->create());
@@ -49,7 +49,9 @@ test('a failed transfer is critical and a received one is not key', function () 
     $failing->update(['ar_status' => ArStatus::Failed]);
     $landing->update(['ar_status' => ArStatus::Received, 'amount_received' => '10', 'net_amount_received' => '10', 'receive_date' => now()->toDateString()]);
 
-    expect(UserNotification::query()->forUser($generalManager)->sole()->subject_id)->toBe($failing->id)
+    $generalManagerPriorities = UserNotification::query()->forUser($generalManager)->pluck('priority', 'subject_id');
+
+    expect($generalManagerPriorities->all())->toEqual([$failing->id => NotificationPriority::Critical, $landing->id => NotificationPriority::Info])
         ->and(UserNotification::query()->forUser($financial)->count())->toBe(2);
 });
 
@@ -88,8 +90,9 @@ test('media team members never hear about finance modules', function () {
     expect(UserNotification::query()->forUser($media)->count())->toBe(0);
 });
 
-test('a tranche is named with its amount formatted like the rest of the app', function () {
-    $transfer = Activity::withoutRecording(fn () => TransfersTracking::factory()->create(['payment_amount' => '923100.12']));
+test('a tranche is named by its agreement and scheduled date, never its amount', function () {
+    $transfer = Activity::withoutRecording(fn () => TransfersTracking::factory()->create(['payment_amount' => '923100.12', 'scheduled_date' => '2026-11-03']));
 
-    expect($transfer->activityLabel())->toContain(' · 923,100.12 ');
+    expect($transfer->activityLabel())->toEndWith(' · 2026-11-03')
+        ->not->toContain('923');
 });

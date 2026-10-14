@@ -27,7 +27,7 @@ final class NotificationPresenter
             $params[$name] = $this->param($param, $locale);
         }
 
-        $sentence = (string) __((string) ($data['key'] ?? ''), $params, $locale);
+        $sentence = (string) __($this->lineKey($data, $locale), $params, $locale);
         $more = (int) ($data['count'] ?? 1) - 1;
 
         if ($more > 0) {
@@ -66,7 +66,7 @@ final class NotificationPresenter
             );
         }
 
-        $html = strtr(e((string) __((string) ($data['key'] ?? ''), $params, $locale)), $tokens);
+        $html = strtr(e((string) __($this->lineKey($data, $locale), $params, $locale)), $tokens);
         $more = (int) ($data['count'] ?? 1) - 1;
 
         if ($more > 0) {
@@ -195,6 +195,19 @@ final class NotificationPresenter
      * The Carbon locale the rest of the app formats dates with (Levantine
      * month names in Arabic), so notifications read like every other page.
      */
+    /**
+     * The lang line of a notification. A catalog event (EventCatalog) is a
+     * {title, body} pair under the stored key; its sentence is the body.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function lineKey(array $data, string $locale): string
+    {
+        $key = (string) ($data['key'] ?? '');
+
+        return is_array(__($key, [], $locale)) ? $key.'.body' : $key;
+    }
+
     private function carbonLocale(string $locale): string
     {
         return Locale::tryFrom($locale)?->carbonLocale() ?? $locale;
