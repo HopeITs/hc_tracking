@@ -198,8 +198,32 @@ final class NotificationPresenter
                     array_values($param['event_counts']),
                 ),
             ),
+            isset($param['month']) => $this->formatDate($param['month'].'-01', (string) __('notifications.digests.monthly.month_format', [], $locale), $locale),
+            isset($param['digest_sections']) => $this->digestSections($param['digest_sections'], $locale),
             default => '',
         };
+    }
+
+    /**
+     * The monthly digest's non-zero counts ("Projects started: 2 · …"), or
+     * "nothing pending" when every count is zero.
+     *
+     * @param  array<string, int|string>  $counts  "{section}_{line}" => count
+     */
+    private function digestSections(array $counts, string $locale): string
+    {
+        $lines = [];
+
+        foreach ($counts as $line => $count) {
+            if ((int) $count > 0) {
+                $lines[] = (string) __('notifications.digests.monthly.line', [
+                    'label' => (string) __("notifications.digests.monthly.lines.{$line}", [], $locale),
+                    'count' => (string) $count,
+                ], $locale);
+            }
+        }
+
+        return $lines === [] ? (string) __('notifications.digests.monthly.nothing_pending', [], $locale) : implode(' · ', $lines);
     }
 
     /**

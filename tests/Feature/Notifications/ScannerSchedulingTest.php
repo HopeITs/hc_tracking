@@ -2,6 +2,7 @@
 
 use App\Jobs\RunScanner;
 use App\Notifications\Alerts\DueSoonScanner;
+use App\Notifications\Alerts\MonthlyDigestScanner;
 use App\Notifications\Alerts\OffTrackIndicatorScanner;
 use App\Notifications\Alerts\OnHoldReminderScanner;
 use App\Notifications\Alerts\OversightDigestScanner;
@@ -40,6 +41,20 @@ test('the scheduler runs the frequent group every fifteen minutes and the daily 
 
     expect($events->first(fn ($event) => str_contains($event->command, 'notifications:scan frequent'))->expression)->toBe('*/15 * * * *')
         ->and($events->first(fn ($event) => str_contains($event->command, 'notifications:scan daily'))->expression)->toBe('0 6 * * *');
+});
+
+test('the monthly digest runs daily at eight on one server without overlapping and queues its scanner', function () {
+    $event = collect(app(Schedule::class)->events())->first(fn ($event) => str_contains($event->command, 'reports:monthly-digest'));
+
+    expect($event->expression)->toBe('0 8 * * *')
+        ->and($event->withoutOverlapping)->toBeTrue()
+        ->and($event->onOneServer)->toBeTrue();
+
+    Queue::fake();
+
+    $this->artisan('reports:monthly-digest')->assertSuccessful();
+
+    Queue::assertPushed(RunScanner::class, fn (RunScanner $job): bool => $job->scanner === MonthlyDigestScanner::class);
 });
 
 test('a scanner job runs its scanner', function () {
