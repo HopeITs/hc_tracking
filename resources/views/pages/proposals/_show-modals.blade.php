@@ -93,7 +93,14 @@
         confirm="unlinkProject"
         :confirm-label="__('proposals.unlink_project')"
         confirm-test="confirm-unlink-project"
-    />
+    >
+        @if ($showUnlinkModal)
+            @if ($unlinkUnreportedTargetCount > 0)
+                <p class="text-sm text-secondary-dark dark:text-ink" data-unlink-unreported-targets>{{ trans_choice('proposals.unlink_project_unreported_targets', $unlinkUnreportedTargetCount, ['count' => $unlinkUnreportedTargetCount, 'name' => $this->projects->firstWhere('id', $unlinkingProjectId)?->name ?? '']) }}</p>
+            @endif
+            <flux:error name="project" />
+        @endif
+    </x-ui.confirm-modal>
 
     <x-ui.modal
         wire:model="showFileModal"

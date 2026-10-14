@@ -290,6 +290,7 @@ test('a proposal can be attached to and detached from a project', function () {
     $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
     $proposal = Proposal::factory()->create(['name' => 'Emergency WASH Response']);
+    $proposal->projects()->attach(Project::factory()->create());
 
     Livewire::actingAs($user)
         ->test('pages::projects.show', ['project' => $project])

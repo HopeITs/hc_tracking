@@ -170,6 +170,8 @@ test('a tranche cannot be pointed at a closed account, but one already on it may
 });
 
 test('a project can be linked and unlinked from the page', function () {
+    $kept = Project::factory()->create(['name' => 'Homs schools']);
+    $this->proposal->projects()->attach($kept);
     $project = Project::factory()->create(['name' => 'Aleppo clinics']);
 
     $page = proposalPage()
@@ -177,13 +179,13 @@ test('a project can be linked and unlinked from the page', function () {
         ->call('linkProject')
         ->assertHasNoErrors();
 
-    expect($this->proposal->projects()->pluck('projects.id')->all())->toBe([$project->id]);
+    expect($this->proposal->projects()->pluck('projects.id')->sort()->values()->all())->toBe([$kept->id, $project->id]);
 
     $page->call('confirmUnlinkProject', $project->id)
         ->assertSet('showUnlinkModal', true)
         ->call('unlinkProject');
 
-    expect($this->proposal->projects()->count())->toBe(0);
+    expect($this->proposal->projects()->pluck('projects.id')->all())->toBe([$kept->id]);
 });
 
 test('a file uploads to the proposal and downloads only through its own proposal', function () {
