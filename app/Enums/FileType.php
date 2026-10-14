@@ -31,4 +31,22 @@ enum FileType: string
     {
         return array_column(self::cases(), 'value');
     }
+
+    /**
+     * The Content-Type a stored file is served with.
+     *
+     * Taken from the validated type, never from the stored bytes or the
+     * client's declared MIME, so a download or preview cannot be coaxed into
+     * another type.
+     */
+    public function mimeType(): string
+    {
+        return match ($this) {
+            self::Pdf => 'application/pdf',
+            self::Docx => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            self::Xlsx => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            self::Jpg => 'image/jpeg',
+            self::Png => 'image/png',
+        };
+    }
 }
