@@ -7,6 +7,7 @@ use App\Livewire\Concerns\ManagesTransferForm;
 use App\Livewire\Concerns\PreviewsFiles;
 use App\Livewire\Concerns\Proposals\ChartsProposalChronology;
 use App\Livewire\Concerns\Proposals\ManagesProposalFiles;
+use App\Livewire\Concerns\Proposals\ManagesProposalForm;
 use App\Livewire\Concerns\Proposals\ManagesProposalRecord;
 use App\Livewire\Concerns\Proposals\ReadsProposalDelivery;
 use App\Livewire\Concerns\Proposals\ReadsProposalFunding;
@@ -33,6 +34,7 @@ new #[Title('titles.proposal')] class extends Component
     use ChecksFinanceVisibility;
     use ManagesAgreementForm;
     use ManagesProposalFiles;
+    use ManagesProposalForm;
     use ManagesProposalRecord;
     use ManagesTransferForm;
     use PreviewsFiles;
@@ -46,8 +48,12 @@ new #[Title('titles.proposal')] class extends Component
     #[Locked]
     public int $proposalId;
 
-    /** The tabs this page offers, in strip order. */
-    private const TABS = ['status', 'deadlines', 'funding', 'projects', 'tasks', 'targets', 'reports', 'documents'];
+    /**
+     * The tabs this page offers, in strip order. Logical Framework (T12),
+     * Indicators & Targets (T13) and Plan (T31) each render their own
+     * `_tab-*` partial, so those tasks never edit this file's lines.
+     */
+    private const TABS = ['status', 'deadlines', 'funding', 'projects', 'logframe', 'targets', 'plan', 'tasks', 'reports', 'documents'];
 
     /**
      * Which tab's content is shown beneath the fixed header.
@@ -77,7 +83,7 @@ new #[Title('titles.proposal')] class extends Component
      * Counts come from the same collections the tabs render, so a badge can
      * never disagree with the list beneath it.
      *
-     * @return array<int, array{key: string, label: string, count: int}>
+     * @return array<int, array{key: string, label: string, count: int|null}>
      */
     #[Computed]
     public function tabs(): array
@@ -87,8 +93,10 @@ new #[Title('titles.proposal')] class extends Component
             ['key' => 'deadlines', 'label' => __('proposals.deadlines'), 'count' => count($this->deadlines)],
             ...($this->canViewAgreements() ? [['key' => 'funding', 'label' => __('common.funding'), 'count' => $this->agreements->count()]] : []),
             ['key' => 'projects', 'label' => __('common.projects'), 'count' => $this->projects->count()],
+            ['key' => 'logframe', 'label' => __('proposals.tab_logframe'), 'count' => null],
+            ['key' => 'targets', 'label' => __('proposals.tab_targets'), 'count' => $this->targets->count()],
+            ['key' => 'plan', 'label' => __('proposals.tab_plan'), 'count' => null],
             ['key' => 'tasks', 'label' => __('common.tasks'), 'count' => $this->tasks->count()],
-            ['key' => 'targets', 'label' => __('common.targets'), 'count' => $this->targets->count()],
             ['key' => 'reports', 'label' => __('proposals.donor_reports'), 'count' => $this->reports->count()],
             ['key' => 'documents', 'label' => __('proposals.documents'), 'count' => $this->proposalFiles->count() + $this->projectFiles->count()],
         ];
@@ -153,6 +161,16 @@ new #[Title('titles.proposal')] class extends Component
     protected function agreementProposalScope(): ?int
     {
         return $this->proposalId;
+    }
+
+    protected function proposalFormScope(): ?int
+    {
+        return $this->proposalId;
+    }
+
+    protected function proposalSaved(Proposal $proposal, bool $wasCreated): void
+    {
+        $this->forgetReadings();
     }
 
     protected function transferProposalScope(): ?int
@@ -232,7 +250,7 @@ new #[Title('titles.proposal')] class extends Component
                     {{ $this->proposal->phase->label() }}
                 </span>
                 @can('update', $this->proposal)
-                <x-ui.button size="sm" icon="pencil-square" class="min-h-10 touch-manipulation" wire:click="openDetailsModal" data-test="open-details-modal">{{ __('proposals.edit_details') }}</x-ui.button>
+                <x-ui.button size="sm" icon="pencil-square" class="min-h-10 touch-manipulation" wire:click="openEditModal({{ $this->proposal->id }})" data-test="open-details-modal">{{ __('proposals.edit_details') }}</x-ui.button>
                 <x-ui.button tone="primary" size="sm" icon="arrow-path" class="min-h-10 touch-manipulation" wire:click="openStatusModal" data-test="open-status-modal">{{ __('proposals.change_status') }}</x-ui.button>
                 @endcan
             </div>
@@ -253,10 +271,14 @@ new #[Title('titles.proposal')] class extends Component
 
         @elseif ($tab === 'projects')
             @include('pages.proposals._show-projects-tab')
+        @elseif ($tab === 'logframe')
+            @include('pages.proposals._tab-logframe')
+        @elseif ($tab === 'targets')
+            @include('pages.proposals._tab-targets')
+        @elseif ($tab === 'plan')
+            @include('pages.proposals._tab-plan')
         @elseif ($tab === 'tasks')
             @include('pages.proposals._show-tasks-tab')
-        @elseif ($tab === 'targets')
-            @include('pages.proposals._show-targets-tab')
         @elseif ($tab === 'deadlines')
             @include('pages.proposals._show-deadlines-tab')
         @elseif ($tab === 'reports')

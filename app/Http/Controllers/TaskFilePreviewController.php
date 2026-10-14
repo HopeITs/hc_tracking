@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Enums\FileType;
+use App\Exceptions\UnreadableStoredFile;
 use App\Models\Task;
 use App\Models\TaskAttachment;
+use App\Support\StoredFiles;
 use App\Support\UploadName;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TaskFilePreviewController extends Controller
@@ -30,14 +31,7 @@ class TaskFilePreviewController extends Controller
         abort_unless($taskAttachment->task_id === $task->id, 404);
         abort_unless($taskAttachment->isPreviewable() && $taskAttachment->isStored(), 404);
 
-        $contentType = match ($taskAttachment->type) {
-            FileType::Pdf => 'application/pdf',
-            FileType::Png => 'image/png',
-            default => 'image/jpeg',
-        };
-
         $headers = [
-            'Content-Type' => $contentType,
             'X-Content-Type-Options' => 'nosniff',
             'Cross-Origin-Resource-Policy' => 'same-origin',
             'Cache-Control' => 'private, max-age=300',
@@ -50,6 +44,10 @@ class TaskFilePreviewController extends Controller
             $headers['Content-Security-Policy'] = 'sandbox';
         }
 
-        return Storage::disk($taskAttachment->disk)->response($taskAttachment->path, UploadName::clean($taskAttachment->displayName()), $headers, 'inline');
+        try {
+            return StoredFiles::stream($taskAttachment->disk, $taskAttachment->path, $taskAttachment->encryption_key_id, UploadName::clean($taskAttachment->displayName()), $taskAttachment->type, $headers, 'inline');
+        } catch (UnreadableStoredFile $exception) {
+            throw $exception->forRow('task_attachments', $taskAttachment->id);
+        }
     }
 }

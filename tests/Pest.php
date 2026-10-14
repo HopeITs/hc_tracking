@@ -26,6 +26,7 @@ use App\Models\User;
 use App\Models\UserNotification;
 use App\Notifications\Alerts\NotificationSettings;
 use App\Notifications\NotificationPresenter;
+use App\Support\FileKeyring;
 use Carbon\CarbonImmutable;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Database\Schema\Blueprint;
@@ -49,7 +50,10 @@ use Tests\TestCase;
 
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
-    ->beforeEach(fn () => createHrSchema())
+    ->beforeEach(function (): void {
+        createHrSchema();
+        useFileKey(newFileKey());
+    })
     ->in('Feature');
 
 /*
@@ -81,6 +85,36 @@ expect()->extend('toBeOne', function () {
 function something()
 {
     // ..
+}
+
+/**
+ * A fresh random file encryption key. No real key is ever committed: every
+ * Feature test starts with one of these.
+ */
+function newFileKey(): string
+{
+    return 'base64:'.base64_encode(random_bytes(32));
+}
+
+/**
+ * Point uploads at a file key (and decrypt-only previous keys) and drop the
+ * memoized keyring so the next store or stream uses them. Mirrors useAppKey().
+ *
+ * @param  array<string, string>  $previousKeys  key id => key
+ */
+function useFileKey(?string $key, string $keyId = 'k1', array $previousKeys = []): void
+{
+    config([
+        'files.encryption.key' => $key,
+        'files.encryption.key_id' => $keyId,
+        'files.encryption.previous_keys' => array_map(
+            fn (string $id, string $previousKey): string => $id.':'.$previousKey,
+            array_keys($previousKeys),
+            array_values($previousKeys),
+        ),
+    ]);
+
+    FileKeyring::forget();
 }
 
 /**

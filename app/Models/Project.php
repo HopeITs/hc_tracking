@@ -9,6 +9,7 @@ use App\Concerns\HasSlug;
 use App\Concerns\RecordsActivity;
 use App\Enums\AssignmentStatus;
 use App\Enums\ProjectStatus;
+use App\Enums\ProposalPhase;
 use App\Enums\ProposalStatus;
 use App\Notifications\TracksActivity;
 use App\Observers\MediaOwnerObserver;
@@ -126,18 +127,67 @@ class Project extends Model implements TracksActivity
     {
         Program::query()->whereKey($programId)->lockForUpdate()->value('id');
 
-        $openStatuses = array_values(array_map(
-            fn (ProjectStatus $status): string => $status->value,
-            array_filter(ProjectStatus::cases(), fn (ProjectStatus $status): bool => $status->isOpen()),
-        ));
-
         return static::query()
             ->where('center_id', $centerId)
             ->where('program_id', $programId)
-            ->whereIn('status', $openStatuses)
+            ->whereIn('status', self::openStatusValues())
             ->when($exceptId !== null, fn (Builder $query) => $query->whereKeyNot($exceptId))
             ->orderBy('id')
             ->first(['id', 'slug', 'name', 'status', 'center_id', 'program_id']);
+    }
+
+    /**
+     * The status values of a project still being delivered, taken from
+     * ProjectStatus::isOpen() so there is one list.
+     *
+     * @return list<string>
+     */
+    public static function openStatusValues(): array
+    {
+        return array_values(array_map(
+            fn (ProjectStatus $status): string => $status->value,
+            array_filter(ProjectStatus::cases(), fn (ProjectStatus $status): bool => $status->isOpen()),
+        ));
+    }
+
+    /**
+     * Whether a linked proposal is still in play: not rejected or completed
+     * (D-06: a draft whose only proposal was rejected shows "No active
+     * proposal"). Reads the eager-loaded `proposals:id,status`.
+     */
+    public function hasActiveProposal(): bool
+    {
+        $this->loadMissing('proposals:proposals.id,proposals.status');
+
+        return $this->proposals->contains(fn (Proposal $proposal): bool => ! $proposal->status->isTerminal());
+    }
+
+    /**
+     * The phase to show for this project. Display only, never stored: a draft
+     * takes the phase of its current (latest in-play) proposal, or Ideation
+     * when it has none.
+     */
+    public function phase(): ProposalPhase
+    {
+        return match ($this->status) {
+            ProjectStatus::Archived => ProposalPhase::Archived,
+            ProjectStatus::Closed => ProposalPhase::Closure,
+            ProjectStatus::Approved => ProposalPhase::Implementation,
+            ProjectStatus::Active => ProposalPhase::Monitoring,
+            ProjectStatus::Draft, ProjectStatus::Submitted => $this->draftPhase(),
+        };
+    }
+
+    private function draftPhase(): ProposalPhase
+    {
+        $this->loadMissing('proposals:proposals.id,proposals.status');
+
+        $current = $this->proposals
+            ->filter(fn (Proposal $proposal): bool => ! $proposal->status->isTerminal())
+            ->sortByDesc('id')
+            ->first();
+
+        return $current?->status->phase() ?? ProposalPhase::Ideation;
     }
 
     /**
@@ -276,12 +326,30 @@ class Project extends Model implements TracksActivity
     #[Scope]
     protected function open(Builder $query): void
     {
-        $query->whereIn('status', [
-            ProjectStatus::Draft->value,
-            ProjectStatus::Submitted->value,
-            ProjectStatus::Approved->value,
-            ProjectStatus::Active->value,
-        ]);
+        $query->whereIn('status', self::openStatusValues());
+    }
+
+    /**
+     * Limit the query to projects a proposal may be linked to: draft,
+     * approved, active or closed (a closed one is reopened as a draft on
+     * link), never archived, and never one whose owner rejected it.
+     *
+     * The one server-side rule behind every project picker and every link,
+     * so a tampered id is refused by the same query that built the list.
+     *
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function linkableToProposals(Builder $query): void
+    {
+        $query
+            ->whereIn('status', [
+                ProjectStatus::Draft->value,
+                ProjectStatus::Approved->value,
+                ProjectStatus::Active->value,
+                ProjectStatus::Closed->value,
+            ])
+            ->whereDoesntHave('ownerAssignment', fn (Builder $assignment) => $assignment->where('status', AssignmentStatus::Rejected->value));
     }
 
     /**

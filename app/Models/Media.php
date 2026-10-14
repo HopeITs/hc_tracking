@@ -29,6 +29,7 @@ use Illuminate\Support\Facades\Storage;
  * @property string $original_name
  * @property string|null $mime_type
  * @property int|null $size
+ * @property string|null $encryption_key_id
  * @property FileType $type
  * @property CarbonImmutable|null $uploaded_at
  * @property int $uploaded_by
@@ -44,6 +45,7 @@ use Illuminate\Support\Facades\Storage;
     'original_name',
     'mime_type',
     'size',
+    'encryption_key_id',
     'type',
     'uploaded_at',
     'uploaded_by',
@@ -73,6 +75,7 @@ class Media extends Model
     protected $attributes = [
         'collection' => 'other',
         'disk' => 'local',
+        'encryption_key_id' => null,
     ];
 
     /**
@@ -108,6 +111,14 @@ class Media extends Model
     public function isStored(): bool
     {
         return Storage::disk($this->disk)->exists($this->path);
+    }
+
+    /**
+     * Whether the file on disk is encrypted; NULL is legacy plaintext.
+     */
+    public function isEncrypted(): bool
+    {
+        return $this->encryption_key_id !== null;
     }
 
     /**

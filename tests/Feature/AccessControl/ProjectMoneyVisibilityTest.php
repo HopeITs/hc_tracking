@@ -100,11 +100,12 @@ test('Financial and General Manager see the funding envelope, the amounts and a 
     expect($page->instance()->fundingByCurrency)->not->toBeEmpty();
 })->with(['Financial', 'General Manager']);
 
-test('a Managers user can still link and unlink proposals, choosing them by name', function () {
+test('a proposal editor without the money permissions links and unlinks proposals, choosing them by name', function () {
     $project = Project::factory()->create();
     $proposal = Proposal::factory()->create(['name' => 'Hilltop Schools']);
+    $proposal->projects()->attach(Project::factory()->create());
 
-    $page = Livewire::actingAs(userWithRole('Managers'))
+    $page = Livewire::actingAs(userWithRole('Public Relations Manager'))
         ->test('pages::projects.show', ['project' => $project])
         ->set('tab', 'proposals')
         ->assertSee('Hilltop Schools')

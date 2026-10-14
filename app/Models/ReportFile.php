@@ -22,13 +22,14 @@ use Illuminate\Support\Facades\Storage;
  * @property string|null $original_name
  * @property string|null $mime_type
  * @property int|null $size
+ * @property string|null $encryption_key_id
  * @property CarbonImmutable $date
  * @property FileType $type
  * @property int|null $uploaded_by
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['report_id', 'path', 'disk', 'original_name', 'mime_type', 'size', 'date', 'type', 'uploaded_by'])]
+#[Fillable(['report_id', 'path', 'disk', 'original_name', 'mime_type', 'size', 'encryption_key_id', 'date', 'type', 'uploaded_by'])]
 class ReportFile extends Model
 {
     /** @use HasFactory<ReportFileFactory> */
@@ -42,6 +43,7 @@ class ReportFile extends Model
      */
     protected $attributes = [
         'disk' => 'local',
+        'encryption_key_id' => null,
     ];
 
     /**
@@ -83,6 +85,14 @@ class ReportFile extends Model
     public function isStored(): bool
     {
         return $this->original_name !== null && Storage::disk($this->disk)->exists($this->path);
+    }
+
+    /**
+     * Whether the file on disk is encrypted; NULL is legacy plaintext.
+     */
+    public function isEncrypted(): bool
+    {
+        return $this->encryption_key_id !== null;
     }
 
     /**

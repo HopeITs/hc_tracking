@@ -1,6 +1,6 @@
 <?php
 
-use App\Actions\Projects\ChangeProjectStatus;
+use App\Actions\Projects\CloseProject;
 use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
 use App\Livewire\Concerns\AddsQuickTask;
@@ -16,6 +16,7 @@ use App\Models\Project;
 use Flux\Flux;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
@@ -62,28 +63,35 @@ new #[Title('titles.project')] class extends Component {
         $this->respond = '';
     }
 
-    /**
-     * Move the project to another status; the action enforces who may.
-     */
-    public function changeStatus(string $status): void
+    /** The Close Project confirmation: a flux:modal only opens from a boolean bound with wire:model. */
+    public bool $showCloseModal = false;
+
+    public function confirmClose(): void
     {
-        $target = ProjectStatus::tryFrom($status);
+        Gate::authorize('update', Project::query()->findOrFail($this->projectId));
 
-        if ($target === null) {
-            return;
-        }
+        $this->showCloseModal = true;
+    }
 
+    /**
+     * Close the active project (active → closed); the action enforces who may
+     * and that it is still active.
+     */
+    public function closeProject(): void
+    {
         try {
-            app(ChangeProjectStatus::class)->handle(Project::query()->findOrFail($this->projectId), $target);
+            app(CloseProject::class)->handle(Project::query()->findOrFail($this->projectId));
         } catch (ValidationException $exception) {
+            $this->showCloseModal = false;
             Flux::toast(variant: 'danger', text: $exception->validator->errors()->first());
 
             return;
         }
 
+        $this->showCloseModal = false;
         unset($this->project);
 
-        Flux::toast(variant: 'success', text: __('projects.status_changed', ['status' => $target->label()]));
+        Flux::toast(variant: 'success', text: __('projects.project_closed'));
     }
 
     #[Computed]
@@ -116,6 +124,7 @@ new #[Title('titles.project')] class extends Component {
                 'program:id,strategy_id',
                 'program.strategy:id,name',
                 'user:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
+                'proposals:proposals.id,proposals.status',
                 'media' => fn ($query) => $query
                     ->select(['id', 'mediable_type', 'mediable_id', 'collection', 'original_name', 'type', 'size', 'uploaded_at', 'uploaded_by'])
                     ->whereNotIn('collection', $hiddenCollections)
@@ -240,33 +249,22 @@ new #[Title('titles.project')] class extends Component {
 
         <x-slot:actions>
             <div class="flex flex-wrap items-center gap-2">
-                @can('update', $this->project)
-                    @php
-                        $mayArchive = auth()->user()->can('delete', $this->project);
-                        $currentStatus = $this->project->status;
-                    @endphp
-                    <flux:dropdown position="bottom" align="end">
-                        <button type="button" class="inline-flex items-center gap-1 rounded-full focus-visible:outline-2 focus-visible:outline-primary" aria-label="{{ __('projects.change_status') }}" data-test="project-status-trigger">
-                            <x-ui.enum-badge :case="$currentStatus" />
-                            <flux:icon name="chevron-down" variant="micro" class="size-4 text-secondary-medium dark:text-ink-muted" />
-                        </button>
-
-                        <flux:menu>
-                            @foreach (ProjectStatus::cases() as $statusOption)
-                                @continue(! $mayArchive && $statusOption !== $currentStatus && ($statusOption === ProjectStatus::Archived || $currentStatus === ProjectStatus::Archived))
-                                <flux:menu.item
-                                    :icon="$statusOption === $currentStatus ? 'check' : null"
-                                    wire:click="changeStatus('{{ $statusOption->value }}')"
-                                    wire:key="project-status-option-{{ $statusOption->value }}"
-                                    data-test="project-status-option-{{ $statusOption->value }}"
-                                >{{ $statusOption->label() }}</flux:menu.item>
-                            @endforeach
-                        </flux:menu>
-                    </flux:dropdown>
-                @else
-                    <x-ui.enum-badge :case="$this->project->status" />
-                @endcan
+                <x-ui.enum-badge :case="$this->project->status" />
+                @if ($this->project->status === ProjectStatus::Draft && ! $this->project->hasActiveProposal())
+                    <span class="inline-flex items-center gap-1 rounded-full bg-status-warn-soft px-2 py-0.5 text-[11px] font-bold text-status-warn" data-test="no-active-proposal">
+                        <flux:icon name="exclamation-circle" variant="micro" class="size-3 shrink-0" aria-hidden="true" />
+                        {{ __('projects.no_active_proposal') }}
+                    </span>
+                @endif
+                @if ($this->project->status === ProjectStatus::Active)
+                    @can('update', $this->project)
+                        <x-ui.button tone="ghost" size="sm" icon="lock-closed" wire:click="confirmClose" data-test="close-project">{{ __('projects.close_project') }}</x-ui.button>
+                    @endcan
+                @endif
                 <x-ui.employee-chip :employee="$this->project->user" class="rounded-lg border border-secondary-soft p-2.5 dark:border-line" />
+                @if ($this->canStartConceptNote)
+                    <x-ui.button tone="primary" size="sm" icon="document-plus" class="min-h-10 touch-manipulation" :href="route('proposals.index', ['for_project' => $this->project->id])" wire:navigate data-test="new-concept-note">{{ __('proposals.new_concept_note') }}</x-ui.button>
+                @endif
             </div>
         </x-slot:actions>
 
@@ -430,4 +428,14 @@ new #[Title('titles.project')] class extends Component {
     @endif
 
     @include('pages.projects._show-modals')
+
+    <x-ui.confirm-modal
+        wire:model="showCloseModal"
+        tone="neutral"
+        :title="__('projects.close_project_title')"
+        :message="__('projects.close_project_body')"
+        confirm="closeProject"
+        :confirm-label="__('projects.close_project')"
+        confirm-test="confirm-close-project"
+    />
 </section>

@@ -9,6 +9,8 @@ Every prompt in `docs/lifecycle/prompts/` inherits these rules. Read this file o
 4. Upstream handoffs `docs/lifecycle/handoffs/TNN.md` and the code on `main`.
 5. `CLAUDE.md` and the `.ai/rules` files whose globs match the paths you touch (`.ai/rules/index.md`).
 
+`docs/lifecycle/quality-bar.md` is the code and UI/UX bar for every task; each prompt's "Quality bar (this task)" section adds to it.
+
 If two sources disagree, the higher one wins. If the higher one is *missing* something you need, **stop and ask** (section 6). Never fill a contract gap with your own choice. There is no other plan file: do not look for the Arabic `.ar.md` plan or any `.docx`.
 
 ## 2. Start state (run before planning)

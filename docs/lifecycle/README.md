@@ -9,7 +9,7 @@ October 2026 · 15 working days (Mon 12 Oct → Fri 30 Oct) · Team A (Dev 1–3
 /lifecycle T04            # slice 1
 /lifecycle T17A 2         # slice 2 of a multi-slice task
 ```
-The command loads `AGENT.md` → `contracts.md` → the decisions the prompt lists → the prompt, then runs the start-state checks and enters plan mode. One slice per session; `/clear` between slices.
+The command loads `AGENT.md` → `contracts.md` → `quality-bar.md` → the decisions the prompt lists → the prompt, then runs the start-state checks and enters plan mode. One slice per session; `/clear` between slices.
 
 ## Files
 | File | Purpose | Who edits |
@@ -17,6 +17,7 @@ The command loads `AGENT.md` → `contracts.md` → the decisions the prompt lis
 | `AGENT.md` | Rules every session follows | Dev 1 |
 | `decisions.md` | Final answers D-01…D-54 | Dev 1 after management sign-off |
 | `contracts.md` | Frozen names, values, signatures, events, schema, permissions | Dev 1 only (both teams agree) |
+| `quality-bar.md` | Code and UI/UX bar every PR is reviewed against | Dev 1 + Dev 2 |
 | `glossary.md` | Terms and roles | anyone |
 | `prompts/TNN.md` | One prompt per task, flattened (no revision blocks) | Dev 1 |
 | `prompts/later/` | Out of the October window (T14, T24, T25, T32b) | — |

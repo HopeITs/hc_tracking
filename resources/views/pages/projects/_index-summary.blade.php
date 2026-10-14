@@ -8,7 +8,7 @@
     {{-- The pipeline, which is also the status filter. Six equal segments on
          one baseline; the selected one is the only large red area here. --}}
     <div role="group" aria-label="{{ __('projects.lifecycle') }}" class="grid grid-flow-col auto-cols-[minmax(7.5rem,1fr)] snap-x gap-px overflow-x-auto rounded-xl border border-secondary-soft bg-secondary-soft dark:border-line dark:bg-line">
-        @foreach (ProjectStatus::cases() as $case)
+        @foreach (ProjectStatus::live() as $case)
             @php
                 $segmentCount = $statusCounts[$case->value] ?? 0;
                 $isSelected = $status === $case->value;

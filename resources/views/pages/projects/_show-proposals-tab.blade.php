@@ -1,6 +1,6 @@
         <x-ui.panel :title="__('projects.linked_proposals')" :count="$this->attachedProposals->count()" :subtitle="__('projects.a_project_may_be_funded_by_several_proposals_and_a_proposal')">
             <x-slot:toolbar>
-                @can('update', $this->project)
+                @can('proposals.update')
                 <div class="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-end">
                     <x-ui.select :label="__('projects.link_a_proposal')" wire:model="proposalToAttach" class="min-w-56">
                         <flux:select.option value="">{{ __('common.select_a_proposal') }}</flux:select.option>
@@ -44,7 +44,7 @@
                                         <span class="tabular-nums">{{ $proposal->planned_date_begin?->translatedFormat(__('formats.date')) }} – {{ $proposal->planned_date_end?->translatedFormat(__('formats.date')) }}</span>
                                     </p>
                                 </div>
-                                @can('update', $this->project)
+                                @can('proposals.update')
                                     <x-ui.button
                                         tone="ghost"
                                         size="sm"

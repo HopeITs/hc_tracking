@@ -22,13 +22,14 @@ use Illuminate\Support\Facades\Storage;
  * @property string|null $original_name
  * @property string|null $mime_type
  * @property int|null $size
+ * @property string|null $encryption_key_id
  * @property FileType $type
  * @property CarbonImmutable $date
  * @property int|null $uploaded_by
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['task_id', 'path', 'disk', 'original_name', 'mime_type', 'size', 'type', 'date', 'uploaded_by'])]
+#[Fillable(['task_id', 'path', 'disk', 'original_name', 'mime_type', 'size', 'encryption_key_id', 'type', 'date', 'uploaded_by'])]
 class TaskAttachment extends Model
 {
     /** @use HasFactory<TaskAttachmentFactory> */
@@ -60,6 +61,7 @@ class TaskAttachment extends Model
      */
     protected $attributes = [
         'disk' => 'local',
+        'encryption_key_id' => null,
     ];
 
     /**
@@ -101,6 +103,14 @@ class TaskAttachment extends Model
     public function isStored(): bool
     {
         return $this->original_name !== null && Storage::disk($this->disk)->exists($this->path);
+    }
+
+    /**
+     * Whether the file on disk is encrypted; NULL is legacy plaintext.
+     */
+    public function isEncrypted(): bool
+    {
+        return $this->encryption_key_id !== null;
     }
 
     /**

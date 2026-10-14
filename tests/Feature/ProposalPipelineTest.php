@@ -69,8 +69,7 @@ test('a proposal can be created with a trimmed name', function () {
         ->test('pages::proposals.index')
         ->call('openCreateModal')
         ->set('name', '  Rapid Response Fund  ')
-        ->set('proposalDonorId', (string) insertDonor())->set('internalProjectNumber', 'HC-2026-041')
-        ->set('proposalStatus', ProposalStatus::ConceptNote->value)
+        ->set('donorId', (string) insertDonor())->set('projectIds', [(string) Project::factory()->create()->id])->set('internalProjectNumber', 'HC-2026-041')
         ->set('plannedDateBegin', '2026-01-01')
         ->set('plannedDateEnd', '2026-12-31')
         ->call('saveProposal')
@@ -89,8 +88,7 @@ test('a proposal end date cannot fall before its begin date', function () {
         ->test('pages::proposals.index')
         ->call('openCreateModal')
         ->set('name', 'Backwards Proposal')
-        ->set('proposalDonorId', (string) insertDonor())->set('internalProjectNumber', 'HC-2026-042')
-        ->set('proposalStatus', ProposalStatus::ConceptNote->value)
+        ->set('donorId', (string) insertDonor())->set('projectIds', [(string) Project::factory()->create()->id])->set('internalProjectNumber', 'HC-2026-042')
         ->set('plannedDateBegin', '2026-12-31')
         ->set('plannedDateEnd', '2026-01-01')
         ->call('saveProposal')
@@ -322,7 +320,7 @@ test('a user without proposal permissions sees no edit controls and cannot creat
         ->assertDontSeeHtml('data-test="advance-proposal-'.$proposal->id.'"');
 
     $fresh()->call('openCreateModal')->assertForbidden();
-    $fresh()->set('name', 'Sneaked in')->set('proposalDonorId', (string) insertDonor())->set('internalProjectNumber', 'HC-2026-043')->set('plannedDateBegin', '2026-01-01')->set('plannedDateEnd', '2026-12-31')->set('proposalStatus', 'concept note')->call('saveProposal')->assertForbidden();
+    $fresh()->set('name', 'Sneaked in')->set('donorId', (string) insertDonor())->set('internalProjectNumber', 'HC-2026-043')->set('plannedDateBegin', '2026-01-01')->set('plannedDateEnd', '2026-12-31')->call('saveProposal')->assertForbidden();
     $fresh()->call('openStageModal', $proposal->id)->assertForbidden();
     $fresh()->call('confirmDelete', $proposal->id)->assertForbidden();
     expect(fn () => $fresh()->set('deletingProposalId', $proposal->id))->toThrow(CannotUpdateLockedPropertyException::class);
@@ -338,8 +336,7 @@ test('a proposal cannot be created without an internal project number', function
         ->test('pages::proposals.index')
         ->call('openCreateModal')
         ->set('name', 'Rapid Response Fund')
-        ->set('proposalDonorId', (string) insertDonor())->set('internalProjectNumber', '   ')
-        ->set('proposalStatus', ProposalStatus::ConceptNote->value)
+        ->set('donorId', (string) insertDonor())->set('projectIds', [(string) Project::factory()->create()->id])->set('internalProjectNumber', '   ')
         ->set('plannedDateBegin', '2026-01-01')
         ->set('plannedDateEnd', '2026-12-31')
         ->call('saveProposal')
@@ -356,8 +353,7 @@ test('a new proposal cannot reuse another proposal\'s internal number, whatever 
         ->test('pages::proposals.index')
         ->call('openCreateModal')
         ->set('name', 'Rapid Response Fund')
-        ->set('proposalDonorId', (string) insertDonor())->set('internalProjectNumber', 'hc-2026-044')
-        ->set('proposalStatus', ProposalStatus::ConceptNote->value)
+        ->set('donorId', (string) insertDonor())->set('projectIds', [(string) Project::factory()->create()->id])->set('internalProjectNumber', 'hc-2026-044')
         ->set('plannedDateBegin', '2026-01-01')
         ->set('plannedDateEnd', '2026-12-31')
         ->call('saveProposal')
@@ -374,14 +370,13 @@ test('the internal project number is trimmed and limited to 50 characters', func
         ->test('pages::proposals.index')
         ->call('openCreateModal')
         ->set('name', 'Rapid Response Fund')
-        ->set('proposalStatus', ProposalStatus::ConceptNote->value)
         ->set('plannedDateBegin', '2026-01-01')
         ->set('plannedDateEnd', '2026-12-31')
-        ->set('proposalDonorId', (string) insertDonor())->set('internalProjectNumber', str_repeat('A', 51))
+        ->set('donorId', (string) insertDonor())->set('projectIds', [(string) Project::factory()->create()->id])->set('internalProjectNumber', str_repeat('A', 51))
         ->call('saveProposal')
         ->assertHasErrors(['internalProjectNumber' => 'max']);
 
-    $component->set('proposalDonorId', (string) insertDonor())->set('internalProjectNumber', '  HC-2026-045  ')
+    $component->set('internalProjectNumber', '  HC-2026-045  ')
         ->call('saveProposal')
         ->assertHasNoErrors();
 
@@ -395,8 +390,7 @@ test('a new internal number cannot use the reserved placeholder prefix', functio
         ->test('pages::proposals.index')
         ->call('openCreateModal')
         ->set('name', 'Rapid Response Fund')
-        ->set('proposalDonorId', (string) insertDonor())->set('internalProjectNumber', $number)
-        ->set('proposalStatus', ProposalStatus::ConceptNote->value)
+        ->set('donorId', (string) insertDonor())->set('projectIds', [(string) Project::factory()->create()->id])->set('internalProjectNumber', $number)
         ->set('plannedDateBegin', '2026-01-01')
         ->set('plannedDateEnd', '2026-12-31')
         ->call('saveProposal')
@@ -414,11 +408,11 @@ test('a proposal still holding its placeholder saves while the number is left al
         ->test('pages::proposals.index')
         ->call('openEditModal', $proposal->id)
         ->assertSet('internalProjectNumber', 'TEMP-0007')
-        ->set('proposalDonorId', (string) insertDonor())->set('internalProjectNumber', 'TEMP-0008')
+        ->set('internalProjectNumber', 'TEMP-0008')
         ->call('saveProposal')
         ->assertHasErrors('internalProjectNumber');
 
-    $component->set('proposalDonorId', (string) insertDonor())->set('internalProjectNumber', 'TEMP-0007')
+    $component->set('internalProjectNumber', 'TEMP-0007')
         ->set('name', 'Renamed proposal')
         ->call('saveProposal')
         ->assertHasNoErrors();
@@ -450,7 +444,7 @@ test('changing the internal number is recorded in the activity log and notifies'
     Livewire::actingAs($user)
         ->test('pages::proposals.index')
         ->call('openEditModal', $proposal->id)
-        ->set('proposalDonorId', (string) insertDonor())->set('internalProjectNumber', 'HC-2026-047')
+        ->set('internalProjectNumber', 'HC-2026-047')
         ->call('saveProposal')
         ->assertHasNoErrors();
 
@@ -476,8 +470,7 @@ test('a duplicate that slips past validation shows the duplicate error instead o
         ->test('pages::proposals.index')
         ->call('openCreateModal')
         ->set('name', 'Rapid Response Fund')
-        ->set('proposalDonorId', (string) insertDonor())->set('internalProjectNumber', 'HC-2026-049')
-        ->set('proposalStatus', ProposalStatus::ConceptNote->value)
+        ->set('donorId', (string) insertDonor())->set('projectIds', [(string) Project::factory()->create()->id])->set('internalProjectNumber', 'HC-2026-049')
         ->set('plannedDateBegin', '2026-01-01')
         ->set('plannedDateEnd', '2026-12-31')
         ->call('saveProposal')

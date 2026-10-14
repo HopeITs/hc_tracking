@@ -18,16 +18,10 @@ use Illuminate\Support\Facades\File;
 function lifecycleActionStubs(): array
 {
     return [
-        'Proposals/SaveProposal.php', // TODO T06
-        'Proposals/LinkProposalProject.php', // TODO T06
-        'Proposals/UnlinkProposalProject.php', // TODO T06
-        'Projects/ReopenProjectAsDraft.php', // TODO T06
         'Proposals/InviteDefaultReviewers.php', // TODO T07
         'Proposals/ApproveProposal.php', // TODO T08
         'Projects/ApproveProjectFromProposal.php', // TODO T08
         'Projects/ActivateProject.php', // TODO T08
-        'Projects/SaveProject.php', // TODO T05
-        'Projects/CloseProject.php', // TODO T05
         'FundingAgreements/SaveAgreementInstallments.php', // TODO T09
     ];
 }
@@ -43,7 +37,9 @@ it('authorizes inside every sensitive action', function (string $directory) {
             continue;
         }
 
-        expect(File::get($file->getPathname()))->toContain('Gate::authorize(');
+        // Gate::forUser($actor)->authorize( counts too: actions that take the
+        // acting user as an argument (SaveProposal) authorize that user.
+        expect(File::get($file->getPathname()))->toMatch('/Gate::(forUser\([^)]*\)->)?authorize\(/');
     }
 })->with(['Reports', 'Transfers', 'Donors', 'FundingAgreements', 'Tasks', 'Projects', 'Proposals', 'IndicatorLibrary']);
 

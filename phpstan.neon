@@ -65,19 +65,6 @@ parameters:
             path: app/Livewire/Concerns/Proposals/ChartsProposalChronology.php
             count: 1
         -
-            # openDetailsModal() reads planned_date_begin/end as
-            # `?->toDateString() ?? ''`; proposals.planned_date_* are NOT NULL, so
-            # PHPStan calls the `?? ''` fallback dead.
-            identifier: nullCoalesce.expr
-            path: app/Livewire/Concerns/Proposals/ManagesProposalRecord.php
-            count: 2
-        -
-            # The same two lines in openDetailsModal(): the `?->` on a NOT NULL
-            # planned date is reported as never meeting null.
-            identifier: nullsafe.neverNull
-            path: app/Livewire/Concerns/Proposals/ManagesProposalRecord.php
-            count: 2
-        -
             # agreementMoney() compares `amount_received_currency?->value` and
             # `amount_transfered_currency?->value`; both columns are NOT NULL
             # (default USD), so the `?->` is reported as never meeting null.
@@ -247,19 +234,6 @@ parameters:
             identifier: nullsafe.neverNull
             path: app/Livewire/Concerns/Proposals/ChartsProposalPipeline.php
             count: 5
-        -
-            # openEditModal() reads planned_date_begin/end as
-            # `?->toDateString() ?? ''`; proposals.planned_date_* are NOT NULL, so
-            # PHPStan calls the `?? ''` fallback dead.
-            identifier: nullCoalesce.expr
-            path: app/Livewire/Concerns/Proposals/ManagesProposalForm.php
-            count: 2
-        -
-            # The same two lines in openEditModal(): the `?->` on a NOT NULL
-            # planned date is reported as never meeting null.
-            identifier: nullsafe.neverNull
-            path: app/Livewire/Concerns/Proposals/ManagesProposalForm.php
-            count: 2
         -
             # togglePhase() reads `ProposalPhase::tryFrom($phase)?->value ?? ''`.
             # tryFrom() does return null; PHPStan only objects that `??` already

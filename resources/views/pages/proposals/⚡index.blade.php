@@ -6,10 +6,13 @@ use App\Enums\ProposalStatus;
 use App\Livewire\Concerns\ChecksFinanceVisibility;
 use App\Livewire\Concerns\FiltersFinanceRegister;
 use App\Livewire\Concerns\Proposals\ChartsProposalPipeline;
+use App\Livewire\Concerns\Proposals\DeletesProposals;
 use App\Livewire\Concerns\Proposals\ExportsProposalRegister;
 use App\Livewire\Concerns\Proposals\ManagesProposalForm;
 use App\Livewire\Concerns\Proposals\ManagesProposalStages;
 use App\Livewire\Concerns\Proposals\ReadsProposalRegister;
+use App\Models\Proposal;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Number;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -19,6 +22,7 @@ use Livewire\WithPagination;
 new #[Title('titles.proposals')] class extends Component {
     use ChartsProposalPipeline;
     use ChecksFinanceVisibility;
+    use DeletesProposals;
     use ExportsProposalRegister;
     use FiltersFinanceRegister;
     use ManagesProposalForm;
@@ -55,12 +59,33 @@ new #[Title('titles.proposals')] class extends Component {
     public string $flag = '';
 
     /**
+     * A project id from New Concept Note on the project page: the create form
+     * opens with it chosen. Read once on mount, then cleared from the URL.
+     */
+    #[Url(as: 'for_project', except: '')]
+    public string $forProject = '';
+
+    /**
      * Everything here arrives from the URL. Normalise on the way in, so a
      * hand-typed value never leaves a filter applied with no control showing it.
      */
     public function mount(): void
     {
         $this->normaliseFilters();
+
+        if ($this->forProject !== '') {
+            $projectId = ctype_digit($this->forProject) ? (int) $this->forProject : null;
+            $this->forProject = '';
+
+            if (Gate::allows('create', Proposal::class)) {
+                $this->openCreateModal($projectId);
+            }
+        }
+    }
+
+    protected function proposalSaved(Proposal $proposal, bool $wasCreated): void
+    {
+        $this->resetPage();
     }
 
     public function updated(string $property): void
@@ -267,7 +292,7 @@ new #[Title('titles.proposals')] class extends Component {
     @endif
 
 
-    @include('pages.proposals._index-proposal-modal')
+    @include('pages.proposals._proposal-form')
 
     @include('pages.proposals._index-stage-modal')
 
