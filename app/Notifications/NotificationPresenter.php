@@ -187,6 +187,17 @@ final class NotificationPresenter
                 $locale === 'ar' ? '، ' : ', ',
                 array_map(fn (array $names): string => $this->localized($names, $locale), $param['localized_list']),
             ),
+            isset($param['event_counts']) => implode(
+                $locale === 'ar' ? '، ' : ', ',
+                array_map(
+                    fn (int|string $key, mixed $count): string => (string) __('notifications.digests.oversight_line', [
+                        'count' => (string) $count,
+                        'event' => (string) __("notifications.events.{$key}.title", [], $locale),
+                    ], $locale),
+                    array_keys($param['event_counts']),
+                    array_values($param['event_counts']),
+                ),
+            ),
             default => '',
         };
     }

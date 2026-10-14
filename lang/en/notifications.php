@@ -178,6 +178,9 @@ return [
             'past_end' => 'The project “:subject” is past its end date but still active',
             'report_without_files' => 'The approved report on “:subject” has no files attached',
         ],
+        'project_started' => 'The project “:subject” started on :date',
+        'project_ended' => 'The project “:subject” ended on :date',
+        'on_hold_reminder' => 'The proposal “:subject” is on hold and its review date (:date) has come',
     ],
 
     'admin' => [
@@ -246,6 +249,8 @@ return [
         'weekly_program' => ':program this week: :overdue overdue, :off_track indicators off track, :open_risks open risks, :upcoming deadlines in the next 14 days',
         'weekly_all' => 'This week across :programs programs: :overdue overdue, :off_track indicators off track, :open_risks open risks, :upcoming deadlines in the next 14 days',
         'daily' => 'Your day: :due_today due today, :overdue overdue, :stalled stalled, :assigned new assignments',
+        'oversight' => 'Oversight summary since :date: :counts (total :count)',
+        'oversight_line' => ':count × :event',
     ],
 
     'quick' => [

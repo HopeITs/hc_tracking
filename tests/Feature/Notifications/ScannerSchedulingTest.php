@@ -3,6 +3,9 @@
 use App\Jobs\RunScanner;
 use App\Notifications\Alerts\DueSoonScanner;
 use App\Notifications\Alerts\OffTrackIndicatorScanner;
+use App\Notifications\Alerts\OnHoldReminderScanner;
+use App\Notifications\Alerts\OversightDigestScanner;
+use App\Notifications\Alerts\ProjectDatesScanner;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\DevCommands;
 use Illuminate\Support\Facades\Queue;
@@ -14,6 +17,18 @@ test('a scan group queues one job per scanner', function () {
 
     Queue::assertPushed(RunScanner::class, 4);
     Queue::assertPushed(RunScanner::class, fn (RunScanner $job): bool => $job->scanner === DueSoonScanner::class);
+});
+
+test('the daily group queues the project dates, on-hold reminder and oversight digest scanners', function () {
+    Queue::fake();
+
+    $this->artisan('notifications:scan daily')->assertSuccessful();
+
+    Queue::assertPushed(RunScanner::class, 5);
+
+    foreach ([ProjectDatesScanner::class, OnHoldReminderScanner::class, OversightDigestScanner::class] as $scanner) {
+        Queue::assertPushed(RunScanner::class, fn (RunScanner $job): bool => $job->scanner === $scanner);
+    }
 });
 
 test('an unknown scan group is refused', function () {

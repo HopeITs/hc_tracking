@@ -112,7 +112,7 @@ final class RecipientResolver
      * The project an activity is about, for the MEAL officer: the subject
      * itself, or the `project_id` the recording module put in its properties.
      */
-    private function projectIdOf(Activity $activity): ?int
+    public function projectIdOf(Activity $activity): ?int
     {
         if ($activity->subject_type === 'project') {
             return $activity->subject_id;

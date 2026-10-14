@@ -178,6 +178,9 @@ return [
             'past_end' => 'تجاوز المشروع «:subject» تاريخ انتهائه وما زال نشطًا',
             'report_without_files' => 'التقرير المعتمد عن «:subject» بلا ملفات مرفقة',
         ],
+        'project_started' => 'بدأ المشروع «:subject» في :date',
+        'project_ended' => 'انتهى المشروع «:subject» في :date',
+        'on_hold_reminder' => 'المقترح «:subject» معلّق وقد حلّ موعد مراجعته (:date)',
     ],
 
     'admin' => [
@@ -246,6 +249,8 @@ return [
         'weekly_program' => ':program هذا الأسبوع: :overdue متأخرة، :off_track مؤشرات خارج المسار، :open_risks مخاطر قائمة، :upcoming مواعيد خلال 14 يومًا',
         'weekly_all' => 'هذا الأسبوع في :programs برامج: :overdue متأخرة، :off_track مؤشرات خارج المسار، :open_risks مخاطر قائمة، :upcoming مواعيد خلال 14 يومًا',
         'daily' => 'يومك: :due_today مستحقة اليوم، :overdue متأخرة، :stalled متوقفة، :assigned إسنادات جديدة',
+        'oversight' => 'ملخص المتابعة منذ :date: :counts (المجموع :count)',
+        'oversight_line' => ':event × :count',
     ],
 
     'quick' => [
