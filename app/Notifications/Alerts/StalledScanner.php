@@ -112,7 +112,7 @@ final class StalledScanner implements Scanner
      */
     private function proposals(CarbonImmutable $today, int $threshold): array
     {
-        $proposals = Proposal::query()->select(['id', 'name', 'status', 'updated_at'])->whereNotIn('status', [ProposalStatus::Completed->value, ProposalStatus::Rejected->value])->get();
+        $proposals = Proposal::query()->select(['id', 'name', 'status', 'updated_at'])->whereNotIn('status', [ProposalStatus::Completed->value, ProposalStatus::Rejected->value, ProposalStatus::OnHold->value])->get();
         $since = $this->statusSince('proposal', $proposals->modelKeys(), ['proposal.created', 'proposal.status_changed']);
 
         return array_values($proposals->flatMap(fn (Proposal $proposal): array => $this->stalls(

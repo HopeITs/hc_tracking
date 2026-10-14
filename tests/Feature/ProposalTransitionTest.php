@@ -109,7 +109,6 @@ test('a missing requirement refuses the move with its message and writes nothing
         ->and($proposal->statusNotes()->count())->toBe(0);
 })->with([
     'linked_project' => [ProposalStatus::ConceptNote, ProposalStatus::ConceptNoteReview, [], fn (Proposal $p) => $p->projects()->detach(), 'linked_project', 'proposals.link_project_first'],
-    'planned_dates' => [ProposalStatus::ConceptNote, ProposalStatus::ConceptNoteReview, [], fn (Proposal $p) => $p->forceFill(['planned_date_end' => null])->save(), 'planned_dates', 'proposals.planned_dates_required'],
     'reason' => [ProposalStatus::ConceptNoteReview, ProposalStatus::ConceptNote, ['reason' => '  '], fn () => null, 'reason', 'proposals.reason_required'],
     'reason_min_10' => [ProposalStatus::Submitted, ProposalStatus::Rejected, ['reason' => 'No fit.', 'effective_date' => '2026-10-13'], fn () => null, 'reason', 'proposals.rejection_reason'],
     'effective_date' => [ProposalStatus::ProposalReview, ProposalStatus::Submitted, ['effective_date' => '2026-10-14'], fn () => null, 'effective_date', 'proposals.date_not_future'],

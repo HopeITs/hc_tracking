@@ -27,20 +27,6 @@ function proposalStatusWriters(): array
 }
 
 /**
- * Writers that predate the state machine. T04 slice 2 moves their callers
- * onto TransitionProposal and empties this list.
- *
- * @return list<string>
- */
-function legacyProposalStatusWriters(): array
-{
-    return [
-        'app/Actions/Proposals/ChangeProposalStatus.php', // TODO T04 slice 2
-        'app/Livewire/Concerns/Proposals/ManagesProposalStages.php', // TODO T04 slice 2
-    ];
-}
-
-/**
  * The line numbers of every recognisable proposal status write in a source.
  *
  * @return list<int>
@@ -119,7 +105,7 @@ test('the scan ignores reads and other models', function (string $source) {
 ]);
 
 test('only the contracts §4 writers write a proposal status', function () {
-    $allowed = [...proposalStatusWriters(), ...legacyProposalStatusWriters()];
+    $allowed = proposalStatusWriters();
     $offenders = [];
 
     foreach (proposalStatusScannedSources() as $path => $source) {
@@ -135,14 +121,10 @@ test('only the contracts §4 writers write a proposal status', function () {
     expect($offenders)->toBe([]);
 });
 
-test('every allowlisted writer exists and every legacy writer still writes', function () {
+test('every allowlisted writer exists', function () {
     $sources = proposalStatusScannedSources();
 
     foreach (proposalStatusWriters() as $path) {
         expect($sources)->toHaveKey($path);
-    }
-
-    foreach (legacyProposalStatusWriters() as $path) {
-        expect(proposalStatusWrites($sources[$path] ?? ''))->not->toBeEmpty("{$path} no longer writes a status: remove it from the legacy list.");
     }
 });

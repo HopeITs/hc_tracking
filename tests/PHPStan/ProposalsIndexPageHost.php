@@ -10,7 +10,7 @@ use App\Livewire\Concerns\Proposals\ChartsProposalPipeline;
 use App\Livewire\Concerns\Proposals\DeletesProposals;
 use App\Livewire\Concerns\Proposals\ExportsProposalRegister;
 use App\Livewire\Concerns\Proposals\ManagesProposalForm;
-use App\Livewire\Concerns\Proposals\ManagesProposalStages;
+use App\Livewire\Concerns\Proposals\ManagesProposalStatus;
 use App\Livewire\Concerns\Proposals\ReadsProposalRegister;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -31,7 +31,7 @@ abstract class ProposalsIndexPageHost extends Component
     use ExportsProposalRegister;
     use FiltersFinanceRegister;
     use ManagesProposalForm;
-    use ManagesProposalStages;
+    use ManagesProposalStatus;
     use ReadsProposalRegister;
     use WithPagination;
 
@@ -51,4 +51,6 @@ abstract class ProposalsIndexPageHost extends Component
     public string $flag = '';
 
     public string $forProject = '';
+
+    private function forgetReadings(): void {}
 }

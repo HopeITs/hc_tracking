@@ -21,7 +21,7 @@ test('a rejected proposal is critical for finance, the pr manager and the top ro
     $proposal = Activity::withoutRecording(fn () => Proposal::factory()->create());
 
     $this->actingAs(userWithRole('Financial'));
-    $proposal->update(['status' => ProposalStatus::Rejected]);
+    $proposal->forceFill(['status' => ProposalStatus::Rejected])->save();
 
     foreach ([$financial, $prManager, $generalManager] as $recipient) {
         expect(UserNotification::query()->forUser($recipient)->sole()->priority)->toBe(NotificationPriority::Critical);
@@ -33,7 +33,7 @@ test('an approved proposal is important; a status note is recorded on the propos
     $proposal = Activity::withoutRecording(fn () => Proposal::factory()->create());
 
     $this->actingAs(userWithRole('Financial'));
-    $proposal->update(['status' => ProposalStatus::Approved]);
+    $proposal->forceFill(['status' => ProposalStatus::Approved])->save();
     ProposalStatusNote::factory()->create(['proposal_id' => $proposal->id, 'context' => 'Signed by donor']);
 
     expect(Activity::query()->orderBy('id')->pluck('event')->all())->toBe(['proposal.status_changed', 'proposal.status_note_added'])

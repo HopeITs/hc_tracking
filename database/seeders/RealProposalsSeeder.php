@@ -57,7 +57,8 @@ class RealProposalsSeeder extends Seeder
                 throw new RuntimeException("Proposal \"{$proposal['name']}\" has no agreement donor — run RealDonorsSeeder and check the donor list first.");
             }
 
-            $created = Proposal::query()->firstOrCreate(
+            // Seed data sets the status directly: it is not mass assignable (contracts.md §4).
+            $created = Proposal::unguarded(fn () => Proposal::query()->firstOrCreate(
                 ['name' => $proposal['name']],
                 [
                     'donor_id' => $donorId,
@@ -69,7 +70,7 @@ class RealProposalsSeeder extends Seeder
                     'status' => $proposal['status'],
                     'notes' => $proposal['notes'],
                 ],
-            );
+            ));
 
             return [$proposal['name'] => $created->id];
         });

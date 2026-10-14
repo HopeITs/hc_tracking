@@ -328,11 +328,12 @@ test('the proposal form is rendered only while its modal is open', function () {
         ->assertSeeHtml('wire:model="plannedDateBegin"');
 });
 
-test('the stage form is rendered only while its modal is open', function () {
-    $proposal = registerFundedProposal();
+test('the status form is rendered only while its modal is open', function () {
+    $proposal = Proposal::factory()->create(['status' => ProposalStatus::Submitted]);
 
     proposalRegister()
         ->assertDontSeeHtml('wire:model="statusContext"')
-        ->call('openStageModal', $proposal->id)
+        ->call('openStatusModal', $proposal->id)
+        ->set('newStatus', ProposalStatus::ProposalDraft->value)
         ->assertSeeHtml('wire:model="statusContext"');
 });

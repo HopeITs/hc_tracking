@@ -13,9 +13,11 @@
                         @php
                             $flowKey = 'p'.$proposal->id;
                             $isRejected = $proposal->status === \App\Enums\ProposalStatus::Rejected;
-                            // A rejection answers a submission, so the rail stops at Submitted and marks the next stop.
-                            $reachedStep = (int) array_search($isRejected ? \App\Enums\ProposalStatus::Submitted : $proposal->status, $lifecycle, true);
+                            // A hold or a rejection sits at the stop it left; a rejection marks the next stop.
+                            $reachedStep = (int) array_search($proposal->lifecycleStop(), $lifecycle, true);
+                            $statusTargets = $proposal->transitionTargets();
                             $nextStatus = $proposal->status->next();
+                            $nextStatus = $nextStatus !== null && in_array($nextStatus, $statusTargets, true) ? $nextStatus : null;
                             $latestNote = $proposal->statusNotes->first();
                             $taskSlots = min($proposal->tasks_count, 24);
                             $doneSlots = $proposal->tasks_count > 0 ? (int) round($proposal->done_tasks_count / $proposal->tasks_count * $taskSlots) : 0;
@@ -56,11 +58,11 @@
                                     <x-ui.button tone="ghost" size="sm" icon="eye" class="size-10! touch-manipulation" :href="route('proposals.show', $proposal)" wire:navigate :aria-label="__('common.view_name', ['name' => $proposal->name])" />
                                     @can('update', $proposal)
                                     @if ($nextStatus !== null)
-                                        <x-ui.button size="sm" icon:trailing="arrow-right" class="min-h-10 touch-manipulation rtl:[&_svg]:rotate-180" wire:click="openStageModal({{ $proposal->id }})" data-test="advance-proposal-{{ $proposal->id }}">
+                                        <x-ui.button size="sm" icon:trailing="arrow-right" class="min-h-10 touch-manipulation rtl:[&_svg]:rotate-180" wire:click="openStatusModal({{ $proposal->id }})" data-test="advance-proposal-{{ $proposal->id }}">
                                             {{ __('proposals.move_to_status', ['status' => $nextStatus->label()]) }}
                                         </x-ui.button>
-                                    @else
-                                        <x-ui.button size="sm" tone="ghost" icon="arrows-right-left" class="min-h-10 touch-manipulation" wire:click="openStageModal({{ $proposal->id }})" data-test="advance-proposal-{{ $proposal->id }}">
+                                    @elseif ($statusTargets !== [])
+                                        <x-ui.button size="sm" tone="ghost" icon="arrows-right-left" class="min-h-10 touch-manipulation" wire:click="openStatusModal({{ $proposal->id }})" data-test="advance-proposal-{{ $proposal->id }}">
                                             {{ __('proposals.change_status') }}
                                         </x-ui.button>
                                     @endif
@@ -81,7 +83,7 @@
                             </div>
 
                             {{-- Lifecycle stepper --}}
-                            <ol class="mt-5 grid grid-cols-7" aria-label="{{ __('proposals.lifecycle') }}">
+                            <ol class="mt-5 grid grid-cols-9" aria-label="{{ __('proposals.lifecycle') }}">
                                 @foreach ($lifecycle as $index => $step)
                                     @php
                                         $isCurrent = ! $isRejected && $index === $reachedStep;

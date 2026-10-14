@@ -1,10 +1,10 @@
 {{--
-    The lifecycle rail of proposals/show: seven stops, each with the date it
+    The lifecycle rail of proposals/show: nine stops, each with the date it
     was reached. Included by ⚡show.blade.php, whose top PHP block defines
     $mutedText, $inkText, $hairline, $amount, $term, $chronology and
     $arrivals.
 --}}
-    {{-- The lifecycle as one thread: seven stops, each carrying the date it was reached.
+    {{-- The lifecycle as one thread: nine stops, each carrying the date it was reached.
          Where the thread scrolls (narrow screens) it opens centred on the current stop;
          the delta is measured from the rendered boxes, so it holds in RTL too. --}}
     <nav
@@ -19,7 +19,7 @@
         })"
         data-lifecycle
     >
-        <ol class="grid min-w-[44rem] grid-cols-7 @3xl/detail:min-w-0">
+        <ol class="grid min-w-[56rem] grid-cols-9 @3xl/detail:min-w-0">
             @foreach ($this->lifecycle as $index => $stop)
                 <li
                     class="relative flex min-w-0 flex-col items-center gap-1.5"

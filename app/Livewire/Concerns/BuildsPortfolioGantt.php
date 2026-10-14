@@ -566,13 +566,20 @@ trait BuildsPortfolioGantt
 
     /**
      * How far along the fundraising lifecycle a proposal is, for its bar.
+     *
+     * The one progress map of the portfolio Gantt (percent). Rejected shows no
+     * progress; on hold keeps the submitted figure; the retired final reports
+     * status only renders history.
      */
     private function proposalProgress(ProposalStatus $status): int
     {
         return match ($status) {
             ProposalStatus::ConceptNote => 5,
+            ProposalStatus::ConceptNoteReview => 8,
+            ProposalStatus::ConceptNoteSubmitted => 10,
             ProposalStatus::ProposalDraft => 15,
-            ProposalStatus::Submitted => 30,
+            ProposalStatus::ProposalReview => 22,
+            ProposalStatus::Submitted, ProposalStatus::OnHold => 30,
             ProposalStatus::Approved => 45,
             ProposalStatus::Rejected => 0,
             ProposalStatus::Active => 65,
@@ -584,14 +591,14 @@ trait BuildsPortfolioGantt
     private function proposalTone(Proposal $proposal): string
     {
         $phase = $proposal->status->phase();
-        $overdue = $proposal->planned_date_end->isPast() && $phase === ProposalPhase::Planning;
+        $beforeApproval = in_array($phase, [ProposalPhase::Ideation, ProposalPhase::Planning], true);
+        $overdue = $proposal->planned_date_end->isPast() && $beforeApproval;
 
         return match (true) {
             $proposal->status === ProposalStatus::Rejected => 'muted',
             $proposal->status === ProposalStatus::Completed => 'good',
             $overdue => 'critical',
-            $phase === ProposalPhase::Planning => 'neutral',
-            $proposal->status === ProposalStatus::Submitted => 'warn',
+            $beforeApproval => 'neutral',
             default => 'funding',
         };
     }

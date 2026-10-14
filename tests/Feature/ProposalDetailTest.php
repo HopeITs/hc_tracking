@@ -80,19 +80,21 @@ test('changing status updates the proposal and appends an audit note in one act'
 
     Livewire::actingAs($user)
         ->test('pages::proposals.show', ['proposal' => $proposal])
-        ->set('newStatus', ProposalStatus::Approved->value)
-        ->set('statusContext', '  Grant agreement countersigned.  ')
-        ->set('statusDate', '2026-04-01')
+        ->call('openStatusModal', $proposal->id)
+        ->set('newStatus', ProposalStatus::ProposalDraft->value)
+        ->set('statusContext', '  Donor asked to resubmit.  ')
         ->call('changeStatus')
-        ->assertHasNoErrors();
+        ->assertHasNoErrors()
+        ->assertSet('showStatusModal', false);
 
     $proposal->refresh();
     $note = ProposalStatusNote::query()->where('proposal_id', $proposal->id)->sole();
 
-    expect($proposal->status)->toBe(ProposalStatus::Approved)
-        ->and($note->status)->toBe(ProposalStatus::Approved)
-        ->and($note->context)->toBe('Grant agreement countersigned.')
-        ->and($note->date->toDateString())->toBe('2026-04-01');
+    expect($proposal->status)->toBe(ProposalStatus::ProposalDraft)
+        ->and($note->status)->toBe(ProposalStatus::ProposalDraft)
+        ->and($note->context)->toBe('Donor asked to resubmit.')
+        ->and($note->changed_by)->toBe($user->id)
+        ->and($note->is_correction)->toBeFalse();
 });
 
 test('a status change with no context is rejected and changes nothing', function () {
@@ -101,7 +103,8 @@ test('a status change with no context is rejected and changes nothing', function
 
     Livewire::actingAs($user)
         ->test('pages::proposals.show', ['proposal' => $proposal])
-        ->set('newStatus', ProposalStatus::Approved->value)
+        ->call('openStatusModal', $proposal->id)
+        ->set('newStatus', ProposalStatus::ProposalDraft->value)
         ->set('statusContext', '   ')
         ->call('changeStatus')
         ->assertHasErrors(['statusContext']);
@@ -634,12 +637,13 @@ test('the add-task form is rendered only while its modal is open', function () {
 
 test('the status and details forms are rendered only while their modals are open', function () {
     $user = User::factory()->role('Financial')->create();
-    $proposal = Proposal::factory()->create();
+    $proposal = Proposal::factory()->create(['status' => ProposalStatus::Submitted]);
 
     Livewire::actingAs($user)
         ->test('pages::proposals.show', ['proposal' => $proposal])
         ->assertDontSeeHtml('wire:model="statusContext"')
-        ->call('openStatusModal')
+        ->call('openStatusModal', $proposal->id)
+        ->set('newStatus', ProposalStatus::ProposalDraft->value)
         ->assertSeeHtml('wire:model="statusContext"');
 
     Livewire::actingAs($user)

@@ -408,8 +408,8 @@ test('a user without proposal permissions sees no edit controls and cannot chang
 
     $fresh = fn () => Livewire::actingAs($viewer)->test('pages::proposals.show', ['proposal' => $this->proposal]);
 
-    $fresh()->call('openStatusModal')->assertForbidden();
-    $fresh()->set('newStatus', ProposalStatus::Completed->value)->set('statusContext', 'Done')->set('statusDate', '2026-06-15')->call('changeStatus')->assertForbidden();
+    $fresh()->call('openStatusModal', $this->proposal->id)->assertForbidden();
+    $fresh()->set('newStatus', ProposalStatus::Completed->value)->set('statusContext', 'Done')->set('statusDate', '2026-06-15')->call('changeStatus')->assertNotFound();
     $fresh()->call('confirmDeleteFile', $media->id)->assertForbidden();
     expect(fn () => $fresh()->set('deletingFileId', $media->id))->toThrow(CannotUpdateLockedPropertyException::class);
     $fresh()->call('openAgreementEdit', $agreement->id)->assertForbidden();

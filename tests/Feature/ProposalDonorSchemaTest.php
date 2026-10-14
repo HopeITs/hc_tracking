@@ -221,16 +221,15 @@ test('creating a proposal requires a donor', function () {
         ->call('openCreateModal')
         ->set('name', 'Donorless')
         ->set('internalProjectNumber', 'HC-2026-044')
-        ->set('proposalStatus', ProposalStatus::ConceptNote->value)
         ->set('plannedDateBegin', '2026-01-01')
         ->set('plannedDateEnd', '2026-12-31')
         ->call('saveProposal')
-        ->assertHasErrors(['proposalDonorId'])
+        ->assertHasErrors(['donorId'])
         ->assertSee('Choose the donor.');
 
     expect(Proposal::query()->where('name', 'Donorless')->exists())->toBeFalse();
 
-    $form->set('proposalDonorId', (string) $donor->id)->call('saveProposal')->assertHasNoErrors();
+    $form->set('donorId', (string) $donor->id)->set('projectIds', [(string) Project::factory()->create()->id])->call('saveProposal')->assertHasNoErrors();
 
     expect(Proposal::query()->where('name', 'Donorless')->sole()->donor_id)->toBe($donor->id);
 });

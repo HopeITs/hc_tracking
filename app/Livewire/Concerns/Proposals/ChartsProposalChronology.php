@@ -308,10 +308,10 @@ trait ChartsProposalChronology
     }
 
     /**
-     * The lifecycle rail: seven stops, each with the date it was reached.
+     * The lifecycle rail: nine stops, each with the date it was reached.
      *
-     * A rejection answers a submission, so the rail runs to Submitted and the
-     * stop after it is redrawn as the rejection rather than as the next step.
+     * A rejection or a hold sits at the stop the proposal left (lifecycleStop()); a
+     * rejection redraws the stop after it as the rejection rather than the next step.
      *
      * @return array<int, array{status: ProposalStatus, label: string, date: CarbonImmutable|null, state: string}>
      */
@@ -320,7 +320,7 @@ trait ChartsProposalChronology
     {
         $isRejected = $this->proposal->status === ProposalStatus::Rejected;
         $stops = ProposalStatus::lifecycle();
-        $reached = (int) array_search($isRejected ? ProposalStatus::Submitted : $this->proposal->status, $stops, true);
+        $reached = (int) array_search($this->proposal->lifecycleStop(), $stops, true);
         $dates = $this->statusNotes->sortBy('date')->groupBy(fn (ProposalStatusNote $note): string => $note->status->value);
 
         $rail = [];

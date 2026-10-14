@@ -12,6 +12,7 @@ use App\Enums\ProposalStatus;
 use App\Notifications\TracksActivity;
 use App\Observers\MediaOwnerObserver;
 use App\Observers\PlanIndicatorSourceObserver;
+use App\Support\ProposalTransitions;
 use Carbon\CarbonImmutable;
 use Database\Factories\ProposalFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -56,7 +57,6 @@ use Illuminate\Support\Facades\DB;
     'planned_date_end',
     'actual_date_begin',
     'actual_date_end',
-    'status',
     'notes',
     'requested_budget',
     'requested_currency',
@@ -288,6 +288,58 @@ class Proposal extends Model implements TracksActivity
             ->value('status');
 
         return $before instanceof ProposalStatus ? $before : ProposalStatus::tryFrom((string) $before);
+    }
+
+    /**
+     * The stop of the main lifecycle line the proposal sits at.
+     *
+     * On hold and rejected sit at the stop they left (a rejection during a
+     * hold looks past the hold); the retired final reports status sits at
+     * active. Reads the loaded status notes (all of them) so a register page
+     * costs no extra query per row; falls back to submitted when the trail
+     * does not show where it came from.
+     */
+    public function lifecycleStop(): ProposalStatus
+    {
+        $notes = $this->statusNotes->sortByDesc('id')->values();
+
+        $before = function (ProposalStatus $left) use ($notes): ?ProposalStatus {
+            $position = $notes->search(fn (ProposalStatusNote $note): bool => $note->status === $left);
+
+            return $position === false
+                ? null
+                : $notes->slice($position + 1)->first(fn (ProposalStatusNote $note): bool => $note->status !== $left)?->status;
+        };
+
+        $stop = match ($this->status) {
+            ProposalStatus::OnHold => $before(ProposalStatus::OnHold),
+            ProposalStatus::Rejected => $before(ProposalStatus::Rejected) === ProposalStatus::OnHold
+                ? $before(ProposalStatus::OnHold)
+                : $before(ProposalStatus::Rejected),
+            ProposalStatus::FinalReports => ProposalStatus::Active,
+            default => $this->status,
+        };
+
+        return $stop !== null && in_array($stop, ProposalStatus::lifecycle(), true) ? $stop : ProposalStatus::Submitted;
+    }
+
+    /**
+     * The statuses TransitionProposal may move this proposal to.
+     *
+     * For a proposal on hold the pre-hold status comes from the loaded status
+     * notes when they are loaded (register rows), else from the audit trail.
+     *
+     * @return list<ProposalStatus>
+     */
+    public function transitionTargets(): array
+    {
+        $preHold = match (true) {
+            $this->status !== ProposalStatus::OnHold => null,
+            $this->relationLoaded('statusNotes') => $this->lifecycleStop(),
+            default => $this->statusBefore(ProposalStatus::OnHold),
+        };
+
+        return ProposalTransitions::targets($this->status, $preHold);
     }
 
     /**
