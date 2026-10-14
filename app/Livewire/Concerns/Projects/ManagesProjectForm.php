@@ -4,17 +4,15 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Projects;
 
+use App\Actions\Projects\SaveProject;
 use App\Enums\ProjectStatus;
 use App\Models\HrCenter;
 use App\Models\HrEmployee;
 use App\Models\Program;
 use App\Models\Project;
-use Closure;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
@@ -74,6 +72,13 @@ trait ManagesProjectForm
      */
     #[Locked]
     public string $proposedName = '';
+
+    /**
+     * The status of the edited project, null on create. It only decides
+     * whether the date inputs show; the form never writes a status.
+     */
+    #[Locked]
+    public ?string $savedStatus = null;
 
     /**
      * The center the edited project already has: it stays choosable after HR
@@ -164,6 +169,16 @@ trait ManagesProjectForm
         $this->name = $this->proposedName = $program->name.' — '.$center->name;
     }
 
+    /**
+     * Whether the form offers the dates: only for a project that is past
+     * draft (approved, active, closed or archived); a draft gets its dates
+     * from the proposal approval.
+     */
+    public function datesEditable(): bool
+    {
+        return $this->savedStatus !== null && $this->savedStatus !== ProjectStatus::Draft->value;
+    }
+
     public function openCreateModal(): void
     {
         Gate::authorize('create', Project::class);
@@ -200,8 +215,10 @@ trait ManagesProjectForm
         $this->editingProjectId = $project->id;
         $this->name = $project->name;
         $this->description = $project->description ?? '';
-        $this->startDate = $project->start_date?->toDateString() ?? '';
-        $this->endDate = $project->end_date?->toDateString() ?? '';
+        $this->savedStatus = $project->status->value;
+        // A draft has no dates in the form (contracts.md §3): whatever it still holds stays untouched.
+        $this->startDate = $this->datesEditable() ? ($project->start_date?->toDateString() ?? '') : '';
+        $this->endDate = $this->datesEditable() ? ($project->end_date?->toDateString() ?? '') : '';
         $this->targetBeneficiaries = self::formInteger($project->target_beneficiaries);
         $this->targetMen = self::formInteger($project->target_men);
         $this->targetWomen = self::formInteger($project->target_women);
@@ -216,114 +233,28 @@ trait ManagesProjectForm
 
     public function saveProject(): void
     {
-        if ($this->editingProjectId === null) {
-            Gate::authorize('create', Project::class);
-        } else {
-            Gate::authorize('update', Project::query()->findOrFail($this->editingProjectId));
-        }
+        $project = $this->editingProjectId === null ? null : Project::query()->findOrFail($this->editingProjectId);
 
-        $this->name = trim($this->name);
-        $this->description = trim($this->description);
+        $project === null
+            ? Gate::authorize('create', Project::class)
+            : Gate::authorize('update', $project);
 
-        // Only someone who may change the owner has to pick a program manager;
-        // for anyone else the submitted owner is ignored below.
-        $mustPickProgramManager = $this->editingProjectId === null
-            || Gate::allows('reassign', Project::query()->findOrFail($this->editingProjectId));
+        $saved = app(SaveProject::class)->handle($project, [
+            'name' => $this->name,
+            'description' => $this->description,
+            'startDate' => $this->startDate,
+            'endDate' => $this->endDate,
+            'targetBeneficiaries' => $this->targetBeneficiaries,
+            'targetMen' => $this->targetMen,
+            'targetWomen' => $this->targetWomen,
+            'targetBoys' => $this->targetBoys,
+            'targetGirls' => $this->targetGirls,
+            'centerId' => $this->centerId,
+            'programId' => $this->programId,
+            'userId' => $this->userId,
+        ], auth()->user());
 
-        $validated = $this->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'startDate' => ['nullable', 'date'],
-            'endDate' => [
-                'nullable',
-                'date',
-                Rule::when($this->startDate !== '', ['after_or_equal:startDate']),
-            ],
-            'targetBeneficiaries' => ['nullable', 'integer', 'min:0', 'max:4294967295'],
-            'targetMen' => ['nullable', 'integer', 'min:0', 'max:4294967295'],
-            'targetWomen' => ['nullable', 'integer', 'min:0', 'max:4294967295'],
-            'targetBoys' => ['nullable', 'integer', 'min:0', 'max:4294967295'],
-            'targetGirls' => ['nullable', 'integer', 'min:0', 'max:4294967295'],
-            'centerId' => [
-                Rule::when($this->editingProjectId === null || $this->savedCenterId !== null, ['required'], ['nullable']),
-                'integer',
-                function (string $attribute, mixed $value, Closure $fail): void {
-                    $center = HrCenter::remembered((int) $value);
-
-                    if ($center === null || (! $center->is_active && $center->id !== $this->savedCenterId)) {
-                        $fail(__('projects.choose_the_center'));
-                    }
-                },
-            ],
-            'programId' => ['required', 'integer', Rule::exists(Program::class, 'id')],
-            'userId' => ['required', 'integer', Rule::exists(HrEmployee::class, 'id'), Rule::when($mustPickProgramManager, [Rule::in($this->ownerOptions->pluck('id')->all())])],
-        ], [
-            'name.required' => __('projects.enter_a_project_name'),
-            'centerId.required' => __('projects.choose_the_center'),
-            'centerId.integer' => __('projects.choose_the_center'),
-            'programId.required' => __('projects.select_a_program_2'),
-            'programId.exists' => __('projects.the_selected_program_is_no_longer_available'),
-            'userId.required' => __('projects.select_a_project_owner'),
-            'userId.exists' => __('projects.the_selected_owner_is_no_longer_available'),
-            'userId.in' => __('projects.owner_must_be_program_manager'),
-            'endDate.after_or_equal' => __('projects.the_end_date_must_be_on_or_after_the_start_date'),
-        ]);
-
-        $project = $this->editingProjectId === null
-            ? new Project
-            : Project::query()->findOrFail($this->editingProjectId);
-
-        // An owner edits their project but does not move it to another
-        // program or owner, and archiving goes through archiveProject().
-        $mayReassign = ! $project->exists || Gate::allows('reassign', $project);
-
-        // A new project always starts as a draft; an existing one keeps its
-        // status, which changes only from the project page.
-        if (! $project->exists) {
-            $project->status = ProjectStatus::Draft;
-        }
-
-        $center = $validated['centerId'] === null || $validated['centerId'] === '' ? null : HrCenter::remembered((int) $validated['centerId']);
-
-        $project->fill([
-            'name' => $validated['name'],
-            'description' => $validated['description'] === '' ? null : $validated['description'],
-            'start_date' => self::nullableString($validated['startDate']),
-            'end_date' => self::nullableString($validated['endDate']),
-            'target_beneficiaries' => self::nullableInteger($validated['targetBeneficiaries']),
-            'target_men' => self::nullableInteger($validated['targetMen']),
-            'target_women' => self::nullableInteger($validated['targetWomen']),
-            'target_boys' => self::nullableInteger($validated['targetBoys']),
-            'target_girls' => self::nullableInteger($validated['targetGirls']),
-            'center_id' => $center?->id,
-            'city_id' => $center === null ? $project->city_id : $center->city_id,
-            'program_id' => $mayReassign ? (int) $validated['programId'] : $project->program_id,
-            'user_id' => $mayReassign ? (int) $validated['userId'] : $project->user_id,
-        ]);
-
-        $openProject = DB::transaction(function () use ($project): ?Project {
-            $claimsPair = $project->center_id !== null
-                && $project->status->isOpen()
-                && (! $project->exists || $project->isDirty(['center_id', 'program_id']));
-
-            $openProject = $claimsPair
-                ? Project::openProjectFor($project->center_id, $project->program_id, $project->exists ? $project->id : null)
-                : null;
-
-            if ($openProject === null) {
-                $project->save();
-            }
-
-            return $openProject;
-        });
-
-        if ($openProject !== null) {
-            $this->addError('centerId', __('projects.open_project_exists', ['name' => $openProject->name]));
-
-            return;
-        }
-
-        $wasRecentlyCreated = $project->wasRecentlyCreated;
+        $wasRecentlyCreated = $saved->wasRecentlyCreated;
 
         $this->showProjectModal = false;
         $this->resetProjectForm();
@@ -363,6 +294,7 @@ trait ManagesProjectForm
         $this->targetGirls = '';
         $this->centerId = '';
         $this->savedCenterId = null;
+        $this->savedStatus = null;
         $this->proposedName = '';
         $this->programId = '';
         $this->userId = '';

@@ -80,16 +80,30 @@
                 <div class="grid grid-cols-2 gap-x-4 gap-y-3 @4xl/modal:grid-cols-3">
                     <x-ui.form-input wire:model="name" :label="__('projects.project_name')" maxlength="255" required autofocus class="col-span-2" />
 
-                    <x-ui.form-input wire:model="startDate" :label="__('common.start_date')" type="date" />
-                    <x-ui.form-input wire:model="endDate" :label="__('projects.end_date')" type="date" />
+                    @if ($this->datesEditable())
+                        <x-ui.form-input wire:model="startDate" :label="__('common.start_date')" type="date" />
+                        <x-ui.form-input wire:model="endDate" :label="__('projects.end_date')" type="date" />
 
-                    <div class="col-span-2 min-w-0 @4xl/modal:col-span-1">
-                        <span class="form-label">{{ __('projects.duration') }}</span>
-                        <p class="flex min-h-11 flex-wrap items-center gap-x-2 tabular-nums">
-                            <span class="text-lg font-bold text-secondary-dark dark:text-ink" x-text="durationLabel || '—'">—</span>
-                            <span class="text-xs font-medium text-secondary-medium dark:text-ink-muted" x-text="durationRange"></span>
+                        <div class="col-span-2 min-w-0 @4xl/modal:col-span-1">
+                            <span class="form-label">{{ __('projects.duration') }}</span>
+                            <p class="flex min-h-11 flex-wrap items-center gap-x-2 tabular-nums">
+                                <span class="text-lg font-bold text-secondary-dark dark:text-ink" x-text="durationLabel || '—'">—</span>
+                                <span class="text-xs font-medium text-secondary-medium dark:text-ink-muted" x-text="durationRange"></span>
+                            </p>
+                        </div>
+                    @else
+                        {{-- A draft has no dates: they are set when the proposal is approved. --}}
+                        <p class="col-span-2 text-sm text-secondary-medium dark:text-ink-muted @4xl/modal:col-span-3">
+                            <flux:icon name="calendar-days" variant="micro" class="inline size-4 align-text-bottom" aria-hidden="true" />
+                            {{ __('projects.dates_prohibited_draft') }}
                         </p>
-                    </div>
+                        @error('startDate')
+                            <p role="alert" class="col-span-2 text-sm font-medium text-status-critical @4xl/modal:col-span-3">{{ $message }}</p>
+                        @enderror
+                        @error('endDate')
+                            <p role="alert" class="col-span-2 text-sm font-medium text-status-critical @4xl/modal:col-span-3">{{ $message }}</p>
+                        @enderror
+                    @endif
 
                     <x-ui.form-textarea wire:model="description" :label="__('common.description')" rows="2" class="col-span-2 @4xl/modal:col-span-3" />
                 </div>

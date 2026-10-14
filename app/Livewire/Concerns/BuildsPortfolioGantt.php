@@ -298,7 +298,7 @@ trait BuildsPortfolioGantt
         if ($groupBy === 'status') {
             $groups = [];
 
-            foreach (ProjectStatus::cases() as $status) {
+            foreach (ProjectStatus::live() as $status) {
                 $inStatus = $projects->filter(fn (Project $project): bool => $project->status === $status);
 
                 if ($inStatus->isNotEmpty()) {

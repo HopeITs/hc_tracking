@@ -81,7 +81,7 @@ test('the status URL filter selects projects by lifecycle state', function () {
         ->assertDontSeeText('Closed Shelter Project');
 });
 
-test('a project can be created with lifecycle dates and independent beneficiary targets', function () {
+test('a project is created as a dateless draft with independent beneficiary targets', function () {
     $user = User::factory()->role('General Manager')->create();
     $city = insertHrCity();
     $owner = insertHrEmployee();
@@ -92,8 +92,6 @@ test('a project can be created with lifecycle dates and independent beneficiary 
         ->call('openCreateModal')
         ->set('name', '  Idlib Water Network  ')
         ->set('description', '  Restores reliable household water access.  ')
-        ->set('startDate', '2026-09-01')
-        ->set('endDate', '2027-08-31')
         ->set('targetBeneficiaries', '1000')
         ->set('targetMen', '180')
         ->set('targetWomen', '220')
@@ -110,8 +108,8 @@ test('a project can be created with lifecycle dates and independent beneficiary 
 
     expect($project->description)->toBe('Restores reliable household water access.')
         ->and($project->status)->toBe(ProjectStatus::Draft)
-        ->and($project->start_date?->toDateString())->toBe('2026-09-01')
-        ->and($project->end_date?->toDateString())->toBe('2027-08-31')
+        ->and($project->start_date)->toBeNull()
+        ->and($project->end_date)->toBeNull()
         ->and($project->target_beneficiaries)->toBe(1000)
         ->and($project->targetDemographicTotal())->toBe(700)
         ->and($project->city_id)->toBe($city)

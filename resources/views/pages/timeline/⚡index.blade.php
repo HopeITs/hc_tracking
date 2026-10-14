@@ -178,7 +178,7 @@ new #[Title('titles.timeline')] class extends Component {
 
                 <x-ui.header-filter-select :label="__('common.status')" wire:model.live="status" :value="$status">
                     <option value="">{{ __('gantt.all_statuses') }}</option>
-                    @foreach (ProjectStatus::cases() as $statusOption)
+                    @foreach (ProjectStatus::live() as $statusOption)
                         <option value="{{ $statusOption->value }}">{{ $statusOption->label() }}</option>
                     @endforeach
                 </x-ui.header-filter-select>

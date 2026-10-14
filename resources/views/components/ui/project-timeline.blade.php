@@ -59,7 +59,7 @@
                 <span class="rounded-full bg-black/10 px-1.5 text-xs tabular-nums dark:bg-white/15">{{ $totalProjects }}</span>
             </button>
 
-            @foreach (ProjectStatus::cases() as $index => $case)
+            @foreach (ProjectStatus::live() as $index => $case)
                 @php $segment = $statusSegments[$index]; @endphp
                 @continue($segment['count'] === 0 && $status !== $case->value)
                 <button type="button" wire:click="filterProjectsByStatus('{{ $case->value }}')" aria-pressed="{{ $status === $case->value ? 'true' : 'false' }}" @class([

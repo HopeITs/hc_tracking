@@ -238,7 +238,7 @@ trait FiltersProjectDirectory
     protected function applySort(Builder $query): Builder
     {
         if ($this->view === 'board') {
-            $cases = ProjectStatus::cases();
+            $cases = ProjectStatus::live();
             $arms = [];
 
             foreach (array_keys($cases) as $position) {

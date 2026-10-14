@@ -7,14 +7,13 @@ namespace App\Enums;
 use App\Enums\Concerns\HasTranslatedLabel;
 
 /**
- * The states a project moves through from first draft to archive.
+ * The states a project moves through from first draft to archive
+ * (contracts.md §3).
  *
  * The value is what lands in `projects.status` (VARCHAR(50)), which is NOT
- * NULL and defaults to 'draft'. Every project existing before this column was
- * added therefore reads as a draft until someone advances it.
- *
- * Unlike `ProposalStatus` this is a strict sequence, so `next()` and
- * `isOpen()` are derivable from the case order alone.
+ * NULL and defaults to 'draft'. A project is created as a dateless draft; it
+ * becomes `approved` and `active` only through the automatic writers (T08,
+ * T33), and `submitted` is retired: it still renders in old activity rows.
  *
  * Values are lower case and casing is part of the value.
  */
@@ -23,6 +22,7 @@ enum ProjectStatus: string
     use HasTranslatedLabel;
 
     case Draft = 'draft';
+    /** @deprecated Retired by T05; kept so old activity rows and history still render. */
     case Submitted = 'submitted';
     case Approved = 'approved';
     case Active = 'active';
@@ -38,9 +38,21 @@ enum ProjectStatus: string
     public function isOpen(): bool
     {
         return match ($this) {
-            self::Draft, self::Submitted, self::Approved, self::Active => true,
-            self::Closed, self::Archived => false,
+            self::Draft, self::Approved, self::Active => true,
+            self::Submitted, self::Closed, self::Archived => false,
         };
+    }
+
+    /**
+     * Every status a project can be in today: all of them but the retired
+     * `submitted`. Pickers, filters, charts and the lifecycle bar iterate
+     * this, never `cases()`.
+     *
+     * @return list<self>
+     */
+    public static function live(): array
+    {
+        return [self::Draft, self::Approved, self::Active, self::Closed, self::Archived];
     }
 
     /**
@@ -48,10 +60,14 @@ enum ProjectStatus: string
      */
     public function next(): ?self
     {
-        $cases = self::cases();
-        $position = array_search($this, $cases, true);
-
-        return $cases[$position + 1] ?? null;
+        return match ($this) {
+            self::Draft => self::Approved,
+            self::Submitted => self::Approved,
+            self::Approved => self::Active,
+            self::Active => self::Closed,
+            self::Closed => self::Archived,
+            self::Archived => null,
+        };
     }
 
     /**

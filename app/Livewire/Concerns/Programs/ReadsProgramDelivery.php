@@ -264,13 +264,13 @@ trait ReadsProgramDelivery
             ->groupBy('status')
             ->pluck('total', 'status');
 
-        return collect(ProjectStatus::cases())
+        return collect(ProjectStatus::live())
             ->map(fn (ProjectStatus $status): array => [
                 'label' => $status->label(),
                 'count' => (int) ($counts[$status->value] ?? 0),
                 'tone' => match ($status) {
                     ProjectStatus::Active => 'bg-status-good',
-                    ProjectStatus::Submitted, ProjectStatus::Approved => 'bg-status-warn',
+                    ProjectStatus::Approved => 'bg-status-warn',
                     default => 'bg-secondary-light',
                 },
             ])
