@@ -39,5 +39,6 @@ return [
     'activity_log' => 'سجل النشاط',
     'notification_rules' => 'قواعد الإشعارات',
     'notifications' => 'الإشعارات',
+    'my_reviews' => 'مراجعاتي',
     'notification_settings' => 'إعدادات الإشعارات',
 ];

@@ -78,6 +78,41 @@ class ProposalReviewer extends Model
     }
 
     /**
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function forEmployee(Builder $query, int $employeeId): void
+    {
+        $query->where('employee_id', $employeeId);
+    }
+
+    /**
+     * Rows still waiting on their reviewer: not seen, and the proposal is in
+     * that row's review status. A stage the proposal has left no longer asks.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function awaitingReview(Builder $query): void
+    {
+        $query->whereNull('seen_at')->where(function (Builder $stages): void {
+            foreach (ReviewStage::cases() as $stage) {
+                $stages->orWhere(fn (Builder $row) => $row
+                    ->where('stage', $stage->value)
+                    ->whereHas('proposal', fn (Builder $proposal) => $proposal->where('status', $stage->reviewStatus())));
+            }
+        });
+    }
+
+    /**
+     * Whether this row still waits on its reviewer; see awaitingReview().
+     */
+    public function isAwaitingReview(Proposal $proposal): bool
+    {
+        return $this->seen_at === null && $proposal->status === $this->stage->reviewStatus();
+    }
+
+    /**
      * Only an extra reviewer who has neither seen the proposal nor written a
      * note may be taken off; anything else is part of the review record.
      */

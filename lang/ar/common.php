@@ -37,6 +37,7 @@ return [
     'count_tranche' => '{0} لا توجد دفعات|{1} دفعة واحدة|{2} دفعتان|[3,10] :count دفعات|[11,*] :count دفعة',
     'currency' => 'العملة',
     'dashboard' => 'لوحة التحكم',
+    'my_reviews' => 'مراجعاتي',
     'delete_name' => 'حذف :name',
     'description' => 'الوصف',
     'donors' => 'المانحون',

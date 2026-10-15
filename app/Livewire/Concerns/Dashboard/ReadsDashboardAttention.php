@@ -8,20 +8,22 @@ use App\Enums\ArStatus;
 use App\Enums\MilestoneStatus;
 use App\Enums\TaskStatus;
 use App\Models\Milestone;
+use App\Models\ProposalReviewer;
 use App\Models\Risk;
 use App\Models\Scopes\TaskVisibilityScope;
 use App\Models\Task;
 use App\Models\TransfersTracking;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Number;
 use Livewire\Attributes\Computed;
 
 /**
- * The dashboard's "Needs attention" queue: every late task, milestone and
- * pending transfer plus every materialised risk, the counts behind its
- * filter, and the row shaping and links the "Coming up" list shares.
+ * The dashboard's "Needs attention" queue: the proposal reviews waiting on
+ * the viewer, every late task, milestone and pending transfer plus every
+ * materialised risk, the counts behind its filter, and the row shaping and links the "Coming up" list shares.
  *
  * Used by dashboard/index only. The page provides visible() and canView()
  * (the viewer's module access). transferHref() and taskParentName() are also
@@ -43,6 +45,12 @@ trait ReadsDashboardAttention
     private const RiskSlots = 2;
 
     /**
+     * How many rows of the "All" view lead with reviews waiting on the viewer
+     * before late work takes the rest; spare rows go back to reviews.
+     */
+    private const ReviewSlots = 3;
+
+    /**
      * Everything that is late or has gone wrong, most overdue first.
      *
      * Dated items (tasks, milestones, transfers) sort by days late; materialised
@@ -50,7 +58,8 @@ trait ReadsDashboardAttention
      * rendered once and the queue's filter only hides rows in the browser, so
      * `allRank` and `groupRank` say where a row sits in each view. The "All" view
      * keeps up to two rows for risks, so a busy week of late work never pushes
-     * a materialised risk off the dashboard.
+     * a materialised risk off the dashboard. Reviews asked of the viewer lead
+     * it, oldest request first, in up to three rows.
      *
      * @return Collection<int, array{key: string, group: string, icon: string, tone: string, title: string, context: string, badge: string, daysLate: int|null, href: string, allRank: int|null, groupRank: int}>
      */
@@ -134,14 +143,36 @@ trait ReadsDashboardAttention
                 href: route('risks.index', ['project' => $risk->project_id, 'status' => 'happened']),
             ));
 
+        $reviews = $this->awaitingReviews()
+            ->limit(self::AttentionLimit)
+            ->get()
+            ->map(function (ProposalReviewer $review) use ($today): array {
+                $daysAsked = (int) $review->created_at?->startOfDay()->diffInDays($today);
+
+                return $this->attentionEntry(
+                    key: 'review-'.$review->id,
+                    group: 'reviews',
+                    icon: 'document-magnifying-glass',
+                    title: $review->proposal->name,
+                    context: __('dashboard.review_asked_of_you', ['stage' => $review->stage->label()]),
+                    daysLate: null,
+                    href: route('proposals.show', $review->proposal),
+                    badge: trans_choice('dashboard.review_asked_days', $daysAsked, ['count' => $daysAsked]),
+                );
+            });
+
         $dated = $tasks->concat($milestones)->concat($transfers)->sortByDesc('daysLate')->values();
-        $datedShownInAll = min($dated->count(), self::AttentionLimit - min($risks->count(), self::RiskSlots));
-        $risksShownInAll = min($risks->count(), self::AttentionLimit - $datedShownInAll);
+        $reviewsShownInAll = min($reviews->count(), self::ReviewSlots);
+        $openInAll = self::AttentionLimit - $reviewsShownInAll;
+        $datedShownInAll = min($dated->count(), $openInAll - min($risks->count(), self::RiskSlots));
+        $risksShownInAll = min($risks->count(), $openInAll - $datedShownInAll);
+        $reviewsShownInAll += min($reviews->count() - $reviewsShownInAll, $openInAll - $datedShownInAll - $risksShownInAll);
         $groupRanks = [];
 
-        return $dated
-            ->map(fn (array $item, int $index): array => [...$item, 'allRank' => $index < $datedShownInAll ? $index : null])
-            ->concat($risks->map(fn (array $item, int $index): array => [...$item, 'allRank' => $index < $risksShownInAll ? $datedShownInAll + $index : null]))
+        return $reviews
+            ->map(fn (array $item, int $index): array => [...$item, 'allRank' => $index < $reviewsShownInAll ? $index : null])
+            ->concat($dated->map(fn (array $item, int $index): array => [...$item, 'allRank' => $index < $datedShownInAll ? $reviewsShownInAll + $index : null]))
+            ->concat($risks->map(fn (array $item, int $index): array => [...$item, 'allRank' => $index < $risksShownInAll ? $reviewsShownInAll + $datedShownInAll + $index : null]))
             ->map(function (array $item) use (&$groupRanks): array {
                 /** @var array<string, int> $groupRanks */
                 $groupRanks[$item['group']] = ($groupRanks[$item['group']] ?? -1) + 1;
@@ -166,6 +197,7 @@ trait ReadsDashboardAttention
             'delivery' => min(self::AttentionLimit, $items->where('group', 'delivery')->count()),
             'funding' => min(self::AttentionLimit, $items->where('group', 'funding')->count()),
             'risks' => min(self::AttentionLimit, $items->where('group', 'risks')->count()),
+            'reviews' => min(self::AttentionLimit, $items->where('group', 'reviews')->count()),
         ];
     }
 
@@ -179,20 +211,45 @@ trait ReadsDashboardAttention
     {
         $today = CarbonImmutable::today();
 
-        // Organisation-wide: a count on the dashboard is the same for everyone.
+        // Organisation-wide: a count on the dashboard is the same for everyone,
+        // except the reviews, which are asked of the viewer alone.
         $delivery = $this->visible(Task::query(), 'tasks')->withoutGlobalScope(TaskVisibilityScope::class)->where('status', '!=', TaskStatus::Done)->whereDate('due_date', '<', $today)->count()
             + $this->visible(Milestone::query(), 'milestones')->where('status', MilestoneStatus::Planned)->whereDate('planned_end_date', '<', $today)->count();
         $funding = $this->canView('transfers')
             ? TransfersTracking::query()->where('ar_status', ArStatus::Pending)->whereDate('scheduled_date', '<', $today)->count()
             : 0;
         $risks = $this->visible(Risk::query(), 'risks')->where('happened', true)->count();
+        $reviews = $this->awaitingReviews()->count();
 
         return [
-            'all' => $delivery + $funding + $risks,
+            'all' => $delivery + $funding + $risks + $reviews,
             'delivery' => $delivery,
             'funding' => $funding,
             'risks' => $risks,
+            'reviews' => $reviews,
         ];
+    }
+
+    /**
+     * The viewer's reviewer rows still waiting on them, oldest request first.
+     * Being asked opens the proposal (ProposalPolicy::view), so no module
+     * permission gates them.
+     *
+     * @return Builder<ProposalReviewer>
+     */
+    private function awaitingReviews(): Builder
+    {
+        $employeeId = auth()->user()?->employee_id;
+
+        return ProposalReviewer::query()
+            ->when(
+                $employeeId === null,
+                fn (Builder $query) => $query->whereRaw('1 = 0'),
+                fn (Builder $query) => $query->forEmployee((int) $employeeId),
+            )
+            ->awaitingReview()
+            ->with('proposal:id,slug,name,status')
+            ->oldest('id');
     }
 
     /**
@@ -211,7 +268,7 @@ trait ReadsDashboardAttention
      *
      * @return array{key: string, group: string, icon: string, tone: string, title: string, context: string, badge: string, daysLate: int|null, href: string}
      */
-    private function attentionEntry(string $key, string $group, string $icon, string $title, string $context, ?int $daysLate, string $href): array
+    private function attentionEntry(string $key, string $group, string $icon, string $title, string $context, ?int $daysLate, string $href, ?string $badge = null): array
     {
         return [
             'key' => $key,
@@ -219,14 +276,14 @@ trait ReadsDashboardAttention
             'icon' => $icon,
             'tone' => match ($group) {
                 'funding' => 'funding',
-                'risks' => 'critical',
+                'risks', 'reviews' => 'critical',
                 default => 'warn',
             },
             'title' => $title,
             'context' => $context,
-            'badge' => $daysLate === null
+            'badge' => $badge ?? ($daysLate === null
                 ? __('common.materialised')
-                : trans_choice('dashboard.days_late', max(1, $daysLate), ['count' => max(1, $daysLate)]),
+                : trans_choice('dashboard.days_late', max(1, $daysLate), ['count' => max(1, $daysLate)])),
             'daysLate' => $daysLate,
             'href' => $href,
         ];

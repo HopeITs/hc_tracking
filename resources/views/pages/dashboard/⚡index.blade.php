@@ -72,6 +72,7 @@ new #[Title('titles.dashboard')] class extends Component {
     $canViewFundingPosition = $this->canViewFundingPosition();
     $focusTabs = [
         'all' => __('dashboard.all'),
+        ...($counts['reviews'] > 0 ? ['reviews' => __('dashboard.reviews')] : []),
         'delivery' => __('dashboard.delivery'),
         ...($canViewTransfers ? ['funding' => __('dashboard.funding')] : []),
         'risks' => __('dashboard.risks'),

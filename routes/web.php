@@ -35,6 +35,9 @@ Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () 
 
     Route::livewire('home', 'pages::dashboard.index')->name('dashboard');
 
+    // Open to everyone: the page lists only the viewer's own reviewer rows.
+    Route::livewire('my-reviews', 'pages::reviews.index')->name('reviews.index');
+
     Route::livewire('executive-summary', 'pages::executive-summary.index')
         ->can('executive-summary.view')
         ->name('executive-summary.index');

@@ -4,6 +4,9 @@
         : [];
     $showsAdministration = auth()->user()?->canAny(['cities.view', 'sectors.view', 'activity-log.view', 'notification-settings.manage'])
         || auth()->user()?->can('viewAny', \App\Models\User::class);
+    $reviewerEmployeeId = auth()->user()?->employee_id;
+    $hasReviews = $reviewerEmployeeId !== null && \App\Models\ProposalReviewer::query()->forEmployee((int) $reviewerEmployeeId)->exists();
+    $awaitingReviews = $hasReviews ? \App\Models\ProposalReviewer::query()->forEmployee((int) $reviewerEmployeeId)->awaitingReview()->count() : 0;
     /* The heading's look lives in app.css ("Sidebar group headings"): Flux renders it as the group's first div, which utilities passed here cannot reach reliably. */
     $navigationGroupClasses = 'in-data-flux-sidebar-collapsed-desktop:flex!';
     $navigationItemClasses = 'touch-manipulation rounded-lg! in-data-flux-sidebar-collapsed-desktop:rounded-2xl! text-secondary-dark! hover:bg-secondary-soft/70! max-lg:h-11! data-current:border-primary! data-current:bg-primary! data-current:font-semibold! data-current:text-white! data-current:shadow-sm! dark:text-ink-muted! dark:hover:bg-white/[0.06]! dark:hover:text-ink! dark:data-current:border-transparent! dark:data-current:bg-surface-2! dark:data-current:text-ink! dark:data-current:shadow-none! dark:data-current:before:absolute dark:data-current:before:inset-y-1.5 dark:data-current:before:start-0 dark:data-current:before:w-0.5 dark:data-current:before:rounded-full dark:data-current:before:bg-brand in-data-flux-sidebar-collapsed-desktop:dark:data-current:before:hidden';
@@ -88,6 +91,28 @@
             >
                 {{ __('common.dashboard') }}
             </flux:sidebar.item>
+
+            {{-- Anyone ever asked to review a proposal, whatever their role: reviewers hold no proposals.view. --}}
+            @if ($hasReviews)
+                <flux:sidebar.item
+                    icon="document-magnifying-glass"
+                    :href="route('reviews.index')"
+                    :current="request()->routeIs('reviews.*')"
+                    :class="$navigationItemClasses"
+                    wire:navigate.hover
+                    data-my-reviews-link
+                >
+                    {{ __('common.my_reviews') }}
+                    @if ($awaitingReviews > 0)
+                        <x-slot:icon-trailing>
+                            <span
+                                class="ms-auto inline-flex min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold leading-5 tabular-nums text-white in-data-current:bg-white/25 in-data-flux-sidebar-collapsed-desktop:hidden dark:bg-status-critical-soft dark:text-status-critical"
+                                data-my-reviews-badge
+                            >{{ $awaitingReviews > 99 ? '99+' : $awaitingReviews }}<span class="sr-only"> {{ __('proposals.my_reviews_awaiting') }}</span></span>
+                        </x-slot:icon-trailing>
+                    @endif
+                </flux:sidebar.item>
+            @endif
 
             @can('executive-summary.view')
                 <flux:sidebar.item

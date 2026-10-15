@@ -77,7 +77,8 @@
                                     </span>
                                     <span @class([
                                         'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums whitespace-nowrap',
-                                        'bg-status-critical-soft text-primary dark:bg-status-critical-soft dark:text-status-critical' => $item['daysLate'] === null || $item['daysLate'] > 14,
+                                        'bg-secondary-soft text-secondary-dark dark:bg-surface-2 dark:text-ink' => $item['group'] === 'reviews',
+                                        'bg-status-critical-soft text-primary dark:bg-status-critical-soft dark:text-status-critical' => $item['group'] !== 'reviews' && ($item['daysLate'] === null || $item['daysLate'] > 14),
                                         'bg-white text-status-warn ring-1 ring-status-warn/40 ring-inset dark:bg-status-warn-soft dark:ring-0' => $item['daysLate'] !== null && $item['daysLate'] <= 14,
                                     ])>{{ $item['badge'] }}</span>
                                     <flux:icon.chevron-right variant="micro" class="size-4 shrink-0 text-secondary-light transition-transform duration-200 group-hover:translate-x-0.5 rtl:-scale-x-100 rtl:group-hover:-translate-x-0.5" />

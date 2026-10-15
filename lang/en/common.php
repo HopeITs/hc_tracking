@@ -37,6 +37,7 @@ return [
     'count_tranche' => ':count tranche|:count tranches',
     'currency' => 'Currency',
     'dashboard' => 'Dashboard',
+    'my_reviews' => 'My reviews',
     'delete_name' => 'Delete :name',
     'description' => 'Description',
     'donors' => 'Donors',
