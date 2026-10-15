@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Proposals;
 
+use App\Actions\Proposals\DeleteProposal;
 use App\Models\Proposal;
 use Flux\Flux;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 
 /**
- * The register's delete confirmation for a proposal.
+ * The register's delete confirmation for a proposal. The delete itself, its
+ * guards and the framework clean-up live in DeleteProposal.
  *
  * Used by proposals/index only. The page uses WithPagination (resetPage).
  */
@@ -59,22 +62,19 @@ trait DeletesProposals
             return;
         }
 
-        if (! $this->canDelete($this->deletingProposalId)) {
+        $proposal = Proposal::query()->find($this->deletingProposalId);
+
+        try {
+            if ($proposal !== null) {
+                app(DeleteProposal::class)->handle($proposal);
+            }
+        } catch (ValidationException $exception) {
             $this->cancelDelete();
 
-            Flux::toast(
-                variant: 'danger',
-                text: __('proposals.this_proposal_has_a_funding_agreement_remove_the_agreement_f'),
-            );
+            Flux::toast(variant: 'danger', text: collect($exception->errors())->flatten()->first());
 
             return;
         }
-
-        $proposal = Proposal::query()->findOrFail($this->deletingProposalId);
-
-        Gate::authorize('delete', $proposal);
-
-        $proposal->delete();
 
         $this->cancelDelete();
         $this->resetPage();

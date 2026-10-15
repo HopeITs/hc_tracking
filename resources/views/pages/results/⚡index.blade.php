@@ -5,6 +5,10 @@ use App\Livewire\Concerns\Results\BuildsResultsFramework;
 use App\Livewire\Concerns\Results\BuildsResultsTree;
 use App\Livewire\Concerns\Results\ManagesResultForm;
 use App\Livewire\Concerns\Results\SummarisesResults;
+use App\Models\Proposal;
+use App\Models\Result;
+use Illuminate\Support\Collection;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -20,6 +24,10 @@ new #[Title('titles.results_framework')] class extends Component {
 
     #[Url(except: '')]
     public string $program = '';
+
+    /** '' every framework, 'none' the program framework only, an id one proposal's framework. */
+    #[Url(except: '')]
+    public string $proposal = '';
 
     #[Url(except: '')]
     public string $type = '';
@@ -40,9 +48,26 @@ new #[Title('titles.results_framework')] class extends Component {
     public function clearFilters(): void
     {
         $this->search = '';
+        $this->proposal = '';
         $this->program = '';
         $this->type = '';
         $this->focus = '';
+    }
+
+    /**
+     * Proposals that own a framework, read from the loaded results (no query).
+     *
+     * @return Collection<int, Proposal>
+     */
+    #[Computed]
+    public function proposalOptions(): Collection
+    {
+        return $this->allResults
+            ->map(fn (Result $result): ?Proposal => $result->proposal)
+            ->filter()
+            ->unique('id')
+            ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
     }
 
     /**
@@ -64,7 +89,7 @@ new #[Title('titles.results_framework')] class extends Component {
 ?>
 
 @php
-    $filtersAreActive = $search !== '' || $program !== '' || $type !== '' || $focus !== '';
+    $filtersAreActive = $search !== '' || $proposal !== '' || $program !== '' || $type !== '' || $focus !== '';
     $overview = $this->overview;
     $programCount = $this->groupedRoots->count();
 
@@ -72,6 +97,8 @@ new #[Title('titles.results_framework')] class extends Component {
         ResultType::Impact->value => 'bg-secondary-dark ring-secondary-dark dark:bg-ink dark:ring-ink',
         ResultType::Outcome->value => 'bg-primary ring-primary',
         ResultType::Output->value => 'bg-board ring-secondary-light',
+        ResultType::Activity->value => 'bg-transparent ring-secondary-medium dark:ring-ink-muted',
+        ResultType::CrossCutting->value => 'bg-secondary-light ring-secondary-light dark:bg-ink-muted dark:ring-ink-muted',
     ];
 
     $coverageTone = match (true) {
@@ -122,6 +149,14 @@ new #[Title('titles.results_framework')] class extends Component {
                 <option value="none">{{ __('common.unassigned') }}</option>
                 @foreach ($this->programOptions as $programOption)
                     <option value="{{ $programOption->id }}">{{ $programOption->name }}</option>
+                @endforeach
+            </x-ui.header-filter-select>
+
+            <x-ui.header-filter-select :label="__('results_framework.framework')" wire:model.live="proposal" :value="$proposal">
+                <option value="">{{ __('results_framework.all_frameworks') }}</option>
+                <option value="none">{{ __('results_framework.program_framework_only') }}</option>
+                @foreach ($this->proposalOptions as $proposalOption)
+                    <option value="{{ $proposalOption->id }}">{{ $proposalOption->name }}</option>
                 @endforeach
             </x-ui.header-filter-select>
 

@@ -31,6 +31,7 @@ function contractEventKeys(): array
         'program.logframe_missing', 'annual_plan.missing', 'supervision.added', 'supervision.removed',
         // T07: a moved MEAL Manager slot tells both holders; registered by the owning task, not yet in §15.2 (Dev 3).
         'notification_settings.meal_manager_changed',
+        'result.created', 'result.updated', 'result.deleted',
     ];
 }
 
@@ -85,6 +86,7 @@ test('importance, oversight and critical follow the contract', function () {
         'project.archived', 'project.created', 'project.sectors_changed',
         'proposal.created', 'proposal.deleted', 'proposal.need_assessment_added', 'proposal.project_linked', 'proposal.project_unlinked',
         'proposal.reviewer_removed', 'proposal.reviewer_seen', 'proposal.targets_saved',
+        'result.created', 'result.deleted', 'result.updated',
         'supervision.added', 'supervision.removed',
     ])
         ->and($critical)->toBe([

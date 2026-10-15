@@ -94,6 +94,26 @@ test('the level comes from the node type and its place in the program framework'
     ]);
 });
 
+test('an activity takes its output number and a cross-cutting result is CC', function () {
+    $programId = programWithHrCode('002');
+    $outcomeId = insertResult(null, $programId);
+    insertResult($outcomeId, $programId, ResultType::Output);
+    $secondOutputId = insertResult($outcomeId, $programId, ResultType::Output);
+    insertResult($secondOutputId, $programId, ResultType::Activity);
+    $secondActivityId = insertResult($secondOutputId, $programId, ResultType::Activity);
+    $ids = [
+        'second activity' => insertIndicator($secondActivityId, 'Sessions held'),
+        'cross-cutting' => insertIndicator(insertResult(null, $programId, ResultType::CrossCutting), 'Complaints answered'),
+    ];
+
+    $this->artisan('meal:seed-indicator-library')->assertSuccessful();
+
+    expect(array_map(linkedCode(...), $ids))->toBe([
+        'second activity' => '002.AC1.2.2.1',
+        'cross-cutting' => '002.CC.1',
+    ]);
+});
+
 test('names that differ only in case, spacing or tashkeel share one entry', function () {
     $programId = programWithHrCode('002');
     $outcomeId = insertResult(null, $programId);

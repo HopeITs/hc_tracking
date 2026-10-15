@@ -229,13 +229,15 @@ class Program extends Model implements TracksActivity
     }
 
     /**
-     * The logframe results this program is measured by.
+     * The logframe results this program is measured by: its program
+     * framework only. A proposal framework's nodes carry the program too but
+     * belong to the proposal (contracts §11.2, Proposal::results()).
      *
      * @return HasMany<Result, $this>
      */
     public function results(): HasMany
     {
-        return $this->hasMany(Result::class);
+        return $this->hasMany(Result::class)->programFramework();
     }
 
     public function activityModule(): string

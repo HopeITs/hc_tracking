@@ -27,7 +27,7 @@ class ResultFactory extends Factory
                 'Increased household resilience to shocks.',
                 'Strengthened community health referral pathways.',
             ]),
-            'type' => fake()->randomElement(ResultType::cases()),
+            'type' => fake()->randomElement([ResultType::Impact, ResultType::Outcome, ResultType::Output]),
         ];
     }
 
@@ -48,6 +48,30 @@ class ResultFactory extends Factory
     {
         return $this->state(fn (array $attributes): array => [
             'type' => $type,
+        ]);
+    }
+
+    /**
+     * An activity under the given output (an activity always has an output parent).
+     */
+    public function activity(Result $output): static
+    {
+        return $this->state([
+            'type' => ResultType::Activity,
+            'parent_id' => $output->id,
+            'program_id' => $output->program_id,
+            'proposal_id' => $output->proposal_id,
+        ]);
+    }
+
+    /**
+     * A cross-cutting result: always a root.
+     */
+    public function crossCutting(): static
+    {
+        return $this->state([
+            'type' => ResultType::CrossCutting,
+            'parent_id' => null,
         ]);
     }
 }

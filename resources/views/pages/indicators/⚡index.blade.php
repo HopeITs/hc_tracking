@@ -155,12 +155,16 @@ new #[Title('titles.indicators')] class extends Component {
         ResultType::Impact->value => 'bg-secondary-dark ring-secondary-dark dark:bg-ink dark:ring-ink',
         ResultType::Outcome->value => 'bg-primary ring-primary',
         ResultType::Output->value => 'bg-board ring-secondary-light',
+        ResultType::Activity->value => 'bg-transparent ring-secondary-medium dark:ring-ink-muted',
+        ResultType::CrossCutting->value => 'bg-secondary-light ring-secondary-light dark:bg-ink-muted dark:ring-ink-muted',
     ];
 
     $levelAccents = [
         ResultType::Impact->value => 'bg-secondary-dark dark:bg-ink',
         ResultType::Outcome->value => 'bg-primary',
         ResultType::Output->value => 'bg-secondary-light',
+        ResultType::Activity->value => 'bg-secondary-soft ring-1 ring-inset ring-secondary-medium dark:bg-surface-2 dark:ring-ink-muted',
+        ResultType::CrossCutting->value => 'bg-secondary-medium dark:bg-ink-muted',
     ];
 
     $ragSegments = [

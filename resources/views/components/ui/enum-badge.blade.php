@@ -45,7 +45,7 @@
         },
         $case instanceof \App\Enums\ResultType => match ($case) {
             \App\Enums\ResultType::Impact => 'solid',
-            default => 'outline',
+            \App\Enums\ResultType::Outcome, \App\Enums\ResultType::Output, \App\Enums\ResultType::Activity, \App\Enums\ResultType::CrossCutting => 'outline',
         },
         $case instanceof \App\Enums\DonorType => 'outline',
         $case instanceof \App\Enums\RagStatus => match ($case) {

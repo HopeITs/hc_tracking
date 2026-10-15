@@ -10,17 +10,19 @@
     $surface = match ($result->type) {
         ResultType::Impact => 'border-secondary-dark bg-board text-secondary-dark shadow-[0_18px_40px_-24px_rgb(0_0_0/0.35)] dark:border-field-line dark:text-ink',
         ResultType::Outcome => 'border-board-line bg-board text-secondary-dark shadow-[0_10px_28px_-22px_rgb(0_0_0/0.45)] dark:text-ink',
-        ResultType::Output => 'border-board-line bg-board-head text-secondary-dark dark:text-ink',
+        ResultType::Output, ResultType::Activity, ResultType::CrossCutting => 'border-board-line bg-board-head text-secondary-dark dark:text-ink',
     };
     $mark = match ($result->type) {
         ResultType::Impact => 'bg-secondary-dark ring-secondary-dark dark:bg-ink dark:ring-ink',
         ResultType::Outcome => 'bg-primary ring-primary',
         ResultType::Output => 'bg-board ring-secondary-light',
+        ResultType::Activity => 'bg-transparent ring-secondary-medium dark:ring-ink-muted',
+        ResultType::CrossCutting => 'bg-secondary-light ring-secondary-light dark:bg-ink-muted dark:ring-ink-muted',
     };
     $muted = 'text-secondary-medium dark:text-ink-muted';
     $statementSize = match (true) {
         $isApex => 'text-lg @xl/detail:text-xl @3xl/detail:text-2xl font-bold leading-snug',
-        $result->type === ResultType::Output => 'text-sm font-medium leading-relaxed',
+        in_array($result->type, [ResultType::Output, ResultType::Activity, ResultType::CrossCutting], true) => 'text-sm font-medium leading-relaxed',
         default => 'text-base font-semibold leading-snug',
     };
 @endphp

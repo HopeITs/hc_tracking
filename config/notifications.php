@@ -6,7 +6,10 @@ use App\Notifications\Alerts\DataGapScanner;
 use App\Notifications\Alerts\DueSoonScanner;
 use App\Notifications\Alerts\EscalationScanner;
 use App\Notifications\Alerts\OffTrackIndicatorScanner;
+use App\Notifications\Alerts\OnHoldReminderScanner;
 use App\Notifications\Alerts\OverdueScanner;
+use App\Notifications\Alerts\OversightDigestScanner;
+use App\Notifications\Alerts\ProjectDatesScanner;
 use App\Notifications\Alerts\StalledScanner;
 use App\Notifications\Recipients\AccountRecipients;
 use App\Notifications\Recipients\DonorRecipients;
@@ -110,7 +113,7 @@ return [
     */
     'scanners' => [
         'frequent' => [DueSoonScanner::class, OverdueScanner::class, EscalationScanner::class, StalledScanner::class],
-        'daily' => [OffTrackIndicatorScanner::class, DataGapScanner::class],
+        'daily' => [OffTrackIndicatorScanner::class, DataGapScanner::class, ProjectDatesScanner::class, OnHoldReminderScanner::class, OversightDigestScanner::class],
     ],
 
     /*

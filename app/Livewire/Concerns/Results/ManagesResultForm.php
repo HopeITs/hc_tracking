@@ -4,19 +4,18 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Results;
 
-use App\Enums\Period;
+use App\Actions\Results\DeleteResult;
+use App\Actions\Results\SaveResult;
 use App\Enums\ResultType;
-use App\Models\AnnualPlan;
-use App\Models\Indicator;
-use App\Models\PlanIndicator;
 use App\Models\Program;
+use App\Models\Proposal;
 use App\Models\Result;
+use App\Support\ProposalFramework;
 use Flux\Flux;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Enum;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 
@@ -24,14 +23,38 @@ use Livewire\Attributes\Locked;
  * The result form, its delete confirmation and the cache reset every write
  * ends with.
  *
- * Used by results/index only. forgetFramework() unsets the computed reads of
- * BuildsResultsFramework, BuildsResultsTree and SummarisesResults, so a write
- * re-renders the tree it just changed in the same request.
+ * Used by results/index and the proposal Logical Framework tab, always with
+ * BuildsResultsFramework, whose frameworkResults() every id is loaded
+ * through. The form writes into one framework: `formProposalId` (null = the
+ * program framework), taken from the pinned proposal, the parent a child is
+ * added under, or the result being edited — never from the request.
+ * forgetFramework() unsets the computed reads of BuildsResultsFramework,
+ * BuildsResultsTree and SummarisesResults, so a write re-renders the tree it
+ * just changed in the same request.
  *
  * @property-read Collection<int, Result> $parentOptions
+ * @property-read Collection<int, Result> $contributesToOptions
+ *
+ * @method ?int fixedProposalId()
+ * @method Builder<Result> frameworkResults()
  */
 trait ManagesResultForm
 {
+    /**
+     * SaveResult's error keys => the form property each message belongs to.
+     *
+     * @var array<string, string>
+     */
+    private const array FORM_FIELDS = [
+        'statement' => 'statement',
+        'type' => 'resultType',
+        'checkout_period' => 'checkoutPeriod',
+        'program_id' => 'resultProgramId',
+        'parent_id' => 'parentId',
+        'contributes_to_result_id' => 'contributesToId',
+        'structure' => 'statement',
+    ];
+
     public bool $showResultModal = false;
 
     public bool $showDeleteModal = false;
@@ -41,6 +64,10 @@ trait ManagesResultForm
 
     #[Locked]
     public ?int $deletingResultId = null;
+
+    /** The proposal whose framework the form writes into; null = the program framework. */
+    #[Locked]
+    public ?int $formProposalId = null;
 
     public string $statement = '';
 
@@ -52,6 +79,8 @@ trait ManagesResultForm
 
     public string $parentId = '';
 
+    public string $contributesToId = '';
+
     /** @return Collection<int, Program> */
     #[Computed]
     public function programOptions(): Collection
@@ -60,21 +89,49 @@ trait ManagesResultForm
     }
 
     /**
-     * The level a statement of this type contributes to, or null for an impact,
-     * which sits at the top of the chain.
+     * The level a statement of this type contributes to, or null for a level
+     * with no parent (impact, cross-cutting, or an unknown value).
      */
     protected function parentLevelOf(string $type): ?ResultType
     {
-        return match (ResultType::tryFrom($type)) {
-            ResultType::Output => ResultType::Outcome,
-            ResultType::Outcome => ResultType::Impact,
-            default => null,
-        };
+        return ResultType::tryFrom($type)?->parentLevel();
+    }
+
+    /**
+     * The level added under a statement of this level, or null when nothing
+     * may sit under it (an activity, a cross-cutting result).
+     */
+    protected function childLevelOf(ResultType $type): ?ResultType
+    {
+        if (! $type->acceptsChildren()) {
+            return null;
+        }
+
+        foreach (ResultType::cases() as $level) {
+            if ($level->parentLevel() === $type) {
+                return $level;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Results in the framework the form writes into.
+     *
+     * @return Builder<Result>
+     */
+    protected function formFramework(): Builder
+    {
+        return $this->formProposalId === null
+            ? Result::query()->programFramework()
+            : Result::query()->proposalFramework($this->formProposalId);
     }
 
     /**
      * Results this one may contribute to: only statements one level up the
-     * chain — an output under an outcome, an outcome under an impact.
+     * chain, in the same framework — an activity under an output, an output
+     * under an outcome, an outcome under an impact.
      *
      * Excludes the node and its descendants so ResultObserver's
      * InvalidParentException stays a backstop. Unlike milestones there is no
@@ -104,11 +161,51 @@ trait ManagesResultForm
             }
         }
 
-        return Result::query()
+        return $this->formFramework()
             ->select(['id', 'statement', 'type', 'program_id'])
             ->with('program:id')
             ->where('type', $parentLevel->value)
             ->when($excludedIds !== [], fn ($query) => $query->whereNotIn('id', $excludedIds))
+            ->orderBy('program_id')
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
+     * Whether the form is placing a root of a proposal framework, the only
+     * statement that may contribute to the program framework (contracts §11.2).
+     */
+    public function placesProposalRoot(): bool
+    {
+        return $this->formProposalId !== null
+            && $this->parentId === ''
+            && $this->resultType !== ResultType::Activity->value;
+    }
+
+    /**
+     * Program-framework results a proposal root may contribute to: any level,
+     * in one of the programs the proposal's projects belong to.
+     *
+     * @return Collection<int, Result>
+     */
+    #[Computed]
+    public function contributesToOptions(): Collection
+    {
+        if (! $this->placesProposalRoot()) {
+            return new Collection;
+        }
+
+        $proposal = Proposal::query()->select(['id'])->find($this->formProposalId);
+
+        if ($proposal === null) {
+            return new Collection;
+        }
+
+        return Result::query()
+            ->programFramework()
+            ->select(['id', 'statement', 'type', 'program_id'])
+            ->with('program:id')
+            ->whereIn('program_id', ProposalFramework::programIds($proposal))
             ->orderBy('program_id')
             ->orderBy('id')
             ->get();
@@ -120,24 +217,33 @@ trait ManagesResultForm
      */
     public function updatedResultType(): void
     {
-        unset($this->parentOptions);
+        unset($this->parentOptions, $this->contributesToOptions);
 
         if ($this->parentId !== '' && ! $this->parentOptions->contains('id', (int) $this->parentId)) {
             $this->parentId = '';
+        }
+
+        if (! $this->placesProposalRoot()) {
+            $this->contributesToId = '';
         }
     }
 
     /**
      * A contributing statement lives in its parent's program, so choosing a
-     * parent sets the program to match.
+     * parent sets the program to match; a nested statement contributes to
+     * the program framework only through its root.
      */
     public function updatedParentId(): void
     {
+        unset($this->contributesToOptions);
+
         if ($this->parentId === '') {
             return;
         }
 
-        $parent = Result::query()->select(['id', 'program_id'])->find((int) $this->parentId);
+        $this->contributesToId = '';
+
+        $parent = $this->formFramework()->select(['id', 'program_id'])->find((int) $this->parentId);
 
         if ($parent !== null) {
             $this->resultProgramId = (string) ($parent->program_id ?? '');
@@ -153,7 +259,7 @@ trait ManagesResultForm
      */
     protected function canDelete(int $resultId): bool
     {
-        $result = Result::query()
+        $result = $this->frameworkResults()
             ->select(['id'])
             ->withCount(['children', 'indicators'])
             ->find($resultId);
@@ -162,7 +268,8 @@ trait ManagesResultForm
     }
 
     /**
-     * Open the create form, optionally pre-wired under an existing statement.
+     * Open the create form, optionally pre-wired under an existing statement
+     * in that statement's framework.
      */
     public function openCreateModal(?int $parentResultId = null): void
     {
@@ -170,19 +277,24 @@ trait ManagesResultForm
 
         $this->resetResultForm();
 
-        if ($parentResultId !== null) {
-            $parent = Result::query()
-                ->select(['id', 'program_id', 'type'])
-                ->find($parentResultId);
+        if ($parentResultId === null) {
+            $this->showResultModal = true;
 
-            // An output is the bottom of the chain: nothing can contribute to it.
-            if ($parent !== null && $parent->type !== ResultType::Output) {
-                $this->parentId = (string) $parent->id;
-                $this->resultProgramId = (string) ($parent->program_id ?? '');
-                $this->resultType = $parent->type === ResultType::Impact
-                    ? ResultType::Outcome->value
-                    : ResultType::Output->value;
-            }
+            return;
+        }
+
+        $parent = $this->frameworkResults()
+            ->select(['id', 'program_id', 'proposal_id', 'type'])
+            ->findOrFail($parentResultId);
+
+        $childLevel = $this->childLevelOf($parent->type);
+
+        // An activity or a cross-cutting result is the bottom of its chain: nothing nests under it.
+        if ($childLevel !== null) {
+            $this->formProposalId = $parent->proposal_id;
+            $this->parentId = (string) $parent->id;
+            $this->resultProgramId = (string) ($parent->program_id ?? '');
+            $this->resultType = $childLevel->value;
         }
 
         $this->showResultModal = true;
@@ -192,17 +304,19 @@ trait ManagesResultForm
     {
         Gate::authorize('results.update');
 
-        $result = Result::query()
-            ->select(['id', 'statement', 'parent_id', 'program_id', 'type', 'checkout_period'])
+        $result = $this->frameworkResults()
+            ->select(['id', 'statement', 'parent_id', 'program_id', 'proposal_id', 'contributes_to_result_id', 'type', 'checkout_period'])
             ->findOrFail($resultId);
 
         $this->resetValidation();
         $this->editingResultId = $result->id;
+        $this->formProposalId = $result->proposal_id;
         $this->statement = $result->statement;
         $this->resultType = $result->type->value;
         $this->checkoutPeriod = $result->checkout_period->value;
         $this->resultProgramId = (string) ($result->program_id ?? '');
         $this->parentId = (string) ($result->parent_id ?? '');
+        $this->contributesToId = (string) ($result->contributes_to_result_id ?? '');
         $this->showResultModal = true;
     }
 
@@ -210,78 +324,25 @@ trait ManagesResultForm
     {
         Gate::authorize($this->editingResultId === null ? 'results.create' : 'results.update');
 
-        $this->statement = trim($this->statement);
+        $existing = $this->editingResultId === null ? null : $this->frameworkResults()->findOrFail($this->editingResultId);
+        $proposal = $this->formProposalId === null ? null : Proposal::query()->findOrFail($this->formProposalId);
 
-        $validated = $this->validate([
-            'statement' => ['required', 'string'],
-            'resultType' => ['required', new Enum(ResultType::class)],
-            'checkoutPeriod' => ['required', new Enum(Period::class)],
-            'resultProgramId' => ['nullable', 'integer', Rule::exists(Program::class, 'id')],
-            'parentId' => ['nullable', 'integer', Rule::exists(Result::class, 'id')],
-        ], [
-            'statement.required' => __('results_framework.write_the_result_statement'),
-            'resultType.required' => __('results_framework.choose_impact_outcome_or_output'),
-            'checkoutPeriod.required' => __('common.choose_how_often_this_is_checked'),
-        ]);
-
-        $result = $this->editingResultId === null
-            ? new Result
-            : Result::query()->findOrFail($this->editingResultId);
-
-        $parentId = $validated['parentId'] === '' || $validated['parentId'] === null ? null : (int) $validated['parentId'];
-        $programId = $validated['resultProgramId'] === '' || $validated['resultProgramId'] === null ? null : (int) $validated['resultProgramId'];
-        $type = ResultType::from($validated['resultType']);
-
-        if ($parentId !== null) {
-            $parent = Result::query()->select(['id', 'type', 'program_id'])->findOrFail($parentId);
-
-            if ($parent->type !== $this->parentLevelOf($type->value)) {
-                $this->addError('parentId', __('results_framework.a_result_contributes_only_to_the_level_directly_above'));
-
-                return;
-            }
-
-            // A contributing statement always lives in its parent's program.
-            $programId = $parent->program_id;
+        try {
+            $result = app(SaveResult::class)->handle($existing, [
+                'statement' => $this->statement,
+                'type' => $this->resultType,
+                'checkout_period' => $this->checkoutPeriod,
+                'program_id' => $this->resultProgramId,
+                'parent_id' => $this->parentId,
+                'contributes_to_result_id' => $this->placesProposalRoot() ? $this->contributesToId : '',
+            ], $proposal);
+        } catch (ValidationException $exception) {
+            throw ValidationException::withMessages(
+                collect($exception->errors())->mapWithKeys(fn (array $messages, string $field): array => [
+                    (self::FORM_FIELDS[$field] ?? 'statement') => $messages,
+                ])->all(),
+            );
         }
-
-        $subtreeIds = [];
-
-        if ($result->exists) {
-            $children = Result::query()->select(['id', 'type'])->where('parent_id', $result->id)->get();
-
-            if ($children->isNotEmpty() && $type !== $result->type
-                && $children->contains(fn (Result $child): bool => $this->parentLevelOf($child->type->value) !== $type)) {
-                $this->addError('resultType', __('results_framework.nested_results_still_sit_at_the_level_below'));
-
-                return;
-            }
-
-            if ($programId !== $result->program_id) {
-                $subtreeIds = $result->descendants()->pluck('id')->push($result->id)->all();
-
-                if ($programId !== null && $this->programChangeBreaksChain($subtreeIds, $programId)) {
-                    $this->addError('resultProgramId', __('results_framework.moving_this_result_would_break_its_indicators_or_targets'));
-
-                    return;
-                }
-            }
-        }
-
-        DB::transaction(function () use ($result, $validated, $type, $programId, $parentId, $subtreeIds): void {
-            $result->fill([
-                'statement' => $validated['statement'],
-                'type' => $type,
-                'checkout_period' => $validated['checkoutPeriod'],
-                'program_id' => $programId,
-                'parent_id' => $parentId,
-            ])->save();
-
-            // The statements below move with it, so the tree never straddles programs.
-            if ($subtreeIds !== []) {
-                Result::query()->whereIn('id', $subtreeIds)->whereKeyNot($result->id)->update(['program_id' => $programId]);
-            }
-        });
 
         $wasRecentlyCreated = $result->wasRecentlyCreated;
 
@@ -295,36 +356,11 @@ trait ManagesResultForm
         );
     }
 
-    /**
-     * Whether moving these statements into a program would strand what hangs
-     * off them: an indicator scoped to a project in another program, or a
-     * target committed in another program's annual plan.
-     *
-     * @param  array<int>  $resultIds
-     */
-    protected function programChangeBreaksChain(array $resultIds, int $programId): bool
-    {
-        $indicatorIds = Indicator::query()->whereIn('result_id', $resultIds)->select('id');
-
-        $strandedIndicator = Indicator::query()
-            ->whereIn('result_id', $resultIds)
-            ->whereHas('project', fn ($query) => $query->where('program_id', '!=', $programId))
-            ->exists();
-
-        $strandedTarget = PlanIndicator::query()
-            ->whereIn('indicator_id', $indicatorIds)
-            ->where('source_type', 'annual_plan')
-            ->whereIn('source_id', AnnualPlan::query()->select('id')->where('program_id', '!=', $programId))
-            ->exists();
-
-        return $strandedIndicator || $strandedTarget;
-    }
-
     public function confirmDelete(int $resultId): void
     {
         Gate::authorize('results.delete');
 
-        $this->deletingResultId = $resultId;
+        $this->deletingResultId = $this->frameworkResults()->select(['id'])->findOrFail($resultId)->id;
         $this->showDeleteModal = true;
     }
 
@@ -342,18 +378,19 @@ trait ManagesResultForm
             return;
         }
 
-        if (! $this->canDelete($this->deletingResultId)) {
+        $result = $this->frameworkResults()->with('proposal:id')->find($this->deletingResultId);
+
+        try {
+            if ($result !== null) {
+                app(DeleteResult::class)->handle($result, $result->proposal);
+            }
+        } catch (ValidationException $exception) {
             $this->cancelDelete();
 
-            Flux::toast(
-                variant: 'danger',
-                text: __('results_framework.this_result_still_has_nested_results_or_indicators_remove_th'),
-            );
+            Flux::toast(variant: 'danger', text: collect($exception->errors())->flatten()->first());
 
             return;
         }
-
-        Result::query()->findOrFail($this->deletingResultId)->delete();
 
         $this->cancelDelete();
         $this->forgetFramework();
@@ -370,11 +407,15 @@ trait ManagesResultForm
     /**
      * Drop every cached read of the framework after a write, so the same
      * request re-renders the tree it just changed rather than the old one.
+     * A page without one of these reads (the Logical Framework tab has no
+     * overview) simply skips it.
      */
     protected function forgetFramework(): void
     {
-        foreach (['allResults', 'resultsById', 'childCounts', 'measurements', 'groupedRoots', 'visibleNodes', 'overview', 'focusCounts', 'parentOptions'] as $property) {
-            unset($this->{$property});
+        foreach (['allResults', 'resultsById', 'childCounts', 'measurements', 'groupedRoots', 'frameworkRoots', 'visibleNodes', 'overview', 'focusCounts', 'parentOptions', 'contributesToOptions'] as $property) {
+            if (method_exists($this, $property)) {
+                unset($this->{$property});
+            }
         }
     }
 
@@ -382,10 +423,12 @@ trait ManagesResultForm
     {
         $this->resetValidation();
         $this->editingResultId = null;
+        $this->formProposalId = $this->fixedProposalId();
         $this->statement = '';
         $this->resultType = 'outcome';
         $this->checkoutPeriod = 'quarterly';
         $this->resultProgramId = '';
         $this->parentId = '';
+        $this->contributesToId = '';
     }
 }

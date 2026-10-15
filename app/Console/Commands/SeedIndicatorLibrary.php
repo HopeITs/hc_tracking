@@ -138,8 +138,8 @@ class SeedIndicatorLibrary extends Command
     }
 
     /**
-     * Read the whole results framework once and number its outcomes and
-     * outputs by id.
+     * Read the whole results framework once and number its outcomes,
+     * outputs and activities by id.
      */
     private function loadFramework(): void
     {
@@ -152,12 +152,15 @@ class SeedIndicatorLibrary extends Command
             $program = $result->program_id ?? 'none';
 
             $counter = match ($result->type) {
-                ResultType::Impact => null,
+                ResultType::Impact, ResultType::CrossCutting => null,
                 ResultType::Outcome => "outcomes:{$program}",
                 ResultType::Output => match ($parent?->type) {
                     ResultType::Outcome, ResultType::Output => "under:{$parent->id}",
-                    ResultType::Impact, null => "loose:{$program}",
+                    ResultType::Impact, ResultType::Activity, ResultType::CrossCutting, null => "loose:{$program}",
                 },
+                ResultType::Activity => $parent?->type === ResultType::Output
+                    ? "activities:{$parent->id}"
+                    : "loose-activities:{$program}",
             };
 
             if ($counter !== null) {
@@ -212,8 +215,9 @@ class SeedIndicatorLibrary extends Command
     }
 
     /**
-     * The library level of a result: `G`, `OC{n}`, or `OP` followed by the
-     * outcome number and the output's place under each parent.
+     * The library level of a result: `G`, `OC{n}`, `OP` followed by the
+     * outcome number and the output's place under each parent, `AC` followed
+     * by its output's numbers and its own place, or `CC` for cross-cutting.
      */
     private function levelRef(Result $result): string
     {
@@ -229,8 +233,12 @@ class SeedIndicatorLibrary extends Command
             ResultType::Output => match ($parent?->type) {
                 ResultType::Output => $this->levelRef($parent).'.'.$this->ranks[$result->id],
                 ResultType::Outcome => 'OP'.$this->ranks[$parent->id].'.'.$this->ranks[$result->id],
-                ResultType::Impact, null => 'OP'.$this->ranks[$result->id],
+                ResultType::Impact, ResultType::Activity, ResultType::CrossCutting, null => 'OP'.$this->ranks[$result->id],
             },
+            ResultType::Activity => $parent?->type === ResultType::Output
+                ? 'AC'.substr($this->levelRef($parent), 2).'.'.$this->ranks[$result->id]
+                : 'AC'.$this->ranks[$result->id],
+            ResultType::CrossCutting => 'CC',
         };
 
         if (strlen($levelRef) > 20 || preg_match(SaveLibraryIndicator::LevelRefPattern, $levelRef) !== 1) {
