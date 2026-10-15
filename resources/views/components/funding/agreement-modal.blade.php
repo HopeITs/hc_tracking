@@ -44,7 +44,7 @@
                     <x-ui.form-field :label="__('common.proposal')" for="agreement-locked-proposal">
                         <div id="agreement-locked-proposal" class="form-box" data-locked data-locked-proposal>
                             <flux:icon.lock-closed variant="micro" class="size-3.5 shrink-0 text-secondary-light" />
-                            <span class="truncate">{{ $lockedProposalName }}</span>
+                            <span class="truncate" dir="auto">{{ $lockedProposalName }}</span>
                         </div>
                     </x-ui.form-field>
                 @else
@@ -94,32 +94,35 @@
                         $amountError = $errors->first("installments.{$index}.amount");
                         $dateError = $errors->first("installments.{$index}.scheduled_date");
                     @endphp
-                    <div wire:key="installment-row-{{ $index }}" class="grid grid-cols-[1.75rem_minmax(0,1fr)_minmax(0,1fr)_auto] items-start gap-2" data-installment-row>
+                    <div wire:key="installment-row-{{ $index }}" class="grid grid-cols-[1.75rem_minmax(0,1fr)_auto] items-start gap-2" data-installment-row>
                         <span class="pt-2.5 text-sm font-semibold tabular-nums text-secondary-medium dark:text-ink-muted" dir="ltr">{{ $index + 1 }}</span>
 
-                        <div class="min-w-0">
-                            <div class="form-box" @if ($amountError !== '') data-invalid @endif>
-                                <input type="number" step="0.01" min="0" dir="ltr" class="form-box-input tabular-nums"
-                                    wire:model.live.debounce.400ms="installments.{{ $index }}.amount"
-                                    aria-label="{{ __('funding_agreements.installment_amount_label', ['number' => $index + 1]) }}"
-                                    @if ($amountError !== '') aria-invalid="true" @endif />
-                                <span class="form-affix">{{ $currencyCode }}</span>
+                        <div class="grid min-w-0 gap-2 @lg/modal:grid-cols-2">
+                            <div class="min-w-0">
+                                <div class="form-box" @if ($amountError !== '') data-invalid @endif>
+                                    <input type="number" step="0.01" min="0" dir="ltr" class="form-box-input tabular-nums"
+                                        wire:model.live.debounce.400ms="installments.{{ $index }}.amount"
+                                        aria-label="{{ __('funding_agreements.installment_amount_label', ['number' => $index + 1]) }}"
+                                        @if ($amountError !== '') aria-invalid="true" @endif />
+                                    <span class="form-affix">{{ $currencyCode }}</span>
+                                </div>
+                                @if ($amountError !== '')
+                                    <p class="form-error">{{ $amountError }}</p>
+                                @endif
                             </div>
-                            @if ($amountError !== '')
-                                <p class="form-error">{{ $amountError }}</p>
-                            @endif
-                        </div>
 
-                        <div class="min-w-0">
-                            <div class="form-box" @if ($dateError !== '') data-invalid @endif>
-                                <input type="date" dir="ltr" class="form-box-input tabular-nums"
-                                    wire:model="installments.{{ $index }}.scheduled_date"
-                                    aria-label="{{ __('funding_agreements.installment_date_label', ['number' => $index + 1]) }}"
-                                    @if ($dateError !== '') aria-invalid="true" @endif />
+                            <div class="min-w-0">
+                                <div class="form-box" @if ($dateError !== '') data-invalid @endif>
+                                    <input type="date" dir="ltr" class="form-box-input tabular-nums"
+                                        wire:model="installments.{{ $index }}.scheduled_date"
+                                        aria-label="{{ __('funding_agreements.installment_date_label', ['number' => $index + 1]) }}"
+                                        @if ($dateError !== '') aria-invalid="true" @endif />
+                                </div>
+                                @if ($dateError !== '')
+                                    <p class="form-error">{{ $dateError }}</p>
+                                @endif
                             </div>
-                            @if ($dateError !== '')
-                                <p class="form-error">{{ $dateError }}</p>
-                            @endif
+
                         </div>
 
                         <x-ui.button type="button" tone="ghost" icon="trash" class="min-h-10" wire:click="removeInstallment({{ $index }})"
@@ -152,9 +155,6 @@
                                 <input type="checkbox" wire:model.live="confirmInstallmentSum" class="size-4" data-test="confirm-installment-sum" />
                                 {{ __('funding_agreements.save_anyway') }}
                             </label>
-                            @error('confirmInstallmentSum')
-                                <p class="form-error">{{ $message }}</p>
-                            @enderror
                         </div>
                     </div>
                 @endif
