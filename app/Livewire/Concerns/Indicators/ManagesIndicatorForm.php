@@ -203,7 +203,7 @@ trait ManagesIndicatorForm
             ? new Indicator
             : Indicator::query()->findOrFail($this->editingIndicatorId);
 
-        $result = Result::query()->select(['id', 'program_id'])->findOrFail((int) $validated['indicatorResultId']);
+        $result = Result::query()->select(['id', 'program_id', 'proposal_id'])->findOrFail((int) $validated['indicatorResultId']);
         $projectId = $validated['indicatorProjectId'] === '' || $validated['indicatorProjectId'] === null
             ? null
             : (int) $validated['indicatorProjectId'];
@@ -279,7 +279,7 @@ trait ManagesIndicatorForm
             return true;
         }
 
-        $before = Indicator::query()->with('result:id,program_id')->findOrFail($indicator->id);
+        $before = Indicator::query()->with('result:id,program_id,proposal_id')->findOrFail($indicator->id);
         $after = (clone $indicator)->setRelation('result', $result);
 
         foreach ($targets as $target) {

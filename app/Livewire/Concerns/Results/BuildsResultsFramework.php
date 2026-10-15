@@ -12,6 +12,7 @@ use App\Models\PlanIndicator;
 use App\Models\Proposal;
 use App\Models\Result;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Livewire\Attributes\Computed;
@@ -20,9 +21,11 @@ use Livewire\Attributes\Computed;
  * The one read of the results framework and the measurement attached to
  * every statement in it.
  *
- * Used by results/index only. The tree, the filters and the headline figures
- * (BuildsResultsTree, SummarisesResults) resolve in memory from what is loaded
- * here, so the page holds a fixed query count however it is filtered.
+ * Used by results/index (every framework) and the proposal Logical Framework
+ * tab (one proposal's framework, see fixedProposalId()). The tree, the
+ * filters and the headline figures (BuildsResultsTree, SummarisesResults)
+ * resolve in memory from what is loaded here, so the page holds a fixed
+ * query count however it is filtered.
  *
  * @property-read Collection<int, Result> $allResults
  * @property-read array<int, Result> $resultsById
@@ -47,11 +50,13 @@ trait BuildsResultsFramework
     #[Computed]
     public function allResults(): Collection
     {
-        return Result::query()
-            ->select(['id', 'statement', 'parent_id', 'program_id', 'type', 'checkout_period'])
+        return $this->frameworkResults()
+            ->select(['id', 'statement', 'parent_id', 'program_id', 'proposal_id', 'contributes_to_result_id', 'type', 'checkout_period'])
             ->with([
                 // program_id is nullable, so a result can outlive its program.
                 'program:id',
+                'proposal:id,name',
+                'contributesTo:id,statement',
                 'indicators' => fn ($query) => $query
                     ->select(['id', 'name', 'result_id', 'project_id', 'measure', 'unit', 'baseline', 'target', 'frequency'])
                     ->with([
@@ -78,6 +83,31 @@ trait BuildsResultsFramework
             ])
             ->orderBy('id')
             ->get();
+    }
+
+    /**
+     * The one proposal whose framework this page is pinned to, or null for a
+     * page that reads every framework (results/index).
+     */
+    protected function fixedProposalId(): ?int
+    {
+        return null;
+    }
+
+    /**
+     * Results this page may read and write: the pinned proposal's framework,
+     * or every framework. Every id a page receives is loaded through it, so
+     * another proposal's node is not found from a pinned page (BOLA).
+     *
+     * @return Builder<Result>
+     */
+    protected function frameworkResults(): Builder
+    {
+        $proposalId = $this->fixedProposalId();
+
+        return $proposalId === null
+            ? Result::query()
+            : Result::query()->proposalFramework($proposalId);
     }
 
     /**

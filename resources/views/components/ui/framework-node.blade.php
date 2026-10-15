@@ -1,4 +1,4 @@
-@props(['node', 'depth' => 0, 'order' => 0])
+@props(['node', 'depth' => 0, 'order' => 0, 'editable' => true])
 
 @php
     use App\Enums\RagStatus;
@@ -38,11 +38,11 @@
         ResultType::Activity => 'text-sm font-medium leading-relaxed',
     };
 
-    /* Levels the page can add a contributing result under (activities come with the logframe tab, T12 slice 2). */
-    $acceptsContributions = match ($result->type) {
-        ResultType::Impact, ResultType::Outcome => true,
-        ResultType::Output, ResultType::Activity, ResultType::CrossCutting => false,
-    };
+    /* Levels the chain lets a result nest under; a page whose framework is locked for this user (editable false) adds and deletes nothing. */
+    $acceptsContributions = $editable && $result->type->acceptsChildren();
+
+    /* Only a proposal root contributes to the program framework (contracts §11.2); the relation is preloaded by the page. */
+    $contributesTo = $result->relationLoaded('contributesTo') ? $result->getRelation('contributesTo') : null;
 
     /* Worst rating wins: one red indicator colours the whole statement red. */
     $tone = match (true) {
@@ -110,7 +110,7 @@
                     />@endcan
                 </flux:tooltip>
 
-                @if ($node['deletable'])
+                @if ($editable && $node['deletable'])
                     <flux:tooltip :content="__('results_framework.delete_result')">
                         @can('results.delete')<x-ui.button
                             tone="ghost"
@@ -122,7 +122,7 @@
                             data-test="delete-result-{{ $result->id }}"
                         />@endcan
                     </flux:tooltip>
-                @else
+                @elseif ($editable)
                     <flux:tooltip :content="__('results_framework.locked_while_it_carries_nested_results_or_indicators')">
                         <span class="inline-flex size-8 cursor-not-allowed items-center justify-center text-secondary-light" aria-disabled="true">
                             <flux:icon.lock-closed class="size-4" />
@@ -145,7 +145,14 @@
             </p>
         @endif
 
-        <p class="mt-1.5 px-4 pb-3.5 text-pretty text-secondary-dark {{ $statementClasses }} dark:text-ink">{{ $result->statement }}</p>
+        @if ($contributesTo !== null)
+            <p class="mt-1.5 flex flex-wrap items-center gap-1 px-4 type-meta text-secondary-medium dark:text-ink-muted" data-test="contributes-to-{{ $result->id }}">
+                <flux:icon.link variant="micro" class="size-3.5 shrink-0" aria-hidden="true" />
+                <span>{{ __('results_framework.contributes_to_program') }} <bdi>{{ Str::limit($contributesTo->statement, 80) }}</bdi></span>
+            </p>
+        @endif
+
+        <p dir="auto" class="mt-1.5 px-4 pb-3.5 text-start text-pretty text-secondary-dark {{ $statementClasses }} dark:text-ink">{{ $result->statement }}</p>
 
         {{-- The measurement rail: what this statement is measured by, and how it is tracking. --}}
         <div class="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-secondary-soft bg-board-head px-4 py-2.5 dark:border-line">
@@ -420,7 +427,7 @@
                         ])></span>
                         <span aria-hidden="true" class="absolute start-0 top-7 h-px w-6 bg-secondary-soft dark:bg-line-strong"></span>
 
-                        <x-ui.framework-node :node="$child" :depth="$depth + 1" :order="$loop->index" />
+                        <x-ui.framework-node :node="$child" :depth="$depth + 1" :order="$loop->index" :editable="$editable" />
                     </li>
                 @endforeach
             </ol>

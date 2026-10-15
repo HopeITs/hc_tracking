@@ -111,7 +111,7 @@ trait ReadsProposalDelivery
             ->where('source_id', $this->proposalId)
             ->with([
                 'indicator:id,name,result_id,project_id,measure,unit',
-                'indicator.result:id,statement,type,program_id',
+                'indicator.result:id,statement,type,program_id,proposal_id',
                 'project:id,name,program_id',
                 'reports:id,plan_indicator_id,status,value,planned_date,period_start,period_end,submit_date',
             ])

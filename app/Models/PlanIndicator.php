@@ -215,8 +215,10 @@ class PlanIndicator extends Model implements TracksActivity
      * Where a target committed in this source, for this indicator and project,
      * would not fit the chain.
      *
-     * Four rules, each skipped when the side it compares is unset:
+     * Five rules, each skipped when the side it compares is unset:
      * - an indicator scoped to one project can only be targeted for that project;
+     * - an annual plan commits targets on the program framework only, never on
+     *   a proposal framework's indicator (T12);
      * - an annual plan belongs to one program, so it can only commit targets on
      *   results of that program;
      * - a project delivering an annual-plan target must sit in the plan's program;
@@ -234,6 +236,10 @@ class PlanIndicator extends Model implements TracksActivity
         }
 
         if ($source instanceof AnnualPlan) {
+            if ($indicator->relationLoaded('result') && $indicator->result?->proposal_id !== null) {
+                $issues[] = 'targets.issue_plan_target_on_proposal_framework';
+            }
+
             if ($resultProgramId !== null && $source->program_id !== $resultProgramId) {
                 $issues[] = 'targets.issue_plan_program_differs_from_result';
             }

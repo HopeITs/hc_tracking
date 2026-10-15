@@ -8,6 +8,7 @@ use App\Concerns\HasSlug;
 use App\Concerns\HasTree;
 use App\Concerns\RecordsActivity;
 use App\Enums\MilestoneStatus;
+use App\Enums\ResultType;
 use App\Notifications\TracksActivity;
 use App\Observers\MediaOwnerObserver;
 use App\Observers\MilestoneObserver;
@@ -16,10 +17,12 @@ use Carbon\CarbonImmutable;
 use Database\Factories\MilestoneFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Facades\DB;
 
 /**
  * @property int $id
@@ -101,6 +104,61 @@ class Milestone extends Model implements TracksActivity
     public function activity(): BelongsTo
     {
         return $this->belongsTo(Result::class, 'result_id');
+    }
+
+    /**
+     * Activities a milestone of this project may deliver (contracts §11.2):
+     * an activity of a proposal funding the project, or of the project's
+     * program framework. A proposal-level milestone (with a `proposal_id`)
+     * delivers only its own proposal's activities. The one definition the
+     * link action and every picker read.
+     *
+     * @return Builder<Result>
+     */
+    public static function allowedActivitiesFor(int $projectId, ?int $proposalId = null): Builder
+    {
+        $activities = Result::query()->where('type', ResultType::Activity->value);
+
+        if ($proposalId !== null) {
+            return $activities->where('proposal_id', $proposalId);
+        }
+
+        return $activities->where(fn (Builder $query) => $query
+            ->whereIn('proposal_id', DB::table('project_proposal')->select('proposal_id')->where('project_id', $projectId))
+            ->orWhere(fn (Builder $query) => $query
+                ->whereNull('proposal_id')
+                ->whereIn('program_id', Project::query()->select('program_id')->whereKey($projectId))));
+    }
+
+    /**
+     * @return Builder<Result>
+     */
+    public function allowedActivities(): Builder
+    {
+        return self::allowedActivitiesFor($this->project_id, $this->proposal_id);
+    }
+
+    /**
+     * Why the stored activity link no longer fits, as translation keys. A
+     * link is never fixed automatically: unlinking the project from the
+     * proposal or moving the project's program only flags it here.
+     *
+     * @return list<string>
+     */
+    public function activityLinkIssues(): array
+    {
+        if ($this->result_id === null || $this->allowedActivities()->whereKey($this->result_id)->exists()) {
+            return [];
+        }
+
+        $activity = Result::query()->select(['id', 'type', 'proposal_id'])->find($this->result_id);
+
+        return match (true) {
+            $activity === null => [],
+            $activity->type !== ResultType::Activity => ['milestones.activity_link_not_activity'],
+            $activity->proposal_id === null => ['milestones.activity_link_program_moved'],
+            default => ['milestones.activity_link_not_funding'],
+        };
     }
 
     /**
@@ -207,6 +265,7 @@ class Milestone extends Model implements TracksActivity
             'planned_start_date' => 'dates_changed',
             'planned_end_date' => 'dates_changed',
             'name' => 'updated',
+            'result_id' => 'updated',
         ];
     }
 

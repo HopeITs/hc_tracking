@@ -167,7 +167,7 @@ trait ManagesTargetForm
             return;
         }
 
-        $indicator = Indicator::query()->with('result:id,program_id')->findOrFail((int) $validated['targetIndicatorId']);
+        $indicator = Indicator::query()->with('result:id,program_id,proposal_id')->findOrFail((int) $validated['targetIndicatorId']);
         $projectId = $validated['targetProjectId'] === '' || $validated['targetProjectId'] === null
             ? null
             : (int) $validated['targetProjectId'];

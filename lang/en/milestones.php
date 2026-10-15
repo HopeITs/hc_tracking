@@ -66,4 +66,12 @@ return [
     'zoom_months' => 'Months',
     'zoom_weeks' => 'Weeks',
     'milestone_activity' => 'Choose an activity from the framework of this project\'s proposal.',
+    'activity_in_framework' => 'Activity in framework',
+    'activity_in_framework_help' => 'The logframe activity this milestone delivers: from a proposal funding the project, or from the program framework.',
+    'search_activities' => 'Search activities',
+    'no_activity' => 'No activity',
+    'program_framework' => 'Program framework',
+    'activity_link_not_funding' => 'The linked activity belongs to a proposal that no longer funds this project. Choose another activity.',
+    'activity_link_program_moved' => 'The linked activity is in another program\'s framework since the project moved. Choose another activity.',
+    'activity_link_not_activity' => 'The linked result is no longer an activity. Choose another activity.',
 ];

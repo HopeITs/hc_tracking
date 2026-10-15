@@ -198,6 +198,7 @@ trait ReadsProgramDelivery
     public function resultRoots(): Collection
     {
         $results = Result::query()
+            ->programFramework()
             ->select(['id', 'statement', 'parent_id', 'program_id', 'type', 'checkout_period'])
             ->where('program_id', $this->programId)
             ->withCount('indicators')

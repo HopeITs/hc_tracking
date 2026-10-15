@@ -119,6 +119,16 @@ function enumColumns(): array
             'default' => null,
             'badCasing' => 'Impact',
         ]],
+        'results.type (hyphenated cross-cutting)' => [[
+            'model' => Result::class,
+            'table' => 'results',
+            'column' => 'type',
+            'width' => 50,
+            'assign' => ResultType::CrossCutting,
+            'stored' => 'cross-cutting',
+            'default' => null,
+            'badCasing' => 'Cross-Cutting',
+        ]],
         'results.checkout_period' => [[
             'model' => Result::class,
             'table' => 'results',

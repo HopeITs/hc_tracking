@@ -9,6 +9,7 @@ use App\Models\Milestone;
 use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
+use App\Models\Proposal;
 use App\Models\Report;
 use App\Models\Result;
 use App\Models\Strategy;
@@ -153,6 +154,25 @@ test('program detail renders the results logframe as a tree', function () {
         ->assertSee('Root impact statement.')
         ->assertSee('Nested outcome statement.')
         ->assertSee('data-tree-depth="1"', false);
+});
+
+test('program detail shows only the program framework, never a proposal framework of the same program', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $program = Program::factory()->create();
+    Result::factory()->type(ResultType::Impact)->create(['program_id' => $program->id, 'statement' => 'Program impact statement.']);
+    $proposalImpact = Result::factory()->type(ResultType::Impact)->create([
+        'program_id' => $program->id,
+        'proposal_id' => Proposal::factory()->create()->id,
+        'statement' => 'Proposal impact statement.',
+    ]);
+
+    Livewire::actingAs($user)
+        ->test('pages::programs.show', ['program' => $program])
+        ->set('tab', 'results')
+        ->assertSee('Program impact statement.')
+        ->assertDontSee('Proposal impact statement.');
+
+    expect($program->results()->pluck('id')->all())->not->toContain($proposalImpact->id);
 });
 
 test('program logframe counts statements per level and flags unmeasured ones', function () {

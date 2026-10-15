@@ -73,7 +73,7 @@ trait BuildsIndicatorRows
             ->select(['id', 'name', 'result_id', 'project_id', 'measure', 'unit', 'baseline', 'target', 'frequency', 'updated_at'])
             ->with([
                 // parent_id is selected so the statement's lineage can be walked.
-                'result:id,statement,type,program_id,parent_id',
+                'result:id,statement,type,program_id,proposal_id,parent_id',
                 // program_id is nullable on results, so a result can outlive its program.
                 'result.program:id',
                 // A logframe is three levels at most, so walking up costs a
