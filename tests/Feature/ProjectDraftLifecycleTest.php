@@ -64,6 +64,7 @@ beforeEach(function () {
     $this->create = fn (array $fields = []) => Livewire::actingAs($this->user)
         ->test('pages::projects.index')
         ->call('openCreateModal')
+        ->set('sectorIds', newProjectSectorIds())
         ->set(($this->data)($fields))
         ->call('saveProject');
 });
@@ -127,6 +128,7 @@ test('the date inputs are not rendered for a draft', function () {
 
     Livewire::actingAs($this->user)->test('pages::projects.index')
         ->call('openCreateModal')
+        ->set('sectorIds', newProjectSectorIds())
         ->assertDontSeeHtml('wire:model="startDate"')
         ->assertDontSeeHtml('wire:model="endDate"')
         ->call('closeProjectModal')

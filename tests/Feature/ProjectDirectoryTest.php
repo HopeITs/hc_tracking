@@ -90,6 +90,7 @@ test('a project is created as a dateless draft with independent beneficiary targ
     Livewire::actingAs($user)
         ->test('pages::projects.index')
         ->call('openCreateModal')
+        ->set('sectorIds', newProjectSectorIds())
         ->set('name', '  Idlib Water Network  ')
         ->set('description', '  Restores reliable household water access.  ')
         ->set('targetBeneficiaries', '1000')
@@ -126,6 +127,7 @@ test('nullable project details are normalized before saving', function () {
     Livewire::actingAs($user)
         ->test('pages::projects.index')
         ->call('openCreateModal')
+        ->set('sectorIds', newProjectSectorIds())
         ->set('name', 'Project without targets')
         ->set('description', '   ')
         ->set('centerId', (string) insertHrCenter($city))
@@ -149,6 +151,7 @@ test('creating a project requires a name a center a program and an owner', funct
     Livewire::actingAs($user)
         ->test('pages::projects.index')
         ->call('openCreateModal')
+        ->set('sectorIds', newProjectSectorIds())
         ->set('name', '')
         ->set('centerId', '')
         ->set('programId', '')
@@ -165,6 +168,7 @@ test('a project cannot be placed at a center that does not exist in hr', functio
     Livewire::actingAs($user)
         ->test('pages::projects.index')
         ->call('openCreateModal')
+        ->set('sectorIds', newProjectSectorIds())
         ->set('name', 'Ghost Center Project')
         ->set('centerId', '999999')
         ->set('programId', (string) Program::factory()->create()->id)
@@ -184,6 +188,7 @@ test('project lifecycle dates and targets reject invalid values', function () {
     Livewire::actingAs($user)
         ->test('pages::projects.index')
         ->call('openCreateModal')
+        ->set('sectorIds', newProjectSectorIds())
         ->set('name', 'Invalid Project')
         ->set('centerId', (string) insertHrCenter($city))
         ->set('programId', (string) $program->id)
@@ -506,8 +511,9 @@ test('the project directory renders within its query budget', function () {
 
     // 17 + one query that loads every owner assignment for the Rejected badge
     // + one count of the projects without a center (shown to managers)
-    // + the two HR queries of EmployeeProfile behind the owner chips' positions.
-    expect($queries)->toBeLessThanOrEqual(21);
+    // + the two HR queries of EmployeeProfile behind the owner chips' positions
+    // + the sector filter's options (T34; the table view adds one eager load).
+    expect($queries)->toBeLessThanOrEqual(22);
 });
 
 test('a board card hides relations it has none of and keeps a materialised risk', function () {
@@ -715,6 +721,7 @@ test('a failed project save points at the rail sections that hold the problems',
     Livewire::actingAs($user)
         ->test('pages::projects.index')
         ->call('openCreateModal')
+        ->set('sectorIds', newProjectSectorIds())
         ->call('saveProject')
         ->assertHasErrors(['name', 'centerId', 'programId', 'userId'])
         ->assertSeeText('1 field needs attention')
@@ -754,5 +761,6 @@ test('the project form is rendered only while its modal is open', function () {
         ->test('pages::projects.index')
         ->assertDontSeeHtml('wire:model="targetBeneficiaries"')
         ->call('openCreateModal')
+        ->set('sectorIds', newProjectSectorIds())
         ->assertSeeHtml('wire:model="targetBeneficiaries"');
 });

@@ -36,6 +36,7 @@ class DatabaseSeeder extends Seeder
                 MealSeeder::class,
                 FinanceSeeder::class,
                 RealDataSeeder::class,
+                SectorSeeder::class,
             ]);
         }));
 

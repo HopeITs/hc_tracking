@@ -13,6 +13,7 @@
                         <th scope="col" class="w-44 text-end! @max-5xl:hidden">{{ __('projects.col_funding') }}</th>
                         <th scope="col" class="w-44 @max-6xl:hidden">{{ __('projects.connections') }}</th>
                         <th scope="col" class="w-40 @max-4xl:hidden">{{ __('projects.owner') }}</th>
+                        <th scope="col" class="w-44 @max-6xl:hidden">{{ __('sectors.sectors') }}</th>
                         <th scope="col" class="w-36">{{ __('projects.col_schedule') }}</th>
                         <th scope="col" class="w-28">{{ __('common.status') }}</th>
                         <th scope="col" class="w-28"><span class="sr-only">{{ __('common.actions') }}</span></th>
@@ -106,6 +107,10 @@
                                     <x-ui.employee-chip :employee="$project->user" compact />
                                     <x-ui.assignment-badge :project="$project" />
                                 </div>
+                            </x-ui.data-table.cell>
+
+                            <x-ui.data-table.cell :label="__('sectors.sectors')" class="@max-6xl:hidden @max-3xl:flex!" data-test="project-sectors-cell">
+                                <x-projects.sector-chips :sectors="$project->sectors" :empty="__('sectors.none')" class="text-xs" />
                             </x-ui.data-table.cell>
 
                             <x-ui.data-table.cell :label="__('projects.col_schedule')">

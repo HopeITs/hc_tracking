@@ -10,6 +10,7 @@ use App\Models\HrCity;
 use App\Models\HrEmployee;
 use App\Models\HrProgram;
 use App\Models\Project;
+use App\Models\Sector;
 use App\Support\Like;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -29,6 +30,7 @@ use Livewire\Attributes\Computed;
  * @property string $program
  * @property string $strategy
  * @property string $owner
+ * @property string $sector
  * @property string $status
  * @property string $view
  * @property string $sort
@@ -57,6 +59,18 @@ trait FiltersProjectDirectory
         return HrCity::query()->select(['id', 'name_en', 'name_ar'])->orderBy(HrCity::nameColumn())->orderBy('id')->get();
     }
 
+    /**
+     * Every sector for the filter, inactive ones included (older projects
+     * still carry them), in the managers' order. Loaded once per request.
+     *
+     * @return Collection<int, Sector>
+     */
+    #[Computed]
+    public function sectorOptions(): Collection
+    {
+        return Sector::query()->ordered()->get(['id', 'name_ar', 'name_en', 'is_active']);
+    }
+
     public function updatedSearch(): void
     {
         $this->resetPage();
@@ -78,6 +92,11 @@ trait FiltersProjectDirectory
     }
 
     public function updatedOwner(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedSector(): void
     {
         $this->resetPage();
     }
@@ -147,6 +166,7 @@ trait FiltersProjectDirectory
         $this->program = '';
         $this->strategy = '';
         $this->owner = '';
+        $this->sector = '';
         $this->status = '';
         $this->lens = '';
         $this->resetPage();
@@ -210,6 +230,7 @@ trait FiltersProjectDirectory
             ->when($this->program !== '', fn (Builder $query) => $query->where('program_id', (int) $this->program))
             ->when($this->strategy !== '', fn (Builder $query) => $query->whereHas('program', fn ($query) => $query->where('strategy_id', (int) $this->strategy)))
             ->when($this->owner !== '', fn (Builder $query) => $query->where('user_id', (int) $this->owner))
+            ->when($this->sector !== '', fn (Builder $query) => $query->whereHas('sectors', fn (Builder $query) => $query->whereKey((int) $this->sector)))
             ->when($includeStatus && $this->status !== '', fn (Builder $query) => $query->where('status', $this->status))
             ->when($includeLens && $this->lens !== '', fn (Builder $query) => $this->applyLens($query));
     }

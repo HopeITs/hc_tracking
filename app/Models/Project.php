@@ -223,6 +223,17 @@ class Project extends Model implements TracksActivity
     }
 
     /**
+     * The sectors this project covers (contracts.md §12.5). Written only
+     * through App\Actions\Projects\SyncProjectSectors.
+     *
+     * @return BelongsToMany<Sector, $this>
+     */
+    public function sectors(): BelongsToMany
+    {
+        return $this->belongsToMany(Sector::class)->withTimestamps();
+    }
+
+    /**
      * The proposals the donor has approved for this project, each with its donor.
      *
      * Funding is official at donor approval, not at submission. The query

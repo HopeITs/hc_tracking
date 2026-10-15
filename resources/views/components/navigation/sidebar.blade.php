@@ -2,7 +2,7 @@
     $moduleCounts = auth()->check() && ! \App\Http\Middleware\EnsureTwoFactorIsEnabled::mustEnrol(auth()->user())
         ? app(\App\Notifications\UnreadCounts::class)->for(auth()->user())['modules']
         : [];
-    $showsAdministration = auth()->user()?->canAny(['cities.view', 'activity-log.view', 'notification-settings.manage'])
+    $showsAdministration = auth()->user()?->canAny(['cities.view', 'sectors.view', 'activity-log.view', 'notification-settings.manage'])
         || auth()->user()?->can('viewAny', \App\Models\User::class);
     /* The heading's look lives in app.css ("Sidebar group headings"): Flux renders it as the group's first div, which utilities passed here cannot reach reliably. */
     $navigationGroupClasses = 'in-data-flux-sidebar-collapsed-desktop:flex!';
@@ -471,6 +471,18 @@
                         wire:navigate.hover
                     >
                         {{ __('common.cities') }}
+                    </flux:sidebar.item>
+                @endcan
+
+                @can('sectors.view')
+                    <flux:sidebar.item
+                        icon="squares-2x2"
+                        :href="route('admin.sectors.index')"
+                        :current="request()->routeIs('admin.sectors.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate.hover
+                    >
+                        {{ __('navigation.sectors') }}
                     </flux:sidebar.item>
                 @endcan
             </flux:sidebar.group>

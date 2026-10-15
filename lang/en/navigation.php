@@ -14,6 +14,7 @@ return [
     'group_workspace' => 'My Workspace',
     'guideline' => 'User guideline',
     'indicator_library' => 'Indicator Library',
+    'sectors' => 'Sectors',
     'platform' => 'Platform',
     'primary_navigation' => 'Primary navigation',
     'repository' => 'Repository',

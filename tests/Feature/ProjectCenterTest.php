@@ -16,6 +16,7 @@ beforeEach(function () {
     $this->create = fn (array $fields = []) => Livewire::actingAs($this->user)
         ->test('pages::projects.index')
         ->call('openCreateModal')
+        ->set('sectorIds', newProjectSectorIds())
         ->set([
             'centerId' => (string) $this->centerId,
             'programId' => (string) $this->program->id,
@@ -44,6 +45,7 @@ test('choosing the program and center proposes «Program — Center» as an edit
     $form = Livewire::actingAs($this->user)
         ->test('pages::projects.index')
         ->call('openCreateModal')
+        ->set('sectorIds', newProjectSectorIds())
         ->set('programId', (string) $this->program->id)
         ->set('centerId', (string) $this->centerId)
         ->assertSet('name', $this->program->name.' — Hope Center Idlib');

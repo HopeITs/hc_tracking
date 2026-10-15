@@ -21,6 +21,7 @@ use App\Models\Report;
 use App\Models\ReportFile;
 use App\Models\Result;
 use App\Models\Risk;
+use App\Models\Sector;
 use App\Models\Strategy;
 use App\Models\Task;
 use App\Models\TaskAssignee;
@@ -62,6 +63,7 @@ test('the seeders populate every table in the schema', function () {
         Account::class,
         TransfersTracking::class,
         MealCoverageAssignment::class,
+        Sector::class,
     ];
 
     foreach ($models as $model) {
@@ -69,6 +71,7 @@ test('the seeders populate every table in the schema', function () {
     }
 
     expect(DB::table('project_proposal')->count())->toBeGreaterThanOrEqual(Project::query()->count());
+    expect(DB::table('project_sector')->count())->toBeGreaterThanOrEqual(Project::query()->count());
 });
 
 test('seeded projects are placed in existing hr cities and seeding writes no cities', function () {

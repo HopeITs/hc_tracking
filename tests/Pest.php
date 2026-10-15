@@ -19,6 +19,7 @@ use App\Models\Proposal;
 use App\Models\Report;
 use App\Models\Result;
 use App\Models\Role;
+use App\Models\Sector;
 use App\Models\Strategy;
 use App\Models\Task;
 use App\Models\TaskAssignee;
@@ -550,6 +551,17 @@ function insertHrDepartment(string $name = 'Water, Sanitation & Hygiene'): int
         'name' => $name,
         'code' => fake()->unique()->bothify('??####'),
     ]);
+}
+
+/**
+ * The `sectorIds` a new project's form needs (D-47: at least one sector),
+ * as the picker's checkboxes send them: one fresh active sector.
+ *
+ * @return list<string>
+ */
+function newProjectSectorIds(): array
+{
+    return [(string) Sector::factory()->create()->id];
 }
 
 /**
