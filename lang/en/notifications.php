@@ -427,6 +427,11 @@ return [
             'updated' => ':actor updated the strategy “:subject”',
             'deleted' => ':actor deleted the strategy “:subject”',
         ],
+        'strategic_pillar' => [
+            'created' => ':actor created the strategic pillar “:subject”',
+            'updated' => ':actor updated the strategic pillar “:subject”',
+            'deleted' => ':actor deleted the strategic pillar “:subject”',
+        ],
         'meal_coverage' => [
             'assigned' => [
                 'title' => 'MEAL officer assigned',

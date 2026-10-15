@@ -427,6 +427,11 @@ return [
             'updated' => 'حدّث :actor الاستراتيجية «:subject»',
             'deleted' => 'حذف :actor الاستراتيجية «:subject»',
         ],
+        'strategic_pillar' => [
+            'created' => 'أنشأ :actor المحور الاستراتيجي «:subject»',
+            'updated' => 'حدّث :actor المحور الاستراتيجي «:subject»',
+            'deleted' => 'حذف :actor المحور الاستراتيجي «:subject»',
+        ],
         'meal_coverage' => [
             'assigned' => [
                 'title' => 'تعيين مسؤول متابعة وتقييم',

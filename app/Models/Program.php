@@ -35,11 +35,12 @@ use Illuminate\Support\Facades\DB;
  * @property-read string $name
  * @property-read string $slug
  * @property int|null $strategy_id
+ * @property int|null $strategic_pillar_id
  * @property int|null $manager_id
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['strategy_id', 'manager_id'])]
+#[Fillable(['strategy_id', 'strategic_pillar_id', 'manager_id'])]
 #[ObservedBy(ProgramObserver::class)]
 class Program extends Model implements TracksActivity
 {
@@ -199,6 +200,17 @@ class Program extends Model implements TracksActivity
     }
 
     /**
+     * The strategic pillar this program sits under (D-35), always one of its
+     * own strategy's. Null = "No pillar".
+     *
+     * @return BelongsTo<StrategicPillar, $this>
+     */
+    public function pillar(): BelongsTo
+    {
+        return $this->belongsTo(StrategicPillar::class, 'strategic_pillar_id');
+    }
+
+    /**
      * The HR employee accountable for this program.
      *
      * @return BelongsTo<HrEmployee, $this>
@@ -260,7 +272,7 @@ class Program extends Model implements TracksActivity
      */
     public function activityEvents(): array
     {
-        return ['manager_id' => 'manager_changed', 'strategy_id' => 'updated'];
+        return ['manager_id' => 'manager_changed', 'strategy_id' => 'updated', 'strategic_pillar_id' => 'updated'];
     }
 
     /**

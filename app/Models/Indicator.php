@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $name
  * @property int $result_id
  * @property int|null $library_indicator_id
+ * @property int|null $copied_from_id
  * @property string|null $code
  * @property int|null $project_id
  * @property IndicatorMeasure $measure
@@ -33,7 +34,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['name', 'result_id', 'library_indicator_id', 'code', 'project_id', 'measure', 'unit', 'baseline', 'target', 'frequency'])]
+#[Fillable(['name', 'result_id', 'library_indicator_id', 'copied_from_id', 'code', 'project_id', 'measure', 'unit', 'baseline', 'target', 'frequency'])]
 class Indicator extends Model implements TracksActivity
 {
     /** @use HasFactory<IndicatorFactory> */
@@ -76,6 +77,17 @@ class Indicator extends Model implements TracksActivity
     public function libraryIndicator(): BelongsTo
     {
         return $this->belongsTo(LibraryIndicator::class);
+    }
+
+    /**
+     * The program-framework indicator this one was copied from
+     * (CopyResultTree); its `target` is this indicator's default target.
+     *
+     * @return BelongsTo<self, $this>
+     */
+    public function copiedFrom(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'copied_from_id');
     }
 
     /**

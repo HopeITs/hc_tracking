@@ -19,6 +19,7 @@ use App\Models\ReportFile;
 use App\Models\Result;
 use App\Models\Risk;
 use App\Models\Role;
+use App\Models\StrategicPillar;
 use App\Models\Strategy;
 use App\Models\Supervision;
 use App\Models\Task;
@@ -50,6 +51,7 @@ test('the morph map registers exactly the target sources, task sources, media ow
         'account' => Account::class,
         'role' => Role::class,
         'library_indicator' => LibraryIndicator::class,
+        'strategic_pillar' => StrategicPillar::class,
         'meal_coverage' => MealCoverageAssignment::class,
         'supervision' => Supervision::class,
     ]);

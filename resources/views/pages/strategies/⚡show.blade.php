@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Concerns\Strategies\ManagesStrategicPillars;
 use App\Models\AnnualPlan;
 use App\Models\Program;
 use App\Models\Strategy;
@@ -14,6 +15,7 @@ use Livewire\Component;
 use Livewire\WithPagination;
 
 new #[Title('titles.strategy')] class extends Component {
+    use ManagesStrategicPillars;
     use WithPagination;
 
     #[Locked]
@@ -59,7 +61,7 @@ new #[Title('titles.strategy')] class extends Component {
     protected function programsQuery(): Builder
     {
         return Program::query()
-            ->select(['id', 'strategy_id', 'manager_id'])
+            ->select(['id', 'strategy_id', 'strategic_pillar_id', 'manager_id'])
             ->where('strategy_id', $this->strategyId)
             ->with(['manager:id,first_name_en,last_name_en,first_name_ar,last_name_ar'])
             ->withCount(['projects', 'annualPlans']);
@@ -326,6 +328,8 @@ new #[Title('titles.strategy')] class extends Component {
             </div>
         </x-ui.panel>
     @endif
+
+    @include('pages.strategies._show-pillars')
 
     <x-ui.panel :title="__('common.programs')" :count="$this->programs->total()">
         @if ($this->programs->isEmpty())
