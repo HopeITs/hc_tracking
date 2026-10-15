@@ -226,6 +226,8 @@ new class extends Component {
      */
     public function resetCenter(): void
     {
+        Gate::authorize('update', [ActivitySchedule::class, $this->proposal]);
+
         if ($this->resettingActivityId !== null && $this->scopeProjectId !== null) {
             $this->save($this->resettingActivityId, [], [], $this->resettingVersion);
         }

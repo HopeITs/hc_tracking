@@ -348,6 +348,30 @@ test('the grid is read-only for the proposal editor after approval', function ()
     expect(storedSchedule($this->activity))->toBe([]);
 });
 
+test('the grid resets a center calendar, and the proposal editor cannot after approval', function () {
+    $editor = User::factory()->role('Financial')->create();
+    $centerVersion = ActivitySchedule::versionOf(['2026-06' => null]);
+    saveSchedule($this->meal, $this->proposal, $this->activity, ['2026-06'], projectId: $this->project->id);
+    approveForSchedule($this->proposal, '2026-01-01', '2026-12-31');
+
+    activityCalendar($editor, $this->proposal)
+        ->set('scope', (string) $this->project->id)
+        ->call('confirmReset', $this->activity->id, $centerVersion)
+        ->call('resetCenter')
+        ->assertForbidden();
+
+    expect(storedSchedule($this->activity, $this->project->id))->toBe(['2026-06' => null]);
+
+    activityCalendar($this->meal, $this->proposal)
+        ->set('scope', (string) $this->project->id)
+        ->call('confirmReset', $this->activity->id, $centerVersion)
+        ->call('resetCenter')
+        ->assertHasNoErrors()
+        ->assertSet('showResetModal', false);
+
+    expect(storedSchedule($this->activity, $this->project->id))->toBe([]);
+});
+
 test('the grid holds a flat query count whatever the number of activities', function () {
     $countQueries = function (): int {
         activityCalendar($this->meal, $this->proposal);
