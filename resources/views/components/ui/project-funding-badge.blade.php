@@ -9,7 +9,7 @@
     $fundingState = $project->fundingState();
     $fundingBadge = match ($fundingState) {
         'awaiting_owner' => ['icon' => 'clock', 'classes' => 'bg-status-warn-soft text-status-warn'],
-        'awaiting_funding' => ['icon' => 'banknotes', 'classes' => 'bg-secondary-soft text-secondary-dark dark:bg-surface-raised dark:text-ink'],
+        'awaiting_funding' => ['icon' => 'banknotes', 'classes' => 'bg-secondary-soft text-secondary-dark dark:bg-surface-2 dark:text-ink'],
         'funded_awaiting_template' => ['icon' => 'document-check', 'classes' => 'bg-status-good-soft text-status-good'],
         default => null,
     };

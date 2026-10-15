@@ -74,7 +74,7 @@
                                         'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold whitespace-nowrap',
                                         'bg-status-good-soft text-status-good' => $previewProject['outcome'] === 'funded',
                                         'bg-status-warn-soft text-status-warn' => $previewProject['outcome'] === 'waiting',
-                                        'bg-secondary-soft text-secondary-dark dark:bg-surface-raised dark:text-ink' => in_array($previewProject['outcome'], ['extended', 'skipped'], true),
+                                        'bg-secondary-soft text-secondary-dark dark:bg-surface-2 dark:text-ink' => in_array($previewProject['outcome'], ['extended', 'skipped'], true),
                                     ])>
                                         <flux:icon :name="match ($previewProject['outcome']) { 'funded' => 'check-circle', 'waiting' => 'clock', 'extended' => 'arrows-right-left', default => 'minus-circle' }" variant="micro" class="size-3 shrink-0" aria-hidden="true" />
                                         {{ match ($previewProject['outcome']) {
