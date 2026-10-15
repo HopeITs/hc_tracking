@@ -40,7 +40,8 @@ final class Tranches
 
         return match ($transfer->state()) {
             'late' => trans_choice('transfers.count_days_overdue', $days = (int) $transfer->scheduled_date->diffInDays($today), ['count' => $days]),
-            'transit' => trans_choice('transfers.in_transit_for_count_days', $days = max(0, (int) $transfer->transfer_date->diffInDays($today)), ['count' => $days]),
+            // The journey ends at arrival (D-31a); until then it is still running.
+            'transit' => trans_choice('transfers.in_transit_for_count_days', $days = max(0, (int) $transfer->transfer_date->diffInDays($transfer->arrival_date ?? $today)), ['count' => $days]),
             'received' => $transfer->transfer_date !== null && $transfer->receive_date !== null
                 ? trans_choice('transfers.landed_in_count_days', $days = max(0, (int) $transfer->transfer_date->diffInDays($transfer->receive_date, false)), ['count' => $days])
                 : null,

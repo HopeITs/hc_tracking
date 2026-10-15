@@ -60,6 +60,8 @@ trait ManagesTransferForm
 
     public string $transferDate = '';
 
+    public string $arrivalDate = '';
+
     public string $fees = '0';
 
     public string $feesCurrency = 'USD';
@@ -209,6 +211,7 @@ trait ManagesTransferForm
         $this->transferredCurrency = $transfer->amount_transfered_currency->value;
         $this->scheduledDate = $transfer->scheduled_date?->toDateString() ?? '';
         $this->transferDate = $transfer->transfer_date?->toDateString() ?? '';
+        $this->arrivalDate = $transfer->arrival_date?->toDateString() ?? '';
         $this->fees = (string) $transfer->fees;
         $this->feesCurrency = $transfer->fees_currency->value;
         $this->amountReceived = (string) ($transfer->amount_received ?? '');
@@ -256,7 +259,19 @@ trait ManagesTransferForm
             'transferredCurrency' => ['required', new Enum(Currency::class)],
             'scheduledDate' => ['nullable', 'date'],
             // Money cannot have left the donor, or landed, on a day yet to come.
-            'transferDate' => ['nullable', 'date', 'before_or_equal:today'],
+            // Money that has arrived must have been sent first.
+            'transferDate' => ['nullable', 'required_with:arrivalDate', 'date', 'before_or_equal:today'],
+            // Sent <= arrived <= received (D-31a); each error sits on the field that breaks the order.
+            'arrivalDate' => [
+                'nullable',
+                'date',
+                'before_or_equal:today',
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    if ($value !== null && $value !== '' && $this->transferDate !== '' && $value < $this->transferDate) {
+                        $fail(__('funding_agreements.arrival_before_transfer'));
+                    }
+                },
+            ],
             'fees' => ['required', 'numeric', 'min:0', 'max:'.self::MAX_FEES],
             'feesCurrency' => ['required', new Enum(Currency::class)],
             'amountReceived' => ['nullable', 'numeric', 'min:0', 'max:'.self::MAX_AMOUNT],
@@ -274,6 +289,11 @@ trait ManagesTransferForm
                 'date',
                 'before_or_equal:today',
                 ...($this->transferDate !== '' ? ['after_or_equal:transferDate'] : []),
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    if ($value !== null && $value !== '' && $this->arrivalDate !== '' && $value < $this->arrivalDate) {
+                        $fail(__('funding_agreements.transfer_dates_order'));
+                    }
+                },
             ],
             'transferArStatus' => ['required', new Enum(ArStatus::class)],
         ], [
@@ -283,7 +303,9 @@ trait ManagesTransferForm
             'fees.max' => __('transfers.an_amount_is_too_large'),
             'exchangeRate.max' => __('transfers.an_amount_is_too_large'),
             'exchangeRate.gt' => __('transfers.an_exchange_rate_must_be_above_zero'),
+            'transferDate.required_with' => __('funding_agreements.transfer_dates_order'),
             'transferDate.before_or_equal' => __('transfers.money_cannot_be_sent_in_the_future'),
+            'arrivalDate.before_or_equal' => __('transfers.money_cannot_arrive_in_the_future'),
             'receiveDate.before_or_equal' => __('transfers.money_cannot_land_in_the_future'),
             'receiveDate.after_or_equal' => __('transfers.money_cannot_land_before_it_was_sent'),
             'receiveDate.prohibited_if' => __('transfers.a_pending_tranche_has_no_landing_date'),
@@ -373,6 +395,7 @@ trait ManagesTransferForm
         $this->transferredCurrency = 'USD';
         $this->scheduledDate = '';
         $this->transferDate = '';
+        $this->arrivalDate = '';
         $this->fees = '0';
         $this->feesCurrency = 'USD';
         $this->amountReceived = '';

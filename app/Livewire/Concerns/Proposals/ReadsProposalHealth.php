@@ -220,6 +220,16 @@ trait ReadsProposalHealth
             }
         }
 
+        // Existence only, never an amount: a status corrected away from approved keeps its agreement.
+        if (! $this->proposal->status->isApprovedByDonor() && DonorProposal::query()->where('proposal_id', $this->proposalId)->exists()) {
+            $warnings[] = [
+                'key' => 'agreement-status-inconsistent',
+                'text' => __('funding_agreements.proposal_status_inconsistent_with_agreement'),
+                'tab' => 'funding',
+                'critical' => false,
+            ];
+        }
+
         $missingNet = collect($this->agreementMoney)->sum('missingNetCount');
 
         if ($missingNet > 0) {

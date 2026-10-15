@@ -83,4 +83,8 @@ return [
     'delete_tranche' => 'حذف الدفعة',
     'receipt_status_hint' => 'الحالة "مستلمة" تتطلب صافي المبلغ وتاريخ وصوله.',
     'agreement_filter_chip' => ':donor · :proposal',
+    'arrived_on' => 'تاريخ الوصول',
+    'arrival_date_hint' => 'متى وصل المبلغ إلى المصرف أو شركة التحويل.',
+    'receive_date_hint' => 'متى دخل المبلغ حساب المنظمة.',
+    'money_cannot_arrive_in_the_future' => 'لا يمكن أن يكون تاريخ الوصول في المستقبل.',
 ];

@@ -297,6 +297,7 @@ return [
             'report_mark_reviewed' => 'تعليم كمراجَع',
             'report_approve' => 'اعتماد',
             'transfer_mark_received' => 'تعليم كمستلمة',
+            'agreement_record' => 'تسجيل الاتفاقية',
             'assignment_acknowledge' => 'تأكيد الاستلام',
             'assignment_reject' => 'رفض',
             'alert_snooze' => 'تأجيل التذكير',

@@ -297,6 +297,7 @@ return [
             'report_mark_reviewed' => 'Mark reviewed',
             'report_approve' => 'Approve',
             'transfer_mark_received' => 'Mark received',
+            'agreement_record' => 'Record agreement',
             'alert_snooze' => 'Snooze reminder',
             'assignment_acknowledge' => 'Acknowledge',
             'assignment_reject' => 'Reject',

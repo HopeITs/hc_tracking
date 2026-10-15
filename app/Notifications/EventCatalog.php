@@ -183,7 +183,7 @@ final class EventCatalog
             ],
             // transfers
             [
-                'transfer.generated' => self::entry('transfers', $now, 'listener', OversightMode::ManagementOnly),
+                'transfer.generated' => self::entry('transfers', $now, 'listener', OversightMode::ManagementOnly, activity: 'transfer.generated'),
                 'transfer.received' => self::entry('transfers', $now, 'module_map', OversightMode::ManagementOnly, activity: 'transfer.received'),
                 'transfer.late' => self::entry('transfers', $now, 'scanner', OversightMode::ManagementOnly),
             ],

@@ -88,6 +88,16 @@ class DonorProposal extends Model implements TracksActivity
     }
 
     /**
+     * The planned payment schedule, in sequence order.
+     *
+     * @return HasMany<FundingAgreementInstallment, $this>
+     */
+    public function installments(): HasMany
+    {
+        return $this->hasMany(FundingAgreementInstallment::class, 'funding_agreement_id')->orderBy('sequence');
+    }
+
+    /**
      * The reports owed to the donor under this agreement.
      *
      * @return HasMany<DonorReport, $this>

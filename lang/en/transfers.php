@@ -83,4 +83,8 @@ return [
     'delete_tranche' => 'Delete tranche',
     'receipt_status_hint' => 'Received needs the net amount and the date it landed.',
     'agreement_filter_chip' => ':donor · :proposal',
+    'arrived_on' => 'Arrived on',
+    'arrival_date_hint' => 'When the money reached the bank or transfer company.',
+    'receive_date_hint' => 'When it landed in the organisation account.',
+    'money_cannot_arrive_in_the_future' => 'The arrival date cannot be in the future.',
 ];

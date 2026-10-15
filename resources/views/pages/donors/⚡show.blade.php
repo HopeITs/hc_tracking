@@ -379,11 +379,16 @@ new #[Title('titles.donor')] class extends Component {
     <x-funding.agreement-modal
         :open="$showAgreementModal"
         :editing="$editingAgreementId !== null"
-        :locked-donor-name="$donor->name"
         :proposal-options="$showAgreementModal ? $this->proposalOptions : []"
-        :warning="$showAgreementModal ? $this->agreementProposalWarning : null"
+        :locked-proposal-name="$showAgreementModal && $editingAgreementId !== null ? $this->agreementProposalLabel : null"
+        :warning="$showAgreementModal ? $this->agreementStatusWarning : null"
         :delete-blocker="$showAgreementModal ? $this->agreementDeleteBlocker : null"
         :locked-currency="$showAgreementModal && $this->agreementCurrencyLocked ? $agreementCurrency : null"
         :confirming-delete="$confirmingAgreementDelete"
+        :donor-name="$showAgreementModal ? $this->agreementDonorName : null"
+        :installments="$installments"
+        :installments-total="$this->installmentsTotal"
+        :installments-differ="$this->installmentsDifferFromBudget"
+        :currency-code="$agreementCurrency"
     />
 </section>

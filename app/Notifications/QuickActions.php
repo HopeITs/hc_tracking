@@ -8,6 +8,7 @@ use App\Enums\ArStatus;
 use App\Enums\ReportStatus;
 use App\Enums\TaskStatus;
 use App\Models\Assignment;
+use App\Models\Proposal;
 use App\Models\Report;
 use App\Models\Scopes\TaskVisibilityScope;
 use App\Models\Task;
@@ -40,6 +41,7 @@ final class QuickActions
             'task' => $this->taskActions($subjectId, $user),
             'report' => $this->reportActions($subjectId, $user),
             'project' => $this->assignmentActions($subjectType, $subjectId, $user),
+            'proposal' => $this->canRecordAgreementFor($subjectId, $user) ? ['agreement.record'] : [],
             'transfer' => $user->can('transfers.update') && TransfersTracking::query()->whereKey($subjectId)->toBase()->value('ar_status') === ArStatus::Pending->value
                 ? ['transfer.mark_received'] : [],
             default => [],
@@ -122,9 +124,48 @@ final class QuickActions
                 ? ['ok' => true, 'message' => 'notifications.quick.opening', 'redirect' => route('transfers.index', ['edit' => $id])]
                 : $this->result(false, 'forbidden'),
             'assignment.acknowledge', 'assignment.reject' => $this->runAssignment($user, $notification, $type),
+            'agreement.record' => $this->runRecordAgreement($user, $id),
             'alert.snooze' => $this->snooze($user, $notification),
             default => $this->result(false, 'unavailable'),
         };
+    }
+
+    /**
+     * Recording an agreement is offered on a proposal a donor approved that
+     * has none yet, to the people who may record one.
+     */
+    private function canRecordAgreementFor(int $proposalId, User $user): bool
+    {
+        if (! $user->can('funding-agreements.create')) {
+            return false;
+        }
+
+        $proposal = Proposal::query()->withCount('donorProposals')->find($proposalId, ['id', 'status']);
+
+        return $proposal !== null && $proposal->status->isApprovedByDonor() && $proposal->donor_proposals_count === 0;
+    }
+
+    /**
+     * Opens the proposal page with the agreement form ready: the form itself
+     * re-checks permission and state on save.
+     *
+     * @return array{ok: bool, message: string, redirect: string|null}
+     */
+    private function runRecordAgreement(User $user, int $proposalId): array
+    {
+        if (! $user->can('funding-agreements.create')) {
+            return $this->result(false, 'forbidden');
+        }
+
+        if (! $this->canRecordAgreementFor($proposalId, $user)) {
+            return $this->result(false, 'already_done');
+        }
+
+        $url = app(SubjectLinks::class)->routeFor('proposal', $proposalId);
+
+        return $url === null
+            ? $this->result(false, 'missing')
+            : ['ok' => true, 'message' => 'notifications.quick.opening_record', 'redirect' => $url.'?record_agreement=1'];
     }
 
     /**

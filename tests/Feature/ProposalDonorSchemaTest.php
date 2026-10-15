@@ -92,6 +92,7 @@ test('the unique index and the composite foreign key exist under their names', f
         ->select('index_name as name')
         ->pluck('name')
         ->unique()
+        ->values()
         ->all();
 
     $foreignKey = DB::table('information_schema.referential_constraints')
@@ -235,7 +236,7 @@ test('creating a proposal requires a donor', function () {
 });
 
 test('an agreement takes its donor from the proposal, never from the request', function () {
-    $proposal = Proposal::factory()->create();
+    $proposal = Proposal::factory()->running()->create();
     $other = Donor::factory()->create();
 
     $this->actingAs(User::factory()->role('Financial')->create());
