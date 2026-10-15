@@ -207,14 +207,14 @@ trait FindsFocusedTypeDates
 
         return match ($type) {
             'milestone' => $this->upcomingOrRecent(
-                Milestone::query()->whereIn('responsible_user_id', $employeeIds)->with('project:id,name'),
+                Milestone::query()->whereIn('responsible_user_id', $employeeIds)->with(['project:id,name', 'proposal:id,name']),
                 'planned_start_date'
             )->map(fn (Milestone $milestone): array => [
                 'kind' => 'modal-milestone',
                 'id' => $milestone->id,
                 'url' => null,
                 'title' => $milestone->name,
-                'subLabel' => $milestone->project?->name,
+                'subLabel' => $milestone->ownerName(),
                 'date' => $milestone->planned_start_date,
             ]),
             'task' => $this->upcomingOrRecent(

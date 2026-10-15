@@ -94,7 +94,7 @@ new #[Title('titles.task')] class extends Component
                 // below can show "milestone · project" without an extra
                 // query — the other four source types have nothing further
                 // to load.
-                'source' => fn (MorphTo $morphTo) => $morphTo->morphWith([Milestone::class => ['project:id,name']]),
+                'source' => fn (MorphTo $morphTo) => $morphTo->morphWith([Milestone::class => ['project:id,name', 'proposal:id,name']]),
                 'taskAssignees.employee:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
                 'creator:id,hr_user_id',
                 'parentTask:id,title',
@@ -212,10 +212,12 @@ new #[Title('titles.task')] class extends Component
         :subtitle="$this->task->sourceLabel()"
     >
         <x-slot:meta>
-            @if ($this->task->source instanceof \App\Models\Milestone)
+            @if ($this->task->source instanceof \App\Models\Milestone && $this->task->source->project !== null)
                 <a href="{{ route('projects.show', $this->task->source->project) }}" wire:navigate class="font-medium hover:underline">
-                    {{ $this->task->source->name }} · {{ $this->task->source->project->name }}
+                    {{ $this->task->source->name }} · {{ $this->task->source->ownerName() }}
                 </a>
+            @elseif ($this->task->source instanceof \App\Models\Milestone)
+                <span class="font-medium">{{ $this->task->source->name }} · {{ $this->task->source->ownerName() }}</span>
             @endif
             <span>{{ __('tasks.assigned_to_name', ['name' => $assignees->isEmpty() ? __('common.not_assigned') : $assignees->map->name->implode(', ')]) }}</span>
             <span>{{ __('tasks.created_by_name', ['name' => $this->task->creator->name]) }}</span>

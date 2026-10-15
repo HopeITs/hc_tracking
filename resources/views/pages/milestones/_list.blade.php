@@ -1,13 +1,18 @@
 @php
-    /** @var \Illuminate\Database\Eloquent\Collection<int, \App\Models\Project> $projects */
+    /** @var \Illuminate\Database\Eloquent\Collection<int, \App\Models\Project|\App\Models\Proposal> $projects */
 @endphp
 
 @foreach ($projects as $projectRow)
-    <x-ui.panel :title="$projectRow->name" :subtitle="$projectRow->city?->name ?? __('common.unknown_city')" :count="$projectRow->milestones->count()" wire:key="milestone-project-{{ $projectRow->id }}">
+    @php $isProject = $projectRow instanceof \App\Models\Project; @endphp
+    <x-ui.panel :title="$projectRow->name" :subtitle="$isProject ? ($projectRow->city?->name ?? __('common.unknown_city')) : __('milestones.proposal_plan')" :count="$projectRow->milestones->count()" wire:key="milestone-{{ $isProject ? 'project' : 'proposal' }}-{{ $projectRow->id }}">
         <x-slot:toolbar>
             <div class="flex shrink-0 items-center gap-1">
-                @can('create', [App\Models\Milestone::class, $projectRow->id])<x-ui.button tone="ghost" size="sm" icon="plus" class="size-9!" wire:click="openCreateModal(null, null, {{ $projectRow->id }})" data-test="milestone-list-add-{{ $projectRow->id }}" :aria-label="__('milestones.add_milestone_to_project', ['name' => $projectRow->name])" />@endcan
-                <x-ui.button tone="ghost" size="sm" icon="eye" class="size-9!" :href="route('projects.show', $projectRow)" wire:navigate :aria-label="__('common.view_name', ['name' => $projectRow->name])" />
+                @if ($isProject)
+                    @can('create', [App\Models\Milestone::class, $projectRow->id])<x-ui.button tone="ghost" size="sm" icon="plus" class="size-9!" wire:click="openCreateModal(null, null, {{ $projectRow->id }})" data-test="milestone-list-add-{{ $projectRow->id }}" :aria-label="__('milestones.add_milestone_to_project', ['name' => $projectRow->name])" />@endcan
+                    <x-ui.button tone="ghost" size="sm" icon="eye" class="size-9!" :href="route('projects.show', $projectRow)" wire:navigate :aria-label="__('common.view_name', ['name' => $projectRow->name])" />
+                @else
+                    @can('view', $projectRow)<x-ui.button tone="ghost" size="sm" icon="eye" class="size-9!" :href="route('proposals.show', $projectRow)" wire:navigate :aria-label="__('common.view_name', ['name' => $projectRow->name])" />@endcan
+                @endif
             </div>
         </x-slot:toolbar>
 

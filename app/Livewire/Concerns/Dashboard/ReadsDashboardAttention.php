@@ -70,7 +70,7 @@ trait ReadsDashboardAttention
 
         $tasks = $this->visible(Task::query(), 'tasks')
             ->select(['id', 'source_type', 'source_id', 'title', 'due_date', 'status'])
-            ->with(['source' => fn (MorphTo $morphTo) => $morphTo->morphWith([Milestone::class => ['project:id,name']])])
+            ->with(['source' => fn (MorphTo $morphTo) => $morphTo->morphWith([Milestone::class => ['project:id,name', 'proposal:id,name']])])
             ->where('status', '!=', TaskStatus::Done)
             ->whereDate('due_date', '<', $today)
             ->oldest('due_date')
@@ -87,8 +87,8 @@ trait ReadsDashboardAttention
             ));
 
         $milestones = $this->visible(Milestone::query(), 'milestones')
-            ->select(['id', 'project_id', 'name', 'planned_end_date', 'status'])
-            ->with('project:id,name')
+            ->select(['id', 'project_id', 'proposal_id', 'name', 'planned_end_date', 'status'])
+            ->with(['project:id,name', 'proposal:id,name'])
             ->where('status', MilestoneStatus::Planned)
             ->whereDate('planned_end_date', '<', $today)
             ->oldest('planned_end_date')
@@ -99,7 +99,7 @@ trait ReadsDashboardAttention
                 group: 'delivery',
                 icon: 'flag',
                 title: $milestone->name,
-                context: __('dashboard.milestone_in', ['project' => $milestone->project?->name ?? '—']),
+                context: __('dashboard.milestone_in', ['project' => $milestone->ownerName()]),
                 daysLate: (int) $milestone->planned_end_date->diffInDays($today),
                 href: route('milestones.index', ['project' => $milestone->project_id, 'status' => MilestoneStatus::Planned->value]),
             ));
@@ -297,7 +297,7 @@ trait ReadsDashboardAttention
     private function taskParentName(Task $task): string
     {
         return $task->source instanceof Milestone
-            ? ($task->source->project?->name ?? '—')
+            ? $task->source->ownerName()
             : $task->sourceLabel();
     }
 }

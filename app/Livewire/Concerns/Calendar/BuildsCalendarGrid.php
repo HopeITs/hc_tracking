@@ -84,10 +84,10 @@ trait BuildsCalendarGrid
         $milestonesByDay = $employeeIds === [] || ! $this->showMilestones
             ? new Collection
             : Milestone::query()
-                ->select(['id', 'project_id', 'name', 'planned_start_date', 'planned_end_date', 'actual_end_date', 'status', 'weight_percentage', 'responsible_user_id'])
+                ->select(['id', 'project_id', 'proposal_id', 'name', 'planned_start_date', 'planned_end_date', 'actual_end_date', 'status', 'weight_percentage', 'responsible_user_id'])
                 ->whereIn('responsible_user_id', $employeeIds)
                 ->whereBetween('planned_start_date', [$gridStart->toDateString(), $gridEnd->toDateString()])
-                ->with('project:id,name')
+                ->with(['project:id,name', 'proposal:id,name'])
                 ->withCount(['children', 'tasks' => fn ($query) => $query->withoutGlobalScope(TaskVisibilityScope::class)])
                 ->orderBy('planned_start_date')
                 ->orderBy('sequence')

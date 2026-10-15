@@ -73,7 +73,7 @@ trait ShowsCalendarDay
         $rows = new \Illuminate\Support\Collection;
 
         foreach ($calendar['milestonesByDay']->get($date, new Collection) as $milestone) {
-            $rows->push(['type' => 'milestone', 'kind' => 'modal-milestone', 'id' => $milestone->id, 'url' => null, 'title' => $milestone->name, 'subLabel' => $milestone->project?->name]);
+            $rows->push(['type' => 'milestone', 'kind' => 'modal-milestone', 'id' => $milestone->id, 'url' => null, 'title' => $milestone->name, 'subLabel' => $milestone->ownerName()]);
         }
 
         foreach ($calendar['tasksByDay']->get($date, new Collection) as $task) {

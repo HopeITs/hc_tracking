@@ -146,4 +146,7 @@ return [
     'you_assigned' => 'أسندتَها أنت',
     'what_needs_to_happen' => 'ما الذي يجب أن يحدث؟',
     'work_items_across_every_proposal_ordered_by_the_nearest_due' => 'بنود العمل في كل المقترحات، مرتبة حسب أقرب تاريخ استحقاق.',
+    'due_before_requested' => 'الموعد النهائي لا يسبق تاريخ الطلب',
+    'set_the_due_date' => 'حدّد الموعد النهائي.',
+    'delivered_deliverable_keeps_its_kind' => 'التسليم الذي سُلِّم يحتفظ بنوعه.',
 ];

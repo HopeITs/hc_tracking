@@ -8,20 +8,22 @@ use App\Enums\MilestoneStatus;
 use App\Exceptions\InvalidParentException;
 use App\Models\Milestone;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Keeps the milestone tree well formed.
  *
- * Neither guard can be expressed in the schema: milestones.project_id and
- * parent_milestone_id are independent foreign keys, so the database is happy to
- * nest a milestone under one in another project, and InnoDB will not notice a
- * row pointing at its own descendant either.
+ * Neither guard can be expressed in the schema: milestones.project_id,
+ * proposal_id and parent_milestone_id are independent foreign keys, so the
+ * database is happy to nest a milestone under one in another project or
+ * proposal, and InnoDB will not notice a row pointing at its own descendant
+ * either.
  */
 final class MilestoneObserver
 {
     /**
-     * Reject a parent that would close a loop or cross a project boundary,
-     * then place the milestone at the end of its siblings.
+     * Reject a parent that would close a loop or cross a project or proposal
+     * boundary, then place the milestone at the end of its siblings.
      *
      * @throws InvalidParentException
      */
@@ -36,7 +38,7 @@ final class MilestoneObserver
 
             $parent = Milestone::query()->find($parentKey);
 
-            if ($parent !== null && $parent->project_id !== $milestone->project_id) {
+            if ($parent !== null && ! $this->canNestUnder($milestone, $parent)) {
                 throw InvalidParentException::crossProject();
             }
         }
@@ -46,8 +48,32 @@ final class MilestoneObserver
     }
 
     /**
+     * A child shares its parent's proposal (none for a plain project
+     * milestone) and, when the parent belongs to a project, that project too:
+     * a center-specific milestone may sit under a proposal-level one, never
+     * under another center's (contracts.md §12.2).
+     */
+    private function canNestUnder(Milestone $milestone, Milestone $parent): bool
+    {
+        return $this->sameKey($parent->proposal_id, $milestone->proposal_id)
+            && ($parent->project_id === null || $this->sameKey($parent->project_id, $milestone->project_id));
+    }
+
+    /**
+     * Compare two nullable foreign keys, whether they came from the database
+     * as integers or from a form as numeric strings.
+     */
+    private function sameKey(mixed $first, mixed $second): bool
+    {
+        return $first === null || $second === null
+            ? $first === $second
+            : (int) $first === (int) $second;
+    }
+
+    /**
      * Places a milestone after its last sibling under the same parent within
-     * the same project, so nobody has to pick a sequence number by hand.
+     * the same project (for a proposal-level milestone with no project, the
+     * same proposal), so nobody has to pick a sequence number by hand.
      *
      * Fires when the milestone is new, and again whenever an existing one is
      * re-nested under a different parent — the two moments its position in
@@ -65,7 +91,11 @@ final class MilestoneObserver
         }
 
         $lastSiblingSequence = Milestone::query()
-            ->where('project_id', $milestone->project_id)
+            ->when(
+                $milestone->project_id === null,
+                fn (Builder $query) => $query->whereNull('project_id')->where('proposal_id', $milestone->proposal_id),
+                fn (Builder $query) => $query->where('project_id', $milestone->project_id),
+            )
             ->where('parent_milestone_id', $milestone->parent_milestone_id)
             ->max('sequence');
 

@@ -60,8 +60,8 @@ new #[Title('titles.milestone')] class extends Component {
     public function milestone(): Milestone
     {
         return Milestone::query()
-            ->select(['id', 'project_id', 'name', 'description', 'planned_start_date', 'planned_end_date', 'actual_start_date', 'actual_end_date', 'status', 'sequence', 'weight_percentage', 'responsible_user_id', 'parent_milestone_id', 'updated_at'])
-            ->with(['project:id,name', 'responsibleUser:id,first_name_en,last_name_en,first_name_ar,last_name_ar', 'parent:id,name'])
+            ->select(['id', 'project_id', 'proposal_id', 'name', 'description', 'planned_start_date', 'planned_end_date', 'actual_start_date', 'actual_end_date', 'status', 'sequence', 'weight_percentage', 'responsible_user_id', 'parent_milestone_id', 'updated_at'])
+            ->with(['project:id,name', 'proposal:id,name', 'responsibleUser:id,first_name_en,last_name_en,first_name_ar,last_name_ar', 'parent:id,name'])
             ->findOrFail($this->milestoneId);
     }
 
@@ -100,7 +100,7 @@ new #[Title('titles.milestone')] class extends Component {
 
         return Milestone::query()
             ->select(['id', 'name', 'project_id', 'sequence'])
-            ->where('project_id', $this->milestone->project_id)
+            ->where(fn ($query) => $this->constrainToParentCandidates($query))
             ->whereNotIn('id', $invalidParentIds)
             ->orderBy('sequence')
             ->orderBy('name')
@@ -114,7 +114,7 @@ new #[Title('titles.milestone')] class extends Component {
     {
         return Milestone::query()
             ->select(['id', 'name', 'project_id', 'sequence'])
-            ->where('project_id', $this->milestone->project_id)
+            ->where(fn ($query) => $this->constrainToParentCandidates($query))
             ->orderBy('sequence')
             ->orderBy('name')
             ->orderBy('id')
@@ -150,7 +150,7 @@ new #[Title('titles.milestone')] class extends Component {
                 'nullable',
                 'integer',
                 Rule::exists(Milestone::class, 'id')->where(
-                    fn ($query) => $query->where('project_id', $milestone->project_id),
+                    fn ($query) => $this->constrainToParentCandidates($query),
                 ),
                 Rule::notIn($this->invalidParentIds()),
             ],
@@ -187,7 +187,7 @@ new #[Title('titles.milestone')] class extends Component {
 
     public function openRelatedModal(): void
     {
-        Gate::authorize('create', [Milestone::class, $this->milestone->project_id]);
+        $this->authorizeRelatedMilestone();
 
         $this->resetValidation();
         $this->relatedName = '';
@@ -208,7 +208,7 @@ new #[Title('titles.milestone')] class extends Component {
 
     public function saveRelatedMilestone(): void
     {
-        Gate::authorize('create', [Milestone::class, $this->milestone->project_id]);
+        $this->authorizeRelatedMilestone();
 
         $this->relatedName = trim($this->relatedName);
         $this->relatedDescription = trim($this->relatedDescription);
@@ -227,7 +227,7 @@ new #[Title('titles.milestone')] class extends Component {
                 'nullable',
                 'integer',
                 Rule::exists(Milestone::class, 'id')->where(
-                    fn ($query) => $query->where('project_id', $projectId),
+                    fn ($query) => $this->constrainToParentCandidates($query),
                 ),
             ],
         ], [
@@ -271,6 +271,37 @@ new #[Title('titles.milestone')] class extends Component {
         unset($this->relatedTasks);
     }
 
+    /**
+     * Related milestones are added here for project milestones only: a
+     * proposal's milestones are added on its plan, where the plan window and
+     * the proposal period apply (SaveProposalMilestone).
+     */
+    protected function authorizeRelatedMilestone(): void
+    {
+        abort_if($this->milestone->proposal_id !== null, 403);
+
+        Gate::authorize('create', [Milestone::class, $this->milestone->project_id]);
+    }
+
+    /**
+     * Limit a milestones query to those this milestone may nest under (see
+     * MilestoneObserver): the same proposal (none for a project milestone)
+     * and, for a parent in a project, this milestone's project.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<Milestone>|\Illuminate\Database\Query\Builder  $query
+     * @return \Illuminate\Database\Eloquent\Builder<Milestone>|\Illuminate\Database\Query\Builder
+     */
+    protected function constrainToParentCandidates(\Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Query\Builder $query): \Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Query\Builder
+    {
+        $milestone = $this->milestone;
+
+        return $query
+            ->where('proposal_id', $milestone->proposal_id)
+            ->where(fn ($query) => $milestone->project_id === null
+                ? $query->whereNull('project_id')
+                : $query->whereNull('project_id')->orWhere('project_id', $milestone->project_id));
+    }
+
     /** @return array<int, int> */
     protected function invalidParentIds(): array
     {
@@ -292,7 +323,7 @@ new #[Title('titles.milestone')] class extends Component {
     $dropdownLabelClasses = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-ink-muted';
     $canEditMilestone = auth()->user()->can('update', $this->milestone);
     $canMoveMilestone = $canEditMilestone || auth()->user()->can('updateProgress', $this->milestone);
-    $canAddRelated = auth()->user()->can('create', [App\Models\Milestone::class, $this->milestone->project_id]);
+    $canAddRelated = $this->milestone->proposal_id === null && auth()->user()->can('create', [App\Models\Milestone::class, $this->milestone->project_id]);
     $selectedParentMilestone = $parentMilestoneId === '' ? null : $this->parentOptions->firstWhere('id', (int) $parentMilestoneId);
 @endphp
 
@@ -306,7 +337,7 @@ new #[Title('titles.milestone')] class extends Component {
         :title="$this->milestone->name"
         :unread="app(\App\Notifications\UnreadSubjects::class)->has(auth()->user(), 'milestone', $this->milestone->id)"
         title-class="text-3xl! font-bold! leading-none!"
-        :subtitle="$this->milestone->project->name"
+        :subtitle="$this->milestone->ownerName()"
     >
         <x-slot:meta>
             <x-ui.enum-badge :case="$this->milestone->status" />

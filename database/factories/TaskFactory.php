@@ -2,10 +2,14 @@
 
 namespace Database\Factories;
 
+use App\Enums\DeliverableKind;
+use App\Enums\DeliveryState;
+use App\Enums\TaskKind;
 use App\Enums\TaskStatus;
 use App\Models\Proposal;
 use App\Models\Task;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Database\Factories\Concerns\CreatesHrRecords;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -58,6 +62,46 @@ class TaskFactory extends Factory
             'status' => TaskStatus::Done,
             'progress_percentage' => 100,
             'completed_date' => fake()->dateTimeBetween('-6 months', 'now')->format('Y-m-d'),
+        ]);
+    }
+
+    /**
+     * A department task on a proposal's plan (contracts.md §12.2): raised on
+     * the proposal and handed to an HR department.
+     */
+    public function forProposal(Proposal $proposal, ?int $departmentId = null): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'source_type' => 'proposal',
+            'source_id' => $proposal->id,
+            'department_id' => $departmentId ?? $this->createHrDepartment(),
+            'requested_on' => $attributes['requested_on'] ?? CarbonImmutable::today()->toDateString(),
+            'due_date' => $attributes['due_date'] ?? CarbonImmutable::today()->addMonth()->toDateString(),
+        ]);
+    }
+
+    /**
+     * A media deliverable, still requested, that hands over the given kinds.
+     *
+     * @param  list<DeliverableKind>  $mediaKinds
+     */
+    public function mediaDeliverable(array $mediaKinds = [DeliverableKind::Photos]): static
+    {
+        return $this->state([
+            'kind' => TaskKind::MediaDeliverable,
+            'media_kinds' => array_map(fn (DeliverableKind $kind): string => $kind->value, $mediaKinds),
+            'delivery_state' => DeliveryState::Requested,
+        ]);
+    }
+
+    /**
+     * A financial task: Finance only, and its title carries no amount.
+     */
+    public function financial(): static
+    {
+        return $this->state([
+            'kind' => TaskKind::Financial,
+            'title' => 'Prepare the financial annex',
         ]);
     }
 

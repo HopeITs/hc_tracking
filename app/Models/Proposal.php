@@ -17,6 +17,7 @@ use Carbon\CarbonImmutable;
 use Database\Factories\ProposalFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -214,6 +215,32 @@ class Proposal extends Model implements TracksActivity
     public function tasks(): MorphMany
     {
         return $this->morphMany(Task::class, 'source');
+    }
+
+    /**
+     * The milestones on this proposal's plan (contracts.md §12.2): shared at
+     * proposal level, or center-specific when they also carry a project_id.
+     *
+     * @return HasMany<Milestone, $this>
+     */
+    public function milestones(): HasMany
+    {
+        return $this->hasMany(Milestone::class);
+    }
+
+    /**
+     * Every task on this proposal's plan: raised on the proposal itself or on
+     * one of its milestones. Goes through the task visibility scope like any
+     * other task query.
+     *
+     * @return Builder<Task>
+     */
+    public function planTasks(): Builder
+    {
+        return Task::query()->where(fn (Builder $query) => $query
+            ->where(fn (Builder $query) => $query->where('source_type', 'proposal')->where('source_id', $this->id))
+            ->orWhere(fn (Builder $query) => $query->where('source_type', 'milestone')
+                ->whereIn('source_id', Milestone::query()->select('id')->where('proposal_id', $this->id))));
     }
 
     /**

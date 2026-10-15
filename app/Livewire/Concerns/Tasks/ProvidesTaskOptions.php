@@ -132,14 +132,14 @@ trait ProvidesTaskOptions
     {
         return match ($type) {
             'milestone' => Milestone::query()
-                ->select(['id', 'name', 'project_id'])
-                ->with('project:id,name')
+                ->select(['id', 'name', 'project_id', 'proposal_id'])
+                ->with(['project:id,name', 'proposal:id,name'])
                 ->orderBy('name')
                 ->orderBy('id')
                 ->get()
                 ->map(fn (Milestone $milestone): array => [
                     'id' => $milestone->id,
-                    'name' => $milestone->name.' · '.$milestone->project->name,
+                    'name' => $milestone->name.' · '.$milestone->ownerName(),
                 ]),
             'proposal' => Proposal::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get()
                 ->map(fn (Proposal $proposal): array => ['id' => $proposal->id, 'name' => $proposal->name]),

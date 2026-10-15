@@ -28,6 +28,17 @@ trait CreatesHrRecords
     }
 
     /**
+     * Insert an HR department and return its id.
+     */
+    protected function createHrDepartment(): int
+    {
+        return DB::connection('hr')->table('departments')->insertGetId([
+            'name' => fake()->unique()->words(2, true),
+            'code' => fake()->unique()->bothify('??####'),
+        ]);
+    }
+
+    /**
      * Insert an HR employee and return its id.
      */
     protected function createHrEmployee(): int

@@ -23,7 +23,10 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 /**
  * @property int $id
- * @property int $project_id
+ * @property int|null $project_id
+ * @property int|null $proposal_id
+ * @property bool $is_final_report
+ * @property CarbonImmutable|null $planned_dates_edited_at
  * @property string $name
  * @property string $slug
  * @property string|null $description
@@ -41,6 +44,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
  */
 #[Fillable([
     'project_id',
+    'proposal_id',
     'name',
     'description',
     'planned_start_date',
@@ -58,6 +62,16 @@ class Milestone extends Model implements TracksActivity
     use HasFactory, RecordsActivity;
 
     use HasSlug, HasTree;
+
+    /**
+     * Mirror the column default so a milestone that has not been
+     * round-tripped through the database still reports it (strict mode).
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'is_final_report' => false,
+    ];
 
     protected function slugSource(): string
     {
@@ -81,13 +95,50 @@ class Milestone extends Model implements TracksActivity
     }
 
     /**
-     * The project this milestone belongs to.
+     * A user who moves the planned dates of an existing milestone marks it,
+     * so the approval rebase (RebaseProposalPlan) leaves those dates alone
+     * (contracts.md §12.2). The rebase itself writes through the query
+     * builder, which fires no model events and so never sets this.
+     */
+    protected static function booted(): void
+    {
+        static::updating(function (Milestone $milestone): void {
+            if ($milestone->isDirty(['planned_start_date', 'planned_end_date'])) {
+                $milestone->planned_dates_edited_at = CarbonImmutable::now();
+            }
+        });
+    }
+
+    /**
+     * The project this milestone belongs to: null for a milestone shared at
+     * proposal level (contracts.md §12.2).
      *
      * @return BelongsTo<Project, $this>
      */
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    /**
+     * The proposal whose plan this milestone is part of, if any.
+     *
+     * @return BelongsTo<Proposal, $this>
+     */
+    public function proposal(): BelongsTo
+    {
+        return $this->belongsTo(Proposal::class);
+    }
+
+    /**
+     * The project or, for a proposal-level milestone, the proposal it sits
+     * under, for labels on pages that list milestones of every project.
+     */
+    public function ownerName(): string
+    {
+        $owner = $this->project_id !== null ? $this->project : $this->proposal;
+
+        return $owner === null ? __('milestones.no_project') : $owner->name;
     }
 
     /**
@@ -138,6 +189,8 @@ class Milestone extends Model implements TracksActivity
             'status' => MilestoneStatus::class,
             'sequence' => 'integer',
             'weight_percentage' => 'decimal:2',
+            'is_final_report' => 'boolean',
+            'planned_dates_edited_at' => 'datetime',
         ];
     }
 
@@ -195,6 +248,16 @@ class Milestone extends Model implements TracksActivity
             'planned_end_date' => 'dates_changed',
             'name' => 'updated',
         ];
+    }
+
+    /**
+     * The rebase bookkeeping stamp is not news.
+     *
+     * @return list<string>
+     */
+    protected function activityExcludedFields(): array
+    {
+        return ['planned_dates_edited_at'];
     }
 
     /**

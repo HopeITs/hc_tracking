@@ -542,15 +542,13 @@ parameters:
         # which PHPStan could not read before. Changing any of it is a logic
         # change.
         -
-            # Five redundant `?->`, each the last one on the left of a `??`, which
-            # already covers null: `milestone->project?->name`, `transfer->
-            # donorProposal?->donor?->name`, `donorProposal?->proposal?->name`,
-            # `risk->project?->name` and `task->source->project?->name` (source is
-            # a Milestone there). The '—' fallback is a defensive label for a
-            # dangling reference: keep it.
+            # Three redundant `?->`, each the last one on the left of a `??`, which
+            # already covers null: `transfer->donorProposal?->donor?->name`,
+            # `donorProposal?->proposal?->name` and `risk->project?->name`. The
+            # '—' fallback is a defensive label for a dangling reference: keep it.
             identifier: nullsafe.neverNull
             path: app/Livewire/Concerns/Dashboard/ReadsDashboardAttention.php
-            count: 5
+            count: 3
         -
             # attentionItems() eager-loads `source` with a callback typed for the
             # MorphTo it receives (it calls morphWith()); Larastan types every
@@ -569,15 +567,14 @@ parameters:
             path: app/Livewire/Concerns/Dashboard/ReadsDashboardAttention.php
             count: 1
         -
-            # Six redundant `?->`, each the last one on the left of a `??`, which
-            # already covers null: `milestone->project?->name`, `donorProposal?->
-            # donor?->name`, `report->planIndicator?->indicator?->name` (in
-            # upcoming() and activity()), `note->proposal?->name` and `report->
-            # user?->name`. The '—' fallback is a defensive label for a dangling
-            # reference: keep it.
+            # Five redundant `?->`, each the last one on the left of a `??`, which
+            # already covers null: `donorProposal?->donor?->name`, `report->
+            # planIndicator?->indicator?->name` (in upcoming() and activity()),
+            # `note->proposal?->name` and `report->user?->name`. The '—' fallback
+            # is a defensive label for a dangling reference: keep it.
             identifier: nullsafe.neverNull
             path: app/Livewire/Concerns/Dashboard/ReadsDashboardWork.php
-            count: 6
+            count: 5
         -
             # upcoming() eager-loads `source` with a callback typed for the MorphTo
             # it receives (it calls morphWith()); same as attentionItems().

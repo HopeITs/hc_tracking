@@ -536,6 +536,10 @@ return [
                 'title' => 'Targets saved',
                 'body' => ':actor saved the targets of “:subject”',
             ],
+            'plan_rebased' => [
+                'title' => 'Plan moved to the grant period',
+                'body' => 'The plan of “:subject” moved to the grant period; milestones and tasks cut at the grant end: :value',
+            ],
         ],
         'donor_proposal' => [
             'created' => ':actor recorded the funding agreement “:subject”',

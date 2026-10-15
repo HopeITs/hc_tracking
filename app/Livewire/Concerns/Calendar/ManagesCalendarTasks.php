@@ -103,8 +103,8 @@ trait ManagesCalendarTasks
     {
         return match ($this->taskSourceType) {
             'milestone' => Milestone::query()
-                ->select(['id', 'name', 'project_id'])
-                ->with('project:id,name')
+                ->select(['id', 'name', 'project_id', 'proposal_id'])
+                ->with(['project:id,name', 'proposal:id,name'])
                 ->orderBy('name')
                 ->orderBy('id')
                 ->get(),

@@ -1,11 +1,11 @@
 @php
     use App\Enums\MilestoneStatus;
 
-    /** @var \Illuminate\Database\Eloquent\Collection<int, \App\Models\Project> $projects */
+    /** @var \Illuminate\Database\Eloquent\Collection<int, \App\Models\Project|\App\Models\Proposal> $projects */
 
     $allMilestones = $projects
         ->flatMap(fn ($projectRow) => $this->flattenMilestones($projectRow->milestones)->map(function ($milestone) use ($projectRow) {
-            $milestone->setRelation('project', $projectRow);
+            $milestone->setRelation($projectRow instanceof \App\Models\Project ? 'project' : 'proposal', $projectRow);
 
             return $milestone;
         }))
@@ -83,7 +83,11 @@
                             @endif
                         </div>
 
-                        <a href="{{ route('projects.show', $milestone->project) }}" wire:navigate class="truncate text-xs text-secondary-medium hover:underline dark:text-ink-muted">{{ $milestone->project->name }}</a>
+                        @if ($milestone->project_id !== null)
+                            <a href="{{ route('projects.show', $milestone->project) }}" wire:navigate class="truncate text-xs text-secondary-medium hover:underline dark:text-ink-muted">{{ $milestone->ownerName() }}</a>
+                        @else
+                            <span class="truncate text-xs text-secondary-medium dark:text-ink-muted">{{ $milestone->ownerName() }}</span>
+                        @endif
 
                         <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                             @if ($milestoneDueDate !== null)
