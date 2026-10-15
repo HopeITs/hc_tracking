@@ -10,6 +10,7 @@ use App\Livewire\Concerns\ManagesAgreementForm;
 use App\Livewire\Concerns\ManagesTransferForm;
 use App\Livewire\Concerns\PreviewsFiles;
 use App\Livewire\Concerns\Proposals\ChartsProposalChronology;
+use App\Livewire\Concerns\Proposals\ManagesProposalApproval;
 use App\Livewire\Concerns\Proposals\ManagesProposalFiles;
 use App\Livewire\Concerns\Proposals\ManagesProposalForm;
 use App\Livewire\Concerns\Proposals\ManagesProposalRecord;
@@ -37,6 +38,7 @@ abstract class ProposalsShowPageHost extends Component
     use ChartsProposalChronology;
     use ChecksFinanceVisibility;
     use ManagesAgreementForm;
+    use ManagesProposalApproval;
     use ManagesProposalFiles;
     use ManagesProposalForm;
     use ManagesProposalRecord;

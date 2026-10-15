@@ -209,4 +209,11 @@ return [
     'project_restored_as' => 'Project restored as :status',
     'only_archived_can_be_restored' => 'Only an archived project can be restored.',
     'dates_required' => 'Enter the start and end dates.',
+    'awaiting_owner_acknowledgement' => 'Awaiting owner acknowledgement',
+    'awaiting_funding' => 'Awaiting funding',
+    'funded_awaiting_template' => 'Funded, awaiting report template',
+    'no_agreement_yet' => 'No agreement recorded yet',
+    'activate_not_approved' => 'Only an approved project can be activated.',
+    'activate_dates_required' => 'The project has no dates yet.',
+    'activate_owner_not_acknowledged' => 'The owner has not acknowledged the project.',
 ];

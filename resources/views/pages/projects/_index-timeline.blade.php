@@ -98,6 +98,7 @@
 
                                         <div class="mt-2 flex flex-wrap items-center gap-1.5">
                                             <x-ui.enum-badge :case="$project->status" />
+                                            <x-ui.project-funding-badge :project="$project" />
                                             <x-ui.employee-chip :employee="$project->user" compact />
                                             <x-ui.assignment-badge :project="$project" />
                                         </div>

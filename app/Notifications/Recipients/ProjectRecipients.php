@@ -9,6 +9,7 @@ use App\Models\Activity;
 use App\Models\HrContract;
 use App\Models\Program;
 use App\Models\Project;
+use App\Support\MealCoverage;
 
 /**
  * Projects: the owner is direct; Managers watch; approved / closed is ★,
@@ -25,7 +26,8 @@ final class ProjectRecipients extends ModuleRecipients
             Project::ownerEmployeeIdFor($activity->subject_id),
             ...$this->idsFromProperty($activity, 'employee_ids'),
             $this->changedFrom($activity, 'user_id'),
-            ...($this->isAssignmentDecision($activity) ? $this->programManagerEmployeeIds($activity) : []),
+            ...($this->isAssignmentDecision($activity) || $this->isFundingMilestone($activity) ? $this->programManagerEmployeeIds($activity) : []),
+            ...($this->isFundingMilestone($activity) ? [MealCoverage::mealManagerEmployeeId()] : []),
             ...$this->topLevelEmployeeIds($activity),
         ]);
     }
@@ -46,12 +48,13 @@ final class ProjectRecipients extends ModuleRecipients
 
     public function watcherRoles(Activity $activity): array
     {
-        return ['Managers'];
+        return $this->isFundingMilestone($activity) ? ['Managers', 'Public Relations Manager'] : ['Managers'];
     }
 
     public function isKeyEvent(Activity $activity): bool
     {
         return $activity->event === 'project.deleted'
+            || $activity->event === 'project.approved'
             || ($activity->event === 'project.status_changed' && in_array($this->changedTo($activity, 'status'), ['approved', 'closed'], true));
     }
 
@@ -85,6 +88,15 @@ final class ProjectRecipients extends ModuleRecipients
         }
 
         return HrContract::topLevelEmployeeIds();
+    }
+
+    /**
+     * A project reached `approved` or `active` (T08): the program manager,
+     * the MEAL Manager and the Public Relations Manager hear it with the owner.
+     */
+    private function isFundingMilestone(Activity $activity): bool
+    {
+        return in_array($activity->event, ['project.approved', 'project.activated'], true);
     }
 
     private function isAssignmentDecision(Activity $activity): bool

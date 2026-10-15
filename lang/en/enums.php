@@ -50,6 +50,7 @@ return [
         'final_report' => 'Final report',
         'final_report_acceptance' => 'Final report acceptance',
         'need_assessment' => 'Need assessment',
+        'donor_approval' => 'Donor approval',
     ],
     'review_stage' => [
         'concept_note' => 'Concept note',

@@ -513,7 +513,8 @@ test('the project directory renders within its query budget', function () {
     // + one count of the projects without a center (shown to managers)
     // + the two HR queries of EmployeeProfile behind the owner chips' positions
     // + the sector filter's options (T34; the table view adds one eager load).
-    expect($queries)->toBeLessThanOrEqual(22);
+    // + one load of the linked proposals' statuses for the funding badge (T08).
+    expect($queries)->toBeLessThanOrEqual(23);
 });
 
 test('a board card hides relations it has none of and keeps a materialised risk', function () {

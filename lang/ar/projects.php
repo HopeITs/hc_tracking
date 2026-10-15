@@ -209,4 +209,11 @@ return [
     'project_restored_as' => 'تمت استعادة المشروع بحالة :status',
     'only_archived_can_be_restored' => 'لا يُستعاد إلا مشروع مؤرشف',
     'dates_required' => 'أدخل تاريخَي البداية والنهاية',
+    'awaiting_owner_acknowledgement' => 'بانتظار تأكيد المالك',
+    'awaiting_funding' => 'بانتظار التمويل',
+    'funded_awaiting_template' => 'ممول، بانتظار نموذج التقرير',
+    'no_agreement_yet' => 'لا اتفاقية مسجلة بعد',
+    'activate_not_approved' => 'لا يُفعَّل إلا مشروع معتمد',
+    'activate_dates_required' => 'لا تواريخ للمشروع بعد',
+    'activate_owner_not_acknowledged' => 'لم يؤكّد المالك المشروع بعد',
 ];

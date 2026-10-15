@@ -107,5 +107,16 @@ trait HasAssignments
             'responded_at' => $selfAssigned ? now() : null,
             'responded_by' => $selfAssigned ? $actor->getAuthIdentifier() : null,
         ]);
+
+        if ($selfAssigned) {
+            $this->assignmentAcknowledged($field);
+        }
     }
+
+    /**
+     * Called when the person in a field acknowledged it, including by putting
+     * themselves there. A model reacts by overriding it (a project approves
+     * itself once its owner has acknowledged).
+     */
+    public function assignmentAcknowledged(string $field): void {}
 }

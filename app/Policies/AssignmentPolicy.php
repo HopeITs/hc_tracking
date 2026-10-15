@@ -25,6 +25,16 @@ class AssignmentPolicy
     }
 
     /**
+     * The assignee's own acknowledgement may approve the project they now
+     * answer for (ApproveProjectFromProposal, via owner_acknowledgement).
+     * Checked after the assignment moved to acknowledged, so it is not `respond`.
+     */
+    public function approveProject(User $user, Assignment $assignment): bool
+    {
+        return $assignment->status === AssignmentStatus::Acknowledged && $assignment->isFor($user);
+    }
+
+    /**
      * Only the top level (the CEO) lifts a rejection's block, and only on a
      * rejected assignment.
      */

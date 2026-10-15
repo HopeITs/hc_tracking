@@ -7,6 +7,8 @@
 @use('App\Enums\MediaCollection')
     @include('pages.proposals._status-modals')
 
+    @include('pages.proposals._approve-modal')
+
     @include('pages.proposals._proposal-form')
 
     <x-funding.agreement-modal

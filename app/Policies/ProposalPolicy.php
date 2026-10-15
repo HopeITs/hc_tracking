@@ -85,6 +85,15 @@ class ProposalPolicy
     }
 
     /**
+     * Determine whether the user can record the donor's approval. There is no
+     * proposals.approve permission: approval follows proposals.update.
+     */
+    public function approve(User $user, Proposal $proposal): bool
+    {
+        return $user->can('proposals.update');
+    }
+
+    /**
      * Determine whether the user can correct a rejected or completed status.
      */
     public function correctStatus(User $user, Proposal $proposal): bool

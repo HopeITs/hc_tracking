@@ -50,6 +50,7 @@ return [
         'final_report' => 'التقرير الختامي',
         'final_report_acceptance' => 'موافقة الممول على التقرير الختامي',
         'need_assessment' => 'تقييم الاحتياج',
+        'donor_approval' => 'موافقة المانح',
     ],
     'review_stage' => [
         'concept_note' => 'المذكرة المفاهيمية',

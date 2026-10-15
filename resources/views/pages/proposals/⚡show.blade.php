@@ -6,6 +6,7 @@ use App\Livewire\Concerns\ManagesAgreementForm;
 use App\Livewire\Concerns\ManagesTransferForm;
 use App\Livewire\Concerns\PreviewsFiles;
 use App\Livewire\Concerns\Proposals\ChartsProposalChronology;
+use App\Livewire\Concerns\Proposals\ManagesProposalApproval;
 use App\Livewire\Concerns\Proposals\ManagesProposalFiles;
 use App\Livewire\Concerns\Proposals\ManagesProposalForm;
 use App\Livewire\Concerns\Proposals\ManagesProposalRecord;
@@ -39,6 +40,7 @@ new #[Title('titles.proposal')] class extends Component
     use ManagesProposalForm;
     use ManagesProposalRecord;
     use ManagesProposalReviewers;
+    use ManagesProposalApproval;
     use ManagesProposalStatus;
     use ManagesTransferForm;
     use PreviewsFiles;
@@ -213,7 +215,7 @@ new #[Title('titles.proposal')] class extends Component
             $this->proposal, $this->statusNotes, $this->agreements, $this->agreementRows, $this->fundingTranches, $this->donorReports, $this->agreementMoney, $this->moneyByCurrency,
             $this->projects, $this->linkableProjects, $this->tasks, $this->targets, $this->reports,
             $this->projectFiles, $this->documents, $this->deadlines, $this->warnings, $this->lifecycle, $this->chronology,
-            $this->arrivals, $this->vitals, $this->term, $this->tabs, $this->proposalFiles, $this->reviewStages, $this->needAssessments,
+            $this->arrivals, $this->vitals, $this->term, $this->tabs, $this->proposalFiles, $this->reviewStages, $this->needAssessments, $this->approvalSubject, $this->approvalPreview,
         );
     }
 };
@@ -255,6 +257,11 @@ new #[Title('titles.proposal')] class extends Component
                 </span>
                 @can('update', $this->proposal)
                 <x-ui.button size="sm" icon="pencil-square" class="min-h-10 touch-manipulation" wire:click="openEditModal({{ $this->proposal->id }})" data-test="open-details-modal">{{ __('proposals.edit_details') }}</x-ui.button>
+                @can('approve', $this->proposal)
+                @if ($this->proposal->canBeApproved())
+                <x-ui.button tone="primary" size="sm" icon="check-badge" class="min-h-10 touch-manipulation" wire:click="openApproveModal({{ $this->proposal->id }})" data-test="open-approve-modal">{{ __('proposals.approve_proposal') }}</x-ui.button>
+                @endif
+                @endcan
                 @if ($this->proposal->transitionTargets() !== [])
                 <x-ui.button tone="primary" size="sm" icon="arrow-path" class="min-h-10 touch-manipulation" wire:click="openStatusModal({{ $this->proposal->id }})" data-test="open-status-modal">{{ __('proposals.change_status') }}</x-ui.button>
                 @endif
