@@ -81,7 +81,8 @@ test('the donor page lists reports still owed to the donor and records an agreem
         ->assertDontSee('Inception report')
         ->call('recordAgreementForDonor')
         ->assertSet('showAgreementModal', true)
-        ->assertSet('agreementDonorId', (string) $agreement->donor_id);
+        ->assertSeeHtml('data-locked-donor')
+        ->assertSee($agreement->donor->name);
 });
 
 test('an overdue donor report reaches the proposal deadlines and warnings', function () {
@@ -214,12 +215,15 @@ test('an agreement recorded from a donor page always belongs to that donor', fun
     $user = User::factory()->role('Financial')->create();
     $donor = Donor::factory()->create();
     $otherDonor = Donor::factory()->create();
-    $proposal = Proposal::factory()->create(['donor_id' => $donor->id]);
+    $proposal = Proposal::factory()->running()->create(['donor_id' => $donor->id]);
+    $foreign = Proposal::factory()->running()->create(['donor_id' => $otherDonor->id]);
 
     Livewire::actingAs($user)->test('pages::donors.show', ['donor' => $donor])
         ->call('recordAgreementForDonor')
         ->assertSeeHtml('data-locked-donor')
-        ->set('agreementDonorId', (string) $otherDonor->id)
+        ->set('agreementProposalId', (string) $foreign->id)
+        ->call('saveAgreement')
+        ->assertHasErrors(['agreementProposalId'])
         ->set('agreementProposalId', (string) $proposal->id)
         ->set('budget', '5000')
         ->call('saveAgreement')

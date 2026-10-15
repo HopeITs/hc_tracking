@@ -4,6 +4,8 @@ use App\Enums\ArStatus;
 use App\Enums\ReportStatus;
 use App\Enums\TaskStatus;
 use App\Models\Activity;
+use App\Models\DonorProposal;
+use App\Models\Proposal;
 use App\Models\Report;
 use App\Models\Task;
 use App\Models\TransfersTracking;
@@ -136,4 +138,31 @@ test('a quick action that did not go through leaves the notification unread', fu
     Livewire::actingAs($assignee)->test('notifications.bell')->call('runQuickAction', $notification->id, 'task.mark_done');
 
     expect($notification->fresh()->read_at)->toBeNull();
+});
+
+test('an approved proposal without an agreement offers Record agreement to those who may record one, and it opens the form', function () {
+    $financial = userWithRole('Financial');
+    $mediaTeam = userWithRole('Media Team');
+    $proposal = Proposal::factory()->running()->create();
+    $actions = app(QuickActions::class);
+
+    expect($actions->forSubject('proposal', $proposal->id, $financial))->toBe([['type' => 'agreement.record']])
+        ->and($actions->forSubject('proposal', $proposal->id, $mediaTeam))->toBe([]);
+
+    $notification = (new UserNotification)->forceFill([
+        'subject_type' => 'proposal',
+        'subject_id' => $proposal->id,
+        'data' => ['actions' => [['type' => 'agreement.record']]],
+    ]);
+
+    $result = $actions->run($financial, $notification, 'agreement.record');
+
+    expect($result['ok'])->toBeTrue()
+        ->and($result['redirect'])->toEndWith('?record_agreement=1')
+        ->and($actions->run($mediaTeam, $notification, 'agreement.record')['ok'])->toBeFalse();
+
+    DonorProposal::factory()->create(['proposal_id' => $proposal->id]);
+
+    expect($actions->forSubject('proposal', $proposal->id, $financial))->toBe([])
+        ->and($actions->run($financial, $notification, 'agreement.record')['ok'])->toBeFalse();
 });

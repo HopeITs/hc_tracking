@@ -7,11 +7,14 @@
 @props([
     'open' => true,
     'editing' => false,
-    'donorOptions' => [],
     'proposalOptions' => [],
     'lockedProposalName' => null,
-    'lockedDonorName' => null,
+    'donorName' => null,
     'warning' => null,
+    'installments' => [],
+    'installmentsTotal' => '0.00',
+    'installmentsDiffer' => false,
+    'currencyCode' => 'USD',
     'deleteBlocker' => null,
     'confirmingDelete' => false,
     'lockedCurrency' => null,
@@ -27,25 +30,15 @@
     :required-note="! $editing"
 >
     @if ($open)
-        <x-ui.form-section :title="__('funding_agreements.section_parties')" :fields="['agreementDonorId', 'agreementProposalId']">
+        <x-ui.form-section :title="__('funding_agreements.section_parties')" :fields="['agreementProposalId']">
             <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
-                @if ($lockedDonorName !== null)
-                    <x-ui.form-field :label="__('funding_agreements.donor')" for="agreement-locked-donor">
-                        <div id="agreement-locked-donor" class="form-box" data-locked data-locked-donor>
-                            <flux:icon.lock-closed variant="micro" class="size-3.5 shrink-0 text-secondary-light" />
-                            <span class="truncate">{{ $lockedDonorName }}</span>
-                        </div>
-                    </x-ui.form-field>
-                @else
-                    {{-- Options are only passed while the modal is open: the form is not the
-                         filtered directory, but its full names would still satisfy an
-                         assertDontSee() against the directory list if always rendered. --}}
-                    <x-ui.form-select wire:model="agreementDonorId" :label="__('funding_agreements.donor')" :placeholder="__('funding_agreements.select_a_donor')" required autofocus>
-                        @foreach ($donorOptions as $donorOption)
-                            <option value="{{ $donorOption->id }}">{{ $donorOption->name }}</option>
-                        @endforeach
-                    </x-ui.form-select>
-                @endif
+                {{-- The donor is never chosen: it is the proposal's, shown for confirmation only. --}}
+                <x-ui.form-field :label="__('funding_agreements.donor')" for="agreement-locked-donor" :help="__('funding_agreements.donor_comes_from_the_proposal')">
+                    <div id="agreement-locked-donor" class="form-box" data-locked data-locked-donor>
+                        <flux:icon.lock-closed variant="micro" class="size-3.5 shrink-0 text-secondary-light" />
+                        <span class="truncate" dir="auto">{{ $donorName ?? __('funding_agreements.donor_follows_the_proposal') }}</span>
+                    </div>
+                </x-ui.form-field>
 
                 @if ($lockedProposalName !== null)
                     <x-ui.form-field :label="__('common.proposal')" for="agreement-locked-proposal">
@@ -55,9 +48,9 @@
                         </div>
                     </x-ui.form-field>
                 @else
-                    <x-ui.form-select wire:model.live="agreementProposalId" :label="__('common.proposal')" :placeholder="__('common.select_a_proposal')" required>
+                    <x-ui.form-select wire:model.live="agreementProposalId" :label="__('common.proposal')" :placeholder="__('common.select_a_proposal')" :help="__('funding_agreements.only_donor_approved_proposals_without_an_agreement')" required autofocus>
                         @foreach ($proposalOptions as $proposalOption)
-                            <option value="{{ $proposalOption->id }}">{{ $proposalOption->name }} · {{ $proposalOption->internal_project_number }}</option>
+                            <option value="{{ $proposalOption->id }}">{{ $proposalOption->name }} · {{ $proposalOption->internal_project_number }} · {{ $proposalOption->donor->name }}</option>
                         @endforeach
                     </x-ui.form-select>
                 @endif
@@ -85,6 +78,86 @@
                 @endif
 
                 <x-ui.form-input wire:model="externalProjectNumber" :label="__('funding_agreements.external_project_number')" maxlength="50" />
+            </div>
+        </x-ui.form-section>
+
+        <x-ui.form-section :title="__('funding_agreements.section_installments')" :fields="['installments', 'confirmInstallmentSum']" data-installments-editor>
+            <div class="grid gap-3">
+                <p class="form-help">{{ __('funding_agreements.installments_help') }}</p>
+
+                @error('installments')
+                    <p class="form-error"><flux:icon.exclamation-circle variant="micro" class="size-3.5 shrink-0" />{{ $message }}</p>
+                @enderror
+
+                @forelse ($installments as $index => $installment)
+                    @php
+                        $amountError = $errors->first("installments.{$index}.amount");
+                        $dateError = $errors->first("installments.{$index}.scheduled_date");
+                    @endphp
+                    <div wire:key="installment-row-{{ $index }}" class="grid grid-cols-[1.75rem_minmax(0,1fr)_minmax(0,1fr)_auto] items-start gap-2" data-installment-row>
+                        <span class="pt-2.5 text-sm font-semibold tabular-nums text-secondary-medium dark:text-ink-muted" dir="ltr">{{ $index + 1 }}</span>
+
+                        <div class="min-w-0">
+                            <div class="form-box" @if ($amountError !== '') data-invalid @endif>
+                                <input type="number" step="0.01" min="0" dir="ltr" class="form-box-input tabular-nums"
+                                    wire:model.live.debounce.400ms="installments.{{ $index }}.amount"
+                                    aria-label="{{ __('funding_agreements.installment_amount_label', ['number' => $index + 1]) }}"
+                                    @if ($amountError !== '') aria-invalid="true" @endif />
+                                <span class="form-affix">{{ $currencyCode }}</span>
+                            </div>
+                            @if ($amountError !== '')
+                                <p class="form-error">{{ $amountError }}</p>
+                            @endif
+                        </div>
+
+                        <div class="min-w-0">
+                            <div class="form-box" @if ($dateError !== '') data-invalid @endif>
+                                <input type="date" dir="ltr" class="form-box-input tabular-nums"
+                                    wire:model="installments.{{ $index }}.scheduled_date"
+                                    aria-label="{{ __('funding_agreements.installment_date_label', ['number' => $index + 1]) }}"
+                                    @if ($dateError !== '') aria-invalid="true" @endif />
+                            </div>
+                            @if ($dateError !== '')
+                                <p class="form-error">{{ $dateError }}</p>
+                            @endif
+                        </div>
+
+                        <x-ui.button type="button" tone="ghost" icon="trash" class="min-h-10" wire:click="removeInstallment({{ $index }})"
+                            wire:loading.attr="disabled" wire:target="removeInstallment({{ $index }})"
+                            aria-label="{{ __('funding_agreements.remove_installment', ['number' => $index + 1]) }}" />
+                    </div>
+                @empty
+                    <p class="text-sm text-secondary-medium dark:text-ink-muted" data-installments-empty>{{ __('funding_agreements.no_installments_yet') }}</p>
+                @endforelse
+
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <x-ui.button type="button" size="sm" icon="plus" wire:click="addInstallment" wire:loading.attr="disabled" wire:target="addInstallment" data-test="add-installment">
+                        {{ __('funding_agreements.add_installment') }}
+                    </x-ui.button>
+
+                    @if ($installments !== [])
+                        <p class="text-sm tabular-nums" data-installments-total>
+                            {{ __('funding_agreements.installments_total') }}
+                            <x-ui.money :amount="$installmentsTotal" :currency="$currencyCode" />
+                        </p>
+                    @endif
+                </div>
+
+                @if ($installmentsDiffer)
+                    <div class="flex items-start gap-2.5 rounded-lg border border-status-warn/40 bg-status-warn/10 p-3 text-sm text-secondary-dark dark:text-ink" role="alert" data-installments-mismatch>
+                        <flux:icon.exclamation-triangle class="mt-0.5 size-4 shrink-0 text-status-warn" />
+                        <div class="grid gap-2">
+                            <p>{{ __('funding_agreements.installments_sum_mismatch', ['sum' => number_format((float) $installmentsTotal, 2)]) }}</p>
+                            <label class="flex items-center gap-2 font-medium">
+                                <input type="checkbox" wire:model.live="confirmInstallmentSum" class="size-4" data-test="confirm-installment-sum" />
+                                {{ __('funding_agreements.save_anyway') }}
+                            </label>
+                            @error('confirmInstallmentSum')
+                                <p class="form-error">{{ $message }}</p>
+                            @enderror
+                        </div>
+                    </div>
+                @endif
             </div>
         </x-ui.form-section>
 

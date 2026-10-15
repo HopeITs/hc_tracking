@@ -122,12 +122,10 @@ test('the details form edits only this page\'s proposal', function () {
 });
 
 test('an agreement recorded on the page is filed against this proposal even if the payload names another', function () {
-    $other = Proposal::factory()->create();
-    $donor = Donor::factory()->create();
+    $other = Proposal::factory()->running()->create();
 
     proposalPage()
         ->call('openAgreementCreate')
-        ->set('agreementDonorId', (string) $donor->id)
         ->set('agreementProposalId', (string) $other->id)
         ->set('budget', '5000')
         ->set('agreementCurrency', 'EUR')

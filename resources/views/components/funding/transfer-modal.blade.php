@@ -51,12 +51,13 @@
             </div>
         </x-ui.form-section>
 
-        <x-ui.form-section :title="__('transfers.sent')" :fields="['paymentAmount', 'transferredCurrency', 'scheduledDate', 'transferDate']">
+        <x-ui.form-section :title="__('transfers.sent')" :fields="['paymentAmount', 'transferredCurrency', 'scheduledDate', 'transferDate', 'arrivalDate']">
             <div class="grid grid-cols-2 gap-x-4 gap-y-3 @4xl/modal:grid-cols-4">
                 <x-ui.form-input wire:model="paymentAmount" :label="__('transfers.payment_amount')" type="number" step="0.01" min="0" required />
                 <x-ui.form-segmented wire:model="transferredCurrency" :label="__('common.currency')" required :options="$currencyOptions" />
                 <x-ui.form-input wire:model="scheduledDate" :label="__('transfers.scheduled')" type="date" />
                 <x-ui.form-input wire:model="transferDate" :label="__('transfers.sent_on')" type="date" />
+                <x-ui.form-input wire:model="arrivalDate" :label="__('transfers.arrived_on')" :help="__('transfers.arrival_date_hint')" type="date" class="col-span-2" />
             </div>
         </x-ui.form-section>
 
@@ -73,7 +74,7 @@
                 <x-ui.form-input wire:model="netAmountReceived" :label="__('common.net_received')" type="number" step="0.01" min="0" />
                 <x-ui.form-segmented wire:model="receivedCurrency" :label="__('common.currency')" required :options="$currencyOptions" />
                 <x-ui.form-input wire:model="exchangeRate" :label="__('transfers.exchange_rate')" type="number" step="0.000001" min="0" required />
-                <x-ui.form-input wire:model="receiveDate" :label="__('transfers.received_on')" type="date" />
+                <x-ui.form-input wire:model="receiveDate" :label="__('transfers.received_on')" :help="__('transfers.receive_date_hint')" type="date" class="col-span-2" />
             </div>
         </x-ui.form-section>
 

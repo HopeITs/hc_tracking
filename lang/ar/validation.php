@@ -169,7 +169,6 @@ return [
         'actualDateBegin' => 'البداية الفعلية',
         'actualDateEnd' => 'النهاية الفعلية',
         'agreementCurrency' => 'العملة',
-        'agreementDonorId' => 'المانح',
         'agreementProposalId' => 'المقترح',
         'amountReceived' => 'المبلغ المستلم',
         'assignedTo' => 'المكلّف',

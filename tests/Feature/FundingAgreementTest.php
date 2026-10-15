@@ -231,13 +231,11 @@ test('agreements can be narrowed to where their money is stuck, most urgent firs
 
 test('an agreement can be created with a budget and currency', function () {
     $user = User::factory()->role('Financial')->create();
-    $donor = Donor::factory()->create();
-    $proposal = Proposal::factory()->create();
+    $proposal = Proposal::factory()->running()->create();
 
     Livewire::actingAs($user)
         ->test('pages::funding-agreements.index')
         ->call('openCreateModal')
-        ->set('agreementDonorId', (string) $donor->id)
         ->set('agreementProposalId', (string) $proposal->id)
         ->set('budget', '750000.00')
         ->set('agreementCurrency', Currency::Usd->value)
@@ -257,8 +255,7 @@ test('a negative budget is rejected', function () {
     Livewire::actingAs($user)
         ->test('pages::funding-agreements.index')
         ->call('openCreateModal')
-        ->set('agreementDonorId', (string) Donor::factory()->create()->id)
-        ->set('agreementProposalId', (string) Proposal::factory()->create()->id)
+        ->set('agreementProposalId', (string) Proposal::factory()->running()->create()->id)
         ->set('budget', '-1')
         ->set('agreementCurrency', Currency::Usd->value)
         ->call('saveAgreement')
@@ -340,21 +337,18 @@ test('a budget larger than its column is rejected, not sent to the database', fu
         ->assertHasErrors(['budget' => 'max']);
 });
 
-test('recording an agreement against an unapproved proposal warns but is allowed', function () {
+test('recording an agreement against an unapproved proposal is refused', function () {
     $user = User::factory()->role('Financial')->create();
-    $donor = Donor::factory()->create();
     $proposal = Proposal::factory()->create(['status' => 'concept note']);
 
     Livewire::actingAs($user)->test('pages::funding-agreements.index')
         ->call('openAgreementCreate')
-        ->set('agreementDonorId', (string) $donor->id)
         ->set('agreementProposalId', (string) $proposal->id)
-        ->assertSeeHtml('data-agreement-proposal-warning')
         ->set('budget', '1000')
         ->call('saveAgreement')
-        ->assertHasNoErrors();
+        ->assertHasErrors(['agreementProposalId']);
 
-    expect(DonorProposal::query()->where('proposal_id', $proposal->id)->exists())->toBeTrue();
+    expect(DonorProposal::query()->where('proposal_id', $proposal->id)->exists())->toBeFalse();
 });
 
 test('the agreement page links to its tranches in the transfers ledger', function () {
@@ -414,8 +408,7 @@ test('a user without funding agreement permissions cannot record one', function 
 
     $fresh()->assertDontSeeHtml('data-test="create-agreement-button"');
     $fresh()->call('openCreateModal')->assertForbidden();
-    $fresh()->set('agreementDonorId', (string) Donor::factory()->create()->id)
-        ->set('agreementProposalId', (string) Proposal::factory()->create()->id)
+    $fresh()->set('agreementProposalId', (string) Proposal::factory()->running()->create()->id)
         ->set('budget', '100')
         ->set('agreementCurrency', 'USD')
         ->call('saveAgreement')->assertForbidden();
@@ -794,7 +787,7 @@ test('agreement detail shows the gross amount received beside what landed', func
 
 test('the agreement picker names each proposal with its internal number', function () {
     $user = User::factory()->role('Financial')->create();
-    Proposal::factory()->create(['name' => 'Winter Shelter Kit', 'internal_project_number' => 'HC-2026-071']);
+    Proposal::factory()->running()->create(['name' => 'Winter Shelter Kit', 'internal_project_number' => 'HC-2026-071']);
 
     Livewire::actingAs($user)
         ->test('pages::funding-agreements.index')
