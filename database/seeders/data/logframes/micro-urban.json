@@ -1,0 +1,299 @@
+{
+    "program_code": "002",
+    "hr_program_id": 2,
+    "track": "urban",
+    "goal": {
+        "statement": "تعزيز المرونة الاقتصادية للأسر المستفيدة من خلال دعم إنشاء مشاريع مدرة للدخل مستدامة وتحسين قدرتها على توليد الدخل وتلبية الاحتياجات الأساسية.",
+        "indicators": [
+            {
+                "ref": "G1",
+                "name_ar": "% من المشاريع المدعومة التي لا تزال عاملة وتحقق أرباحاً بعد 24–36 شهراً من انتهاء الدعم.",
+                "measure": "percentage",
+                "unit": null,
+                "target_raw": "0.8",
+                "definition": "يقيس نسبة المشاريع التي استمرت في العمل وتحقق أرباحاً تشغيلية بعد مرور 24–36 شهراً من تمويل المشروع، وهو مؤشر لاستدامة المشروع.",
+                "calculation_method": "عدد المشاريع المدعومة التي ما زالت تعمل وتحقق أرباحاً.\n/ إجمالي المشاريع المدعومة التي مولت منذ 24–36 شهراً.",
+                "frequency": "follow-up",
+                "follow_up_months": 24,
+                "frequency_note": "مرة واحدة بين الشهر 24–36 بعد التمويل",
+                "collected_by": "project_team",
+                "activities": []
+            }
+        ]
+    },
+    "outcomes": [
+        {
+            "ref": "outcome1",
+            "statement": "تحسن استدامة ونمو المشاريع متناهية الصغر المدعومة بالقروض",
+            "indicators": [
+                {
+                    "ref": "O1.1",
+                    "name_ar": "% من المشاريع المتناهية الصغر الممولة التي لا تزال نشطة بعد 12 شهراً",
+                    "measure": "percentage",
+                    "unit": null,
+                    "target_raw": "0.8",
+                    "definition": "يقيس استمرارية المشاريع بعد مرور سنة من التمويل.",
+                    "calculation_method": "البسط: عدد المشاريع المدعومة التي ما زالت تعمل وتحقق أرباحاً.\nالمقام: إجمالي المشاريع المدعومة التي انتهى دعمها منذ 24–36 شهراً.\nالمعادلة: (البسط ÷ المقام) ×100",
+                    "frequency": "follow-up",
+                    "follow_up_months": 12,
+                    "frequency_note": "بعد 12 شهراً من التمويل.",
+                    "collected_by": "project_team",
+                    "activities": []
+                },
+                {
+                    "ref": "O1.2",
+                    "name_ar": "% المشاريع التي تحقق أرباحاً بعد 12 شهراً",
+                    "measure": "percentage",
+                    "unit": null,
+                    "target_raw": "0.8",
+                    "definition": "يقيس نسبة المشاريع التي تحقق صافي ربح موجب بعد سنة من بدء المشروع.",
+                    "calculation_method": "البسط: عدد المشاريع ذات صافي الربح الإيجابي.\nالمقام: إجمالي المشاريع التي تم تقييمها بعد 12 شهراً.\nالمعادلة: (البسط ÷ المقام) ×100",
+                    "frequency": "follow-up",
+                    "follow_up_months": 12,
+                    "frequency_note": "بعد 12 شهراً من التمويل.",
+                    "collected_by": "project_team",
+                    "activities": []
+                },
+                {
+                    "ref": "O1.3",
+                    "name_ar": "% المشاركين الذين يطبقون مهارات إدارة مالية بعد 12 شهراً",
+                    "measure": "percentage",
+                    "unit": null,
+                    "target_raw": "0.7",
+                    "definition": "يقيس مدى تطبيق المستفيدين للمهارات المكتسبة (مثل إعداد السجلات المالية، حساب الأرباح، إدارة التدفقات النقدية، إعداد الميزانية).",
+                    "calculation_method": "البسط: عدد المشاركين الذين يطبقون الحد الأدنى من ممارسات الإدارة المالية المحددة مسبقاً.\nالمقام: إجمالي المشاركين الذين تلقوا التدريب وتمت متابعتهم.\nالمعادلة: (البسط ÷ المقام) ×100",
+                    "frequency": "follow-up",
+                    "follow_up_months": 12,
+                    "frequency_note": "بعد 12 شهراً من التمويل.",
+                    "collected_by": "project_team",
+                    "activities": []
+                }
+            ],
+            "outputs": [
+                {
+                    "ref": "output1.1",
+                    "statement": "تمويل مشاريع مدرة للدخل للأسر المستهدفة",
+                    "indicators": [
+                        {
+                            "ref": "Op1.1a",
+                            "name_ar": "عدد المشاريع متناهية الصغر التي حصلت على تمويل من المشروع.",
+                            "measure": "numeric",
+                            "unit": null,
+                            "target_raw": "-",
+                            "definition": "يقيس عدد المشاريع التي استلمت التمويل فعلياً.",
+                            "calculation_method": "مجموع المشاريع التي تم صرف التمويل لها وفق سجلات المشروع.",
+                            "frequency": "monthly",
+                            "follow_up_months": null,
+                            "frequency_note": "شهري / ربع سنوي.",
+                            "collected_by": "project_team",
+                            "activities": [
+                                "تسجيل استمارة",
+                                "زيارات ميدانية",
+                                "دراسة الالستمارات",
+                                "لجنة لاخذ القرار"
+                            ]
+                        },
+                        {
+                            "ref": "OP1.1b",
+                            "name_ar": "نسبة المشاريع متناهية الصغر الممولة للشباب",
+                            "measure": "percentage",
+                            "unit": null,
+                            "target_raw": "0.3",
+                            "definition": "يقيس نسبة المشاريع الممولة التي يملكها أو يديرها شباب ضمن الفئة العمرية المعتمدة (مثلاً 18–35 سنة).",
+                            "calculation_method": "البسط: عدد المشاريع الممولة للشباب.\nالمقام: إجمالي المشاريع الممولة.\nالمعادلة: (البسط ÷ المقام) ×100",
+                            "frequency": "monthly",
+                            "follow_up_months": null,
+                            "frequency_note": "شهري أو ربع سنوي.",
+                            "collected_by": "project_team",
+                            "activities": [
+                                "توقيع عقود",
+                                "مشتريات",
+                                "افتتاح مشروع"
+                            ]
+                        },
+                        {
+                            "ref": "OP1.1c",
+                            "name_ar": "متوسط قيمة التمويل المقدم لكل مشروع مستفيد.",
+                            "measure": "average",
+                            "unit": null,
+                            "target_raw": "-",
+                            "definition": "يقيس متوسط مبلغ التمويل الذي حصل عليه كل مشروع.",
+                            "calculation_method": "إجمالي قيمة التمويل المصروف ÷ عدد المشاريع الممولة.",
+                            "frequency": "quarterly",
+                            "follow_up_months": null,
+                            "frequency_note": "ربع سنوي.",
+                            "collected_by": "project_team",
+                            "activities": []
+                        }
+                    ]
+                },
+                {
+                    "ref": "output1.2",
+                    "statement": "تعزيز قدرات أصحاب المشاريع في الإدارة المالية والتسويق والتخطيط",
+                    "indicators": [
+                        {
+                            "ref": "OP1.2a",
+                            "name_ar": "عدد المستفيدين الذين أكملوا التدريب على إدارة المشاريع والتسويق والتخطيط المالي.",
+                            "measure": "numeric",
+                            "unit": null,
+                            "target_raw": "80% ( مشاريع جديدة و زراعية)",
+                            "definition": "يقيس عدد المشاركين الذين استوفوا متطلبات إكمال التدريب.",
+                            "calculation_method": "عدد المشاركين الذين حضروا النسبة المطلوبة (مثلاً ≥80%) وأكملوا التدريب.",
+                            "frequency": "per-event",
+                            "follow_up_months": null,
+                            "frequency_note": "بعد كل دورة تدريبية.",
+                            "collected_by": "project_team",
+                            "activities": [
+                                "دورات تمكين لجميع المشاريع الجديدة ( ادارة وتسويق)"
+                            ]
+                        },
+                        {
+                            "ref": "OP1.2b",
+                            "name_ar": "نسبة المشاركين الذين أظهروا تحسناً في اختبار المعرفة أو المهارات بعد التدريب",
+                            "measure": "percentage",
+                            "unit": null,
+                            "target_raw": "0.8",
+                            "definition": "يقيس مدى تحسن المعرفة أو المهارات نتيجة التدريب.",
+                            "calculation_method": "البسط: عدد المشاركين الذين ارتفعت درجاتهم بين الاختبار القبلي والبعدي أو تجاوزوا الحد الأدنى للتحسن.\nالمقام: جميع المشاركين الذين أكملوا الاختبارين.\nالمعادلة: (البسط ÷ المقام) ×100",
+                            "frequency": "per-event",
+                            "follow_up_months": null,
+                            "frequency_note": "بعد كل دورة تدريبية.",
+                            "collected_by": "project_team",
+                            "activities": []
+                        }
+                    ]
+                },
+                {
+                    "ref": "output1.3",
+                    "statement": "تحسين اختيار المشاريع بناءً على تحليل السوق والجدوى الاقتصادية",
+                    "indicators": [
+                        {
+                            "ref": "OP1.3a",
+                            "name_ar": "% المشاريع المختارة بناءً على تقييم سوق",
+                            "measure": "percentage",
+                            "unit": null,
+                            "target_raw": "**",
+                            "definition": "يقيس مدى اعتماد المشروع على تحليل السوق في اختيار المشاريع.",
+                            "calculation_method": "البسط: عدد المشاريع المختارة بناءً على تقييم سوق موثق.\nالمقام: إجمالي المشاريع المختارة.\nالمعادلة: (البسط ÷ المقام) ×100",
+                            "frequency": "per-event",
+                            "follow_up_months": null,
+                            "frequency_note": "عند اختيار المشاريع.",
+                            "collected_by": "project_team",
+                            "activities": []
+                        },
+                        {
+                            "ref": "OP1.3b",
+                            "name_ar": "عدد تقييمات السوق المنفذة",
+                            "measure": "numeric",
+                            "unit": null,
+                            "target_raw": "**",
+                            "definition": "يقيس عدد دراسات أو تقييمات السوق التي تم تنفيذها.",
+                            "calculation_method": "مجموع تقييمات السوق المكتملة والمعتمدة.",
+                            "frequency": "per-event",
+                            "follow_up_months": null,
+                            "frequency_note": "حسب التنفيذ (غالباً مرة قبل التدخل ثم عند الحاجة).",
+                            "collected_by": "project_team",
+                            "activities": [
+                                "مقابلة نقابات مهنية و اصخاب عمل",
+                                "اجتماع مهن للمستفيدين"
+                            ]
+                        },
+                        {
+                            "ref": "OP1.3c",
+                            "name_ar": "% المشاريع ضمن قطاعات ذات طلب مرتفع",
+                            "measure": "percentage",
+                            "unit": null,
+                            "target_raw": "**",
+                            "definition": "قيس مدى توافق المشاريع مع القطاعات ذات الطلب المرتفع في السوق المحلي.",
+                            "calculation_method": "البسط: عدد المشاريع ضمن القطاعات ذات الطلب المرتفع وفق دراسة السوق.\nالمقام: إجمالي المشاريع الممولة.\nالمعادلة: (البسط ÷ المقام) ×100",
+                            "frequency": "per-event",
+                            "follow_up_months": null,
+                            "frequency_note": "عند اختيار المشاريع.",
+                            "collected_by": "project_team",
+                            "activities": []
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "ref": "outcome2",
+            "statement": "تحسن الدخل والاستقرار الاقتصادي والقدرة على تلبية الاحتياجات الأساسية للأسر المستفيدة.",
+            "indicators": [
+                {
+                    "ref": "O2.1",
+                    "name_ar": "متوسط الدخل الشهري الصافي للأسر المستفيدة قبل وبعد التدخل",
+                    "measure": "average",
+                    "unit": null,
+                    "target_raw": "-",
+                    "definition": "يقيس متوسط صافي الدخل الشهري للأسر المستفيدة للمقارنة بين خط الأساس والمتابعة.",
+                    "calculation_method": "مجموع صافي الدخل الشهري لجميع الأسر ÷ عدد الأسر المستجيبة (قبل وبعد التدخل بشكل منفصل).",
+                    "frequency": "baseline-endline",
+                    "follow_up_months": null,
+                    "frequency_note": "خط أساس، ثم بعد 12 شهراً (ويمكن نهاية المشروع).",
+                    "collected_by": "project_team",
+                    "activities": []
+                },
+                {
+                    "ref": "O2.2",
+                    "name_ar": "نسبة التغير في متوسط الدخل الشهري الصافي للأسر المستفيدة بعد [12] شهراً من التدخل.",
+                    "measure": "percentage",
+                    "unit": null,
+                    "target_raw": "زيادة 20%",
+                    "definition": "يقيس نسبة الزيادة أو النقصان في متوسط الدخل الشهري مقارنة بخط الأساس.",
+                    "calculation_method": "المعادلة: ((متوسط الدخل بعد التدخل − متوسط الدخل قبل التدخل) ÷ متوسط الدخل قبل التدخل) ×100",
+                    "frequency": "follow-up",
+                    "follow_up_months": 12,
+                    "frequency_note": "بعد 12 شهراً.",
+                    "collected_by": "project_team",
+                    "activities": []
+                }
+            ],
+            "outputs": [
+                {
+                    "ref": "Output2.1",
+                    "statement": "تعزيز تنويع مصادر الدخل للأسر المستفيدة",
+                    "indicators": [
+                        {
+                            "ref": "Op2.1",
+                            "name_ar": "% الأسر التي أضافت نشاطاً اقتصادياً جديداً خلال المشروع",
+                            "measure": "percentage",
+                            "unit": null,
+                            "target_raw": "0.5",
+                            "definition": "يقيس نسبة الأسر التي بدأت مصدر دخل جديداً نتيجة التدخل",
+                            "calculation_method": "البسط: عدد الأسر التي بدأت نشاطاً اقتصادياً جديداً.\nالمقام: إجمالي الأسر المستفيدة.\nالمعادلة: (البسط ÷ المقام) ×100",
+                            "frequency": "semi-annual",
+                            "follow_up_months": null,
+                            "frequency_note": "نصف سنوي أو نهاية المشروع.",
+                            "collected_by": "project_team",
+                            "activities": [
+                                "زيارات متابعة",
+                                "واستبيانات"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "ref": "Output2.2",
+                    "statement": "تعزيز القدرة الاقتصادية للأسر على تلبية الاحتياجات الأساسية",
+                    "indicators": [
+                        {
+                            "ref": "OP2.2",
+                            "name_ar": "% الأسر القادرة على تغطية احتياجاتها الأساسية دون استراتيجيات تأقلم سلبية",
+                            "measure": "percentage",
+                            "unit": null,
+                            "target_raw": "0.8",
+                            "definition": "يقيس نسبة الأسر التي تستطيع تلبية احتياجاتها الأساسية دون اللجوء إلى استراتيجيات سلبية مثل بيع الأصول أو تقليل الوجبات أو الاستدانة الضارة.",
+                            "calculation_method": "البسط: عدد الأسر التي أفادت بأنها تغطي احتياجاتها الأساسية دون استخدام استراتيجيات تأقلم سلبية خلال فترة الاستدعاء المحددة.\nالمقام: إجمالي الأسر التي شملها المسح.\nالمعادلة: (البسط ÷ المقام) ×100",
+                            "frequency": "baseline-endline",
+                            "follow_up_months": null,
+                            "frequency_note": "خط أساس، ثم كل 6–12 شهراً، ونهاية المشروع.",
+                            "collected_by": "meal",
+                            "activities": []
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

@@ -30,11 +30,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $unit
  * @property string|null $baseline
  * @property string|null $target
+ * @property bool $is_tracking_only
  * @property Period $frequency
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['name', 'result_id', 'library_indicator_id', 'copied_from_id', 'code', 'project_id', 'measure', 'unit', 'baseline', 'target', 'frequency'])]
+#[Fillable(['name', 'result_id', 'library_indicator_id', 'copied_from_id', 'code', 'project_id', 'measure', 'unit', 'baseline', 'target', 'is_tracking_only', 'frequency'])]
 class Indicator extends Model implements TracksActivity
 {
     /** @use HasFactory<IndicatorFactory> */
@@ -54,6 +55,7 @@ class Indicator extends Model implements TracksActivity
     protected $attributes = [
         'measure' => 'numeric',
         'frequency' => 'quarterly',
+        'is_tracking_only' => false,
     ];
 
     /**
@@ -223,6 +225,7 @@ class Indicator extends Model implements TracksActivity
             'frequency' => Period::class,
             'baseline' => 'decimal:2',
             'target' => 'decimal:2',
+            'is_tracking_only' => 'boolean',
         ];
     }
 

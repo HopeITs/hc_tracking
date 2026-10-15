@@ -1,0 +1,388 @@
+{
+    "program_code": "002",
+    "hr_program_id": 2,
+    "track": "agri",
+    "goal": {
+        "statement": "تعزيز الأمن الغذائي والمرونة الاقتصادية للأسر الريفية من خلال مشاريع زراعية ورعوية مستدامة ومدرّة للدخل",
+        "indicators": [
+            {
+                "ref": "G1",
+                "name_ar": "نسبة الأسر التي تحقق مستوى مقبولاً من مؤشر استهلاك الغذاء (FCS)",
+                "measure": "percentage",
+                "unit": null,
+                "target_raw": "0.8",
+                "definition": "يقيس تنوع وتكرار استهلاك الغذاء خلال آخر 7 أيام ويعكس الوضع الغذائي للأسرة.",
+                "calculation_method": "(عدد الأسر ذات FCS ≥ 35 ÷ إجمالي الأسر المستجيبة) ×100",
+                "frequency": "per-season",
+                "follow_up_months": null,
+                "frequency_note": "خط أساس، كل موسم زراعي أو كل 6 أشهر، ونهاية المشروع",
+                "collected_by": "project_team",
+                "activities": []
+            },
+            {
+                "ref": "G2",
+                "name_ar": "نسبة الأسر التي تستخدم استراتيجيات التأقلم المرتبطة بالأمن الغذائي (rCSI)",
+                "measure": "percentage",
+                "unit": null,
+                "target_raw": "0.8",
+                "definition": "يقيس مدى اعتماد الأسرة على استراتيجيات سلبية قصيرة الأجل بسبب نقص الغذاء خلال آخر 7 أيام.",
+                "calculation_method": "(عدد الأسر التي يقع rCSI لديها ضمن الفئة المستهدفة ÷ إجمالي الأسر) ×100، ويمكن أيضاً الإبلاغ عن متوسط rCSI",
+                "frequency": "per-season",
+                "follow_up_months": null,
+                "frequency_note": "خط أساس، كل موسم زراعي أو كل 6 أشهر، ونهاية المشروع",
+                "collected_by": "project_team",
+                "activities": []
+            }
+        ]
+    },
+    "outcomes": [
+        {
+            "ref": "Outcome 1",
+            "statement": "تبني المستفيدين ممارسات زراعية ورعوية محسنة ومستدامة",
+            "indicators": [
+                {
+                    "ref": "O1.1",
+                    "name_ar": "% المستفيدين الذين يطبقون ثلاث ممارسات زراعية أو رعوية محسنة على الأقل",
+                    "measure": "percentage",
+                    "unit": null,
+                    "target_raw": "0.7",
+                    "definition": "يقيس تبني الممارسات التي تم التدريب عليها.",
+                    "calculation_method": "(عدد المستفيدين الذين يطبقون ≥3 ممارسات ÷ إجمالي المستفيدين الذين تمت متابعتهم) ×100",
+                    "frequency": "per-season",
+                    "follow_up_months": null,
+                    "frequency_note": "مرة خلال الموسم الزراعي، ونهاية المشروع",
+                    "collected_by": "project_team",
+                    "activities": []
+                }
+            ],
+            "outputs": [
+                {
+                    "ref": "Output 1.1",
+                    "statement": "تنفيذ تدريبات على الممارسات الزراعية والرعوية الجيدة (GAP/GVP)",
+                    "indicators": [
+                        {
+                            "ref": "OP1.1a",
+                            "name_ar": "عدد المستفيدين الذين أكملوا التدريب الفني بنجاح",
+                            "measure": "numeric",
+                            "unit": null,
+                            "target_raw": "0.8",
+                            "definition": "عدد الأشخاص الذين حضروا التدريب واستوفوا معيار النجاح المحدد.",
+                            "calculation_method": "مجموع المشاركين الذين حققو 80% من الجلسات المخصصة",
+                            "frequency": "monthly",
+                            "follow_up_months": null,
+                            "frequency_note": "بعد كل تدريب مع تجميع شهري",
+                            "collected_by": "project_team",
+                            "activities": [
+                                "تقديم تريبات للمستفيدين خول الممارسات الجيدة"
+                            ]
+                        },
+                        {
+                            "ref": "OP1.1b",
+                            "name_ar": "عدد جلسات التدريب المنفذة",
+                            "measure": "numeric",
+                            "unit": null,
+                            "target_raw": "**",
+                            "definition": "عدد الدورات أو الجلسات التدريبية المنجزة فعلياً.",
+                            "calculation_method": "مجموع الجلسات المنفذة",
+                            "frequency": "monthly",
+                            "follow_up_months": null,
+                            "frequency_note": "شهري",
+                            "collected_by": "project_team",
+                            "activities": []
+                        },
+                        {
+                            "ref": "OP1.1c",
+                            "name_ar": "% المشاركين الذين أظهروا تحسناً في المعرفة الفنية (اختبار قبل/بعد)",
+                            "measure": "percentage",
+                            "unit": null,
+                            "target_raw": "0.8",
+                            "definition": "يقيس تحسن المعرفة بين اختبار ما قبل التدريب وما بعده.",
+                            "calculation_method": "(عدد المشاركين الذين تحسن اختبارهم بعد التدريب ÷ إجمالي من أجروا الاختبارين) ×100",
+                            "frequency": "per-event",
+                            "follow_up_months": null,
+                            "frequency_note": "بعد كل تدريب",
+                            "collected_by": "project_team",
+                            "activities": []
+                        }
+                    ]
+                },
+                {
+                    "ref": "Output 1.2",
+                    "statement": "تقديم خدمات الإرشاد والمتابعة الفنية",
+                    "indicators": [
+                        {
+                            "ref": "OP1.2a",
+                            "name_ar": "عدد الزيارات الإرشادية المنفذة",
+                            "measure": "numeric",
+                            "unit": null,
+                            "target_raw": "**",
+                            "definition": "عدد الزيارات الفنية والإرشادية المنجزة للمستفيدين.",
+                            "calculation_method": "مجموع الزيارات المسجلة",
+                            "frequency": "monthly",
+                            "follow_up_months": null,
+                            "frequency_note": "شهري",
+                            "collected_by": "project_team",
+                            "activities": [
+                                "متابعة فنية ارشادية خلال الموسم"
+                            ]
+                        },
+                        {
+                            "ref": "OP1.2b",
+                            "name_ar": "% المستفيدين الذين تلقوا زيارة متابعة واحدة على الأقل كل شهرين",
+                            "measure": "percentage",
+                            "unit": null,
+                            "target_raw": "1",
+                            "definition": "يقيس انتظام خدمات الإرشاد.",
+                            "calculation_method": "(عدد المستفيدين الذين استوفوا الشرط ÷ إجمالي المستفيدين) ×100",
+                            "frequency": "monthly",
+                            "follow_up_months": null,
+                            "frequency_note": "كل شهرين",
+                            "collected_by": "project_team",
+                            "activities": []
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "ref": "Outcome 2",
+            "statement": "زيادة الإنتاجية الزراعية والحيوانية وتحسن الأداء الاقتصادي للمشاريع المدعومة",
+            "indicators": [
+                {
+                    "ref": "O2.1",
+                    "name_ar": "متوسط إنتاجية المحاصيل المستهدفة (كغ/هكتار)",
+                    "measure": "average",
+                    "unit": "كغ/هكتار",
+                    "target_raw": "-",
+                    "definition": "متوسط كمية الإنتاج لكل هكتار من المحصول المستهدف.",
+                    "calculation_method": "إجمالي الإنتاج (كغ) ÷ إجمالي المساحة المزروعة (هكتار)",
+                    "frequency": "per-season",
+                    "follow_up_months": null,
+                    "frequency_note": "بعد كل موسم حصاد",
+                    "collected_by": "project_team",
+                    "activities": []
+                },
+                {
+                    "ref": "O2.2",
+                    "name_ar": "متوسط إنتاج الحليب أو الوزن الحي للحيوانات المستهدفة مقارنة بخط الأساس",
+                    "measure": "average",
+                    "unit": null,
+                    "target_raw": "-",
+                    "definition": "يقيس تحسن الإنتاج الحيواني نتيجة التدخل. ( عدد او وزن)",
+                    "calculation_method": "(متوسط الإنتاج أو الوزن الحالي − خط الأساس) أو نسبة التغير المئوية",
+                    "frequency": "per-season",
+                    "follow_up_months": null,
+                    "frequency_note": "كل دورة إنتاج أو نهاية الموسم",
+                    "collected_by": "project_team",
+                    "activities": []
+                },
+                {
+                    "ref": "O2.3",
+                    "name_ar": "% المشاريع المدعومة التي تحقق أرباحاً تشغيلية بعد 12 شهراً",
+                    "measure": "percentage",
+                    "unit": null,
+                    "target_raw": "0.8",
+                    "definition": "يقيس الاستدامة الاقتصادية للمشاريع.",
+                    "calculation_method": "(عدد المشاريع ذات الربح التشغيلي الموجب ÷ إجمالي المشاريع المدعومة) ×100",
+                    "frequency": "follow-up",
+                    "follow_up_months": 12,
+                    "frequency_note": "بعد 12 شهراً من بدء المشروع",
+                    "collected_by": "project_team",
+                    "activities": []
+                }
+            ],
+            "outputs": [
+                {
+                    "ref": "Output 2.1",
+                    "statement": "توفير مدخلات إنتاج زراعية ورعوية (بذور، أعلاف، لقاحات وغيرها)",
+                    "indicators": [
+                        {
+                            "ref": "OP2.1a",
+                            "name_ar": "% المستفيدين الذين استلموا حزم مدخلات مكتملة وفي الوقت المناسب",
+                            "measure": "percentage",
+                            "unit": null,
+                            "target_raw": "1",
+                            "definition": "يقيس كفاءة التوزيع والتسليم.",
+                            "calculation_method": "(عدد المستفيدين الذين استلموا الحزمة كاملة وفي الموعد ÷ إجمالي المستفيدين المستهدفين) ×100",
+                            "frequency": "per-event",
+                            "follow_up_months": null,
+                            "frequency_note": "بعد كل عملية توزيع",
+                            "collected_by": "project_team",
+                            "activities": [
+                                "تسجيل استمارة",
+                                "زيارات ميدانية",
+                                "دراسة الالستمارات",
+                                "لجنة لاخذ القرار"
+                            ]
+                        },
+                        {
+                            "ref": "OP2.1b",
+                            "name_ar": "عدد المستفيدين الذين تلقوا مدخلات إنتاج مطابقة للمواصفات",
+                            "measure": "numeric",
+                            "unit": null,
+                            "target_raw": "1",
+                            "definition": "عدد المستفيدين الذين استلموا المدخلات المطابقة للمواصفات الفنية.",
+                            "calculation_method": "مجموع المستفيدين المستلمين",
+                            "frequency": "per-event",
+                            "follow_up_months": null,
+                            "frequency_note": "بعد كل توزيع",
+                            "collected_by": "project_team",
+                            "activities": [
+                                "توقيع عقود",
+                                "مشتريات",
+                                "افتتاح مشروع"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "ref": "Output 2.2",
+                    "statement": "تمويل مشاريع زراعية ورعوية صغيرة",
+                    "indicators": [
+                        {
+                            "ref": "OP2.2",
+                            "name_ar": "عدد المشاريع الزراعية والرعوية الممولة",
+                            "measure": "numeric",
+                            "unit": null,
+                            "target_raw": "-",
+                            "definition": "عدد المشاريع التي تلقت التمويل فعلياً.",
+                            "calculation_method": "مجموع المشاريع",
+                            "frequency": "monthly",
+                            "follow_up_months": null,
+                            "frequency_note": "شهري أو ربع سنوي",
+                            "collected_by": "project_team",
+                            "activities": []
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "ref": "Outcome 3",
+            "statement": "زيادة مشاركة المستفيدين في الأسواق المحلية وتحسن مبيعاتهم",
+            "indicators": [
+                {
+                    "ref": "O3.1",
+                    "name_ar": "% المستفيدين الذين باعوا جزءاً من إنتاجهم خلال الموسم الماضي",
+                    "measure": "percentage",
+                    "unit": null,
+                    "target_raw": "0.5",
+                    "definition": "يقيس المشاركة في السوق.",
+                    "calculation_method": "(عدد المستفيدين الذين باعوا إنتاجاً ÷ إجمالي المستفيدين) ×100",
+                    "frequency": "per-season",
+                    "follow_up_months": null,
+                    "frequency_note": "بعد كل موسم إنتاج",
+                    "collected_by": "project_team",
+                    "activities": []
+                },
+                {
+                    "ref": "O3.2",
+                    "name_ar": "متوسط قيمة المبيعات الزراعية أو الحيوانية السنوية للأسر المستفيدة",
+                    "measure": "average",
+                    "unit": null,
+                    "target_raw": "-",
+                    "definition": "متوسط الإيرادات السنوية من بيع المنتجات الزراعية أو الحيوانية.",
+                    "calculation_method": "إجمالي قيمة المبيعات ÷ عدد الأسر",
+                    "frequency": "annual",
+                    "follow_up_months": null,
+                    "frequency_note": "سنوياً",
+                    "collected_by": "project_team",
+                    "activities": []
+                }
+            ],
+            "outputs": [
+                {
+                    "ref": "Output 3.1",
+                    "statement": "دعم ربط المنتجين بالأسواق المحلية",
+                    "indicators": [
+                        {
+                            "ref": "OP3.1",
+                            "name_ar": "عدد المستفيدين الذين تم ربطهم بقنوات تسويق أو مشترين محتملين",
+                            "measure": "numeric",
+                            "unit": null,
+                            "target_raw": "0.3",
+                            "definition": "عدد المنتجين الذين تم ربطهم رسمياً بجهات تسويق أو مشترين.",
+                            "calculation_method": "مجموع المستفيدين",
+                            "frequency": "quarterly",
+                            "follow_up_months": null,
+                            "frequency_note": "ربع سنوي",
+                            "collected_by": "project_team",
+                            "activities": [
+                                "دراسة سوق"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "ref": "Output 3.2",
+                    "statement": "دعم المشاريع المنتجة للأغذية ذات الأولوية المجتمعية",
+                    "indicators": [
+                        {
+                            "ref": "OP3.2",
+                            "name_ar": "% المشاريع المدعومة المنتجة لأغذية أساسية عالية الطلب في السوق المحلي",
+                            "measure": "percentage",
+                            "unit": null,
+                            "target_raw": "**",
+                            "definition": "يقيس مدى توافق المشاريع مع احتياجات السوق.",
+                            "calculation_method": "(عدد المشاريع المنتجة للأغذية ذات الأولوية ÷ إجمالي المشاريع المدعومة) ×100",
+                            "frequency": "annual",
+                            "follow_up_months": null,
+                            "frequency_note": "سنوياً",
+                            "collected_by": "project_team",
+                            "activities": []
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "cross_cutting": {
+        "statement": "المساءلة ورضا المستفيدين",
+        "indicators": [
+            {
+                "ref": "CC1",
+                "name_ar": "% المستفيدين الراضين عن الدعم المقدم",
+                "measure": "percentage",
+                "unit": null,
+                "target_raw": "0.8",
+                "definition": "نسبة المستفيدين الذين أفادوا بأنهم راضون أو راضون جداً عن المشروع.",
+                "calculation_method": "(عدد المستفيدين الراضين ÷ إجمالي المستجيبين) ×100",
+                "frequency": "semi-annual",
+                "follow_up_months": null,
+                "frequency_note": "كل 6 أشهر ونهاية المشروع",
+                "collected_by": "project_team",
+                "activities": [
+                    "استبيانات"
+                ]
+            },
+            {
+                "ref": "CC2",
+                "name_ar": "% الشكاوى التي تمت معالجتها خلال الفترة الزمنية المحددة",
+                "measure": "percentage",
+                "unit": null,
+                "target_raw": "1",
+                "definition": "يقيس أداء نظام الشكاوى.",
+                "calculation_method": "(عدد الشكاوى المغلقة ضمن المدة المحددة ÷ إجمالي الشكاوى المستلمة) ×100",
+                "frequency": "monthly",
+                "follow_up_months": null,
+                "frequency_note": "شهري",
+                "collected_by": "project_team",
+                "activities": []
+            },
+            {
+                "ref": "CC4",
+                "name_ar": "% المستفيدين الذين يرون أن المشروع ساهم في تحسين سبل عيشهم",
+                "measure": "percentage",
+                "unit": null,
+                "target_raw": "0.8",
+                "definition": "يقيس الأثر المدرك للمشروع على سبل العيش.",
+                "calculation_method": "(عدد المستفيدين الذين أجابوا بنعم ÷ إجمالي المستجيبين) ×100",
+                "frequency": "annual",
+                "follow_up_months": null,
+                "frequency_note": "نهاية المشروع أو سنوياً",
+                "collected_by": "project_team",
+                "activities": []
+            }
+        ]
+    }
+}

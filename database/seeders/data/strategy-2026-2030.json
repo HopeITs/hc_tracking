@@ -1,0 +1,48 @@
+{
+    "strategy_slug": "country-strategy-2026-2030",
+    "pillars": [
+        {
+            "code": "P1",
+            "name_ar": "التمكين الاقتصادي ودعم الأسر",
+            "name_en": "Economic Empowerment and Family Support",
+            "goal_ar": "تعزيز المرونة الاقتصادية، والأمن الغذائي والمائي للأسر الحضرية والريفية الهشة في سوريا من خلال دعم وتطوير مشاريع مستدامة ومدرة للدخل تساهم في التعافي الاقتصادي، بالتكامل مع تقديم شبكات أمان اجتماعي طارئة وتأهيل البنية التحتية الأساسية للمياه.",
+            "goal_en": null,
+            "sort_order": 1,
+            "programs": [
+                { "hr_program_id": 2, "label": "Micro" },
+                { "hr_program_id": 3, "label": "Relief Programs" },
+                { "hr_program_id": 4, "label": "Family to Family" },
+                { "hr_program_id": null, "label": "Wells" },
+                { "hr_program_id": null, "label": "Alternative Energy" }
+            ]
+        },
+        {
+            "code": "P2",
+            "name_ar": "تمكين وتأهيل الشباب والطلاب",
+            "name_en": "Youth and Student Empowerment",
+            "goal_ar": "بناء قدرات الشباب والطلاب الأكاديمية، والقيادية، والمهنية لتعزيز قابليتهم للتوظيف ومشاركتهم الاقتصادية والمجتمعية المستدامة كقوة دفع إيجابية في المجتمع.",
+            "goal_en": null,
+            "sort_order": 2,
+            "programs": [
+                { "hr_program_id": 8, "label": "Study Zone" },
+                { "hr_program_id": 13, "label": "LEAP" },
+                { "hr_program_id": 12, "label": "Entrepreneurship project" },
+                { "hr_program_id": 7, "label": "DISC (Development Impact and Support Center)" }
+            ]
+        },
+        {
+            "code": "P3",
+            "name_ar": "تنمية الطفولة والتربية الإيجابية",
+            "name_en": "Childhood Development and Positive Parenting",
+            "goal_ar": "رعاية نمو الطفل بشكل متكامل من خلال التعليم الإبداعي والاستكشافي، وتقديم الدعم النفسي والاجتماعي، وتأهيل مقدمي الرعاية لبناء بيئة أسرية آمنة ومحفزة.",
+            "goal_en": null,
+            "sort_order": 3,
+            "programs": [
+                { "hr_program_id": 10, "label": "Children University" },
+                { "hr_program_id": null, "label": "PSS" },
+                { "hr_program_id": null, "label": "Case Management" },
+                { "hr_program_id": null, "label": "Parenting" }
+            ]
+        }
+    ]
+}
