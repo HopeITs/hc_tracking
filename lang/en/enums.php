@@ -49,6 +49,7 @@ return [
         'other' => 'Other',
         'final_report' => 'Final report',
         'final_report_acceptance' => 'Final report acceptance',
+        'donor_approval' => 'Donor approval',
     ],
     'dependency_type' => [
         'fs' => 'Finish to start',

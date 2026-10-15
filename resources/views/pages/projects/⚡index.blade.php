@@ -103,6 +103,7 @@ new #[Title('titles.projects')] class extends Component {
                 'program.strategy:id,name',
                 'user:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
                 'ownerAssignment',
+                'proposals:proposals.id,proposals.status',
             ])
             ->when($this->view === 'timeline', fn (Builder $query) => $query->with([
                 'milestones' => fn ($query) => $query

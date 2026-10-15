@@ -506,8 +506,9 @@ test('the project directory renders within its query budget', function () {
 
     // 17 + one query that loads every owner assignment for the Rejected badge
     // + one count of the projects without a center (shown to managers)
-    // + the two HR queries of EmployeeProfile behind the owner chips' positions.
-    expect($queries)->toBeLessThanOrEqual(21);
+    // + the two HR queries of EmployeeProfile behind the owner chips' positions
+    // + one load of the linked proposals' statuses for the funding badge (T08).
+    expect($queries)->toBeLessThanOrEqual(22);
 });
 
 test('a board card hides relations it has none of and keeps a materialised risk', function () {

@@ -36,7 +36,7 @@ test('an approved proposal is important; a status note is recorded on the propos
     $proposal->forceFill(['status' => ProposalStatus::Approved])->save();
     ProposalStatusNote::factory()->create(['proposal_id' => $proposal->id, 'context' => 'Signed by donor']);
 
-    expect(Activity::query()->orderBy('id')->pluck('event')->all())->toBe(['proposal.status_changed', 'proposal.status_note_added'])
+    expect(Activity::query()->orderBy('id')->pluck('event')->all())->toBe(['proposal.approved', 'proposal.status_note_added'])
         ->and(UserNotification::query()->forUser($financial)->sole()->priority)->toBe(NotificationPriority::Important);
 });
 

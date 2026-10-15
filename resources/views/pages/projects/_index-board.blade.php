@@ -187,6 +187,7 @@
                                             <div class="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
                                                 <x-ui.employee-chip :employee="$project->user" compact />
                                                 <x-ui.assignment-badge :project="$project" />
+                                                <x-ui.project-funding-badge :project="$project" />
                                             </div>
                                         </div>
                                     </div>

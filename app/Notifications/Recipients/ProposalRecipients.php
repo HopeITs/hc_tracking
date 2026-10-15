@@ -58,8 +58,9 @@ final class ProposalRecipients extends WatcherRecipients
 
     public function isKeyEvent(Activity $activity): bool
     {
-        return $activity->event === 'proposal.status_changed'
-            && in_array($this->changedTo($activity, 'status'), ['approved', 'rejected'], true);
+        return $activity->event === 'proposal.approved'
+            || ($activity->event === 'proposal.status_changed'
+                && in_array($this->changedTo($activity, 'status'), ['approved', 'rejected'], true));
     }
 
     public function priority(Activity $activity): NotificationPriority

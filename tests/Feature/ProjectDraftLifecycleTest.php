@@ -3,6 +3,8 @@
 use App\Actions\Projects\ArchiveProject;
 use App\Actions\Projects\RestoreProject;
 use App\Actions\Projects\SaveProject;
+use App\Actions\Proposals\ApproveProposal;
+use App\Enums\AssignmentStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\ProposalStatus;
 use App\Models\Program;
@@ -23,9 +25,9 @@ use Livewire\Livewire;
  * Drafts that hold dates without a donor-approved proposal behind them.
  *
  * The invariant of §3: a draft holds dates only while it is linked to a
- * donor-approved proposal and waits for its owner's acknowledgement. T08
- * extends the exemption when it writes that path; until then no draft may
- * hold dates at all.
+ * donor-approved proposal and waits for its owner's acknowledgement. A draft
+ * whose owner has already acknowledged would have been approved, so it is a
+ * violation too (T08).
  *
  * @return list<int>
  */
@@ -36,16 +38,32 @@ function draftsHoldingDatesWithoutApproval(): array
         array_filter(ProposalStatus::cases(), fn (ProposalStatus $status): bool => $status->isApprovedByDonor()),
     );
 
-    return Project::query()
+    $awaitingAcknowledgement = Project::query()
+        ->where('status', ProjectStatus::Draft->value)
+        ->where(fn ($query) => $query->whereNotNull('start_date')->orWhereNotNull('end_date'))
+        ->whereIn('id', DB::table('project_proposal')
+            ->join('proposals', 'proposals.id', '=', 'project_proposal.proposal_id')
+            ->whereIn('proposals.status', $approved)
+            ->select('project_proposal.project_id'))
+        ->get()
+        ->filter(fn (Project $project): bool => $project->user_id !== null && $project->isAssignmentAcknowledged('user_id'))
+        ->pluck('id')
+        ->all();
+
+    $withoutApprovedProposal = Project::query()
         ->where('status', ProjectStatus::Draft->value)
         ->where(fn ($query) => $query->whereNotNull('start_date')->orWhereNotNull('end_date'))
         ->whereNotIn('id', DB::table('project_proposal')
             ->join('proposals', 'proposals.id', '=', 'project_proposal.proposal_id')
             ->whereIn('proposals.status', $approved)
             ->select('project_proposal.project_id'))
-        ->orderBy('id')
         ->pluck('id')
         ->all();
+
+    $ids = [...$awaitingAcknowledgement, ...$withoutApprovedProposal];
+    sort($ids);
+
+    return $ids;
 }
 
 beforeEach(function () {
@@ -302,4 +320,25 @@ test('the draft messages read in Arabic', function () {
         ->set('tab', 'plan')
         ->assertSee('تُفعَّل الخطة الزمنية بعد اعتماد المقترح')
         ->assertSee('لا يوجد مقترح فعّال');
+});
+
+test('the draft invariant holds after an approval: waiting drafts hold dates, acknowledged ones are approved', function () {
+    $proposal = Proposal::factory()->create(['status' => ProposalStatus::Submitted, 'planned_date_begin' => '2026-11-01', 'planned_date_end' => '2027-10-31']);
+    $waiting = Project::factory()->create();
+    $acknowledged = Project::factory()->create();
+    $acknowledged->currentAssignment('user_id')->forceFill(['status' => AssignmentStatus::Acknowledged])->save();
+    $proposal->projects()->attach([$waiting->id => ['target_beneficiaries' => 10], $acknowledged->id => ['target_beneficiaries' => 10]]);
+
+    $this->actingAs(userWithRole('Financial'));
+    app(ApproveProposal::class)->handle($proposal, ProposalStatus::Submitted, [
+        'actual_date_begin' => '2026-11-01',
+        'actual_date_end' => '2027-10-31',
+        'decision_date' => today()->toDateString(),
+        'approval_note' => 'The donor confirmed by email.',
+    ]);
+
+    expect($waiting->fresh()->status)->toBe(ProjectStatus::Draft)
+        ->and($waiting->fresh()->start_date)->not->toBeNull()
+        ->and($acknowledged->fresh()->status)->toBe(ProjectStatus::Approved)
+        ->and(draftsHoldingDatesWithoutApproval())->toBe([]);
 });

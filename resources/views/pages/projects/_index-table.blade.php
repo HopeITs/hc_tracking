@@ -115,7 +115,10 @@
                             </x-ui.data-table.cell>
 
                             <x-ui.data-table.cell :label="__('common.status')">
-                                <x-ui.enum-badge :case="$project->status" />
+                                <div class="flex flex-wrap items-center gap-1.5">
+                                    <x-ui.enum-badge :case="$project->status" />
+                                    <x-ui.project-funding-badge :project="$project" />
+                                </div>
                             </x-ui.data-table.cell>
 
                             <x-ui.data-table.cell>

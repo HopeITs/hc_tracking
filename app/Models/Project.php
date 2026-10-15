@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Actions\Projects\ApproveProjectFromProposal;
 use App\Concerns\HasAssignments;
 use App\Concerns\HasSlug;
 use App\Concerns\RecordsActivity;
@@ -72,6 +73,13 @@ class Project extends Model implements TracksActivity
 {
     /** @use HasFactory<ProjectFactory> */
     use HasAssignments, HasFactory, HasSlug, RecordsActivity;
+
+    /**
+     * How the pending save came about, read by activityProperties().
+     *
+     * @var array<string, mixed>
+     */
+    protected array $activityContext = [];
 
     protected function slugSource(): string
     {
@@ -160,6 +168,36 @@ class Project extends Model implements TracksActivity
         $this->loadMissing('proposals:proposals.id,proposals.status');
 
         return $this->proposals->contains(fn (Proposal $proposal): bool => ! $proposal->status->isTerminal());
+    }
+
+    /**
+     * Where the project stands on its way to being funded, for the badge on
+     * the list and the detail page; null when nothing is pending. Display
+     * only, never stored. Reads the eager-loaded `proposals:id,status` and
+     * `ownerAssignment`.
+     *
+     * - `awaiting_owner`: a draft with a donor-approved proposal whose owner
+     *   has not acknowledged (and has not rejected).
+     * - `awaiting_funding`: a draft whose proposals are submitted, not yet approved.
+     * - `funded_awaiting_template`: approved, waiting for MEAL's report template.
+     */
+    public function fundingState(): ?string
+    {
+        $this->loadMissing(['proposals:proposals.id,proposals.status', 'ownerAssignment']);
+
+        if ($this->status === ProjectStatus::Approved) {
+            return 'funded_awaiting_template';
+        }
+
+        if ($this->status !== ProjectStatus::Draft) {
+            return null;
+        }
+
+        if ($this->proposals->contains(fn (Proposal $proposal): bool => $proposal->status->isApprovedByDonor())) {
+            return $this->isOwnerRejected() || $this->ownerAssignment?->status === AssignmentStatus::Acknowledged ? null : 'awaiting_owner';
+        }
+
+        return $this->proposals->contains(fn (Proposal $proposal): bool => $proposal->status === ProposalStatus::Submitted) ? 'awaiting_funding' : null;
     }
 
     /**
@@ -404,6 +442,42 @@ class Project extends Model implements TracksActivity
     }
 
     /**
+     * A move to approved or active is its own event (contracts.md §15), so one
+     * change raises one event; any other status move stays status_changed.
+     */
+    protected function activityEventForChange(string $field, mixed $old, mixed $new): ?string
+    {
+        if ($field === 'status') {
+            return match ($new) {
+                ProjectStatus::Approved->value => 'approved',
+                ProjectStatus::Active->value => 'activated',
+                default => 'status_changed',
+            };
+        }
+
+        return $this->activityEvents()[$field] ?? null;
+    }
+
+    /**
+     * Remember how the next save came about (the approval path and the
+     * proposal behind it) so the activity it records carries it.
+     *
+     * @param  array<string, mixed>  $context
+     */
+    public function setActivityContext(array $context): void
+    {
+        $this->activityContext = $context;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function activityProperties(string $event): array
+    {
+        return in_array($event, ['project.approved', 'project.activated'], true) ? $this->activityContext : [];
+    }
+
+    /**
      * @return list<string>
      */
     public function activityEmployeeFields(): array
@@ -419,6 +493,17 @@ class Project extends Model implements TracksActivity
     public function assignmentFields(): array
     {
         return ['user_id'];
+    }
+
+    /**
+     * The owner acknowledged being in charge: a draft that waits on a
+     * donor-approved proposal becomes approved. A no-op otherwise.
+     */
+    public function assignmentAcknowledged(string $field): void
+    {
+        if ($field === 'user_id') {
+            app(ApproveProjectFromProposal::class)->handle($this, 'owner_acknowledgement');
+        }
     }
 
     /**

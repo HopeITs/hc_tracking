@@ -74,6 +74,15 @@ class ProjectPolicy
     }
 
     /**
+     * Determine whether the user can activate an approved project: MEAL, by
+     * confirming its report template (ConfirmReportTemplate, T33).
+     */
+    public function activate(User $user, Project $project): bool
+    {
+        return $user->can('report-templates.manage');
+    }
+
+    /**
      * Determine whether the user can archive or restore the project.
      */
     public function delete(User $user, Project $project): bool

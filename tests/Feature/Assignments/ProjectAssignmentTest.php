@@ -3,11 +3,13 @@
 use App\Enums\AssignmentStatus;
 use App\Enums\NotificationPriority;
 use App\Enums\ProjectStatus;
+use App\Enums\ProposalStatus;
 use App\Models\Activity;
 use App\Models\Assignment;
 use App\Models\HrContract;
 use App\Models\Program;
 use App\Models\Project;
+use App\Models\Proposal;
 use App\Models\User;
 use App\Models\UserNotification;
 use App\Notifications\QuickActions;
@@ -437,4 +439,30 @@ test('choosing a program picks its manager, who can be swapped for another progr
         ->assertHasNoErrors();
 
     expect(Project::query()->where('name', 'Swapped owner')->sole()->user_id)->toBe($firstManager);
+});
+
+test('acknowledging on the project page approves a draft waiting on a donor-approved proposal, and rejecting keeps it a draft', function () {
+    ['project' => $project, 'owner' => $owner] = projectAssignedToANewOwner();
+    $proposal = Proposal::factory()->create(['status' => ProposalStatus::Approved, 'actual_date_begin' => '2026-11-01', 'actual_date_end' => '2027-10-31']);
+    $proposal->projects()->attach($project->id, ['target_beneficiaries' => 10]);
+    $project->forceFill(['start_date' => '2026-11-01', 'end_date' => '2027-10-31'])->saveQuietly();
+
+    Livewire::actingAs($owner)
+        ->test('pages::projects.show', ['project' => $project])
+        ->call('openAssignmentModal', 'reject')
+        ->set('assignmentNote', 'I cannot take this project on.')
+        ->call('submitAssignment');
+
+    expect($project->fresh()->status)->toBe(ProjectStatus::Draft)
+        ->and($project->fresh()->isOwnerRejected())->toBeTrue();
+
+    // The top level lifting the block is covered by ProposalApprovalTest; here the same person is asked again.
+    $project->currentAssignment('user_id')->forceFill(['status' => AssignmentStatus::Pending])->save();
+
+    Livewire::actingAs($owner)
+        ->test('pages::projects.show', ['project' => $project])
+        ->call('openAssignmentModal', 'acknowledge')
+        ->call('submitAssignment');
+
+    expect($project->fresh()->status)->toBe(ProjectStatus::Approved);
 });

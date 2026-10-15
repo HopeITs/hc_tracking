@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Facades\DB;
 
 /**
  * One time a person was put in a "responsible" field of a record (a project's
@@ -159,9 +160,17 @@ class Assignment extends Model
     {
         $note = $note === null || trim($note) === '' ? null : trim($note);
 
-        $this->respond(AssignmentStatus::Acknowledged, $user, $note);
-        $this->syncAssigneeNotifications(markRead: true, stripActions: true);
-        $this->recordOnAssignable('assignment_acknowledged', $note);
+        DB::transaction(function () use ($user, $note): void {
+            $this->respond(AssignmentStatus::Acknowledged, $user, $note);
+            $this->syncAssigneeNotifications(markRead: true, stripActions: true);
+            $this->recordOnAssignable('assignment_acknowledged', $note);
+
+            $assignable = $this->assignable;
+
+            if ($assignable instanceof Model && method_exists($assignable, 'assignmentAcknowledged')) {
+                $assignable->assignmentAcknowledged($this->field);
+            }
+        });
     }
 
     /**

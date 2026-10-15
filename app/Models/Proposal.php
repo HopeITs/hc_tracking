@@ -291,6 +291,16 @@ class Proposal extends Model implements TracksActivity
     }
 
     /**
+     * Whether ApproveProposal accepts the proposal now: submitted, or on hold
+     * entered from submitted (contracts.md §2).
+     */
+    public function canBeApproved(): bool
+    {
+        return $this->status === ProposalStatus::Submitted
+            || ($this->status === ProposalStatus::OnHold && $this->statusBefore(ProposalStatus::OnHold) === ProposalStatus::Submitted);
+    }
+
+    /**
      * The stop of the main lifecycle line the proposal sits at.
      *
      * On hold and rejected sit at the stop they left (a rejection during a
@@ -407,6 +417,19 @@ class Proposal extends Model implements TracksActivity
     public function activityProgramId(): ?int
     {
         return null;
+    }
+
+    /**
+     * Donor approval is its own event (contracts.md §15); the other status
+     * moves stay proposal.status_changed.
+     */
+    protected function activityEventForChange(string $field, mixed $old, mixed $new): ?string
+    {
+        if ($field === 'status' && $new === ProposalStatus::Approved->value) {
+            return 'approved';
+        }
+
+        return $this->activityEvents()[$field] ?? null;
     }
 
     /**

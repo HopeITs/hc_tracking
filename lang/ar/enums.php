@@ -49,6 +49,7 @@ return [
         'other' => 'أخرى',
         'final_report' => 'التقرير الختامي',
         'final_report_acceptance' => 'موافقة الممول على التقرير الختامي',
+        'donor_approval' => 'موافقة المانح',
     ],
     'dependency_type' => [
         'fs' => 'من النهاية إلى البداية',
