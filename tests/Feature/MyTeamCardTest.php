@@ -27,7 +27,7 @@ function teamSupervision(int $supervisorEmployeeId, int $superviseeEmployeeId): 
 /**
  * A task assigned to one HR employee only.
  */
-function taskAssignedTo(int $employeeId, string $dueDate, TaskStatus $status = TaskStatus::InProgress): Task
+function supervisedTaskAssignedTo(int $employeeId, string $dueDate, TaskStatus $status = TaskStatus::InProgress): Task
 {
     $task = Task::factory()->create(['due_date' => $dueDate, 'status' => $status]);
     $task->taskAssignees()->delete();
@@ -67,11 +67,11 @@ test('it counts each supervisee\'s overdue open tasks, from HR and local supervi
     insertHrContract($hrReport, insertHrPosition($department, directManagerId: $managerPosition));
     teamSupervision($supervisor->employee_id, $localReport);
 
-    taskAssignedTo($hrReport, '2026-09-01');
-    taskAssignedTo($hrReport, '2026-09-10', TaskStatus::Todo);
-    taskAssignedTo($hrReport, '2026-09-02', TaskStatus::Done);
-    taskAssignedTo($hrReport, '2026-09-20');
-    taskAssignedTo($localReport, '2026-09-20');
+    supervisedTaskAssignedTo($hrReport, '2026-09-01');
+    supervisedTaskAssignedTo($hrReport, '2026-09-10', TaskStatus::Todo);
+    supervisedTaskAssignedTo($hrReport, '2026-09-02', TaskStatus::Done);
+    supervisedTaskAssignedTo($hrReport, '2026-09-20');
+    supervisedTaskAssignedTo($localReport, '2026-09-20');
 
     expect(myTeamFor($supervisor))->toBe([
         ['employeeId' => $hrReport, 'name' => 'Omar Khalil', 'overdue' => 2],
@@ -94,7 +94,7 @@ test('tasks the supervisor cannot see are not counted', function () {
     insertHrContract($supervisor->employee_id, insertHrPosition($media));
     teamSupervision($supervisor->employee_id, $supervisee);
 
-    taskAssignedTo($supervisee, '2026-09-01');
+    supervisedTaskAssignedTo($supervisee, '2026-09-01');
 
     expect(myTeamFor($supervisor))->toBe([
         ['employeeId' => $supervisee, 'name' => 'Sami Haddad', 'overdue' => 0],
@@ -105,7 +105,7 @@ test('an inactive supervisee is not listed', function () {
     $supervisor = userWithRole('Managers', insertHrEmployee());
     $inactive = insertHrEmployee(isActive: false);
     teamSupervision($supervisor->employee_id, $inactive);
-    taskAssignedTo($inactive, '2026-09-01');
+    supervisedTaskAssignedTo($inactive, '2026-09-01');
 
     expect(myTeamFor($supervisor))->toBe([]);
     Livewire::actingAs($supervisor)->test('pages::dashboard.index')->assertDontSeeHtml('data-my-team');
@@ -118,7 +118,7 @@ test('the card costs the same queries for one or ten supervisees', function () {
         foreach (range(1, $superviseeCount) as $index) {
             $supervisee = insertHrEmployee();
             teamSupervision($supervisor->employee_id, $supervisee);
-            taskAssignedTo($supervisee, '2026-09-01');
+            supervisedTaskAssignedTo($supervisee, '2026-09-01');
         }
 
         // A new request: forget the previous run's map, then render once so the
