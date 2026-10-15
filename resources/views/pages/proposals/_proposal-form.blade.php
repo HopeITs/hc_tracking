@@ -14,5 +14,7 @@
         :locked-donor-name="$this->proposalEditFacts['donorLocked'] ? $this->proposalDonors->firstWhere('id', (int) $donorId)?->name : null"
         :needs-beneficiaries-reason="$this->proposalEditFacts['approved']"
         :skipping="$startingStage === ProposalStatus::ProposalDraft->value"
+        :renewable="$this->renewableProposals"
+        :renewal="$this->renewalPreview"
         :stored-number="$editingProposalId !== null ? $internalProjectNumber : null"
     />

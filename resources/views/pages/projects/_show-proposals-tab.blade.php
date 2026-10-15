@@ -1,3 +1,30 @@
+        @if ($this->fundingHistory->isNotEmpty())
+            <x-ui.panel :title="__('projects.funding_history')" :count="$this->fundingHistory->count()" :subtitle="__('projects.funding_history_hint')" class="mb-4" data-test="funding-history">
+                <ol class="divide-y divide-secondary-soft dark:divide-line">
+                    @foreach ($this->fundingHistory as $entry)
+                        <li class="grid gap-x-4 gap-y-1 px-4 py-3 text-sm @2xl/detail:grid-cols-[minmax(0,2fr)_minmax(0,1.5fr)_auto_auto] @2xl/detail:items-center" wire:key="funding-history-{{ $entry->id }}">
+                            <div class="min-w-0">
+                                @if ($this->canViewProposals())
+                                    <a href="{{ route('proposals.show', $entry) }}" wire:navigate class="font-semibold text-secondary-dark hover:underline dark:text-ink" dir="auto">{{ $entry->name }}</a>
+                                @else
+                                    <span class="font-semibold text-secondary-dark dark:text-ink" dir="auto">{{ $entry->name }}</span>
+                                @endif
+                                <x-ui.project-number :number="$entry->internal_project_number" kind="internal" class="text-xs text-secondary-medium dark:text-ink-muted" />
+                                @if ($entry->previousProposal !== null)
+                                    <span class="block text-xs text-secondary-medium dark:text-ink-muted" dir="auto">{{ __('projects.funding_history_renews', ['number' => $entry->previousProposal->internal_project_number]) }}</span>
+                                @endif
+                            </div>
+                            <span class="min-w-0 truncate text-secondary-medium dark:text-ink-muted" dir="auto">{{ $entry->donor->name ?? '—' }}</span>
+                            <x-ui.enum-badge :case="$entry->status" />
+                            <span class="tabular-nums text-xs text-secondary-medium dark:text-ink-muted" dir="ltr">
+                                {{ $entry->planned_date_begin?->format('Y') }}–{{ $entry->planned_date_end?->format('Y') }}@if ($entry->actual_date_begin !== null) · {{ $entry->actual_date_begin->format('Y') }}–{{ $entry->actual_date_end?->format('Y') ?? '…' }}@endif
+                            </span>
+                        </li>
+                    @endforeach
+                </ol>
+            </x-ui.panel>
+        @endif
+
         <x-ui.panel :title="__('projects.linked_proposals')" :count="$this->attachedProposals->count()" :subtitle="__('projects.a_project_may_be_funded_by_several_proposals_and_a_proposal')">
             <x-slot:toolbar>
                 @can('proposals.update')

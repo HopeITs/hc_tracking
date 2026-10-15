@@ -12,6 +12,7 @@ use App\Enums\ProposalStatus;
 use App\Notifications\TracksActivity;
 use App\Observers\MediaOwnerObserver;
 use App\Observers\PlanIndicatorSourceObserver;
+use App\Observers\ProposalObserver;
 use App\Support\ProposalTransitions;
 use Carbon\CarbonImmutable;
 use Database\Factories\ProposalFactory;
@@ -66,7 +67,7 @@ use Illuminate\Support\Facades\DB;
     'final_report_accepted_by',
     'previous_proposal_id',
 ])]
-#[ObservedBy([PlanIndicatorSourceObserver::class, MediaOwnerObserver::class])]
+#[ObservedBy([PlanIndicatorSourceObserver::class, MediaOwnerObserver::class, ProposalObserver::class])]
 class Proposal extends Model implements TracksActivity
 {
     /** @use HasFactory<ProposalFactory> */
@@ -129,6 +130,27 @@ class Proposal extends Model implements TracksActivity
     public function delete(): bool
     {
         return (bool) DB::transaction(fn () => parent::delete());
+    }
+
+    /**
+     * The proposal this one renews, or null when it starts a funding line or
+     * its predecessor was deleted.
+     *
+     * @return BelongsTo<Proposal, $this>
+     */
+    public function previousProposal(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'previous_proposal_id');
+    }
+
+    /**
+     * The proposals that renew this one.
+     *
+     * @return HasMany<Proposal, $this>
+     */
+    public function renewals(): HasMany
+    {
+        return $this->hasMany(self::class, 'previous_proposal_id');
     }
 
     /**
@@ -424,6 +446,20 @@ class Proposal extends Model implements TracksActivity
     protected function activityExcludedFields(): array
     {
         return ['requested_budget'];
+    }
+
+    /**
+     * A renewal's creation names the proposal it renews.
+     *
+     * @return array<string, mixed>
+     */
+    protected function activityProperties(string $event): array
+    {
+        $previousId = $this->activityAttribute('previous_proposal_id');
+
+        return $event === $this->getMorphClass().'.created' && $previousId !== null
+            ? ['renewed_from' => (int) $previousId]
+            : [];
     }
 
     public function activityModule(): string

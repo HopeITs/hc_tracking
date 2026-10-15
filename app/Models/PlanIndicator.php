@@ -12,6 +12,7 @@ use App\Notifications\TracksActivity;
 use Carbon\CarbonImmutable;
 use Database\Factories\PlanIndicatorFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -107,6 +108,41 @@ class PlanIndicator extends Model implements TracksActivity
         }
 
         return (float) $approved->sum(fn (Report $report): float => (float) $report->value);
+    }
+
+    /**
+     * What the renewed proposal's matching target reached last year, shown
+     * beside a target as a reference only (T10, D-11).
+     *
+     * The match is the previous proposal's target on the same project whose
+     * indicator is linked to the same library entry. Returns null for a
+     * target that is not in a renewal, has no library link, or has no match.
+     *
+     * @return array{value: ?float, percent: ?float}|null
+     */
+    public static function previousYearReference(self $target): ?array
+    {
+        if ($target->source_type !== 'proposal') {
+            return null;
+        }
+
+        $libraryId = $target->indicator()->value('library_indicator_id');
+        $previousId = Proposal::query()->whereKey($target->source_id)->value('previous_proposal_id');
+
+        if ($libraryId === null || $previousId === null || $target->project_id === null) {
+            return null;
+        }
+
+        $match = self::query()
+            ->where('source_type', 'proposal')
+            ->where('source_id', $previousId)
+            ->where('project_id', $target->project_id)
+            ->whereHas('indicator', fn (Builder $query) => $query->where('library_indicator_id', $libraryId))
+            ->with(['reports', 'indicator'])
+            ->orderBy('id')
+            ->first();
+
+        return $match === null ? null : ['value' => $match->achievedValue(), 'percent' => $match->percentAchieved()];
     }
 
     /**

@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Proposals;
 
+use App\Actions\Proposals\CloneProposalForRenewal;
 use App\Actions\Proposals\SaveProposal;
 use App\Enums\ProposalStatus;
 use App\Models\Donor;
 use App\Models\HrCenter;
 use App\Models\HrProgram;
+use App\Models\Milestone;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\Result;
+use App\Models\Task;
 use App\Models\User;
 use App\Support\Like;
 use Flux\Flux;
@@ -76,6 +80,14 @@ trait ManagesProposalForm
     public string $startingStage = 'concept note';
 
     public string $skipReason = '';
+
+    /**
+     * The proposal being renewed (T10, "Start from previous proposal"), or ''
+     * for a plain create. Chosen from renewableProposals() and read again by
+     * CloneProposalForRenewal, which also refuses an invisible or
+     * non-renewable one.
+     */
+    public string $previousProposalId = '';
 
     /**
      * Called after a proposal is created or edited through the form.
@@ -197,6 +209,105 @@ trait ManagesProposalForm
     }
 
     /**
+     * The proposals a renewal can start from: visible to the user, approved,
+     * active, completed or rejected, newest first (T10).
+     *
+     * @return list<array{id: int, label: string}>
+     */
+    #[Computed]
+    public function renewableProposals(): array
+    {
+        if (! $this->showProposalModal || $this->editingProposalId !== null || ! $this->proposalActor()->can('proposals.view')) {
+            return [];
+        }
+
+        return Proposal::query()
+            ->select(['id', 'name', 'internal_project_number'])
+            ->whereIn('status', array_map(fn (ProposalStatus $status): string => $status->value, CloneProposalForRenewal::RenewableStatuses))
+            ->orderByDesc('id')
+            ->limit(200)
+            ->get()
+            ->map(fn (Proposal $proposal): array => ['id' => $proposal->id, 'label' => $proposal->internal_project_number.' — '.$proposal->name])
+            ->all();
+    }
+
+    /**
+     * What choosing the previous proposal will and will not copy (T10): its
+     * projects and the counts of framework nodes, milestones and tasks, plus
+     * the number of a renewal draft that already exists. Counts only.
+     *
+     * @return array{projects: list<array{id: int, name: string, place: string}>, results: int, milestones: int, tasks: int, existingDraft: ?string}|null
+     */
+    #[Computed]
+    public function renewalPreview(): ?array
+    {
+        $previous = $this->selectedRenewable();
+
+        if ($previous === null) {
+            return null;
+        }
+
+        $projects = $previous->projects()
+            ->select(['projects.id', 'projects.name', 'projects.center_id', 'projects.program_id', 'projects.city_id'])
+            ->with('city:id,name_en,name_ar')
+            ->orderBy('projects.id')
+            ->get();
+
+        return [
+            'projects' => $this->projectRows($projects),
+            'results' => Result::query()->where('proposal_id', $previous->id)->count(),
+            'milestones' => Milestone::query()->where('proposal_id', $previous->id)->count(),
+            'tasks' => Task::query()->withoutGlobalScopes()->where('source_type', 'proposal')->where('source_id', $previous->id)->count(),
+            'existingDraft' => CloneProposalForRenewal::existingDraftFor($previous)?->internal_project_number,
+        ];
+    }
+
+    /**
+     * Choosing (or clearing) the previous proposal pre-fills the form from it:
+     * name, notes and the planned dates one year on. The internal number stays
+     * blank, since the renewal needs its own.
+     */
+    public function updatedPreviousProposalId(): void
+    {
+        $this->resetValidation();
+        $previous = $this->selectedRenewable();
+
+        if ($previous === null) {
+            $this->previousProposalId = '';
+
+            return;
+        }
+
+        $span = (int) $previous->planned_date_begin->diffInDays($previous->planned_date_end);
+        $begin = $previous->planned_date_end->addDay();
+
+        $this->name = $previous->name;
+        $this->notes = $previous->notes ?? '';
+        $this->plannedDateBegin = $begin->toDateString();
+        $this->plannedDateEnd = $begin->addDays($span)->toDateString();
+    }
+
+    /**
+     * The chosen previous proposal when it is visible and renewable, else null.
+     */
+    private function selectedRenewable(): ?Proposal
+    {
+        if (! $this->showProposalModal || $this->editingProposalId !== null || ! ctype_digit($this->previousProposalId)) {
+            return null;
+        }
+
+        $proposal = Proposal::query()
+            ->select(['id', 'name', 'notes', 'status', 'planned_date_begin', 'planned_date_end'])
+            ->find((int) $this->previousProposalId);
+
+        return $proposal !== null
+            && in_array($proposal->status, CloneProposalForRenewal::RenewableStatuses, true)
+            && $this->proposalActor()->can('view', $proposal)
+                ? $proposal
+                : null;
+    }
+
+    /**
      * Open an empty create form. A project id (New Concept Note on the
      * project page) is pre-selected only when it may take a proposal; the
      * save checks it again.
@@ -291,6 +402,12 @@ trait ManagesProposalForm
 
         $this->resetValidation();
 
+        if ($existing === null && $this->previousProposalId !== '') {
+            $this->renewProposal();
+
+            return;
+        }
+
         try {
             $proposal = app(SaveProposal::class)->handle($existing, $this->proposalFormData($existing === null), $this->proposalActor());
         } catch (UniqueConstraintViolationException $exception) {
@@ -312,6 +429,55 @@ trait ManagesProposalForm
         Flux::toast(
             variant: 'success',
             text: $existing === null ? __('proposals.proposal_created') : __('proposals.proposal_updated'),
+        );
+    }
+
+    /**
+     * Save a renewal through CloneProposalForRenewal (T10): the projects, donor
+     * and framework come from the previous proposal, never from the form.
+     */
+    private function renewProposal(): void
+    {
+        $previous = $this->selectedRenewable();
+
+        if ($previous === null) {
+            $this->addError('previousProposalId', __('proposals.choose_previous'));
+
+            return;
+        }
+
+        try {
+            $result = app(CloneProposalForRenewal::class)->handle($previous, [
+                'internalProjectNumber' => $this->internalProjectNumber,
+                'name' => $this->name,
+                'notes' => $this->notes === '' ? null : $this->notes,
+                'plannedDateBegin' => $this->plannedDateBegin === '' ? null : $this->plannedDateBegin,
+                'plannedDateEnd' => $this->plannedDateEnd === '' ? null : $this->plannedDateEnd,
+            ], $this->proposalActor());
+        } catch (UniqueConstraintViolationException $exception) {
+            if (! str_contains($exception->getMessage(), 'proposals_internal_project_number_unique')) {
+                throw $exception;
+            }
+
+            $this->addError('internalProjectNumber', __('validation.unique', ['attribute' => __('validation.attributes.internalProjectNumber')]));
+
+            return;
+        }
+
+        $notes = array_values(array_filter([
+            $result['skippedProjects'] === [] ? null : __('proposals.renewal_skipped_projects', ['names' => implode('، ', $result['skippedProjects'])]),
+            $result['replacedProjects'] === [] ? null : __('proposals.renewal_replaced_projects', ['names' => implode('، ', $result['replacedProjects'])]),
+            $result['skippedIndicators'] === [] ? null : __('proposals.renewal_skipped_indicators', ['names' => implode('، ', $result['skippedIndicators'])]),
+            $result['skippedParts'] === [] ? null : __('proposals.renewal_created_partial', ['parts' => implode('، ', array_map(fn (string $part): string => $part === 'framework' ? __('proposals.renewal_part_framework') : __('proposals.renewal_part_plan'), $result['skippedParts']))]),
+        ]));
+
+        $this->showProposalModal = false;
+        $this->resetProposalForm();
+        $this->proposalSaved($result['proposal'], true);
+
+        Flux::toast(
+            variant: $notes === [] ? 'success' : 'warning',
+            text: implode(' ', [__('proposals.renewal_created'), ...$notes]),
         );
     }
 
@@ -339,6 +505,7 @@ trait ManagesProposalForm
         $this->notes = '';
         $this->startingStage = ProposalStatus::ConceptNote->value;
         $this->skipReason = '';
+        $this->previousProposalId = '';
     }
 
     /**

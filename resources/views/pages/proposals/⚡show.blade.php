@@ -17,6 +17,7 @@ use App\Livewire\Concerns\Proposals\ReadsProposalFunding;
 use App\Livewire\Concerns\Proposals\ReadsProposalHealth;
 use App\Livewire\Concerns\Proposals\ReadsProposalVitals;
 use App\Livewire\Concerns\SwitchesFundingView;
+use App\Models\Activity;
 use App\Models\DonorProposal;
 use App\Models\Media;
 use App\Models\Proposal;
@@ -140,6 +141,40 @@ new #[Title('titles.proposal')] class extends Component
         return Proposal::query()
             ->select(['id', 'name', 'internal_project_number', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end', 'status', 'notes', 'updated_at'])
             ->findOrFail($this->proposalId);
+    }
+
+    /**
+     * The renewal chain around this proposal (T10): the proposal it renews,
+     * the ones that renew it, and whether its predecessor was removed (the
+     * link clears when the predecessor is deleted; the creation activity still
+     * says it renewed one). Names, numbers and statuses only.
+     *
+     * @return array{previous: ?Proposal, removed: bool, next: Collection<int, Proposal>}
+     */
+    #[Computed]
+    public function renewalChain(): array
+    {
+        $previousId = Proposal::query()->whereKey($this->proposalId)->value('previous_proposal_id');
+        $previous = $previousId === null
+            ? null
+            : Proposal::query()->select(['id', 'slug', 'name', 'internal_project_number', 'status'])->find($previousId);
+
+        $removed = $previous === null && Activity::query()
+            ->where('event', 'proposal.created')
+            ->where('subject_type', 'proposal')
+            ->where('subject_id', $this->proposalId)
+            ->get(['id', 'properties'])
+            ->contains(fn (Activity $activity): bool => isset($activity->properties['renewed_from']));
+
+        return [
+            'previous' => $previous,
+            'removed' => $removed,
+            'next' => Proposal::query()
+                ->select(['id', 'slug', 'name', 'internal_project_number', 'status'])
+                ->where('previous_proposal_id', $this->proposalId)
+                ->orderBy('id')
+                ->get(),
+        ];
     }
 
     /** @return Collection<int, ProposalStatusNote> */
@@ -305,6 +340,8 @@ new #[Title('titles.proposal')] class extends Component
     </x-ui.detail-header>
 
     @include('pages.proposals._show-lifecycle')
+
+    @include('pages.proposals._show-renewal-chain')
 
     @include('pages.proposals._show-warnings')
 
