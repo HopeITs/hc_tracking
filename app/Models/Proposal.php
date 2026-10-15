@@ -227,6 +227,17 @@ class Proposal extends Model implements TracksActivity
     }
 
     /**
+     * The proposal's own logical framework (contracts §11.2): every result
+     * whose `proposal_id` is this proposal, roots and children alike.
+     *
+     * @return HasMany<Result, $this>
+     */
+    public function results(): HasMany
+    {
+        return $this->hasMany(Result::class);
+    }
+
+    /**
      * The indicator targets committed in this proposal.
      *
      * @return MorphMany<PlanIndicator, $this>

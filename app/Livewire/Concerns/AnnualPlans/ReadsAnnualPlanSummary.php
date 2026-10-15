@@ -139,15 +139,13 @@ trait ReadsAnnualPlanSummary
     #[Computed]
     public function resultGroups(): SupportCollection
     {
-        $typeOrder = ['impact' => 0, 'outcome' => 1, 'output' => 2];
-
         return $this->targets
             ->groupBy('indicator.result_id')
             ->map(fn (Collection $targets): array => [
                 'result' => $targets->first()->indicator->result,
                 'targets' => $targets,
             ])
-            ->sortBy(fn (array $group): int => $typeOrder[$group['result']->type->value] ?? 99)
+            ->sortBy(fn (array $group): int => $group['result']->type->rank())
             ->values();
     }
 

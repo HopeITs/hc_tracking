@@ -7,12 +7,14 @@
         ResultType::Impact => 'bg-secondary-dark ring-secondary-dark dark:bg-ink dark:ring-ink',
         ResultType::Outcome => 'bg-primary ring-primary',
         ResultType::Output => 'bg-board ring-secondary-light',
+        ResultType::Activity => 'bg-transparent ring-secondary-medium dark:ring-ink-muted',
+        ResultType::CrossCutting => 'bg-secondary-light ring-secondary-light dark:bg-ink-muted dark:ring-ink-muted',
     };
 
     $accent = fn (ResultType $type): string => match ($type) {
         ResultType::Impact => 'h-1 bg-primary',
         ResultType::Outcome => 'h-0.5 bg-primary/60',
-        ResultType::Output => 'h-0.5 bg-transparent',
+        ResultType::Output, ResultType::Activity, ResultType::CrossCutting => 'h-0.5 bg-transparent',
     };
 @endphp
 

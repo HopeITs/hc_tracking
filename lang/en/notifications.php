@@ -471,9 +471,18 @@ return [
             'deleted' => ':actor deleted a target for “:subject”',
         ],
         'result' => [
-            'created' => ':actor added the result “:subject”',
-            'updated' => ':actor updated the result “:subject”',
-            'deleted' => ':actor deleted the result “:subject”',
+            'created' => [
+                'title' => 'Result added',
+                'body' => ':actor added the result “:subject”',
+            ],
+            'updated' => [
+                'title' => 'Result updated',
+                'body' => ':actor updated the result “:subject”',
+            ],
+            'deleted' => [
+                'title' => 'Result deleted',
+                'body' => ':actor deleted the result “:subject”',
+            ],
         ],
         'report' => [
             'created' => ':actor started a report on “:subject”',

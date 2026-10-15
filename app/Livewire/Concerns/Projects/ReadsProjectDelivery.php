@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Livewire\Concerns\Projects;
 
 use App\Enums\IndicatorMeasure;
-use App\Enums\ResultType;
 use App\Models\Indicator;
 use App\Models\Milestone;
 use App\Models\PlanIndicator;
@@ -153,8 +152,6 @@ trait ReadsProjectDelivery
     #[Computed]
     public function targetsByResult(): \Illuminate\Support\Collection
     {
-        $resultOrder = [ResultType::Impact->value => 0, ResultType::Outcome->value => 1, ResultType::Output->value => 2];
-
         return $this->targets
             ->groupBy(fn (PlanIndicator $target) => $target->indicator->result_id)
             ->map(fn (Collection $groupTargets) => [
@@ -167,7 +164,7 @@ trait ReadsProjectDelivery
                     ])
                     ->values(),
             ])
-            ->sortBy(fn (array $group) => $resultOrder[$group['result']->type->value] ?? 99)
+            ->sortBy(fn (array $group): int => $group['result']->type->rank())
             ->values();
     }
 

@@ -115,10 +115,16 @@ return [
         'reviewed' => 'Reviewed',
         'approved' => 'Approved',
     ],
+    'activity_kind' => [
+        'continuous' => 'Continuous',
+        'event' => 'Event',
+    ],
     'result_type' => [
         'impact' => 'Impact',
         'outcome' => 'Outcome',
         'output' => 'Output',
+        'activity' => 'Activity',
+        'cross_cutting' => 'Cross-cutting',
     ],
     'task_priority' => [
         'low' => 'Low',

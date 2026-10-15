@@ -41,7 +41,7 @@
                 <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
                     <x-ui.form-select
                         wire:model.live="parentId"
-                        :label="__('results_framework.contributes_to')"
+                        :label="__('results_framework.contributes_to_label')"
                         :disabled="$resultType === ResultType::Impact->value"
                         :locked-reason="__('results_framework.an_impact_sits_at_the_top_of_the_chain')"
                         :help="__('results_framework.only_the_level_directly_above_is_offered')"

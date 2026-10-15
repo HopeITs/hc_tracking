@@ -65,4 +65,5 @@ return [
     'zoom_days' => 'Days',
     'zoom_months' => 'Months',
     'zoom_weeks' => 'Weeks',
+    'milestone_activity' => 'Choose an activity from the framework of this project\'s proposal.',
 ];

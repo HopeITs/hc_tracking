@@ -15,23 +15,33 @@
     $children = $node['children'];
     $lineage = $node['lineage'];
 
-    /* The one Impact/Outcome/Output identity used across programs, projects and this page. */
+    /* The one ResultType identity used across programs, projects and this page: an activity is a hollow dot with no accent bar. */
     $mark = match ($result->type) {
         ResultType::Impact => 'bg-secondary-dark ring-secondary-dark dark:bg-ink dark:ring-ink',
         ResultType::Outcome => 'bg-primary ring-primary',
         ResultType::Output => 'bg-board ring-secondary-light',
+        ResultType::Activity => 'bg-transparent ring-secondary-medium dark:ring-ink-muted',
+        ResultType::CrossCutting => 'bg-secondary-light ring-secondary-light dark:bg-ink-muted dark:ring-ink-muted',
     };
 
     $accent = match ($result->type) {
         ResultType::Impact => 'h-1 bg-primary',
         ResultType::Outcome => 'h-0.5 bg-primary/60',
         ResultType::Output => 'h-0.5 bg-transparent',
+        ResultType::Activity, ResultType::CrossCutting => 'h-0.5 bg-transparent',
     };
 
     $statementClasses = match ($result->type) {
         ResultType::Impact => 'text-lg font-bold leading-snug @2xl/directory:text-xl',
         ResultType::Outcome => 'text-base font-semibold leading-snug',
-        ResultType::Output => 'text-sm font-semibold leading-relaxed',
+        ResultType::Output, ResultType::CrossCutting => 'text-sm font-semibold leading-relaxed',
+        ResultType::Activity => 'text-sm font-medium leading-relaxed',
+    };
+
+    /* Levels the page can add a contributing result under (activities come with the logframe tab, T12 slice 2). */
+    $acceptsContributions = match ($result->type) {
+        ResultType::Impact, ResultType::Outcome => true,
+        ResultType::Output, ResultType::Activity, ResultType::CrossCutting => false,
     };
 
     /* Worst rating wins: one red indicator colours the whole statement red. */
@@ -73,8 +83,8 @@
             </span>
 
             <div class="ms-auto flex shrink-0 items-center gap-0.5">
-                {{-- An output is the bottom of the chain: nothing contributes to it. --}}
-                @unless ($result->type === ResultType::Output)
+                {{-- Only levels the chain lets this page nest under offer an add button. --}}
+                @if ($acceptsContributions)
                     <flux:tooltip :content="__('results_framework.add_a_contributing_result')">
                         @can('results.create')<x-ui.button
                             tone="ghost"
@@ -86,7 +96,7 @@
                             data-test="add-child-result-{{ $result->id }}"
                         />@endcan
                     </flux:tooltip>
-                @endunless
+                @endif
 
                 <flux:tooltip :content="__('results_framework.edit_result')">
                     @can('results.update')<x-ui.button
@@ -125,7 +135,7 @@
         @if ($lineage !== [])
             <p class="mt-1.5 flex flex-wrap items-center gap-1 px-4 type-meta text-secondary-medium dark:text-ink-muted">
                 <flux:icon.arrow-turn-down-right variant="micro" class="size-3.5 shrink-0 rtl:-scale-x-100" aria-hidden="true" />
-                <span class="sr-only">{{ __('results_framework.contributes_to') }}</span>
+                <span class="sr-only">{{ __('results_framework.contributes_to_label') }}</span>
                 @foreach ($lineage as $ancestor)
                     <span>{{ Str::limit($ancestor->statement, 48) }}</span>
                     @unless ($loop->last)

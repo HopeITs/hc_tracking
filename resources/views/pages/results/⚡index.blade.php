@@ -72,6 +72,8 @@ new #[Title('titles.results_framework')] class extends Component {
         ResultType::Impact->value => 'bg-secondary-dark ring-secondary-dark dark:bg-ink dark:ring-ink',
         ResultType::Outcome->value => 'bg-primary ring-primary',
         ResultType::Output->value => 'bg-board ring-secondary-light',
+        ResultType::Activity->value => 'bg-transparent ring-secondary-medium dark:ring-ink-muted',
+        ResultType::CrossCutting->value => 'bg-secondary-light ring-secondary-light dark:bg-ink-muted dark:ring-ink-muted',
     ];
 
     $coverageTone = match (true) {

@@ -36,6 +36,8 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
  * @property string $weight_percentage
  * @property int $responsible_user_id
  * @property int|null $parent_milestone_id
+ * @property int|null $proposal_id
+ * @property int|null $result_id
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
@@ -88,6 +90,17 @@ class Milestone extends Model implements TracksActivity
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    /**
+     * The framework activity this milestone delivers (contracts §11.2).
+     * Linked only through LinkMilestoneToActivity, so it is not fillable.
+     *
+     * @return BelongsTo<Result, $this>
+     */
+    public function activity(): BelongsTo
+    {
+        return $this->belongsTo(Result::class, 'result_id');
     }
 
     /**

@@ -29,6 +29,7 @@ function contractEventKeys(): array
         'library_indicator.created', 'library_indicator.updated', 'library_indicator.deactivated', 'library_indicator.reactivated',
         'meal_coverage.assigned', 'meal_coverage.responsible_changed', 'meal_coverage.project_assigned',
         'program.logframe_missing', 'annual_plan.missing', 'supervision.added', 'supervision.removed',
+        'result.created', 'result.updated', 'result.deleted',
     ];
 }
 
@@ -83,6 +84,7 @@ test('importance, oversight and critical follow the contract', function () {
         'project.archived', 'project.created', 'project.sectors_changed',
         'proposal.created', 'proposal.deleted', 'proposal.need_assessment_added', 'proposal.project_linked', 'proposal.project_unlinked',
         'proposal.reviewer_removed', 'proposal.reviewer_seen', 'proposal.targets_saved',
+        'result.created', 'result.deleted', 'result.updated',
         'supervision.added', 'supervision.removed',
     ])
         ->and($critical)->toBe([

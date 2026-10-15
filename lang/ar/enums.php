@@ -115,10 +115,16 @@ return [
         'reviewed' => 'تمت مراجعته',
         'approved' => 'معتمد',
     ],
+    'activity_kind' => [
+        'continuous' => 'مستمر',
+        'event' => 'حدث',
+    ],
     'result_type' => [
         'impact' => 'الأثر',
         'outcome' => 'النتيجة',
         'output' => 'المُخرَج',
+        'activity' => 'النشاط',
+        'cross_cutting' => 'عابر للمستويات',
     ],
     'task_priority' => [
         'low' => 'منخفضة',

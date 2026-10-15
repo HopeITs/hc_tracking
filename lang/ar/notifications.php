@@ -471,9 +471,18 @@ return [
             'deleted' => 'حذف :actor مستهدفًا للمؤشر «:subject»',
         ],
         'result' => [
-            'created' => 'أضاف :actor النتيجة «:subject»',
-            'updated' => 'حدّث :actor النتيجة «:subject»',
-            'deleted' => 'حذف :actor النتيجة «:subject»',
+            'created' => [
+                'title' => 'إضافة نتيجة',
+                'body' => 'أضاف :actor النتيجة «:subject»',
+            ],
+            'updated' => [
+                'title' => 'تحديث نتيجة',
+                'body' => 'حدّث :actor النتيجة «:subject»',
+            ],
+            'deleted' => [
+                'title' => 'حذف نتيجة',
+                'body' => 'حذف :actor النتيجة «:subject»',
+            ],
         ],
         'report' => [
             'created' => 'بدأ :actor تقريرًا عن «:subject»',

@@ -4,19 +4,15 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Results;
 
-use App\Enums\Period;
+use App\Actions\Results\DeleteResult;
+use App\Actions\Results\SaveResult;
 use App\Enums\ResultType;
-use App\Models\AnnualPlan;
-use App\Models\Indicator;
-use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Result;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Enum;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 
@@ -32,6 +28,19 @@ use Livewire\Attributes\Locked;
  */
 trait ManagesResultForm
 {
+    /**
+     * SaveResult's error keys => the form property each message belongs to.
+     *
+     * @var array<string, string>
+     */
+    private const array FORM_FIELDS = [
+        'statement' => 'statement',
+        'type' => 'resultType',
+        'checkout_period' => 'checkoutPeriod',
+        'program_id' => 'resultProgramId',
+        'parent_id' => 'parentId',
+    ];
+
     public bool $showResultModal = false;
 
     public bool $showDeleteModal = false;
@@ -60,16 +69,12 @@ trait ManagesResultForm
     }
 
     /**
-     * The level a statement of this type contributes to, or null for an impact,
-     * which sits at the top of the chain.
+     * The level a statement of this type contributes to, or null for a level
+     * with no parent (impact, cross-cutting, or an unknown value).
      */
     protected function parentLevelOf(string $type): ?ResultType
     {
-        return match (ResultType::tryFrom($type)) {
-            ResultType::Output => ResultType::Outcome,
-            ResultType::Outcome => ResultType::Impact,
-            default => null,
-        };
+        return ResultType::tryFrom($type)?->parentLevel();
     }
 
     /**
@@ -105,6 +110,7 @@ trait ManagesResultForm
         }
 
         return Result::query()
+            ->programFramework()
             ->select(['id', 'statement', 'type', 'program_id'])
             ->with('program:id')
             ->where('type', $parentLevel->value)
@@ -210,78 +216,23 @@ trait ManagesResultForm
     {
         Gate::authorize($this->editingResultId === null ? 'results.create' : 'results.update');
 
-        $this->statement = trim($this->statement);
+        $existing = $this->editingResultId === null ? null : Result::query()->findOrFail($this->editingResultId);
 
-        $validated = $this->validate([
-            'statement' => ['required', 'string'],
-            'resultType' => ['required', new Enum(ResultType::class)],
-            'checkoutPeriod' => ['required', new Enum(Period::class)],
-            'resultProgramId' => ['nullable', 'integer', Rule::exists(Program::class, 'id')],
-            'parentId' => ['nullable', 'integer', Rule::exists(Result::class, 'id')],
-        ], [
-            'statement.required' => __('results_framework.write_the_result_statement'),
-            'resultType.required' => __('results_framework.choose_impact_outcome_or_output'),
-            'checkoutPeriod.required' => __('common.choose_how_often_this_is_checked'),
-        ]);
-
-        $result = $this->editingResultId === null
-            ? new Result
-            : Result::query()->findOrFail($this->editingResultId);
-
-        $parentId = $validated['parentId'] === '' || $validated['parentId'] === null ? null : (int) $validated['parentId'];
-        $programId = $validated['resultProgramId'] === '' || $validated['resultProgramId'] === null ? null : (int) $validated['resultProgramId'];
-        $type = ResultType::from($validated['resultType']);
-
-        if ($parentId !== null) {
-            $parent = Result::query()->select(['id', 'type', 'program_id'])->findOrFail($parentId);
-
-            if ($parent->type !== $this->parentLevelOf($type->value)) {
-                $this->addError('parentId', __('results_framework.a_result_contributes_only_to_the_level_directly_above'));
-
-                return;
-            }
-
-            // A contributing statement always lives in its parent's program.
-            $programId = $parent->program_id;
+        try {
+            $result = app(SaveResult::class)->handle($existing, [
+                'statement' => $this->statement,
+                'type' => $this->resultType,
+                'checkout_period' => $this->checkoutPeriod,
+                'program_id' => $this->resultProgramId,
+                'parent_id' => $this->parentId,
+            ]);
+        } catch (ValidationException $exception) {
+            throw ValidationException::withMessages(
+                collect($exception->errors())->mapWithKeys(fn (array $messages, string $field): array => [
+                    (self::FORM_FIELDS[$field] ?? 'statement') => $messages,
+                ])->all(),
+            );
         }
-
-        $subtreeIds = [];
-
-        if ($result->exists) {
-            $children = Result::query()->select(['id', 'type'])->where('parent_id', $result->id)->get();
-
-            if ($children->isNotEmpty() && $type !== $result->type
-                && $children->contains(fn (Result $child): bool => $this->parentLevelOf($child->type->value) !== $type)) {
-                $this->addError('resultType', __('results_framework.nested_results_still_sit_at_the_level_below'));
-
-                return;
-            }
-
-            if ($programId !== $result->program_id) {
-                $subtreeIds = $result->descendants()->pluck('id')->push($result->id)->all();
-
-                if ($programId !== null && $this->programChangeBreaksChain($subtreeIds, $programId)) {
-                    $this->addError('resultProgramId', __('results_framework.moving_this_result_would_break_its_indicators_or_targets'));
-
-                    return;
-                }
-            }
-        }
-
-        DB::transaction(function () use ($result, $validated, $type, $programId, $parentId, $subtreeIds): void {
-            $result->fill([
-                'statement' => $validated['statement'],
-                'type' => $type,
-                'checkout_period' => $validated['checkoutPeriod'],
-                'program_id' => $programId,
-                'parent_id' => $parentId,
-            ])->save();
-
-            // The statements below move with it, so the tree never straddles programs.
-            if ($subtreeIds !== []) {
-                Result::query()->whereIn('id', $subtreeIds)->whereKeyNot($result->id)->update(['program_id' => $programId]);
-            }
-        });
 
         $wasRecentlyCreated = $result->wasRecentlyCreated;
 
@@ -293,31 +244,6 @@ trait ManagesResultForm
             variant: 'success',
             text: $wasRecentlyCreated ? __('results_framework.result_added') : __('results_framework.result_updated'),
         );
-    }
-
-    /**
-     * Whether moving these statements into a program would strand what hangs
-     * off them: an indicator scoped to a project in another program, or a
-     * target committed in another program's annual plan.
-     *
-     * @param  array<int>  $resultIds
-     */
-    protected function programChangeBreaksChain(array $resultIds, int $programId): bool
-    {
-        $indicatorIds = Indicator::query()->whereIn('result_id', $resultIds)->select('id');
-
-        $strandedIndicator = Indicator::query()
-            ->whereIn('result_id', $resultIds)
-            ->whereHas('project', fn ($query) => $query->where('program_id', '!=', $programId))
-            ->exists();
-
-        $strandedTarget = PlanIndicator::query()
-            ->whereIn('indicator_id', $indicatorIds)
-            ->where('source_type', 'annual_plan')
-            ->whereIn('source_id', AnnualPlan::query()->select('id')->where('program_id', '!=', $programId))
-            ->exists();
-
-        return $strandedIndicator || $strandedTarget;
     }
 
     public function confirmDelete(int $resultId): void
@@ -342,7 +268,13 @@ trait ManagesResultForm
             return;
         }
 
-        if (! $this->canDelete($this->deletingResultId)) {
+        $result = Result::query()->find($this->deletingResultId);
+
+        try {
+            if ($result !== null) {
+                app(DeleteResult::class)->handle($result);
+            }
+        } catch (ValidationException) {
             $this->cancelDelete();
 
             Flux::toast(
@@ -352,8 +284,6 @@ trait ManagesResultForm
 
             return;
         }
-
-        Result::query()->findOrFail($this->deletingResultId)->delete();
 
         $this->cancelDelete();
         $this->forgetFramework();

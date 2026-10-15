@@ -65,4 +65,5 @@ return [
     'zoom_days' => 'أيام',
     'zoom_months' => 'أشهر',
     'zoom_weeks' => 'أسابيع',
+    'milestone_activity' => 'اختر نشاطًا من إطار مقترح هذا المشروع',
 ];

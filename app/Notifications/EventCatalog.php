@@ -236,6 +236,9 @@ final class EventCatalog
             // results
             [
                 'program.logframe_missing' => self::entry('results', $digest, 'scanner', $all),
+                'result.created' => self::entry('results', $digest, 'module_map', $all, activity: 'result.created'),
+                'result.updated' => self::entry('results', $digest, 'module_map', $all, activity: 'result.updated'),
+                'result.deleted' => self::entry('results', $digest, 'module_map', $all, activity: 'result.deleted'),
             ],
             // annual-plans
             [

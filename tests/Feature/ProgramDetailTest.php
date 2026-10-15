@@ -167,7 +167,7 @@ test('program logframe counts statements per level and flags unmeasured ones', f
         ->test('pages::programs.show', ['program' => $program])
         ->set('tab', 'results')
         ->assertSet('resultSummary', [
-            'levels' => ['impact' => 1, 'outcome' => 1, 'output' => 1],
+            'levels' => ['impact' => 1, 'outcome' => 1, 'output' => 1, 'activity' => 0, 'cross-cutting' => 0],
             'indicators' => 2,
             'unmeasured' => 2,
         ])
@@ -201,7 +201,7 @@ test('program plan timeline fills the strategy window and totals each plan', fun
         ->and($timeline[1])->toMatchArray([
             'targets' => 1,
             'attributed' => 0,
-            'levels' => ['impact' => 1, 'outcome' => 0, 'output' => 0],
+            'levels' => ['impact' => 1, 'outcome' => 0, 'output' => 0, 'activity' => 0, 'cross-cutting' => 0],
             'reports' => 2,
             'approved' => 1,
         ]);

@@ -133,6 +133,8 @@ trait ReadsProgramDelivery
             ->selectRaw('sum(case when results.type = ? then 1 else 0 end) as impact', [ResultType::Impact->value])
             ->selectRaw('sum(case when results.type = ? then 1 else 0 end) as outcome', [ResultType::Outcome->value])
             ->selectRaw('sum(case when results.type = ? then 1 else 0 end) as output', [ResultType::Output->value])
+            ->selectRaw('sum(case when results.type = ? then 1 else 0 end) as activity', [ResultType::Activity->value])
+            ->selectRaw('sum(case when results.type = ? then 1 else 0 end) as cross_cutting', [ResultType::CrossCutting->value])
             ->toBase()
             ->get()
             ->keyBy('plan_id');
@@ -174,6 +176,8 @@ trait ReadsProgramDelivery
                         ResultType::Impact->value => (int) ($targets->impact ?? 0),
                         ResultType::Outcome->value => (int) ($targets->outcome ?? 0),
                         ResultType::Output->value => (int) ($targets->output ?? 0),
+                        ResultType::Activity->value => (int) ($targets->activity ?? 0),
+                        ResultType::CrossCutting->value => (int) ($targets->cross_cutting ?? 0),
                     ],
                     'reports' => (int) ($reports->reports ?? 0),
                     'approved' => (int) ($reports->approved ?? 0),
