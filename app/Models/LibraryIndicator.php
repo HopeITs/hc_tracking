@@ -119,6 +119,20 @@ class LibraryIndicator extends Model implements TracksActivity
         return $this->name_en;
     }
 
+    /**
+     * The framework level a level reference sits at: OP1.2 → OP.
+     */
+    public static function levelKindOf(string $levelRef): string
+    {
+        foreach (['CC', 'OC', 'OP', 'AC', 'G'] as $kind) {
+            if (str_starts_with($levelRef, $kind)) {
+                return $kind;
+            }
+        }
+
+        return $levelRef;
+    }
+
     public function activityModule(): string
     {
         return 'indicator-library';

@@ -216,4 +216,12 @@ return [
     'activate_not_approved' => 'لا يُفعَّل إلا مشروع معتمد',
     'activate_dates_required' => 'لا تواريخ للمشروع بعد',
     'activate_owner_not_acknowledged' => 'لم يؤكّد المالك المشروع بعد',
+    'project_indicators' => 'مؤشرات المشروع',
+    'project_indicators_subtitle' => 'من أُطر المقترحات التي تموّل هذا المشروع ومن الإطار المنطقي لبرنامجه.',
+    'no_project_indicators' => 'لا مؤشرات بعد',
+    'no_project_indicators_body' => 'ستظهر هنا المؤشرات المرفقة في مقترحات هذا المشروع أو في الإطار المنطقي لبرنامجه.',
+    'program_framework' => 'الإطار المنطقي للبرنامج',
+    'scope_to_project' => 'تخصيص لهذا المشروع',
+    'indicator_scoped_here' => 'مخصّص لهذا المشروع',
+    'indicator_scoped' => 'خُصّص المؤشر لهذا المشروع.',
 ];

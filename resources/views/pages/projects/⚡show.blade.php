@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Projects\CloseProject;
+use App\Actions\Targets\ScopeIndicatorToProject;
 use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
 use App\Livewire\Concerns\AddsQuickTask;
@@ -92,6 +93,21 @@ new #[Title('titles.project')] class extends Component {
         unset($this->project);
 
         Flux::toast(variant: 'success', text: __('projects.project_closed'));
+    }
+
+    /**
+     * Scope a program-framework indicator to this project (T13); the action
+     * checks the program and the committed targets again under lock.
+     */
+    public function scopeIndicator(int $indicatorId): void
+    {
+        Gate::authorize('indicators.update');
+
+        app(ScopeIndicatorToProject::class)->handle(Project::query()->findOrFail($this->projectId), $indicatorId);
+
+        unset($this->projectIndicators);
+
+        Flux::toast(variant: 'success', text: __('projects.indicator_scoped'));
     }
 
     #[Computed]

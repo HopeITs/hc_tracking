@@ -666,9 +666,21 @@ test('the team B tabs each render their own partial, under construction until th
         ->assertSeeHtml('data-under-construction="'.$tab.'"')
         ->assertSeeText(__('proposals.under_construction'));
 })->with([
-    'indicators and targets' => ['targets', 'Indicators & Targets'],
     'plan' => ['plan', 'Plan'],
 ]);
+
+test('the indicators and targets tab renders the targets component, no longer under construction', function () {
+    $user = User::factory()->role('Financial')->create();
+    $proposal = Proposal::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::proposals.show', ['proposal' => $proposal])
+        ->assertSeeText('Indicators & Targets')
+        ->set('tab', 'targets')
+        ->assertSeeHtml('data-tab-panel="targets"')
+        ->assertSeeLivewire('proposals.targets')
+        ->assertDontSeeHtml('data-under-construction="targets"');
+});
 
 test('the logical framework tab renders the proposal framework, no longer under construction', function () {
     $user = User::factory()->role('Financial')->create();
