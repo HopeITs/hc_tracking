@@ -28,6 +28,7 @@ use InvalidArgumentException;
  * @property Currency $amount_transfered_currency
  * @property CarbonImmutable|null $scheduled_date
  * @property CarbonImmutable|null $transfer_date
+ * @property CarbonImmutable|null $arrival_date
  * @property string $fees
  * @property Currency $fees_currency
  * @property string|null $amount_received
@@ -36,6 +37,8 @@ use InvalidArgumentException;
  * @property Currency $amount_received_currency
  * @property CarbonImmutable|null $receive_date
  * @property ArStatus $ar_status
+ * @property string $source 'manual' (typed by Finance) or 'auto' (generated from an installment)
+ * @property int|null $installment_id
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
@@ -46,6 +49,7 @@ use InvalidArgumentException;
     'amount_transfered_currency',
     'scheduled_date',
     'transfer_date',
+    'arrival_date',
     'fees',
     'fees_currency',
     'amount_received',
@@ -54,6 +58,8 @@ use InvalidArgumentException;
     'amount_received_currency',
     'receive_date',
     'ar_status',
+    'source',
+    'installment_id',
 ])]
 class TransfersTracking extends Model implements TracksActivity
 {
@@ -89,6 +95,29 @@ class TransfersTracking extends Model implements TracksActivity
     public function donorProposal(): BelongsTo
     {
         return $this->belongsTo(DonorProposal::class);
+    }
+
+    /**
+     * The installment this row was generated from; null for a manual row.
+     *
+     * @return BelongsTo<FundingAgreementInstallment, $this>
+     */
+    public function installment(): BelongsTo
+    {
+        return $this->belongsTo(FundingAgreementInstallment::class, 'installment_id');
+    }
+
+    /**
+     * Whether Finance has recorded anything real on this row: a sent, arrival
+     * or receive date, or an amount that landed. Such a row is no longer a
+     * placeholder, so the schedule can neither delete nor replace it.
+     */
+    public function hasActualData(): bool
+    {
+        return $this->transfer_date !== null
+            || $this->arrival_date !== null
+            || $this->receive_date !== null
+            || $this->amount_received !== null;
     }
 
     /**
@@ -273,6 +302,7 @@ class TransfersTracking extends Model implements TracksActivity
             'payment_amount' => 'decimal:2',
             'scheduled_date' => 'date',
             'transfer_date' => 'date',
+            'arrival_date' => 'date',
             'fees' => 'decimal:2',
             'amount_received' => 'decimal:2',
             'exchange_rate' => 'decimal:6',

@@ -9,6 +9,7 @@ use App\Models\IndicatorProgress;
 use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
+use App\Models\Proposal;
 use App\Models\Report;
 use App\Models\Result;
 use App\Models\User;
@@ -442,15 +443,20 @@ test('changing the level clears a parent that can no longer hold it', function (
         ->assertSet('parentId', '');
 });
 
-test('nothing can be added under an output', function () {
+test('nothing can be added under an activity, while an output takes activities', function () {
     $user = User::factory()->role('General Manager')->create();
     $output = Result::factory()->type(ResultType::Output)->create();
+    $activity = Result::factory()->activity($output)->create();
 
     Livewire::actingAs($user)
         ->test('pages::results.index')
-        ->assertDontSeeHtml('data-test="add-child-result-'.$output->id.'"')
+        ->assertSeeHtml('data-test="add-child-result-'.$output->id.'"')
+        ->assertDontSeeHtml('data-test="add-child-result-'.$activity->id.'"')
+        ->call('openCreateModal', $activity->id)
+        ->assertSet('parentId', '')
         ->call('openCreateModal', $output->id)
-        ->assertSet('parentId', '');
+        ->assertSet('parentId', (string) $output->id)
+        ->assertSet('resultType', ResultType::Activity->value);
 });
 
 test('a contributing result always takes its parent program', function () {
@@ -547,4 +553,107 @@ test('a target reads its achievement from approved reports only, and an unmeasur
         ->assertSee('25% achieved')
         ->assertDontSee('100% achieved')
         ->assertSeeHtml('href="'.route('indicators.index', ['create' => $unmeasured->id]).'"');
+});
+
+test('each proposal framework reads as its own group after the program groups', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $program = Program::factory()->create(['name' => 'Water Security']);
+    $proposal = Proposal::factory()->create(['name' => 'Dry Season Response']);
+    Result::factory()->type(ResultType::Impact)->create(['program_id' => $program->id, 'statement' => 'Program-level impact.']);
+    $proposalOutput = Result::factory()->type(ResultType::Output)->create(['program_id' => $program->id, 'proposal_id' => $proposal->id, 'statement' => 'Proposal-level output.']);
+    Result::factory()->activity($proposalOutput)->create(['statement' => 'Proposal-level activity.']);
+
+    $groups = Livewire::actingAs($user)
+        ->test('pages::results.index')
+        ->assertSeeInOrder(['Water Security', 'Program-level impact.', __('results_framework.proposal_group', ['name' => 'Dry Season Response']), 'Proposal-level output.', 'Proposal-level activity.'])
+        ->assertSeeHtml('data-result-type="activity"')
+        ->instance()
+        ->groupedRoots
+        ->keys()
+        ->all();
+
+    expect($groups)->toBe(['Water Security', __('results_framework.proposal_group', ['name' => 'Dry Season Response'])]);
+});
+
+test('the framework filter narrows to the program framework or to one proposal', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $proposal = Proposal::factory()->create();
+    Result::factory()->type(ResultType::Impact)->create(['statement' => 'Program-level impact.']);
+    Result::factory()->type(ResultType::Impact)->create(['proposal_id' => $proposal->id, 'statement' => 'Proposal-level impact.']);
+    Result::factory()->type(ResultType::Impact)->create(['proposal_id' => Proposal::factory()->create()->id, 'statement' => 'Another proposal impact.']);
+
+    Livewire::actingAs($user)
+        ->test('pages::results.index')
+        ->set('proposal', 'none')
+        ->assertSee('Program-level impact.')
+        ->assertDontSee('Proposal-level impact.')
+        ->set('proposal', (string) $proposal->id)
+        ->assertSee('Proposal-level impact.')
+        ->assertDontSee('Program-level impact.')
+        ->assertDontSee('Another proposal impact.')
+        ->set('type', ResultType::CrossCutting->value)
+        ->assertDontSee('Proposal-level impact.');
+});
+
+test('a proposal node is edited in its own framework from the results page', function () {
+    $user = User::factory()->role('MEAL')->create();
+    $proposal = Proposal::factory()->create();
+    $output = Result::factory()->type(ResultType::Output)->create(['proposal_id' => $proposal->id]);
+    $programOutcome = Result::factory()->type(ResultType::Outcome)->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::results.index')
+        ->call('openCreateModal', $output->id)
+        ->assertSet('formProposalId', $proposal->id)
+        ->assertSet('resultType', ResultType::Activity->value)
+        ->set('statement', 'Run the distribution days.')
+        ->call('saveResult')
+        ->assertHasNoErrors()
+        ->call('openEditModal', $output->id)
+        ->set('resultType', ResultType::Output->value)
+        ->set('parentId', (string) $programOutcome->id)
+        ->call('saveResult')
+        ->assertHasErrors(['parentId' => __('results_framework.other_framework')]);
+
+    expect(Result::query()->where('statement', 'Run the distribution days.')->sole())
+        ->proposal_id->toBe($proposal->id)
+        ->parent_id->toBe($output->id);
+});
+
+test('the results page holds a flat query count across both kinds of framework', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $program = Program::factory()->create();
+
+    $seed = function (int $branches) use ($program): void {
+        $proposal = Proposal::factory()->create();
+
+        foreach (range(1, $branches) as $branch) {
+            $programOutcome = Result::factory()->type(ResultType::Outcome)->create(['program_id' => $program->id]);
+            insertIndicator(Result::factory()->type(ResultType::Output)->create(['program_id' => $program->id, 'parent_id' => $programOutcome->id])->id);
+
+            $proposalOutput = Result::factory()->type(ResultType::Output)->create(['program_id' => $program->id, 'proposal_id' => $proposal->id, 'contributes_to_result_id' => $programOutcome->id]);
+            Result::factory()->activity($proposalOutput)->create();
+            insertIndicator($proposalOutput->id);
+        }
+    };
+
+    $countQueries = function () use ($user): int {
+        Livewire::actingAs($user)->test('pages::results.index');
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        Livewire::actingAs($user)->test('pages::results.index');
+
+        $count = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        return $count;
+    };
+
+    $seed(1);
+    $small = $countQueries();
+
+    $seed(10);
+
+    expect($countQueries())->toBe($small);
 });

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Results;
 
+use App\Enums\ResultType;
 use App\Models\Result;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Collection as BaseCollection;
@@ -14,10 +15,13 @@ use Livewire\Attributes\Computed;
  * visibility, the hidden lineage of a re-rooted statement, nodes with their
  * rollups, the program groups and the flattened reading order.
  *
- * Used by results/index only. Reads the data BuildsResultsFramework loads and
- * the page's #[Url] filter properties; SummarisesResults reads what it builds.
+ * Used by results/index and the proposal Logical Framework tab (which has no
+ * filters and overrides matchesFilters()). Reads the data
+ * BuildsResultsFramework loads and the page's #[Url] filter properties;
+ * SummarisesResults reads what it builds.
  *
  * @property string $search
+ * @property string $proposal
  * @property string $program
  * @property string $type
  * @property string $focus
@@ -38,6 +42,14 @@ trait BuildsResultsTree
     protected function matchesFilters(Result $result, ?string $focus = null): bool
     {
         $focus ??= $this->focus;
+
+        if ($this->proposal === 'none' && $result->proposal_id !== null) {
+            return false;
+        }
+
+        if ($this->proposal !== '' && $this->proposal !== 'none' && $result->proposal_id !== (int) $this->proposal) {
+            return false;
+        }
 
         if ($this->program === 'none' && $result->program_id !== null) {
             return false;
@@ -149,16 +161,48 @@ trait BuildsResultsTree
     }
 
     /**
-     * The visible framework as root nodes grouped by program name, with an
-     * explicit Unassigned group last.
-     *
-     * A statement whose parent the filters hid is promoted to a root of its
-     * own so nothing disappears silently; it carries the hidden lineage.
+     * The visible framework as root nodes grouped by program name (an
+     * explicit Unassigned group after the named ones), then one group per
+     * proposal framework.
      *
      * @return BaseCollection<int|string, array<int, array<string, mixed>>>
      */
     #[Computed]
     public function groupedRoots(): BaseCollection
+    {
+        $unassigned = __('common.unassigned');
+
+        /*
+         * Program groups first (Unassigned last among them), then one group
+         * per proposal framework, each sorted by name.
+         */
+        $groupRank = fn (array $node): array => match (true) {
+            $node['result']->proposal_id !== null => [2, $node['result']->proposal->name],
+            $node['result']->program === null => [1, ''],
+            default => [0, (string) $node['result']->program->name],
+        };
+
+        return collect($this->rootNodes())
+            ->sortBy([
+                fn (array $left, array $right): int => $groupRank($left)[0] <=> $groupRank($right)[0],
+                fn (array $left, array $right): int => strcasecmp($groupRank($left)[1], $groupRank($right)[1]),
+            ])
+            ->groupBy(fn (array $node): string => match (true) {
+                $node['result']->proposal_id !== null => __('results_framework.proposal_group', ['name' => $node['result']->proposal->name]),
+                default => $node['result']->program?->name ?? $unassigned,
+            })
+            ->map(fn (BaseCollection $nodes): array => $nodes->values()->all());
+    }
+
+    /**
+     * The visible framework as root nodes, cross-cutting roots last.
+     *
+     * A statement whose parent the filters hid is promoted to a root of its
+     * own so nothing disappears silently; it carries the hidden lineage.
+     *
+     * @return list<array<string, mixed>>
+     */
+    protected function rootNodes(): array
     {
         $visible = $this->allResults->filter(fn (Result $result): bool => $this->matchesFilters($result));
         $visibleIds = $visible->mapWithKeys(fn (Result $result): array => [$result->id => true])->all();
@@ -176,17 +220,10 @@ trait BuildsResultsTree
             $roots[] = $result;
         }
 
-        $unassigned = __('common.unassigned');
-
-        return collect($roots)
+        return array_values(collect($roots)
+            ->sortBy(fn (Result $result): int => $result->type === ResultType::CrossCutting ? 1 : 0)
             ->map(fn (Result $result): array => $this->buildNode($result, $childrenByParent, $visibleIds, 0))
-            ->groupBy(fn (array $node): string => $node['result']->program?->name ?? $unassigned)
-            ->map(fn (BaseCollection $nodes): array => $nodes->all())
-            ->sortKeysUsing(fn (string $left, string $right): int => match (true) {
-                $left === $unassigned => 1,
-                $right === $unassigned => -1,
-                default => strcasecmp($left, $right),
-            });
+            ->all());
     }
 
     /**

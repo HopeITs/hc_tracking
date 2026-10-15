@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\Period;
+use App\Enums\ResultType;
 use App\Livewire\Concerns\ChecksFinanceVisibility;
 use App\Livewire\Concerns\Targets\FiltersTargets;
 use App\Livewire\Concerns\Targets\ManagesTargetForm;
@@ -96,10 +97,12 @@ new #[Title('titles.targets')] class extends Component {
     ];
     $shareOf = fn (int $part): float => $pulse['total'] > 0 ? round($part / $pulse['total'] * 100, 1) : 0;
     $formatValue = fn (float $value): string => fmod($value, 1.0) === 0.0 ? number_format($value) : number_format($value, 2);
-    $resultMark = fn ($type): string => match ($type?->value) {
-        'impact' => 'bg-secondary-dark ring-secondary-dark dark:bg-ink dark:ring-ink',
-        'outcome' => 'bg-primary ring-primary',
-        default => 'bg-white ring-secondary-light dark:bg-surface-1',
+    $resultMark = fn (?ResultType $type): string => match ($type) {
+        ResultType::Impact => 'bg-secondary-dark ring-secondary-dark dark:bg-ink dark:ring-ink',
+        ResultType::Outcome => 'bg-primary ring-primary',
+        ResultType::Output, null => 'bg-white ring-secondary-light dark:bg-surface-1',
+        ResultType::Activity => 'bg-transparent ring-secondary-medium dark:ring-ink-muted',
+        ResultType::CrossCutting => 'bg-secondary-light ring-secondary-light dark:bg-ink-muted dark:ring-ink-muted',
     };
     $groups = $this->targets->groupBy(fn ($target) => $target->indicator->result_id);
 @endphp

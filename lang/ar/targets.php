@@ -65,6 +65,7 @@ return [
     'count_evidence_file' => '{0} لا ملفات إثبات|{1} ملف إثبات واحد|{2} ملفا إثبات|[3,10] :count ملفات إثبات|[11,*] :count ملف إثبات',
     'not_yet_seen_by_meal' => 'لم يطّلع عليه فريق المتابعة والتقييم بعد',
     'issue_project_differs_from_indicator' => 'المؤشر مخصص لمشروع آخر.',
+    'issue_plan_target_on_proposal_framework' => 'لا تستهدف الخطة السنوية مؤشرًا من إطار مقترح.',
     'issue_plan_program_differs_from_result' => 'الخطة السنوية تتبع برنامجًا غير برنامج النتيجة.',
     'issue_project_outside_plan_program' => 'المشروع ليس ضمن برنامج الخطة السنوية.',
     'issue_project_not_on_proposal' => 'المشروع غير ممول ضمن هذا المقترح.',

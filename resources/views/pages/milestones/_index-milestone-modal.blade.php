@@ -16,7 +16,7 @@
                 </div>
             </x-ui.form-section>
 
-            <x-ui.form-section :title="__('common.section_placement')" :fields="['milestoneProjectId', 'parentMilestoneId', 'responsibleUserId']">
+            <x-ui.form-section :title="__('common.section_placement')" :fields="['milestoneProjectId', 'parentMilestoneId', 'responsibleUserId', 'milestoneActivityId']">
                 <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-3">
                     <x-ui.form-select wire:model.live="milestoneProjectId" id="milestone-form-project" :label="__('common.project')" :placeholder="__('common.select_a_project')" :search-label="__('milestones.search_projects')" required>
                         @foreach ($this->projectOptions as $projectOption)
@@ -32,6 +32,10 @@
                     </x-ui.form-select>
 
                     <x-ui.form-select wire:model="responsibleUserId" :label="__('milestones.responsible')" :placeholder="__('common.select')" :search-label="__('milestones.search_responsible')" employees />
+
+                    <div class="@2xl/modal:col-span-3">
+                        <x-milestones.activity-select wire:model="milestoneActivityId" :options="$this->milestoneActivityOptions" :disabled="$milestoneProjectId === ''" />
+                    </div>
                 </div>
             </x-ui.form-section>
 

@@ -3,11 +3,14 @@
 use App\Actions\Milestones\SaveMilestone;
 use App\Enums\MilestoneStatus;
 use App\Livewire\Concerns\AddsQuickTask;
+use App\Livewire\Concerns\Milestones\PicksMilestoneActivity;
 use App\Models\HrEmployee;
 use App\Models\Milestone;
+use App\Models\Result;
 use App\Models\Task;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
@@ -18,6 +21,7 @@ use Livewire\Component;
 
 new #[Title('titles.milestone')] class extends Component {
     use AddsQuickTask;
+    use PicksMilestoneActivity;
 
     #[Locked]
     public int $milestoneId;
@@ -30,6 +34,7 @@ new #[Title('titles.milestone')] class extends Component {
     public string $weightPercentage = '0';
     public string $responsibleUserId = '';
     public string $parentMilestoneId = '';
+    public string $milestoneActivityId = '';
 
     public bool $showRelatedModal = false;
     public string $relatedName = '';
@@ -40,6 +45,7 @@ new #[Title('titles.milestone')] class extends Component {
     public string $relatedWeightPercentage = '0';
     public string $relatedResponsibleUserId = '';
     public string $relatedParentMilestoneId = '';
+    public string $relatedActivityId = '';
 
     public function mount(Milestone $milestone): void
     {
@@ -54,13 +60,14 @@ new #[Title('titles.milestone')] class extends Component {
         $this->weightPercentage = $freshMilestone->weight_percentage;
         $this->responsibleUserId = (string) $freshMilestone->responsible_user_id;
         $this->parentMilestoneId = (string) ($freshMilestone->parent_milestone_id ?? '');
+        $this->milestoneActivityId = (string) ($freshMilestone->result_id ?? '');
     }
 
     #[Computed]
     public function milestone(): Milestone
     {
         return Milestone::query()
-            ->select(['id', 'project_id', 'proposal_id', 'name', 'description', 'planned_start_date', 'planned_end_date', 'actual_start_date', 'actual_end_date', 'status', 'sequence', 'weight_percentage', 'responsible_user_id', 'parent_milestone_id', 'updated_at'])
+            ->select(['id', 'project_id', 'proposal_id', 'result_id', 'name', 'description', 'planned_start_date', 'planned_end_date', 'actual_start_date', 'actual_end_date', 'status', 'sequence', 'weight_percentage', 'responsible_user_id', 'parent_milestone_id', 'updated_at'])
             ->with(['project:id,name', 'proposal:id,name', 'responsibleUser:id,first_name_en,last_name_en,first_name_ar,last_name_ar', 'parent:id,name'])
             ->findOrFail($this->milestoneId);
     }
@@ -106,6 +113,39 @@ new #[Title('titles.milestone')] class extends Component {
             ->orderBy('name')
             ->orderBy('id')
             ->get();
+    }
+
+    /**
+     * Activities this milestone may deliver, keeping its current link.
+     *
+     * @return Collection<int, Result>
+     */
+    #[Computed]
+    public function activityOptions(): Collection
+    {
+        return $this->activityOptionsFor($this->milestone->project_id, $this->milestone->proposal_id, $this->milestone->result_id);
+    }
+
+    /**
+     * Activities a new milestone of this project may deliver.
+     *
+     * @return Collection<int, Result>
+     */
+    #[Computed]
+    public function relatedActivityOptions(): Collection
+    {
+        return $this->activityOptionsFor($this->milestone->project_id);
+    }
+
+    /**
+     * Why the stored activity link no longer fits (Milestone::activityLinkIssues()).
+     *
+     * @return list<string>
+     */
+    #[Computed]
+    public function activityLinkIssues(): array
+    {
+        return $this->milestone->activityLinkIssues();
     }
 
     /** @return Collection<int, Milestone> */
@@ -164,23 +204,29 @@ new #[Title('titles.milestone')] class extends Component {
             'weightPercentage.max' => __('milestones.weight_cannot_exceed_100_percent'),
         ]);
 
-        app(SaveMilestone::class)->handle($milestone, $canEdit ? [
-            'name' => $validated['name'],
-            'description' => $validated['description'] === '' ? null : $validated['description'],
-            'planned_start_date' => $validated['plannedStartDate'],
-            'planned_end_date' => $validated['plannedEndDate'] === '' ? null : $validated['plannedEndDate'],
-            'status' => $validated['milestoneStatus'],
-            'weight_percentage' => $validated['weightPercentage'],
-            'responsible_user_id' => (int) $validated['responsibleUserId'],
-            'parent_milestone_id' => $validated['parentMilestoneId'] === '' || $validated['parentMilestoneId'] === null
-                ? null
-                : (int) $validated['parentMilestoneId'],
-        ] : [
-            'status' => $validated['milestoneStatus'],
-        ]);
+        DB::transaction(function () use ($milestone, $canEdit, $validated): void {
+            app(SaveMilestone::class)->handle($milestone, $canEdit ? [
+                'name' => $validated['name'],
+                'description' => $validated['description'] === '' ? null : $validated['description'],
+                'planned_start_date' => $validated['plannedStartDate'],
+                'planned_end_date' => $validated['plannedEndDate'] === '' ? null : $validated['plannedEndDate'],
+                'status' => $validated['milestoneStatus'],
+                'weight_percentage' => $validated['weightPercentage'],
+                'responsible_user_id' => (int) $validated['responsibleUserId'],
+                'parent_milestone_id' => $validated['parentMilestoneId'] === '' || $validated['parentMilestoneId'] === null
+                    ? null
+                    : (int) $validated['parentMilestoneId'],
+            ] : [
+                'status' => $validated['milestoneStatus'],
+            ]);
 
-        unset($this->milestone);
-        unset($this->parentOptions);
+            // Only an editor moves the link; the responsible person changes status alone.
+            if ($canEdit) {
+                $this->linkActivity($milestone, $this->milestoneActivityId, 'milestoneActivityId');
+            }
+        });
+
+        unset($this->milestone, $this->parentOptions, $this->activityOptions, $this->activityLinkIssues);
 
         Flux::toast(variant: 'success', text: __('milestones.milestone_updated'));
     }
@@ -198,6 +244,7 @@ new #[Title('titles.milestone')] class extends Component {
         $this->relatedWeightPercentage = '0';
         $this->relatedResponsibleUserId = '';
         $this->relatedParentMilestoneId = (string) $this->milestoneId;
+        $this->relatedActivityId = '';
         $this->showRelatedModal = true;
     }
 
@@ -239,19 +286,23 @@ new #[Title('titles.milestone')] class extends Component {
             'relatedWeightPercentage.max' => __('milestones.weight_cannot_exceed_100_percent'),
         ]);
 
-        app(SaveMilestone::class)->handle(null, [
-            'project_id' => $projectId,
-            'name' => $validated['relatedName'],
-            'description' => $validated['relatedDescription'] === '' ? null : $validated['relatedDescription'],
-            'planned_start_date' => $validated['relatedPlannedStartDate'],
-            'planned_end_date' => $validated['relatedPlannedEndDate'] === '' ? null : $validated['relatedPlannedEndDate'],
-            'status' => $validated['relatedStatus'],
-            'weight_percentage' => $validated['relatedWeightPercentage'],
-            'responsible_user_id' => (int) $validated['relatedResponsibleUserId'],
-            'parent_milestone_id' => $validated['relatedParentMilestoneId'] === '' || $validated['relatedParentMilestoneId'] === null
-                ? null
-                : (int) $validated['relatedParentMilestoneId'],
-        ]);
+        DB::transaction(function () use ($projectId, $validated): void {
+            $created = app(SaveMilestone::class)->handle(null, [
+                'project_id' => $projectId,
+                'name' => $validated['relatedName'],
+                'description' => $validated['relatedDescription'] === '' ? null : $validated['relatedDescription'],
+                'planned_start_date' => $validated['relatedPlannedStartDate'],
+                'planned_end_date' => $validated['relatedPlannedEndDate'] === '' ? null : $validated['relatedPlannedEndDate'],
+                'status' => $validated['relatedStatus'],
+                'weight_percentage' => $validated['relatedWeightPercentage'],
+                'responsible_user_id' => (int) $validated['relatedResponsibleUserId'],
+                'parent_milestone_id' => $validated['relatedParentMilestoneId'] === '' || $validated['relatedParentMilestoneId'] === null
+                    ? null
+                    : (int) $validated['relatedParentMilestoneId'],
+            ]);
+
+            $this->linkActivity($created, $this->relatedActivityId, 'relatedActivityId');
+        });
 
         $this->showRelatedModal = false;
         unset($this->relatedMilestones);
@@ -434,6 +485,10 @@ new #[Title('titles.milestone')] class extends Component {
                     </flux:dropdown>
                     <flux:error name="parentMilestoneId" class="mt-1.5" />
                 </div>
+
+                <div class="min-w-0 sm:max-w-xl">
+                    <x-milestones.activity-select id="milestone-edit-activity" wire:model="milestoneActivityId" :options="$this->activityOptions" :issues="$this->activityLinkIssues" :disabled="! $canEditMilestone" data-test="milestone-activity-select" />
+                </div>
             </div>
 
             <div class="flex justify-end gap-2 border-t border-secondary-soft pt-4 dark:border-line">
@@ -528,7 +583,7 @@ new #[Title('titles.milestone')] class extends Component {
                 </div>
             </x-ui.form-section>
 
-            <x-ui.form-section :title="__('common.section_placement')" :fields="['relatedParentMilestoneId', 'relatedResponsibleUserId']">
+            <x-ui.form-section :title="__('common.section_placement')" :fields="['relatedParentMilestoneId', 'relatedResponsibleUserId', 'relatedActivityId']">
                 <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
                     <x-ui.form-select wire:model="relatedParentMilestoneId" :label="__('milestones.nest_under')" :search-label="__('milestones.search_milestones')">
                         <option value="">{{ __('common.top_level') }}</option>
@@ -538,6 +593,10 @@ new #[Title('titles.milestone')] class extends Component {
                     </x-ui.form-select>
 
                     <x-ui.form-select wire:model="relatedResponsibleUserId" :label="__('milestones.responsible')" :placeholder="__('common.select')" :search-label="__('milestones.search_responsible')" employees />
+
+                    <div class="@2xl/modal:col-span-2">
+                        <x-milestones.activity-select wire:model="relatedActivityId" :options="$this->relatedActivityOptions" />
+                    </div>
                 </div>
             </x-ui.form-section>
 

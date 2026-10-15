@@ -1,11 +1,12 @@
-{{-- The chain of statements, one panel per program. Shown when the page's view is cascade. --}}
+{{-- The chain of statements, one panel per program and one per proposal framework. Shown when the page's view is cascade. --}}
         @foreach ($this->groupedRoots as $programName => $nodes)
             @php
                 $groupStatements = collect($nodes)->sum(fn (array $node): int => $node['rollup']['statements']);
                 $groupIndicators = collect($nodes)->sum(fn (array $node): int => $node['rollup']['indicators']);
                 $groupTargets = collect($nodes)->sum(fn (array $node): int => $node['rollup']['targets']);
                 $groupUnmeasured = collect($nodes)->sum(fn (array $node): int => $node['rollup']['unmeasured']);
-                $groupProgram = collect($nodes)->map(fn (array $node) => $node['result']->program)->filter()->first();
+                $groupProposal = $nodes[0]['result']->proposal;
+                $groupProgram = $groupProposal === null ? collect($nodes)->map(fn (array $node) => $node['result']->program)->filter()->first() : null;
             @endphp
             <x-ui.panel
                 :title="$programName"
@@ -24,7 +25,11 @@
                             {{ trans_choice('programs.logframe_count_unmeasured', $groupUnmeasured, ['count' => $groupUnmeasured]) }}
                         </span>
 
-                        @if ($groupProgram !== null)
+                        @if ($groupProposal !== null)
+                            @can('proposals.view')<a href="{{ route('proposals.show', ['proposal' => $groupProposal, 'tab' => 'logframe']) }}" wire:navigate class="type-meta font-semibold text-secondary-medium hover:text-primary dark:hover:text-brand-text hover:underline dark:text-ink-muted" data-test="proposal-framework-link-{{ $groupProposal->id }}">
+                                {{ __('common.view_name', ['name' => $groupProposal->name]) }}
+                            </a>@endcan
+                        @elseif ($groupProgram !== null)
                             <a href="{{ route('programs.show', $groupProgram) }}" wire:navigate class="type-meta font-semibold text-secondary-medium hover:text-primary dark:hover:text-brand-text hover:underline dark:text-ink-muted">
                                 {{ __('common.view_name', ['name' => $groupProgram->name]) }}
                             </a>

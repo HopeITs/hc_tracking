@@ -30,6 +30,7 @@ class SaveTransfer
             'amount_transfered_currency' => $validated['transferredCurrency'],
             'scheduled_date' => $validated['scheduledDate'] === '' ? null : $validated['scheduledDate'],
             'transfer_date' => $validated['transferDate'] === '' ? null : $validated['transferDate'],
+            'arrival_date' => ($validated['arrivalDate'] ?? '') === '' ? null : $validated['arrivalDate'],
             'fees' => $validated['fees'],
             'fees_currency' => $validated['feesCurrency'],
             'amount_received' => $validated['amountReceived'] === '' ? null : $validated['amountReceived'],

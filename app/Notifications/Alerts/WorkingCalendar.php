@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Notifications\Alerts;
 
+use App\Models\Project;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 
@@ -13,7 +14,34 @@ use Carbon\CarbonInterface;
  */
 final class WorkingCalendar
 {
-    public function __construct(private NotificationSettings $settings) {}
+    /**
+     * @param  list<int>|null  $days  a project's own ISO working days; null = the global setting
+     */
+    public function __construct(private NotificationSettings $settings, private ?array $days = null) {}
+
+    /**
+     * The same calendar over the project's own working days (D-22), or the
+     * global days when the project has none or an invalid list. No query.
+     */
+    public function forProject(Project $project): self
+    {
+        $days = $project->getAttribute('working_days');
+
+        if (! is_array($days) || $days === []) {
+            return new self($this->settings);
+        }
+
+        foreach ($days as $day) {
+            if (! is_int($day) || $day < 1 || $day > 7) {
+                return new self($this->settings);
+            }
+        }
+
+        $days = array_values(array_unique($days));
+        sort($days);
+
+        return new self($this->settings, $days);
+    }
 
     public function isWorkingDay(CarbonInterface $day): bool
     {
@@ -104,6 +132,10 @@ final class WorkingCalendar
      */
     private function workingDays(): array
     {
+        if ($this->days !== null) {
+            return $this->days;
+        }
+
         $days = array_values(array_map('intval', (array) $this->settings->get('working_days')));
 
         return $days === [] ? [1, 2, 3, 4, 5, 6, 7] : $days;

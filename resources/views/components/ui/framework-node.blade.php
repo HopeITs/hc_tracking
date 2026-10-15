@@ -1,4 +1,4 @@
-@props(['node', 'depth' => 0, 'order' => 0])
+@props(['node', 'depth' => 0, 'order' => 0, 'editable' => true])
 
 @php
     use App\Enums\RagStatus;
@@ -15,24 +15,34 @@
     $children = $node['children'];
     $lineage = $node['lineage'];
 
-    /* The one Impact/Outcome/Output identity used across programs, projects and this page. */
+    /* The one ResultType identity used across programs, projects and this page: an activity is a hollow dot with no accent bar. */
     $mark = match ($result->type) {
         ResultType::Impact => 'bg-secondary-dark ring-secondary-dark dark:bg-ink dark:ring-ink',
         ResultType::Outcome => 'bg-primary ring-primary',
         ResultType::Output => 'bg-board ring-secondary-light',
+        ResultType::Activity => 'bg-transparent ring-secondary-medium dark:ring-ink-muted',
+        ResultType::CrossCutting => 'bg-secondary-light ring-secondary-light dark:bg-ink-muted dark:ring-ink-muted',
     };
 
     $accent = match ($result->type) {
         ResultType::Impact => 'h-1 bg-primary',
         ResultType::Outcome => 'h-0.5 bg-primary/60',
         ResultType::Output => 'h-0.5 bg-transparent',
+        ResultType::Activity, ResultType::CrossCutting => 'h-0.5 bg-transparent',
     };
 
     $statementClasses = match ($result->type) {
         ResultType::Impact => 'text-lg font-bold leading-snug @2xl/directory:text-xl',
         ResultType::Outcome => 'text-base font-semibold leading-snug',
-        ResultType::Output => 'text-sm font-semibold leading-relaxed',
+        ResultType::Output, ResultType::CrossCutting => 'text-sm font-semibold leading-relaxed',
+        ResultType::Activity => 'text-sm font-medium leading-relaxed',
     };
+
+    /* Levels the chain lets a result nest under; a page whose framework is locked for this user (editable false) adds and deletes nothing. */
+    $acceptsContributions = $editable && $result->type->acceptsChildren();
+
+    /* Only a proposal root contributes to the program framework (contracts §11.2); the relation is preloaded by the page. */
+    $contributesTo = $result->relationLoaded('contributesTo') ? $result->getRelation('contributesTo') : null;
 
     /* Worst rating wins: one red indicator colours the whole statement red. */
     $tone = match (true) {
@@ -73,8 +83,8 @@
             </span>
 
             <div class="ms-auto flex shrink-0 items-center gap-0.5">
-                {{-- An output is the bottom of the chain: nothing contributes to it. --}}
-                @unless ($result->type === ResultType::Output)
+                {{-- Only levels the chain lets this page nest under offer an add button. --}}
+                @if ($acceptsContributions)
                     <flux:tooltip :content="__('results_framework.add_a_contributing_result')">
                         @can('results.create')<x-ui.button
                             tone="ghost"
@@ -86,7 +96,7 @@
                             data-test="add-child-result-{{ $result->id }}"
                         />@endcan
                     </flux:tooltip>
-                @endunless
+                @endif
 
                 <flux:tooltip :content="__('results_framework.edit_result')">
                     @can('results.update')<x-ui.button
@@ -100,7 +110,7 @@
                     />@endcan
                 </flux:tooltip>
 
-                @if ($node['deletable'])
+                @if ($editable && $node['deletable'])
                     <flux:tooltip :content="__('results_framework.delete_result')">
                         @can('results.delete')<x-ui.button
                             tone="ghost"
@@ -112,7 +122,7 @@
                             data-test="delete-result-{{ $result->id }}"
                         />@endcan
                     </flux:tooltip>
-                @else
+                @elseif ($editable)
                     <flux:tooltip :content="__('results_framework.locked_while_it_carries_nested_results_or_indicators')">
                         <span class="inline-flex size-8 cursor-not-allowed items-center justify-center text-secondary-light" aria-disabled="true">
                             <flux:icon.lock-closed class="size-4" />
@@ -125,7 +135,7 @@
         @if ($lineage !== [])
             <p class="mt-1.5 flex flex-wrap items-center gap-1 px-4 type-meta text-secondary-medium dark:text-ink-muted">
                 <flux:icon.arrow-turn-down-right variant="micro" class="size-3.5 shrink-0 rtl:-scale-x-100" aria-hidden="true" />
-                <span class="sr-only">{{ __('results_framework.contributes_to') }}</span>
+                <span class="sr-only">{{ __('results_framework.contributes_to_label') }}</span>
                 @foreach ($lineage as $ancestor)
                     <span>{{ Str::limit($ancestor->statement, 48) }}</span>
                     @unless ($loop->last)
@@ -135,7 +145,14 @@
             </p>
         @endif
 
-        <p class="mt-1.5 px-4 pb-3.5 text-pretty text-secondary-dark {{ $statementClasses }} dark:text-ink">{{ $result->statement }}</p>
+        @if ($contributesTo !== null)
+            <p class="mt-1.5 flex flex-wrap items-center gap-1 px-4 type-meta text-secondary-medium dark:text-ink-muted" data-test="contributes-to-{{ $result->id }}">
+                <flux:icon.link variant="micro" class="size-3.5 shrink-0" aria-hidden="true" />
+                <span>{{ __('results_framework.contributes_to_program') }} <bdi>{{ Str::limit($contributesTo->statement, 80) }}</bdi></span>
+            </p>
+        @endif
+
+        <p dir="auto" class="mt-1.5 px-4 pb-3.5 text-start text-pretty text-secondary-dark {{ $statementClasses }} dark:text-ink">{{ $result->statement }}</p>
 
         {{-- The measurement rail: what this statement is measured by, and how it is tracking. --}}
         <div class="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-secondary-soft bg-board-head px-4 py-2.5 dark:border-line">
@@ -410,7 +427,7 @@
                         ])></span>
                         <span aria-hidden="true" class="absolute start-0 top-7 h-px w-6 bg-secondary-soft dark:bg-line-strong"></span>
 
-                        <x-ui.framework-node :node="$child" :depth="$depth + 1" :order="$loop->index" />
+                        <x-ui.framework-node :node="$child" :depth="$depth + 1" :order="$loop->index" :editable="$editable" />
                     </li>
                 @endforeach
             </ol>

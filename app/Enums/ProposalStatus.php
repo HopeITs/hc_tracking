@@ -131,6 +131,16 @@ enum ProposalStatus: string
     }
 
     /**
+     * The statuses for which isApprovedByDonor() is true, for queries.
+     *
+     * @return list<self>
+     */
+    public static function approvedByDonor(): array
+    {
+        return array_values(array_filter(self::cases(), fn (self $status): bool => $status->isApprovedByDonor()));
+    }
+
+    /**
      * The main line in order, without the on hold and rejected branches.
      *
      * @return list<self>

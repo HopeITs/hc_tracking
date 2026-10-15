@@ -666,10 +666,22 @@ test('the team B tabs each render their own partial, under construction until th
         ->assertSeeHtml('data-under-construction="'.$tab.'"')
         ->assertSeeText(__('proposals.under_construction'));
 })->with([
-    'logical framework' => ['logframe', 'Logical Framework'],
     'indicators and targets' => ['targets', 'Indicators & Targets'],
     'plan' => ['plan', 'Plan'],
 ]);
+
+test('the logical framework tab renders the proposal framework, no longer under construction', function () {
+    $user = User::factory()->role('Financial')->create();
+    $proposal = Proposal::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::proposals.show', ['proposal' => $proposal])
+        ->assertSeeText('Logical Framework')
+        ->set('tab', 'logframe')
+        ->assertSeeHtml('data-tab-panel="logframe"')
+        ->assertDontSeeHtml('data-under-construction="logframe"')
+        ->assertSeeLivewire('proposals.logframe');
+});
 
 test('the tab labels read in Arabic', function () {
     $user = User::factory()->role('Financial')->create(['locale' => 'ar']);

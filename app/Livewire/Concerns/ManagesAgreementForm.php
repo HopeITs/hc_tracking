@@ -5,14 +5,18 @@ declare(strict_types=1);
 namespace App\Livewire\Concerns;
 
 use App\Actions\FundingAgreements\DeleteFundingAgreement;
+use App\Actions\FundingAgreements\SaveAgreementInstallments;
 use App\Actions\FundingAgreements\SaveFundingAgreement;
 use App\Enums\Currency;
+use App\Enums\ProposalStatus;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\Proposal;
 use Closure;
 use Flux\Flux;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
@@ -43,8 +47,6 @@ trait ManagesAgreementForm
 
     public bool $confirmingAgreementDelete = false;
 
-    public string $agreementDonorId = '';
-
     public string $agreementProposalId = '';
 
     public string $budget = '';
@@ -52,6 +54,18 @@ trait ManagesAgreementForm
     public string $agreementCurrency = 'USD';
 
     public string $externalProjectNumber = '';
+
+    /**
+     * The installment rows being edited; the sequence is the row's position.
+     *
+     * @var list<array{amount: string, scheduled_date: string}>
+     */
+    public array $installments = [];
+
+    /**
+     * The user's explicit yes to a schedule that does not add up to the budget.
+     */
+    public bool $confirmInstallmentSum = false;
 
     /**
      * Called after an agreement is recorded or edited.
@@ -89,34 +103,160 @@ trait ManagesAgreementForm
         return Donor::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get();
     }
 
-    /** @return Collection<int, Proposal> */
+    /**
+     * The proposals an agreement can be recorded for: donor-approved, without
+     * an agreement yet, inside this page's scope (plus the one being edited).
+     * Names and numbers only: no money column is ever selected here.
+     *
+     * @return Collection<int, Proposal>
+     */
     #[Computed]
     public function proposalOptions(): Collection
     {
-        return Proposal::query()->select(['id', 'name', 'internal_project_number', 'status'])->orderBy('name')->orderBy('id')->get();
+        return Proposal::query()
+            ->select(['id', 'name', 'internal_project_number', 'status', 'donor_id'])
+            ->with('donor:id,name')
+            ->where(function (Builder $query): void {
+                $query->where(fn (Builder $eligible) => $eligible
+                    ->whereIn('status', array_map(fn (ProposalStatus $status): string => $status->value, ProposalStatus::approvedByDonor()))
+                    ->whereDoesntHave('donorProposals'));
+
+                if ($this->editingAgreementId !== null) {
+                    $query->orWhereHas('donorProposals', fn (Builder $agreement) => $agreement->whereKey($this->editingAgreementId));
+                }
+            })
+            ->when($this->agreementProposalScope() !== null, fn (Builder $query) => $query->whereKey($this->agreementProposalScope()))
+            ->when($this->agreementDonorScope() !== null, fn (Builder $query) => $query->where('donor_id', $this->agreementDonorScope()))
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get();
     }
 
     /**
-     * A warning when the chosen proposal has not been approved by a donor, or
-     * was rejected. Recording is still allowed: paperwork is sometimes signed
-     * before the status catches up.
+     * The donor the chosen proposal belongs to, shown read-only: the agreement
+     * always takes it from the proposal.
      */
     #[Computed]
-    public function agreementProposalWarning(): ?string
+    public function agreementDonorName(): ?string
     {
         $proposalId = (int) ($this->agreementProposalScope() ?? $this->agreementProposalId);
 
         if ($proposalId === 0) {
+            return $this->agreementDonorScope() === null ? null : Donor::query()->whereKey($this->agreementDonorScope())->value('name');
+        }
+
+        return Proposal::query()->whereKey($proposalId)->first(['id', 'donor_id'])?->donor()->value('name');
+    }
+
+    /**
+     * The proposal of the agreement being edited, for the read-only field.
+     */
+    #[Computed]
+    public function agreementProposalLabel(): ?string
+    {
+        if ($this->editingAgreementId === null) {
             return null;
         }
 
-        $status = Proposal::query()->whereKey($proposalId)->first(['id', 'status'])?->status;
+        $proposal = Proposal::query()
+            ->whereIn('id', DonorProposal::query()->whereKey($this->editingAgreementId)->select('proposal_id'))
+            ->first(['id', 'name', 'internal_project_number']);
 
-        if ($status === null || $status->isApprovedByDonor()) {
+        return $proposal === null ? null : $proposal->name.' · '.$proposal->internal_project_number;
+    }
+
+    /**
+     * A warning when the agreement being edited sits on a proposal that is no
+     * longer donor-approved (a legacy agreement, or a status corrected away
+     * from approved). The agreement is kept; the mismatch is made visible.
+     */
+    #[Computed]
+    public function agreementStatusWarning(): ?string
+    {
+        if ($this->editingAgreementId === null) {
             return null;
         }
 
-        return __('funding_agreements.proposal_not_approved_warning', ['status' => $status->label()]);
+        $status = DonorProposal::query()->whereKey($this->editingAgreementId)->first(['id', 'proposal_id'])?->proposal()->value('status');
+
+        return $status === null || $status->isApprovedByDonor()
+            ? null
+            : __('funding_agreements.proposal_status_inconsistent_with_agreement');
+    }
+
+    /**
+     * What the rows add up to, for the running total beside the budget.
+     */
+    #[Computed]
+    public function installmentsTotal(): string
+    {
+        return SaveAgreementInstallments::sumOf($this->installments);
+    }
+
+    /**
+     * Whether a schedule is entered that does not add up to the budget.
+     */
+    #[Computed]
+    public function installmentsDifferFromBudget(): bool
+    {
+        return $this->installments !== [] && is_numeric($this->budget)
+            && SaveAgreementInstallments::sumDiffersFromBudget($this->budget, $this->installments);
+    }
+
+    public function addInstallment(): void
+    {
+        $this->installments[] = ['amount' => '', 'scheduled_date' => ''];
+        $this->confirmInstallmentSum = false;
+    }
+
+    public function removeInstallment(int $index): void
+    {
+        unset($this->installments[$index]);
+        $this->installments = array_values($this->installments);
+        $this->confirmInstallmentSum = false;
+    }
+
+    public function updatedInstallments(): void
+    {
+        $this->confirmInstallmentSum = false;
+    }
+
+    public function updatedBudget(): void
+    {
+        $this->confirmInstallmentSum = false;
+    }
+
+    /**
+     * Choosing a proposal for a new agreement starts the form from what the
+     * proposal asked for (budget and currency), editable. Only users who may
+     * record agreements reach this form, so the figures go to nobody else.
+     */
+    public function updatedAgreementProposalId(): void
+    {
+        if ($this->editingAgreementId === null) {
+            $this->prefillFromProposal();
+        }
+    }
+
+    protected function prefillFromProposal(): void
+    {
+        $proposalId = (int) ($this->agreementProposalScope() ?? $this->agreementProposalId);
+
+        if ($proposalId === 0 || ! Gate::allows('funding-agreements.create')) {
+            return;
+        }
+
+        $proposal = $this->proposalOptions->firstWhere('id', $proposalId)
+            ? Proposal::query()->whereKey($proposalId)->first(['id', 'requested_budget', 'requested_currency'])
+            : null;
+
+        if ($proposal === null) {
+            return;
+        }
+
+        $this->budget = $proposal->requested_budget === null ? '' : (string) $proposal->requested_budget;
+        $this->agreementCurrency = $proposal->requested_currency?->value ?? 'USD';
+        unset($this->agreementDonorName);
     }
 
     /**
@@ -161,6 +301,7 @@ trait ManagesAgreementForm
         Gate::authorize('funding-agreements.create');
 
         $this->resetAgreementForm();
+        $this->prefillFromProposal();
         $this->showAgreementModal = true;
     }
 
@@ -173,11 +314,16 @@ trait ManagesAgreementForm
         $this->resetValidation();
         $this->confirmingAgreementDelete = false;
         $this->editingAgreementId = $agreement->id;
-        $this->agreementDonorId = (string) $agreement->donor_id;
         $this->agreementProposalId = (string) $agreement->proposal_id;
         $this->budget = (string) $agreement->budget;
         $this->agreementCurrency = $agreement->currency->value;
         $this->externalProjectNumber = $agreement->external_project_number ?? '';
+        $this->installments = $agreement->installments()
+            ->get(['id', 'funding_agreement_id', 'sequence', 'amount', 'scheduled_date'])
+            ->map(fn ($installment): array => ['amount' => (string) $installment->amount, 'scheduled_date' => $installment->scheduled_date->toDateString()])
+            ->all();
+        $this->confirmInstallmentSum = false;
+        unset($this->agreementDonorName, $this->agreementStatusWarning, $this->agreementProposalLabel, $this->proposalOptions);
         $this->showAgreementModal = true;
     }
 
@@ -191,15 +337,22 @@ trait ManagesAgreementForm
             $this->agreementProposalId = (string) $this->agreementProposalScope();
         }
 
-        if ($this->agreementDonorScope() !== null) {
-            $this->agreementDonorId = (string) $this->agreementDonorScope();
-        }
-
         $existing = $this->editingAgreementId === null ? null : $this->scopedAgreement($this->editingAgreementId);
 
+        // An edit never moves the agreement: its proposal (and so its donor) is fixed.
+        if ($existing !== null) {
+            $this->agreementProposalId = (string) $existing->proposal_id;
+        }
+
         $validated = $this->validate([
-            'agreementDonorId' => ['required', 'integer', Rule::exists(Donor::class, 'id')],
-            'agreementProposalId' => ['required', 'integer', Rule::exists(Proposal::class, 'id')],
+            'agreementProposalId' => [
+                'required',
+                'integer',
+                Rule::exists(Proposal::class, 'id')->when(
+                    $existing === null && $this->agreementDonorScope() !== null,
+                    fn ($rule) => $rule->where('donor_id', $this->agreementDonorScope()),
+                ),
+            ],
             'budget' => ['required', 'numeric', 'min:0', 'max:'.self::MAX_BUDGET],
             'agreementCurrency' => [
                 'required',
@@ -213,16 +366,37 @@ trait ManagesAgreementForm
                 },
             ],
             'externalProjectNumber' => ['nullable', 'string', 'max:50'],
+            'installments' => ['array'],
         ], [
-            'agreementDonorId.required' => __('funding_agreements.select_the_donor'),
             'agreementProposalId.required' => __('funding_agreements.select_the_proposal_being_funded'),
+            'agreementProposalId.exists' => __('funding_agreements.select_the_proposal_being_funded'),
             'budget.required' => __('funding_agreements.enter_the_agreed_budget'),
             'budget.min' => __('funding_agreements.a_budget_cannot_be_negative'),
             'budget.max' => __('funding_agreements.a_budget_is_too_large'),
             'agreementCurrency.required' => __('funding_agreements.select_the_currency_this_budget_is_stated_in'),
         ]);
 
-        $agreement = app(SaveFundingAgreement::class)->handle($existing, $validated);
+        $rows = $this->installmentPayload($validated['agreementCurrency']);
+
+        // A schedule that does not add up is allowed, once the user says so.
+        if ($rows !== [] && ! $this->confirmInstallmentSum && SaveAgreementInstallments::sumDiffersFromBudget($validated['budget'], $rows)) {
+            $this->addError('confirmInstallmentSum', __('funding_agreements.installments_sum_mismatch', ['sum' => number_format((float) SaveAgreementInstallments::sumOf($rows), 2)]));
+
+            return;
+        }
+
+        // One transaction: the agreement and its schedule are saved together or not at all.
+        $agreement = DB::transaction(function () use ($existing, $validated, $rows): DonorProposal {
+            $agreement = app(SaveFundingAgreement::class)->handle($existing, $validated);
+
+            // Clearing a schedule that exists is refused by the action; an agreement
+            // that never had one (a legacy agreement with manual tranches) is left alone.
+            if ($rows !== [] || $agreement->installments()->exists()) {
+                app(SaveAgreementInstallments::class)->handle($agreement, $rows);
+            }
+
+            return $agreement;
+        });
 
         $isCreate = $agreement->wasRecentlyCreated;
 
@@ -234,6 +408,28 @@ trait ManagesAgreementForm
             variant: 'success',
             text: $isCreate ? __('funding_agreements.funding_agreement_recorded') : __('funding_agreements.funding_agreement_updated'),
         );
+    }
+
+    /**
+     * The rows in the shape SaveAgreementInstallments takes: the sequence is
+     * the position, the currency is the agreement's and never typed per row.
+     *
+     * @return list<array{sequence: int, amount: string, currency: string, scheduled_date: string}>
+     */
+    private function installmentPayload(string $currency): array
+    {
+        $rows = [];
+
+        foreach (array_values($this->installments) as $index => $row) {
+            $rows[] = [
+                'sequence' => $index + 1,
+                'amount' => trim((string) ($row['amount'] ?? '')),
+                'currency' => $currency,
+                'scheduled_date' => trim((string) ($row['scheduled_date'] ?? '')),
+            ];
+        }
+
+        return $rows;
     }
 
     /**
@@ -307,11 +503,12 @@ trait ManagesAgreementForm
         $this->resetValidation();
         $this->editingAgreementId = null;
         $this->confirmingAgreementDelete = false;
-        $this->agreementDonorId = $this->agreementDonorScope() === null ? '' : (string) $this->agreementDonorScope();
         $this->agreementProposalId = $this->agreementProposalScope() === null ? '' : (string) $this->agreementProposalScope();
         $this->budget = '';
         $this->agreementCurrency = 'USD';
         $this->externalProjectNumber = '';
-        unset($this->agreementDeleteBlocker, $this->agreementProposalWarning, $this->agreementCurrencyLocked);
+        $this->installments = [];
+        $this->confirmInstallmentSum = false;
+        unset($this->agreementDeleteBlocker, $this->agreementStatusWarning, $this->agreementCurrencyLocked, $this->agreementDonorName, $this->agreementProposalLabel, $this->proposalOptions, $this->installmentsTotal, $this->installmentsDifferFromBudget);
     }
 }

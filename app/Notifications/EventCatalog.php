@@ -185,7 +185,7 @@ final class EventCatalog
             ],
             // transfers
             [
-                'transfer.generated' => self::entry('transfers', $now, 'listener', OversightMode::ManagementOnly),
+                'transfer.generated' => self::entry('transfers', $now, 'listener', OversightMode::ManagementOnly, activity: 'transfer.generated'),
                 'transfer.received' => self::entry('transfers', $now, 'module_map', OversightMode::ManagementOnly, activity: 'transfer.received'),
                 'transfer.late' => self::entry('transfers', $now, 'scanner', OversightMode::ManagementOnly),
             ],
@@ -238,6 +238,9 @@ final class EventCatalog
             // results
             [
                 'program.logframe_missing' => self::entry('results', $digest, 'scanner', $all),
+                'result.created' => self::entry('results', $digest, 'module_map', $all, activity: 'result.created'),
+                'result.updated' => self::entry('results', $digest, 'module_map', $all, activity: 'result.updated'),
+                'result.deleted' => self::entry('results', $digest, 'module_map', $all, activity: 'result.deleted'),
             ],
             // annual-plans
             [

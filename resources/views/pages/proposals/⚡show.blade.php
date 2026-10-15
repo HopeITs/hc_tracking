@@ -70,10 +70,36 @@ new #[Title('titles.proposal')] class extends Component
     #[Url(except: 'status')]
     public string $tab = 'status';
 
+    /**
+     * Deep link from the "Record agreement" notification action: opens the
+     * agreement form once for a proposal that may take one, then clears itself.
+     */
+    #[Url(as: 'record_agreement', except: false)]
+    public bool $recordAgreementLink = false;
+
     public function mount(Proposal $proposal): void
     {
         $this->proposalId = $proposal->id;
         $this->updatedTab();
+
+        if ($this->recordAgreementLink && $this->canRecordAgreement) {
+            $this->openAgreementCreate();
+        }
+
+        $this->recordAgreementLink = false;
+    }
+
+    /**
+     * Whether the Record Agreement button applies: the viewer may record
+     * agreements, a donor approved this proposal and it has none yet. Asks
+     * the database for existence only, never an amount.
+     */
+    #[Computed]
+    public function canRecordAgreement(): bool
+    {
+        return auth()->user()?->can('funding-agreements.create') === true
+            && $this->proposal->status->isApprovedByDonor()
+            && ! DonorProposal::query()->where('proposal_id', $this->proposalId)->exists();
     }
 
     public function updatedTab(): void
@@ -212,7 +238,7 @@ new #[Title('titles.proposal')] class extends Component
     private function forgetReadings(): void
     {
         unset(
-            $this->proposal, $this->statusNotes, $this->agreements, $this->agreementRows, $this->fundingTranches, $this->donorReports, $this->agreementMoney, $this->moneyByCurrency,
+            $this->proposal, $this->canRecordAgreement, $this->statusNotes, $this->agreements, $this->agreementRows, $this->fundingTranches, $this->donorReports, $this->agreementMoney, $this->moneyByCurrency,
             $this->projects, $this->linkableProjects, $this->tasks, $this->targets, $this->reports,
             $this->projectFiles, $this->documents, $this->deadlines, $this->warnings, $this->lifecycle, $this->chronology,
             $this->arrivals, $this->vitals, $this->term, $this->tabs, $this->proposalFiles, $this->reviewStages, $this->needAssessments, $this->approvalSubject, $this->approvalPreview,
@@ -266,6 +292,9 @@ new #[Title('titles.proposal')] class extends Component
                 <x-ui.button tone="primary" size="sm" icon="arrow-path" class="min-h-10 touch-manipulation" wire:click="openStatusModal({{ $this->proposal->id }})" data-test="open-status-modal">{{ __('proposals.change_status') }}</x-ui.button>
                 @endif
                 @endcan
+                @if ($this->canRecordAgreement)
+                <x-ui.button size="sm" icon="banknotes" class="min-h-10 touch-manipulation" wire:click="openAgreementCreate" data-test="record-agreement-button">{{ __('funding_agreements.record_agreement') }}</x-ui.button>
+                @endif
                 @can('correctStatus', $this->proposal)
                 @if ($this->proposal->status->isTerminal())
                 <x-ui.button size="sm" icon="arrow-uturn-left" class="min-h-10 touch-manipulation" wire:click="openCorrectModal({{ $this->proposal->id }})" data-test="open-correct-status-modal">{{ __('proposals.correct_status') }}</x-ui.button>

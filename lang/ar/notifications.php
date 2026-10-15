@@ -179,6 +179,9 @@ return [
             'past_end' => 'تجاوز المشروع «:subject» تاريخ انتهائه وما زال نشطًا',
             'report_without_files' => 'التقرير المعتمد عن «:subject» بلا ملفات مرفقة',
         ],
+        'project_started' => 'بدأ المشروع «:subject» في :date',
+        'project_ended' => 'انتهى المشروع «:subject» في :date',
+        'on_hold_reminder' => 'المقترح «:subject» معلّق وقد حلّ موعد مراجعته (:date)',
     ],
 
     'admin' => [
@@ -255,6 +258,36 @@ return [
         'weekly_program' => ':program هذا الأسبوع: :overdue متأخرة، :off_track مؤشرات خارج المسار، :open_risks مخاطر قائمة، :upcoming مواعيد خلال 14 يومًا',
         'weekly_all' => 'هذا الأسبوع في :programs برامج: :overdue متأخرة، :off_track مؤشرات خارج المسار، :open_risks مخاطر قائمة، :upcoming مواعيد خلال 14 يومًا',
         'daily' => 'يومك: :due_today مستحقة اليوم، :overdue متأخرة، :stalled متوقفة، :assigned إسنادات جديدة',
+        'oversight' => 'ملخص المتابعة منذ :date: :counts (المجموع :count)',
+        'oversight_line' => ':event × :count',
+        'monthly' => [
+            'summary' => 'الملخص الشهري لشهر :month: :sections',
+            'month_format' => 'F Y',
+            'line' => ':label: :count',
+            'nothing_pending' => 'لا يوجد شيء معلّق هذا الشهر',
+            'invalid_month' => 'اختر شهرًا حاليًا أو سابقًا بصيغة YYYY-MM',
+            'sections' => [
+                'projects' => 'المشاريع',
+                'indicators' => 'المؤشرات',
+                'donor_reports' => 'تقارير المانحين',
+            ],
+            'lines' => [
+                'projects_started' => 'مشاريع بدأت',
+                'projects_ended' => 'مشاريع انتهت',
+                'indicators_off_track' => 'مؤشرات خارج المسار',
+                'donor_reports_due' => 'تقارير مانحين مستحقة الشهر القادم',
+                'donor_reports_overdue' => 'تقارير مانحين متأخرة',
+            ],
+            'console' => [
+                'queued' => 'أُدرج الملخص الشهري في قائمة الانتظار. يُرسل فقط في أول يوم عمل من الشهر.',
+                'sent' => 'أُرسل :count ملخص شهري عن :month.',
+                'dry_run' => 'تجربة لشهر :month: لن يُرسل أو يُسجَّل شيء.',
+                'recipient' => 'المستلم',
+                'scope' => 'البرامج',
+                'counts' => 'الأعداد',
+                'all_programs' => 'كل البرامج',
+            ],
+        ],
     ],
 
     'quick' => [
@@ -264,6 +297,7 @@ return [
             'report_mark_reviewed' => 'تعليم كمراجَع',
             'report_approve' => 'اعتماد',
             'transfer_mark_received' => 'تعليم كمستلمة',
+            'agreement_record' => 'تسجيل الاتفاقية',
             'assignment_acknowledge' => 'تأكيد الاستلام',
             'assignment_reject' => 'رفض',
             'alert_snooze' => 'تأجيل التذكير',
@@ -447,9 +481,18 @@ return [
             'deleted' => 'حذف :actor مستهدفًا للمؤشر «:subject»',
         ],
         'result' => [
-            'created' => 'أضاف :actor النتيجة «:subject»',
-            'updated' => 'حدّث :actor النتيجة «:subject»',
-            'deleted' => 'حذف :actor النتيجة «:subject»',
+            'created' => [
+                'title' => 'إضافة نتيجة',
+                'body' => 'أضاف :actor النتيجة «:subject»',
+            ],
+            'updated' => [
+                'title' => 'تحديث نتيجة',
+                'body' => 'حدّث :actor النتيجة «:subject»',
+            ],
+            'deleted' => [
+                'title' => 'حذف نتيجة',
+                'body' => 'حذف :actor النتيجة «:subject»',
+            ],
         ],
         'report' => [
             'created' => 'بدأ :actor تقريرًا عن «:subject»',
@@ -701,6 +744,50 @@ return [
             'returned' => [
                 'title' => 'إعادة مهمة قسم',
                 'body' => 'أعاد :actor «:subject»',
+            ],
+        ],
+    ],
+
+    'mail' => [
+        'monthly_digest' => [
+            'subject' => 'الملخص الشهري: :month',
+            'preheader' => 'ما جرى في :month وما زال معلّقًا.',
+            'heading' => 'ملخصك لشهر :month',
+            'scope_all' => 'في كل البرامج.',
+            'scope_programs' => 'للبرامج التي تديرها.',
+            'column_item' => 'البند',
+            'column_count' => 'العدد',
+            'footer' => 'افتح HC Tracking للتفاصيل. لا يحتوي هذا البريد أي مبالغ.',
+        ],
+    ],
+
+    'settings' => [
+        'events' => [
+            'title' => 'إشعارات الأحداث',
+            'hint' => 'كل حركة على مشروع أو مقترح أو تقرير. تصل كل حركة أيضًا إلى المتابعة والتقييم والإدارة العامة؛ وحدث «الملخص اليومي» يصلهم في ملخص صباح اليوم التالي.',
+            'search' => 'ابحث في الأحداث',
+            'use_defaults' => 'استخدم الإعداد الافتراضي لكل الأحداث',
+            'critical' => 'حرج',
+            'on' => 'مفعّل',
+            'off' => 'متوقف',
+            'importance' => 'كيف تصل إلى المتابعة',
+            'scheduled' => 'يُرسل حسب الجدول، فورًا',
+            'oversight_roles' => 'أدوار متابعة إضافية',
+            'oversight_roles_for' => 'أدوار متابعة إضافية لـ :event',
+            'no_extra_roles' => 'لا أدوار إضافية',
+            'no_oversight' => 'لا متابعة لهذا الحدث',
+            'no_match' => 'لا يوجد حدث يطابق هذا البحث.',
+            'stale_heading' => 'بعض الإعدادات المحفوظة لم تعد سارية',
+            'stale_keys' => 'أحداث لم تعد موجودة:',
+            'stale_roles' => 'أدوار لم تعد موجودة:',
+            'stale_hint' => 'يتم تجاهلها وستُحذف عند الحفظ التالي.',
+            'unknown_event' => 'هذا الحدث غير موجود',
+            'unknown_role' => 'هذا الدور غير موجود',
+            'super_admin_forbidden' => 'لا يمكن اعتماد دور Super Admin كدور رقابة',
+            'modules' => [
+                'monthly-reports' => 'التقارير الشهرية',
+                'report-templates' => 'قوالب التقارير',
+                'donor-reports' => 'تقارير المانحين',
             ],
         ],
     ],

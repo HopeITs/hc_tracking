@@ -7,6 +7,7 @@ namespace App\Livewire\Concerns\Calendar;
 use App\Actions\Milestones\DeleteMilestone;
 use App\Actions\Milestones\SaveMilestone;
 use App\Enums\MilestoneStatus;
+use App\Livewire\Concerns\Milestones\PicksMilestoneActivity;
 use App\Models\Donor;
 use App\Models\DonorReport;
 use App\Models\HrEmployee;
@@ -15,12 +16,14 @@ use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalStatusNote;
 use App\Models\Report;
+use App\Models\Result;
 use App\Models\Task;
 use App\Models\TransfersTracking;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
@@ -40,6 +43,8 @@ use Livewire\Attributes\Locked;
  */
 trait ManagesCalendarMilestones
 {
+    use PicksMilestoneActivity;
+
     public bool $showMilestoneModal = false;
 
     public bool $showDeleteModal = false;
@@ -68,6 +73,29 @@ trait ManagesCalendarMilestones
 
     public string $parentMilestoneId = '';
 
+    public string $milestoneActivityId = '';
+
+    /**
+     * Activities the milestone may deliver: for an edit, those of its own
+     * project and proposal plus its current link; for a new one, the chosen
+     * project's.
+     *
+     * @return Collection<int, Result>
+     */
+    #[Computed]
+    public function milestoneActivityOptions(): Collection
+    {
+        if ($this->editingMilestoneId !== null) {
+            $editing = Milestone::query()->select(['id', 'project_id', 'proposal_id', 'result_id'])->find($this->editingMilestoneId);
+
+            return $editing === null
+                ? new Collection
+                : $this->activityOptionsFor($editing->project_id, $editing->proposal_id, $editing->result_id);
+        }
+
+        return $this->activityOptionsFor($this->milestoneProjectId === '' ? null : (int) $this->milestoneProjectId);
+    }
+
     /** @return Collection<int, Milestone> */
     #[Computed]
     public function parentOptions(): Collection
@@ -93,9 +121,10 @@ trait ManagesCalendarMilestones
     {
         if ($this->editingMilestoneId === null) {
             $this->parentMilestoneId = '';
+            $this->milestoneActivityId = '';
         }
 
-        unset($this->parentOptions);
+        unset($this->parentOptions, $this->milestoneActivityOptions);
     }
 
     public function openCreateModal(?string $date = null): void
@@ -115,7 +144,7 @@ trait ManagesCalendarMilestones
     public function openEditModal(int $milestoneId): void
     {
         $milestone = Milestone::query()
-            ->select(['id', 'project_id', 'proposal_id', 'name', 'planned_start_date', 'planned_end_date', 'status', 'sequence', 'weight_percentage', 'responsible_user_id', 'parent_milestone_id'])
+            ->select(['id', 'project_id', 'proposal_id', 'result_id', 'name', 'planned_start_date', 'planned_end_date', 'status', 'sequence', 'weight_percentage', 'responsible_user_id', 'parent_milestone_id'])
             ->findOrFail($milestoneId);
 
         // Someone who may not edit the milestone is taken to its own page, and
@@ -137,6 +166,8 @@ trait ManagesCalendarMilestones
         $this->responsibleUserId = (string) $milestone->responsible_user_id;
         $this->milestoneProjectId = (string) $milestone->project_id;
         $this->parentMilestoneId = (string) ($milestone->parent_milestone_id ?? '');
+        $this->milestoneActivityId = (string) ($milestone->result_id ?? '');
+        unset($this->milestoneActivityOptions);
         $this->showMilestoneModal = true;
     }
 
@@ -207,7 +238,13 @@ trait ManagesCalendarMilestones
             $attributes['project_id'] = (int) $validated['milestoneProjectId'];
         }
 
-        $milestone = app(SaveMilestone::class)->handle($existingMilestone, $attributes);
+        // A refused link rolls the milestone's own changes back with it.
+        $milestone = DB::transaction(function () use ($existingMilestone, $attributes): Milestone {
+            $saved = app(SaveMilestone::class)->handle($existingMilestone, $attributes);
+            $this->linkActivity($saved, $this->milestoneActivityId, 'milestoneActivityId');
+
+            return $saved;
+        });
         $wasRecentlyCreated = $milestone->wasRecentlyCreated;
 
         $this->showMilestoneModal = false;
@@ -271,7 +308,8 @@ trait ManagesCalendarMilestones
         $this->responsibleUserId = '';
         $this->milestoneProjectId = '';
         $this->parentMilestoneId = '';
-        unset($this->parentOptions);
+        $this->milestoneActivityId = '';
+        unset($this->parentOptions, $this->milestoneActivityOptions);
     }
 
     /** @return array<int, int> */

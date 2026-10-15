@@ -10,9 +10,11 @@ use App\Enums\MilestoneStatus;
 use App\Models\HrEmployee;
 use App\Models\Milestone;
 use App\Models\Project;
+use App\Models\Result;
 use App\Models\Scopes\TaskVisibilityScope;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
@@ -31,6 +33,8 @@ use Livewire\Attributes\Locked;
  */
 trait ManagesMilestoneDirectoryForm
 {
+    use PicksMilestoneActivity;
+
     public bool $showMilestoneModal = false;
 
     #[Locked]
@@ -56,11 +60,25 @@ trait ManagesMilestoneDirectoryForm
 
     public string $parentMilestoneId = '';
 
+    public string $milestoneActivityId = '';
+
     public function updatedMilestoneProjectId(): void
     {
         $this->parentMilestoneId = '';
+        $this->milestoneActivityId = '';
 
-        unset($this->parentOptions);
+        unset($this->parentOptions, $this->milestoneActivityOptions);
+    }
+
+    /**
+     * Activities a milestone of the chosen project may deliver.
+     *
+     * @return Collection<int, Result>
+     */
+    #[Computed]
+    public function milestoneActivityOptions(): Collection
+    {
+        return $this->activityOptionsFor($this->milestoneProjectId === '' ? null : (int) $this->milestoneProjectId);
     }
 
     /** @return Collection<int, Project> */
@@ -135,7 +153,7 @@ trait ManagesMilestoneDirectoryForm
             $this->milestoneProjectId = (string) $projectId;
         }
 
-        unset($this->parentOptions);
+        unset($this->parentOptions, $this->milestoneActivityOptions);
 
         $this->showMilestoneModal = true;
     }
@@ -173,19 +191,24 @@ trait ManagesMilestoneDirectoryForm
 
         Gate::authorize('create', [Milestone::class, (int) $validated['milestoneProjectId']]);
 
-        app(SaveMilestone::class)->handle(null, [
-            'project_id' => (int) $validated['milestoneProjectId'],
-            'name' => $validated['name'],
-            'description' => $validated['description'] === '' ? null : $validated['description'],
-            'planned_start_date' => $validated['plannedStartDate'],
-            'planned_end_date' => $validated['plannedEndDate'] === '' ? null : $validated['plannedEndDate'],
-            'status' => $validated['milestoneStatus'],
-            'weight_percentage' => $validated['weightPercentage'],
-            'responsible_user_id' => (int) $validated['responsibleUserId'],
-            'parent_milestone_id' => $validated['parentMilestoneId'] === '' || $validated['parentMilestoneId'] === null
-                ? null
-                : (int) $validated['parentMilestoneId'],
-        ]);
+        DB::transaction(function () use ($validated): void {
+            $created = app(SaveMilestone::class)->handle(null, [
+                'project_id' => (int) $validated['milestoneProjectId'],
+                'name' => $validated['name'],
+                'description' => $validated['description'] === '' ? null : $validated['description'],
+                'planned_start_date' => $validated['plannedStartDate'],
+                'planned_end_date' => $validated['plannedEndDate'] === '' ? null : $validated['plannedEndDate'],
+                'status' => $validated['milestoneStatus'],
+                'weight_percentage' => $validated['weightPercentage'],
+                'responsible_user_id' => (int) $validated['responsibleUserId'],
+                'parent_milestone_id' => $validated['parentMilestoneId'] === '' || $validated['parentMilestoneId'] === null
+                    ? null
+                    : (int) $validated['parentMilestoneId'],
+            ]);
+
+            // A refused link rolls the new milestone back with it.
+            $this->linkActivity($created, $this->milestoneActivityId, 'milestoneActivityId');
+        });
 
         $this->showMilestoneModal = false;
         $this->resetMilestoneForm();
@@ -272,6 +295,7 @@ trait ManagesMilestoneDirectoryForm
         $this->responsibleUserId = '';
         $this->milestoneProjectId = '';
         $this->parentMilestoneId = '';
-        unset($this->parentOptions);
+        $this->milestoneActivityId = '';
+        unset($this->parentOptions, $this->milestoneActivityOptions);
     }
 }

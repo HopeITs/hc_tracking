@@ -95,7 +95,7 @@ trait ReadsAgreementAttention
         if (! $this->agreement->proposal->status->isApprovedByDonor()) {
             $items[] = [
                 'key' => 'proposal-status',
-                'text' => __('funding_agreements.proposal_not_approved_warning', ['status' => $this->agreement->proposal->status->label()]),
+                'text' => __('funding_agreements.proposal_status_inconsistent_with_agreement'),
                 'critical' => false,
             ];
         }

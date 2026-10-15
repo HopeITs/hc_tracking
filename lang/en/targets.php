@@ -65,6 +65,7 @@ return [
     'count_evidence_file' => '{0} No evidence files|{1} :count evidence file|[2,*] :count evidence files',
     'not_yet_seen_by_meal' => 'Not yet seen by MEAL',
     'issue_project_differs_from_indicator' => 'The indicator is scoped to a different project.',
+    'issue_plan_target_on_proposal_framework' => 'An annual plan cannot target an indicator of a proposal framework.',
     'issue_plan_program_differs_from_result' => 'The annual plan belongs to a different program from the result.',
     'issue_project_outside_plan_program' => 'The project is not in the annual plan\'s program.',
     'issue_project_not_on_proposal' => 'The project is not funded by this proposal.',

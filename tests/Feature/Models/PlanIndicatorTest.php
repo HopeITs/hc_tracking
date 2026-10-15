@@ -167,6 +167,16 @@ test('a target that does not fit its chain names every broken rule', function ()
     ]);
 });
 
+test('an annual plan cannot target an indicator of a proposal framework', function () {
+    $program = Program::factory()->create();
+    $plan = AnnualPlan::factory()->for($program)->create();
+    $proposalResult = Result::factory()->for($program)->create(['proposal_id' => Proposal::factory()->create()->id]);
+    $indicator = Indicator::factory()->for($proposalResult)->create();
+
+    expect(PlanIndicator::chainIssuesFor($plan, $indicator->load('result'), null))
+        ->toBe(['targets.issue_plan_target_on_proposal_framework']);
+});
+
 test('a proposal target may only be delivered by a project the proposal funds', function () {
     $proposal = Proposal::factory()->create();
     $funded = Project::factory()->create();

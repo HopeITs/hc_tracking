@@ -1,18 +1,32 @@
 <?php
 
 use App\Actions\Proposals\SaveDefaultReviewerSlots;
+use App\Enums\EventImportance;
+use App\Enums\OversightMode;
 use App\Enums\ReviewerSlot;
 use App\Models\HrPosition;
+use App\Models\Role;
 use App\Notifications\Alerts\NotificationSettings;
+use App\Notifications\EventCatalog;
 use App\Support\Slots;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Lang;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
 new #[Title('titles.notification_rules')] class extends Component {
+    /**
+     * One row per EventCatalog key, in catalog order (the Event Notifications section).
+     *
+     * @var list<array{key: string, enabled: bool, importance: string, oversight_roles: list<string>}>
+     */
+    public array $events = [];
+
     /** @var list<int> ISO weekdays */
     public array $workingDays = [];
 
@@ -63,9 +77,10 @@ new #[Title('titles.notification_rules')] class extends Component {
         'weeklyDigestTime' => 'weekly_digest_time',
     ];
 
-    public function mount(NotificationSettings $settings): void
+    public function mount(NotificationSettings $settings, EventCatalog $catalog): void
     {
         $this->fill($this->toForm($settings->all()));
+        $this->events = $this->eventRows($catalog);
         $this->fillReviewerPositions();
     }
 
@@ -145,12 +160,22 @@ new #[Title('titles.notification_rules')] class extends Component {
             'offTrackPace' => ['required', 'integer', 'between:1,100'],
             'dailyBriefTime' => ['required', 'date_format:H:i'],
             'weeklyDigestTime' => ['required', 'date_format:H:i'],
+            'events' => ['array'],
+            'events.*.key' => ['required', 'string', 'distinct', Rule::in(EventCatalog::keys())],
+            'events.*.enabled' => ['required', 'boolean'],
+            'events.*.importance' => ['required', Rule::enum(EventImportance::class)],
+            'events.*.oversight_roles' => ['array'],
+            'events.*.oversight_roles.*' => ['string', Rule::notIn([EventCatalog::SuperAdminRole]), Rule::exists('roles', 'name')],
+        ], [
+            'events.*.key.in' => __('notifications.settings.events.unknown_event'),
+            'events.*.oversight_roles.*.not_in' => __('notifications.settings.events.super_admin_forbidden'),
+            'events.*.oversight_roles.*.exists' => __('notifications.settings.events.unknown_role'),
         ]);
 
         $stages = collect(explode(',', $validated['dueSoonDays']))->map(fn (string $days): int => (int) trim($days))->filter()->unique()->sortDesc()->values()->all();
         $days = collect($validated['workingDays'])->map(fn (mixed $day): int => (int) $day)->unique()->sort()->values()->all();
 
-        $values = ['working_days' => $days, 'due_soon_days' => $stages];
+        $values = ['working_days' => $days, 'due_soon_days' => $stages, 'event_overrides' => $this->overridesFrom($validated['events'] ?? [])];
 
         foreach (self::Keys as $property => $key) {
             $values[$key] = $validated[$property];
@@ -159,6 +184,8 @@ new #[Title('titles.notification_rules')] class extends Component {
         $settings->save($values);
 
         $this->fill($this->toForm($values));
+        $this->events = $this->eventRows(new EventCatalog($settings));
+        unset($this->staleOverrides);
         $this->dispatch('notification-rules-saved');
 
         Flux::toast(variant: 'success', text: __('notifications.admin.saved'));
@@ -186,7 +213,7 @@ new #[Title('titles.notification_rules')] class extends Component {
      * Everything the page script needs: defaults, translated templates,
      * pre-resolved plural forms (Arabic needs real plural ranges) and weekday names.
      *
-     * @return array{defaults: array<string, mixed>, strings: array<string, string>, plurals: array<string, array<1|2|3|11, string>>, weekdays: list<string>}
+     * @return array{defaults: array<string, mixed>, eventDefaults: list<array{key: string, enabled: bool, importance: string, oversight_roles: list<string>}>, strings: array<string, string>, plurals: array<string, array<1|2|3|11, string>>, weekdays: list<string>}
      */
     protected function clientConfig(): array
     {
@@ -194,6 +221,7 @@ new #[Title('titles.notification_rules')] class extends Component {
 
         return [
             'defaults' => $this->defaultRules(),
+            'eventDefaults' => $this->defaultEventRows(),
             'strings' => [
                 'due' => __('notifications.admin.flow_due'),
                 'manager' => __('notifications.admin.flow_manager'),
@@ -221,6 +249,155 @@ new #[Title('titles.notification_rules')] class extends Component {
         $monday = CarbonImmutable::now()->startOfWeek(CarbonImmutable::MONDAY);
 
         return array_map(fn (int $offset): string => $monday->addDays($offset)->translatedFormat($format), range(0, 6));
+    }
+
+    /**
+     * Roles an admin may add as oversight: every role but Super Admin (D-20a).
+     *
+     * @return list<string>
+     */
+    #[Computed]
+    public function oversightRoleOptions(): array
+    {
+        return array_values(Role::query()
+            ->where('name', '!=', EventCatalog::SuperAdminRole)
+            ->orderBy('name')
+            ->pluck('name')
+            ->map(fn (mixed $name): string => (string) $name)
+            ->all());
+    }
+
+    /**
+     * Stored overrides the page can no longer apply: keys that left the
+     * catalog and roles that no longer exist (or Super Admin). They are left
+     * out of the form, so the next save drops them.
+     *
+     * @return array{keys: list<string>, roles: list<string>}
+     */
+    #[Computed]
+    public function staleOverrides(): array
+    {
+        $stored = app(NotificationSettings::class)->get('event_overrides');
+        $stored = is_array($stored) ? $stored : [];
+        $known = array_intersect_key($stored, EventCatalog::all());
+        $roles = collect($known)
+            ->flatMap(fn (mixed $override): array => is_array($override) && is_array($override['oversight_roles'] ?? null) ? $override['oversight_roles'] : [])
+            ->filter(fn (mixed $role): bool => is_string($role) && $role !== '')
+            ->unique()
+            ->diff($this->oversightRoleOptions)
+            ->sort();
+
+        return [
+            'keys' => array_values(array_map('strval', array_diff(array_keys($stored), EventCatalog::keys()))),
+            'roles' => array_values($roles->all()),
+        ];
+    }
+
+    /**
+     * The section's rows grouped by module, in catalog order.
+     *
+     * @return list<array{module: string, label: string, rows: list<array{index: int, key: string, title: string, critical: bool, scheduled: bool, oversight: bool}>}>
+     */
+    protected function eventGroups(): array
+    {
+        $groups = [];
+
+        foreach (array_keys(EventCatalog::all()) as $index => $key) {
+            $definition = EventCatalog::all()[$key];
+            $module = $definition['module'];
+
+            $groups[$module] ??= [
+                'module' => $module,
+                'label' => Lang::has("notifications.modules.{$module}") ? __("notifications.modules.{$module}") : __("notifications.settings.events.modules.{$module}"),
+                'rows' => [],
+            ];
+
+            $groups[$module]['rows'][] = [
+                'index' => $index,
+                'key' => $key,
+                'title' => __("notifications.events.{$key}.title"),
+                'critical' => $definition['critical'],
+                'scheduled' => $definition['direct'] === 'scanner',
+                'oversight' => $definition['oversight'] !== OversightMode::None,
+            ];
+        }
+
+        return array_values($groups);
+    }
+
+    /**
+     * The form rows: the catalog merged with the stored overrides, minus roles that are gone.
+     *
+     * @return list<array{key: string, enabled: bool, importance: string, oversight_roles: list<string>}>
+     */
+    private function eventRows(EventCatalog $catalog): array
+    {
+        $options = $this->oversightRoleOptions();
+
+        return array_map(function (string $key) use ($catalog, $options): array {
+            $effective = $catalog->effective($key);
+
+            return [
+                'key' => $key,
+                'enabled' => $effective['enabled'] ?? true,
+                'importance' => ($effective['importance'] ?? EventImportance::Immediate)->value,
+                'oversight_roles' => array_values(array_intersect($effective['oversight_roles'] ?? [], $options)),
+            ];
+        }, EventCatalog::keys());
+    }
+
+    /**
+     * The catalog defaults as form rows (the page script's "use default").
+     *
+     * @return list<array{key: string, enabled: bool, importance: string, oversight_roles: list<string>}>
+     */
+    private function defaultEventRows(): array
+    {
+        return array_map(fn (string $key): array => [
+            'key' => $key,
+            'enabled' => true,
+            'importance' => EventCatalog::all()[$key]['importance']->value,
+            'oversight_roles' => [],
+        ], EventCatalog::keys());
+    }
+
+    /**
+     * Only what differs from the catalog. Scheduled (scanner) events keep their
+     * importance, and events without oversight take no extra roles.
+     *
+     * @param  array<int, array{key: string, enabled: mixed, importance: string, oversight_roles?: list<string>}>  $rows
+     * @return array<string, array{enabled?: false, importance?: string, oversight_roles?: list<string>}>
+     */
+    private function overridesFrom(array $rows): array
+    {
+        $catalog = EventCatalog::all();
+        $overrides = [];
+
+        foreach ($rows as $row) {
+            $definition = $catalog[$row['key']];
+            $override = [];
+
+            if (! filter_var($row['enabled'], FILTER_VALIDATE_BOOLEAN)) {
+                $override['enabled'] = false;
+            }
+
+            if ($definition['direct'] !== 'scanner' && $row['importance'] !== $definition['importance']->value) {
+                $override['importance'] = $row['importance'];
+            }
+
+            $roles = array_values(array_unique($row['oversight_roles'] ?? []));
+            sort($roles);
+
+            if ($definition['oversight'] !== OversightMode::None && $roles !== []) {
+                $override['oversight_roles'] = $roles;
+            }
+
+            if ($override !== []) {
+                $overrides[$row['key']] = $override;
+            }
+        }
+
+        return $overrides;
     }
 
     /**
@@ -304,6 +481,8 @@ new #[Title('titles.notification_rules')] class extends Component {
                 </section>
             </div>
         </div>
+
+        @include('pages.admin._rules-events')
 
         <div
             class="rules-savebar sticky bottom-4 z-30 mt-10 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-secondary-dark px-5 py-3 text-white shadow-lg dark:bg-surface-3 dark:shadow-raised dark:text-ink"

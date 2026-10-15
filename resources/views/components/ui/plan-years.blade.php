@@ -14,6 +14,8 @@
         ResultType::Impact->value => 'bg-secondary-dark dark:bg-ink',
         ResultType::Outcome->value => 'bg-primary',
         ResultType::Output->value => 'bg-secondary-light',
+        ResultType::Activity->value => 'bg-secondary-soft ring-1 ring-inset ring-secondary-medium dark:bg-surface-2 dark:ring-ink-muted',
+        ResultType::CrossCutting->value => 'bg-secondary-medium dark:bg-ink-muted',
     ];
 @endphp
 

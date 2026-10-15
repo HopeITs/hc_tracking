@@ -61,7 +61,7 @@ trait ReadsTargets
                     Proposal::class => [$this->donorRelation().':id,name', 'projects:id'],
                 ]),
                 'indicator:id,name,result_id,project_id,measure,unit,baseline',
-                'indicator.result:id,statement,type,program_id',
+                'indicator.result:id,statement,type,program_id,proposal_id',
                 'project:id,name,city_id,program_id',
                 'project.city:id,name_en,name_ar',
             ])

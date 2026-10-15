@@ -179,6 +179,9 @@ return [
             'past_end' => 'The project “:subject” is past its end date but still active',
             'report_without_files' => 'The approved report on “:subject” has no files attached',
         ],
+        'project_started' => 'The project “:subject” started on :date',
+        'project_ended' => 'The project “:subject” ended on :date',
+        'on_hold_reminder' => 'The proposal “:subject” is on hold and its review date (:date) has come',
     ],
 
     'admin' => [
@@ -255,6 +258,36 @@ return [
         'weekly_program' => ':program this week: :overdue overdue, :off_track indicators off track, :open_risks open risks, :upcoming deadlines in the next 14 days',
         'weekly_all' => 'This week across :programs programs: :overdue overdue, :off_track indicators off track, :open_risks open risks, :upcoming deadlines in the next 14 days',
         'daily' => 'Your day: :due_today due today, :overdue overdue, :stalled stalled, :assigned new assignments',
+        'oversight' => 'Oversight summary since :date: :counts (total :count)',
+        'oversight_line' => ':count × :event',
+        'monthly' => [
+            'summary' => 'Monthly digest for :month: :sections',
+            'month_format' => 'F Y',
+            'line' => ':label: :count',
+            'nothing_pending' => 'Nothing pending this month.',
+            'invalid_month' => 'Choose a past or current month as YYYY-MM.',
+            'sections' => [
+                'projects' => 'Projects',
+                'indicators' => 'Indicators',
+                'donor_reports' => 'Donor reports',
+            ],
+            'lines' => [
+                'projects_started' => 'Projects started',
+                'projects_ended' => 'Projects ended',
+                'indicators_off_track' => 'Indicators off track',
+                'donor_reports_due' => 'Donor reports due next month',
+                'donor_reports_overdue' => 'Donor reports overdue',
+            ],
+            'console' => [
+                'queued' => 'The monthly digest was queued. It goes out only on the first working day of the month.',
+                'sent' => ':count monthly digests sent for :month.',
+                'dry_run' => 'Dry run for :month: nothing is sent or recorded.',
+                'recipient' => 'Recipient',
+                'scope' => 'Programs',
+                'counts' => 'Counts',
+                'all_programs' => 'All programs',
+            ],
+        ],
     ],
 
     'quick' => [
@@ -264,6 +297,7 @@ return [
             'report_mark_reviewed' => 'Mark reviewed',
             'report_approve' => 'Approve',
             'transfer_mark_received' => 'Mark received',
+            'agreement_record' => 'Record agreement',
             'alert_snooze' => 'Snooze reminder',
             'assignment_acknowledge' => 'Acknowledge',
             'assignment_reject' => 'Reject',
@@ -447,9 +481,18 @@ return [
             'deleted' => ':actor deleted a target for “:subject”',
         ],
         'result' => [
-            'created' => ':actor added the result “:subject”',
-            'updated' => ':actor updated the result “:subject”',
-            'deleted' => ':actor deleted the result “:subject”',
+            'created' => [
+                'title' => 'Result added',
+                'body' => ':actor added the result “:subject”',
+            ],
+            'updated' => [
+                'title' => 'Result updated',
+                'body' => ':actor updated the result “:subject”',
+            ],
+            'deleted' => [
+                'title' => 'Result deleted',
+                'body' => ':actor deleted the result “:subject”',
+            ],
         ],
         'report' => [
             'created' => ':actor started a report on “:subject”',
@@ -701,6 +744,50 @@ return [
             'returned' => [
                 'title' => 'Department task returned',
                 'body' => ':actor returned “:subject”',
+            ],
+        ],
+    ],
+
+    'mail' => [
+        'monthly_digest' => [
+            'subject' => 'Monthly digest: :month',
+            'preheader' => 'What happened in :month and what is still pending.',
+            'heading' => 'Your digest for :month',
+            'scope_all' => 'Across all programs.',
+            'scope_programs' => 'For the programs you manage.',
+            'column_item' => 'Item',
+            'column_count' => 'Count',
+            'footer' => 'Open HC Tracking for the details. This email never contains amounts.',
+        ],
+    ],
+
+    'settings' => [
+        'events' => [
+            'title' => 'Event notifications',
+            'hint' => 'Every movement on a project, proposal or report. MEAL and General Management also hear about each one; a daily-summary event reaches them in the next morning summary.',
+            'search' => 'Search events',
+            'use_defaults' => 'Use the default for every event',
+            'critical' => 'Critical',
+            'on' => 'On',
+            'off' => 'Off',
+            'importance' => 'How oversight hears about it',
+            'scheduled' => 'Sent on schedule, right away',
+            'oversight_roles' => 'Extra oversight roles',
+            'oversight_roles_for' => 'Extra oversight roles for :event',
+            'no_extra_roles' => 'No extra roles',
+            'no_oversight' => 'No oversight for this event',
+            'no_match' => 'No event matches this search.',
+            'stale_heading' => 'Some saved settings no longer apply',
+            'stale_keys' => 'Events that no longer exist:',
+            'stale_roles' => 'Roles that no longer exist:',
+            'stale_hint' => 'They are ignored and will be removed the next time you save.',
+            'unknown_event' => 'This event does not exist.',
+            'unknown_role' => 'This role does not exist.',
+            'super_admin_forbidden' => 'Super Admin cannot be an oversight role.',
+            'modules' => [
+                'monthly-reports' => 'Monthly reports',
+                'report-templates' => 'Report templates',
+                'donor-reports' => 'Donor reports',
             ],
         ],
     ],

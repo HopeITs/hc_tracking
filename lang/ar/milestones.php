@@ -77,4 +77,13 @@ return [
     'parent_milestone_in_another_center' => 'المرحلة الأم تتبع مركزًا آخر.',
     'nested_milestones_in_other_centers' => 'المراحل المتفرعة من هذه المرحلة تتبع مراكز أخرى. انقلها أولًا.',
     'proposal_plan' => 'خطة المقترح',
+    'milestone_activity' => 'اختر نشاطًا من إطار مقترح هذا المشروع',
+    'activity_in_framework' => 'النشاط في الإطار',
+    'activity_in_framework_help' => 'نشاط الإطار المنطقي الذي يحققه هذا المَعلَم: من مقترح يموّل المشروع، أو من إطار البرنامج.',
+    'search_activities' => 'ابحث في الأنشطة',
+    'no_activity' => 'دون نشاط',
+    'program_framework' => 'إطار البرنامج',
+    'activity_link_not_funding' => 'النشاط المرتبط يتبع مقترحًا لم يعد يموّل هذا المشروع. اختر نشاطًا آخر.',
+    'activity_link_program_moved' => 'النشاط المرتبط صار في إطار برنامج آخر بعد نقل المشروع. اختر نشاطًا آخر.',
+    'activity_link_not_activity' => 'النتيجة المرتبطة لم تعد نشاطًا. اختر نشاطًا آخر.',
 ];
