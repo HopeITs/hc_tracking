@@ -6,6 +6,7 @@ namespace App\Livewire\Concerns\Results;
 
 use App\Actions\Results\DeleteResult;
 use App\Actions\Results\SaveResult;
+use App\Enums\ActivityKind;
 use App\Enums\ResultType;
 use App\Models\Program;
 use App\Models\Proposal;
@@ -48,6 +49,7 @@ trait ManagesResultForm
     private const array FORM_FIELDS = [
         'statement' => 'statement',
         'type' => 'resultType',
+        'activity_kind' => 'activityKind',
         'checkout_period' => 'checkoutPeriod',
         'program_id' => 'resultProgramId',
         'parent_id' => 'parentId',
@@ -72,6 +74,8 @@ trait ManagesResultForm
     public string $statement = '';
 
     public string $resultType = 'outcome';
+
+    public string $activityKind = 'continuous';
 
     public string $checkoutPeriod = 'quarterly';
 
@@ -305,7 +309,7 @@ trait ManagesResultForm
         Gate::authorize('results.update');
 
         $result = $this->frameworkResults()
-            ->select(['id', 'statement', 'parent_id', 'program_id', 'proposal_id', 'contributes_to_result_id', 'type', 'checkout_period'])
+            ->select(['id', 'statement', 'parent_id', 'program_id', 'proposal_id', 'contributes_to_result_id', 'type', 'activity_kind', 'checkout_period'])
             ->findOrFail($resultId);
 
         $this->resetValidation();
@@ -313,6 +317,7 @@ trait ManagesResultForm
         $this->formProposalId = $result->proposal_id;
         $this->statement = $result->statement;
         $this->resultType = $result->type->value;
+        $this->activityKind = ($result->activity_kind ?? ActivityKind::Continuous)->value;
         $this->checkoutPeriod = $result->checkout_period->value;
         $this->resultProgramId = (string) ($result->program_id ?? '');
         $this->parentId = (string) ($result->parent_id ?? '');
@@ -331,6 +336,7 @@ trait ManagesResultForm
             $result = app(SaveResult::class)->handle($existing, [
                 'statement' => $this->statement,
                 'type' => $this->resultType,
+                'activity_kind' => $this->resultType === ResultType::Activity->value ? $this->activityKind : '',
                 'checkout_period' => $this->checkoutPeriod,
                 'program_id' => $this->resultProgramId,
                 'parent_id' => $this->parentId,
@@ -412,7 +418,7 @@ trait ManagesResultForm
      */
     protected function forgetFramework(): void
     {
-        foreach (['allResults', 'resultsById', 'childCounts', 'measurements', 'groupedRoots', 'frameworkRoots', 'visibleNodes', 'overview', 'focusCounts', 'parentOptions', 'contributesToOptions'] as $property) {
+        foreach (['allResults', 'resultsById', 'childCounts', 'measurements', 'groupedRoots', 'frameworkRoots', 'visibleNodes', 'overview', 'focusCounts', 'parentOptions', 'contributesToOptions', 'activitiesFingerprint'] as $property) {
             if (method_exists($this, $property)) {
                 unset($this->{$property});
             }
@@ -426,6 +432,7 @@ trait ManagesResultForm
         $this->formProposalId = $this->fixedProposalId();
         $this->statement = '';
         $this->resultType = 'outcome';
+        $this->activityKind = ActivityKind::Continuous->value;
         $this->checkoutPeriod = 'quarterly';
         $this->resultProgramId = '';
         $this->parentId = '';

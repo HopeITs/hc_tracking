@@ -1,3 +1,4 @@
+@use('App\Enums\ActivityKind')
 @use('App\Enums\ResultType')
 @use('App\Enums\Period')
 
@@ -12,7 +13,7 @@
         required-note
     >
         @if ($showResultModal)
-            <x-ui.form-section :title="__('common.section_details')" :fields="['statement', 'resultType', 'checkoutPeriod']">
+            <x-ui.form-section :title="__('common.section_details')" :fields="['statement', 'resultType', 'activityKind', 'checkoutPeriod']">
                 <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
                     <x-ui.form-textarea wire:model="statement" :label="__('results_framework.statement')" required autofocus class="@2xl/modal:col-span-2" />
 
@@ -29,6 +30,16 @@
                             ['value' => ResultType::CrossCutting->value, 'label' => ResultType::CrossCutting->label(), 'dot' => 'bg-secondary-light dark:bg-ink-muted'],
                         ]"
                     />
+
+                    @if ($resultType === ResultType::Activity->value)
+                        <x-ui.form-segmented
+                            wire:model="activityKind"
+                            :label="__('results_framework.activity_kind')"
+                            :help="__('results_framework.activity_kind_help')"
+                            required
+                            :options="collect(ActivityKind::cases())->map(fn (ActivityKind $kind): array => ['value' => $kind->value, 'label' => $kind->label()])->all()"
+                        />
+                    @endif
 
                     <x-ui.form-segmented
                         wire:model="checkoutPeriod"

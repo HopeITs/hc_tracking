@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Actions\Results;
 
+use App\Enums\ActivityKind;
 use App\Enums\Period;
 use App\Enums\ResultType;
+use App\Models\ActivitySchedule;
 use App\Models\AnnualPlan;
 use App\Models\Indicator;
 use App\Models\PlanIndicator;
@@ -40,13 +42,17 @@ use Illuminate\Validation\ValidationException;
  * - Lock: once the proposal reaches `submitted`, creating, moving or
  *   retyping takes `results.update`.
  *
- * Error keys: statement, type, checkout_period, program_id, parent_id,
+ * - Kind: activities carry `continuous` (default) or `event`; other levels
+ *   none. An activity with scheduled months keeps its kind and level until
+ *   its calendar is cleared.
+ *
+ * Error keys: statement, type, activity_kind, checkout_period, program_id, parent_id,
  * contributes_to_result_id, structure.
  */
 final class SaveResult
 {
     /**
-     * @param  array{statement?: mixed, type?: mixed, checkout_period?: mixed, program_id?: mixed, parent_id?: mixed, contributes_to_result_id?: mixed}  $validated
+     * @param  array{statement?: mixed, type?: mixed, activity_kind?: mixed, checkout_period?: mixed, program_id?: mixed, parent_id?: mixed, contributes_to_result_id?: mixed}  $validated
      *
      * @throws ValidationException
      */
@@ -83,6 +89,14 @@ final class SaveResult
                 $this->ensureChildrenStillFit($result, $type);
             }
 
+            $activityKind = $type === ResultType::Activity
+                ? ($input['activity_kind'] ?? ($result->exists ? $result->activity_kind : null) ?? ActivityKind::Continuous)
+                : null;
+
+            if ($result->exists && $result->type === ResultType::Activity) {
+                $this->ensureCalendarStillFits($result, $type, $activityKind);
+            }
+
             $programIds = $lockedProposal === null ? [] : ProposalFramework::programIds($lockedProposal);
             $programId = match (true) {
                 $parent !== null => $parent->program_id,
@@ -109,6 +123,7 @@ final class SaveResult
             $result->fill([
                 'statement' => $input['statement'],
                 'type' => $type,
+                'activity_kind' => $activityKind,
                 'checkout_period' => $input['checkout_period'],
                 'program_id' => $programId,
                 'parent_id' => $parentId,
@@ -139,7 +154,7 @@ final class SaveResult
      * framework later, under locks.
      *
      * @param  array<string, mixed>  $validated
-     * @return array{statement: string, type: ResultType, checkout_period: string, program_id: int|null, parent_id: int|null, contributes_to_result_id: int|null}
+     * @return array{statement: string, type: ResultType, activity_kind: ActivityKind|null, checkout_period: string, program_id: int|null, parent_id: int|null, contributes_to_result_id: int|null}
      *
      * @throws ValidationException
      */
@@ -147,7 +162,7 @@ final class SaveResult
     {
         $validated['statement'] = trim((string) ($validated['statement'] ?? ''));
 
-        foreach (['program_id', 'parent_id', 'contributes_to_result_id'] as $key) {
+        foreach (['activity_kind', 'program_id', 'parent_id', 'contributes_to_result_id'] as $key) {
             if (($validated[$key] ?? null) === '') {
                 $validated[$key] = null;
             }
@@ -156,6 +171,7 @@ final class SaveResult
         $data = Validator::make($validated, [
             'statement' => ['required', 'string'],
             'type' => ['required', Rule::enum(ResultType::class)],
+            'activity_kind' => ['nullable', Rule::enum(ActivityKind::class)],
             'checkout_period' => ['required', Rule::enum(Period::class)],
             'program_id' => ['nullable', 'integer', Rule::exists(Program::class, 'id')],
             'parent_id' => ['nullable', 'integer'],
@@ -164,12 +180,14 @@ final class SaveResult
             'statement.required' => __('results_framework.write_the_result_statement'),
             'type.required' => __('results_framework.choose_impact_outcome_or_output'),
             'type.enum' => __('results_framework.choose_impact_outcome_or_output'),
+            'activity_kind.enum' => __('results_framework.choose_continuous_or_event'),
             'checkout_period.required' => __('common.choose_how_often_this_is_checked'),
         ])->validate();
 
         return [
             'statement' => $data['statement'],
             'type' => ResultType::from($data['type']),
+            'activity_kind' => isset($data['activity_kind']) ? ActivityKind::from($data['activity_kind']) : null,
             'checkout_period' => (string) $data['checkout_period'],
             'program_id' => isset($data['program_id']) ? (int) $data['program_id'] : null,
             'parent_id' => isset($data['parent_id']) ? (int) $data['parent_id'] : null,
@@ -255,6 +273,23 @@ final class SaveResult
 
         if ($children->contains(fn (Result $child): bool => $child->type->parentLevel() !== $type)) {
             $this->refuse('type', 'results_framework.nested_results_still_sit_at_the_level_below');
+        }
+    }
+
+    /**
+     * An activity with scheduled months keeps its level and its kind: its
+     * calendar was built for them (a continuous run vs separate months).
+     *
+     * @throws ValidationException
+     */
+    private function ensureCalendarStillFits(Result $activity, ResultType $type, ?ActivityKind $kind): void
+    {
+        if ($type === ResultType::Activity && $kind === $activity->activity_kind) {
+            return;
+        }
+
+        if (ActivitySchedule::query()->where('result_id', $activity->id)->exists()) {
+            $this->refuse($type === ResultType::Activity ? 'activity_kind' : 'type', 'results_framework.activity_kind_scheduled');
         }
     }
 

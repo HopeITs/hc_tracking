@@ -6,6 +6,7 @@ namespace App\Support;
 
 use App\Enums\ProposalStatus;
 use App\Models\Proposal;
+use Carbon\CarbonImmutable;
 
 /**
  * The rules a proposal's own logical framework shares with every writer
@@ -41,6 +42,23 @@ final class ProposalFramework
         $programIds ??= self::programIds($proposal);
 
         return count($programIds) === 1 ? $programIds[0] : null;
+    }
+
+    /**
+     * The months an activity of this proposal may be scheduled in, as the
+     * first days of the first and last month: the actual period once both
+     * actual dates are set (approval), else the planned period. The approval
+     * shift moves the calendar into the actual period, so it stays valid.
+     *
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable}
+     */
+    public static function scheduleWindow(Proposal $proposal): array
+    {
+        $isActual = $proposal->actual_date_begin !== null && $proposal->actual_date_end !== null;
+        $begin = $isActual ? $proposal->actual_date_begin : $proposal->planned_date_begin;
+        $end = $isActual ? $proposal->actual_date_end : $proposal->planned_date_end;
+
+        return [$begin->startOfMonth(), $end->startOfMonth()];
     }
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Observers;
 
+use App\Enums\ActivityKind;
 use App\Enums\ResultType;
 use App\Exceptions\InvalidParentException;
 use App\Models\Result;
@@ -34,6 +35,8 @@ final class ResultObserver
      */
     public function saving(Result $result): void
     {
+        $this->normalizeActivityKind($result);
+
         if (! $result->isDirty(['parent_id', 'type', 'proposal_id', 'program_id'])) {
             return;
         }
@@ -81,6 +84,30 @@ final class ResultObserver
         if ($result->proposal_id !== $parent->proposal_id
             || ($result->proposal_id !== null && $result->program_id !== $parent->program_id)) {
             throw InvalidParentException::crossFramework();
+        }
+    }
+
+    /**
+     * Only activities carry a kind, and an activity always has one
+     * (`continuous` unless chosen, contracts §11.2). A partly selected row
+     * whose type is untouched is left alone (strict mode).
+     */
+    private function normalizeActivityKind(Result $result): void
+    {
+        $kindLoaded = ! $result->exists || array_key_exists('activity_kind', $result->getAttributes());
+
+        if (! $kindLoaded && ! $result->isDirty('type')) {
+            return;
+        }
+
+        if ($result->type !== ResultType::Activity) {
+            $result->activity_kind = null;
+
+            return;
+        }
+
+        if (! $kindLoaded || $result->activity_kind === null) {
+            $result->activity_kind = ActivityKind::Continuous;
         }
     }
 

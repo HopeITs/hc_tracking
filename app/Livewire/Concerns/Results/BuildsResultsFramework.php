@@ -51,7 +51,7 @@ trait BuildsResultsFramework
     public function allResults(): Collection
     {
         return $this->frameworkResults()
-            ->select(['id', 'statement', 'parent_id', 'program_id', 'proposal_id', 'contributes_to_result_id', 'type', 'checkout_period'])
+            ->select(['id', 'statement', 'parent_id', 'program_id', 'proposal_id', 'contributes_to_result_id', 'type', 'activity_kind', 'checkout_period'])
             ->with([
                 // program_id is nullable, so a result can outlive its program.
                 'program:id',

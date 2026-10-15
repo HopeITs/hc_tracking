@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Concerns\HasTree;
 use App\Concerns\RecordsActivity;
+use App\Enums\ActivityKind;
 use App\Enums\Period;
 use App\Enums\ResultType;
 use App\Notifications\TracksActivity;
@@ -38,11 +39,12 @@ use Illuminate\Support\Str;
  * @property int|null $contributes_to_result_id
  * @property int|null $copied_from_id
  * @property ResultType $type
+ * @property ActivityKind|null $activity_kind
  * @property Period $checkout_period
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['statement', 'parent_id', 'program_id', 'proposal_id', 'contributes_to_result_id', 'copied_from_id', 'type', 'checkout_period'])]
+#[Fillable(['statement', 'parent_id', 'program_id', 'proposal_id', 'contributes_to_result_id', 'copied_from_id', 'type', 'activity_kind', 'checkout_period'])]
 #[ObservedBy(ResultObserver::class)]
 class Result extends Model implements TracksActivity
 {
@@ -121,6 +123,17 @@ class Result extends Model implements TracksActivity
     }
 
     /**
+     * The months this activity is scheduled in: the proposal calendar and
+     * every center override (see ActivitySchedule).
+     *
+     * @return HasMany<ActivitySchedule, $this>
+     */
+    public function schedules(): HasMany
+    {
+        return $this->hasMany(ActivitySchedule::class);
+    }
+
+    /**
      * Results of a program's own framework, outside every proposal.
      *
      * @param  Builder<static>  $query
@@ -167,6 +180,7 @@ class Result extends Model implements TracksActivity
     {
         return [
             'type' => ResultType::class,
+            'activity_kind' => ActivityKind::class,
             'checkout_period' => Period::class,
         ];
     }
@@ -193,6 +207,6 @@ class Result extends Model implements TracksActivity
      */
     public function activityEvents(): array
     {
-        return ['statement' => 'updated', 'type' => 'updated', 'parent_id' => 'updated', 'program_id' => 'updated', 'contributes_to_result_id' => 'updated'];
+        return ['statement' => 'updated', 'type' => 'updated', 'parent_id' => 'updated', 'program_id' => 'updated', 'contributes_to_result_id' => 'updated', 'activity_kind' => 'updated'];
     }
 }

@@ -66,6 +66,8 @@ return [
         'frequency' => 'Frequency',
         'period' => 'Period',
         'statement' => 'Statement',
+        'schedule' => 'Calendar',
+        'activity_kind' => 'Activity kind',
         'type' => 'Type',
         'value' => 'Value',
         'planned_date' => 'Planned date',
