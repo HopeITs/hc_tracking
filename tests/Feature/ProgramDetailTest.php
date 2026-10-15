@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\DonorAttribution;
 use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\ResultType;
@@ -15,6 +16,8 @@ use App\Models\Result;
 use App\Models\Strategy;
 use App\Models\Task;
 use App\Models\User;
+use Database\Seeders\RolesAndPermissionsSeeder;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 test('guests are redirected from program detail', function () {
@@ -455,4 +458,31 @@ test('program detail links each annual plan year to its plan', function () {
         ->test('pages::programs.show', ['program' => $program])
         ->set('tab', 'plans')
         ->assertSee(route('annual-plans.show', $plan), false);
+});
+
+test('MEAL sets the program donor attribution and it is logged', function () {
+    $this->seed(RolesAndPermissionsSeeder::class);
+    $program = Program::factory()->create();
+
+    Livewire::actingAs(User::factory()->role('MEAL')->create())
+        ->test('pages::programs.show', ['program' => $program])
+        ->assertSeeText(__('programs.donor_attribution'))
+        ->call('setDonorAttribution', 'split')
+        ->assertHasNoErrors();
+
+    expect(DB::table('programs')->where('id', $program->id)->value('donor_attribution'))->toBe('split')
+        ->and(DB::table('activities')->where('subject_type', 'program')->where('subject_id', $program->id)->where('event', 'program.updated')->exists())->toBeTrue();
+});
+
+test('only report-templates.manage holders set the donor attribution', function () {
+    $this->seed(RolesAndPermissionsSeeder::class);
+    $program = Program::factory()->create();
+
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
+        ->test('pages::programs.show', ['program' => $program])
+        ->assertSeeText(DonorAttribution::Shared->label())
+        ->call('setDonorAttribution', 'split')
+        ->assertForbidden();
+
+    expect(DB::table('programs')->where('id', $program->id)->value('donor_attribution'))->toBe('shared');
 });

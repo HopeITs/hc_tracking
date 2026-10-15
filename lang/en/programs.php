@@ -113,4 +113,7 @@ return [
     'timeline_overdue' => 'Overdue',
     'timeline_today' => 'Today',
     'timeline_weighted_complete' => 'Weighted progress',
+    'donor_attribution' => 'Donors on one indicator',
+    'donor_attribution_help' => 'How a center total combines the same indicator funded by several donors.',
+    'donor_attribution_saved' => 'Donor attribution saved.',
 ];

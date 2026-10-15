@@ -113,4 +113,7 @@ return [
     'timeline_overdue' => 'متأخر',
     'timeline_today' => 'اليوم',
     'timeline_weighted_complete' => 'التقدم الموزون',
+    'donor_attribution' => 'المانحون على مؤشر واحد',
+    'donor_attribution_help' => 'كيف يُجمع مستهدف المركز لنفس المؤشر الممول من عدة مانحين.',
+    'donor_attribution_saved' => 'تم حفظ طريقة احتساب المانحين.',
 ];

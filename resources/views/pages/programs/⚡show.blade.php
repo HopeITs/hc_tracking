@@ -1,5 +1,7 @@
 <?php
 
+use App\Actions\Targets\SetProgramDonorAttribution;
+use App\Enums\DonorAttribution;
 use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
 use App\Livewire\Concerns\AddsQuickTask;
@@ -72,11 +74,30 @@ new #[Title('titles.program')] class extends Component {
         $this->resetPage('projectsPage');
     }
 
+    /**
+     * Set how this program combines one indicator's targets across donors
+     * (D-40/D-46). Unknown values are ignored.
+     */
+    public function setDonorAttribution(string $attribution): void
+    {
+        $value = DonorAttribution::tryFrom($attribution);
+
+        if ($value === null) {
+            return;
+        }
+
+        app(SetProgramDonorAttribution::class)->handle($this->program, $value);
+
+        unset($this->program);
+
+        Flux::toast(variant: 'success', text: __('programs.donor_attribution_saved'));
+    }
+
     #[Computed]
     public function program(): Program
     {
         return Program::query()
-            ->select(['id', 'strategy_id', 'manager_id', 'updated_at'])
+            ->select(['id', 'strategy_id', 'manager_id', 'donor_attribution', 'updated_at'])
             ->selectSub(
                 Risk::query()
                     ->selectRaw('count(*)')
@@ -249,7 +270,7 @@ new #[Title('titles.program')] class extends Component {
                     </div>
                 </div>
 
-                <dl class="grid gap-5 border-t border-secondary-soft pt-4 @3xl/detail:grid-cols-3 dark:border-line">
+                <dl class="grid gap-5 border-t border-secondary-soft pt-4 @3xl/detail:grid-cols-2 @5xl/detail:grid-cols-4 dark:border-line">
                     <div class="min-w-0">
                         <dt class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-ink-muted">{{ __('programs.linked_strategy') }}</dt>
                         <dd class="mt-1.5 truncate text-sm font-semibold">
@@ -272,6 +293,23 @@ new #[Title('titles.program')] class extends Component {
                     <div class="min-w-0">
                         <dt class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-ink-muted">{{ __('programs.updated') }}</dt>
                         <dd class="mt-1.5 truncate text-sm font-semibold">{{ $this->program->updated_at?->translatedFormat(__('formats.date')) ?? '—' }}</dd>
+                    </div>
+                    <div class="min-w-0" data-program-donor-attribution>
+                        <dt class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-ink-muted">
+                            <label for="program-donor-attribution">{{ __('programs.donor_attribution') }}</label>
+                        </dt>
+                        <dd class="mt-1.5 text-sm font-semibold">
+                            @can('report-templates.manage')
+                                <flux:select id="program-donor-attribution" size="sm" wire:change="setDonorAttribution($event.target.value)" wire:loading.attr="disabled" wire:target="setDonorAttribution">
+                                    @foreach (DonorAttribution::cases() as $attribution)
+                                        <flux:select.option value="{{ $attribution->value }}" :selected="$this->program->donor_attribution === $attribution">{{ $attribution->label() }}</flux:select.option>
+                                    @endforeach
+                                </flux:select>
+                            @else
+                                {{ $this->program->donor_attribution->label() }}
+                            @endcan
+                            <p class="mt-1 text-xs font-normal text-secondary-medium dark:text-ink-muted">{{ __('programs.donor_attribution_help') }}</p>
+                        </dd>
                     </div>
                 </dl>
             </div>

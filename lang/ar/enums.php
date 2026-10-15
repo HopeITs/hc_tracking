@@ -134,6 +134,10 @@ return [
         'continuous' => 'مستمر',
         'event' => 'حدث',
     ],
+    'donor_attribution' => [
+        'shared' => 'مشترك (المستهدف الأعلى)',
+        'split' => 'مقسّم (مجموع المستهدفات)',
+    ],
     'result_type' => [
         'impact' => 'الأثر',
         'outcome' => 'النتيجة',
