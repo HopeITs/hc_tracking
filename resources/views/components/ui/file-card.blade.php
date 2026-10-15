@@ -11,7 +11,7 @@
         \App\Enums\MediaCollection::Proposal => 'border-primary/25 bg-status-critical-soft text-primary dark:text-brand-text',
         \App\Enums\MediaCollection::Agreement => 'border-funding/25 bg-funding-soft text-funding',
         \App\Enums\MediaCollection::Mou => 'border-status-good/25 bg-status-good-soft text-status-good',
-        \App\Enums\MediaCollection::Evidence => 'border-status-warn/25 bg-status-warn-soft text-status-warn',
+        \App\Enums\MediaCollection::Evidence, \App\Enums\MediaCollection::NeedAssessment =>'border-status-warn/25 bg-status-warn-soft text-status-warn',
         \App\Enums\MediaCollection::Photo => 'border-secondary-dark/20 bg-secondary-dark text-white dark:border-white/10 dark:bg-surface-2',
         \App\Enums\MediaCollection::Other => 'border-secondary-light text-secondary-medium dark:text-ink-muted',
         \App\Enums\MediaCollection::FinalReport, \App\Enums\MediaCollection::FinalReportAcceptance => 'border-status-good/25 bg-status-good-soft text-status-good',

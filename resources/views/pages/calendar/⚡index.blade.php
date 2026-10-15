@@ -125,7 +125,7 @@ new #[Title('titles.calendar')] class extends Component {
         'milestone' => ['milestonesByDay'],
         'task' => ['tasksByDay'],
         'report' => ['reportsByDay'],
-        'proposal' => ['proposalsByDay'],
+        'proposal' => ['proposalsByDay', 'reviewMeetingsByDay'],
         'transfer' => ['transfersByDay'],
         'donor' => ['donorFollowUpsByDay', 'donorReportsByDay'],
         'project' => ['projectStartsByDay', 'projectEndsByDay'],
@@ -134,7 +134,7 @@ new #[Title('titles.calendar')] class extends Component {
     // Every per-day grouping, regardless of type — used to tell whether a
     // day has anything on it at all, so its content area can open the
     // day-detail list instead of the "add" menu.
-    $allGroupKeys = ['milestonesByDay', 'tasksByDay', 'reportsByDay', 'proposalsByDay', 'transfersByDay', 'donorFollowUpsByDay', 'donorReportsByDay', 'projectStartsByDay', 'projectEndsByDay'];
+    $allGroupKeys = ['milestonesByDay', 'tasksByDay', 'reportsByDay', 'proposalsByDay', 'transfersByDay', 'donorFollowUpsByDay', 'donorReportsByDay', 'projectStartsByDay', 'projectEndsByDay', 'reviewMeetingsByDay'];
 
     $focusedType = $this->focusedType();
 

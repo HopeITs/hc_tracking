@@ -8,7 +8,6 @@ use App\Enums\MealCoverageScope;
 use App\Models\HrEmployee;
 use App\Models\MealCoverageAssignment;
 use App\Models\Project;
-use App\Notifications\Alerts\NotificationSettings;
 use Illuminate\Support\Collection;
 
 /**
@@ -112,17 +111,12 @@ final class MealCoverage
     }
 
     /**
-     * The MEAL Manager slot holder (contracts §9): the HR position in
-     * `proposal_default_reviewers.meal_manager`, resolved to its current
-     * holder. Null when the slot is unset or vacant.
+     * The MEAL Manager slot holder (contracts §9), null when the slot is
+     * vacant. One meaning of vacant for every caller: Slots::holderOf().
      */
     public static function mealManagerEmployeeId(): ?int
     {
-        // TODO T07: return Slots::holderOf('meal_manager');
-        $slots = app(NotificationSettings::class)->get('proposal_default_reviewers');
-        $positionId = is_array($slots) ? ($slots['meal_manager'] ?? null) : null;
-
-        return $positionId === null ? null : EmployeeProfile::holderOfPosition((int) $positionId);
+        return Slots::holderOf('meal_manager');
     }
 
     /**

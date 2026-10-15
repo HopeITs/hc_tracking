@@ -1,5 +1,8 @@
 <?php
 
+use App\Models\Activity;
+use App\Models\User;
+use App\Models\UserNotification;
 use App\Notifications\Alerts\NotificationSettings;
 use App\Notifications\Alerts\WorkingCalendar;
 use Carbon\CarbonImmutable;
@@ -164,4 +167,82 @@ test('the page renders every rule section with its controls', function () {
         ->assertSeeHtml('id="rule-stalledProposal"')
         ->assertSeeHtml('id="rule-weeklyDigestTime"')
         ->assertSee(__('notifications.admin.stalled_report_reviewed'));
+});
+
+/**
+ * A General Manager granted notification-settings.manage directly, so the
+ * default-reviewer tests never rely on Super Admin alone (D-20a).
+ */
+function reviewerSettingsAdmin(): User
+{
+    $user = userWithRole('General Manager');
+    $user->givePermissionTo('notification-settings.manage');
+
+    return $user->fresh();
+}
+
+test('the default proposal reviewers section stores a position for each slot and shows it again', function () {
+    $finance = insertHrPosition(insertHrDepartment('Finance'), 'Finance Manager');
+    $ceo = insertHrPosition(insertHrDepartment('Board'), 'CEO');
+
+    Livewire::actingAs(reviewerSettingsAdmin())->test('pages::admin.notification-settings')
+        ->assertSeeHtml('id="rules-default-reviewers"')
+        ->set('reviewerPositions.finance_manager', (string) $finance)
+        ->set('reviewerPositions.ceo', (string) $ceo)
+        ->call('saveDefaultReviewers')
+        ->assertHasNoErrors();
+
+    expect(app(NotificationSettings::class)->get('proposal_default_reviewers'))
+        ->toEqual(['meal_manager' => null, 'finance_manager' => $finance, 'fundraising_manager' => null, 'ceo' => $ceo]);
+
+    Livewire::actingAs(reviewerSettingsAdmin())->test('pages::admin.notification-settings')
+        ->assertSet('reviewerPositions.finance_manager', (string) $finance)
+        ->assertSet('reviewerPositions.meal_manager', '');
+});
+
+test('a default reviewer slot must be an HR position', function (string $value) {
+    Livewire::actingAs(reviewerSettingsAdmin())->test('pages::admin.notification-settings')
+        ->set('reviewerPositions.ceo', $value)
+        ->call('saveDefaultReviewers')
+        ->assertHasErrors(['reviewerPositions.ceo']);
+
+    expect(app(NotificationSettings::class)->get('proposal_default_reviewers')['ceo'])->toBeNull();
+})->with(['not a number' => ['ceo'], 'unknown in HR' => ['999999']]);
+
+test('without notification-settings.manage nobody saves the default reviewers', function () {
+    Livewire::actingAs(userWithRole('General Manager'))->test('pages::admin.notification-settings')
+        ->call('saveDefaultReviewers')
+        ->assertForbidden();
+});
+
+test('moving the MEAL Manager slot to another position is logged and tells both holders', function () {
+    $previous = holdMealManagerSlot();
+    $previousUser = userWithRole('MEAL', $previous);
+    $nextHolder = insertHrEmployee(firstNameEn: 'Nadia', lastNameEn: 'Next');
+    $nextPosition = insertHrPosition(insertHrDepartment('MEAL'), 'MEAL Manager');
+    insertHrContract($nextHolder, $nextPosition);
+    $nextUser = userWithRole('MEAL', $nextHolder);
+
+    Livewire::actingAs(reviewerSettingsAdmin())->test('pages::admin.notification-settings')
+        ->set('reviewerPositions.meal_manager', (string) $nextPosition)
+        ->call('saveDefaultReviewers')
+        ->assertHasNoErrors();
+
+    $activity = Activity::query()->where('event', 'notification_settings.meal_manager_changed')->sole();
+    $key = 'notifications.events.notification_settings.meal_manager_changed';
+
+    expect($activity->properties['employee_id'])->toBe($nextHolder)
+        ->and($activity->properties['previous_employee_id'])->toBe($previous)
+        ->and(UserNotification::query()->forUser($previousUser)->get()->pluck('data.key')->all())->toBe([$key])
+        ->and(UserNotification::query()->forUser($nextUser)->get()->pluck('data.key')->all())->toBe([$key]);
+});
+
+test('saving the default reviewers without moving the MEAL Manager logs nothing', function () {
+    holdMealManagerSlot();
+
+    Livewire::actingAs(reviewerSettingsAdmin())->test('pages::admin.notification-settings')
+        ->set('reviewerPositions.ceo', (string) insertHrPosition(insertHrDepartment('Board'), 'CEO'))
+        ->call('saveDefaultReviewers');
+
+    expect(Activity::query()->where('event', 'notification_settings.meal_manager_changed')->exists())->toBeFalse();
 });

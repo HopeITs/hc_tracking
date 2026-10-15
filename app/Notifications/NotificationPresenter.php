@@ -178,9 +178,10 @@ final class NotificationPresenter
         }
 
         return match (true) {
-            isset($param['trans']) => (string) __($param['trans'], [], $locale),
+            isset($param['trans']) => (string) __($param['trans'], array_map(fn (mixed $nested): string => $this->param($nested, $locale), $param['params'] ?? []), $locale),
             isset($param['enum']) => (string) __('enums.'.$param['enum'].'.'.$this->enumKey((string) $param['value']), [], $locale),
             isset($param['date']) => $this->formatDate($param['date'], (string) __('formats.date', [], $locale), $locale),
+            isset($param['datetime']) => $this->formatDate($param['datetime'], (string) __('formats.datetime', [], $locale), $locale),
             isset($param['weekday']) => $this->formatDate($param['weekday'], 'l', $locale),
             isset($param['localized']) => $this->localized($param['localized'], $locale),
             isset($param['localized_list']) => implode(

@@ -9,6 +9,7 @@ use App\Models\DonorReport;
 use App\Models\Milestone;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalStatusNote;
 use App\Models\Report;
 use App\Models\Task;
 use App\Models\TransfersTracking;
@@ -23,7 +24,7 @@ use Livewire\Attributes\Computed;
  * Used by calendar/index only. The #[Computed] calendar() comes from
  * BuildsCalendarGrid, canViewAgreements() from ChecksFinanceVisibility.
  *
- * @property-read array{month: CarbonImmutable, weeks: ?array<int, array<int, CarbonImmutable>>, days: ?array<int, CarbonImmutable>, milestonesByDay: \Illuminate\Support\Collection<string, Collection<int, Milestone>>, tasksByDay: \Illuminate\Support\Collection<string, Collection<int, Task>>, reportsByDay: \Illuminate\Support\Collection<string, Collection<int, Report>>, proposalsByDay: \Illuminate\Support\Collection<string, Collection<int, Proposal>>, transfersByDay: \Illuminate\Support\Collection<string, Collection<int, TransfersTracking>>, donorFollowUpsByDay: \Illuminate\Support\Collection<string, Collection<int, Donor>>, donorReportsByDay: \Illuminate\Support\Collection<string, Collection<int, DonorReport>>, projectStartsByDay: \Illuminate\Support\Collection<string, Collection<int, Project>>, projectEndsByDay: \Illuminate\Support\Collection<string, Collection<int, Project>>, unscheduledTasks: Collection<int, Task>, nowOffsetPercent: float} $calendar  #[Computed] calendar()
+ * @property-read array{month: CarbonImmutable, weeks: ?array<int, array<int, CarbonImmutable>>, days: ?array<int, CarbonImmutable>, milestonesByDay: \Illuminate\Support\Collection<string, Collection<int, Milestone>>, tasksByDay: \Illuminate\Support\Collection<string, Collection<int, Task>>, reportsByDay: \Illuminate\Support\Collection<string, Collection<int, Report>>, proposalsByDay: \Illuminate\Support\Collection<string, Collection<int, Proposal>>, transfersByDay: \Illuminate\Support\Collection<string, Collection<int, TransfersTracking>>, donorFollowUpsByDay: \Illuminate\Support\Collection<string, Collection<int, Donor>>, donorReportsByDay: \Illuminate\Support\Collection<string, Collection<int, DonorReport>>, projectStartsByDay: \Illuminate\Support\Collection<string, Collection<int, Project>>, projectEndsByDay: \Illuminate\Support\Collection<string, Collection<int, Project>>, reviewMeetingsByDay: \Illuminate\Support\Collection<string, Collection<int, ProposalStatusNote>>, unscheduledTasks: Collection<int, Task>, nowOffsetPercent: float} $calendar  #[Computed] calendar()
  */
 trait ShowsCalendarDay
 {
@@ -85,6 +86,10 @@ trait ShowsCalendarDay
 
         foreach ($calendar['proposalsByDay']->get($date, new Collection) as $proposal) {
             $rows->push(['type' => 'proposal', 'kind' => 'link', 'id' => $proposal->id, 'url' => route('proposals.show', $proposal), 'title' => $proposal->name, 'subLabel' => null]);
+        }
+
+        foreach ($calendar['reviewMeetingsByDay']->get($date, new Collection) as $meeting) {
+            $rows->push(['type' => 'proposal', 'kind' => 'link', 'id' => $meeting->proposal_id, 'url' => route('proposals.show', $meeting->proposal), 'title' => $meeting->proposal->name, 'subLabel' => __('calendar.review_meeting').' · '.$meeting->meeting_at->format('H:i')]);
         }
 
         foreach ($calendar['transfersByDay']->get($date, new Collection) as $transfer) {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\Locale;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Query\JoinClause;
@@ -56,6 +57,30 @@ class HrPosition extends HrModel
             ->pluck('employee_id', 'program_id')
             ->map(fn (mixed $id): ?int => $id === null ? null : (int) $id)
             ->all();
+    }
+
+    /**
+     * Active positions for a picker, labelled «title · department» in the
+     * interface language and sorted by that label. One HR query; department
+     * names come from the in-memory lookup.
+     *
+     * @return list<array{value: string, label: string}>
+     */
+    public static function pickerOptions(): array
+    {
+        $titleColumn = Locale::current() === Locale::Arabic ? 'title_ar' : 'title_en';
+
+        return array_values(static::query()
+            ->where('is_active', true)
+            ->get(['id', 'department_id', 'title_en', 'title_ar'])
+            ->map(function (self $position) use ($titleColumn): array {
+                $title = trim((string) $position->{$titleColumn}) !== '' ? $position->{$titleColumn} : $position->title_en;
+                $department = HrDepartment::nameOf((int) $position->department_id);
+
+                return ['value' => (string) $position->id, 'label' => $department === '' ? $title : $title.' · '.$department];
+            })
+            ->sortBy('label', SORT_NATURAL | SORT_FLAG_CASE)
+            ->all());
     }
 
     /**

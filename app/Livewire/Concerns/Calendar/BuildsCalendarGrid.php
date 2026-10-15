@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Calendar;
 
+use App\Enums\ReviewStage;
 use App\Models\Donor;
 use App\Models\DonorReport;
 use App\Models\Milestone;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalStatusNote;
 use App\Models\Report;
 use App\Models\Scopes\TaskVisibilityScope;
 use App\Models\Task;
@@ -45,7 +47,7 @@ trait BuildsCalendarGrid
      * view, the plain list of visible days instead — `weeks` is null then
      * and `days` is populated, and vice versa in month view.
      *
-     * @return array{month: CarbonImmutable, weeks: ?array<int, array<int, CarbonImmutable>>, days: ?array<int, CarbonImmutable>, milestonesByDay: \Illuminate\Support\Collection<string, Collection<int, Milestone>>, tasksByDay: \Illuminate\Support\Collection<string, Collection<int, Task>>, reportsByDay: \Illuminate\Support\Collection<string, Collection<int, Report>>, proposalsByDay: \Illuminate\Support\Collection<string, Collection<int, Proposal>>, transfersByDay: \Illuminate\Support\Collection<string, Collection<int, TransfersTracking>>, donorFollowUpsByDay: \Illuminate\Support\Collection<string, Collection<int, Donor>>, donorReportsByDay: \Illuminate\Support\Collection<string, Collection<int, DonorReport>>, projectStartsByDay: \Illuminate\Support\Collection<string, Collection<int, Project>>, projectEndsByDay: \Illuminate\Support\Collection<string, Collection<int, Project>>, unscheduledTasks: Collection<int, Task>, nowOffsetPercent: float}
+     * @return array{month: CarbonImmutable, weeks: ?array<int, array<int, CarbonImmutable>>, days: ?array<int, CarbonImmutable>, milestonesByDay: \Illuminate\Support\Collection<string, Collection<int, Milestone>>, tasksByDay: \Illuminate\Support\Collection<string, Collection<int, Task>>, reportsByDay: \Illuminate\Support\Collection<string, Collection<int, Report>>, proposalsByDay: \Illuminate\Support\Collection<string, Collection<int, Proposal>>, transfersByDay: \Illuminate\Support\Collection<string, Collection<int, TransfersTracking>>, donorFollowUpsByDay: \Illuminate\Support\Collection<string, Collection<int, Donor>>, donorReportsByDay: \Illuminate\Support\Collection<string, Collection<int, DonorReport>>, projectStartsByDay: \Illuminate\Support\Collection<string, Collection<int, Project>>, projectEndsByDay: \Illuminate\Support\Collection<string, Collection<int, Project>>, reviewMeetingsByDay: \Illuminate\Support\Collection<string, Collection<int, ProposalStatusNote>>, unscheduledTasks: Collection<int, Task>, nowOffsetPercent: float}
      */
     #[Computed]
     public function calendar(): array
@@ -203,6 +205,29 @@ trait BuildsCalendarGrid
                 ->get()
                 ->groupBy(fn (DonorReport $report): string => $report->due_on->toDateString());
 
+        // Review meetings (T07) on the note that opened a review stage, for the
+        // people asked to review it. Someone without proposals.view reviews
+        // only as themselves, so the people filter never shows them others'.
+        $ownEmployeeId = $this->employeeId();
+        $reviewEmployeeIds = $this->canViewProposals() ? $employeeIds : ($ownEmployeeId === null ? [] : [$ownEmployeeId]);
+
+        $reviewMeetingsByDay = $reviewEmployeeIds === [] || ! $this->showProposals
+            ? new Collection
+            : ProposalStatusNote::query()
+                ->select(['id', 'proposal_id', 'status', 'meeting_at'])
+                ->whereBetween('meeting_at', [$gridStart->startOfDay(), $gridEnd->endOfDay()])
+                ->where(function (Builder $query) use ($reviewEmployeeIds): void {
+                    foreach (ReviewStage::cases() as $stage) {
+                        $query->orWhere(fn (Builder $stageQuery) => $stageQuery
+                            ->where('status', $stage->reviewStatus())
+                            ->whereHas('proposal.reviewers', fn (Builder $reviewers) => $reviewers->whereIn('employee_id', $reviewEmployeeIds)->where('stage', $stage->value)));
+                    }
+                })
+                ->with('proposal:id,slug,name')
+                ->orderBy('meeting_at')
+                ->get()
+                ->groupBy(fn (ProposalStatusNote $note): string => $note->meeting_at->toDateString());
+
         return [
             'month' => $month,
             'weeks' => $weeks,
@@ -216,6 +241,7 @@ trait BuildsCalendarGrid
             'donorReportsByDay' => $donorReportsByDay,
             'projectStartsByDay' => $projectStartsByDay,
             'projectEndsByDay' => $projectEndsByDay,
+            'reviewMeetingsByDay' => $reviewMeetingsByDay,
             'unscheduledTasks' => $unscheduledTasks,
             'nowOffsetPercent' => ($now->hour * 60 + $now->minute) / (24 * 60) * 100,
         ];

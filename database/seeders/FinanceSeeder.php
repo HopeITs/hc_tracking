@@ -4,17 +4,19 @@ namespace Database\Seeders;
 
 use App\Enums\DonorReportType;
 use App\Enums\ProposalStatus;
+use App\Enums\ReviewStage;
 use App\Models\Account;
 use App\Models\DonorProposal;
 use App\Models\DonorReport;
 use App\Models\Proposal;
+use App\Models\ProposalReviewer;
 use App\Models\ProposalStatusNote;
 use App\Models\TransfersTracking;
 use Illuminate\Database\Seeder;
 
 /**
  * The finance layer: bank accounts, payment tranches, the reports owed to
- * donors and the proposal status audit trail.
+ * donors, the proposal status audit trail and its concept-note reviewers.
  *
  * Depends on DemoDeliverySeeder.
  */
@@ -65,6 +67,14 @@ class FinanceSeeder extends Seeder
                     'context' => 'Moved to '.$status->value.'.',
                 ]);
             }
+
+            // The owners of its projects reviewed the concept note (T07).
+            $proposal->projects()->pluck('user_id')->filter()->unique()->each(fn (int|string $ownerId) => ProposalReviewer::factory()->seen()->create([
+                'proposal_id' => $proposal->id,
+                'stage' => ReviewStage::ConceptNote,
+                'employee_id' => (int) $ownerId,
+                'note' => 'Read and agreed with the problem statement.',
+            ]));
         });
     }
 }

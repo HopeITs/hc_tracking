@@ -22,12 +22,13 @@ use Illuminate\Support\Str;
  * @property ProposalStatus $status
  * @property string $context
  * @property CarbonImmutable $date
+ * @property CarbonImmutable|null $meeting_at
  * @property bool $is_correction
  * @property int|null $changed_by
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['proposal_id', 'status', 'context', 'date', 'is_correction', 'changed_by'])]
+#[Fillable(['proposal_id', 'status', 'context', 'date', 'meeting_at', 'is_correction', 'changed_by'])]
 class ProposalStatusNote extends Model
 {
     /** @use HasFactory<ProposalStatusNoteFactory> */
@@ -73,6 +74,7 @@ class ProposalStatusNote extends Model
         return [
             'status' => ProposalStatus::class,
             'date' => 'date',
+            'meeting_at' => 'immutable_datetime',
             'is_correction' => 'boolean',
         ];
     }

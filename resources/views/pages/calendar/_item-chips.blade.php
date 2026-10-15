@@ -8,6 +8,7 @@
     $dayTasks = $calendar['tasksByDay']->get($dateKey, new \Illuminate\Support\Collection);
     $dayReports = $calendar['reportsByDay']->get($dateKey, new \Illuminate\Support\Collection);
     $dayProposals = $calendar['proposalsByDay']->get($dateKey, new \Illuminate\Support\Collection);
+    $dayReviewMeetings = $calendar['reviewMeetingsByDay']->get($dateKey, new \Illuminate\Support\Collection);
     $dayTransfers = $calendar['transfersByDay']->get($dateKey, new \Illuminate\Support\Collection);
     $dayDonorFollowUps = $calendar['donorFollowUpsByDay']->get($dateKey, new \Illuminate\Support\Collection);
     $dayDonorReports = $calendar['donorReportsByDay']->get($dateKey, new \Illuminate\Support\Collection);
@@ -77,6 +78,23 @@
         <span class="size-1.5 shrink-0 rounded-full {{ $typeDotClasses['proposal'] }}"></span>
         <flux:icon.paper-airplane variant="micro" class="size-3 shrink-0" />
         <span class="min-w-0 flex-1 truncate text-start font-medium">{{ $proposal->name }}</span>
+    </a>
+@endforeach
+
+@foreach ($dayReviewMeetings as $meeting)
+    <a
+        href="{{ route('proposals.show', $meeting->proposal) }}"
+        wire:navigate
+        wire:key="calendar-review-meeting-{{ $meeting->id }}"
+        x-on:click.stop
+        class="flex items-center gap-1 rounded bg-board-head px-1.5 py-0.5 text-[10px] text-secondary-dark dark:bg-surface-2 dark:text-ink"
+        title="{{ __('calendar.review_meeting') }} · {{ $meeting->proposal->name }}"
+        data-test="calendar-review-meeting-{{ $meeting->id }}"
+    >
+        <span class="size-1.5 shrink-0 rounded-full {{ $typeDotClasses['proposal'] }}"></span>
+        <flux:icon.users variant="micro" class="size-3 shrink-0" />
+        <span class="shrink-0 tabular-nums" dir="ltr">{{ $meeting->meeting_at->format('H:i') }}</span>
+        <span class="min-w-0 flex-1 truncate text-start font-medium"><span class="sr-only">{{ __('calendar.review_meeting') }}: </span>{{ $meeting->proposal->name }}</span>
     </a>
 @endforeach
 

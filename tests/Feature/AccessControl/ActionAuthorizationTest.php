@@ -18,7 +18,6 @@ use Illuminate\Support\Facades\File;
 function lifecycleActionStubs(): array
 {
     return [
-        'Proposals/InviteDefaultReviewers.php', // TODO T07
         'Proposals/ApproveProposal.php', // TODO T08
         'Projects/ApproveProjectFromProposal.php', // TODO T08
         'Projects/ActivateProject.php', // TODO T08

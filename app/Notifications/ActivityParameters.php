@@ -61,6 +61,12 @@ final class ActivityParameters
             }
         }
 
+        if (array_key_exists('meeting', $activity->properties)) {
+            $params['meeting'] = is_string($activity->properties['meeting'])
+                ? ['trans' => 'notifications.review_meeting_suffix', 'params' => ['at' => ['datetime' => $activity->properties['meeting']]]]
+                : '';
+        }
+
         return $params;
     }
 

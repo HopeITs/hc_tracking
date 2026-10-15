@@ -4,8 +4,10 @@
     $mutedText, $inkText, $hairline, $amount, $term, $chronology and
     $arrivals.
 --}}
+            @include('pages.proposals._show-reviewers')
+
             {{-- Why the status moved, and whatever was written down about this proposal. --}}
-            <div class="grid gap-x-10 gap-y-8 @3xl/detail:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+            <div class="mt-10 grid gap-x-10 gap-y-8 @3xl/detail:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
                 <section aria-labelledby="moves-heading" class="min-w-0" data-status-history>
                     <h2 id="moves-heading" class="text-lg font-bold {{ $inkText }}">{{ __('proposals.status_history') }}</h2>
                     <p class="mt-0.5 text-xs {{ $mutedText }}">{{ __('proposals.the_audit_trail_for_this_proposal_s_status_newest_first') }}</p>

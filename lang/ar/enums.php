@@ -49,6 +49,20 @@ return [
         'other' => 'أخرى',
         'final_report' => 'التقرير الختامي',
         'final_report_acceptance' => 'موافقة الممول على التقرير الختامي',
+        'need_assessment' => 'تقييم الاحتياج',
+    ],
+    'review_stage' => [
+        'concept_note' => 'المذكرة المفاهيمية',
+        'proposal' => 'المقترح',
+    ],
+    'reviewer_slot' => [
+        'meal_manager' => 'مدير المتابعة والتقييم',
+        'finance_manager' => 'المدير المالي',
+        'fundraising_manager' => 'مدير المشاريع وجمع التمويل',
+        'ceo' => 'المدير التنفيذي',
+        'project_owner' => 'مسؤول المشروع',
+        'program_manager' => 'مدير البرنامج',
+        'additional' => 'مراجع إضافي',
     ],
     'dependency_type' => [
         'fs' => 'من النهاية إلى البداية',

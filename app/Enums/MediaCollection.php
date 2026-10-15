@@ -27,6 +27,7 @@ enum MediaCollection: string
     case Other = 'other';
     case FinalReport = 'final_report';
     case FinalReportAcceptance = 'final_report_acceptance';
+    case NeedAssessment = 'need assessment';
 
     /**
      * Whether this collection holds signed funding paperwork.

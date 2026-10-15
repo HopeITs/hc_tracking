@@ -186,6 +186,8 @@ return [
         'weekly_digest_time' => '08:00',
         // Admin overrides per EventCatalog key: enabled, importance, extra oversight roles.
         'event_overrides' => [],
+        // Default proposal reviewers (contracts §9): an HR position id per slot, never a person.
+        'proposal_default_reviewers' => ['meal_manager' => null, 'finance_manager' => null, 'fundraising_manager' => null, 'ceo' => null],
     ],
 
 ];

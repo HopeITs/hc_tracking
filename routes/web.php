@@ -135,16 +135,16 @@ Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () 
         ->name('proposals.index');
 
     Route::livewire('proposals/{proposal}', 'pages::proposals.show')
-        ->can('proposals.view')
+        ->can('view', 'proposal')
         ->name('proposals.show');
 
     Route::get('proposals/{proposal}/files/{media}/download', ProposalFileDownloadController::class)
-        ->can('proposals.view')
+        ->can('view', 'proposal')
         ->middleware('throttle:files')
         ->name('proposals.files.download');
 
     Route::get('proposals/{proposal}/files/{media}/preview', ProposalFilePreviewController::class)
-        ->can('proposals.view')
+        ->can('view', 'proposal')
         ->middleware('throttle:files')
         ->name('proposals.files.preview');
 

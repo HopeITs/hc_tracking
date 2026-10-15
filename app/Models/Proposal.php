@@ -227,6 +227,17 @@ class Proposal extends Model implements TracksActivity
     }
 
     /**
+     * The people asked to review its concept-note and proposal stages.
+     * Narrow to one stage with ->forStage().
+     *
+     * @return HasMany<ProposalReviewer, $this>
+     */
+    public function reviewers(): HasMany
+    {
+        return $this->hasMany(ProposalReviewer::class);
+    }
+
+    /**
      * The indicator targets committed in this proposal.
      *
      * @return MorphMany<PlanIndicator, $this>

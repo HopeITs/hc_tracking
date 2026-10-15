@@ -7,7 +7,10 @@ namespace App\Livewire\Concerns\Proposals;
 use App\Actions\Proposals\CorrectProposalStatus;
 use App\Actions\Proposals\TransitionProposal;
 use App\Enums\ProposalStatus;
+use App\Enums\ReviewStage;
+use App\Models\HrEmployee;
 use App\Models\Proposal;
+use App\Models\ProposalReviewer;
 use App\Support\ProposalTransitions;
 use Flux\Flux;
 use Illuminate\Support\Facades\Gate;
@@ -30,6 +33,7 @@ use Livewire\Attributes\Locked;
  * @property-read Proposal|null $statusSubject  #[Computed] statusSubject()
  * @property-read list<ProposalStatus> $statusTargets  #[Computed] statusTargets()
  * @property-read list<string> $statusFields  #[Computed] statusFields()
+ * @property-read list<string> $unseenReviewerNames  #[Computed] unseenReviewerNames()
  * @property-read list<ProposalStatus> $correctionTargets  #[Computed] correctionTargets()
  */
 trait ManagesProposalStatus
@@ -49,6 +53,8 @@ trait ManagesProposalStatus
     public string $statusDate = '';
 
     public string $statusRemindOn = '';
+
+    public string $statusMeetingAt = '';
 
     public bool $statusStale = false;
 
@@ -108,7 +114,8 @@ trait ManagesProposalStatus
     }
 
     /**
-     * The inputs the chosen target needs: reason, effective_date, remind_on.
+     * The inputs the chosen target needs: reason, effective_date, remind_on,
+     * and the optional review meeting when the target opens a review (T07).
      *
      * @return list<string>
      */
@@ -136,7 +143,40 @@ trait ManagesProposalStatus
             }
         }
 
+        if (ReviewStage::forReviewStatus($to) !== null) {
+            $fields[] = 'meeting_at';
+        }
+
         return $fields;
+    }
+
+    /**
+     * D-15: when the chosen target sends the proposal to the donor, the
+     * reviewers of that stage who have not seen it yet, by name. A warning
+     * only; the move is never blocked.
+     *
+     * @return list<string>
+     */
+    #[Computed]
+    public function unseenReviewerNames(): array
+    {
+        $to = ProposalStatus::tryFrom($this->newStatus);
+        $stage = $to === null || ! in_array($to, $this->statusTargets, true) ? null : ReviewStage::forSubmission($to);
+
+        if ($stage === null || $this->statusProposalId === null) {
+            return [];
+        }
+
+        $employeeIds = ProposalReviewer::query()->where('proposal_id', $this->statusProposalId)->forStage($stage)->unseen()->pluck('employee_id')->all();
+
+        if ($employeeIds === []) {
+            return [];
+        }
+
+        return array_values(HrEmployee::query()->whereKey($employeeIds)->get(HrEmployee::NameColumns)
+            ->map(fn (HrEmployee $employee): string => $employee->name)
+            ->sort()
+            ->all());
     }
 
     /**
@@ -164,12 +204,13 @@ trait ManagesProposalStatus
             'reason' => in_array('reason', $fields, true) ? trim($this->statusContext) : null,
             'effective_date' => in_array('effective_date', $fields, true) ? $this->statusDate : null,
             'remind_on' => in_array('remind_on', $fields, true) ? $this->statusRemindOn : null,
+            'meeting_at' => in_array('meeting_at', $fields, true) && trim($this->statusMeetingAt) !== '' ? $this->statusMeetingAt : null,
         ], fn (?string $value): bool => $value !== null);
 
         try {
             $result = app(TransitionProposal::class)->handle($proposal, $to, ProposalStatus::from($this->statusExpectedFrom), $input);
         } catch (ValidationException $exception) {
-            $this->showStatusErrors($exception, ['status' => 'newStatus', 'reason' => 'statusContext', 'effective_date' => 'statusDate', 'remind_on' => 'statusRemindOn'], 'statusGate');
+            $this->showStatusErrors($exception, ['status' => 'newStatus', 'reason' => 'statusContext', 'effective_date' => 'statusDate', 'remind_on' => 'statusRemindOn', 'meeting_at' => 'statusMeetingAt'], 'statusGate');
 
             return;
         }
@@ -181,6 +222,10 @@ trait ManagesProposalStatus
 
         if (in_array('all_projects_archived', $result->warnings, true)) {
             Flux::toast(variant: 'warning', text: __('proposals.warning_all_projects_archived'));
+        }
+
+        if (in_array('reviewers_unseen', $result->warnings, true)) {
+            Flux::toast(variant: 'warning', text: __('proposals.warning_reviewers_unseen'));
         }
     }
 
@@ -298,9 +343,10 @@ trait ManagesProposalStatus
         $this->statusContext = '';
         $this->statusDate = '';
         $this->statusRemindOn = '';
+        $this->statusMeetingAt = '';
         $this->statusStale = false;
         $this->correctTarget = '';
         $this->correctReason = '';
-        unset($this->statusSubject, $this->statusTargets, $this->statusFields, $this->correctionTargets);
+        unset($this->statusSubject, $this->statusTargets, $this->statusFields, $this->unseenReviewerNames, $this->correctionTargets);
     }
 }

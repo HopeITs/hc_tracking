@@ -13,6 +13,7 @@ use App\Livewire\Concerns\Proposals\ChartsProposalChronology;
 use App\Livewire\Concerns\Proposals\ManagesProposalFiles;
 use App\Livewire\Concerns\Proposals\ManagesProposalForm;
 use App\Livewire\Concerns\Proposals\ManagesProposalRecord;
+use App\Livewire\Concerns\Proposals\ManagesProposalReviewers;
 use App\Livewire\Concerns\Proposals\ManagesProposalStatus;
 use App\Livewire\Concerns\Proposals\ReadsProposalDelivery;
 use App\Livewire\Concerns\Proposals\ReadsProposalFunding;
@@ -39,6 +40,7 @@ abstract class ProposalsShowPageHost extends Component
     use ManagesProposalFiles;
     use ManagesProposalForm;
     use ManagesProposalRecord;
+    use ManagesProposalReviewers;
     use ManagesProposalStatus;
     use ManagesTransferForm;
     use PreviewsFiles;

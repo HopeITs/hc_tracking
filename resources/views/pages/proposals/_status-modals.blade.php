@@ -77,6 +77,17 @@
                     @if (in_array('reason', $this->statusFields, true))
                         <x-ui.form-textarea wire:model="statusContext" :label="__('proposals.why_did_it_change')" required class="col-span-2" />
                     @endif
+
+                    @if (in_array('meeting_at', $this->statusFields, true))
+                        <x-ui.form-input wire:model="statusMeetingAt" :label="__('proposals.meeting_at')" type="datetime-local" :min="now()->format('Y-m-d\TH:i')" :help="__('proposals.meeting_at_help')" class="col-span-2" data-test="status-meeting-at" />
+                    @endif
+
+                    @if ($this->unseenReviewerNames !== [])
+                        <div class="col-span-2 flex items-start gap-2 rounded-lg border border-status-warn/30 bg-status-warn-soft p-3 text-sm text-status-warn" role="status" data-test="status-unseen-reviewers">
+                            <flux:icon.eye-slash variant="mini" class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                            <p class="min-w-0">{{ __('proposals.unseen_reviewers_warning', ['names' => implode(\App\Enums\Locale::current() === \App\Enums\Locale::Arabic ? '، ' : ', ', $this->unseenReviewerNames)]) }}</p>
+                        </div>
+                    @endif
                 </div>
             @endif
         @endif

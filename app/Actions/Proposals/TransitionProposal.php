@@ -8,6 +8,7 @@ use App\Enums\MediaCollection;
 use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\ProposalStatus;
+use App\Enums\ReviewStage;
 use App\Events\ProposalStatusChanged;
 use App\Models\Donor;
 use App\Models\Milestone;
@@ -15,6 +16,7 @@ use App\Models\Proposal;
 use App\Models\ProposalStatusNote;
 use App\Support\ProposalTransitions;
 use App\Support\TransitionResult;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -29,11 +31,14 @@ use Illuminate\Validation\Validator as ValidatorInstance;
  * last saw, so two people moving the same proposal never both win. The
  * status, its one audit note and the reminder date commit together;
  * ProposalStatusChanged is dispatched only after that commit.
+ *
+ * Entering a review status also invites that stage's reviewers (T07) in the
+ * same transaction; the optional review meeting is kept on the opening note.
  */
 final class TransitionProposal
 {
     /**
-     * @param  array{reason?: string, effective_date?: string, remind_on?: string}  $input
+     * @param  array{reason?: string, effective_date?: string, remind_on?: string, meeting_at?: string}  $input
      */
     public function handle(Proposal $proposal, ProposalStatus $to, ProposalStatus $expectedFrom, array $input): TransitionResult
     {
@@ -60,15 +65,12 @@ final class TransitionProposal
                 ]);
             }
 
-            $validated = $this->validate($locked, $requirements, $input);
+            $reviewStage = ReviewStage::forReviewStatus($to);
+            $validated = $this->validate($locked, $requirements, $input, $reviewStage !== null);
 
             $locked->status = $to;
             $locked->status_remind_on = $to === ProposalStatus::OnHold ? $validated['remind_on'] : null;
             $locked->save();
-
-            // T07: entering `concept note review` or `proposal review` invites the
-            // default reviewers here, inside this transaction:
-            // app(InviteDefaultReviewers::class)->handle($locked, ReviewStage::ConceptNote|Proposal);
 
             $reason = trim((string) ($validated['reason'] ?? ''));
 
@@ -77,9 +79,14 @@ final class TransitionProposal
                 'status' => $to,
                 'context' => $reason !== '' ? $reason : __('proposals.status_moved_standard_note', ['from' => $from->label(), 'to' => $to->label()]),
                 'date' => $validated['effective_date'] ?? today()->toDateString(),
+                'meeting_at' => filled($validated['meeting_at'] ?? null) ? CarbonImmutable::parse($validated['meeting_at']) : null,
                 'changed_by' => Auth::id(),
                 'is_correction' => false,
             ]);
+
+            if ($reviewStage !== null) {
+                app(InviteDefaultReviewers::class)->handle($locked, $reviewStage);
+            }
 
             ProposalStatusChanged::dispatch($locked->id, $from, $to, Auth::id());
 
@@ -96,10 +103,11 @@ final class TransitionProposal
      * Every failure is reported at once, each under its own key.
      *
      * @param  list<string>  $requirements
-     * @param  array{reason?: string, effective_date?: string, remind_on?: string}  $input
-     * @return array{reason?: string, effective_date?: string, remind_on?: string}
+     * @param  array{reason?: string, effective_date?: string, remind_on?: string, meeting_at?: string}  $input
+     * @param  bool  $opensReview  only a move into a review status takes a meeting time
+     * @return array{reason?: string, effective_date?: string, remind_on?: string, meeting_at?: string|null}
      */
-    private function validate(Proposal $proposal, array $requirements, array $input): array
+    private function validate(Proposal $proposal, array $requirements, array $input, bool $opensReview): array
     {
         $rules = ['reason' => ['nullable', 'string', 'max:5000']];
         $messages = [];
@@ -127,6 +135,14 @@ final class TransitionProposal
             $messages['remind_on.after'] = __('proposals.remind_on_future');
         }
 
+        if ($opensReview) {
+            $rules['meeting_at'] = ['nullable', 'date', 'after:now'];
+            $messages['meeting_at.date'] = __('proposals.meeting_after_now');
+            $messages['meeting_at.after'] = __('proposals.meeting_after_now');
+        } else {
+            unset($input['meeting_at']);
+        }
+
         $validator = Validator::make($input, $rules, $messages);
 
         $validator->after(function (ValidatorInstance $validator) use ($proposal, $requirements): void {
@@ -139,7 +155,7 @@ final class TransitionProposal
             }
         });
 
-        /** @var array{reason?: string, effective_date?: string, remind_on?: string} */
+        /** @var array{reason?: string, effective_date?: string, remind_on?: string, meeting_at?: string|null} */
         return $validator->validate();
     }
 
@@ -200,15 +216,22 @@ final class TransitionProposal
     }
 
     /**
-     * Warning keys (contracts.md §6) this move raises. Only
-     * all_projects_archived is T04's: a review starts while every linked
-     * project is archived.
+     * Warning keys (contracts.md §6) this move raises. Neither blocks it:
+     * all_projects_archived (T04) when a review starts while every linked
+     * project is archived; reviewers_unseen (T07, D-15) when the proposal goes
+     * to the donor while a reviewer of that stage has not seen it.
      *
      * @return list<string>
      */
     private function warnings(Proposal $proposal, ProposalStatus $to): array
     {
-        if (! in_array($to, [ProposalStatus::ConceptNoteReview, ProposalStatus::ProposalReview], true)) {
+        $submittedStage = ReviewStage::forSubmission($to);
+
+        if ($submittedStage !== null) {
+            return $proposal->reviewers()->forStage($submittedStage)->unseen()->exists() ? ['reviewers_unseen'] : [];
+        }
+
+        if (ReviewStage::forReviewStatus($to) === null) {
             return [];
         }
 

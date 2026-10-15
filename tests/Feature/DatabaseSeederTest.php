@@ -15,6 +15,7 @@ use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalReviewer;
 use App\Models\ProposalStatusNote;
 use App\Models\Report;
 use App\Models\ReportFile;
@@ -57,6 +58,7 @@ test('the seeders populate every table in the schema', function () {
         Report::class,
         ReportFile::class,
         ProposalStatusNote::class,
+        ProposalReviewer::class,
         Account::class,
         TransfersTracking::class,
         MealCoverageAssignment::class,

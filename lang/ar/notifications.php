@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'review_meeting_suffix' => ' — اجتماع المراجعة :at',
     'system' => 'النظام',
     'none' => 'لا شيء',
     'inbox' => 'الإشعارات',
@@ -193,6 +194,14 @@ return [
         'decrease' => 'إنقاص :label',
         'increase' => 'زيادة :label',
         'working_days_unit' => '{1} يوم عمل|{2} يوما عمل|[3,10] أيام عمل|[11,*] يوم عمل',
+        'default_reviewers' => [
+            'title' => 'المراجعون الافتراضيون للمقترحات',
+            'hint' => 'يُحفظ المنصب لا الشخص: يُدعى من يشغله عند بدء كل مراجعة. التغيير لا يمسّ المراجعات التي بدأت.',
+            'none' => 'بلا منصب',
+            'save' => 'حفظ المراجعين',
+            'saved' => 'حُفظ المراجعون الافتراضيون.',
+            'unknown_position' => 'اختر منصبًا موجودًا في الموارد البشرية.',
+        ],
         'sections' => [
             'week' => 'أسبوع العمل',
             'deadlines' => 'المواعيد',
@@ -490,23 +499,26 @@ return [
             ],
             'review_requested' => [
                 'title' => 'طلب مراجعة',
-                'body' => 'طلب :actor مراجعتك للمقترح «:subject»',
+                'body' => 'طلب :actor مراجعة المقترح «:subject»:meeting',
             ],
+            'review_requested_you' => 'طلب :actor مراجعتك للمقترح «:subject»:meeting',
             'reviewer_added' => [
                 'title' => 'إضافة مراجع',
-                'body' => 'أضاف :actor مراجعًا إلى المقترح «:subject»',
+                'body' => 'أضاف :actor :employee مراجعًا للمقترح «:subject»',
             ],
+            'reviewer_added_you' => 'أضافك :actor مراجعًا للمقترح «:subject»',
             'reviewer_removed' => [
                 'title' => 'إزالة مراجع',
-                'body' => 'أزال :actor مراجعًا من المقترح «:subject»',
+                'body' => 'أزال :actor :employee من مراجعي المقترح «:subject»',
             ],
             'reviewer_seen' => [
                 'title' => 'اطّلاع مراجع',
                 'body' => 'اطّلع :actor على المقترح «:subject»',
             ],
+            'reviewer_note_updated' => 'عدّل :actor ملاحظة مراجعته على المقترح «:subject»',
             'need_assessment_added' => [
                 'title' => 'إضافة تقييم احتياج',
-                'body' => 'أضاف :actor تقييم احتياج إلى المقترح «:subject»',
+                'body' => 'أرفق :actor تقييم احتياج بالمقترح «:subject»',
             ],
             'approved' => [
                 'title' => 'اعتماد مقترح',
@@ -588,6 +600,12 @@ return [
             'renamed' => 'غيّر :actor اسم الدور من «:from» إلى «:to»',
             'permissions_changed' => 'غيّر :actor صلاحيات الدور «:subject» (أُضيف: :added؛ أُزيل: :removed)',
             'deleted' => 'حذف :actor الدور «:subject»',
+        ],
+        'notification_settings' => [
+            'meal_manager_changed' => [
+                'title' => 'تغيير منصب مدير المتابعة والتقييم',
+                'body' => 'نقل :actor منصب مدير المتابعة والتقييم إلى منصب آخر',
+            ],
         ],
         'supervision' => [
             'added' => [

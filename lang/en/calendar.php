@@ -26,4 +26,5 @@ return [
     'time_period' => 'Time period',
     'transfer' => 'Transfer',
     'week' => 'Week',
+    'review_meeting' => 'Review meeting',
 ];

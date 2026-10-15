@@ -1,9 +1,14 @@
 <?php
 
+use App\Actions\Proposals\SaveDefaultReviewerSlots;
+use App\Enums\ReviewerSlot;
+use App\Models\HrPosition;
 use App\Notifications\Alerts\NotificationSettings;
+use App\Support\Slots;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
@@ -37,6 +42,9 @@ new #[Title('titles.notification_rules')] class extends Component {
 
     public string $weeklyDigestTime = '08:00';
 
+    /** @var array<string, string> slot value => HR position id ('' for none) */
+    public array $reviewerPositions = [];
+
     /**
      * Form property => settings key.
      */
@@ -58,6 +66,56 @@ new #[Title('titles.notification_rules')] class extends Component {
     public function mount(NotificationSettings $settings): void
     {
         $this->fill($this->toForm($settings->all()));
+        $this->fillReviewerPositions();
+    }
+
+    /**
+     * Store the HR position behind each default proposal reviewer slot
+     * (contracts.md §9). A position, never a person.
+     */
+    public function saveDefaultReviewers(): void
+    {
+        Gate::authorize('notification-settings.manage');
+
+        $this->validate(
+            collect(ReviewerSlot::defaultSlots())->mapWithKeys(fn (ReviewerSlot $slot): array => ["reviewerPositions.{$slot->value}" => ['nullable', 'integer']])->all(),
+            collect(ReviewerSlot::defaultSlots())->mapWithKeys(fn (ReviewerSlot $slot): array => ["reviewerPositions.{$slot->value}.integer" => __('notifications.admin.default_reviewers.unknown_position')])->all(),
+        );
+
+        $positions = collect(ReviewerSlot::defaultSlots())
+            ->mapWithKeys(fn (ReviewerSlot $slot): array => [$slot->value => filled($this->reviewerPositions[$slot->value] ?? null) ? (int) $this->reviewerPositions[$slot->value] : null])
+            ->all();
+
+        try {
+            app(SaveDefaultReviewerSlots::class)->handle($positions, auth()->user());
+        } catch (ValidationException $exception) {
+            foreach ($exception->errors() as $key => $messages) {
+                foreach ($messages as $message) {
+                    $this->addError($key, $message);
+                }
+            }
+
+            return;
+        }
+
+        $this->fillReviewerPositions();
+
+        Flux::toast(variant: 'success', text: __('notifications.admin.default_reviewers.saved'));
+    }
+
+    /**
+     * Active HR positions for the slot pickers.
+     *
+     * @return list<array{value: string, label: string}>
+     */
+    protected function positionOptions(): array
+    {
+        return HrPosition::pickerOptions();
+    }
+
+    private function fillReviewerPositions(): void
+    {
+        $this->reviewerPositions = array_map(fn (?int $id): string => $id === null ? '' : (string) $id, Slots::positionIds());
     }
 
     public function save(NotificationSettings $settings): void
@@ -275,4 +333,6 @@ new #[Title('titles.notification_rules')] class extends Component {
             </div>
         </div>
     </form>
+
+    @include('pages.admin._default-reviewers')
 </section>

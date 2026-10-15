@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'review_meeting_suffix' => ' — review meeting :at',
     'system' => 'The system',
     'none' => 'none',
     'inbox' => 'Notifications',
@@ -193,6 +194,14 @@ return [
         'decrease' => 'Decrease :label',
         'increase' => 'Increase :label',
         'working_days_unit' => '{1} working day|[2,*] working days',
+        'default_reviewers' => [
+            'title' => 'Default proposal reviewers',
+            'hint' => 'A position is stored, not a person: whoever holds it when a review starts is invited. Changes never touch reviews already started.',
+            'none' => 'No position',
+            'save' => 'Save reviewers',
+            'saved' => 'Default reviewers saved.',
+            'unknown_position' => 'Choose a position that exists in HR.',
+        ],
         'sections' => [
             'week' => 'Working week',
             'deadlines' => 'Deadlines',
@@ -490,23 +499,26 @@ return [
             ],
             'review_requested' => [
                 'title' => 'Review requested',
-                'body' => ':actor asked for your review of “:subject”',
+                'body' => ':actor asked for a review of “:subject”:meeting',
             ],
+            'review_requested_you' => ':actor asked for your review of “:subject”:meeting',
             'reviewer_added' => [
                 'title' => 'Reviewer added',
-                'body' => ':actor added a reviewer to “:subject”',
+                'body' => ':actor added :employee as a reviewer of “:subject”',
             ],
+            'reviewer_added_you' => ':actor added you as a reviewer of “:subject”',
             'reviewer_removed' => [
                 'title' => 'Reviewer removed',
-                'body' => ':actor removed a reviewer from “:subject”',
+                'body' => ':actor removed :employee from the reviewers of “:subject”',
             ],
             'reviewer_seen' => [
                 'title' => 'Reviewer has seen the proposal',
                 'body' => ':actor has seen “:subject”',
             ],
+            'reviewer_note_updated' => ':actor updated their review note on “:subject”',
             'need_assessment_added' => [
                 'title' => 'Need assessment added',
-                'body' => ':actor added a need assessment to “:subject”',
+                'body' => ':actor attached a need assessment to “:subject”',
             ],
             'approved' => [
                 'title' => 'Proposal approved',
@@ -588,6 +600,12 @@ return [
             'renamed' => ':actor renamed the role “:from” to “:to”',
             'permissions_changed' => ':actor changed the permissions of the role “:subject” (added: :added; removed: :removed)',
             'deleted' => ':actor deleted the role “:subject”',
+        ],
+        'notification_settings' => [
+            'meal_manager_changed' => [
+                'title' => 'MEAL Manager position changed',
+                'body' => ':actor moved the MEAL Manager slot to another position',
+            ],
         ],
         'supervision' => [
             'added' => [

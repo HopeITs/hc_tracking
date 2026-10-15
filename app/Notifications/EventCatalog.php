@@ -245,6 +245,8 @@ final class EventCatalog
             [
                 'supervision.added' => self::entry('access-management', $digest, 'module_map', $all, activity: 'supervision.added'),
                 'supervision.removed' => self::entry('access-management', $digest, 'module_map', $all, activity: 'supervision.removed'),
+                // T07: the MEAL Manager slot moved to another HR position; the previous and new holders are told.
+                'notification_settings.meal_manager_changed' => self::entry('access-management', $now, 'module_map', $all, activity: 'notification_settings.meal_manager_changed'),
             ],
         ];
     }

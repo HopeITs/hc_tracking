@@ -9,6 +9,7 @@ use App\Livewire\Concerns\Proposals\ChartsProposalChronology;
 use App\Livewire\Concerns\Proposals\ManagesProposalFiles;
 use App\Livewire\Concerns\Proposals\ManagesProposalForm;
 use App\Livewire\Concerns\Proposals\ManagesProposalRecord;
+use App\Livewire\Concerns\Proposals\ManagesProposalReviewers;
 use App\Livewire\Concerns\Proposals\ManagesProposalStatus;
 use App\Livewire\Concerns\Proposals\ReadsProposalDelivery;
 use App\Livewire\Concerns\Proposals\ReadsProposalFunding;
@@ -37,6 +38,7 @@ new #[Title('titles.proposal')] class extends Component
     use ManagesProposalFiles;
     use ManagesProposalForm;
     use ManagesProposalRecord;
+    use ManagesProposalReviewers;
     use ManagesProposalStatus;
     use ManagesTransferForm;
     use PreviewsFiles;
@@ -211,7 +213,7 @@ new #[Title('titles.proposal')] class extends Component
             $this->proposal, $this->statusNotes, $this->agreements, $this->agreementRows, $this->fundingTranches, $this->donorReports, $this->agreementMoney, $this->moneyByCurrency,
             $this->projects, $this->linkableProjects, $this->tasks, $this->targets, $this->reports,
             $this->projectFiles, $this->documents, $this->deadlines, $this->warnings, $this->lifecycle, $this->chronology,
-            $this->arrivals, $this->vitals, $this->term, $this->tabs,
+            $this->arrivals, $this->vitals, $this->term, $this->tabs, $this->proposalFiles, $this->reviewStages, $this->needAssessments,
         );
     }
 };

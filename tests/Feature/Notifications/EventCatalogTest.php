@@ -29,6 +29,8 @@ function contractEventKeys(): array
         'library_indicator.created', 'library_indicator.updated', 'library_indicator.deactivated', 'library_indicator.reactivated',
         'meal_coverage.assigned', 'meal_coverage.responsible_changed', 'meal_coverage.project_assigned',
         'program.logframe_missing', 'annual_plan.missing', 'supervision.added', 'supervision.removed',
+        // T07: a moved MEAL Manager slot tells both holders; registered by the owning task, not yet in §15.2 (Dev 3).
+        'notification_settings.meal_manager_changed',
     ];
 }
 

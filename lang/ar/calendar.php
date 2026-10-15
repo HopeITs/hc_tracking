@@ -26,4 +26,5 @@ return [
     'time_period' => 'الفترة الزمنية',
     'transfer' => 'تحويل مالي',
     'week' => 'أسبوع',
+    'review_meeting' => 'اجتماع مراجعة',
 ];

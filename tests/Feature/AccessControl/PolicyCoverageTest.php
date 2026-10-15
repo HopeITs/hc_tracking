@@ -21,6 +21,7 @@ use App\Models\Media;
 use App\Models\NotificationMute;
 use App\Models\Permission;
 use App\Models\PlanIndicator;
+use App\Models\ProposalReviewer;
 use App\Models\ProposalStatusNote;
 use App\Models\ReportFile;
 use App\Models\Result;
@@ -75,6 +76,7 @@ function modelsGuardedWithoutPolicy(): array
         Permission::class => ['access-management', 'access-management.* permissions and UserPolicy::grantPermission.'],
         PlanIndicator::class => ['targets', 'targets.* permissions on the targets page.'],
         ProposalStatusNote::class => ['proposals', 'Written only through a proposal status change (ProposalPolicy::update).'],
+        ProposalReviewer::class => ['proposals', 'Written only by the review actions under ProposalPolicy::transition, manageReviewers and markReviewed (T07).'],
         ReportFile::class => ['reports', 'Follows its report (ReportPolicy); the download controllers check it.'],
         Result::class => ['results', 'results.* permissions on the results page.'],
         Role::class => ['access-management', 'UserPolicy::manageRole, editRolePermissions and assignRole.'],

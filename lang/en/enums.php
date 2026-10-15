@@ -49,6 +49,20 @@ return [
         'other' => 'Other',
         'final_report' => 'Final report',
         'final_report_acceptance' => 'Final report acceptance',
+        'need_assessment' => 'Need assessment',
+    ],
+    'review_stage' => [
+        'concept_note' => 'Concept note',
+        'proposal' => 'Proposal',
+    ],
+    'reviewer_slot' => [
+        'meal_manager' => 'MEAL Manager',
+        'finance_manager' => 'Finance Manager',
+        'fundraising_manager' => 'Projects & Fundraising Manager',
+        'ceo' => 'CEO',
+        'project_owner' => 'Project owner',
+        'program_manager' => 'Program manager',
+        'additional' => 'Additional reviewer',
     ],
     'dependency_type' => [
         'fs' => 'Finish to start',
