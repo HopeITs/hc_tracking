@@ -66,6 +66,8 @@ return [
         'frequency' => 'التواتر',
         'period' => 'الفترة',
         'statement' => 'النص',
+        'schedule' => 'الرزنامة',
+        'activity_kind' => 'نوع النشاط',
         'type' => 'النوع',
         'value' => 'القيمة',
         'planned_date' => 'التاريخ المخطط',

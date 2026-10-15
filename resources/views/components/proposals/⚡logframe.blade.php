@@ -79,6 +79,19 @@ new class extends Component {
     }
 
     /**
+     * A short fingerprint of the framework's activities (ids, statements,
+     * kinds, parents), read from the results already loaded.
+     */
+    #[Computed]
+    public function activitiesFingerprint(): string
+    {
+        return substr(sha1($this->allResults
+            ->filter(fn (Result $result): bool => $result->type === ResultType::Activity)
+            ->map(fn (Result $result): string => $result->id.':'.$result->parent_id.':'.$result->activity_kind?->value.':'.$result->statement)
+            ->implode('|')), 0, 12);
+    }
+
+    /**
      * The tree roots and the cross-cutting roots, each as prebuilt node arrays.
      *
      * @return array{tree: list<array<string, mixed>>, crossCutting: list<array<string, mixed>>}
@@ -155,6 +168,9 @@ new class extends Component {
                 @endforeach
             </section>
         @endif
+
+        {{-- Re-mounted when an activity is added, renamed, retyped or removed above, so its rows follow the tree. --}}
+        <livewire:proposals.activity-calendar :proposal-id="$proposalId" wire:key="activity-calendar-{{ $this->activitiesFingerprint }}" />
     @endif
 
     @include('pages.results._index-result-modal')
