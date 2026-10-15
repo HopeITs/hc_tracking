@@ -220,7 +220,7 @@ test('a pending tranche whose scheduled date has passed puts the money reading i
     $component->assertSeeText('Overdue');
 });
 
-test('the work reading counts finished tasks and groups them under the project their milestone reaches', function () {
+test('the work reading counts finished tasks and the plan tab lists the funded projects\' milestone work', function () {
     $user = User::factory()->role('General Manager')->create();
     $proposal = Proposal::factory()->create();
 
@@ -245,14 +245,15 @@ test('the work reading counts finished tasks and groups them under the project t
 
     $component = Livewire::actingAs($user)
         ->test('pages::proposals.show', ['proposal' => $proposal])
-        ->set('tab', 'tasks');
+        ->set('tab', 'plan');
 
     $work = collect($component->instance()->vitals)->firstWhere('key', 'work');
 
     expect($work['figure'])->toBe('1')
         ->and($work['suffix'])->toBe('/2');
 
-    $component->assertSeeTextInOrder(['Aleppo Water Response', 'Verify beneficiary list'])
+    $component->assertSeeText('Verify beneficiary list')
+        ->assertSeeText('Procure water pumps')
         // Undated tasks cannot be placed on the schedule, and the page says so.
         ->assertSeeText('be placed on the schedule');
 });
@@ -275,7 +276,7 @@ test('a task sourced from a milestone whose project this proposal does not fund 
 
     Livewire::actingAs($user)
         ->test('pages::proposals.show', ['proposal' => $proposal])
-        ->set('tab', 'tasks')
+        ->set('tab', 'plan')
         ->assertDontSeeText('Stranded task');
 });
 
@@ -300,8 +301,9 @@ test('a task sourced directly from the proposal is listed apart from funded-proj
 
     Livewire::actingAs($user)
         ->test('pages::proposals.show', ['proposal' => $proposal])
-        ->set('tab', 'tasks')
-        ->assertSeeText('Work not tied to a funded project')
+        ->set('tab', 'plan')
+        ->assertSeeHtml('data-plan-group="other"')
+        ->assertSeeText('Milestone task')
         ->assertSeeText('Proposal-level task');
 });
 
@@ -390,7 +392,7 @@ test('each tab shows only its own content and the strip counts its records', fun
         ->test('pages::proposals.show', ['proposal' => $proposal]);
 
     expect(collect($component->instance()->tabs)->pluck('count', 'key')->all())
-        ->toBe(['status' => 1, 'deadlines' => 1, 'funding' => 1, 'projects' => 0, 'logframe' => null, 'targets' => 0, 'plan' => null, 'tasks' => 1, 'reports' => 0, 'documents' => 0]);
+        ->toBe(['status' => 1, 'deadlines' => 1, 'funding' => 1, 'projects' => 0, 'logframe' => null, 'targets' => 0, 'plan' => 1, 'reports' => 0, 'documents' => 0]);
 
     $component->assertSeeText('Board signed off')
         ->assertDontSeeText('UNICEF')
@@ -398,46 +400,51 @@ test('each tab shows only its own content and the strip counts its records', fun
         ->set('tab', 'funding')
         ->assertSeeText('UNICEF')
         ->assertDontSeeText('Board signed off')
-        ->set('tab', 'tasks')
+        ->set('tab', 'plan')
         ->assertSeeText('Draft the budget narrative')
         ->assertDontSeeText('UNICEF');
 });
 
-test('a task can be added from the proposal show page pre-filled with this proposal', function () {
+test('a department task can be added from the plan tab pre-filled with this proposal', function () {
     $user = User::factory()->role('Financial')->create();
+    $department = insertHrDepartment('Finance');
     $assignee = insertHrEmployee();
-    $proposal = Proposal::factory()->create();
+    insertHrContract($assignee, insertHrPosition($department));
+    $proposal = Proposal::factory()->create(['status' => ProposalStatus::ConceptNote]);
 
     Livewire::actingAs($user)
         ->test('pages::proposals.show', ['proposal' => $proposal])
-        ->set('tab', 'tasks')
-        ->call('openAddTaskModal')
-        ->assertSet('showAddTaskModal', true)
-        ->set('newTaskTitle', '  Draft the budget narrative  ')
-        ->set('newTaskAssignedTo', [(string) $assignee])
-        ->call('addTask')
+        ->set('tab', 'plan')
+        ->call('openPlanTaskForm')
+        ->assertSet('showPlanTaskModal', true)
+        ->set('planTask.title', 'Draft the budget narrative')
+        ->set('planTask.department_id', (string) $department)
+        ->set('planTask.assignee_employee_id', (string) $assignee)
+        ->set('planTask.due_date', now()->addDays(10)->toDateString())
+        ->call('savePlanTask')
         ->assertHasNoErrors()
-        ->assertSet('showAddTaskModal', false);
+        ->assertSet('showPlanTaskModal', false);
 
     $task = Task::query()->where('title', 'Draft the budget narrative')->sole();
 
     expect($task->source_type)->toBe('proposal')
         ->and($task->source_id)->toBe($proposal->id)
+        ->and($task->department_id)->toBe($department)
         ->and($task->taskAssignees->pluck('employee_id')->all())->toBe([$assignee]);
 });
 
-test('adding a task from the proposal show page requires a title and an assignee', function () {
+test('adding a department task from the plan tab requires a title, a department and a due date', function () {
     $user = User::factory()->role('Financial')->create();
-    $proposal = Proposal::factory()->create();
+    $proposal = Proposal::factory()->create(['status' => ProposalStatus::ConceptNote]);
 
     Livewire::actingAs($user)
         ->test('pages::proposals.show', ['proposal' => $proposal])
-        ->set('tab', 'tasks')
-        ->call('openAddTaskModal')
-        ->set('newTaskTitle', '   ')
-        ->set('newTaskAssignedTo', [])
-        ->call('addTask')
-        ->assertHasErrors(['newTaskTitle', 'newTaskAssignedTo']);
+        ->set('tab', 'plan')
+        ->call('openPlanTaskForm')
+        ->set('planTask.title', '   ')
+        ->call('savePlanTask')
+        ->assertHasErrors(['planTask.title', 'planTask.department_id', 'planTask.due_date'])
+        ->assertSet('showPlanTaskModal', true);
 });
 
 test('the arrivals climb accumulates only received tranches, in the order they landed', function () {
@@ -588,7 +595,7 @@ test('the tasks tab puts open work before finished work and flags overdue and la
 
     Livewire::actingAs($user)
         ->test('pages::proposals.show', ['proposal' => $proposal])
-        ->set('tab', 'tasks')
+        ->set('tab', 'plan')
         ->assertSeeTextInOrder(['Late procurement', 'Forgotten status', 'Finished survey'])
         ->assertSeeHtml('data-status-lags')
         ->assertSeeText('100% done, but the status is still Todo')
@@ -608,7 +615,7 @@ test('a finished task waiting under review is not flagged as a lagging status', 
 
     Livewire::actingAs($user)
         ->test('pages::proposals.show', ['proposal' => $proposal])
-        ->set('tab', 'tasks')
+        ->set('tab', 'plan')
         ->assertDontSeeHtml('data-status-lags');
 });
 
@@ -624,15 +631,16 @@ test('the proposal header shows its internal number and the agreement form names
         ->assertSee('Winter Shelter Kit · TEMP-0012');
 });
 
-test('the add-task form is rendered only while its modal is open', function () {
+test('the department task form is rendered only while its modal is open', function () {
     $user = User::factory()->role('Financial')->create();
-    $proposal = Proposal::factory()->create();
+    $proposal = Proposal::factory()->create(['status' => ProposalStatus::ConceptNote]);
 
     Livewire::actingAs($user)
         ->test('pages::proposals.show', ['proposal' => $proposal])
-        ->assertDontSeeHtml('data-test="new-proposal-task-assignee-picker"')
-        ->call('openAddTaskModal')
-        ->assertSeeHtml('data-test="new-proposal-task-assignee-picker"');
+        ->set('tab', 'plan')
+        ->assertDontSeeHtml('wire:model="planTask.title"')
+        ->call('openPlanTaskForm')
+        ->assertSeeHtml('wire:model="planTask.title"');
 });
 
 test('the status and details forms are rendered only while their modals are open', function () {
@@ -667,7 +675,6 @@ test('the team B tabs each render their own partial, under construction until th
         ->assertSeeText(__('proposals.under_construction'));
 })->with([
     'indicators and targets' => ['targets', 'Indicators & Targets'],
-    'plan' => ['plan', 'Plan'],
 ]);
 
 test('the logical framework tab renders the proposal framework, no longer under construction', function () {
@@ -692,5 +699,6 @@ test('the tab labels read in Arabic', function () {
         ->assertSeeText('الإطار المنطقي')
         ->assertSeeText('المؤشرات والمستهدفات')
         ->set('tab', 'plan')
-        ->assertSeeText('قيد الإنشاء');
+        ->assertSeeText('المراحل')
+        ->assertDontSeeHtml('data-under-construction="plan"');
 });

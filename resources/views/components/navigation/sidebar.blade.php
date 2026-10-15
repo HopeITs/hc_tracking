@@ -429,6 +429,19 @@
                     </flux:sidebar.item>
                 @endcan
 
+                @can('tasks.view')
+                    <flux:sidebar.item
+                        icon="building-office-2"
+                        :href="route('department-tasks.index')"
+                        :current="request()->routeIs('department-tasks.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate.hover
+                        data-test="department-tasks-nav"
+                    >
+                        {{ __('titles.department_tasks') }}
+                    </flux:sidebar.item>
+                @endcan
+
                 @can('calendar.view')
                     <flux:sidebar.item
                         icon="calendar"

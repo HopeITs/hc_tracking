@@ -1,11 +1,13 @@
 <?php
 
 use App\Actions\Milestones\SaveMilestone;
+use App\Actions\Milestones\SaveProposalMilestone;
 use App\Enums\MilestoneStatus;
 use App\Livewire\Concerns\AddsQuickTask;
 use App\Livewire\Concerns\Milestones\PicksMilestoneActivity;
 use App\Models\HrEmployee;
 use App\Models\Milestone;
+use App\Models\Proposal;
 use App\Models\Result;
 use App\Models\Task;
 use Flux\Flux;
@@ -14,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
@@ -172,10 +175,19 @@ new #[Title('titles.milestone')] class extends Component {
         $this->description = trim($this->description);
 
         $milestone = Milestone::query()->findOrFail($this->milestoneId);
-        $canEdit = Gate::allows('update', $milestone);
+        $planProposal = $milestone->proposal_id === null ? null : Proposal::query()->findOrFail($milestone->proposal_id);
+        $canEdit = $planProposal === null
+            ? Gate::allows('update', $milestone)
+            : Gate::inspect('planForProposal', [Milestone::class, $planProposal, $milestone])->allowed();
 
         if (! $canEdit) {
             Gate::authorize('updateProgress', $milestone);
+        }
+
+        if ($canEdit && $planProposal !== null) {
+            $this->updatePlanMilestone($milestone);
+
+            return;
         }
 
         $validated = $this->validate([
@@ -225,6 +237,67 @@ new #[Title('titles.milestone')] class extends Component {
                 $this->linkActivity($milestone, $this->milestoneActivityId, 'milestoneActivityId');
             }
         });
+
+        unset($this->milestone, $this->parentOptions, $this->activityOptions, $this->activityLinkIssues);
+
+        Flux::toast(variant: 'success', text: __('milestones.milestone_updated'));
+    }
+
+    /**
+     * A proposal plan milestone (T31) changes only through the plan window:
+     * its plan fields go through SaveProposalMilestone, which locks the
+     * proposal and checks the window, the period and the tree; status and
+     * weight follow in the same transaction.
+     */
+    private function updatePlanMilestone(Milestone $milestone): void
+    {
+        $validated = $this->validate([
+            'milestoneStatus' => ['required', new Enum(MilestoneStatus::class)],
+            'weightPercentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
+        ], [
+            'weightPercentage.max' => __('milestones.weight_cannot_exceed_100_percent'),
+        ]);
+
+        $proposal = Proposal::query()->findOrFail($milestone->proposal_id);
+
+        try {
+            DB::transaction(function () use ($proposal, $milestone, $validated): void {
+                $saved = app(SaveProposalMilestone::class)->handle($proposal, $milestone->id, [
+                    'name' => $this->name,
+                    'description' => $this->description,
+                    'planned_start_date' => $this->plannedStartDate,
+                    'planned_end_date' => $this->plannedEndDate,
+                    'responsible_employee_id' => $this->responsibleUserId,
+                    'project_id' => $milestone->project_id,
+                    'parent_milestone_id' => $this->parentMilestoneId,
+                ]);
+
+                app(SaveMilestone::class)->handle($saved, [
+                    'status' => $validated['milestoneStatus'],
+                    'weight_percentage' => $validated['weightPercentage'] === '' || $validated['weightPercentage'] === null ? $saved->weight_percentage : $validated['weightPercentage'],
+                ]);
+
+                $this->linkActivity($saved, $this->milestoneActivityId, 'milestoneActivityId');
+            });
+        } catch (ValidationException $exception) {
+            $fields = [
+                'name' => 'name',
+                'description' => 'description',
+                'planned_start_date' => 'plannedStartDate',
+                'planned_end_date' => 'plannedEndDate',
+                'responsible_employee_id' => 'responsibleUserId',
+                'parent_milestone_id' => 'parentMilestoneId',
+                'project_id' => 'parentMilestoneId',
+            ];
+
+            foreach ($exception->errors() as $key => $messages) {
+                foreach ($messages as $message) {
+                    $this->addError($fields[$key] ?? $key, $message);
+                }
+            }
+
+            return;
+        }
 
         unset($this->milestone, $this->parentOptions, $this->activityOptions, $this->activityLinkIssues);
 

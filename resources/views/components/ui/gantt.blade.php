@@ -63,6 +63,15 @@
             'funding' => 'bg-funding-soft text-funding ring-funding/25',
             'muted' => 'bg-transparent text-secondary-light ring-secondary-soft dark:text-ink-muted dark:ring-white/15',
         ],
+        // A proposal plan's colour (T31): a stripe at the row's start, never the bar's status tone.
+        'series' => [
+            1 => 'bg-series-1',
+            2 => 'bg-series-2',
+            3 => 'bg-series-3',
+            4 => 'bg-series-4',
+            5 => 'bg-series-5',
+            6 => 'bg-series-6',
+        ],
     ];
     $icons = [
         'folder' => ['folder', 'text-secondary-medium dark:text-ink-muted'],
@@ -71,6 +80,7 @@
         'project' => ['briefcase', 'text-secondary-dark dark:text-ink'],
         'milestone' => ['flag', 'text-secondary-medium dark:text-ink-muted'],
         'task' => ['check-circle', 'text-secondary-light'],
+        'activity' => ['squares-2x2', 'text-secondary-medium dark:text-ink-muted'],
         'proposal' => ['document-text', 'text-funding'],
         'transfer' => ['banknotes', 'text-funding'],
         'report' => ['document-chart-bar', 'text-funding'],
@@ -124,6 +134,7 @@
             'proposal' => __('gantt.kinds.proposal'),
             'milestone' => __('gantt.kinds.milestone'),
             'task' => __('gantt.kinds.task'),
+            'activity' => __('gantt.kinds.activity'),
             'transfer' => __('gantt.kinds.transfer'),
             'report' => __('gantt.kinds.report'),
             'project' => __('gantt.kinds.project'),
@@ -632,6 +643,9 @@
                                     <span x-text="item.row.wbs"></span>
                                 </span>
                                 <span class="flex min-w-0 items-center gap-1.5" x-bind:style="`padding-left:${item.row.depth * indent}px`">
+                                    <template x-if="item.row.series">
+                                        <span class="h-4 w-1 shrink-0 rounded-full" x-bind:class="tones.series?.[item.row.series] ?? ''" data-gantt-series aria-hidden="true"></span>
+                                    </template>
                                     <button
                                         type="button"
                                         class="grid size-4 shrink-0 place-items-center rounded text-secondary-medium hover:bg-secondary-soft/60 hover:text-secondary-dark dark:text-ink-muted dark:hover:bg-white/10 dark:hover:text-ink"

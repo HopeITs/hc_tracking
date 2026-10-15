@@ -244,6 +244,33 @@ class Proposal extends Model implements TracksActivity
     }
 
     /**
+     * The owners of each proposal — the owners (HR employees) of the projects
+     * it funds: a proposal has no owner of its own (contracts §15.2).
+     *
+     * @param  array<int>  $proposalIds
+     * @return array<int, list<int>> proposal id => owner employee ids
+     */
+    public static function ownerEmployeeIdsFor(array $proposalIds): array
+    {
+        if ($proposalIds === []) {
+            return [];
+        }
+
+        $owners = [];
+        $rows = DB::table('project_proposal')
+            ->join('projects', 'projects.id', '=', 'project_proposal.project_id')
+            ->whereIn('project_proposal.proposal_id', $proposalIds)
+            ->whereNotNull('projects.user_id')
+            ->get(['project_proposal.proposal_id', 'projects.user_id']);
+
+        foreach ($rows as $row) {
+            $owners[(int) $row->proposal_id][(int) $row->user_id] = (int) $row->user_id;
+        }
+
+        return array_map(fn (array $ids): array => array_values($ids), $owners);
+    }
+
+    /**
      * The audit trail of status changes on this proposal.
      *
      * @return HasMany<ProposalStatusNote, $this>

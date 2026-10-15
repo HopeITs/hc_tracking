@@ -1,8 +1,10 @@
 {{--
-    One task on the proposal's Tasks tab.
+    One task on the proposal's Plan tab.
 
     Expects $task (with taskAssignees.employee and source loaded) plus the
-    $inkText / $mutedText tone strings the page shares with its parts. Below
+    $inkText / $mutedText tone strings the page shares with its parts.
+    Optional $planActions (bool) adds the edit and assign buttons of a
+    department task the viewer may plan (T31). Below
     the @3xl container width the columns fold into one meta line under the
     title; from @3xl the meta wrapper becomes `contents`, so each cell lands
     in the grid column the tab's column header names.
@@ -14,6 +16,10 @@
     $progress = max(0, min(100, (int) $task->progress_percentage));
     // Progress and status are entered separately, so a finished task can still sit in an earlier column.
     $statusLags = $progress >= 100 && in_array($task->status, [\App\Enums\TaskStatus::Todo, \App\Enums\TaskStatus::InProgress], true);
+    $isDepartmentTask = $task->department_id !== null;
+    $departmentName = $isDepartmentTask ? \App\Models\HrDepartment::nameOf((int) $task->department_id) : '';
+    $daysLeft = ! $isDone && $task->due_date !== null && ! $isOverdue ? (int) today()->diffInDays($task->due_date) : null;
+    $planActions ??= false;
 @endphp
 
 <li
@@ -45,13 +51,35 @@
             @if ($task->source_type === 'milestone')
                 <span class="min-w-0 truncate">{{ $task->sourceLabel() }}</span>
             @endif
-            @if ($statusLags)
-                @if ($task->source_type === 'milestone')
-                    <span aria-hidden="true">·</span>
+            @if ($isDepartmentTask)
+                @if ($departmentName === '')
+                    <span class="inline-flex items-center gap-1 font-semibold text-status-warn" data-department-unavailable>
+                        <flux:icon.exclamation-triangle variant="micro" class="size-3.5 shrink-0" aria-hidden="true" />{{ __('department_tasks.department_unavailable') }}
+                    </span>
+                @else
+                    <span class="inline-flex min-w-0 items-center gap-1" data-department="{{ $task->department_id }}">
+                        <flux:icon.building-office-2 variant="micro" class="size-3.5 shrink-0" aria-hidden="true" /><span class="truncate" dir="auto">{{ $departmentName }}</span>
+                    </span>
                 @endif
+                @if ($task->delivery_state !== null)
+                    <x-ui.enum-badge :case="$task->delivery_state" class="py-0! text-[11px]!" />
+                @endif
+            @endif
+            @if ($daysLeft !== null && $daysLeft <= 7)
+                <span class="inline-flex items-center gap-1 font-semibold text-status-warn" data-due-soon>
+                    <flux:icon.clock variant="micro" class="size-3.5 shrink-0" aria-hidden="true" />{{ $daysLeft === 0 ? __('department_tasks.due_today') : trans_choice('department_tasks.due_in_days', $daysLeft, ['count' => $daysLeft]) }}
+                </span>
+            @endif
+            @if ($statusLags)
                 <span class="font-semibold text-status-warn" data-status-lags>{{ __('proposals.progress_complete_but_status_is', ['status' => $task->status->label()]) }}</span>
             @endif
         </p>
+        @if ($planActions)
+            <div class="mt-1.5 flex flex-wrap gap-1.5">
+                <x-ui.button tone="ghost" size="xs" icon="pencil-square" wire:click="openPlanTaskForm({{ $task->id }})" data-test="edit-plan-task-{{ $task->id }}">{{ __('department_tasks.edit_task') }}</x-ui.button>
+                <x-ui.button tone="ghost" size="xs" icon="user-plus" wire:click="openAssignModal({{ $task->id }})" data-test="assign-plan-task-{{ $task->id }}">{{ __('department_tasks.assign_person') }}</x-ui.button>
+            </div>
+        @endif
     </div>
 
     <div class="col-start-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs @3xl/detail:contents">

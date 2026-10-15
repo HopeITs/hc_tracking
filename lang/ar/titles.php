@@ -41,4 +41,5 @@ return [
     'notifications' => 'الإشعارات',
     'my_reviews' => 'مراجعاتي',
     'notification_settings' => 'إعدادات الإشعارات',
+    'department_tasks' => 'مهام الأقسام',
 ];

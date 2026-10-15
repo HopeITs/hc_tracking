@@ -46,6 +46,10 @@ new #[Title('titles.project')] class extends Component {
     #[Url(as: 'respond', except: '')]
     public string $respond = '';
 
+    /** The Plan tab's proposal filter (T31, D-05): '' = every linked proposal's plan, else one proposal id. */
+    #[Url(as: 'plan_proposal', except: '')]
+    public string $planProposal = '';
+
     public function mount(Project $project): void
     {
         $this->projectId = $project->id;
@@ -197,7 +201,7 @@ new #[Title('titles.project')] class extends Component {
     #[Computed]
     public function ganttPayload(): array
     {
-        return $this->projectGanttPayload($this->project, $this->ganttBaselineId);
+        return $this->projectGanttPayload($this->project, $this->ganttBaselineId, $this->planProposal === '' ? null : (int) $this->planProposal);
     }
 
     /** @return array<int, array{key: string, label: string, count: int|null}> */

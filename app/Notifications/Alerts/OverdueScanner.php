@@ -5,10 +5,15 @@ declare(strict_types=1);
 namespace App\Notifications\Alerts;
 
 use App\Enums\NotificationPriority;
+use App\Notifications\EventCatalog;
+use App\Notifications\Recipients\OversightRecipients;
 use Carbon\CarbonImmutable;
 
 /**
- * "Overdue": day 1, then every N working days (default 3) until done.
+ * "Overdue": day 1, then every N working days (default 3) until done. A
+ * scanner-driven catalog event (`<eventKey>.overdue`, e.g. a department task)
+ * also tells the people who hear only once it is late (its requester) and
+ * its oversight, and sends nothing while an admin has it switched off.
  */
 final class OverdueScanner implements Scanner
 {
@@ -17,6 +22,8 @@ final class OverdueScanner implements Scanner
         private WorkingCalendar $calendar,
         private NotificationSettings $settings,
         private AlertDispatcher $dispatcher,
+        private EventCatalog $events,
+        private OversightRecipients $oversight,
     ) {}
 
     public function scan(CarbonImmutable $now): int
@@ -49,7 +56,22 @@ final class OverdueScanner implements Scanner
                 [['type' => 'alert.snooze']],
             );
 
-            $sent += $this->dispatcher->sendForItem('overdue', "day{$mark}:{$item->dueDate->toDateString()}", $payload, $item);
+            $stage = "day{$mark}:{$item->dueDate->toDateString()}";
+
+            if ($item->eventKey === null) {
+                $sent += $this->dispatcher->sendForItem('overdue', $stage, $payload, $item);
+
+                continue;
+            }
+
+            $eventKey = $item->eventKey.'.overdue';
+
+            if (! ($this->events->effective($eventKey)['enabled'] ?? false)) {
+                continue;
+            }
+
+            $direct = array_values(array_unique([...$item->directUserIds, ...$item->overdueUserIds]));
+            $sent += $this->dispatcher->send('overdue', $stage, $payload, $direct, $this->oversight->userIdsFor($eventKey, $item->projectId));
         }
 
         return $sent;

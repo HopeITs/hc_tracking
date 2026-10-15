@@ -14,6 +14,10 @@ final readonly class DeadlineItem
     /**
      * @param  list<int>  $directUserIds  people named on the item
      * @param  list<string>  $watcherRoles  who hears when nobody is named
+     * @param  string|null  $eventKey  catalog key prefix of a scanner-driven event (`department_task` → `.due` / `.overdue`); its enabled flag and oversight apply
+     * @param  list<int>  $overdueUserIds  people who hear only once the item is overdue (a task's requester)
+     * @param  list<int>|null  $dueSoonStages  working-day stages of its own; null = the global `due_soon_days`
+     * @param  list<int>  $unassignedUserIds  set when nobody carries the item yet: who must name a person (D-33)
      */
     public function __construct(
         public string $subjectType,
@@ -23,5 +27,10 @@ final readonly class DeadlineItem
         public CarbonImmutable $dueDate,
         public array $directUserIds,
         public array $watcherRoles = [],
+        public ?string $eventKey = null,
+        public array $overdueUserIds = [],
+        public ?int $projectId = null,
+        public ?array $dueSoonStages = null,
+        public array $unassignedUserIds = [],
     ) {}
 }

@@ -41,4 +41,5 @@ return [
     'notifications' => 'Notifications',
     'my_reviews' => 'My Reviews',
     'notification_settings' => 'Notification Settings',
+    'department_tasks' => 'Department Tasks',
 ];

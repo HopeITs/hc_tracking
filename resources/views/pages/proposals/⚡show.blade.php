@@ -1,6 +1,6 @@
 <?php
 
-use App\Livewire\Concerns\AddsQuickTask;
+use App\Livewire\Concerns\BuildsProposalPlanGantt;
 use App\Livewire\Concerns\ChecksFinanceVisibility;
 use App\Livewire\Concerns\ManagesAgreementForm;
 use App\Livewire\Concerns\ManagesTransferForm;
@@ -8,6 +8,7 @@ use App\Livewire\Concerns\PreviewsFiles;
 use App\Livewire\Concerns\Proposals\ChartsProposalChronology;
 use App\Livewire\Concerns\Proposals\ManagesProposalApproval;
 use App\Livewire\Concerns\Proposals\ManagesProposalFiles;
+use App\Livewire\Concerns\Proposals\ManagesProposalPlan;
 use App\Livewire\Concerns\Proposals\ManagesProposalForm;
 use App\Livewire\Concerns\Proposals\ManagesProposalRecord;
 use App\Livewire\Concerns\Proposals\ManagesProposalReviewers;
@@ -32,11 +33,12 @@ use Livewire\WithFileUploads;
 
 new #[Title('titles.proposal')] class extends Component
 {
-    use AddsQuickTask;
+    use BuildsProposalPlanGantt;
     use ChartsProposalChronology;
     use ChecksFinanceVisibility;
     use ManagesAgreementForm;
     use ManagesProposalFiles;
+    use ManagesProposalPlan;
     use ManagesProposalForm;
     use ManagesProposalRecord;
     use ManagesProposalReviewers;
@@ -57,9 +59,10 @@ new #[Title('titles.proposal')] class extends Component
     /**
      * The tabs this page offers, in strip order. Logical Framework (T12),
      * Indicators & Targets (T13) and Plan (T31) each render their own
-     * `_tab-*` partial, so those tasks never edit this file's lines.
+     * `_tab-*` partial, so those tasks never edit this file's lines. The
+     * Plan tab took over the old Tasks tab; `?tab=tasks` lands on it.
      */
-    private const TABS = ['status', 'deadlines', 'funding', 'projects', 'logframe', 'targets', 'plan', 'tasks', 'reports', 'documents'];
+    private const TABS = ['status', 'deadlines', 'funding', 'projects', 'logframe', 'targets', 'plan', 'reports', 'documents'];
 
     /**
      * Which tab's content is shown beneath the fixed header.
@@ -104,6 +107,10 @@ new #[Title('titles.proposal')] class extends Component
 
     public function updatedTab(): void
     {
+        if ($this->tab === 'tasks') {
+            $this->tab = 'plan';
+        }
+
         if (! in_array($this->tab, self::TABS, true) || ($this->tab === 'funding' && ! $this->canViewAgreements())) {
             $this->tab = 'status';
         }
@@ -127,8 +134,7 @@ new #[Title('titles.proposal')] class extends Component
             ['key' => 'projects', 'label' => __('common.projects'), 'count' => $this->projects->count()],
             ['key' => 'logframe', 'label' => __('proposals.tab_logframe'), 'count' => null],
             ['key' => 'targets', 'label' => __('proposals.tab_targets'), 'count' => $this->targets->count()],
-            ['key' => 'plan', 'label' => __('proposals.tab_plan'), 'count' => null],
-            ['key' => 'tasks', 'label' => __('common.tasks'), 'count' => $this->tasks->count()],
+            ['key' => 'plan', 'label' => __('proposals.tab_plan'), 'count' => count($this->planMilestones) + $this->planTaskRows->count()],
             ['key' => 'reports', 'label' => __('proposals.donor_reports'), 'count' => $this->reports->count()],
             ['key' => 'documents', 'label' => __('proposals.documents'), 'count' => $this->proposalFiles->count() + $this->projectFiles->count()],
         ];
@@ -155,20 +161,15 @@ new #[Title('titles.proposal')] class extends Component
     }
 
     /**
-     * Raise a task straight against this proposal — the source is always the
-     * proposal, never one of its funded projects' milestones: a task tied to
-     * one milestone's delivery is added from the milestone's own page instead.
+     * The Plan tab's read-only Gantt of this proposal's milestones, tasks
+     * and activities.
      *
-     * @return array{type: string, id: int}
+     * @return array{rows: list<array<string, mixed>>, links: list<array<string, mixed>>, from: string, to: string, today: string}
      */
-    protected function quickTaskSource(): array
+    #[Computed]
+    public function planGanttPayload(): array
     {
-        return ['type' => 'proposal', 'id' => $this->proposalId];
-    }
-
-    protected function quickTaskCreated(): void
-    {
-        unset($this->tasks);
+        return $this->proposalPlanGanttPayload($this->proposal);
     }
 
     /**
@@ -240,6 +241,7 @@ new #[Title('titles.proposal')] class extends Component
         unset(
             $this->proposal, $this->canRecordAgreement, $this->statusNotes, $this->agreements, $this->agreementRows, $this->fundingTranches, $this->donorReports, $this->agreementMoney, $this->moneyByCurrency,
             $this->projects, $this->linkableProjects, $this->tasks, $this->targets, $this->reports,
+            $this->planMilestones, $this->planTaskRows, $this->planGroups, $this->planGanttPayload, $this->planWindow, $this->planProjectOptions,
             $this->projectFiles, $this->documents, $this->deadlines, $this->warnings, $this->lifecycle, $this->chronology,
             $this->arrivals, $this->vitals, $this->term, $this->tabs, $this->proposalFiles, $this->reviewStages, $this->needAssessments, $this->approvalSubject, $this->approvalPreview,
         );
@@ -324,8 +326,6 @@ new #[Title('titles.proposal')] class extends Component
             @include('pages.proposals._tab-targets')
         @elseif ($tab === 'plan')
             @include('pages.proposals._tab-plan')
-        @elseif ($tab === 'tasks')
-            @include('pages.proposals._show-tasks-tab')
         @elseif ($tab === 'deadlines')
             @include('pages.proposals._show-deadlines-tab')
         @elseif ($tab === 'reports')

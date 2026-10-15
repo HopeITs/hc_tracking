@@ -354,7 +354,7 @@ trait EditsProjectGantt
 
     /**
      * The milestone or task behind a chart row id, only when it belongs to
-     * this page's project.
+     * this page's project and not to a proposal plan.
      */
     private function ganttRecord(string $rowId): Milestone|Task|null
     {
@@ -362,10 +362,11 @@ trait EditsProjectGantt
             return null;
         }
 
-        $projectMilestones = Milestone::query()->where('project_id', $this->projectId)->select('id');
+        // A proposal plan's milestones and tasks move only through the plan window (T31).
+        $projectMilestones = Milestone::query()->where('project_id', $this->projectId)->whereNull('proposal_id')->select('id');
 
         return $matches[1] === 'milestone'
-            ? Milestone::query()->where('project_id', $this->projectId)->find((int) $matches[2])
+            ? Milestone::query()->where('project_id', $this->projectId)->whereNull('proposal_id')->find((int) $matches[2])
             : Task::query()->where('source_type', 'milestone')->whereIn('source_id', $projectMilestones)->find((int) $matches[2]);
     }
 

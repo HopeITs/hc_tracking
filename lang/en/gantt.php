@@ -116,6 +116,7 @@ return [
         'proposal' => 'Proposal',
         'report' => 'Donor report',
         'task' => 'Task',
+        'activity' => 'Activity',
         'transfer' => 'Transfer',
     ],
     'lag' => 'Lag (working days, negative for lead)',
@@ -243,4 +244,6 @@ return [
         'week' => 'Week',
         'year' => 'Year',
     ],
+    'plan_proposals' => 'Proposal plans',
+    'all_proposals' => 'All proposals',
 ];

@@ -34,6 +34,8 @@ new #[Title('titles.notification_rules')] class extends Component {
 
     public int $overdueRepeat = 3;
 
+    public int $departmentTaskDue = 5;
+
     public int $escalateManagerAfter = 5;
 
     public int $escalateTopAfter = 10;
@@ -64,6 +66,7 @@ new #[Title('titles.notification_rules')] class extends Component {
      */
     private const Keys = [
         'overdueRepeat' => 'overdue_repeat_days',
+        'departmentTaskDue' => 'department_task_due_days',
         'escalateManagerAfter' => 'escalate_manager_after_days',
         'escalateTopAfter' => 'escalate_top_after_days',
         'escalationCatchUp' => 'escalation_catch_up_days',
@@ -149,6 +152,7 @@ new #[Title('titles.notification_rules')] class extends Component {
             }],
             'dueSoonDays' => ['required', 'regex:/^\s*\d{1,2}(\s*,\s*\d{1,2})*\s*$/'],
             'overdueRepeat' => ['required', 'integer', 'between:1,30'],
+            'departmentTaskDue' => ['required', 'integer', 'between:1,30'],
             'escalateManagerAfter' => ['required', 'integer', 'between:1,60'],
             'escalateTopAfter' => ['required', 'integer', 'gt:escalateManagerAfter', 'max:90'],
             'escalationCatchUp' => ['required', 'integer', 'between:1,30'],
@@ -449,6 +453,7 @@ new #[Title('titles.notification_rules')] class extends Component {
                     <div class="rules-rows">
                         @include('pages.admin._rules-warnings')
                         @include('pages.admin._rules-row', ['property' => 'overdueRepeat', 'label' => __('notifications.admin.remind_every'), 'hint' => __('notifications.admin.remind_every_hint')])
+                        @include('pages.admin._rules-row', ['property' => 'departmentTaskDue', 'label' => __('notifications.admin.department_task_due'), 'hint' => __('notifications.admin.department_task_due_hint')])
                         @include('pages.admin._rules-row', ['property' => 'escalateManagerAfter', 'label' => __('notifications.admin.manager_after'), 'hint' => __('notifications.admin.manager_after_hint')])
                         @include('pages.admin._rules-row', ['property' => 'escalateTopAfter', 'label' => __('notifications.admin.top_after'), 'hint' => __('notifications.admin.top_after_hint')])
                         @include('pages.admin._rules-row', ['property' => 'escalationCatchUp', 'label' => __('notifications.admin.escalation_window'), 'hint' => __('notifications.admin.escalation_window_hint')])

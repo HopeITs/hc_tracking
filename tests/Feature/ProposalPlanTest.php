@@ -18,6 +18,7 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
@@ -682,4 +683,258 @@ test('a project milestone is never offered a parent from a proposal plan', funct
     expect($offered)->toBe([$sibling->id]);
     $component->assertHasErrors(['parentMilestoneId']);
     expect($milestone->fresh()->parent_milestone_id)->toBeNull();
+});
+
+/*
+ * The Plan tab on the proposal page (slice 2).
+ */
+
+test('the old tasks tab lands on the plan tab', function () {
+    Livewire::actingAs(userWithRole('Public Relations Manager'))
+        ->withQueryParams(['tab' => 'tasks'])
+        ->test('pages::proposals.show', ['proposal' => proposalPlanProposal()])
+        ->assertSet('tab', 'plan')
+        ->assertSeeHtml('data-tab-panel="plan"');
+});
+
+test('the plan tab groups the milestones and the media, finance and other department tasks', function () {
+    $proposal = proposalPlanProposal();
+    $media = proposalPlanDepartment('Media');
+    $finance = proposalPlanDepartment('Finance');
+    $this->actingAs($manager = userWithRole('Public Relations Manager'));
+
+    $milestone = app(SaveProposalMilestone::class)->handle($proposal, null, proposalPlanMilestoneInput(['name' => 'Baseline survey']));
+    app(SaveDepartmentTask::class)->handle($proposal, null, proposalPlanTaskInput($media['department'], [
+        'title' => 'Film the distribution',
+        'kind' => TaskKind::MediaDeliverable->value,
+        'media_kinds' => [DeliverableKind::Video->value],
+        'milestone_id' => $milestone->id,
+    ]));
+    app(SaveDepartmentTask::class)->handle($proposal, null, proposalPlanTaskInput($finance['department'], ['title' => 'Open the project ledger', 'kind' => TaskKind::Financial->value]));
+    app(SaveDepartmentTask::class)->handle($proposal, null, proposalPlanTaskInput($media['department'], ['title' => 'Book the venue']));
+
+    $component = Livewire::actingAs($manager)
+        ->test('pages::proposals.show', ['proposal' => $proposal])
+        ->set('tab', 'plan');
+
+    expect($component->instance()->planGroups['media']->pluck('title')->all())->toBe(['Film the distribution'])
+        ->and($component->instance()->planGroups['finance']->pluck('title')->all())->toBe(['Open the project ledger'])
+        ->and($component->instance()->planGroups['other']->pluck('title')->all())->toBe(['Book the venue']);
+
+    $component->assertSeeHtml('data-plan-milestone="'.$milestone->id.'"')
+        ->assertSeeText('Baseline survey')
+        ->assertSeeHtml('data-department="'.$media['department'].'"')
+        ->assertSeeHtml('data-test="add-plan-milestone-button"')
+        ->assertSeeHtml('data-test="add-final-report-button"');
+
+    $rows = collect($component->instance()->planGanttPayload['rows']);
+
+    expect($rows->pluck('id')->all())->toContain('plan-'.$proposal->id, 'plan-milestone-'.$milestone->id)
+        ->and($rows->every(fn (array $row): bool => $row['editable'] === false))->toBeTrue();
+});
+
+test('a milestone and the final report are added through the plan tab forms', function () {
+    $proposal = proposalPlanProposal();
+    $pr = proposalPlanDepartment('Public Relations');
+    $responsible = insertHrEmployee();
+
+    $page = Livewire::actingAs(userWithRole('Public Relations Manager'))
+        ->test('pages::proposals.show', ['proposal' => $proposal])
+        ->set('tab', 'plan')
+        ->call('openPlanMilestoneForm')
+        ->assertSet('showPlanMilestoneModal', true)
+        ->set('planMilestone.name', 'Inception workshop')
+        ->set('planMilestone.planned_start_date', '2026-03-10')
+        ->set('planMilestone.responsible_employee_id', (string) $responsible)
+        ->call('savePlanMilestone')
+        ->assertHasNoErrors()
+        ->assertSet('showPlanMilestoneModal', false)
+        ->call('openFinalReportForm')
+        ->set('finalReport.planned_start_date', '2026-12-01')
+        ->set('finalReport.planned_end_date', '2026-12-20')
+        ->set('finalReport.responsible_employee_id', (string) $responsible)
+        ->set('finalReport.department_id', (string) $pr['department'])
+        ->call('saveFinalReport')
+        ->assertHasNoErrors()
+        ->assertSet('showFinalReportModal', false)
+        ->assertSeeHtml('data-final-report')
+        ->assertDontSeeHtml('data-test="add-final-report-button"');
+
+    expect(Milestone::query()->where('proposal_id', $proposal->id)->where('is_final_report', true)->count())->toBe(1);
+
+    $page->call('openFinalReportForm')
+        ->set('finalReport.planned_start_date', '2026-12-01')
+        ->set('finalReport.responsible_employee_id', (string) $responsible)
+        ->set('finalReport.department_id', (string) $pr['department'])
+        ->call('saveFinalReport')
+        ->assertHasErrors('finalReport');
+
+    expect(Milestone::query()->where('proposal_id', $proposal->id)->where('is_final_report', true)->count())->toBe(1);
+});
+
+test('a milestone outside the period shows the message on its field', function () {
+    Livewire::actingAs(userWithRole('Public Relations Manager'))
+        ->test('pages::proposals.show', ['proposal' => proposalPlanProposal()])
+        ->set('tab', 'plan')
+        ->call('openPlanMilestoneForm')
+        ->set('planMilestone.name', 'Too late')
+        ->set('planMilestone.planned_start_date', '2027-02-01')
+        ->set('planMilestone.responsible_employee_id', (string) insertHrEmployee())
+        ->call('savePlanMilestone')
+        ->assertHasErrors(['planMilestone.planned_start_date'])
+        ->assertSee(__('milestones.milestone_outside_period'));
+
+    expect(Milestone::query()->where('name', 'Too late')->exists())->toBeFalse();
+});
+
+test('the plan tab is read-only once submitted and says why', function () {
+    Livewire::actingAs(userWithRole('Public Relations Manager'))
+        ->test('pages::proposals.show', ['proposal' => proposalPlanProposal(ProposalStatus::Submitted)])
+        ->set('tab', 'plan')
+        ->assertSeeHtml('data-plan-read-only')
+        ->assertSeeText(__('milestones.plan_window_locked'))
+        ->assertDontSeeHtml('data-test="add-plan-milestone-button"')
+        ->assertDontSeeHtml('data-test="add-plan-task-media"');
+});
+
+test('a user without plan rights is refused by the plan forms and nothing is written', function () {
+    $proposal = proposalPlanProposal();
+    $department = proposalPlanDepartment();
+    $viewer = userWithRole('Media Team');
+
+    Livewire::actingAs($viewer)
+        ->test('pages::proposals.show', ['proposal' => $proposal])
+        ->set('planMilestone.name', 'Sneaky milestone')
+        ->set('planMilestone.planned_start_date', '2026-03-10')
+        ->set('planMilestone.responsible_employee_id', (string) $department['employee'])
+        ->call('savePlanMilestone')
+        ->assertForbidden();
+
+    Livewire::actingAs($viewer)
+        ->test('pages::proposals.show', ['proposal' => $proposal])
+        ->set('planTask.title', 'Sneaky task')
+        ->set('planTask.department_id', (string) $department['department'])
+        ->set('planTask.due_date', '2026-03-20')
+        ->call('savePlanTask')
+        ->assertForbidden();
+
+    expect(Milestone::query()->where('name', 'Sneaky milestone')->exists())->toBeFalse()
+        ->and(Task::query()->withoutGlobalScopes()->where('title', 'Sneaky task')->exists())->toBeFalse();
+});
+
+test('another proposal\'s milestone or task cannot be opened through this page', function () {
+    $proposal = proposalPlanProposal();
+    $other = proposalPlanProposal(name: 'Other grant');
+    $department = proposalPlanDepartment();
+    $this->actingAs($manager = userWithRole('Public Relations Manager'));
+
+    $foreignMilestone = app(SaveProposalMilestone::class)->handle($other, null, proposalPlanMilestoneInput(['name' => 'Foreign milestone']));
+    $foreignTask = app(SaveDepartmentTask::class)->handle($other, null, proposalPlanTaskInput($department['department'], ['title' => 'Foreign task']));
+
+    Livewire::actingAs($manager)
+        ->test('pages::proposals.show', ['proposal' => $proposal])
+        ->call('openPlanMilestoneForm', $foreignMilestone->id)
+        ->assertStatus(404);
+
+    Livewire::actingAs($manager)
+        ->test('pages::proposals.show', ['proposal' => $proposal])
+        ->call('openPlanTaskForm', $foreignTask->id)
+        ->assertStatus(404);
+
+    Livewire::actingAs($manager)
+        ->test('pages::proposals.show', ['proposal' => $proposal])
+        ->call('openAssignModal', $foreignTask->id)
+        ->assertStatus(404);
+
+    expect($foreignMilestone->fresh()->name)->toBe('Foreign milestone')
+        ->and($foreignTask->fresh()->title)->toBe('Foreign task');
+});
+
+test('the person is assigned from the plan tab among the department\'s people only', function () {
+    $proposal = proposalPlanProposal();
+    $media = proposalPlanDepartment('Media');
+    $outsider = insertHrEmployee();
+    $this->actingAs($manager = userWithRole('Public Relations Manager'));
+    $task = app(SaveDepartmentTask::class)->handle($proposal, null, proposalPlanTaskInput($media['department']));
+
+    $page = Livewire::actingAs($manager)
+        ->test('pages::proposals.show', ['proposal' => $proposal])
+        ->set('tab', 'plan')
+        ->call('openAssignModal', $task->id)
+        ->assertSet('showAssignModal', true);
+
+    expect(array_column($page->instance()->assignOptions, 'value'))->toBe([(string) $media['employee']]);
+
+    $page->set('assigneeEmployeeId', (string) $outsider)
+        ->call('saveAssignee')
+        ->assertHasErrors('assigneeEmployeeId')
+        ->set('assigneeEmployeeId', (string) $media['employee'])
+        ->call('saveAssignee')
+        ->assertHasNoErrors()
+        ->assertSet('showAssignModal', false);
+
+    expect($task->taskAssignees()->pluck('employee_id')->all())->toBe([$media['employee']]);
+});
+
+test('the plan tab holds a flat query count whatever the number of tasks', function () {
+    $proposal = proposalPlanProposal();
+    $media = proposalPlanDepartment('Media');
+    $manager = userWithRole('Public Relations Manager');
+    $this->actingAs($manager);
+    $milestone = app(SaveProposalMilestone::class)->handle($proposal, null, proposalPlanMilestoneInput());
+
+    $countQueries = function () use ($manager, $proposal): int {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        Livewire::actingAs($manager)->test('pages::proposals.show', ['proposal' => $proposal])->set('tab', 'plan');
+
+        $queries = DB::getQueryLog();
+        DB::disableQueryLog();
+
+        return count($queries);
+    };
+
+    app(SaveDepartmentTask::class)->handle($proposal, null, proposalPlanTaskInput($media['department'], ['milestone_id' => $milestone->id, 'assignee_employee_id' => $media['employee']]));
+    $countQueries();
+    $small = $countQueries();
+
+    foreach (range(1, 12) as $index) {
+        app(SaveDepartmentTask::class)->handle($proposal, null, proposalPlanTaskInput($media['department'], ['title' => 'Task '.$index, 'milestone_id' => $milestone->id, 'assignee_employee_id' => $media['employee']]));
+    }
+
+    expect($countQueries())->toBe($small);
+});
+
+test('the milestone page edits a plan milestone through the plan window and only its status once locked', function () {
+    $proposal = proposalPlanProposal();
+    $this->actingAs($manager = userWithRole('General Manager'));
+    $milestone = app(SaveProposalMilestone::class)->handle($proposal, null, proposalPlanMilestoneInput());
+
+    Livewire::actingAs($manager)
+        ->test('pages::milestones.show', ['milestone' => $milestone])
+        ->set('plannedStartDate', '2027-02-01')
+        ->set('plannedEndDate', '2027-02-10')
+        ->call('updateMilestone')
+        ->assertHasErrors(['plannedStartDate']);
+
+    expect($milestone->fresh()->planned_start_date->toDateString())->toBe('2026-03-01');
+
+    Livewire::actingAs($manager)
+        ->test('pages::milestones.show', ['milestone' => $milestone])
+        ->set('name', 'Community consultations, round 2')
+        ->call('updateMilestone')
+        ->assertHasNoErrors();
+
+    expect($milestone->fresh()->name)->toBe('Community consultations, round 2');
+
+    Proposal::query()->whereKey($proposal->id)->update(['status' => ProposalStatus::Submitted->value]);
+
+    Livewire::actingAs($manager)
+        ->test('pages::milestones.show', ['milestone' => $milestone])
+        ->set('name', 'Edited while locked')
+        ->call('updateMilestone')
+        ->assertHasNoErrors();
+
+    expect($milestone->fresh()->name)->toBe('Community consultations, round 2');
 });

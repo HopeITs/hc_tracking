@@ -119,6 +119,10 @@ Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () 
         ->can('tasks.view')
         ->name('tasks.index');
 
+    Route::livewire('department-tasks', 'pages::department-tasks.index')
+        ->can('tasks.view')
+        ->name('department-tasks.index');
+
     Route::livewire('tasks/{task}', 'pages::tasks.show')
         ->can('tasks.view')
         ->name('tasks.show');
