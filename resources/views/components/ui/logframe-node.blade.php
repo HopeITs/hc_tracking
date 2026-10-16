@@ -114,6 +114,10 @@
                 @endforeach
             </ul>
         @endif
+
+        @if ($result->type === ResultType::Activity)
+            <x-ui.logframe-milestones :activity-id="$result->id" :groups="$node['milestoneGroups']" :schedule="$node['schedule']" />
+        @endif
     </article>
 
     @if ($children !== [])

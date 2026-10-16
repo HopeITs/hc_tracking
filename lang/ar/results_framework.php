@@ -147,4 +147,9 @@ return [
     'chain_gap_count_no_target' => '{1} مؤشر واحد بلا مستهدف|{2} مؤشران بلا مستهدف|[3,10] :count مؤشرات بلا مستهدف|[11,*] :count مؤشراً بلا مستهدف',
     'chain_gap_count_no_milestone' => '{1} نشاط واحد بلا معلم|{2} نشاطان بلا معلم|[3,10] :count أنشطة بلا معلم|[11,*] :count نشاطاً بلا معلم',
     'chain_gap_count_unlinked_milestone' => '{1} معلم واحد بلا نشاط|{2} معلمان بلا نشاط|[3,10] :count معالم بلا نشاط|[11,*] :count معلماً بلا نشاط',
+    'chain_milestones' => '{1} معلم واحد|{2} معلمان|[3,10] :count معالم|[11,*] :count معلماً',
+    'chain_milestones_progress' => 'تقدّم المعالم الموزون',
+    'chain_milestone_cancelled_excluded' => 'المعالم الملغاة معروضة لكنها لا تُحتسب في التقدّم.',
+    'chain_planned_months' => 'الأشهر المخططة',
+    'chain_weeks' => '{1} الأسبوع :weeks|[2,*] الأسابيع :weeks',
 ];

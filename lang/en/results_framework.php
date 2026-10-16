@@ -147,4 +147,9 @@ return [
     'chain_gap_count_no_target' => '{1} :count indicator without a target|[2,*] :count indicators without a target',
     'chain_gap_count_no_milestone' => '{1} :count activity without a milestone|[2,*] :count activities without a milestone',
     'chain_gap_count_unlinked_milestone' => '{1} :count milestone without an activity|[2,*] :count milestones without an activity',
+    'chain_milestones' => '{1} :count milestone|[2,*] :count milestones',
+    'chain_milestones_progress' => 'Weighted milestone progress',
+    'chain_milestone_cancelled_excluded' => 'Cancelled milestones are listed but not counted in progress.',
+    'chain_planned_months' => 'Planned months',
+    'chain_weeks' => '{1} week :weeks|[2,*] weeks :weeks',
 ];

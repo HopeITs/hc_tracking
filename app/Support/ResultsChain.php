@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Support;
 
+use App\Enums\MilestoneStatus;
 use App\Enums\ResultType;
+use App\Models\ActivitySchedule;
 use App\Models\AnnualPlan;
 use App\Models\Donor;
 use App\Models\Indicator;
@@ -33,12 +35,16 @@ use Illuminate\Validation\Rule;
  * milestones of the scope), then the tree, the filters, the gaps and the
  * options are resolved in memory, so the count never grows with the chain.
  * Achievement is read only through PlanIndicator::achievedValue() /
- * percentAchieved() (approved reports). No money is read.
+ * percentAchieved() (approved reports), milestone progress only through
+ * Milestone::weightedProgress() and link flags through
+ * Milestone::activityLinkIssuesFor(). No money is read.
  *
  * @phpstan-type ChainTarget array{id: int, center: string, centerId: int|null, source: string|null, target: float, achieved: float, percent: float|null, status: string, issues: list<string>}
  * @phpstan-type ChainIndicator array{indicator: Indicator, code: string|null, name: string, linked: bool, inactive: bool, gaps: list<string>, targets: list<ChainTarget>}
  * @phpstan-type ChainProposal array{name: string, url: string|null, donor: string|null, donorUrl: string|null}
- * @phpstan-type ChainNode array{result: Result, depth: int, gaps: list<string>, indicators: list<ChainIndicator>, lineage: list<Result>, proposal: ChainProposal|null, children: list<array<string, mixed>>, contributions: list<array<string, mixed>>}
+ * @phpstan-type ChainMilestone array{milestone: Milestone, issues: list<string>, cancelled: bool}
+ * @phpstan-type ChainMilestoneGroup array{centerId: int, center: string, progress: float|null, hasCancelled: bool, milestones: list<ChainMilestone>}
+ * @phpstan-type ChainNode array{result: Result, depth: int, gaps: list<string>, indicators: list<ChainIndicator>, lineage: list<Result>, proposal: ChainProposal|null, milestoneGroups: list<ChainMilestoneGroup>, schedule: array<string, list<int>|null>, children: list<array<string, mixed>>, contributions: list<array<string, mixed>>}
  * @phpstan-type ChainOption array{value: string, label: string}
  * @phpstan-type ChainFilters array{indicator: string, center: string, donor: string}
  * @phpstan-type Chain array{
@@ -66,6 +72,13 @@ final class ResultsChain
         private readonly array $ownResultIds,
         private array $filters,
     ) {}
+
+    /**
+     * Activity-link flags of every milestone in scope, keyed by milestone id.
+     *
+     * @var array<int, list<string>>
+     */
+    private array $linkIssues = [];
 
     /**
      * The proposal's own framework, its milestones and those of its centers.
@@ -194,6 +207,7 @@ final class ResultsChain
         return Result::query()
             ->select(['id', 'statement', 'parent_id', 'program_id', 'proposal_id', 'contributes_to_result_id', 'type', 'activity_kind', 'checkout_period'])
             ->with([
+                'schedules' => fn ($query) => $query->select(['id', 'result_id', 'project_id', 'month', 'weeks'])->orderBy('month'),
                 'proposal:id,name,slug,donor_id',
                 'proposal.donor:id,name,slug',
                 'indicators' => fn ($query) => $query
@@ -225,7 +239,7 @@ final class ResultsChain
     private static function milestonesQuery(): Builder
     {
         return Milestone::query()
-            ->select(['id', 'slug', 'name', 'status', 'project_id', 'proposal_id', 'result_id', 'planned_start_date', 'planned_end_date', 'sequence'])
+            ->select(['id', 'slug', 'name', 'status', 'project_id', 'proposal_id', 'result_id', 'planned_start_date', 'planned_end_date', 'sequence', 'weight_percentage'])
             ->with('project:id,name,center_id')
             ->orderBy('planned_start_date')
             ->orderBy('id');
@@ -249,6 +263,7 @@ final class ResultsChain
 
         $options = $this->options();
         $this->filters = $this->validFilters($options);
+        $this->linkIssues = Milestone::activityLinkIssuesFor($this->milestones);
 
         $resultsById = $this->results->keyBy('id')->all();
         $milestonesByActivity = [];
@@ -447,9 +462,67 @@ final class ResultsChain
             'indicators' => $this->indicatorRows($result),
             'lineage' => $depth === 0 ? $this->hiddenLineage($result, $resultsById, $visibleIds) : [],
             'proposal' => $this->proposalTag($result, $resultsById),
+            'milestoneGroups' => $result->type === ResultType::Activity ? $this->milestoneGroups($milestonesByActivity[$result->id] ?? []) : [],
+            'schedule' => $result->type === ResultType::Activity ? $this->scheduleOf($result) : [],
             'children' => $children,
             'contributions' => $contributions,
         ];
+    }
+
+    /**
+     * An activity's milestones grouped by center in delivery order, each
+     * group with its weighted progress (cancelled milestones listed but not
+     * counted). A center filter keeps that center's group only.
+     *
+     * @param  list<Milestone>  $milestones
+     * @return list<ChainMilestoneGroup>
+     */
+    private function milestoneGroups(array $milestones): array
+    {
+        $center = $this->filters['center'];
+        $groups = [];
+
+        foreach ($milestones as $milestone) {
+            if ($center !== '' && (string) $milestone->project_id !== $center) {
+                continue;
+            }
+
+            $key = $milestone->project_id;
+
+            $groups[$key] ??= [
+                'centerId' => $key,
+                'center' => $milestone->project->center()->name ?? $milestone->project->name,
+                'items' => [],
+            ];
+            $groups[$key]['items'][] = $milestone;
+        }
+
+        return array_values(array_map(fn (array $group): array => [
+            'center' => $group['center'],
+            'centerId' => $group['centerId'],
+            'progress' => Milestone::weightedProgress($group['items']),
+            'hasCancelled' => collect($group['items'])->contains(fn (Milestone $milestone): bool => $milestone->status === MilestoneStatus::Cancelled),
+            'milestones' => array_map(fn (Milestone $milestone): array => [
+                'milestone' => $milestone,
+                'issues' => $this->linkIssues[$milestone->id] ?? [],
+                'cancelled' => $milestone->status === MilestoneStatus::Cancelled,
+            ], $group['items']),
+        ], $groups));
+    }
+
+    /**
+     * The months an activity is planned in: the proposal calendar, or under
+     * a center filter that center's own calendar when it has one (the rule
+     * of ActivitySchedule::effectiveFor(), read from the eager-loaded rows).
+     *
+     * @return array<string, list<int>|null>
+     */
+    private function scheduleOf(Result $result): array
+    {
+        $center = $this->filters['center'];
+        $override = $center === '' ? collect() : $result->schedules->filter(fn (ActivitySchedule $row): bool => (string) $row->project_id === $center);
+
+        return ActivitySchedule::calendarOf($override->isNotEmpty() ? $override : $result->schedules->whereNull('project_id'));
     }
 
     /**

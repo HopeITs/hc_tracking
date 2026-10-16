@@ -2,6 +2,7 @@
 
 use App\Enums\MilestoneStatus;
 use App\Enums\ResultType;
+use App\Models\ActivitySchedule;
 use App\Models\AnnualPlan;
 use App\Models\Indicator;
 use App\Models\LibraryIndicator;
@@ -216,6 +217,7 @@ test('the chain reads a flat number of queries for 3 or 30 nodes', function (str
                 $target = chainTarget(chainIndicator($outcome), $source, $this->centerA, 10);
                 Report::factory()->approved()->create(['plan_indicator_id' => $target->id, 'value' => 4]);
                 chainMilestone($this->centerA, $activity);
+                ActivitySchedule::factory()->create(['result_id' => $activity->id, 'month' => '2026-03-01']);
             }
         }
     };
@@ -290,4 +292,76 @@ test('an empty framework offers Start Logical Framework only to results.create h
     chainTab($this->viewer, $this->proposal)
         ->assertSee(__('results_framework.chain_empty_heading'))
         ->assertDontSee(__('results_framework.chain_start'));
+});
+
+/**
+ * A milestone with a status and a weight, linked to an activity.
+ */
+function chainWeightedMilestone(Project $project, Result $activity, string $name, MilestoneStatus $status, string $weight, ?Proposal $proposal = null): Milestone
+{
+    $milestone = chainMilestone($project, $activity, proposal: $proposal);
+    $milestone->forceFill(['name' => $name, 'status' => $status, 'weight_percentage' => $weight])->saveQuietly();
+
+    return $milestone;
+}
+
+test('an activity shows its milestones per center with status and weighted progress, cancelled ones left out', function () {
+    $chain = chainProposalFramework($this->proposal, $this->centerA, $this->centerB);
+    chainWeightedMilestone($this->centerA, $chain['activity'], 'Drill well one', MilestoneStatus::Reached, '30');
+    chainWeightedMilestone($this->centerA, $chain['activity'], 'Drill well two', MilestoneStatus::Planned, '50');
+    chainWeightedMilestone($this->centerA, $chain['activity'], 'Soil survey', MilestoneStatus::Cancelled, '20');
+    chainWeightedMilestone($this->centerB, $chain['activity'], 'Pump installed', MilestoneStatus::Reached, '40', $this->proposal);
+
+    chainTab($this->viewer, $this->proposal)
+        ->assertSeeHtml('data-chain-milestones')
+        ->assertSeeInOrder(['Rehabilitate the village wells.', 'Hope Center Sarmada', 'Drill well one', 'Drill well two', 'Soil survey', 'Unmapped Water Project', 'Pump installed'])
+        ->assertSeeHtml('data-chain-milestone-progress="'.$this->centerA->id.'" data-percent="37.5"')
+        ->assertSeeHtml('data-chain-milestone-progress="'.$this->centerB->id.'" data-percent="100"')
+        ->assertSee(MilestoneStatus::Reached->label())
+        ->assertSee(MilestoneStatus::Cancelled->label())
+        ->assertSee(__('results_framework.chain_milestone_cancelled_excluded'))
+        ->assertDontSeeHtml('data-chain-gap="no_milestone"');
+});
+
+test('a milestone whose activity link no longer fits is shown with the flag', function () {
+    $chain = chainProposalFramework($this->proposal, $this->centerA, $this->centerB);
+    $milestone = chainWeightedMilestone($this->centerA, $chain['activity'], 'Borrowed delivery', MilestoneStatus::Planned, '10', Proposal::factory()->create());
+
+    chainTab($this->viewer, $this->proposal)
+        ->assertSee('Borrowed delivery')
+        ->assertSeeHtml('data-chain-milestone="'.$milestone->id.'"')
+        ->assertSee(__('milestones.activity_link_not_funding'));
+});
+
+test('an activity shows its planned months and the center calendar under a center filter', function () {
+    $chain = chainProposalFramework($this->proposal, $this->centerA, $this->centerB);
+    ActivitySchedule::factory()->create(['result_id' => $chain['activity']->id, 'month' => '2026-03-01']);
+    ActivitySchedule::factory()->create(['result_id' => $chain['activity']->id, 'month' => '2026-04-01', 'weeks' => [1, 2]]);
+    ActivitySchedule::factory()->create(['result_id' => $chain['activity']->id, 'project_id' => $this->centerB->id, 'month' => '2026-06-01']);
+    chainMilestone($this->centerA, $chain['activity']);
+    chainMilestone($this->centerB, $chain['activity']);
+
+    chainTab($this->viewer, $this->proposal)
+        ->assertSeeHtml('data-chain-schedule-month="2026-03"')
+        ->assertSeeHtml('data-chain-schedule-month="2026-04"')
+        ->assertSee(trans_choice('results_framework.chain_weeks', 2, ['weeks' => '1, 2']))
+        ->assertDontSeeHtml('data-chain-schedule-month="2026-06"')
+        ->set('chainCenter', (string) $this->centerB->id)
+        ->assertSeeHtml('data-chain-schedule-month="2026-06"')
+        ->assertDontSeeHtml('data-chain-schedule-month="2026-03"');
+
+    chainTab($this->viewer, $this->proposal)
+        ->set('chainCenter', (string) $this->centerA->id)
+        ->assertSeeHtml('data-chain-schedule-month="2026-03"');
+});
+
+test('a center filter keeps only that center\'s milestones under an activity', function () {
+    $chain = chainProposalFramework($this->proposal, $this->centerA, $this->centerB);
+    chainWeightedMilestone($this->centerA, $chain['activity'], 'Drill well one', MilestoneStatus::Reached, '30');
+    chainWeightedMilestone($this->centerB, $chain['activity'], 'Pump installed', MilestoneStatus::Reached, '40');
+
+    chainTab($this->viewer, $this->proposal)
+        ->set('chainCenter', (string) $this->centerB->id)
+        ->assertSee('Pump installed')
+        ->assertDontSee('Drill well one');
 });

@@ -215,3 +215,57 @@ test('the calendar creates a milestone with its activity', function () {
 
     expect(Milestone::query()->where('name', 'Calendar delivery')->sole()->result_id)->toBe($this->fundingActivity->id);
 });
+
+test('the batch link check flags exactly what the per-milestone check flags', function () {
+    $fine = Milestone::factory()->create(['project_id' => $this->project->id, 'result_id' => $this->fundingActivity->id]);
+    $programLink = Milestone::factory()->create(['project_id' => $this->project->id, 'result_id' => $this->programActivity->id]);
+    $notFunding = Milestone::factory()->create(['project_id' => $this->project->id, 'result_id' => $this->strangerActivity->id]);
+    $notActivity = Milestone::factory()->create(['project_id' => $this->project->id, 'result_id' => $this->fundingActivity->parent_id]);
+    $ownProposal = Milestone::factory()->create(['project_id' => $this->project->id, 'proposal_id' => $this->funding->id, 'result_id' => $this->programActivity->id]);
+    $movedProject = Project::factory()->create(['program_id' => Program::factory()->create()->id]);
+    $moved = Milestone::factory()->create(['project_id' => $movedProject->id, 'result_id' => $this->programActivity->id]);
+    $unlinked = $this->milestone;
+
+    $milestones = Milestone::query()->with('project')->orderBy('id')->get();
+
+    expect(Milestone::activityLinkIssuesFor($milestones))
+        ->toBe($milestones->mapWithKeys(fn (Milestone $milestone): array => [$milestone->id => $milestone->activityLinkIssues()])->all())
+        ->and(Milestone::activityLinkIssuesFor($milestones)[$fine->id])->toBe([])
+        ->and(Milestone::activityLinkIssuesFor($milestones)[$programLink->id])->toBe([])
+        ->and(Milestone::activityLinkIssuesFor($milestones)[$unlinked->id])->toBe([])
+        ->and(Milestone::activityLinkIssuesFor($milestones)[$notFunding->id])->toBe(['milestones.activity_link_not_funding'])
+        ->and(Milestone::activityLinkIssuesFor($milestones)[$notActivity->id])->toBe(['milestones.activity_link_not_activity'])
+        ->and(Milestone::activityLinkIssuesFor($milestones)[$ownProposal->id])->toBe(['milestones.activity_link_program_moved'])
+        ->and(Milestone::activityLinkIssuesFor($milestones)[$moved->id])->toBe(['milestones.activity_link_program_moved']);
+});
+
+test('the batch link check reads a fixed number of queries', function () {
+    $count = function (int $milestones): int {
+        Milestone::query()->delete();
+        Milestone::factory()->count($milestones)->create(['project_id' => $this->project->id, 'result_id' => $this->strangerActivity->id]);
+        $loaded = Milestone::query()->with('project')->get();
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        Milestone::activityLinkIssuesFor($loaded);
+        $queries = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        return $queries;
+    };
+
+    expect($count(2))->toBe($count(12))->toBeLessThanOrEqual(3);
+});
+
+test('weighted progress counts reached weight over every weight that still counts', function () {
+    $make = fn (MilestoneStatus $status, string $weight): Milestone => Milestone::factory()->make(['status' => $status, 'weight_percentage' => $weight]);
+
+    expect(Milestone::weightedProgress([
+        $make(MilestoneStatus::Reached, '30'),
+        $make(MilestoneStatus::Planned, '50'),
+        $make(MilestoneStatus::Cancelled, '20'),
+    ]))->toBe(37.5)
+        ->and(Milestone::weightedProgress([$make(MilestoneStatus::Cancelled, '40'), $make(MilestoneStatus::Planned, '0')]))->toBeNull()
+        ->and(Milestone::weightedProgress([]))->toBeNull()
+        ->and(Milestone::weightedProgress([$make(MilestoneStatus::Reached, '60'), $make(MilestoneStatus::Ongoing, '40')]))->toBe(60.0);
+});
