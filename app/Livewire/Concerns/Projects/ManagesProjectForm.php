@@ -4,14 +4,18 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Projects;
 
+use App\Actions\Projects\RestoreProject;
 use App\Actions\Projects\SaveProject;
 use App\Enums\ProjectStatus;
 use App\Models\HrCenter;
 use App\Models\HrEmployee;
+use App\Models\HrProgram;
 use App\Models\Program;
 use App\Models\Project;
+use App\Support\SimilarProjects;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
@@ -65,6 +69,13 @@ trait ManagesProjectForm
     public string $programId = '';
 
     public string $userId = '';
+
+    /**
+     * «This is a new project», ticked when similar projects are listed
+     * (T10). Cleared whenever the name or the placement changes, since the
+     * list it answered no longer applies.
+     */
+    public bool $confirmNewProject = false;
 
     /**
      * The chosen sector ids (T34), as strings from the picker's checkboxes.
@@ -138,6 +149,8 @@ trait ManagesProjectForm
      */
     public function updatedProgramId(string $value): void
     {
+        $this->confirmNewProject = false;
+
         if ($value === '' || ($this->editingProjectId !== null && ! Gate::allows('reassign', Project::query()->findOrFail($this->editingProjectId)))) {
             return;
         }
@@ -153,7 +166,109 @@ trait ManagesProjectForm
 
     public function updatedCenterId(): void
     {
+        $this->confirmNewProject = false;
         $this->proposeName();
+    }
+
+    public function updatedName(): void
+    {
+        $this->confirmNewProject = false;
+    }
+
+    /**
+     * Existing projects with a similar name in other centers (T10), as plain
+     * rows: name, center, program and status. Information only.
+     *
+     * @return list<array{id: int, name: string, center: string, program: string, status: string}>
+     */
+    #[Computed]
+    public function similarProjects(): array
+    {
+        if (! $this->showProjectModal || $this->editingProjectId !== null || mb_strlen(trim($this->name)) < 3) {
+            return [];
+        }
+
+        $matches = SimilarProjects::find(
+            $this->name,
+            ctype_digit($this->programId) ? (int) $this->programId : null,
+            ctype_digit($this->centerId) ? (int) $this->centerId : null,
+        );
+
+        return $matches->map(fn (Project $project): array => [
+            'id' => $project->id,
+            'name' => $project->name,
+            'center' => $project->center_id === null ? __('proposals.no_center') : (HrCenter::remembered($project->center_id)->name ?? '#'.$project->center_id),
+            'program' => $this->hrProgramName($project->program_id),
+            'status' => $project->status->label(),
+        ])->all();
+    }
+
+    /**
+     * The project already holding the chosen center and program (T10): the
+     * open one that makes a second refused, or the newest closed or archived
+     * one that a new proposal can take back. Null until both are chosen.
+     *
+     * @return array{id: int, name: string, slug: string, state: string, canRestore: bool}|null
+     */
+    #[Computed]
+    public function existingPairProject(): ?array
+    {
+        if (! $this->showProjectModal || $this->editingProjectId !== null || ! ctype_digit($this->centerId) || ! ctype_digit($this->programId)) {
+            return null;
+        }
+
+        $centerId = (int) $this->centerId;
+        $programId = (int) $this->programId;
+        $open = Project::openProjectFor($centerId, $programId);
+        $found = $open ?? Project::query()
+            ->select(['id', 'slug', 'name', 'status', 'center_id', 'program_id'])
+            ->where('center_id', $centerId)
+            ->where('program_id', $programId)
+            ->orderByDesc('id')
+            ->first();
+
+        if ($found === null) {
+            return null;
+        }
+
+        return [
+            'id' => $found->id,
+            'name' => $found->name,
+            'slug' => $found->slug,
+            'state' => $found->status === ProjectStatus::Archived ? 'archived' : ($open === null ? 'closed' : 'open'),
+            'canRestore' => $found->status === ProjectStatus::Archived && Gate::allows('delete', $found),
+        ];
+    }
+
+    /**
+     * Take the archived project of the chosen center and program out of the
+     * archive, so a proposal can be added to it (D-27). The status is written
+     * by RestoreProject.
+     */
+    public function restoreExistingProject(): void
+    {
+        $existing = $this->existingPairProject;
+
+        abort_if($existing === null || $existing['state'] !== 'archived', 404);
+
+        $project = Project::query()->whereKey($existing['id'])->firstOrFail();
+
+        $status = app(RestoreProject::class)->handle($project);
+
+        unset($this->existingPairProject);
+
+        Flux::toast(variant: 'success', text: __('projects.project_restored_as', ['status' => $status->label()]));
+    }
+
+    private function hrProgramName(int $programId): string
+    {
+        try {
+            $name = HrProgram::nameOf($programId);
+        } catch (QueryException) {
+            $name = '';
+        }
+
+        return $name !== '' ? $name : '#'.$programId;
     }
 
     /**
@@ -247,6 +362,12 @@ trait ManagesProjectForm
             ? Gate::authorize('create', Project::class)
             : Gate::authorize('update', $project);
 
+        if ($project === null && $this->similarProjects !== [] && ! $this->confirmNewProject) {
+            $this->addError('confirmNewProject', __('projects.similar_confirm'));
+
+            return;
+        }
+
         $saved = app(SaveProject::class)->handle($project, [
             'name' => $this->name,
             'description' => $this->description,
@@ -305,6 +426,7 @@ trait ManagesProjectForm
         $this->savedCenterId = null;
         $this->savedStatus = null;
         $this->proposedName = '';
+        $this->confirmNewProject = false;
         $this->programId = '';
         $this->userId = '';
         $this->sectorIds = [];

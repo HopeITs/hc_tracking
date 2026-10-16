@@ -58,4 +58,12 @@ final class InvalidParentException extends DomainException
     {
         return new self('A cross-cutting result has no parent and no children.');
     }
+
+    /**
+     * A proposal was set to renew itself or one of its own successors.
+     */
+    public static function proposalCycle(): self
+    {
+        return new self('A proposal cannot renew itself or one of its successors.');
+    }
 }

@@ -44,6 +44,7 @@ use Illuminate\Support\Facades\DB;
  * @property int|null $parent_milestone_id
  * @property int|null $proposal_id
  * @property int|null $result_id
+ * @property int|null $copied_from_id
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
@@ -59,6 +60,8 @@ use Illuminate\Support\Facades\DB;
     'weight_percentage',
     'responsible_user_id',
     'parent_milestone_id',
+    'proposal_id',
+    'copied_from_id',
 ])]
 #[ObservedBy([MilestoneObserver::class, MediaOwnerObserver::class, ScheduleItemObserver::class])]
 class Milestone extends Model implements TracksActivity
@@ -81,6 +84,16 @@ class Milestone extends Model implements TracksActivity
     protected function slugSource(): string
     {
         return $this->name;
+    }
+
+    /**
+     * The milestone this one was copied from when a proposal was renewed.
+     *
+     * @return BelongsTo<Milestone, $this>
+     */
+    public function copiedFrom(): BelongsTo
+    {
+        return $this->belongsTo(Milestone::class, 'copied_from_id');
     }
 
     /**

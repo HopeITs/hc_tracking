@@ -76,7 +76,7 @@ trait HasSlug
         $slug = $base;
         $suffix = 2;
 
-        while (static::query()->where('slug', $slug)->exists()) {
+        while (static::withoutGlobalScopes()->where('slug', $slug)->exists()) {
             $slug = $base.'-'.$suffix;
             $suffix++;
         }

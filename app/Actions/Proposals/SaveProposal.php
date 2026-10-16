@@ -36,13 +36,15 @@ use Illuminate\Validation\Validator as ValidatorInstance;
 final class SaveProposal
 {
     /**
-     * `projectIds`, `startingStage` and `skipReason` are read on create only;
+     * `projectIds`, `startingStage`, `skipReason` and `previousProposalId`
+     * (the proposal a renewal renews, set only by CloneProposalForRenewal)
+     * are read on create only;
      * `startingStage` is raw form input, validated as `concept note` or
      * `proposal draft`.
      * `beneficiaries` is keyed by project id. The budget fields are ignored
      * entirely for a user who may not see money.
      *
-     * @param  array{name: string, internalProjectNumber: string, donorId: int|string|null, projectIds?: list<int|string>, beneficiaries?: array<int|string, int|string|null>, beneficiariesReason?: ?string, requestedBudget?: string|int|float|null, requestedCurrency?: ?string, plannedDateBegin: ?string, plannedDateEnd: ?string, notes?: ?string, startingStage?: string, skipReason?: ?string}  $data
+     * @param  array{name: string, internalProjectNumber: string, donorId: int|string|null, projectIds?: list<int|string>, beneficiaries?: array<int|string, int|string|null>, beneficiariesReason?: ?string, requestedBudget?: string|int|float|null, requestedCurrency?: ?string, plannedDateBegin: ?string, plannedDateEnd: ?string, notes?: ?string, startingStage?: string, skipReason?: ?string, previousProposalId?: int|null}  $data
      */
     public function handle(?Proposal $existing, array $data, User $actor): Proposal
     {
@@ -66,6 +68,7 @@ final class SaveProposal
         $proposal = DB::transaction(function () use ($input, $actor, $projectIds, $beneficiaries): Proposal {
             $proposal = new Proposal;
             $this->fillDetails($proposal, $input, $actor);
+            $proposal->previous_proposal_id = isset($input['previousProposalId']) ? (int) $input['previousProposalId'] : null;
             $proposal->save();
 
             ProposalStatusNote::query()->create([

@@ -53,6 +53,7 @@ use Illuminate\Support\Collection;
  * @property CarbonImmutable|null $completed_date
  * @property int $progress_percentage
  * @property int $created_by
+ * @property int|null $copied_from_id
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
@@ -79,6 +80,7 @@ use Illuminate\Support\Collection;
     'completed_date',
     'progress_percentage',
     'created_by',
+    'copied_from_id',
 ])]
 #[ObservedBy(ScheduleItemObserver::class)]
 #[ScopedBy([TaskVisibilityScope::class])]
@@ -303,6 +305,16 @@ class Task extends Model implements TracksActivity
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * The task this one was copied from when a proposal was renewed.
+     *
+     * @return BelongsTo<Task, $this>
+     */
+    public function copiedFrom(): BelongsTo
+    {
+        return $this->belongsTo(Task::class, 'copied_from_id');
     }
 
     /**
