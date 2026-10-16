@@ -19,9 +19,15 @@ use App\Models\Indicator;
 use App\Models\IndicatorProgress;
 use App\Models\KnownDevice;
 use App\Models\Media;
+use App\Models\MonthlyReportActivityEntry;
+use App\Models\MonthlyReportLine;
+use App\Models\MonthlyReportLineBreakdown;
+use App\Models\MonthlyReportLineShare;
+use App\Models\MonthlyReportReopenRequest;
 use App\Models\NotificationMute;
 use App\Models\Permission;
 use App\Models\PlanIndicator;
+use App\Models\ProjectActivityStatus;
 use App\Models\ProposalReviewer;
 use App\Models\ProposalStatusNote;
 use App\Models\ReportFile;
@@ -74,9 +80,15 @@ function modelsGuardedWithoutPolicy(): array
         IndicatorProgress::class => ['indicators', 'Readings are recorded under indicators.* permissions.'],
         KnownDevice::class => [null, 'The signed-in user\'s own sign-in devices only.'],
         Media::class => [null, 'Files follow their owner\'s policy (project, proposal, milestone) and the download controllers check it.'],
+        MonthlyReportActivityEntry::class => ['reports', 'Part of its monthly report (MonthlyReportPolicy::update); written only by SaveMonthlyReportActivities.'],
+        MonthlyReportLine::class => ['reports', 'Part of its monthly report (MonthlyReportPolicy::update, fillMealLines); loaded through the report.'],
+        MonthlyReportLineBreakdown::class => ['reports', 'Part of its monthly report line (MonthlyReportPolicy::update, fillMealLines); loaded through the line.'],
+        MonthlyReportLineShare::class => ['reports', 'Part of its monthly report line (MonthlyReportPolicy::update, fillMealLines); loaded through the line.'],
+        MonthlyReportReopenRequest::class => ['reports', 'Raised and decided under MonthlyReportPolicy::requestReopen and decideReopen; never deleted.'],
         NotificationMute::class => [null, 'The signed-in user\'s own notification preferences only.'],
         Permission::class => ['access-management', 'access-management.* permissions and UserPolicy::grantPermission.'],
         PlanIndicator::class => ['targets', 'targets.* permissions on the targets page.'],
+        ProjectActivityStatus::class => ['reports', 'Written only when a monthly report is validated or reopened (MonthlyReportPolicy::validate, decideReopen).'],
         ProposalStatusNote::class => ['proposals', 'Written only through a proposal status change (ProposalPolicy::update).'],
         ProposalReviewer::class => ['proposals', 'Written only by the review actions under ProposalPolicy::transition, manageReviewers and markReviewed (T07).'],
         ReportFile::class => ['reports', 'Follows its report (ReportPolicy); the download controllers check it.'],

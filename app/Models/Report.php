@@ -24,12 +24,16 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $id
  * @property string $slug
  * @property int $plan_indicator_id
+ * @property int|null $monthly_report_id
+ * @property int|null $monthly_report_line_share_id
  * @property int $user_id
  * @property ReportStatus $status
  * @property CarbonImmutable $planned_date
  * @property CarbonImmutable|null $period_start
  * @property CarbonImmutable|null $period_end
- * @property string $value
+ * @property string|null $value
+ * @property string|null $numerator
+ * @property string|null $denominator
  * @property string|null $narrative_report_notes
  * @property string|null $executive_summary
  * @property string|null $key_achievements
@@ -49,6 +53,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'period_start',
     'period_end',
     'value',
+    'numerator',
+    'denominator',
+    'monthly_report_id',
+    'monthly_report_line_share_id',
     'narrative_report_notes',
     'executive_summary',
     'key_achievements',
@@ -86,6 +94,7 @@ class Report extends Model implements TracksActivity
     protected $attributes = [
         'status' => 'draft',
         'is_seen_by_meal' => false,
+        'monthly_report_id' => null,
     ];
 
     /**
@@ -106,6 +115,36 @@ class Report extends Model implements TracksActivity
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * The monthly report this row mirrors, NULL for a generic report.
+     *
+     * @return BelongsTo<MonthlyReport, $this>
+     */
+    public function monthlyReport(): BelongsTo
+    {
+        return $this->belongsTo(MonthlyReport::class);
+    }
+
+    /**
+     * The monthly report line share this row mirrors.
+     *
+     * @return BelongsTo<MonthlyReportLineShare, $this>
+     */
+    public function lineShare(): BelongsTo
+    {
+        return $this->belongsTo(MonthlyReportLineShare::class, 'monthly_report_line_share_id');
+    }
+
+    /**
+     * Whether this row mirrors a monthly report share (contracts §13). A
+     * mirror is written only by the monthly report actions, never from the
+     * generic Reports pages.
+     */
+    public function isMirror(): bool
+    {
+        return $this->monthly_report_id !== null;
     }
 
     /**
@@ -175,6 +214,10 @@ class Report extends Model implements TracksActivity
             'period_start' => 'date',
             'period_end' => 'date',
             'value' => 'decimal:2',
+            'numerator' => 'decimal:2',
+            'denominator' => 'decimal:2',
+            'monthly_report_id' => 'integer',
+            'monthly_report_line_share_id' => 'integer',
             'submit_date' => 'date',
             'is_seen_by_meal' => 'boolean',
         ];

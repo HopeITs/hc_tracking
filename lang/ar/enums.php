@@ -134,6 +134,29 @@ return [
         'continuous' => 'مستمر',
         'event' => 'حدث',
     ],
+    'monthly_report_status' => [
+        'draft' => 'مسودة',
+        'submitted' => 'مُرسَل',
+        'validated' => 'مُعتمَد',
+    ],
+    'reopen_request_status' => [
+        'pending' => 'قيد الانتظار',
+        'granted' => 'مقبول',
+        'denied' => 'مرفوض',
+    ],
+    'gender' => [
+        'male' => 'ذكر',
+        'female' => 'أنثى',
+    ],
+    'activity_status' => [
+        'not_started' => 'لم يبدأ',
+        'started' => 'بدأ',
+        'ongoing' => 'مستمر',
+        'suspended' => 'معلّق',
+        'cancelled' => 'ملغى',
+        'completed' => 'مكتمل',
+        'conducted' => 'نُفّذ',
+    ],
     'donor_attribution' => [
         'shared' => 'مشترك (المستهدف الأعلى)',
         'split' => 'مقسّم (مجموع المستهدفات)',

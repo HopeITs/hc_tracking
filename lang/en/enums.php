@@ -134,6 +134,29 @@ return [
         'continuous' => 'Continuous',
         'event' => 'Event',
     ],
+    'monthly_report_status' => [
+        'draft' => 'Draft',
+        'submitted' => 'Submitted',
+        'validated' => 'Validated',
+    ],
+    'reopen_request_status' => [
+        'pending' => 'Pending',
+        'granted' => 'Granted',
+        'denied' => 'Denied',
+    ],
+    'gender' => [
+        'male' => 'Male',
+        'female' => 'Female',
+    ],
+    'activity_status' => [
+        'not_started' => 'Not started',
+        'started' => 'Started',
+        'ongoing' => 'Ongoing',
+        'suspended' => 'Suspended',
+        'cancelled' => 'Cancelled',
+        'completed' => 'Completed',
+        'conducted' => 'Conducted',
+    ],
     'donor_attribution' => [
         'shared' => 'Shared (highest target)',
         'split' => 'Split (sum of targets)',

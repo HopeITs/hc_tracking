@@ -1,18 +1,22 @@
 <?php
 
+use App\Enums\ActivityStatus;
 use App\Enums\ArStatus;
 use App\Enums\CollectionFrequency;
 use App\Enums\Currency;
 use App\Enums\DenominatorBasis;
 use App\Enums\DonorType;
 use App\Enums\FileType;
+use App\Enums\Gender;
 use App\Enums\IndicatorCollector;
 use App\Enums\IndicatorMeasure;
 use App\Enums\MediaCollection;
 use App\Enums\MilestoneStatus;
+use App\Enums\MonthlyReportStatus;
 use App\Enums\Period;
 use App\Enums\ProjectStatus;
 use App\Enums\ProposalStatus;
+use App\Enums\ReopenRequestStatus;
 use App\Enums\ReportStatus;
 use App\Enums\ResultType;
 use App\Enums\TaskPriority;
@@ -23,8 +27,14 @@ use App\Models\Indicator;
 use App\Models\LibraryIndicator;
 use App\Models\Media;
 use App\Models\Milestone;
+use App\Models\MonthlyReport;
+use App\Models\MonthlyReportActivityEntry;
+use App\Models\MonthlyReportLine;
+use App\Models\MonthlyReportLineBreakdown;
+use App\Models\MonthlyReportReopenRequest;
 use App\Models\PlanIndicator;
 use App\Models\Project;
+use App\Models\ProjectActivityStatus;
 use App\Models\Proposal;
 use App\Models\ProposalStatusNote;
 use App\Models\Report;
@@ -308,6 +318,66 @@ function enumColumns(): array
             'stored' => 'outcome',
             'default' => null,
             'badCasing' => 'Outcome',
+        ]],
+        'monthly_reports.status' => [[
+            'model' => MonthlyReport::class,
+            'table' => 'monthly_reports',
+            'column' => 'status',
+            'width' => 20,
+            'assign' => MonthlyReportStatus::Validated,
+            'stored' => 'validated',
+            'default' => MonthlyReportStatus::Draft,
+            'badCasing' => 'Draft',
+        ]],
+        'monthly_report_reopen_requests.status' => [[
+            'model' => MonthlyReportReopenRequest::class,
+            'table' => 'monthly_report_reopen_requests',
+            'column' => 'status',
+            'width' => 20,
+            'assign' => ReopenRequestStatus::Granted,
+            'stored' => 'granted',
+            'default' => ReopenRequestStatus::Pending,
+            'badCasing' => 'Pending',
+        ]],
+        'monthly_report_lines.entered_by' => [[
+            'model' => MonthlyReportLine::class,
+            'table' => 'monthly_report_lines',
+            'column' => 'entered_by',
+            'width' => 20,
+            'assign' => IndicatorCollector::Meal,
+            'stored' => 'meal',
+            'default' => null,
+            'badCasing' => 'MEAL',
+        ]],
+        'monthly_report_line_breakdowns.gender' => [[
+            'model' => MonthlyReportLineBreakdown::class,
+            'table' => 'monthly_report_line_breakdowns',
+            'column' => 'gender',
+            'width' => 10,
+            'assign' => Gender::Female,
+            'stored' => 'female',
+            'default' => null,
+            'badCasing' => 'Male',
+        ]],
+        'monthly_report_activity_entries.status' => [[
+            'model' => MonthlyReportActivityEntry::class,
+            'table' => 'monthly_report_activity_entries',
+            'column' => 'status',
+            'width' => 20,
+            'assign' => ActivityStatus::NotStarted,
+            'stored' => 'not_started',
+            'default' => null,
+            'badCasing' => 'Completed',
+        ]],
+        'project_activity_statuses.status' => [[
+            'model' => ProjectActivityStatus::class,
+            'table' => 'project_activity_statuses',
+            'column' => 'status',
+            'width' => 20,
+            'assign' => ActivityStatus::Completed,
+            'stored' => 'completed',
+            'default' => null,
+            'badCasing' => 'Started',
         ]],
     ];
 }

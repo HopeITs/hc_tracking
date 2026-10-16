@@ -326,6 +326,16 @@ class Project extends Model implements TracksActivity
     }
 
     /**
+     * One monthly report per month of the project period (contracts §13).
+     *
+     * @return HasMany<MonthlyReport, $this>
+     */
+    public function monthlyReports(): HasMany
+    {
+        return $this->hasMany(MonthlyReport::class);
+    }
+
+    /**
      * Indicators scoped directly to this project.
      *
      * `indicators.project_id` is nullable, so most indicators are programme

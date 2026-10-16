@@ -10,6 +10,7 @@ use App\Models\Indicator;
 use App\Models\LibraryIndicator;
 use App\Models\MealCoverageAssignment;
 use App\Models\Milestone;
+use App\Models\MonthlyReport;
 use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
@@ -54,6 +55,7 @@ test('the morph map registers exactly the target sources, task sources, media ow
         'strategic_pillar' => StrategicPillar::class,
         'meal_coverage' => MealCoverageAssignment::class,
         'supervision' => Supervision::class,
+        'monthly_report' => MonthlyReport::class,
     ]);
 });
 
