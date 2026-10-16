@@ -18,4 +18,10 @@
             <x-ui.form-input wire:model="nameEn" :label="__('sectors.fields.name_en')" :help="__('sectors.name_en_help')" maxlength="255" dir="ltr" lang="en" data-test="sector-name-en" />
         </div>
     @endif
+
+    <x-slot:actions>
+        <x-ui.button type="submit" tone="primary" data-test="save-sector-button">
+            {{ __('common.save_changes') }}
+        </x-ui.button>
+    </x-slot:actions>
 </x-ui.modal>
