@@ -97,6 +97,32 @@ class PlanIndicator extends Model implements TracksActivity
     }
 
     /**
+     * The dates a figure for this target may cover: its annual plan's year,
+     * or its proposal's period (actual dates where they are known, else
+     * planned). Null when the source is gone. Reads the `source` relation, so
+     * eager-load it for a list. Used by the report form and the monthly
+     * report line builder.
+     *
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable}|null
+     */
+    public function coverableWindow(): ?array
+    {
+        $source = $this->source;
+
+        return match (true) {
+            $source instanceof AnnualPlan => [
+                CarbonImmutable::create($source->year)->startOfYear(),
+                CarbonImmutable::create($source->year)->endOfYear(),
+            ],
+            $source instanceof Proposal => [
+                $source->actual_date_begin ?? $source->planned_date_begin,
+                $source->actual_date_end ?? $source->planned_date_end,
+            ],
+            default => null,
+        };
+    }
+
+    /**
      * The targets a project delivers in a period (contracts §12.1): proposal
      * targets whose proposal runs inside the window (actual dates once both
      * are set, else planned), and annual-plan targets whose plan year

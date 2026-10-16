@@ -152,19 +152,7 @@ trait ManagesReportForm
      */
     protected function coverableWindow(?PlanIndicator $target): ?array
     {
-        $source = $target?->source;
-
-        return match (true) {
-            $source instanceof AnnualPlan => [
-                CarbonImmutable::create($source->year)->startOfYear(),
-                CarbonImmutable::create($source->year)->endOfYear(),
-            ],
-            $source instanceof Proposal => [
-                $source->actual_date_begin ?? $source->planned_date_begin,
-                $source->actual_date_end ?? $source->planned_date_end,
-            ],
-            default => null,
-        };
+        return $target?->coverableWindow();
     }
 
     /**

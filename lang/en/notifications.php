@@ -147,6 +147,7 @@ return [
         'access-management' => 'Users & roles',
         'cities' => 'Cities',
         'report-templates' => 'Report templates',
+        'monthly-reports' => 'Monthly reports',
         'system' => 'System',
     ],
 

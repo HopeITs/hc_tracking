@@ -19,6 +19,7 @@ use App\Notifications\Recipients\LibraryIndicatorRecipients;
 use App\Notifications\Recipients\ManagedRecipients;
 use App\Notifications\Recipients\MealCoverageRecipients;
 use App\Notifications\Recipients\MilestoneRecipients;
+use App\Notifications\Recipients\MonthlyReportRecipients;
 use App\Notifications\Recipients\ProjectRecipients;
 use App\Notifications\Recipients\ProposalRecipients;
 use App\Notifications\Recipients\ReportRecipients;
@@ -62,6 +63,7 @@ return [
         'access-management' => UserRecipients::class,
         'cities' => MealCoverageRecipients::class,
         'report-templates' => ReportTemplateRecipients::class,
+        'monthly-reports' => MonthlyReportRecipients::class,
     ],
 
     /*
@@ -76,6 +78,7 @@ return [
         'access-management' => 'access-management.manage-users',
         // Owners and program managers read the template on the project page.
         'report-templates' => 'projects.view',
+        'monthly-reports' => 'reports.view',
     ],
 
     /*
@@ -150,6 +153,7 @@ return [
         'access-management' => 'users',
         'cities' => 'map-pin',
         'report-templates' => 'clipboard-document-list',
+        'monthly-reports' => 'document-check',
         'system' => 'bell',
     ],
 
@@ -191,6 +195,8 @@ return [
         'stalled_report_reviewed_days' => 5,
         'stalled_proposal_days' => 30,
         'off_track_pace_percent' => 80,
+        // Working days after the end of its month a monthly report is due (contracts §13).
+        'monthly_report_due_working_days' => 5,
         'daily_brief_time' => '07:30',
         'weekly_digest_time' => '08:00',
         // Admin overrides per EventCatalog key: enabled, importance, extra oversight roles.

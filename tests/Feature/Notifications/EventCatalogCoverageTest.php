@@ -1,5 +1,7 @@
 <?php
 
+use App\Events\ProjectActivated;
+use App\Models\Activity;
 use App\Models\DonorProposal;
 use App\Models\DonorReport;
 use App\Models\LibraryIndicator;
@@ -8,7 +10,9 @@ use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Task;
 use App\Models\TransfersTracking;
+use App\Models\UserNotification;
 use App\Notifications\EventCatalog;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Lang;
@@ -46,7 +50,7 @@ const EVENT_CATALOG_IGNORED = [
 /**
  * The modules each owning task adds to config/notifications.php when it lands.
  */
-const EVENT_CATALOG_PENDING_MODULES = ['monthly-reports' => 'T17A', 'donor-reports' => 'T19'];
+const EVENT_CATALOG_PENDING_MODULES = ['donor-reports' => 'T19'];
 
 /**
  * Every activity event a model can record from its own hooks: created,
@@ -122,5 +126,17 @@ test('every ignored event is still recorded somewhere', function () {
 });
 
 test('a grouped monthly report activation sends exactly one notification', function () {
-    // Built against T17's ProjectActivated listener and NotificationGrouper.
-})->skip('T17: monthly reports are not on the branch yet');
+    $ownerId = insertHrEmployee();
+    $owner = userWithRole('Managers', $ownerId);
+    $project = Activity::withoutRecording(fn (): Project => Project::factory()->active()->create([
+        'user_id' => $ownerId,
+        'start_date' => '2026-11-01',
+        'end_date' => '2027-10-31',
+    ]));
+
+    ProjectActivated::dispatch($project->id, null, CarbonImmutable::parse('2026-11-01'), CarbonImmutable::parse('2027-10-31'), 'template_confirmation');
+
+    expect(UserNotification::query()->forUser($owner)->get()
+        ->filter(fn (UserNotification $row): bool => $row->data['key'] === 'notifications.events.monthly_reports.generated')
+        ->count())->toBe(1);
+});

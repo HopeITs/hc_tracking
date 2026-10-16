@@ -147,6 +147,7 @@ return [
         'access-management' => 'المستخدمون والأدوار',
         'cities' => 'المدن',
         'report-templates' => 'قوالب التقارير',
+        'monthly-reports' => 'التقارير الشهرية',
         'system' => 'النظام',
     ],
 
