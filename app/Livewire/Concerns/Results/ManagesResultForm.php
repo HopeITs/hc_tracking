@@ -418,7 +418,7 @@ trait ManagesResultForm
      */
     protected function forgetFramework(): void
     {
-        foreach (['allResults', 'resultsById', 'childCounts', 'measurements', 'groupedRoots', 'frameworkRoots', 'visibleNodes', 'overview', 'focusCounts', 'parentOptions', 'contributesToOptions', 'activitiesFingerprint'] as $property) {
+        foreach (['allResults', 'resultsById', 'childCounts', 'measurements', 'groupedRoots', 'frameworkRoots', 'visibleNodes', 'overview', 'focusCounts', 'parentOptions', 'contributesToOptions', 'activitiesFingerprint', 'chain'] as $property) {
             if (method_exists($this, $property)) {
                 unset($this->{$property});
             }

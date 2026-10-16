@@ -1,11 +1,15 @@
 <?php
 
+use App\Enums\ResultType;
 use App\Models\AnnualPlan;
 use App\Models\Indicator;
+use App\Models\Milestone;
 use App\Models\PlanIndicator;
 use App\Models\Program;
+use App\Models\Project;
 use App\Models\Result;
 use App\Models\User;
+use Livewire\Livewire;
 
 test('guests are redirected from annual plan detail', function () {
     $plan = AnnualPlan::factory()->create();
@@ -90,4 +94,36 @@ test('a target with no project reads as organisation wide', function () {
         ->get(route('annual-plans.show', $plan))
         ->assertOk()
         ->assertSeeText('Organisation-wide');
+});
+
+test('annual plan chain shows the activities with milestones planned that year and this plan\'s targets only', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $program = Program::factory()->create();
+    $plan = AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2026]);
+    $lastYear = AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2025]);
+    $project = Project::factory()->create(['program_id' => $program->id]);
+    $output = Result::factory()->type(ResultType::Output)->create(['program_id' => $program->id, 'statement' => 'Wells are rehabilitated.']);
+    $activities = [];
+
+    foreach (['Activity planned this year.' => '2026-05-01', 'Activity planned last year.' => '2025-05-01', 'Activity without a milestone.' => null] as $statement => $date) {
+        $activities[$statement] = Result::factory()->activity($output)->create(['statement' => $statement]);
+
+        if ($date !== null) {
+            Milestone::factory()->create(['project_id' => $project->id, 'planned_start_date' => $date, 'planned_end_date' => $date])
+                ->forceFill(['result_id' => $activities[$statement]->id])->saveQuietly();
+        }
+    }
+
+    $indicator = Indicator::factory()->create(['result_id' => $output->id]);
+    $planTarget = PlanIndicator::factory()->create(['source_id' => $plan->id, 'indicator_id' => $indicator->id, 'project_id' => $project->id]);
+    $oldTarget = PlanIndicator::factory()->create(['source_id' => $lastYear->id, 'indicator_id' => $indicator->id, 'project_id' => $project->id]);
+
+    Livewire::actingAs($user)
+        ->test('pages::annual-plans.show', ['annualPlan' => $plan])
+        ->assertSeeHtml('data-chain-view')
+        ->assertSeeInOrder(['Wells are rehabilitated.', 'Activity planned this year.'])
+        ->assertDontSee('Activity planned last year.')
+        ->assertDontSee('Activity without a milestone.')
+        ->assertSeeHtml('data-chain-target="'.$planTarget->id.'"')
+        ->assertDontSeeHtml('data-chain-target="'.$oldTarget->id.'"');
 });

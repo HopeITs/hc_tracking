@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\PHPStan;
 
 use App\Livewire\Concerns\Programs\ReadsProgramDelivery;
+use App\Livewire\Concerns\Results\FiltersResultsChain;
 use Livewire\Component;
 
 /**
@@ -17,6 +18,7 @@ use Livewire\Component;
  */
 abstract class ProgramsShowPageHost extends Component
 {
+    use FiltersResultsChain;
     use ReadsProgramDelivery;
 
     public int $programId;

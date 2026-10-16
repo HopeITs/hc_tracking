@@ -226,6 +226,101 @@ class Milestone extends Model implements TracksActivity
     }
 
     /**
+     * activityLinkIssues() for many milestones in three queries, whatever
+     * their number: the same rule as allowedActivitiesFor() and the same
+     * keys, read in memory. Pages that list milestones call this instead of
+     * the per-row form (ResultsChain).
+     *
+     * @param  iterable<Milestone>  $milestones
+     * @return array<int, list<string>> keyed by milestone id
+     */
+    public static function activityLinkIssuesFor(iterable $milestones): array
+    {
+        $milestones = collect($milestones);
+        $linked = $milestones->whereNotNull('result_id');
+        $issues = $milestones->mapWithKeys(fn (Milestone $milestone): array => [$milestone->id => []])->all();
+
+        if ($linked->isEmpty()) {
+            return $issues;
+        }
+
+        $projectIds = $linked->pluck('project_id')->unique()->values()->all();
+
+        $fundingByProject = DB::table('project_proposal')
+            ->select(['project_id', 'proposal_id'])
+            ->whereIn('project_id', $projectIds)
+            ->get()
+            ->groupBy('project_id')
+            ->map(fn ($rows): array => $rows->pluck('proposal_id')->map(fn ($id): int => (int) $id)->all());
+
+        $programOf = Project::query()->whereIn('id', $projectIds)->pluck('program_id', 'id');
+
+        $activities = Result::query()
+            ->select(['id', 'type', 'proposal_id', 'program_id'])
+            ->whereIn('id', $linked->pluck('result_id')->unique()->values()->all())
+            ->get()
+            ->keyBy('id');
+
+        foreach ($linked as $milestone) {
+            $activity = $activities->get($milestone->result_id);
+
+            if ($activity === null) {
+                continue;
+            }
+
+            $allowed = $activity->type === ResultType::Activity && match (true) {
+                $milestone->proposal_id !== null => $activity->proposal_id === $milestone->proposal_id,
+                $activity->proposal_id !== null => in_array($activity->proposal_id, $fundingByProject->get($milestone->project_id, []), true),
+                default => $activity->program_id !== null && $activity->program_id === $programOf->get($milestone->project_id),
+            };
+
+            if ($allowed) {
+                continue;
+            }
+
+            $issues[$milestone->id] = match (true) {
+                $activity->type !== ResultType::Activity => ['milestones.activity_link_not_activity'],
+                $activity->proposal_id === null => ['milestones.activity_link_program_moved'],
+                default => ['milestones.activity_link_not_funding'],
+            };
+        }
+
+        return $issues;
+    }
+
+    /**
+     * Weighted completion of a set of milestones, in percent: reached weight
+     * over every weight that still counts (cancelled milestones are left out
+     * of both sides). The PHP form of the `withSum` reads on the project
+     * directory, project and program pages; null when no weight counts.
+     *
+     * @param  iterable<Milestone>  $milestones
+     */
+    public static function weightedProgress(iterable $milestones): ?float
+    {
+        $planned = 0.0;
+        $reached = 0.0;
+
+        foreach ($milestones as $milestone) {
+            if ($milestone->status === MilestoneStatus::Cancelled) {
+                continue;
+            }
+
+            $planned += (float) $milestone->weight_percentage;
+
+            if ($milestone->status === MilestoneStatus::Reached) {
+                $reached += (float) $milestone->weight_percentage;
+            }
+        }
+
+        if ($planned <= 0) {
+            return null;
+        }
+
+        return round(min(100, ($reached / $planned) * 100), 1);
+    }
+
+    /**
      * The HR employee accountable for reaching this milestone.
      *
      * The column keeps its original name, `responsible_user_id`, but holds an HR

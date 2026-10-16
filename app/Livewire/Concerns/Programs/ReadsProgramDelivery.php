@@ -14,7 +14,7 @@ use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Report;
-use App\Models\Result;
+use App\Support\ResultsChain;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
@@ -30,7 +30,9 @@ use Livewire\Attributes\Computed;
  * @property int $programId
  * @property-read Program $program  #[Computed] program()
  * @property-read Collection<int, AnnualPlan> $annualPlans  #[Computed] annualPlans()
- * @property-read Collection<int, Result> $resultRoots  #[Computed] resultRoots()
+ * @property-read array<string, mixed> $chain  #[Computed] chain()
+ *
+ * @method array{indicator: string, center: string, donor: string} chainFilters() FiltersResultsChain
  */
 trait ReadsProgramDelivery
 {
@@ -187,52 +189,27 @@ trait ReadsProgramDelivery
     }
 
     /**
-     * The program's logframe as root results with their subtrees attached.
+     * The program's read-only results chain (T16): the program framework, the
+     * proposal frameworks contributing to it, indicators, per-center targets,
+     * achievement, gaps and the chain filters. A fixed number of queries.
      *
-     * Loads every statement in one query with its indicator count, then wires
-     * childrenRecursive in memory so every level carries the count.
-     *
-     * @return Collection<int, Result>
+     * @return array<string, mixed>
      */
     #[Computed]
-    public function resultRoots(): Collection
+    public function chain(): array
     {
-        $results = Result::query()
-            ->programFramework()
-            ->select(['id', 'statement', 'parent_id', 'program_id', 'type', 'checkout_period'])
-            ->where('program_id', $this->programId)
-            ->withCount('indicators')
-            ->orderBy('id')
-            ->get();
-
-        $childrenByParent = $results->groupBy('parent_id');
-
-        foreach ($results as $result) {
-            $result->setRelation('childrenRecursive', new Collection($childrenByParent->get($result->id, [])));
-        }
-
-        return $results
-            ->filter(fn (Result $result): bool => $result->parent_id === null || ! $results->contains('id', $result->parent_id))
-            ->values();
+        return ResultsChain::forProgram($this->programId, $this->chainFilters());
     }
 
     /**
-     * Statement and indicator totals across the program's logframe.
+     * Statement and indicator totals across the program's own logframe.
      *
      * @return array{levels: array<string, int>, indicators: int, unmeasured: int}
      */
     #[Computed]
     public function resultSummary(): array
     {
-        $all = $this->resultRoots->flatMap(fn (Result $root) => collect([$root])->merge($root->descendants()));
-
-        return [
-            'levels' => collect(ResultType::cases())
-                ->mapWithKeys(fn (ResultType $type): array => [$type->value => $all->where('type', $type)->count()])
-                ->all(),
-            'indicators' => (int) $all->sum('indicators_count'),
-            'unmeasured' => $all->where('indicators_count', 0)->count(),
-        ];
+        return $this->chain['summary'];
     }
 
     /** @return array{percentage: float|null, reached: float, total: float} */

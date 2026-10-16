@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\Concerns\AnnualPlans\ReadsAnnualPlanSummary;
+use App\Livewire\Concerns\Results\FiltersResultsChain;
 use App\Models\AnnualPlan;
 use App\Models\HrEmployee;
 use Flux\Flux;
@@ -12,6 +13,7 @@ use Livewire\Attributes\Title;
 use Livewire\Component;
 
 new #[Title('titles.annual_plan')] class extends Component {
+    use FiltersResultsChain;
     use ReadsAnnualPlanSummary;
 
     #[Locked]
@@ -136,7 +138,7 @@ new #[Title('titles.annual_plan')] class extends Component {
 
         // The whole page reads through plan(), targets() and the figures built
         // on them, all memoised earlier in this request.
-        unset($this->plan, $this->targets, $this->reportStatusCounts, $this->summary, $this->yearFormOptions);
+        unset($this->plan, $this->targets, $this->reportStatusCounts, $this->summary, $this->yearFormOptions, $this->chain);
 
         Flux::toast(variant: 'success', text: __('annual_plans.annual_plan_updated'));
     }
@@ -222,6 +224,8 @@ new #[Title('titles.annual_plan')] class extends Component {
     @include('pages.annual-plans._show-cover')
 
     @include('pages.annual-plans._show-results')
+
+    @include('pages.annual-plans._show-chain')
 
     {{-- Recent activity is capped to the Connections card's own natural height and scrolls the rest, so neither card stretches to fill space the other doesn't need. --}}
     <div

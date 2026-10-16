@@ -6,6 +6,7 @@ use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
 use App\Livewire\Concerns\AddsQuickTask;
 use App\Livewire\Concerns\Programs\ReadsProgramDelivery;
+use App\Livewire\Concerns\Results\FiltersResultsChain;
 use App\Models\Milestone;
 use App\Models\Program;
 use App\Models\Project;
@@ -25,6 +26,7 @@ use Livewire\WithPagination;
 
 new #[Title('titles.program')] class extends Component {
     use AddsQuickTask;
+    use FiltersResultsChain;
     use ReadsProgramDelivery;
     use WithPagination;
 
@@ -374,7 +376,13 @@ new #[Title('titles.program')] class extends Component {
     @elseif ($tab === 'plans')
         <x-ui.plan-years :slots="$this->planTimeline" :strategy="$this->program->strategy" />
     @else
-        <x-ui.logframe :roots="$this->resultRoots" :summary="$this->resultSummary" />
+        <x-ui.logframe :chain="$this->chain" :summary="$this->resultSummary">
+            @can('results.create')
+                <x-slot:start>
+                    <x-ui.button tone="primary" icon="plus" :href="route('results.index')" wire:navigate>{{ __('results_framework.chain_start') }}</x-ui.button>
+                </x-slot:start>
+            @endcan
+        </x-ui.logframe>
     @endif
 
     <section aria-labelledby="record-activity-heading" class="grid gap-3" data-record-activity>
