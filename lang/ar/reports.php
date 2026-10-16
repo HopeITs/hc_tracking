@@ -19,7 +19,7 @@ return [
     'connection' => 'الترابط',
     'count_file' => '{0} لا توجد ملفات|{1} ملف واحد|{2} ملفان|[3,10] :count ملفات|[11,*] :count ملفًا',
     'count_matching_report' => '{0} لا توجد تقارير مطابقة|{1} تقرير واحد مطابق|{2} تقريران مطابقان|[3,10] :count تقارير مطابقة|[11,*] :count تقريرًا مطابقًا',
-    'count_more_report' => '{1} :count تقرير آخر|[2,*] :count تقارير أخرى',
+    'count_more_report' => '{1} تقرير آخر|{2} تقريران آخران|[3,10] :count تقارير أخرى|[11,*] :count تقريرًا آخر',
     'defaults_to_the_uploaded_file_name' => 'افتراضيًا اسم الملف المرفوع',
     'delete_this_file' => 'حذف هذا الملف',
     'deleting_the_file_also_removes_it_from_storage' => 'سيتم حذف «:name» نهائيًا، بما في ذلك الملف المخزَّن. لا يمكن التراجع عن هذا الإجراء.',

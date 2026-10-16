@@ -96,6 +96,33 @@ test('every translation key used in the code exists in english and arabic', func
     }
 });
 
+test('arabic plural strings use the explicit ranges', function () {
+    $allowed = [
+        ['{0}', '{1}', '{2}', '[3,10]', '[11,*]'],
+        ['{1}', '{2}', '[3,10]', '[11,*]'],
+    ];
+
+    $offPattern = [];
+    foreach (langGroups() as $group) {
+        foreach (langKeys('ar', $group) as $key => $text) {
+            if (! is_string($text) || ! str_contains($text, '|')) {
+                continue;
+            }
+
+            $heads = array_map(
+                fn (string $segment): string => preg_match('/^(\{\d+\}|\[[^\]]+\])/', $segment, $range) === 1 ? $range[1] : '-',
+                explode('|', $text),
+            );
+
+            if (! in_array($heads, $allowed, true)) {
+                $offPattern[] = "{$group}.{$key}";
+            }
+        }
+    }
+
+    expect($offPattern)->toBe([]);
+});
+
 test('no lang group file shadows a plain word that flux translates', function () {
     $plainWords = ['results', 'of', 'to', 'files', 'showing'];
 
@@ -257,4 +284,163 @@ test('a date is formatted with levantine month names without changing the caller
 
     expect($formatted)->toBe('أيلول 2026')
         ->and($date->locale())->toBe('en');
+});
+
+/**
+ * Blade views under resources/views that have been swept against the T26 UI
+ * checklist. A sweep appends its task's files (or whole folders, written with a
+ * trailing slash) here; the first sweeps found the whole tree clean, so every
+ * top-level folder is listed and new views are covered from the start; both view guards below read this one list.
+ *
+ * @return list<string> paths relative to resources/views
+ */
+function localizedViewFiles(): array
+{
+    $entries = [
+        'components/',
+        'errors/',
+        'layouts/',
+        'mail/',
+        'partials/',
+        'notifications/',
+        'pages/',
+    ];
+
+    $files = [];
+    foreach ($entries as $entry) {
+        if (! str_ends_with($entry, '/')) {
+            $files[] = $entry;
+
+            continue;
+        }
+
+        $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(resource_path("views/{$entry}"), FilesystemIterator::SKIP_DOTS));
+        foreach ($iterator as $file) {
+            if (str_ends_with($file->getFilename(), '.blade.php')) {
+                $files[] = str_replace(DIRECTORY_SEPARATOR, '/', substr($file->getPathname(), strlen(resource_path('views/'))));
+            }
+        }
+    }
+
+    sort($files);
+
+    return array_values(array_unique($files));
+}
+
+/**
+ * Physical direction utilities found in a view, as whole class tokens.
+ * A centred `left-1/2` paired with `-translate-x-1/2` is symmetric and allowed.
+ *
+ * @return list<string>
+ */
+function physicalDirectionClasses(string $source): array
+{
+
+    preg_match_all('/(?<![\w-])(?:-?(?:ml|mr|pl|pr)-\S+|(?:left|right)-(?:\d|\[|px(?![\w-])|full(?![\w-])|auto(?![\w-]))[\w\/\[\]\.%-]*|text-(?:left|right)|rounded-(?:l|r|tl|tr|bl|br)(?:-\S+)?|border-(?:l|r)(?:-\S+)?)(?![\w-])/', $source, $matches);
+
+    $found = [];
+    foreach ($matches[0] as $token) {
+        if ($token === 'left-1/2' && str_contains($source, '-translate-x-1/2')) {
+            continue;
+        }
+
+        $found[] = $token;
+    }
+
+    return array_values(array_unique($found));
+}
+
+/**
+ * Reviewed literal values that are not translatable UI text: format examples
+ * and codes shown as input hints.
+ *
+ * @return list<string>
+ */
+function literalUiTextAllowlist(): array
+{
+    return ['OP1.2', 'https://', 'email@example.com'];
+}
+
+/**
+ * Literal UI text in a Blade view: text nodes and literal label-like
+ * attributes outside echoes, directives, PHP blocks, scripts and styles.
+ *
+ * @return list<string>
+ */
+function literalUiText(string $source): array
+{
+    $attributes = ['label', 'placeholder', 'title', 'aria-label', 'heading', 'description', 'alt'];
+
+    $source = preg_replace('/\{\{--.*?--\}\}/s', '', $source) ?? '';
+    $source = preg_replace('/@php\b.*?@endphp/s', '', $source) ?? '';
+    $source = preg_replace('/<\?php.*?\?>/s', '', $source) ?? '';
+    $source = preg_replace('/<(script|style)\b.*?<\/\1>/is', '', $source) ?? '';
+    $source = preg_replace('/<!--.*?-->/s', '', $source) ?? '';
+    $source = preg_replace('/<!doctype[^>]*>/i', '', $source) ?? '';
+    $source = preg_replace('/&#?\w+;/', '', $source) ?? '';
+    $source = preg_replace('/\{\{.*?\}\}|\{!!.*?!!\}/s', '§', $source) ?? '';
+    $source = preg_replace('/@\w+\s*(\((?:[^()]++|(?1))*\))/s', '', $source) ?? '';
+    $source = preg_replace('/@(?:else|endif|endforeach|endforelse|empty|endisset|endcan|endcannot|endunless|endfor|endwhile|endonce|endsection|endprops)(?![\w-])/', '', $source) ?? '';
+
+    $found = [];
+
+    $tag = '/<\/?[A-Za-z§][\w:.\-§]*(?:"[^"]*"|\'[^\']*\'|[^>"\'])*>/su';
+    preg_match_all($tag, $source, $tags);
+    foreach ($tags[0] as $element) {
+        foreach ($attributes as $attribute) {
+            if (preg_match_all('/\s'.preg_quote($attribute, '/').'="([^"]*)"/', $element, $values)) {
+                foreach ($values[1] as $value) {
+                    $value = preg_replace('/\((?:Ctrl|Shift|Alt|Cmd|Tab|Esc|Enter)[^)]*\)/', '', $value) ?? $value;
+                    if (preg_match('/\p{L}/u', $value) === 1 && ! in_array($value, literalUiTextAllowlist(), true)) {
+                        $found[] = "{$attribute}=\"{$value}\"";
+                    }
+                }
+            }
+        }
+    }
+
+    $text = preg_replace($tag, "\n", $source) ?? '';
+    foreach (preg_split('/\R/', $text) ?: [] as $line) {
+        $line = trim($line);
+        if ($line === '' || str_starts_with($line, '@') || str_starts_with($line, '//') || str_starts_with($line, '*')) {
+            continue;
+        }
+        if (preg_match('/\p{L}/u', $line) === 1) {
+            $found[] = $line;
+        }
+    }
+
+    return array_values(array_unique($found));
+}
+
+test('listed views use logical direction classes only', function () {
+    $violations = [];
+    foreach (localizedViewFiles() as $file) {
+        expect(file_exists(resource_path("views/{$file}")))->toBeTrue("{$file} does not exist");
+
+        // The Gantt keeps its timeline in left-to-right pixel space on purpose
+        // (header comment of components/ui/gantt.blade.php); the one reviewed exemption.
+        if ($file === 'components/ui/gantt.blade.php') {
+            continue;
+        }
+
+        $found = physicalDirectionClasses(file_get_contents(resource_path("views/{$file}")));
+        if ($found !== []) {
+            $violations[$file] = $found;
+        }
+    }
+
+    expect($violations)->toBe([]);
+});
+
+test('listed views contain no literal UI text', function () {
+    $violations = [];
+    foreach (localizedViewFiles() as $file) {
+        $found = literalUiText(file_get_contents(resource_path("views/{$file}")));
+        if ($found !== []) {
+            $violations[$file] = $found;
+        }
+    }
+
+    expect($violations)->toBe([]);
 });

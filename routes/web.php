@@ -225,6 +225,14 @@ Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () 
         ->can('sectors.view')
         ->name('admin.sectors.index');
 
+    Route::livewire('admin/evidence-types', 'pages::admin.evidence-types')
+        ->can('evidence-types.manage')
+        ->name('admin.evidence-types.index');
+
+    Route::livewire('admin/narrative-questions', 'pages::admin.narrative-questions')
+        ->can('narrative-questions.manage')
+        ->name('admin.narrative-questions.index');
+
     Route::livewire('admin/accounts', 'pages::admin.accounts')
         ->can('accounts.view')
         ->name('admin.accounts.index');

@@ -3,6 +3,7 @@
 return [
     'review_meeting_suffix' => ' — اجتماع المراجعة :at',
     'system' => 'النظام',
+    'report_template_org_wide_targets' => 'المستهدفات على مستوى المنظمة',
     'none' => 'لا شيء',
     'inbox' => 'الإشعارات',
     'bell_label' => '{0} الإشعارات، لا جديد|{1} الإشعارات، إشعار واحد غير مقروء|{2} الإشعارات، إشعاران غير مقروءين|[3,10] الإشعارات، :count إشعارات غير مقروءة|[11,*] الإشعارات، :count إشعارًا غير مقروء',
@@ -145,6 +146,7 @@ return [
         'accounts' => 'الحسابات',
         'access-management' => 'المستخدمون والأدوار',
         'cities' => 'المدن',
+        'report-templates' => 'قوالب التقارير',
         'system' => 'النظام',
     ],
 
@@ -719,6 +721,8 @@ return [
             ],
         ],
         'report_template' => [
+            'created' => 'أُنشئ قالب تقرير المشروع «:subject»',
+            'updated' => 'عدّل :actor قالب تقرير المشروع «:subject»',
             'pending' => [
                 'title' => 'قالب تقرير بانتظار التأكيد',
                 'body' => 'قالب تقرير المشروع «:subject» بانتظار التأكيد',
@@ -729,7 +733,7 @@ return [
             ],
             'lines_added' => [
                 'title' => 'مؤشرات جديدة للتقرير',
-                'body' => 'أضاف :actor مؤشرات إلى قالب تقرير المشروع «:subject»',
+                'body' => 'أضاف :actor مؤشرات المقترح «:proposal» إلى قالب تقرير المشروع «:subject»، من :from_month إلى :to_month',
             ],
         ],
         'department_task' => [

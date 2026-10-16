@@ -1,6 +1,9 @@
 <?php
 
+use App\Models\LibraryIndicator;
+use App\Models\Proposal;
 use App\Models\User;
+use Illuminate\Testing\TestResponse;
 
 test('the header carries a tour button and the tour overlay with translated steps', function () {
     $user = User::factory()->role('Team Member')->create();
@@ -64,4 +67,71 @@ test('the tour on funding pages includes finance table filter and totals steps',
         ->assertOk()
         ->assertSee('Filter the table')
         ->assertSee('Narrow the table: pick a year, a status, a currency or a flag');
+});
+
+/**
+ * Tours added in T26 slice 2: route, role, query, English step titles, Arabic
+ * intro title and the hook the page must render for the tour to point at.
+ *
+ * @return array<string, array{0: string, 1: string, 2: array<string, string>, 3: list<string>, 4: string, 5: string}>
+ */
+dataset('page tours', [
+    'indicator library' => ['indicator-library.index', 'MEAL', [], ['Indicator Library', 'Find an entry', 'Grouped by level', 'An indicator'], 'مكتبة المؤشرات', 'data-library-entry'],
+    'department tasks' => ['department-tasks.index', 'Team Member', [], ['Department Tasks', 'The requests'], 'مهام الأقسام', 'data-tour="department-tasks-list"'],
+    'sectors' => ['admin.sectors.index', 'MEAL', [], ['Sectors', 'Add a sector'], 'القطاعات', 'data-tour="sectors-create"'],
+    'supervision' => ['admin.users.index', 'General Manager', ['tab' => 'supervision'], ['Supervision'], 'دليل المستخدمين', 'data-supervision-tab'],
+    'default reviewers' => ['admin.notification-settings.edit', 'Super Admin', [], ['Default reviewers'], 'قواعد الإشعارات', 'data-default-reviewers'],
+    'proposal reviewers' => ['proposals.show', 'General Manager', [], ['Reviewers'], 'تفاصيل المقترح', 'data-proposal-reviewers'],
+    'proposal logical framework' => ['proposals.show', 'General Manager', ['tab' => 'logframe'], ['Logical Framework'], 'تفاصيل المقترح', 'data-tour="proposal-logframe"'],
+    'proposal indicators and targets' => ['proposals.show', 'General Manager', ['tab' => 'targets'], ['Indicators & Targets'], 'تفاصيل المقترح', 'data-tour="proposal-targets-grid"'],
+    'proposal plan' => ['proposals.show', 'General Manager', ['tab' => 'plan'], ['Plan'], 'تفاصيل المقترح', 'data-tour="proposal-plan"'],
+]);
+
+/**
+ * Open a tour page as a user of the given role, with the data its hook needs.
+ *
+ * @param  array<string, string>  $query
+ */
+function tourPage(object $test, string $route, string $role, array $query, string $locale): TestResponse
+{
+    LibraryIndicator::factory()->create();
+    $proposal = Proposal::factory()->create();
+
+    $user = userWithRole($role);
+    $user->forceFill(['locale' => $locale])->save();
+
+    $parameters = $route === 'proposals.show' ? ['proposal' => $proposal, ...$query] : $query;
+
+    return $test->actingAs($user)->get(route($route, $parameters))->assertOk();
+}
+
+test('a page tour lists its English steps and the page renders the hook it points at', function (string $route, string $role, array $query, array $titles, string $arabicIntro, string $hook) {
+    $page = tourPage($this, $route, $role, $query, 'en');
+
+    foreach ($titles as $title) {
+        $page->assertSee($title);
+    }
+
+    $page->assertSee($hook, false);
+})->with('page tours');
+
+test('a page tour opens with its Arabic introduction', function (string $route, string $role, array $query, array $titles, string $arabicIntro) {
+    tourPage($this, $route, $role, $query, 'ar')->assertSee($arabicIntro);
+})->with('page tours');
+
+test('the dashboard tour carries the My Team step', function () {
+    $this->actingAs(User::factory()->role('Team Member')->create())
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertSee('Your team');
+});
+
+test('a tour step never points a user without money permissions at a money reading', function () {
+    $proposal = Proposal::factory()->create();
+
+    $this->actingAs(User::factory()->create()->givePermissionTo('proposals.view'))
+        ->get(route('proposals.show', $proposal))
+        ->assertOk()
+        ->assertSee('data-vital', false)
+        ->assertDontSee('data-vital="money"', false);
 });

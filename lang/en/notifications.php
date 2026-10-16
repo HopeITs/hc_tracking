@@ -3,6 +3,7 @@
 return [
     'review_meeting_suffix' => ' — review meeting :at',
     'system' => 'The system',
+    'report_template_org_wide_targets' => 'the organization-wide targets',
     'none' => 'none',
     'inbox' => 'Notifications',
     'bell_label' => '{0} Notifications, none unread|{1} Notifications, 1 unread|[2,*] Notifications, :count unread',
@@ -145,6 +146,7 @@ return [
         'accounts' => 'Accounts',
         'access-management' => 'Users & roles',
         'cities' => 'Cities',
+        'report-templates' => 'Report templates',
         'system' => 'System',
     ],
 
@@ -719,6 +721,8 @@ return [
             ],
         ],
         'report_template' => [
+            'created' => 'The report template of “:subject” was created',
+            'updated' => ':actor updated the report template of “:subject”',
             'pending' => [
                 'title' => 'Report template to confirm',
                 'body' => 'The report template of “:subject” waits for confirmation',
@@ -729,7 +733,7 @@ return [
             ],
             'lines_added' => [
                 'title' => 'New indicators to report',
-                'body' => ':actor added indicators to the report template of “:subject”',
+                'body' => ':actor added indicators for “:proposal” to the report template of “:subject”, from :from_month to :to_month',
             ],
         ],
         'department_task' => [

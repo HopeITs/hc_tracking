@@ -15,6 +15,8 @@ return [
     'guideline' => 'دليل الاستخدام',
     'indicator_library' => 'مكتبة المؤشرات',
     'sectors' => 'القطاعات',
+    'evidence_types' => 'أنواع الشواهد',
+    'narrative_questions' => 'بنك الأسئلة السردية',
     'platform' => 'المنصة',
     'primary_navigation' => 'التنقل الرئيسي',
     'repository' => 'المستودع',

@@ -147,7 +147,7 @@ new class extends Component {
     $canCreate = $editable && auth()->user()->can('results.create');
 @endphp
 
-<div class="@container/directory flex flex-col gap-5" data-test="proposal-logframe">
+<div class="@container/directory flex flex-col gap-5" data-test="proposal-logframe" data-tour="proposal-logframe">
     <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
         <div class="me-auto min-w-0">
             <h2 class="text-base font-bold text-secondary-dark dark:text-ink">{{ __('proposals.tab_logframe') }}</h2>

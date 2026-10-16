@@ -31,6 +31,8 @@ use App\Models\ProjectActivityStatus;
 use App\Models\ProposalReviewer;
 use App\Models\ProposalStatusNote;
 use App\Models\ReportFile;
+use App\Models\ReportTemplateLine;
+use App\Models\ReportTemplateQuestion;
 use App\Models\Result;
 use App\Models\Role;
 use App\Models\ScheduleBaseline;
@@ -92,6 +94,8 @@ function modelsGuardedWithoutPolicy(): array
         ProposalStatusNote::class => ['proposals', 'Written only through a proposal status change (ProposalPolicy::update).'],
         ProposalReviewer::class => ['proposals', 'Written only by the review actions under ProposalPolicy::transition, manageReviewers and markReviewed (T07).'],
         ReportFile::class => ['reports', 'Follows its report (ReportPolicy); the download controllers check it.'],
+        ReportTemplateLine::class => ['report-templates', 'Part of a report template: written only by the report template actions under ReportTemplatePolicy::manage (T33).'],
+        ReportTemplateQuestion::class => ['report-templates', 'Part of a report template: written only by the report template actions under ReportTemplatePolicy::manage (T33).'],
         Result::class => ['results', 'results.* permissions on the results page.'],
         Role::class => ['access-management', 'UserPolicy::manageRole, editRolePermissions and assignRole.'],
         ScheduleBaseline::class => ['projects', 'Part of a project schedule (ProjectPolicy::update).'],

@@ -110,7 +110,7 @@ return [
     'sort_by_field' => 'ترتيب حسب :field',
     'sort_descending' => 'ترتيب تنازلي',
     'subtask_added' => 'تمت إضافة المهمة الفرعية.',
-    'subtask_count' => '{1} مهمة فرعية واحدة|[2,*] :count مهام فرعية',
+    'subtask_count' => '{1} مهمة فرعية واحدة|{2} مهمتان فرعيتان|[3,10] :count مهام فرعية|[11,*] :count مهمة فرعية',
     'subtask_of_title' => 'مهمة فرعية من :title',
     'subtask_title' => 'عنوان المهمة الفرعية',
     'subtasks' => 'المهام الفرعية',

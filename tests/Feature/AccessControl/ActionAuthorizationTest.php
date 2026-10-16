@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\File;
 
 /*
-| Every class in app/Actions/{Reports,Transfers,Donors,FundingAgreements,Tasks,Projects,Proposals,IndicatorLibrary} is the single
+| Every class in app/Actions/{Reports,Transfers,Donors,FundingAgreements,Tasks,Projects,Proposals,IndicatorLibrary,ReportTemplates} is the single
 | entry point for a sensitive write, so each must authorize itself: a caller
 | (a Livewire page, a command, a job) can then never skip the check.
 */
@@ -50,7 +50,7 @@ it('authorizes inside every sensitive action', function (string $directory) {
         // acting user as an argument (SaveProposal) authorize that user.
         expect(File::get($file->getPathname()))->toMatch('/Gate::(forUser\([^)]*\)->)?authorize\(/');
     }
-})->with(['Reports', 'Transfers', 'Donors', 'FundingAgreements', 'Tasks', 'Projects', 'Proposals', 'IndicatorLibrary']);
+})->with(['Reports', 'Transfers', 'Donors', 'FundingAgreements', 'Tasks', 'Projects', 'Proposals', 'IndicatorLibrary', 'ReportTemplates']);
 
 it('exempts only queued system actions that never read the signed-in user', function (string $action) {
     $source = File::get(app_path("Actions/{$action}"));

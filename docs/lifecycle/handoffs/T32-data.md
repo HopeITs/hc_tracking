@@ -46,5 +46,10 @@ The JSON was extracted once with a throwaway script outside the repo. The app ne
 7. **Programs missing in HR** (D-35a): Wells, Alternative Energy, PSS, Case Management, Parenting. They are listed with `hr_program_id: null` and reported as missing. When HR adds them, put their ids in the file and run the pillar import again.
 8. **English names** of the indicators are left empty. MEAL completes them in the library.
 
+## Decided by Dev 1 (2026-10-16)
+- **Review item 3 (no shared indicator):** keep 37 separate entries. MEAL edits or merges them in the library afterwards.
+- **Review item 1 (count indicators with a ratio target):** keep them as percentage with `denominator_basis = fixed`. The project manager reports the count and the system works out the percentage (count ÷ `target_beneficiaries`). MEAL can switch an entry to `entered` (numerator + denominator) in the library when needed. A hand edit like that is kept by later imports, which report it as a conflict.
+- **Review item 6 (activity on CC1):** skipping it is correct. The survey is how the satisfaction indicator is collected, not a project activity. MEAL may record it in the entry's means of verification.
+
 ## Approval
 - [ ] Approved by MEAL: name, date

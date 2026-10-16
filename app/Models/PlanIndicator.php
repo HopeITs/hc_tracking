@@ -86,6 +86,17 @@ class PlanIndicator extends Model implements TracksActivity
     }
 
     /**
+     * The report template lines reporting this target (read only here; lines
+     * are written by the report template actions).
+     *
+     * @return HasMany<ReportTemplateLine, $this>
+     */
+    public function reportTemplateLines(): HasMany
+    {
+        return $this->hasMany(ReportTemplateLine::class);
+    }
+
+    /**
      * The targets a project delivers in a period (contracts §12.1): proposal
      * targets whose proposal runs inside the window (actual dates once both
      * are set, else planned), and annual-plan targets whose plan year

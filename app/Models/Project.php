@@ -26,6 +26,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 
@@ -333,6 +334,17 @@ class Project extends Model implements TracksActivity
     public function monthlyReports(): HasMany
     {
         return $this->hasMany(MonthlyReport::class);
+    }
+
+    /**
+     * The project's monthly report template (contracts.md §12.4), once its
+     * first proposal is approved.
+     *
+     * @return HasOne<ReportTemplate, $this>
+     */
+    public function reportTemplate(): HasOne
+    {
+        return $this->hasOne(ReportTemplate::class);
     }
 
     /**
