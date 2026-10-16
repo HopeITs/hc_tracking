@@ -213,7 +213,7 @@ new #[Title('titles.reports')] class extends Component {
     public function reports(): LengthAwarePaginator
     {
         return $this->visibleReports()
-            ->select(['id', 'plan_indicator_id', 'user_id', 'status', 'planned_date', 'value', 'submit_date', 'is_seen_by_meal'])
+            ->select(['id', 'plan_indicator_id', 'user_id', 'status', 'planned_date', 'value', 'submit_date', 'is_seen_by_meal', 'monthly_report_id'])
             ->with([...$this->targetRelations(), 'user:id,hr_user_id'])
             ->withCount('files')
             ->orderByDesc('planned_date')

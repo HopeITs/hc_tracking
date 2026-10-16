@@ -12,6 +12,12 @@ return [
     'not_measured' => 'Not measured this month',
     'locked' => 'The report is submitted and locked.',
     'stale' => 'The report status just changed. Reload the page.',
+    'numerator_above_denominator' => 'The numerator cannot be greater than the denominator.',
+    'meal_lines_pending' => 'Fill or mark Not measured every MEAL indicator before validating.',
+    'reason_min' => 'Give a reason of at least 10 characters.',
+    'reopen_pending' => 'A reopen request for this report is already waiting for a decision.',
+    'decision_note_required' => 'Add a note explaining why the request is denied.',
+    'cannot_delete' => 'Only a draft that was never submitted can be deleted.',
     'console' => [
         'backfill_row' => 'Project :project: :created months created, :skipped already there, :lines lines built.',
         'prepare_row' => 'Project :project: :lines lines built for this month.',

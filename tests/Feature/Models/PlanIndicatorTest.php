@@ -187,3 +187,23 @@ test('a proposal target may only be delivered by a project the proposal funds', 
         ->and(PlanIndicator::chainIssuesFor($proposal, $indicator, Project::factory()->create()))
         ->toBe(['targets.issue_project_not_on_proposal']);
 });
+
+test('an approved NULL value (Not measured) adds nothing and never becomes the latest level', function (IndicatorMeasure $measure, float $expected) {
+    $target = PlanIndicator::factory()
+        ->for(Indicator::factory()->create(['measure' => $measure]))
+        ->create(['target' => 100]);
+    Report::factory()->approved()->for($target)->create(['value' => 40, 'planned_date' => '2026-10-31']);
+    Report::factory()->approved()->for($target)->create(['value' => null, 'planned_date' => '2026-11-30']);
+
+    $row = PlanIndicator::query()
+        ->whereKey($target->id)
+        ->selectRaw(PlanIndicator::achievedValueSql().' as achieved')
+        ->toBase()
+        ->first();
+
+    expect($target->achievedValue())->toBe($expected)
+        ->and((float) $row->achieved)->toBe($expected);
+})->with([
+    'count' => [IndicatorMeasure::Numeric, 40.0],
+    'percentage' => [IndicatorMeasure::Percentage, 40.0],
+]);

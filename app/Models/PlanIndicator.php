@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Concerns\RecordsActivity;
+use App\Enums\DenominatorBasis;
 use App\Enums\IndicatorMeasure;
 use App\Enums\Period;
 use App\Enums\ReportStatus;
@@ -21,6 +22,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Database\Query\Expression;
+use InvalidArgumentException;
 
 /**
  * A target committed for one indicator, in one plan or proposal.
@@ -160,7 +163,9 @@ class PlanIndicator extends Model implements TracksActivity
      * accumulates, so its approved values are summed; a percentage or average
      * indicator is a level, so the latest approved value stands on its own —
      * 40% then 55% is 55%, not 95%. Unapproved figures are not achievement until they clear
-     * review; pendingValue() reports them separately.
+     * review; pendingValue() reports them separately. A NULL value (a monthly
+     * report line marked Not measured, contracts §13) is no figure: it adds
+     * nothing and never becomes the latest level.
      *
      * Answers from loaded `reports` and `indicator` relations when present, so
      * a list of targets does not query per row. achievedValueSql() is the same
@@ -172,6 +177,7 @@ class PlanIndicator extends Model implements TracksActivity
 
         if ($this->measuresLevel()) {
             $latest = $approved
+                ->filter(fn (Report $report): bool => $report->value !== null)
                 ->sortBy([['planned_date', 'desc'], ['id', 'desc']])
                 ->first();
 
@@ -272,7 +278,7 @@ class PlanIndicator extends Model implements TracksActivity
     {
         $approved = ReportStatus::Approved->value;
         $sum = "(select coalesce(sum(r.value), 0) from reports r where r.plan_indicator_id = plan_indicators.id and r.status = '{$approved}')";
-        $latest = "coalesce((select r.value from reports r where r.plan_indicator_id = plan_indicators.id and r.status = '{$approved}' order by r.planned_date desc, r.id desc limit 1), 0)";
+        $latest = "coalesce((select r.value from reports r where r.plan_indicator_id = plan_indicators.id and r.status = '{$approved}' and r.value is not null order by r.planned_date desc, r.id desc limit 1), 0)";
 
         return '(case when '.self::measureSql().' in ('.self::levelMeasuresSql().") then {$latest} else {$sum} end)";
     }
@@ -287,6 +293,137 @@ class PlanIndicator extends Model implements TracksActivity
         $approved = ReportStatus::Approved->value;
 
         return '(case when '.self::measureSql().' in ('.self::levelMeasuresSql().") then 0 else (select coalesce(sum(r.value), 0) from reports r where r.plan_indicator_id = plan_indicators.id and r.status <> '{$approved}') end)";
+    }
+
+    /**
+     * The pooled ratio of a set of targets over a window (contracts §13
+     * Pooling, D-25): Σ numerators ÷ Σ denominators, ×100 for a percentage,
+     * never an average of percentages. An aggregate over a `plan_indicators`
+     * query (one row per target); T18 and T19 pool only through it.
+     *
+     * Per target, over its approved `reports` rows planned inside the window
+     * that carry a denominator:
+     * - `fixed` basis: numerator = Σ the monthly counts (the latest when the
+     *   library entry is cumulative), denominator = the fixed denominator;
+     * - `entered` basis: the latest row's numerator and denominator.
+     * A target whose approved rows carry no denominator is left out and
+     * counted by pooledExcludedCountSql(). pooledRatio() is the PHP twin.
+     *
+     * @return Expression<literal-string&non-falsy-string>
+     */
+    public static function pooledRatioSql(CarbonImmutable $from, CarbonImmutable $to): Expression
+    {
+        [$numerator, $denominator] = self::pooledTermsSql($from, $to);
+        $percentage = IndicatorMeasure::Percentage->value;
+
+        return new Expression("(sum(case when {$denominator} > 0 then {$numerator} end) / nullif(sum(case when {$denominator} > 0 then {$denominator} end), 0) * (case when max(".self::measureSql().") = '{$percentage}' then 100 else 1 end))");
+    }
+
+    /**
+     * How many targets pooledRatioSql() left out: approved rows in the
+     * window, none with a denominator.
+     *
+     * @return Expression<literal-string&non-falsy-string>
+     */
+    public static function pooledExcludedCountSql(CarbonImmutable $from, CarbonImmutable $to): Expression
+    {
+        [, $denominator, $approved] = self::pooledTermsSql($from, $to);
+
+        return new Expression("coalesce(sum(case when {$denominator} is null and exists(select 1 from reports r where {$approved}) then 1 else 0 end), 0)");
+    }
+
+    /**
+     * pooledRatioSql() and pooledExcludedCountSql() in PHP, over targets with
+     * `reports` and `indicator.libraryIndicator` loaded.
+     *
+     * @param  iterable<self>  $targets
+     * @return array{ratio: ?float, excluded: int}
+     */
+    public static function pooledRatio(iterable $targets, CarbonImmutable $from, CarbonImmutable $to): array
+    {
+        $numerators = 0.0;
+        $denominators = 0.0;
+        $excluded = 0;
+        $isPercentage = false;
+
+        foreach ($targets as $target) {
+            $indicator = $target->getRelation('indicator');
+            $library = $indicator?->getRelation('libraryIndicator');
+            $isPercentage = $isPercentage || $indicator?->measure === IndicatorMeasure::Percentage;
+
+            $approved = $target->loadedReports()
+                ->filter(fn (Report $report): bool => $report->status === ReportStatus::Approved
+                    && $report->planned_date->betweenIncluded($from->startOfDay(), $to->endOfDay()));
+            $measured = $approved
+                ->filter(fn (Report $report): bool => $report->denominator !== null && (float) $report->denominator > 0)
+                ->sortBy([['planned_date', 'desc'], ['id', 'desc']]);
+
+            if ($measured->isEmpty()) {
+                $excluded += $approved->isEmpty() ? 0 : 1;
+
+                continue;
+            }
+
+            $latest = $measured->first();
+            $sumsCounts = $library?->denominator_basis === DenominatorBasis::Fixed && ! $library->is_cumulative;
+
+            $numerators += $sumsCounts
+                ? (float) $measured->sum(fn (Report $report): float => (float) $report->numerator)
+                : (float) $latest->numerator;
+            $denominators += (float) $latest->denominator;
+        }
+
+        return [
+            'ratio' => $denominators > 0.0 ? $numerators / $denominators * ($isPercentage ? 100 : 1) : null,
+            'excluded' => $excluded,
+        ];
+    }
+
+    /**
+     * The per-target numerator and denominator of the pooled ratio, and the
+     * approved-in-window condition they share, as correlated SQL.
+     *
+     * The window goes in as Ymd digits only (sqlDigits()).
+     *
+     * @return array{0: literal-string, 1: literal-string, 2: literal-string}
+     */
+    private static function pooledTermsSql(CarbonImmutable $from, CarbonImmutable $to): array
+    {
+        $status = ReportStatus::Approved->value;
+        $fixed = DenominatorBasis::Fixed->value;
+        $start = self::sqlDigits($from->format('Ymd'));
+        $end = self::sqlDigits($to->format('Ymd'));
+        $approved = "r.plan_indicator_id = plan_indicators.id and r.status = '{$status}' and r.planned_date between cast({$start} as date) and cast({$end} as date)";
+        $measured = "{$approved} and r.denominator > 0";
+        $library = 'from indicators i join library_indicators li on li.id = i.library_indicator_id where i.id = plan_indicators.indicator_id';
+
+        $sumsCounts = "coalesce((select li.denominator_basis = '{$fixed}' and li.is_cumulative = 0 {$library}), 0) = 1";
+        $sum = "(select sum(r.numerator) from reports r where {$measured})";
+        $latestNumerator = "(select r.numerator from reports r where {$measured} order by r.planned_date desc, r.id desc limit 1)";
+        $latestDenominator = "(select r.denominator from reports r where {$measured} order by r.planned_date desc, r.id desc limit 1)";
+
+        return ["(case when {$sumsCounts} then {$sum} else {$latestNumerator} end)", $latestDenominator, $approved];
+    }
+
+    /**
+     * A digit string rebuilt one allowed character at a time, so nothing but
+     * 0–9 can reach the SQL; anything else throws.
+     *
+     * @return literal-string
+     */
+    private static function sqlDigits(string $digits): string
+    {
+        $sql = '';
+
+        foreach (str_split($digits) as $digit) {
+            $sql .= match ($digit) {
+                '0' => '0', '1' => '1', '2' => '2', '3' => '3', '4' => '4',
+                '5' => '5', '6' => '6', '7' => '7', '8' => '8', '9' => '9',
+                default => throw new InvalidArgumentException('Only digits may reach the pooled ratio SQL.'),
+            };
+        }
+
+        return $sql;
     }
 
     /**

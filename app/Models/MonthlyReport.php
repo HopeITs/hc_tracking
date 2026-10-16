@@ -8,9 +8,12 @@ use App\Concerns\HasSlug;
 use App\Concerns\RecordsActivity;
 use App\Enums\MonthlyReportStatus;
 use App\Notifications\TracksActivity;
+use App\Support\MealCoverage;
 use Carbon\CarbonImmutable;
 use Database\Factories\MonthlyReportFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -153,6 +156,45 @@ class MonthlyReport extends Model implements TracksActivity
     public function returner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'returned_by');
+    }
+
+    /**
+     * Reports of the projects this user validates (contracts §13.1 item 6),
+     * minus the ones they prepared or submitted. Feeds T17B's "To validate"
+     * queue (add `status = submitted`) and T18. Same rule as
+     * MonthlyReportPolicy::validate(), without the status:
+     * - the MEAL Manager slot holder: every project;
+     * - a MEAL officer: MealCoverage::projectsCoveredBy();
+     * - a MEAL role holder: also the projects nobody is responsible for.
+     * Never the General Manager; nobody without reports.approve.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function validatableBy(Builder $query, User $user): void
+    {
+        if (! $user->can('reports.approve') || $user->hasRole('General Manager')) {
+            $query->whereRaw('0 = 1');
+
+            return;
+        }
+
+        $query->where(fn (Builder $own) => $own->whereNull('prepared_by')->orWhere('prepared_by', '!=', $user->id))
+            ->where(fn (Builder $own) => $own->whereNull('submitted_by')->orWhere('submitted_by', '!=', $user->id));
+
+        if ($user->employee_id !== null && $user->employee_id === MealCoverage::mealManagerEmployeeId()) {
+            return;
+        }
+
+        $projectIds = $user->employee_id === null ? [] : MealCoverage::projectsCoveredBy($user->employee_id);
+
+        if ($user->hasRole('MEAL')) {
+            $candidates = Project::query()->whereIn('id', self::query()->select('project_id'))->whereNotIn('id', $projectIds)->get();
+            $unassigned = $candidates->filter(fn (Project $project): bool => MealCoverage::responsibleFor($project) === null);
+            $projectIds = [...$projectIds, ...$unassigned->modelKeys()];
+        }
+
+        $query->whereIn('project_id', $projectIds);
     }
 
     /**

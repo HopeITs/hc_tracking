@@ -16,6 +16,11 @@ use App\Models\User;
  * approve or return someone else's report — never their own — and holders of
  * reports.delete may remove anyone's draft. Approved reports are part of the
  * record and are never deleted.
+ *
+ * A monthly report mirror (`monthly_report_id` set, contracts §13) is never
+ * changed, submitted, approved, returned or deleted here, and its files are
+ * not touched (SaveReportFile / DeleteReportFile authorize `update`): it
+ * moves only with its monthly report.
  */
 class ReportPolicy
 {
@@ -49,7 +54,7 @@ class ReportPolicy
      */
     public function update(User $user, Report $report): bool
     {
-        return $report->isEditable() && $this->isAuthor($user, $report) && $user->can('reports.update');
+        return ! $report->isMirror() && $report->isEditable() && $this->isAuthor($user, $report) && $user->can('reports.update');
     }
 
     /**
@@ -58,7 +63,7 @@ class ReportPolicy
      */
     public function delete(User $user, Report $report): bool
     {
-        return $report->isEditable() && ($this->update($user, $report) || $user->can('reports.delete'));
+        return ! $report->isMirror() && $report->isEditable() && ($this->update($user, $report) || $user->can('reports.delete'));
     }
 
     /**
@@ -74,7 +79,8 @@ class ReportPolicy
      */
     public function approve(User $user, Report $report): bool
     {
-        return $report->status === ReportStatus::Reviewed
+        return ! $report->isMirror()
+            && $report->status === ReportStatus::Reviewed
             && $user->can('reports.approve')
             && ! $this->isAuthor($user, $report);
     }
@@ -94,7 +100,7 @@ class ReportPolicy
             && $this->isAuthor($user, $report)
             && $user->can('reports.update');
 
-        return $approverReturns || $authorPullsBack;
+        return ! $report->isMirror() && ($approverReturns || $authorPullsBack);
     }
 
     /**

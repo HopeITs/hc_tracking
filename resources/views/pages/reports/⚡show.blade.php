@@ -38,7 +38,7 @@ new #[Title('titles.report')] class extends Component {
             ->select([
                 'id', 'plan_indicator_id', 'user_id', 'status', 'planned_date', 'period_start', 'period_end',
                 'value', 'narrative_report_notes', 'executive_summary', 'key_achievements', 'challenges',
-                'lessons_learned', 'next_period_plans', 'submit_date', 'is_seen_by_meal',
+                'lessons_learned', 'next_period_plans', 'submit_date', 'is_seen_by_meal', 'monthly_report_id',
             ])
             ->with([
                 'planIndicator:id,indicator_id,target,period,source_type,source_id,project_id',

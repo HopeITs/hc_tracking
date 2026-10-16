@@ -1,13 +1,19 @@
 <?php
 
+use App\Actions\Reports\DeleteReportFile;
+use App\Actions\Reports\SaveReportFile;
 use App\Enums\MonthlyReportStatus;
+use App\Enums\ReportStatus;
 use App\Models\Activity;
 use App\Models\MealCoverageAssignment;
 use App\Models\MonthlyReport;
 use App\Models\MonthlyReportReopenRequest;
 use App\Models\Project;
+use App\Models\Report;
+use App\Models\ReportFile;
 use App\Models\Supervision;
 use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 
 /*
 | MonthlyReportPolicy (contracts §13.1 items 6 and 9, D-09a, D-12a, D-20a).
@@ -242,4 +248,52 @@ test('a decided request or a request of another report cannot be decided', funct
 
     expect($slotHolder->can('decideReopen', [$validated, $denied]))->toBeFalse()
         ->and($slotHolder->can('decideReopen', [$validated, $foreign]))->toBeFalse();
+});
+
+test('the generic Reports policy and file actions refuse a monthly report mirror', function () {
+    $report = monthlyReportIn($this->project, MonthlyReportStatus::Draft, $this->owner);
+    $mirror = fn (ReportStatus $status): Report => Activity::withoutRecording(fn () => Report::factory()->create([
+        'monthly_report_id' => $report->id, 'user_id' => $this->owner->id, 'status' => $status,
+    ]));
+    $draft = $mirror(ReportStatus::Draft);
+    $reviewed = $mirror(ReportStatus::Reviewed);
+    $approver = userWithRole('MEAL', insertHrEmployee(firstNameEn: 'Lina', lastNameEn: 'Approver'));
+    $deleter = userWithRole('General Manager');
+    $file = Activity::withoutRecording(fn () => ReportFile::factory()->create(['report_id' => $draft->id]));
+
+    expect($this->owner->can('update', $draft))->toBeFalse()
+        ->and($this->owner->can('submit', $draft))->toBeFalse()
+        ->and($this->owner->can('delete', $draft))->toBeFalse()
+        ->and($deleter->can('delete', $draft))->toBeFalse()
+        ->and($approver->can('approve', $reviewed))->toBeFalse()
+        ->and($approver->can('returnToDraft', $reviewed))->toBeFalse();
+
+    $this->actingAs($this->owner);
+
+    expect(fn () => app(SaveReportFile::class)->handle($draft, null, null, []))->toThrow(AuthorizationException::class)
+        ->and(fn () => app(DeleteReportFile::class)->handle($draft, $file))->toThrow(AuthorizationException::class);
+});
+
+test('the validator queue holds the officer\'s projects, every project for the slot holder, none for the General Manager or the preparer', function () {
+    $officer = governorateOfficer($this->aleppo);
+    $covered = monthlyReportIn($this->project, MonthlyReportStatus::Submitted, $this->owner);
+    $elsewhere = Activity::withoutRecording(fn () => MonthlyReport::factory()->submitted()->create([
+        'project_id' => Project::factory()->active()->create(['city_id' => insertHrCity('Homs'), 'center_id' => null]),
+        'period' => '2026-10-01',
+    ]));
+    $prepared = Activity::withoutRecording(fn () => MonthlyReport::factory()->for($this->project)->submitted()->create([
+        'period' => '2026-11-01', 'prepared_by' => $officer->id,
+    ]));
+    $slotHolder = mealManager();
+
+    expect(MonthlyReport::query()->validatableBy($officer)->pluck('id')->all())->toBe([$covered->id])
+        ->and(MonthlyReport::query()->validatableBy($slotHolder)->orderBy('id')->pluck('id')->all())->toBe([$covered->id, $elsewhere->id, $prepared->id])
+        ->and(MonthlyReport::query()->validatableBy(userWithRole('General Manager'))->count())->toBe(0);
+});
+
+test('with nobody responsible any MEAL role holder sees the project in the queue', function () {
+    $report = monthlyReportIn($this->project, MonthlyReportStatus::Submitted, $this->owner);
+    $meal = userWithRole('MEAL', insertHrEmployee(firstNameEn: 'Huda', lastNameEn: 'Meal'));
+
+    expect(MonthlyReport::query()->validatableBy($meal)->pluck('id')->all())->toBe([$report->id]);
 });

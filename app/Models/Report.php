@@ -141,10 +141,20 @@ class Report extends Model implements TracksActivity
      * Whether this row mirrors a monthly report share (contracts §13). A
      * mirror is written only by the monthly report actions, never from the
      * generic Reports pages.
+     *
+     * ReportPolicy asks this on rows loaded with a partial select; when the
+     * column was not selected it is read by id (one query), so a mirror can
+     * never pass for a generic report. Lists that authorize per row select
+     * `monthly_report_id`.
      */
     public function isMirror(): bool
     {
-        return $this->monthly_report_id !== null;
+        if (array_key_exists('monthly_report_id', $this->getAttributes())) {
+            return $this->getAttributes()['monthly_report_id'] !== null;
+        }
+
+        return $this->exists
+            && $this->newQueryWithoutScopes()->whereKey($this->getKey())->whereNotNull('monthly_report_id')->exists();
     }
 
     /**
