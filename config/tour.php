@@ -6,7 +6,7 @@
  * `blocks` are steps every page can earn from the shared UI components: each
  * one only appears when the current page renders a matching element. `pages`
  * adds steps for one route, keyed by route name, pointing at that page's own
- * hooks. Copy lives in lang/*\/tour.php: `blocks.<id>` for a block,
+ * hooks. Copy lives in lang/*\/tour_pages.php: `blocks.<id>` for a block,
  * `pages.<route>.<id>` for a page step, and `pages.<route>.<block id>` to
  * override a block's wording on one page. Route names become keys with "." and
  * "-" replaced by "_" (funding-agreements.show => funding_agreements_show).
@@ -29,6 +29,7 @@ return [
     'pages' => [
         'dashboard' => [
             ['id' => 'my_work', 'targets' => ['[data-my-work]']],
+            ['id' => 'my_team', 'targets' => ['[data-my-team]']],
             ['id' => 'attention', 'targets' => ['[data-attention]']],
             ['id' => 'pulse', 'targets' => ['[data-pulse]']],
             ['id' => 'funding', 'targets' => ['[data-funding-position]']],
@@ -60,6 +61,11 @@ return [
             ['id' => 'vital', 'targets' => ['[data-vital]']],
             ['id' => 'lanes', 'targets' => ['[data-lane]'], 'union' => true],
             ['id' => 'warnings', 'targets' => ['[data-warnings]']],
+            ['id' => 'reviewers', 'targets' => ['[data-proposal-reviewers]']],
+            ['id' => 'logframe', 'targets' => ['[data-tour="proposal-logframe"]']],
+            ['id' => 'calendar', 'targets' => ['[data-tour="activity-calendar"]']],
+            ['id' => 'targets', 'targets' => ['[data-tour="proposal-targets-grid"]']],
+            ['id' => 'plan', 'targets' => ['[data-tour="proposal-plan"]']],
         ],
         'funding-agreements.index' => [
             ['id' => 'stages', 'targets' => ['[data-stage-chips]']],
@@ -84,6 +90,21 @@ return [
         ],
         'admin.notification-settings.edit' => [
             ['id' => 'savebar', 'targets' => ['[data-rules-savebar]']],
+            ['id' => 'default_reviewers', 'targets' => ['[data-default-reviewers]']],
+        ],
+        'indicator-library.index' => [
+            ['id' => 'filters', 'targets' => ['[data-library-filters]']],
+            ['id' => 'group', 'targets' => ['[data-library-group]']],
+            ['id' => 'entry', 'targets' => ['[data-library-entry]']],
+        ],
+        'department-tasks.index' => [
+            ['id' => 'list', 'targets' => ['[data-tour="department-tasks-list"]']],
+        ],
+        'admin.sectors.index' => [
+            ['id' => 'create', 'targets' => ['[data-tour="sectors-create"]']],
+        ],
+        'admin.users.index' => [
+            ['id' => 'supervision', 'targets' => ['[data-supervision-tab]']],
         ],
         'security.edit' => [
             ['id' => 'sign_in', 'targets' => ['[data-sign-in-check]']],

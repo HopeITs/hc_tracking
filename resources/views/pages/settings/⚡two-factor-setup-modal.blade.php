@@ -205,7 +205,7 @@ new class extends Component {
                             name="code"
                             wire:model="code"
                             length="6"
-                            label="OTP Code"
+                            :label="__('authentication.authentication_code')"
                             label:sr-only
                             class="mx-auto"
                         />

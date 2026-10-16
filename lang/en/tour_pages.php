@@ -18,6 +18,7 @@ return [
         'dashboard' => [
             'intro' => ['title' => 'Your dashboard', 'body' => 'The whole portfolio in one glance: what needs you, how delivery and funding are doing, and what is coming up. Let’s walk through it.'],
             'my_work' => ['title' => 'Jump to your work', 'body' => 'Shortcuts to the tasks, milestones and records that are yours, with counts so you know where to start.'],
+            'my_team' => ['title' => 'Your team', 'body' => 'The people you supervise and how many overdue tasks each one has.'],
             'attention' => ['title' => 'Needs attention', 'body' => 'Overdue items, blocked work and risks, grouped so the most urgent thing is always first.'],
             'pulse' => ['title' => 'Portfolio pulse', 'body' => 'Progress and health across programs and projects in a handful of figures.'],
             'funding' => ['title' => 'Funding position', 'body' => 'What has been agreed, received and is still owed — delivery and money side by side.'],
@@ -56,9 +57,14 @@ return [
         ],
         'proposals_show' => [
             'intro' => ['title' => 'Proposal detail', 'body' => 'One funding request: where it is in the process, who owns each step and what still has to be done.'],
-            'vital' => ['title' => 'Vital signs', 'body' => 'Donor, amount and the deadline that matters most, at a glance.'],
+            'vital' => ['title' => 'Vital signs', 'body' => 'The headline readings for this proposal; each one opens the tab behind it.'],
             'lanes' => ['title' => 'Work lanes', 'body' => 'The tasks that move the proposal forward, grouped by stage.'],
             'warnings' => ['title' => 'Warnings', 'body' => 'Anything missing or late that could hold the proposal up.'],
+            'reviewers' => ['title' => 'Reviewers', 'body' => 'Who must read this proposal at each stage and whether they have seen it; add or remove reviewers here if you may.'],
+            'logframe' => ['title' => 'Logical Framework', 'body' => 'The Impact, Outcome, Output and Activity tree of this proposal; start from the program framework or build your own.'],
+            'calendar' => ['title' => 'Activity calendar', 'body' => 'The months each activity is scheduled in.'],
+            'targets' => ['title' => 'Indicators & Targets', 'body' => 'One row per indicator and one column per center; an empty cell means no target, and zero is a real target.'],
+            'plan' => ['title' => 'Plan', 'body' => 'The milestones, department tasks and timeline of this proposal in one place.'],
         ],
         'donors_index' => [
             'intro' => ['title' => 'Donors', 'body' => 'Everyone who funds the work, with what they have given and what is due back to them.'],
@@ -102,11 +108,29 @@ return [
             'popups' => ['title' => 'Pop-ups', 'body' => 'Choose whether new notifications appear as pop-ups on your device.'],
             'mutes' => ['title' => 'Mute a module', 'body' => 'Silence the modules you do not need to hear about.'],
         ],
+        'indicator_library_index' => [
+            'intro' => ['title' => 'Indicator Library', 'body' => 'The shared catalogue of indicators every proposal draws from. Look here before you create anything new.'],
+            'filters' => ['title' => 'Find an entry', 'body' => 'Search, or filter by program, level, measure or who collects it, to narrow the catalogue.'],
+            'group' => ['title' => 'Grouped by level', 'body' => 'Entries sit under the level of the logical framework they measure.'],
+            'entry' => ['title' => 'An indicator', 'body' => 'Open one to read its definition, how it is calculated and where its data comes from.'],
+        ],
+        'department_tasks_index' => [
+            'intro' => ['title' => 'Department Tasks', 'body' => 'Deliverables that other departments owe the programs, such as media requests. Filter by department, kind or delivery state.'],
+            'list' => ['title' => 'The requests', 'body' => 'Each request shows who delivers it, when it is due and where it stands: requested, delivered, accepted or returned.'],
+        ],
+        'admin_sectors_index' => [
+            'intro' => ['title' => 'Sectors', 'body' => 'The list of sectors a project can work in. A sector that is in use is deactivated, never deleted.'],
+            'create' => ['title' => 'Add a sector', 'body' => 'Create a sector with an Arabic name; the English name is optional.'],
+        ],
         'admin_notification_settings_edit' => [
             'intro' => ['title' => 'Notification rules', 'body' => 'Set who gets notified about what, and when, for the whole organization.'],
             'savebar' => ['title' => 'Save your changes', 'body' => 'Rules apply only after you save. This bar shows whether anything is unsaved.'],
+            'default_reviewers' => ['title' => 'Default reviewers', 'body' => 'The positions invited to review every proposal; a vacant position is skipped with a warning.'],
         ],
-        'admin_users_index' => ['intro' => ['title' => 'User directory', 'body' => 'Everyone with access, their role and status. Invite people, change roles or deactivate access here.']],
+        'admin_users_index' => [
+            'intro' => ['title' => 'User directory', 'body' => 'Everyone with access, their role and status. Invite people, change roles or deactivate access here.'],
+            'supervision' => ['title' => 'Supervision', 'body' => 'Who supervises whom: HR direct managers by default, plus the exceptions you add here. Supervision gives no extra access.'],
+        ],
         'admin_cities_index' => ['intro' => ['title' => 'Cities', 'body' => 'The locations projects work in, as a list or on the map.']],
         'admin_accounts_index' => ['intro' => ['title' => 'Accounts', 'body' => 'Bank accounts that receive funds, with their balance and transfer history.']],
         'security_edit' => [
