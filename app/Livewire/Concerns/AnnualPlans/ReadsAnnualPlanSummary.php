@@ -6,10 +6,12 @@ namespace App\Livewire\Concerns\AnnualPlans;
 
 use App\Enums\Period;
 use App\Enums\ReportStatus;
+use App\Models\AnnualPlan;
 use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\Report;
 use App\Models\Result;
+use App\Support\ResultsChain;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Collection as SupportCollection;
 use Livewire\Attributes\Computed;
@@ -26,6 +28,9 @@ use Livewire\Attributes\Computed;
  * @property int $annualPlanId
  * @property-read Collection<int, PlanIndicator> $targets  #[Computed] targets()
  * @property-read array<value-of<ReportStatus>, int> $reportStatusCounts  #[Computed] reportStatusCounts()
+ * @property-read array<string, mixed> $chain  #[Computed] chain()
+ *
+ * @method array{indicator: string, center: string, donor: string} chainFilters() FiltersResultsChain
  */
 trait ReadsAnnualPlanSummary
 {
@@ -147,6 +152,22 @@ trait ReadsAnnualPlanSummary
             ])
             ->sortBy(fn (array $group): int => $group['result']->type->rank())
             ->values();
+    }
+
+    /**
+     * The read-only results chain of the plan (T16): the program framework
+     * measured by this plan's targets only, plus the activities whose linked
+     * milestones are planned in the plan year. T24's annual_plan_activities
+     * replaces that milestone rule after October.
+     *
+     * @return array<string, mixed>
+     */
+    #[Computed]
+    public function chain(): array
+    {
+        $plan = AnnualPlan::query()->select(['id', 'program_id', 'year'])->findOrFail($this->annualPlanId);
+
+        return ResultsChain::forAnnualPlan($plan, $this->chainFilters());
     }
 
     /**

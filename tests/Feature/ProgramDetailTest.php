@@ -486,3 +486,30 @@ test('only report-templates.manage holders set the donor attribution', function 
 
     expect(DB::table('programs')->where('id', $program->id)->value('donor_attribution'))->toBe('shared');
 });
+
+test('program results chain lists each contributing proposal under the program result it contributes to', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $program = Program::factory()->create();
+    $otherProgram = Program::factory()->create();
+    $impact = Result::factory()->type(ResultType::Impact)->create(['program_id' => $program->id, 'statement' => 'Program impact statement.']);
+    $otherImpact = Result::factory()->type(ResultType::Impact)->create(['program_id' => $otherProgram->id, 'statement' => 'Other program impact.']);
+    $proposal = Proposal::factory()->create(['name' => 'Multi-program proposal']);
+    $rootHere = Result::factory()->type(ResultType::Impact)->create(['proposal_id' => $proposal->id, 'program_id' => null, 'statement' => 'Proposal root for this program.']);
+    $rootHere->forceFill(['contributes_to_result_id' => $impact->id])->saveQuietly();
+    $rootThere = Result::factory()->type(ResultType::Impact)->create(['proposal_id' => $proposal->id, 'program_id' => null, 'statement' => 'Proposal root for the other program.']);
+    $rootThere->forceFill(['contributes_to_result_id' => $otherImpact->id])->saveQuietly();
+
+    Livewire::actingAs($user)
+        ->test('pages::programs.show', ['program' => $program])
+        ->set('tab', 'results')
+        ->assertSeeHtml('data-chain-contributions')
+        ->assertSeeInOrder(['Program impact statement.', 'Multi-program proposal', $proposal->donor->name, 'Proposal root for this program.'])
+        ->assertDontSee('Proposal root for the other program.');
+
+    Livewire::actingAs($user)
+        ->test('pages::programs.show', ['program' => $otherProgram])
+        ->set('tab', 'results')
+        ->assertSee('Multi-program proposal')
+        ->assertSee('Proposal root for the other program.')
+        ->assertDontSee('Proposal root for this program.');
+});

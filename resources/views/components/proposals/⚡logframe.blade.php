@@ -2,14 +2,17 @@
 
 use App\Livewire\Concerns\Results\BuildsResultsFramework;
 use App\Livewire\Concerns\Results\BuildsResultsTree;
+use App\Livewire\Concerns\Results\FiltersResultsChain;
 use App\Livewire\Concerns\Results\ManagesResultForm;
 use App\Enums\ResultType;
 use App\Models\Proposal;
 use App\Models\Result;
 use App\Support\ProposalFramework;
+use App\Support\ResultsChain;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /*
@@ -23,14 +26,23 @@ use Livewire\Component;
  * loaded through `Result::proposalFramework($proposalId)` and every write
  * goes through SaveResult / DeleteResult with the proposal. Visible to
  * whoever can open the page; no money is read.
+ *
+ * The Chain view (T16) renders the same framework read-only through
+ * App\Support\ResultsChain: indicators, per-center targets, achievement,
+ * gaps and filters. forgetFramework() clears it after a write.
  */
 new class extends Component {
     use BuildsResultsFramework;
     use BuildsResultsTree;
+    use FiltersResultsChain;
     use ManagesResultForm;
 
     #[Locked]
     public int $proposalId;
+
+    /** `structure` (the editable tree) or `chain` (the read-only chain view). */
+    #[Url(as: 'logframe_view', except: 'structure')]
+    public string $view = 'structure';
 
     public function mount(int $proposalId): void
     {
@@ -92,6 +104,26 @@ new class extends Component {
     }
 
     /**
+     * Whether the read-only chain view is shown; any other value is the tree.
+     */
+    #[Computed]
+    public function showsChain(): bool
+    {
+        return $this->view === 'chain';
+    }
+
+    /**
+     * The read-only results chain of this proposal (T16).
+     *
+     * @return array<string, mixed>
+     */
+    #[Computed]
+    public function chain(): array
+    {
+        return ResultsChain::forProposal($this->proposal, $this->chainFilters());
+    }
+
+    /**
      * The tree roots and the cross-cutting roots, each as prebuilt node arrays.
      *
      * @return array{tree: list<array<string, mixed>>, crossCutting: list<array<string, mixed>>}
@@ -134,6 +166,23 @@ new class extends Component {
         @endif
     </div>
 
+    <div class="flex flex-wrap items-center gap-1 self-start rounded-lg border border-secondary-soft bg-ground p-1 print:hidden dark:border-line dark:bg-surface-2" role="group" aria-label="{{ __('results_framework.chain_view_label') }}" data-chain-view-toggle>
+        @foreach (['structure' => __('results_framework.chain_view_structure'), 'chain' => __('results_framework.chain_view_chain')] as $mode => $label)
+            <button
+                type="button"
+                wire:click="$set('view', '{{ $mode }}')"
+                wire:loading.attr="disabled"
+                wire:target="view"
+                aria-pressed="{{ ($mode === 'chain') === $this->showsChain ? 'true' : 'false' }}"
+                @class([
+                    'cursor-pointer rounded-md px-3 py-1.5 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                    'bg-white text-secondary-dark shadow-sm dark:bg-surface-3 dark:text-ink' => ($mode === 'chain') === $this->showsChain,
+                    'text-secondary-medium hover:text-secondary-dark dark:text-ink-muted dark:hover:text-ink' => ($mode === 'chain') !== $this->showsChain,
+                ])
+            >{{ $label }}</button>
+        @endforeach
+    </div>
+
     @if ($this->isLockedForMe)
         <p class="flex items-start gap-2 rounded-lg border border-secondary-soft bg-ground px-3 py-2.5 type-meta text-secondary-dark dark:border-line dark:bg-surface-2 dark:text-ink" data-test="logframe-locked">
             <flux:icon.lock-closed variant="micro" class="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
@@ -141,7 +190,17 @@ new class extends Component {
         </p>
     @endif
 
-    @if ($roots['tree'] === [] && $roots['crossCutting'] === [])
+    @if ($this->showsChain)
+        <div class="@container/detail">
+            <x-ui.logframe :chain="$this->chain" :heading="__('results_framework.chain_heading')" heading-id="proposal-chain-heading">
+                @if ($canCreate)
+                    <x-slot:start>
+                        <x-ui.button tone="primary" icon="plus" wire:click="openCreateModal" wire:loading.attr="disabled" wire:target="openCreateModal">{{ __('results_framework.chain_start') }}</x-ui.button>
+                    </x-slot:start>
+                @endif
+            </x-ui.logframe>
+        </div>
+    @elseif ($roots['tree'] === [] && $roots['crossCutting'] === [])
         <x-ui.panel>
             <x-ui.empty-state
                 icon="share"

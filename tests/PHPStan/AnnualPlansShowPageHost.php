@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\PHPStan;
 
 use App\Livewire\Concerns\AnnualPlans\ReadsAnnualPlanSummary;
+use App\Livewire\Concerns\Results\FiltersResultsChain;
 use Livewire\Component;
 
 /**
@@ -17,6 +18,7 @@ use Livewire\Component;
  */
 abstract class AnnualPlansShowPageHost extends Component
 {
+    use FiltersResultsChain;
     use ReadsAnnualPlanSummary;
 
     public int $annualPlanId;
