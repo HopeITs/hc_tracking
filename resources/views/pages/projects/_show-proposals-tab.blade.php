@@ -15,7 +15,7 @@
                                 @endif
                             </div>
                             <span class="min-w-0 truncate text-secondary-medium dark:text-ink-muted" dir="auto">{{ $entry->donor->name ?? '—' }}</span>
-                            <x-ui.enum-badge :case="$entry->status" />
+                            <span class="flex"><x-ui.enum-badge :case="$entry->status" /></span>
                             <span class="tabular-nums text-xs text-secondary-medium dark:text-ink-muted" dir="ltr">
                                 {{ $entry->planned_date_begin?->format('Y') }}–{{ $entry->planned_date_end?->format('Y') }}@if ($entry->actual_date_begin !== null) · {{ $entry->actual_date_begin->format('Y') }}–{{ $entry->actual_date_end?->format('Y') ?? '…' }}@endif
                             </span>

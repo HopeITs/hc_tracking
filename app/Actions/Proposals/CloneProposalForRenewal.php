@@ -63,7 +63,7 @@ final class CloneProposalForRenewal
     {
         Gate::forUser($user)->authorize('create', Proposal::class);
 
-        $source = Proposal::query()->findOrFail($previous->getKey());
+        $source = Proposal::query()->whereKey($previous->getKey())->firstOrFail();
         Gate::forUser($user)->authorize('view', $source);
 
         if (! in_array($source->status, self::RenewableStatuses, true)) {
@@ -262,7 +262,7 @@ final class CloneProposalForRenewal
                 ->each->delete();
         }
 
-        return $inactive->pluck('name')->all();
+        return array_values($inactive->map(fn (Indicator $indicator): string => (string) $indicator->name)->all());
     }
 
     /**
