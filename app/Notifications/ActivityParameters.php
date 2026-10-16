@@ -61,6 +61,18 @@ final class ActivityParameters
             }
         }
 
+        if (isset($activity->properties['from_month'], $activity->properties['to_month'])) {
+            $params['from_month'] = ['month' => (string) $activity->properties['from_month']];
+            $params['to_month'] = ['month' => (string) $activity->properties['to_month']];
+        }
+
+        if (array_key_exists('proposals', $activity->properties)) {
+            $names = array_values(array_filter((array) $activity->properties['proposals'], fn (mixed $name): bool => is_string($name) && $name !== ''));
+            $params['proposal'] = $names === []
+                ? ['trans' => 'notifications.report_template_org_wide_targets']
+                : ['localized_list' => array_map(fn (string $name): array => ['en' => $name, 'ar' => $name], $names)];
+        }
+
         if (array_key_exists('meeting', $activity->properties)) {
             $params['meeting'] = is_string($activity->properties['meeting'])
                 ? ['trans' => 'notifications.review_meeting_suffix', 'params' => ['at' => ['datetime' => $activity->properties['meeting']]]]

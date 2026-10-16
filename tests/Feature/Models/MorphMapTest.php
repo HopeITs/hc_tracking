@@ -16,6 +16,7 @@ use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Report;
 use App\Models\ReportFile;
+use App\Models\ReportTemplate;
 use App\Models\Result;
 use App\Models\Risk;
 use App\Models\Role;
@@ -54,6 +55,7 @@ test('the morph map registers exactly the target sources, task sources, media ow
         'strategic_pillar' => StrategicPillar::class,
         'meal_coverage' => MealCoverageAssignment::class,
         'supervision' => Supervision::class,
+        'report_template' => ReportTemplate::class,
     ]);
 });
 

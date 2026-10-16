@@ -40,6 +40,21 @@ return [
         'monthly' => 'شهري',
         'quarter_end' => 'نهاية الربع',
     ],
+    'report_template_status' => [
+        'pending' => 'بانتظار التأكيد',
+        'confirmed' => 'مؤكَّد',
+    ],
+    'report_template_line_status' => [
+        'pending' => 'بانتظار التأكيد',
+        'confirmed' => 'مؤكَّد',
+        'retired' => 'متوقف',
+    ],
+    'line_schedule' => [
+        'library_default' => 'حسب تكرار المكتبة',
+        'monthly' => 'كل شهر',
+        'selected_months' => 'أشهر محددة',
+        'once_after_months' => 'مرة واحدة بعد عدد من الأشهر',
+    ],
     'denominator_basis' => [
         'fixed' => 'ثابت (المستفيدون المستهدفون)',
         'entered' => 'مُدخل (البسط والمقام)',

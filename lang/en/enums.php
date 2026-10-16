@@ -40,6 +40,21 @@ return [
         'monthly' => 'Monthly',
         'quarter_end' => 'Quarter end',
     ],
+    'report_template_status' => [
+        'pending' => 'Pending',
+        'confirmed' => 'Confirmed',
+    ],
+    'report_template_line_status' => [
+        'pending' => 'Pending',
+        'confirmed' => 'Confirmed',
+        'retired' => 'Retired',
+    ],
+    'line_schedule' => [
+        'library_default' => 'Library frequency',
+        'monthly' => 'Every month',
+        'selected_months' => 'Selected months',
+        'once_after_months' => 'Once, after a number of months',
+    ],
     'denominator_basis' => [
         'fixed' => 'Fixed (target beneficiaries)',
         'entered' => 'Entered (numerator and denominator)',

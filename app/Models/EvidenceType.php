@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 /**
  * A kind of evidence a monthly report line can require, such as attendance
@@ -84,16 +85,14 @@ class EvidenceType extends Model
     }
 
     /**
-     * Whether anything refers to this type, so it can only be deactivated.
-     *
-     * Nothing does yet: the consumers wire themselves in here when they land,
-     * `report_template_line_evidence_types` in T33 slice 2 and
-     * `monthly_report_files.evidence_type_id` in T17. Until then their
-     * restricting foreign keys are the backstop DeleteEvidenceType catches.
+     * Whether anything refers to this type, so it can only be deactivated:
+     * a report template line requiring it. T17 adds
+     * `monthly_report_files.evidence_type_id` here; until then its
+     * restricting foreign key is the backstop DeleteEvidenceType catches.
      */
     public function isInUse(): bool
     {
-        return false;
+        return DB::table('report_template_line_evidence_types')->where('evidence_type_id', $this->getKey())->exists();
     }
 
     /**

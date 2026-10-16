@@ -6,6 +6,7 @@ use App\Actions\EvidenceTypes\MoveEvidenceType;
 use App\Actions\EvidenceTypes\ReactivateEvidenceType;
 use App\Actions\EvidenceTypes\SaveEvidenceType;
 use App\Models\EvidenceType;
+use App\Models\ReportTemplateLine;
 use App\Support\DefaultEvidenceTypes;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
@@ -262,6 +263,7 @@ describe('the actions', function () {
     it('refuses to delete a used type, and deactivates it instead', function () {
         $this->actingAs(userWithRole('MEAL'));
         $evidenceType = EvidenceType::factory()->create();
+        ReportTemplateLine::factory()->create()->evidenceTypes()->attach($evidenceType->id);
 
         expect(fn () => app(DeleteEvidenceType::class)->handle($evidenceType->id))
             ->toThrow(ValidationException::class, 'This evidence type is in use. Deactivate it instead.');
@@ -273,7 +275,7 @@ describe('the actions', function () {
             ->call('deactivateInsteadOfDelete');
 
         expect($evidenceType->fresh()->is_active)->toBeFalse();
-    })->skip('T33 slice 2: no consumer table yet');
+    });
 });
 
 describe('the active scope', function () {

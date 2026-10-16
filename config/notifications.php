@@ -22,6 +22,7 @@ use App\Notifications\Recipients\MilestoneRecipients;
 use App\Notifications\Recipients\ProjectRecipients;
 use App\Notifications\Recipients\ProposalRecipients;
 use App\Notifications\Recipients\ReportRecipients;
+use App\Notifications\Recipients\ReportTemplateRecipients;
 use App\Notifications\Recipients\ResultRecipients;
 use App\Notifications\Recipients\RiskRecipients;
 use App\Notifications\Recipients\StrategyRecipients;
@@ -60,6 +61,7 @@ return [
         'accounts' => AccountRecipients::class,
         'access-management' => UserRecipients::class,
         'cities' => MealCoverageRecipients::class,
+        'report-templates' => ReportTemplateRecipients::class,
     ],
 
     /*
@@ -72,6 +74,8 @@ return [
     */
     'view_permissions' => [
         'access-management' => 'access-management.manage-users',
+        // Owners and program managers read the template on the project page.
+        'report-templates' => 'projects.view',
     ],
 
     /*
@@ -145,6 +149,7 @@ return [
         'accounts' => 'credit-card',
         'access-management' => 'users',
         'cities' => 'map-pin',
+        'report-templates' => 'clipboard-document-list',
         'system' => 'bell',
     ],
 

@@ -101,12 +101,11 @@ class NarrativeQuestion extends Model
     }
 
     /**
-     * Whether a report template uses this question, so it may only be
-     * deactivated. Always false until `report_template_questions` (T33 slice
-     * 2) exists; that slice wires its `narrative_question_id` in here.
+     * Whether a report template copied this question, so it may only be
+     * deactivated.
      */
     public function isInUse(): bool
     {
-        return false;
+        return ReportTemplateQuestion::query()->where('narrative_question_id', $this->getKey())->exists();
     }
 }

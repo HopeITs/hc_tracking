@@ -7,6 +7,7 @@ use App\Actions\NarrativeQuestions\ReactivateNarrativeQuestion;
 use App\Actions\NarrativeQuestions\SaveNarrativeQuestion;
 use App\Enums\NarrativeQuestionFrequency;
 use App\Models\NarrativeQuestion;
+use App\Models\ReportTemplateQuestion;
 use App\Support\DefaultNarrativeQuestions;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
@@ -331,8 +332,21 @@ describe('the actions', function () {
     });
 
     it('refuses a used question and offers to deactivate it instead', function () {
-        // T33 slice 2: create a report_template_questions row pointing at the question here.
-    })->skip('T33 slice 2: no consumer table yet');
+        $this->actingAs(userWithRole('MEAL'));
+        $question = NarrativeQuestion::factory()->create();
+        ReportTemplateQuestion::factory()->create(['narrative_question_id' => $question->id, 'text_ar' => $question->text_ar]);
+
+        expect(fn () => app(DeleteNarrativeQuestion::class)->handle($question->id))
+            ->toThrow(ValidationException::class, __('narrative_questions.in_use'));
+
+        Livewire::test('pages::admin.narrative-questions')
+            ->call('confirmDelete', $question->id)
+            ->assertSet('deletingQuestionInUse', true)
+            ->assertSee(__('narrative_questions.in_use'))
+            ->call('deactivateInsteadOfDelete');
+
+        expect($question->fresh()->is_active)->toBeFalse();
+    });
 });
 
 describe('the frequency enum', function () {
