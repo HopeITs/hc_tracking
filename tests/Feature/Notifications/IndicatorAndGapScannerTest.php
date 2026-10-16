@@ -4,6 +4,7 @@ use App\Enums\ProjectStatus;
 use App\Models\Activity;
 use App\Models\Indicator;
 use App\Models\IndicatorProgress;
+use App\Models\MonthlyReport;
 use App\Models\Project;
 use App\Models\Report;
 use App\Models\UserNotification;
@@ -80,4 +81,16 @@ test('an approved report without files is a data gap for its author', function (
     app(DataGapScanner::class)->scan(CarbonImmutable::parse('2026-09-21 06:00'));
 
     expect(UserNotification::query()->forUser($author)->where('data', 'like', '%report_without_files%')->count())->toBe(1);
+});
+
+test('an approved monthly report mirror without files is not a data gap', function () {
+    $author = userWithRole('MEAL');
+    Activity::withoutRecording(fn () => Report::factory()->approved()->create([
+        'user_id' => $author->id,
+        'monthly_report_id' => MonthlyReport::factory()->create()->id,
+    ]));
+
+    app(DataGapScanner::class)->scan(CarbonImmutable::parse('2026-09-21 06:00'));
+
+    expect(UserNotification::query()->forUser($author)->where('data', 'like', '%report_without_files%')->count())->toBe(0);
 });

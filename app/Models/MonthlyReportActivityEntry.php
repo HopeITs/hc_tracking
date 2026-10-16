@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * What happened to one logframe activity in a monthly report's month
@@ -59,6 +60,14 @@ class MonthlyReportActivityEntry extends Model
     public function activity(): BelongsTo
     {
         return $this->belongsTo(Result::class, 'result_id');
+    }
+
+    /**
+     * @return HasMany<MonthlyReportFile, $this>
+     */
+    public function files(): HasMany
+    {
+        return $this->hasMany(MonthlyReportFile::class);
     }
 
     /**

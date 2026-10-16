@@ -3,6 +3,7 @@
 use App\Enums\ReportStatus;
 use App\Enums\TaskStatus;
 use App\Models\Activity;
+use App\Models\MonthlyReport;
 use App\Models\Report;
 use App\Models\Task;
 use App\Models\TransfersTracking;
@@ -85,4 +86,18 @@ test('a late tranche is never reported as stalled, sent or not: the overdue chai
     scanStalled('2026-09-23 09:00');
 
     expect(UserNotification::query()->forUser($financial)->where('data', 'like', '%stalled%')->count())->toBe(0);
+});
+
+test('a monthly report mirror never stalls: the monthly report deadline covers it', function () {
+    $author = userWithRole('Public Relations');
+    $this->travelTo(CarbonImmutable::parse('2026-09-14 10:00'));
+    Activity::withoutRecording(fn () => Report::factory()->create([
+        'user_id' => $author->id,
+        'status' => ReportStatus::Draft,
+        'monthly_report_id' => MonthlyReport::factory()->create()->id,
+    ]));
+
+    scanStalled('2026-09-23 09:00');
+
+    expect(UserNotification::query()->forUser($author)->count())->toBe(0);
 });

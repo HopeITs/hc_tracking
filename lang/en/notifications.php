@@ -238,6 +238,8 @@ return [
         'remind_every_hint' => 'While the item stays overdue.',
         'department_task_due' => 'Department task heads-up',
         'department_task_due_hint' => 'Working days before a department task is due.',
+        'monthly_report_due' => 'Monthly report deadline',
+        'monthly_report_due_hint' => 'Working days after the end of the month before a monthly report is due.',
         'manager_after' => 'Tell the program manager after',
         'manager_after_hint' => 'Counted from the due date.',
         'top_after' => 'Tell management after',

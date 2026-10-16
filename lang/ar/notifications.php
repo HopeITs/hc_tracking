@@ -238,6 +238,8 @@ return [
         'remind_every_hint' => 'ما دام العنصر متأخرًا.',
         'department_task_due' => 'تنبيه مهام الأقسام',
         'department_task_due_hint' => 'أيام العمل قبل موعد استحقاق مهمة القسم.',
+        'monthly_report_due' => 'موعد التقرير الشهري',
+        'monthly_report_due_hint' => 'أيام العمل بعد نهاية الشهر حتى يستحق التقرير الشهري.',
         'manager_after' => 'إبلاغ مدير البرنامج بعد',
         'manager_after_hint' => 'تُحتسب من تاريخ الموعد.',
         'top_after' => 'إبلاغ الإدارة بعد',

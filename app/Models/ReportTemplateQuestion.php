@@ -98,6 +98,20 @@ class ReportTemplateQuestion extends Model
     }
 
     /**
+     * Questions asked in the month (contracts §13.1 item 3): `monthly` every
+     * month, `quarter_end` only in March, June, September and December.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function askedIn(Builder $query, CarbonImmutable $month): void
+    {
+        if ($month->month % 3 !== 0) {
+            $query->where($query->qualifyColumn('frequency'), NarrativeQuestionFrequency::Monthly->value);
+        }
+    }
+
+    /**
      * The text in the current language; a question with no English text shows
      * its Arabic text everywhere.
      */

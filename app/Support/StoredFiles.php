@@ -8,6 +8,7 @@ use App\Enums\FileType;
 use App\Exceptions\FileStorageNotConfigured;
 use App\Exceptions\UnreadableStoredFile;
 use App\Models\Media;
+use App\Models\MonthlyReportFile;
 use App\Models\ReportFile;
 use App\Models\TaskAttachment;
 use Illuminate\Contracts\Encryption\DecryptException;
@@ -42,7 +43,7 @@ final class StoredFiles
      *
      * @var list<string>
      */
-    public const FileTables = ['media', 'report_files', 'task_attachments'];
+    public const FileTables = ['media', 'monthly_report_files', 'report_files', 'task_attachments'];
 
     /**
      * Store an upload (when there is one) on the model, set its display name and
@@ -57,7 +58,7 @@ final class StoredFiles
      * @throws FileStorageNotConfigured when the file key is missing or malformed
      */
     public static function save(
-        Media|ReportFile|TaskAttachment $file,
+        Media|MonthlyReportFile|ReportFile|TaskAttachment $file,
         ?UploadedFile $upload,
         string $directory,
         string $typedName,

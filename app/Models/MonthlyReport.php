@@ -117,6 +117,24 @@ class MonthlyReport extends Model implements TracksActivity
     }
 
     /**
+     * @return HasMany<MonthlyReportAnswer, $this>
+     */
+    public function answers(): HasMany
+    {
+        return $this->hasMany(MonthlyReportAnswer::class);
+    }
+
+    /**
+     * Every evidence file of the report, its lines and its activity entries.
+     *
+     * @return HasMany<MonthlyReportFile, $this>
+     */
+    public function files(): HasMany
+    {
+        return $this->hasMany(MonthlyReportFile::class);
+    }
+
+    /**
      * The `reports` rows mirroring this report's shares.
      *
      * @return HasMany<Report, $this>

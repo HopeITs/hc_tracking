@@ -6,12 +6,16 @@ use App\Enums\CollectionFrequency;
 use App\Enums\DenominatorBasis;
 use App\Enums\IndicatorCollector;
 use App\Enums\IndicatorMeasure;
+use App\Enums\MonthlyReportStatus;
+use App\Enums\ProjectStatus;
 use App\Enums\ResultType;
 use App\Models\AnnualPlan;
 use App\Models\Indicator;
 use App\Models\IndicatorProgress;
 use App\Models\LibraryIndicator;
 use App\Models\MealCoverageAssignment;
+use App\Models\MonthlyReport;
+use App\Models\MonthlyReportAnswer;
 use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
@@ -20,6 +24,8 @@ use App\Models\ReportFile;
 use App\Models\Result;
 use App\Models\User;
 use App\Support\IndicatorCode;
+use App\Support\MonthlyReportGenerator;
+use Carbon\CarbonImmutable;
 use Database\Seeders\Concerns\PicksHrRecords;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection;
@@ -75,6 +81,63 @@ class MealSeeder extends Seeder
 
         $this->seedIndicatorLibrary();
         $this->seedMealCoverage();
+        $this->seedMonthlyReports($users);
+    }
+
+    /**
+     * Three months for up to two projects (active ones first): from the
+     * project start, or the last three months when the demo project has no
+     * dates, generated the way activation does: the oldest validated with
+     * an answer, the next submitted, the rest drafts (contracts §13).
+     *
+     * @param  Collection<int, User>  $users
+     */
+    protected function seedMonthlyReports(Collection $users): void
+    {
+        $user = $users->first();
+
+        if ($user === null) {
+            return;
+        }
+
+        $projects = Project::query()
+            ->orderByRaw('status = ? desc', [ProjectStatus::Active->value])
+            ->orderBy('id')
+            ->limit(2)
+            ->get();
+
+        foreach ($projects as $project) {
+            $start = $project->start_date === null
+                ? CarbonImmutable::today()->startOfMonth()->subMonths(2)
+                : CarbonImmutable::parse($project->start_date)->startOfMonth();
+            $end = $start->addMonths(2);
+            $ids = app(MonthlyReportGenerator::class)->generate($project, $start, $end);
+            $reports = MonthlyReport::query()->whereKey($ids)->orderBy('period')->get();
+
+            $reports->get(0)?->forceFill([
+                'status' => MonthlyReportStatus::Validated,
+                'prepared_by' => $user->id,
+                'submitted_at' => now(),
+                'submitted_by' => $user->id,
+                'validated_at' => now(),
+                'validated_by' => $user->id,
+            ])->save();
+
+            $reports->get(1)?->forceFill([
+                'status' => MonthlyReportStatus::Submitted,
+                'prepared_by' => $user->id,
+                'submitted_at' => now(),
+                'submitted_by' => $user->id,
+            ])->save();
+
+            if ($reports->isNotEmpty()) {
+                MonthlyReportAnswer::factory()->create([
+                    'monthly_report_id' => $reports->first()->id,
+                    'question_text' => 'ما أبرز ما تحقق هذا الشهر؟',
+                    'answer' => 'نُفذت جلسات التوعية المخططة ووُزعت المواد في موعدها.',
+                ]);
+            }
+        }
     }
 
     /**

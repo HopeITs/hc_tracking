@@ -6,6 +6,7 @@ namespace App\Notifications\Alerts;
 
 use App\Enums\ArStatus;
 use App\Enums\MilestoneStatus;
+use App\Enums\MonthlyReportStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\ProposalStatus;
 use App\Enums\ReportStatus;
@@ -13,6 +14,7 @@ use App\Enums\TaskStatus;
 use App\Models\DonorReport;
 use App\Models\HrDepartment;
 use App\Models\Milestone;
+use App\Models\MonthlyReport;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Report;
@@ -21,6 +23,7 @@ use App\Models\TransfersTracking;
 use App\Notifications\EmployeeRecipients;
 use App\Notifications\Recipients\OversightRecipients;
 use App\Notifications\TracksActivity;
+use App\Support\MonthlyReportPeriods;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -54,6 +57,7 @@ final class DeadlineCatalog
             ...$this->departmentTasks($limit),
             ...$this->milestones($limit),
             ...$this->reports($limit),
+            ...$this->monthlyReports($dueOnOrBefore),
             ...$this->donorReports($limit),
             ...$this->proposals($limit),
             ...$this->transfers($limit),
@@ -213,12 +217,67 @@ final class DeadlineCatalog
             ->join('plan_indicators', 'plan_indicators.id', '=', 'reports.plan_indicator_id')
             ->join('indicators', 'indicators.id', '=', 'plan_indicators.indicator_id')
             ->where('reports.status', ReportStatus::Draft->value)
+            ->whereNull('reports.monthly_report_id')
             ->whereDate('reports.planned_date', '<=', $limit)
             ->toBase()
             ->get(['reports.id', 'reports.user_id', 'reports.planned_date', 'indicators.name'])
             ->map(fn (object $row): DeadlineItem => new DeadlineItem(
                 'report', (int) $row->id, 'reports', (string) $row->name, CarbonImmutable::parse($row->planned_date), [(int) $row->user_id],
             ))->all());
+    }
+
+    /**
+     * One item per started, required (at least one line), unsubmitted
+     * monthly report (contracts §13, §13.1 item 2), due on
+     * MonthlyReportPeriods::dueDate(): the configured working days after the
+     * month's end on the project's calendar. Months not started raise
+     * nothing; the report's mirrors in `reports` are left out of reports().
+     * Three queries.
+     *
+     * @return list<DeadlineItem>
+     */
+    private function monthlyReports(CarbonImmutable $dueOnOrBefore): array
+    {
+        $reports = MonthlyReport::query()
+            ->where('status', MonthlyReportStatus::Draft->value)
+            ->whereDate('period', '<=', CarbonImmutable::today()->startOfMonth()->toDateString())
+            ->has('lines')
+            ->withCount('lines')
+            ->orderBy('period')
+            ->get(['id', 'project_id', 'period', 'status', 'prepared_by']);
+
+        if ($reports->isEmpty()) {
+            return [];
+        }
+
+        $projects = Project::query()->whereKey($reports->pluck('project_id')->unique()->values())->get(['id', 'name', 'user_id', 'working_days'])->keyBy('id');
+        $owners = $this->employees->usersFor($projects->pluck('user_id')->filter()->map(fn ($id): int => (int) $id)->unique()->values()->all());
+        $items = [];
+
+        foreach ($reports->groupBy('project_id') as $projectId => $projectReports) {
+            $project = $projects->get($projectId);
+
+            if ($project === null) {
+                continue;
+            }
+
+            $periods = MonthlyReportPeriods::fromLoaded($project, $projectReports);
+
+            foreach ($periods->openRequiredReports() as $report) {
+                $due = $periods->dueDate($report->period);
+
+                if ($due->greaterThan($dueOnOrBefore)) {
+                    continue;
+                }
+
+                $items[] = new DeadlineItem(
+                    'monthly_report', $report->id, 'monthly-reports', $project->name.' · '.$report->period->format('Y-m'), $due,
+                    $this->unique([$owners[(int) $project->user_id] ?? null, $report->prepared_by]), ['MEAL'], 'monthly_report', projectId: $project->id,
+                );
+            }
+        }
+
+        return $items;
     }
 
     /**

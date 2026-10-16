@@ -59,7 +59,7 @@ final class DataGapScanner implements Scanner
             }
         }
 
-        $reports = Report::query()->where('status', ReportStatus::Approved->value)->doesntHave('files')->get(['id', 'user_id', 'plan_indicator_id']);
+        $reports = Report::query()->where('status', ReportStatus::Approved->value)->whereNull('monthly_report_id')->doesntHave('files')->get(['id', 'user_id', 'plan_indicator_id']);
 
         foreach ($reports as $report) {
             $payload = $this->dispatcher->payload('reports', NotificationPriority::Info, 'notifications.alerts.data_gap.report_without_files', ['subject' => $report->activityLabel()], 'report', $report->id);

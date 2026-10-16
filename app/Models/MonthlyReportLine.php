@@ -104,6 +104,14 @@ class MonthlyReportLine extends Model
     }
 
     /**
+     * @return HasMany<MonthlyReportFile, $this>
+     */
+    public function files(): HasMany
+    {
+        return $this->hasMany(MonthlyReportFile::class);
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string|class-string>

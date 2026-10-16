@@ -42,7 +42,34 @@ final class MonthlyReportPeriods
             ->orderBy('period')
             ->get(['id', 'project_id', 'period', 'status']);
 
+        return self::fromLoaded($project, $reports);
+    }
+
+    /**
+     * The same helper over reports already loaded by the caller (the
+     * project's reports, oldest first, with `lines_count`), for scanners
+     * reading many projects at once. No query.
+     *
+     * @param  Collection<int, MonthlyReport>  $reports
+     */
+    public static function fromLoaded(Project $project, Collection $reports): self
+    {
         return new self($reports, app(WorkingCalendar::class)->forProject($project), app(NotificationSettings::class));
+    }
+
+    /**
+     * The started required months not yet submitted: the months that have
+     * a deadline the alert scanners watch (§13.1 item 2).
+     *
+     * @return list<MonthlyReport>
+     */
+    public function openRequiredReports(): array
+    {
+        return array_values($this->reports
+            ->filter(fn (MonthlyReport $report): bool => $report->status === MonthlyReportStatus::Draft
+                && (int) $report->getAttribute('lines_count') > 0
+                && $this->hasStarted($report->period))
+            ->all());
     }
 
     /**

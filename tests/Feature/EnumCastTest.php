@@ -29,6 +29,7 @@ use App\Models\Media;
 use App\Models\Milestone;
 use App\Models\MonthlyReport;
 use App\Models\MonthlyReportActivityEntry;
+use App\Models\MonthlyReportFile;
 use App\Models\MonthlyReportLine;
 use App\Models\MonthlyReportLineBreakdown;
 use App\Models\MonthlyReportReopenRequest;
@@ -238,6 +239,16 @@ function enumColumns(): array
             'stored' => 'png',
             'default' => null,
             'badCasing' => 'PNG',
+        ]],
+        'monthly_report_files.type' => [[
+            'model' => MonthlyReportFile::class,
+            'table' => 'monthly_report_files',
+            'column' => 'type',
+            'width' => 50,
+            'assign' => FileType::Pdf,
+            'stored' => 'pdf',
+            'default' => null,
+            'badCasing' => 'PDF',
         ]],
         'task_attachments.type' => [[
             'model' => TaskAttachment::class,

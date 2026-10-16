@@ -99,7 +99,7 @@ final class StalledScanner implements Scanner
      */
     private function reports(CarbonImmutable $today, ReportStatus $status, int $threshold): array
     {
-        $reports = Report::query()->select(['id', 'user_id', 'plan_indicator_id', 'updated_at'])->where('status', $status->value)->get();
+        $reports = Report::query()->select(['id', 'user_id', 'plan_indicator_id', 'updated_at'])->where('status', $status->value)->whereNull('monthly_report_id')->get();
         $since = $this->statusSince('report', $reports->modelKeys(), ['report.created', 'report.submitted', 'report.approved', 'report.status_changed']);
 
         return $this->stalls($reports, $since, $today, $threshold, 'report', 'reports', $status->value, ['enum' => 'report_status', 'value' => $status->value], ['MEAL'],

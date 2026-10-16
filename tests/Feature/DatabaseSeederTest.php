@@ -12,6 +12,8 @@ use App\Models\LibraryIndicator;
 use App\Models\MealCoverageAssignment;
 use App\Models\Media;
 use App\Models\Milestone;
+use App\Models\MonthlyReport;
+use App\Models\MonthlyReportAnswer;
 use App\Models\NarrativeQuestion;
 use App\Models\PlanIndicator;
 use App\Models\Program;
@@ -65,6 +67,8 @@ test('the seeders populate every table in the schema', function () {
         Account::class,
         TransfersTracking::class,
         MealCoverageAssignment::class,
+        MonthlyReport::class,
+        MonthlyReportAnswer::class,
         Sector::class,
         EvidenceType::class,
         NarrativeQuestion::class,

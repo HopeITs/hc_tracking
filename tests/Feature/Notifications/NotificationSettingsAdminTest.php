@@ -35,6 +35,7 @@ test('an administrator changes thresholds and working days and they take effect'
         ->set('workingDays', [7, 1, 2, 3, 4])
         ->set('dueSoonDays', '10, 5, 2')
         ->set('overdueRepeat', 2)
+        ->set('monthlyReportDue', 7)
         ->set('dailyBriefTime', '07:00')
         ->call('save')
         ->assertHasNoErrors();
@@ -43,6 +44,7 @@ test('an administrator changes thresholds and working days and they take effect'
 
     expect($settings->get('due_soon_days'))->toBe([10, 5, 2])
         ->and($settings->get('overdue_repeat_days'))->toBe(2)
+        ->and($settings->get('monthly_report_due_working_days'))->toBe(7)
         ->and($settings->get('daily_brief_time'))->toBe('07:00')
         ->and(app(WorkingCalendar::class)->isWorkingDay(CarbonImmutable::parse('2026-09-27')))->toBeTrue();
 });
@@ -57,6 +59,7 @@ test('settings are validated', function (string $property, mixed $value) {
     'a bad weekday' => ['workingDays', [8]],
     'a bad stage list' => ['dueSoonDays', '7, soon'],
     'a zero repeat' => ['overdueRepeat', 0],
+    'a monthly report deadline over 20' => ['monthlyReportDue', 21],
     'top before manager' => ['escalateTopAfter', 3],
     'a pace over 100' => ['offTrackPace', 150],
     'a bad time' => ['weeklyDigestTime', '8am'],
@@ -125,6 +128,7 @@ test('the reset-to-defaults values are the shipped defaults, not the stored rule
             'dueSoonDays' => '7, 3, 1',
             'overdueRepeat' => 3,
             'departmentTaskDue' => 5,
+            'monthlyReportDue' => 5,
             'escalateManagerAfter' => 5,
             'escalateTopAfter' => 10,
             'escalationCatchUp' => 3,
