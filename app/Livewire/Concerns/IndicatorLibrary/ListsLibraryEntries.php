@@ -160,13 +160,7 @@ trait ListsLibraryEntries
      */
     public static function levelKindOf(string $levelRef): string
     {
-        foreach (['CC', 'OC', 'OP', 'AC', 'G'] as $kind) {
-            if (str_starts_with($levelRef, $kind)) {
-                return $kind;
-            }
-        }
-
-        return $levelRef;
+        return LibraryIndicator::levelKindOf($levelRef);
     }
 
     /**

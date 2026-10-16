@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Concerns\RecordsActivity;
+use App\Enums\DonorAttribution;
 use App\Notifications\TracksActivity;
 use App\Observers\ProgramObserver;
 use Carbon\CarbonImmutable;
@@ -37,15 +38,33 @@ use Illuminate\Support\Facades\DB;
  * @property int|null $strategy_id
  * @property int|null $strategic_pillar_id
  * @property int|null $manager_id
+ * @property DonorAttribution $donor_attribution
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['strategy_id', 'strategic_pillar_id', 'manager_id'])]
+#[Fillable(['strategy_id', 'strategic_pillar_id', 'manager_id', 'donor_attribution'])]
 #[ObservedBy(ProgramObserver::class)]
 class Program extends Model implements TracksActivity
 {
     /** @use HasFactory<ProgramFactory> */
     use HasFactory, RecordsActivity;
+
+    /**
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'donor_attribution' => 'shared',
+    ];
+
+    /**
+     * @return array<string, string|class-string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'donor_attribution' => DonorAttribution::class,
+        ];
+    }
 
     /**
      * Delete the model inside a transaction.
@@ -272,7 +291,7 @@ class Program extends Model implements TracksActivity
      */
     public function activityEvents(): array
     {
-        return ['manager_id' => 'manager_changed', 'strategy_id' => 'updated', 'strategic_pillar_id' => 'updated'];
+        return ['manager_id' => 'manager_changed', 'strategy_id' => 'updated', 'strategic_pillar_id' => 'updated', 'donor_attribution' => 'updated'];
     }
 
     /**

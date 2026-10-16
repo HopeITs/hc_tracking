@@ -9,6 +9,7 @@ use App\Models\Indicator;
 use App\Models\Milestone;
 use App\Models\PlanIndicator;
 use App\Models\Project;
+use App\Models\Proposal;
 use App\Models\Result;
 use App\Models\Risk;
 use App\Models\Task;
@@ -165,6 +166,47 @@ trait ReadsProjectDelivery
                     ->values(),
             ])
             ->sortBy(fn (array $group): int => $group['result']->type->rank())
+            ->values();
+    }
+
+    /**
+     * The project's indicators from every source (T13): instances in the
+     * frameworks of the proposals funding it, and the program framework's
+     * indicators that are organisation-wide or scoped to this project.
+     * Grouped by source, proposals first; one query.
+     *
+     * @return \Illuminate\Support\Collection<int, array{key: string, proposal: ?Proposal, indicators: Collection<int, Indicator>}>
+     */
+    #[Computed]
+    public function projectIndicators(): \Illuminate\Support\Collection
+    {
+        $proposalIds = $this->project->proposals->modelKeys();
+        $programId = $this->project->program_id;
+
+        $indicators = Indicator::query()
+            ->select(['id', 'name', 'code', 'result_id', 'library_indicator_id', 'project_id', 'measure', 'unit'])
+            ->whereIn('result_id', Result::query()
+                ->select('id')
+                ->where(fn (Builder $query): Builder => $query
+                    ->whereIn('proposal_id', $proposalIds)
+                    ->orWhere(fn (Builder $programFramework): Builder => $programFramework->whereNull('proposal_id')->where('program_id', $programId ?? 0))))
+            ->where(fn (Builder $query): Builder => $query->whereNull('project_id')->orWhere('project_id', $this->projectId))
+            ->with([
+                'result:id,statement,type,proposal_id,program_id',
+                'result.proposal:id,name,slug',
+                'libraryIndicator:id,name_ar,name_en',
+            ])
+            ->orderBy('id')
+            ->get();
+
+        return $indicators
+            ->groupBy(fn (Indicator $indicator): string => $indicator->result->proposal_id === null ? 'program' : 'proposal-'.$indicator->result->proposal_id)
+            ->map(fn (Collection $group, string $key): array => [
+                'key' => $key,
+                'proposal' => $group->first()->result->proposal,
+                'indicators' => $group->sortBy(fn (Indicator $indicator): array => [$indicator->result->type->rank(), $indicator->result_id, $indicator->id])->values(),
+            ])
+            ->sortBy(fn (array $group): array => [$group['proposal'] === null ? 1 : 0, $group['proposal']?->name ?? ''])
             ->values();
     }
 

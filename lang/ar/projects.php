@@ -232,4 +232,12 @@ return [
     'funding_history_donor' => 'الجهة المانحة',
     'funding_history_years' => 'السنوات',
     'funding_history_renews' => 'يجدد :number',
+    'project_indicators' => 'مؤشرات المشروع',
+    'project_indicators_subtitle' => 'من أُطر المقترحات التي تموّل هذا المشروع ومن الإطار المنطقي لبرنامجه.',
+    'no_project_indicators' => 'لا مؤشرات بعد',
+    'no_project_indicators_body' => 'ستظهر هنا المؤشرات المرفقة في مقترحات هذا المشروع أو في الإطار المنطقي لبرنامجه.',
+    'program_framework' => 'الإطار المنطقي للبرنامج',
+    'scope_to_project' => 'تخصيص لهذا المشروع',
+    'indicator_scoped_here' => 'مخصّص لهذا المشروع',
+    'indicator_scoped' => 'خُصّص المؤشر لهذا المشروع.',
 ];

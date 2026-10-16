@@ -232,4 +232,12 @@ return [
     'funding_history_donor' => 'Donor',
     'funding_history_years' => 'Years',
     'funding_history_renews' => 'Renews :number',
+    'project_indicators' => 'Project indicators',
+    'project_indicators_subtitle' => 'From the frameworks of the proposals funding this project and from its program framework.',
+    'no_project_indicators' => 'No indicators yet',
+    'no_project_indicators_body' => 'Indicators attached in this project\'s proposals or its program framework will appear here.',
+    'program_framework' => 'Program framework',
+    'scope_to_project' => 'Scope to this project',
+    'indicator_scoped_here' => 'Scoped to this project',
+    'indicator_scoped' => 'Indicator scoped to this project.',
 ];

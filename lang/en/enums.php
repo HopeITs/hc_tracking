@@ -134,6 +134,10 @@ return [
         'continuous' => 'Continuous',
         'event' => 'Event',
     ],
+    'donor_attribution' => [
+        'shared' => 'Shared (highest target)',
+        'split' => 'Split (sum of targets)',
+    ],
     'result_type' => [
         'impact' => 'Impact',
         'outcome' => 'Outcome',

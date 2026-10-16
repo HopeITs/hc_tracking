@@ -12,6 +12,7 @@ use App\Notifications\TracksActivity;
 use Carbon\CarbonImmutable;
 use Database\Factories\PlanIndicatorFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -19,6 +20,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 
 /**
  * A target committed for one indicator, in one plan or proposal.
@@ -28,12 +30,13 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  * @property int $source_id
  * @property int $indicator_id
  * @property string $target
+ * @property string|null $target_population
  * @property int|null $project_id
  * @property Period $period
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['source_type', 'source_id', 'indicator_id', 'target', 'project_id', 'period'])]
+#[Fillable(['source_type', 'source_id', 'indicator_id', 'target', 'target_population', 'project_id', 'period'])]
 class PlanIndicator extends Model implements TracksActivity
 {
     /** @use HasFactory<PlanIndicatorFactory> */
@@ -80,6 +83,37 @@ class PlanIndicator extends Model implements TracksActivity
     public function reports(): HasMany
     {
         return $this->hasMany(Report::class);
+    }
+
+    /**
+     * The targets a project delivers in a period (contracts §12.1): proposal
+     * targets whose proposal runs inside the window (actual dates once both
+     * are set, else planned), and annual-plan targets whose plan year
+     * overlaps it. Read by T17, T18, T19 and T33.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function forProjectInWindow(Builder $query, int $projectId, CarbonImmutable $from, CarbonImmutable $to): void
+    {
+        $query->where('plan_indicators.project_id', $projectId)->where(function (Builder $sources) use ($from, $to): void {
+            $sources->where(function (Builder $proposalTargets) use ($from, $to): void {
+                $proposalTargets->where('plan_indicators.source_type', 'proposal')->whereExists(function (QueryBuilder $proposal) use ($from, $to): void {
+                    $proposal->selectRaw('1')
+                        ->from('proposals')
+                        ->whereColumn('proposals.id', 'plan_indicators.source_id')
+                        ->whereRaw('(case when proposals.actual_date_begin is not null and proposals.actual_date_end is not null then proposals.actual_date_begin else proposals.planned_date_begin end) <= ?', [$to->toDateString()])
+                        ->whereRaw('(case when proposals.actual_date_begin is not null and proposals.actual_date_end is not null then proposals.actual_date_end else proposals.planned_date_end end) >= ?', [$from->toDateString()]);
+                });
+            })->orWhere(function (Builder $planTargets) use ($from, $to): void {
+                $planTargets->where('plan_indicators.source_type', 'annual_plan')->whereExists(function (QueryBuilder $plan) use ($from, $to): void {
+                    $plan->selectRaw('1')
+                        ->from('annual_plans')
+                        ->whereColumn('annual_plans.id', 'plan_indicators.source_id')
+                        ->whereBetween('annual_plans.year', [$from->year, $to->year]);
+                });
+            });
+        });
     }
 
     /**
@@ -361,6 +395,7 @@ class PlanIndicator extends Model implements TracksActivity
     {
         return [
             'target' => 'decimal:2',
+            'target_population' => 'decimal:2',
             'period' => Period::class,
         ];
     }
