@@ -146,4 +146,7 @@ return [
     'you_assigned' => 'You assigned',
     'what_needs_to_happen' => 'What needs to happen?',
     'work_items_across_every_proposal_ordered_by_the_nearest_due' => 'Work items across every proposal, ordered by the nearest due date.',
+    'due_before_requested' => 'The due date cannot be before the request date.',
+    'set_the_due_date' => 'Set the due date.',
+    'delivered_deliverable_keeps_its_kind' => 'A deliverable that has been handed over keeps its kind.',
 ];

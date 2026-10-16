@@ -124,6 +124,7 @@ test('the reset-to-defaults values are the shipped defaults, not the stored rule
             'workingDays' => [1, 2, 3, 4, 5],
             'dueSoonDays' => '7, 3, 1',
             'overdueRepeat' => 3,
+            'departmentTaskDue' => 5,
             'escalateManagerAfter' => 5,
             'escalateTopAfter' => 10,
             'escalationCatchUp' => 3,

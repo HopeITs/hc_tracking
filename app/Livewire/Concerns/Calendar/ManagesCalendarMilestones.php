@@ -109,6 +109,7 @@ trait ManagesCalendarMilestones
         return Milestone::query()
             ->select(['id', 'name', 'project_id', 'sequence'])
             ->where('project_id', $this->parentProjectId())
+            ->whereNull('proposal_id')
             ->when($invalidParentIds !== [], fn (Builder $query) => $query->whereNotIn('id', $invalidParentIds))
             ->orderBy('sequence')
             ->orderBy('name')
@@ -143,11 +144,12 @@ trait ManagesCalendarMilestones
     public function openEditModal(int $milestoneId): void
     {
         $milestone = Milestone::query()
-            ->select(['id', 'project_id', 'result_id', 'name', 'planned_start_date', 'planned_end_date', 'status', 'sequence', 'weight_percentage', 'responsible_user_id', 'parent_milestone_id'])
+            ->select(['id', 'project_id', 'proposal_id', 'result_id', 'name', 'planned_start_date', 'planned_end_date', 'status', 'sequence', 'weight_percentage', 'responsible_user_id', 'parent_milestone_id'])
             ->findOrFail($milestoneId);
 
-        // Someone who may not edit the milestone is taken to its own page.
-        if (Gate::denies('update', $milestone)) {
+        // Someone who may not edit the milestone is taken to its own page, and
+        // so is a milestone on a proposal's plan, which is edited there (T31).
+        if ($milestone->proposal_id !== null || Gate::denies('update', $milestone)) {
             $this->redirectRoute('milestones.show', ['milestone' => $milestone], navigate: true);
 
             return;
@@ -203,7 +205,7 @@ trait ManagesCalendarMilestones
                 'nullable',
                 'integer',
                 Rule::exists(Milestone::class, 'id')->where(
-                    fn ($query) => $query->where('project_id', $projectId),
+                    fn ($query) => $query->where('project_id', $projectId)->whereNull('proposal_id'),
                 ),
                 Rule::notIn($invalidParentIds),
             ],

@@ -149,6 +149,7 @@ return [
     ],
 
     'alerts' => [
+        'department_task_unassigned' => '“:subject” is due on :date and nobody in the department carries it yet — name a person',
         'due_soon' => [
             'today' => '“:subject” is due today',
             'on_day' => '“:subject” is due on :weekday (:date)',
@@ -232,6 +233,8 @@ return [
         'bad_warning' => 'Enter a whole number from 1 to 99 that is not already listed.',
         'remind_every' => 'Remind again every',
         'remind_every_hint' => 'While the item stays overdue.',
+        'department_task_due' => 'Department task heads-up',
+        'department_task_due_hint' => 'Working days before a department task is due.',
         'manager_after' => 'Tell the program manager after',
         'manager_after_hint' => 'Counted from the due date.',
         'top_after' => 'Tell management after',
@@ -424,6 +427,11 @@ return [
             'updated' => ':actor updated the strategy “:subject”',
             'deleted' => ':actor deleted the strategy “:subject”',
         ],
+        'strategic_pillar' => [
+            'created' => ':actor created the strategic pillar “:subject”',
+            'updated' => ':actor updated the strategic pillar “:subject”',
+            'deleted' => ':actor deleted the strategic pillar “:subject”',
+        ],
         'meal_coverage' => [
             'assigned' => [
                 'title' => 'MEAL officer assigned',
@@ -578,6 +586,10 @@ return [
             'targets_saved' => [
                 'title' => 'Targets saved',
                 'body' => ':actor saved the targets of “:subject”',
+            ],
+            'plan_rebased' => [
+                'title' => 'Plan moved to the grant period',
+                'body' => 'The plan of “:subject” moved to the grant period; milestones and tasks cut at the grant end: :value',
             ],
         ],
         'donor_proposal' => [

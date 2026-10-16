@@ -60,6 +60,7 @@ trait SchedulesProjectGantt
 
         $milestones = Milestone::query()
             ->where('project_id', $projectId)
+            ->whereNull('proposal_id')
             ->get(['id', 'project_id', 'parent_milestone_id', 'planned_start_date', 'planned_end_date', 'status', 'sequence']);
 
         foreach ($milestones as $milestone) {

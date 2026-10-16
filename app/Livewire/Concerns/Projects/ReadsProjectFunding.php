@@ -97,6 +97,25 @@ trait ReadsProjectFunding
     }
 
     /**
+     * The project's funding history (T10): every proposal across the years,
+     * oldest first, with its donor, status and planned and actual years. A
+     * renewal names the number it renews. Names, dates and statuses only: no
+     * money, so it is the same for every viewer.
+     *
+     * @return Collection<int, Proposal>
+     */
+    #[Computed]
+    public function fundingHistory(): Collection
+    {
+        return $this->project->proposals()
+            ->select(['proposals.id', 'proposals.slug', 'proposals.name', 'proposals.internal_project_number', 'proposals.status', 'proposals.donor_id', 'proposals.previous_proposal_id', 'proposals.planned_date_begin', 'proposals.planned_date_end', 'proposals.actual_date_begin', 'proposals.actual_date_end'])
+            ->with(['donor:id,name', 'previousProposal:id,internal_project_number'])
+            ->orderBy('proposals.planned_date_begin')
+            ->orderBy('proposals.id')
+            ->get();
+    }
+
+    /**
      * The proposals a donor has approved for this project, with their donors.
      * The agreement budgets are loaded only for a viewer holding
      * funding-agreements.view; everyone else gets names alone.

@@ -84,6 +84,13 @@
     --color-status-active-soft: #e5eef7;
     --color-funding: #2b5f6b;
     --color-funding-soft: #e3eef0;
+    /* Proposal plan series (T31): one colour per proposal on the project Gantt, drawn as a row stripe only. */
+    --color-series-1: #3b6ea8;
+    --color-series-2: #8a5a9e;
+    --color-series-3: #2f8f7a;
+    --color-series-4: #b0662a;
+    --color-series-5: #6b7b2a;
+    --color-series-6: #a8456e;
     --color-ground: #f3f3f4;
     --color-board: #ffffff;
     --color-board-line: #dcddde;
@@ -164,6 +171,12 @@
         --color-status-active-soft: #172637;
         --color-funding: #7cc3cf;
         --color-funding-soft: #122629;
+        --color-series-1: #8bb4e8;
+        --color-series-2: #c49ad6;
+        --color-series-3: #6fd0b8;
+        --color-series-4: #eaa56a;
+        --color-series-5: #b9c770;
+        --color-series-6: #e48ab0;
         --color-ground: var(--color-surface-0);
         --color-board: var(--color-surface-1);
         --color-board-line: var(--color-line);

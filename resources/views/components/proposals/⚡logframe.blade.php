@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Concerns\Proposals\CopiesProgramFramework;
 use App\Livewire\Concerns\Results\BuildsResultsFramework;
 use App\Livewire\Concerns\Results\BuildsResultsTree;
 use App\Livewire\Concerns\Results\FiltersResultsChain;
@@ -33,6 +34,7 @@ use Livewire\Component;
  */
 new class extends Component {
     use BuildsResultsFramework;
+    use CopiesProgramFramework;
     use BuildsResultsTree;
     use FiltersResultsChain;
     use ManagesResultForm;
@@ -160,6 +162,9 @@ new class extends Component {
         @endif
 
         @if ($canCreate)
+            <x-ui.button icon="document-duplicate" wire:click="openCopyModal" wire:loading.attr="disabled" wire:target="openCopyModal" data-test="start-from-program-framework" data-tour="logframe-copy-framework">
+                {{ __('results_framework.start_from_program_framework') }}
+            </x-ui.button>
             <x-ui.button tone="primary" icon="plus" wire:click="openCreateModal" wire:loading.attr="disabled" wire:target="openCreateModal" data-test="create-logframe-result">
                 {{ __('results_framework.add_result') }}
             </x-ui.button>
@@ -233,6 +238,10 @@ new class extends Component {
     @endif
 
     @include('pages.results._index-result-modal')
+
+    @if ($canCreate)
+        @include('components.proposals._logframe-copy-modal')
+    @endif
 
     <x-ui.confirm-modal
         wire:model="showDeleteModal"

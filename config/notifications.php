@@ -175,6 +175,7 @@ return [
     'defaults' => [
         'working_days' => [1, 2, 3, 4, 5],
         'due_soon_days' => [7, 3, 1],
+        'department_task_due_days' => 5,
         'overdue_repeat_days' => 3,
         'escalate_manager_after_days' => 5,
         'escalate_top_after_days' => 10,

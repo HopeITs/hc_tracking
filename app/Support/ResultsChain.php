@@ -43,7 +43,7 @@ use Illuminate\Validation\Rule;
  * @phpstan-type ChainIndicator array{indicator: Indicator, code: string|null, name: string, linked: bool, inactive: bool, gaps: list<string>, targets: list<ChainTarget>}
  * @phpstan-type ChainProposal array{name: string, url: string|null, donor: string|null, donorUrl: string|null}
  * @phpstan-type ChainMilestone array{milestone: Milestone, issues: list<string>, cancelled: bool}
- * @phpstan-type ChainMilestoneGroup array{centerId: int, center: string, progress: float|null, hasCancelled: bool, milestones: list<ChainMilestone>}
+ * @phpstan-type ChainMilestoneGroup array{centerId: int|null, center: string|null, progress: float|null, hasCancelled: bool, milestones: list<ChainMilestone>}
  * @phpstan-type ChainNode array{result: Result, depth: int, gaps: list<string>, indicators: list<ChainIndicator>, lineage: list<Result>, proposal: ChainProposal|null, milestoneGroups: list<ChainMilestoneGroup>, schedule: array<string, list<int>|null>, children: list<array<string, mixed>>, contributions: list<array<string, mixed>>}
  * @phpstan-type ChainOption array{value: string, label: string}
  * @phpstan-type ChainFilters array{indicator: string, center: string, donor: string}
@@ -472,7 +472,9 @@ final class ResultsChain
     /**
      * An activity's milestones grouped by center in delivery order, each
      * group with its weighted progress (cancelled milestones listed but not
-     * counted). A center filter keeps that center's group only.
+     * counted). A proposal-level milestone without a project (T31) forms
+     * a proposal-wide group, first. A center filter keeps that center's
+     * group and the proposal-wide one.
      *
      * @param  list<Milestone>  $milestones
      * @return list<ChainMilestoneGroup>
@@ -483,18 +485,22 @@ final class ResultsChain
         $groups = [];
 
         foreach ($milestones as $milestone) {
-            if ($center !== '' && (string) $milestone->project_id !== $center) {
+            if ($center !== '' && $milestone->project_id !== null && (string) $milestone->project_id !== $center) {
                 continue;
             }
 
-            $key = $milestone->project_id;
+            $key = $milestone->project_id === null ? 'proposal' : (string) $milestone->project_id;
 
             $groups[$key] ??= [
-                'centerId' => $key,
-                'center' => $milestone->project->center()->name ?? $milestone->project->name,
+                'centerId' => $milestone->project_id,
+                'center' => $milestone->project === null ? null : ($milestone->project->center()->name ?? $milestone->project->name),
                 'items' => [],
             ];
             $groups[$key]['items'][] = $milestone;
+        }
+
+        if (isset($groups['proposal'])) {
+            $groups = ['proposal' => $groups['proposal']] + $groups;
         }
 
         return array_values(array_map(fn (array $group): array => [

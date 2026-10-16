@@ -147,24 +147,26 @@ test('the strategy detail programs table sorts by projects descending', function
 test('the strategy detail programs table paginates at 15 rows and totals reflect every program', function () {
     $user = User::factory()->role('General Manager')->create();
     $strategy = Strategy::factory()->create(['start_year' => 2026, 'end_year' => 2026]);
-    Program::factory()->count(17)->sequence(fn ($sequence) => ['name' => 'Program '.str_pad((string) ($sequence->index + 1), 2, '0', STR_PAD_LEFT)])->create(['strategy_id' => $strategy->id]);
+    $programs = Program::factory()->count(17)->sequence(fn ($sequence) => ['name' => 'Program '.str_pad((string) ($sequence->index + 1), 2, '0', STR_PAD_LEFT)])->create(['strategy_id' => $strategy->id]);
+    $row = fn (int $index): string => 'wire:key="strategy-program-'.$programs[$index]->id.'"';
 
+    // The Pillars section above lists every program (T32), so pages are told apart by the table rows.
     $firstPage = $this->actingAs($user)->get(route('strategies.show', $strategy));
 
     $firstPage
         ->assertOk()
-        ->assertSeeText('Program 01')
-        ->assertSeeText('Program 15')
-        ->assertDontSeeText('Program 16')
+        ->assertSee($row(0), false)
+        ->assertSee($row(14), false)
+        ->assertDontSee($row(15), false)
         // The Programs stat tile and panel count reflect all 17, not just this page.
         ->assertSeeText('17');
 
     $this->actingAs($user)
         ->get(route('strategies.show', [$strategy, 'programsPage' => 2]))
         ->assertOk()
-        ->assertSeeText('Program 16')
-        ->assertSeeText('Program 17')
-        ->assertDontSeeText('Program 01');
+        ->assertSee($row(15), false)
+        ->assertSee($row(16), false)
+        ->assertDontSee($row(0), false);
 });
 
 test('an active strategy is shown with the good/green status tone, not the brand red', function () {

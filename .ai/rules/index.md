@@ -54,6 +54,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | {database/migrations/**,app/Models/DonorReport.php,resources/views/pages/funding-agreements/**} | .ai/rules/pages-funding-agreements.md |
 | resources/views/pages/** | .ai/rules/pages.md |
 | {config/access-control.php,app/Policies/UserPolicy.php} | .ai/rules/policies.md |
+| {app/Actions/Proposals/**,resources/views/pages/proposals/**,resources/views/pages/projects/**} | .ai/rules/projects.md |
 | resources/views/pages/proposals/** | .ai/rules/proposals.md |
 | {app/Models/Proposal.php,app/Models/DonorProposal.php,resources/views/pages/{proposals,funding-agreements,transfers,donors}/**} | .ai/rules/proposalsfunding-agreementstransfersdonors.md |
 | app/Providers/** | .ai/rules/providers.md |

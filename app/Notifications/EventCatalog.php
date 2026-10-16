@@ -175,6 +175,8 @@ final class EventCatalog
                 'proposal.project_linked' => self::entry('proposals', $digest, 'module_map', $all, activity: 'proposal.project_linked'),
                 'proposal.project_unlinked' => self::entry('proposals', $digest, 'module_map', $all, activity: 'proposal.project_unlinked'),
                 'proposal.deleted' => self::entry('proposals', $digest, 'module_map', $all, activity: 'proposal.deleted'),
+                // T31: the approval moved the plan to the grant period; the project owners hear of it only when a date was cut at the grant end.
+                'proposal.plan_rebased' => self::entry('proposals', $now, 'module_map', OversightMode::None, activity: 'proposal.plan_rebased'),
             ],
             // funding-agreements
             [

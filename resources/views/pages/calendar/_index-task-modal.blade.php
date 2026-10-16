@@ -31,7 +31,7 @@
 
                 <x-ui.form-select wire:model="taskSourceId" :label="__('tasks.source')" :placeholder="__('common.select')" required>
                     @foreach ($this->sourceOptions as $sourceOption)
-                        <option value="{{ $sourceOption->id }}">{{ $sourceOption->name }}{{ $taskSourceType === 'milestone' ? ' · '.$sourceOption->project->name : '' }}</option>
+                        <option value="{{ $sourceOption->id }}">{{ $sourceOption->name }}{{ $taskSourceType === 'milestone' ? ' · '.$sourceOption->ownerName() : '' }}</option>
                     @endforeach
                 </x-ui.form-select>
             </div>

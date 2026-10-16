@@ -145,6 +145,23 @@ return [
         'activity' => 'Activity',
         'cross_cutting' => 'Cross-cutting',
     ],
+    'task_kind' => [
+        'general' => 'General',
+        'media_deliverable' => 'Media deliverable',
+        'financial' => 'Financial',
+    ],
+    'deliverable_kind' => [
+        'video' => 'Video',
+        'photos' => 'Photos',
+        'file' => 'File',
+        'text' => 'Text',
+    ],
+    'delivery_state' => [
+        'requested' => 'Requested',
+        'delivered' => 'Delivered',
+        'accepted' => 'Accepted',
+        'returned' => 'Returned',
+    ],
     'task_priority' => [
         'low' => 'Low',
         'medium' => 'Medium',

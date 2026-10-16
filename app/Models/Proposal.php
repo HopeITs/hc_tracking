@@ -12,11 +12,13 @@ use App\Enums\ProposalStatus;
 use App\Notifications\TracksActivity;
 use App\Observers\MediaOwnerObserver;
 use App\Observers\PlanIndicatorSourceObserver;
+use App\Observers\ProposalObserver;
 use App\Support\ProposalTransitions;
 use Carbon\CarbonImmutable;
 use Database\Factories\ProposalFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -66,7 +68,7 @@ use Illuminate\Support\Facades\DB;
     'final_report_accepted_by',
     'previous_proposal_id',
 ])]
-#[ObservedBy([PlanIndicatorSourceObserver::class, MediaOwnerObserver::class])]
+#[ObservedBy([PlanIndicatorSourceObserver::class, MediaOwnerObserver::class, ProposalObserver::class])]
 class Proposal extends Model implements TracksActivity
 {
     /** @use HasFactory<ProposalFactory> */
@@ -129,6 +131,27 @@ class Proposal extends Model implements TracksActivity
     public function delete(): bool
     {
         return (bool) DB::transaction(fn () => parent::delete());
+    }
+
+    /**
+     * The proposal this one renews, or null when it starts a funding line or
+     * its predecessor was deleted.
+     *
+     * @return BelongsTo<Proposal, $this>
+     */
+    public function previousProposal(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'previous_proposal_id');
+    }
+
+    /**
+     * The proposals that renew this one.
+     *
+     * @return HasMany<Proposal, $this>
+     */
+    public function renewals(): HasMany
+    {
+        return $this->hasMany(self::class, 'previous_proposal_id');
     }
 
     /**
@@ -214,6 +237,59 @@ class Proposal extends Model implements TracksActivity
     public function tasks(): MorphMany
     {
         return $this->morphMany(Task::class, 'source');
+    }
+
+    /**
+     * The milestones on this proposal's plan (contracts.md §12.2): shared at
+     * proposal level, or center-specific when they also carry a project_id.
+     *
+     * @return HasMany<Milestone, $this>
+     */
+    public function milestones(): HasMany
+    {
+        return $this->hasMany(Milestone::class);
+    }
+
+    /**
+     * Every task on this proposal's plan: raised on the proposal itself or on
+     * one of its milestones. Goes through the task visibility scope like any
+     * other task query.
+     *
+     * @return Builder<Task>
+     */
+    public function planTasks(): Builder
+    {
+        return Task::query()->where(fn (Builder $query) => $query
+            ->where(fn (Builder $query) => $query->where('source_type', 'proposal')->where('source_id', $this->id))
+            ->orWhere(fn (Builder $query) => $query->where('source_type', 'milestone')
+                ->whereIn('source_id', Milestone::query()->select('id')->where('proposal_id', $this->id))));
+    }
+
+    /**
+     * The owners of each proposal — the owners (HR employees) of the projects
+     * it funds: a proposal has no owner of its own (contracts §15.2).
+     *
+     * @param  array<int>  $proposalIds
+     * @return array<int, list<int>> proposal id => owner employee ids
+     */
+    public static function ownerEmployeeIdsFor(array $proposalIds): array
+    {
+        if ($proposalIds === []) {
+            return [];
+        }
+
+        $owners = [];
+        $rows = DB::table('project_proposal')
+            ->join('projects', 'projects.id', '=', 'project_proposal.project_id')
+            ->whereIn('project_proposal.proposal_id', $proposalIds)
+            ->whereNotNull('projects.user_id')
+            ->get(['project_proposal.proposal_id', 'projects.user_id']);
+
+        foreach ($rows as $row) {
+            $owners[(int) $row->proposal_id][(int) $row->user_id] = (int) $row->user_id;
+        }
+
+        return array_map(fn (array $ids): array => array_values($ids), $owners);
     }
 
     /**
@@ -424,6 +500,20 @@ class Proposal extends Model implements TracksActivity
     protected function activityExcludedFields(): array
     {
         return ['requested_budget'];
+    }
+
+    /**
+     * A renewal's creation names the proposal it renews.
+     *
+     * @return array<string, mixed>
+     */
+    protected function activityProperties(string $event): array
+    {
+        $previousId = $this->activityAttribute('previous_proposal_id');
+
+        return $event === $this->getMorphClass().'.created' && $previousId !== null
+            ? ['renewed_from' => (int) $previousId]
+            : [];
     }
 
     public function activityModule(): string

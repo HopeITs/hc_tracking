@@ -48,10 +48,10 @@
 
         <div id="chain-milestones-{{ $activityId }}" x-show="milestones" x-collapse class="mt-2 space-y-2 print:block!">
             @foreach ($groups as $group)
-                <section class="rounded-md border border-board-line bg-board px-3 py-2 dark:border-line" wire:key="chain-milestones-{{ $activityId }}-{{ $group['centerId'] }}">
+                <section class="rounded-md border border-board-line bg-board px-3 py-2 dark:border-line" wire:key="chain-milestones-{{ $activityId }}-{{ $group['centerId'] ?? 'proposal' }}">
                     <div class="grid gap-1.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,14rem)] sm:items-center sm:gap-4">
-                        <p class="text-sm font-semibold" dir="auto">{{ $group['center'] }}</p>
-                        <div class="min-w-0" data-chain-milestone-progress="{{ $group['centerId'] }}" data-percent="{{ $percent($group['progress']) }}">
+                        <p class="text-sm font-semibold" dir="auto">{{ $group['center'] ?? __('results_framework.chain_proposal_wide') }}</p>
+                        <div class="min-w-0" data-chain-milestone-progress="{{ $group['centerId'] ?? 'proposal' }}" data-percent="{{ $percent($group['progress']) }}">
                             <p class="flex items-baseline justify-between gap-2 text-xs">
                                 <span class="{{ $muted }}">{{ __('results_framework.chain_milestones_progress') }}</span>
                                 <span dir="ltr" class="font-bold tabular-nums">{{ $group['progress'] === null ? '—' : $percent($group['progress']).'%' }}</span>

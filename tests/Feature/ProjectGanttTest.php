@@ -1,12 +1,15 @@
 <?php
 
 use App\Enums\MilestoneStatus;
+use App\Enums\ResultType;
 use App\Enums\TaskStatus;
+use App\Models\ActivitySchedule;
 use App\Models\DonorProposal;
 use App\Models\DonorReport;
 use App\Models\Milestone;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\Result;
 use App\Models\Task;
 use App\Models\User;
 use Livewire\Livewire;
@@ -212,4 +215,105 @@ test('an edit answers with the rebuilt payload', function () {
     expect($result['ok'])->toBeTrue()
         ->and(collect($result['payload']['rows'])->firstWhere('id', 'milestone-'.$milestone->id))
         ->toMatchArray(['start' => '2026-12-01', 'end' => '2026-12-02', 'editable' => true]);
+});
+
+/**
+ * A project funded by two proposals, each with a plan: a shared milestone with
+ * a plan task, this center's own milestone, and another center's milestone.
+ *
+ * @return array{project: Project, first: Proposal, second: Proposal, shared: Milestone, own: Milestone, elsewhere: Milestone, task: Task}
+ */
+function ganttPlanFixture(): array
+{
+    $project = Project::factory()->active()->create();
+    $otherCenter = Project::factory()->create();
+    $first = Proposal::factory()->create(['name' => 'Winter Response', 'planned_date_begin' => '2026-01-01', 'planned_date_end' => '2026-12-31']);
+    $second = Proposal::factory()->create(['name' => 'Summer Schools', 'planned_date_begin' => '2026-03-01', 'planned_date_end' => '2026-12-31']);
+    $project->proposals()->attach([$first->id, $second->id]);
+    $otherCenter->proposals()->attach($first->id);
+
+    $plan = fn (Proposal $proposal, ?Project $center, string $name): Milestone => Milestone::factory()->create([
+        'proposal_id' => $proposal->id,
+        'project_id' => $center?->id,
+        'name' => $name,
+        'planned_start_date' => '2026-04-01',
+        'planned_end_date' => '2026-04-30',
+    ]);
+
+    $shared = $plan($first, null, 'Shared consultations');
+    $own = $plan($first, $project, 'Our center launch');
+    $elsewhere = $plan($first, $otherCenter, 'Other center launch');
+    $plan($second, null, 'School kits');
+    $task = Task::factory()->create(['source_type' => 'milestone', 'source_id' => $shared->id, 'department_id' => insertHrDepartment('Media'), 'title' => 'Film the consultations', 'start_date' => '2026-04-02', 'due_date' => '2026-04-10']);
+
+    return compact('project', 'first', 'second', 'shared', 'own', 'elsewhere', 'task');
+}
+
+test('each linked proposal\'s plan is drawn as its own read-only group with its own colour', function () {
+    $fixture = ganttPlanFixture();
+
+    $component = projectPage($fixture['project'])->set('tab', 'plan');
+    $payload = $component->instance()->ganttPayload;
+    $rows = collect($payload['rows'])->keyBy('id');
+
+    expect($payload['series'])->toBe([
+        ['series' => 1, 'id' => $fixture['first']->id, 'name' => 'Winter Response'],
+        ['series' => 2, 'id' => $fixture['second']->id, 'name' => 'Summer Schools'],
+    ])
+        ->and($rows['plan-'.$fixture['first']->id])->toMatchArray(['kind' => 'group', 'series' => 1])
+        ->and($rows['plan-milestone-'.$fixture['shared']->id])->toMatchArray(['parent' => 'plan-'.$fixture['first']->id, 'series' => 1, 'editable' => false])
+        ->and($rows['plan-milestone-'.$fixture['own']->id])->toMatchArray(['series' => 1, 'editable' => false])
+        ->and($rows['plan-task-'.$fixture['task']->id])->toMatchArray(['parent' => 'plan-milestone-'.$fixture['shared']->id, 'editable' => false])
+        ->and($rows)->not->toHaveKey('plan-milestone-'.$fixture['elsewhere']->id)
+        ->and($rows)->not->toHaveKey('milestone-'.$fixture['own']->id)
+        ->and($rows->firstWhere('name', 'School kits'))->toMatchArray(['series' => 2]);
+
+    $component->assertSeeHtml('data-plan-series')->assertSeeHtml('data-series="2"');
+});
+
+test('the plan filter shows one proposal\'s plan and keeps its colour', function () {
+    $fixture = ganttPlanFixture();
+
+    $rows = collect(projectPage($fixture['project'])
+        ->set('tab', 'plan')
+        ->set('planProposal', (string) $fixture['second']->id)
+        ->instance()->ganttPayload['rows'])->keyBy('id');
+
+    expect($rows)->toHaveKey('plan-'.$fixture['second']->id)
+        ->and($rows)->not->toHaveKey('plan-'.$fixture['first']->id)
+        ->and($rows['plan-'.$fixture['second']->id]['series'])->toBe(2);
+});
+
+test('plan milestones and tasks cannot be moved from the project gantt', function () {
+    $fixture = ganttPlanFixture();
+
+    projectPage($fixture['project'])
+        ->call('ganttReschedule', 'milestone-'.$fixture['own']->id, '2026-06-01', '2026-06-10')
+        ->call('ganttReschedule', 'plan-milestone-'.$fixture['shared']->id, '2026-06-01', '2026-06-10')
+        ->call('ganttReschedule', 'task-'.$fixture['task']->id, '2026-06-01', '2026-06-10')
+        ->call('ganttRename', 'milestone-'.$fixture['own']->id, 'Hijacked');
+
+    expect($fixture['own']->fresh())
+        ->name->toBe('Our center launch')
+        ->planned_start_date->toDateString()->toBe('2026-04-01')
+        ->and($fixture['shared']->fresh()->planned_start_date->toDateString())->toBe('2026-04-01')
+        ->and($fixture['task']->fresh()->start_date->toDateString())->toBe('2026-04-02');
+});
+
+test('a proposal activity with a calendar spans its scheduled months with its weeks named', function () {
+    $fixture = ganttPlanFixture();
+    $output = Result::factory()->create(['type' => ResultType::Output, 'proposal_id' => $fixture['first']->id]);
+    $activity = Result::factory()->activity($output)->create(['statement' => 'Run the winter clinics']);
+    ActivitySchedule::query()->create(['result_id' => $activity->id, 'project_id' => null, 'month' => '2026-05-01', 'weeks' => [1, 3]]);
+    ActivitySchedule::query()->create(['result_id' => $activity->id, 'project_id' => null, 'month' => '2026-06-01', 'weeks' => null]);
+
+    $rows = ganttRowsFor($fixture['project']);
+
+    expect($rows['plan-activity-'.$activity->id])->toMatchArray([
+        'kind' => 'activity',
+        'start' => '2026-05-01',
+        'end' => '2026-06-30',
+        'owner' => '2026-05 (1, 3), 2026-06',
+        'editable' => false,
+    ]);
 });

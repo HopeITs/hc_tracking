@@ -78,7 +78,7 @@
                 :fields="['name', 'startDate', 'endDate', 'description']"
             >
                 <div class="grid grid-cols-2 gap-x-4 gap-y-3 @4xl/modal:grid-cols-3">
-                    <x-ui.form-input wire:model="name" :label="__('projects.project_name')" maxlength="255" required autofocus class="col-span-2" />
+                    <x-ui.form-input wire:model.live.debounce.400ms="name" :label="__('projects.project_name')" maxlength="255" required autofocus class="col-span-2" />
 
                     @if ($this->datesEditable())
                         <x-ui.form-input wire:model="startDate" :label="__('common.start_date')" type="date" />
@@ -133,6 +133,61 @@
                     <x-projects.sector-picker wire:model="sectorIds" :required="$editingProjectId === null" class="@2xl/modal:col-span-3" />
                 </div>
             </x-ui.form-section>
+
+            @if ($editingProjectId === null)
+                @php($pairProject = $this->existingPairProject)
+                @if ($pairProject !== null)
+                    <div
+                        class="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm {{ $pairProject['state'] === 'open' ? 'border-status-warn/40 bg-status-warn-soft' : 'border-secondary-soft bg-secondary-soft/40 dark:border-line dark:bg-surface-2' }}"
+                        role="status"
+                        data-test="existing-pair-project"
+                    >
+                        <p class="min-w-0 flex-1 text-secondary-dark dark:text-ink">
+                            <flux:icon name="information-circle" variant="micro" class="inline size-4 align-text-bottom" aria-hidden="true" />
+                            <span dir="auto">{{ match ($pairProject['state']) {
+                                'open' => __('projects.existing_project_open', ['name' => $pairProject['name']]),
+                                'closed' => __('projects.existing_project_closed', ['name' => $pairProject['name']]),
+                                'archived' => __('projects.existing_project_archived', ['name' => $pairProject['name']]),
+                            } }}</span>
+                        </p>
+                        @if ($pairProject['state'] === 'archived')
+                            @if ($pairProject['canRestore'])
+                                <x-ui.button type="button" size="sm" wire:click="restoreExistingProject" wire:loading.attr="disabled" wire:target="restoreExistingProject" data-test="restore-existing-project">
+                                    {{ __('projects.restore_first') }}
+                                </x-ui.button>
+                            @endif
+                        @else
+                            @can('create', \App\Models\Proposal::class)
+                                <x-ui.button :href="route('proposals.index', ['for_project' => $pairProject['id']])" wire:navigate size="sm" tone="primary" data-test="add-proposal-to-existing">
+                                    {{ __('projects.add_proposal_to_it') }}
+                                </x-ui.button>
+                            @endcan
+                        @endif
+                    </div>
+                @endif
+
+                @if ($this->similarProjects !== [])
+                    <div class="rounded-lg border border-secondary-soft bg-secondary-soft/40 dark:border-line dark:bg-surface-2 p-3 text-sm" data-test="similar-projects">
+                        <p class="font-medium text-secondary-dark dark:text-ink">{{ __('projects.similar_projects') }}</p>
+                        <p class="mt-0.5 text-xs text-secondary-medium dark:text-ink-muted">{{ __('projects.similar_projects_hint') }}</p>
+                        <ul class="mt-2 space-y-1">
+                            @foreach ($this->similarProjects as $similar)
+                                <li class="flex flex-wrap items-baseline gap-x-2" wire:key="similar-{{ $similar['id'] }}">
+                                    <span class="font-medium" dir="auto">{{ $similar['name'] }}</span>
+                                    <span class="text-xs text-secondary-medium dark:text-ink-muted" dir="auto">{{ $similar['center'] }} · {{ $similar['program'] }} · {{ $similar['status'] }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                        <label class="mt-3 flex items-start gap-2">
+                            <input type="checkbox" wire:model="confirmNewProject" class="mt-0.5" data-test="confirm-new-project">
+                            <span>{{ __('projects.similar_confirm_label') }}</span>
+                        </label>
+                        @error('confirmNewProject')
+                            <p role="alert" class="mt-1 text-sm font-medium text-status-critical">{{ $message }}</p>
+                        @enderror
+                    </div>
+                @endif
+            @endif
 
             <x-ui.form-section
                 :title="__('projects.section_beneficiaries')"

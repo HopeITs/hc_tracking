@@ -149,6 +149,7 @@ return [
     ],
 
     'alerts' => [
+        'department_task_unassigned' => '«:subject» مستحقة في :date ولم يُكلَّف بها أحد من القسم بعد — سمِّ شخصاً',
         'due_soon' => [
             'today' => 'موعد «:subject» اليوم',
             'on_day' => 'موعد «:subject» يوم :weekday (:date)',
@@ -232,6 +233,8 @@ return [
         'bad_warning' => 'أدخل عددًا صحيحًا من 1 إلى 99 غير موجود في القائمة.',
         'remind_every' => 'التذكير مجددًا كل',
         'remind_every_hint' => 'ما دام العنصر متأخرًا.',
+        'department_task_due' => 'تنبيه مهام الأقسام',
+        'department_task_due_hint' => 'أيام العمل قبل موعد استحقاق مهمة القسم.',
         'manager_after' => 'إبلاغ مدير البرنامج بعد',
         'manager_after_hint' => 'تُحتسب من تاريخ الموعد.',
         'top_after' => 'إبلاغ الإدارة بعد',
@@ -424,6 +427,11 @@ return [
             'updated' => 'حدّث :actor الاستراتيجية «:subject»',
             'deleted' => 'حذف :actor الاستراتيجية «:subject»',
         ],
+        'strategic_pillar' => [
+            'created' => 'أنشأ :actor المحور الاستراتيجي «:subject»',
+            'updated' => 'حدّث :actor المحور الاستراتيجي «:subject»',
+            'deleted' => 'حذف :actor المحور الاستراتيجي «:subject»',
+        ],
         'meal_coverage' => [
             'assigned' => [
                 'title' => 'تعيين مسؤول متابعة وتقييم',
@@ -578,6 +586,10 @@ return [
             'targets_saved' => [
                 'title' => 'حفظ المستهدفات',
                 'body' => 'حفظ :actor مستهدفات المقترح «:subject»',
+            ],
+            'plan_rebased' => [
+                'title' => 'نقل الخطة إلى مدة المنحة',
+                'body' => 'نُقلت خطة المقترح «:subject» إلى مدة المنحة، وعدد المراحل الرئيسية والمهام التي قُصّرت إلى نهاية المنحة: :value',
             ],
         ],
         'donor_proposal' => [

@@ -30,6 +30,11 @@ use App\Support\Slots;
  * (ProposalPolicy::view admits them), so the proposal's reviewers, the
  * removed reviewer and the MEAL Manager skip the permission check for these
  * events.
+ *
+ * The approval rebase (proposal.plan_rebased, T31) is the system's: it tells
+ * the project owners, and only when a milestone or task date was cut at the
+ * grant end, so they can re-plan it. No watcher hears of it, and the owners
+ * (who hold no proposals.view) skip the permission check for it.
  */
 final class ProposalRecipients extends WatcherRecipients
 {
@@ -47,6 +52,8 @@ final class ProposalRecipients extends WatcherRecipients
 
     private const ReviewEvents = [self::ReviewRequested, self::ReviewerAdded, self::ReviewerRemoved, self::ReviewerSeen, self::NeedAssessmentAdded];
 
+    private const PlanRebased = 'proposal.plan_rebased';
+
     protected function roles(): array
     {
         return ['Financial', 'Public Relations Manager'];
@@ -54,7 +61,11 @@ final class ProposalRecipients extends WatcherRecipients
 
     public function watcherRoles(Activity $activity): array
     {
-        return $activity->event === self::BeneficiariesChanged ? [...$this->roles(), 'MEAL'] : $this->roles();
+        return match ($activity->event) {
+            self::BeneficiariesChanged => [...$this->roles(), 'MEAL'],
+            self::PlanRebased => [],
+            default => $this->roles(),
+        };
     }
 
     public function directEmployeeIds(Activity $activity): array
@@ -65,6 +76,7 @@ final class ProposalRecipients extends WatcherRecipients
             self::ReviewerAdded, self::ReviewerRemoved => $this->idsFromProperty($activity, 'employee_id'),
             self::ReviewerSeen => $this->projectOwnerIds($activity),
             self::NeedAssessmentAdded => $this->uniqueIds([...$this->projectOwnerIds($activity), Slots::holderOf('meal_manager')]),
+            self::PlanRebased => $this->hasClippedDates($activity) ? $this->projectOwnerIds($activity) : [],
             default => [],
         };
     }
@@ -93,6 +105,12 @@ final class ProposalRecipients extends WatcherRecipients
                 ...array_values(app(EmployeeRecipients::class)->usersFor($this->mealOfficerIds($activity))),
                 ...$mealHolders,
             ]);
+        }
+
+        if ($activity->event === self::PlanRebased) {
+            return $this->hasClippedDates($activity)
+                ? $this->uniqueIds(array_values(app(EmployeeRecipients::class)->usersFor($this->projectOwnerIds($activity))))
+                : [];
         }
 
         if (! in_array($activity->event, self::ReviewEvents, true)) {
@@ -146,6 +164,16 @@ final class ProposalRecipients extends WatcherRecipients
             ->all();
 
         return $this->uniqueIds($officerIds);
+    }
+
+    /**
+     * Whether the approval rebase cut a milestone or task date at the grant
+     * end (RebaseProposalPlan's clipped lists).
+     */
+    private function hasClippedDates(Activity $activity): bool
+    {
+        return ($activity->properties['clipped_milestones'] ?? []) !== []
+            || ($activity->properties['clipped_tasks'] ?? []) !== [];
     }
 
     /**

@@ -145,6 +145,23 @@ return [
         'activity' => 'النشاط',
         'cross_cutting' => 'عابر للمستويات',
     ],
+    'task_kind' => [
+        'general' => 'عامة',
+        'media_deliverable' => 'تسليم إعلامي',
+        'financial' => 'مالية',
+    ],
+    'deliverable_kind' => [
+        'video' => 'فيديو',
+        'photos' => 'صور',
+        'file' => 'ملف',
+        'text' => 'نص',
+    ],
+    'delivery_state' => [
+        'requested' => 'مطلوب',
+        'delivered' => 'مُسلَّم',
+        'accepted' => 'مقبول',
+        'returned' => 'مُعاد',
+    ],
     'task_priority' => [
         'low' => 'منخفضة',
         'medium' => 'متوسطة',

@@ -121,8 +121,8 @@ trait ReadsDashboardWork
         $horizon = [$today->toDateString(), $today->addDays(30)->toDateString()];
 
         $milestones = $this->visible(Milestone::query(), 'milestones')
-            ->select(['id', 'project_id', 'name', 'planned_end_date'])
-            ->with('project:id,name')
+            ->select(['id', 'project_id', 'proposal_id', 'name', 'planned_end_date'])
+            ->with(['project:id,name', 'proposal:id,name'])
             ->where('status', MilestoneStatus::Planned)
             ->whereBetween('planned_end_date', $horizon)
             ->oldest('planned_end_date')
@@ -134,7 +134,7 @@ trait ReadsDashboardWork
                 'icon' => 'flag',
                 'tone' => 'neutral',
                 'title' => $milestone->name,
-                'context' => __('dashboard.milestone_in', ['project' => $milestone->project?->name ?? '—']),
+                'context' => __('dashboard.milestone_in', ['project' => $milestone->ownerName()]),
                 'href' => route('milestones.index', ['project' => $milestone->project_id]),
             ]);
 
@@ -162,7 +162,7 @@ trait ReadsDashboardWork
 
         $tasks = $this->visible(Task::query(), 'tasks')
             ->select(['id', 'source_type', 'source_id', 'title', 'due_date'])
-            ->with(['source' => fn (MorphTo $morphTo) => $morphTo->morphWith([Milestone::class => ['project:id,name']])])
+            ->with(['source' => fn (MorphTo $morphTo) => $morphTo->morphWith([Milestone::class => ['project:id,name', 'proposal:id,name']])])
             ->where('status', '!=', TaskStatus::Done)
             ->whereBetween('due_date', $horizon)
             ->oldest('due_date')

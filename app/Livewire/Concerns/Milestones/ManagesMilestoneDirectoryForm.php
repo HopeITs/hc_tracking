@@ -99,6 +99,7 @@ trait ManagesMilestoneDirectoryForm
         return Milestone::query()
             ->select(['id', 'name', 'project_id', 'sequence'])
             ->where('project_id', (int) $this->milestoneProjectId)
+            ->whereNull('proposal_id')
             ->orderBy('sequence')
             ->orderBy('name')
             ->orderBy('id')
@@ -175,7 +176,7 @@ trait ManagesMilestoneDirectoryForm
                 'nullable',
                 'integer',
                 Rule::exists(Milestone::class, 'id')->where(
-                    fn ($query) => $query->where('project_id', (int) $this->milestoneProjectId),
+                    fn ($query) => $query->where('project_id', (int) $this->milestoneProjectId)->whereNull('proposal_id'),
                 ),
             ],
         ], [

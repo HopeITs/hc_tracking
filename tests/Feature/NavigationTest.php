@@ -40,7 +40,7 @@ test('the sidebar lists every page for a Super Admin with funding in the order m
         'projects.index', 'milestones.index', 'timeline.index', 'risks.index',
         'results.index', 'indicator-library.index', 'indicators.index', 'targets.index', 'reports.index',
         'donors.index', 'proposals.index', 'funding-agreements.index', 'transfers.index', 'admin.accounts.index',
-        'tasks.index', 'calendar.index',
+        'tasks.index', 'department-tasks.index', 'calendar.index',
         'admin.users.index', 'admin.notification-settings.edit', 'activity.index', 'admin.cities.index', 'admin.sectors.index',
     ]);
 });
@@ -50,7 +50,7 @@ test('the sidebar leaves a Team Member only the read-only cities and sectors und
 
     $html = $this->actingAs($user)->get(route('dashboard'))->assertOk()->getContent();
 
-    expect(array_slice(sidebarRouteNames($html), -4))->toBe(['tasks.index', 'calendar.index', 'admin.cities.index', 'admin.sectors.index']);
+    expect(array_slice(sidebarRouteNames($html), -5))->toBe(['tasks.index', 'department-tasks.index', 'calendar.index', 'admin.cities.index', 'admin.sectors.index']);
 });
 
 test('the sidebar drops the administration heading for someone who holds none of its pages', function () {

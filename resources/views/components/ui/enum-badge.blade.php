@@ -54,6 +54,12 @@
             \App\Enums\RagStatus::Red => 'accent',
         },
         $case instanceof \App\Enums\Period => 'outline',
+        $case instanceof \App\Enums\DeliveryState => match ($case) {
+            \App\Enums\DeliveryState::Accepted => 'good',
+            \App\Enums\DeliveryState::Delivered => 'solid',
+            \App\Enums\DeliveryState::Returned => 'accent',
+            \App\Enums\DeliveryState::Requested => 'outline',
+        },
         $case instanceof \App\Enums\ReportStatus => match ($case) {
             \App\Enums\ReportStatus::Approved => 'solid',
             \App\Enums\ReportStatus::Draft, \App\Enums\ReportStatus::Reviewed => 'outline',

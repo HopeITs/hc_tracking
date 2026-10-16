@@ -90,13 +90,14 @@ new #[Title('titles.strategies')] class extends Component {
     /**
      * Whether this strategy may be deleted.
      *
-     * programs.strategy_id RESTRICTs: a strategy carrying any programs stays.
+     * programs.strategy_id and strategic_pillars.strategy_id RESTRICT: a
+     * strategy carrying any programs or pillars stays.
      */
     protected function canDelete(int $strategyId): bool
     {
-        $strategy = Strategy::query()->select(['id'])->withCount('programs')->find($strategyId);
+        $strategy = Strategy::query()->select(['id'])->withCount(['programs', 'pillars'])->find($strategyId);
 
-        return $strategy !== null && $strategy->programs_count === 0;
+        return $strategy !== null && $strategy->programs_count === 0 && $strategy->pillars_count === 0;
     }
 
     public function openCreateModal(): void
@@ -181,7 +182,9 @@ new #[Title('titles.strategies')] class extends Component {
 
             Flux::toast(
                 variant: 'danger',
-                text: __('strategies.this_strategy_has_linked_programs_and_cannot_be_deleted'),
+                text: $strategy->programs()->exists()
+                    ? __('strategies.this_strategy_has_linked_programs_and_cannot_be_deleted')
+                    : __('strategies.strategy_has_pillars'),
             );
 
             return;

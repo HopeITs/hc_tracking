@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
+use App\Enums\ProposalPlanWindow;
 use App\Models\Milestone;
+use App\Models\Proposal;
 use App\Models\User;
+use Illuminate\Auth\Access\Response;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * Milestones follow their project: besides holders of the milestones.*
@@ -62,6 +66,26 @@ class MilestonePolicy
     {
         return $this->update($user, $milestone)
             || ($user->employee_id !== null && $milestone->responsible_user_id === $user->employee_id);
+    }
+
+    /**
+     * Determine whether the user can add a milestone to a proposal's plan,
+     * or edit one ($milestone), in the proposal's current window (T31):
+     * while planning, plan rights (proposals.update, or milestones.create
+     * with sight of the proposal); after approval, normal execution rights.
+     */
+    public function planForProposal(User $user, Proposal $proposal, ?Milestone $milestone = null): Response
+    {
+        $allowed = match (ProposalPlanWindow::for($proposal->status)) {
+            ProposalPlanWindow::Planning => $user->can('proposals.update')
+                || ($user->can('milestones.create') && Gate::forUser($user)->allows('view', $proposal)),
+            ProposalPlanWindow::Execution => $milestone === null
+                ? $user->can('milestones.create')
+                : $this->update($user, $milestone),
+            ProposalPlanWindow::Locked, ProposalPlanWindow::Closed => false,
+        };
+
+        return $allowed ? Response::allow() : Response::deny(ProposalPlanWindow::for($proposal->status)->denialMessage());
     }
 
     /**

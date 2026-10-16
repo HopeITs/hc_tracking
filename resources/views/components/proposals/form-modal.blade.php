@@ -22,11 +22,14 @@
     'needsBeneficiariesReason' => false,
     'skipping' => false,
     'storedNumber' => null,
+    'renewable' => [],
+    'renewal' => null,
 ])
 
 @php
     $mutedText = 'text-secondary-medium dark:text-ink-muted';
-    $projectRows = $editing ? $linkedProjects : $chosenProjects;
+    $isRenewal = $renewal !== null;
+    $projectRows = $editing ? $linkedProjects : ($isRenewal ? $renewal['projects'] : $chosenProjects);
     $chosenCount = count($chosenProjects);
     $projectsError = $errors->first('projectIds') ?: $errors->first('beneficiaries');
 @endphp
@@ -53,6 +56,41 @@
             </div>
         @endif
 
+        @if (! $editing && $renewable !== [])
+            <x-ui.form-section :title="__('proposals.start_from_previous')" :fields="['previousProposalId']" data-test="renewal-section">
+                <div class="grid gap-y-3">
+                    <x-ui.form-select wire:model.live="previousProposalId" :label="__('proposals.previous_proposal_label')" :placeholder="__('proposals.choose_previous')" :help="__('proposals.choose_previous')" data-test="previous-proposal-select">
+                        @foreach ($renewable as $option)
+                            <option value="{{ $option['id'] }}">{{ $option['label'] }}</option>
+                        @endforeach
+                    </x-ui.form-select>
+
+                    @if ($isRenewal)
+                        <div class="grid gap-3 rounded-lg border border-secondary-soft bg-secondary-soft/40 p-3 text-sm @2xl/modal:grid-cols-2 dark:border-line dark:bg-surface-2" role="status" data-test="renewal-preview">
+                            <div>
+                                <p class="font-semibold text-secondary-dark dark:text-ink">{{ __('proposals.renewal_will_copy') }}</p>
+                                <ul class="mt-1 list-disc space-y-0.5 ps-5 {{ $mutedText }}">
+                                    <li>{{ __('proposals.renewal_copy_basics') }}</li>
+                                    <li>{{ __('proposals.renewal_copy_framework') }} ({{ $renewal['results'] }})</li>
+                                    <li>{{ __('proposals.renewal_copy_plan') }} ({{ $renewal['milestones'] }} / {{ $renewal['tasks'] }})</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-secondary-dark dark:text-ink">{{ __('proposals.renewal_will_not_copy') }}</p>
+                                <p class="mt-1 {{ $mutedText }}">{{ __('proposals.renewal_not_copied_list') }}</p>
+                            </div>
+                            @if ($renewal['existingDraft'] !== null)
+                                <p class="flex items-start gap-2 rounded-lg bg-status-warn-soft px-3 py-2 text-status-warn @2xl/modal:col-span-2" role="status" data-test="renewal-draft-exists">
+                                    <flux:icon.exclamation-triangle variant="micro" class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                                    <span dir="auto">{{ __('proposals.renewal_draft_exists', ['number' => $renewal['existingDraft']]) }}</span>
+                                </p>
+                            @endif
+                        </div>
+                    @endif
+                </div>
+            </x-ui.form-section>
+        @endif
+
         <x-ui.form-section :title="__('proposals.section_basics')" :fields="['name', 'internalProjectNumber', 'notes']">
             <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
                 <x-ui.form-input wire:model="name" :label="__('proposals.proposal_name')" maxlength="255" required autofocus dir="auto" />
@@ -68,6 +106,7 @@
             </div>
         </x-ui.form-section>
 
+        @unless ($isRenewal)
         <x-ui.form-section :title="$showsMoney ? __('proposals.section_donor_and_budget') : __('proposals.section_donor')" :fields="['donorId', 'requestedBudget', 'requestedCurrency']">
             <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
                 @if ($lockedDonorName !== null)
@@ -95,6 +134,7 @@
                 @endif
             </div>
         </x-ui.form-section>
+        @endunless
 
         <x-ui.form-section
             :title="__('proposals.section_projects')"
@@ -102,7 +142,7 @@
             :fields="['projectIds', 'beneficiaries', 'beneficiariesReason', ...array_map(fn (array $row): string => 'beneficiaries.'.$row['id'], $projectRows)]"
         >
             <div class="grid gap-y-3">
-                @unless ($editing)
+                @unless ($editing || $isRenewal)
                     <x-ui.form-field :label="__('proposals.projects_label')" for="proposal-project-picker" required :help="__('proposals.projects_label_help')" :error="$projectsError">
                         <x-ui.multi-select-popover
                             in-modal
@@ -147,8 +187,10 @@
                                     <p class="truncate text-sm font-semibold text-secondary-dark dark:text-ink" dir="auto">{{ $row['name'] }}</p>
                                     <p class="truncate text-xs {{ $mutedText }}">{{ $row['place'] }}</p>
                                 </div>
-                                <x-ui.form-input wire:model="beneficiaries.{{ $row['id'] }}" :label="__('proposals.target_beneficiaries')" type="number" min="1" step="1" inputmode="numeric" dir="ltr" class="w-36" />
-                                @unless ($editing)
+                                @unless ($isRenewal)
+                                    <x-ui.form-input wire:model="beneficiaries.{{ $row['id'] }}" :label="__('proposals.target_beneficiaries')" type="number" min="1" step="1" inputmode="numeric" dir="ltr" class="w-36" />
+                                @endunless
+                                @unless ($editing || $isRenewal)
                                     <x-ui.button type="button" tone="ghost" size="sm" icon="x-mark" class="size-10! shrink-0" wire:click="removeChosenProject({{ $row['id'] }})" :aria-label="__('proposals.remove_project_name', ['name' => $row['name']])" />
                                 @endunless
                             </li>
@@ -171,7 +213,7 @@
             </div>
         </x-ui.form-section>
 
-        @unless ($editing)
+        @unless ($editing || $isRenewal)
             <x-ui.form-section :title="__('proposals.section_start')" :fields="['startingStage', 'skipReason']">
                 <div class="grid gap-y-3">
                     <x-ui.form-segmented

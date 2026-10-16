@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Enums\MilestoneStatus;
 use App\Models\Milestone;
 use App\Models\Project;
+use App\Models\Proposal;
 use Database\Factories\Concerns\CreatesHrRecords;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -45,7 +46,22 @@ class MilestoneFactory extends Factory
     {
         return $this->state([
             'project_id' => $parent->project_id,
+            'proposal_id' => $parent->proposal_id,
             'parent_milestone_id' => $parent->id,
+        ]);
+    }
+
+    /**
+     * A milestone shared at proposal level (contracts.md §12.2): no project,
+     * dated inside the proposal's planned period.
+     */
+    public function forProposal(Proposal $proposal): static
+    {
+        return $this->state([
+            'project_id' => null,
+            'proposal_id' => $proposal->id,
+            'planned_start_date' => $proposal->planned_date_begin->toDateString(),
+            'planned_end_date' => $proposal->planned_date_begin->addMonth()->toDateString(),
         ]);
     }
 

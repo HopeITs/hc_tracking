@@ -6,6 +6,9 @@ namespace App\Models;
 
 use App\Concerns\HasSlug;
 use App\Concerns\RecordsActivity;
+use App\Enums\DeliverableKind;
+use App\Enums\DeliveryState;
+use App\Enums\TaskKind;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Models\Scopes\TaskVisibilityScope;
@@ -16,17 +19,30 @@ use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
+use Illuminate\Database\Eloquent\Casts\AsEnumCollection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Collection;
 
 /**
  * @property int $id
  * @property int|null $parent_task_id
  * @property string $source_type
  * @property int $source_id
+ * @property int|null $department_id
+ * @property TaskKind $kind
+ * @property Collection<int, DeliverableKind>|null $media_kinds
+ * @property DeliveryState|null $delivery_state
+ * @property CarbonImmutable|null $requested_on
+ * @property CarbonImmutable|null $delivered_on
+ * @property string|null $delivered_link
+ * @property string|null $delivered_text
+ * @property CarbonImmutable|null $accepted_at
+ * @property string|null $returned_reason
+ * @property CarbonImmutable|null $planned_dates_edited_at
  * @property string $title
  * @property string $slug
  * @property string|null $description
@@ -37,6 +53,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  * @property CarbonImmutable|null $completed_date
  * @property int $progress_percentage
  * @property int $created_by
+ * @property int|null $copied_from_id
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
@@ -44,6 +61,16 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
     'parent_task_id',
     'source_type',
     'source_id',
+    'department_id',
+    'kind',
+    'media_kinds',
+    'delivery_state',
+    'requested_on',
+    'delivered_on',
+    'delivered_link',
+    'delivered_text',
+    'accepted_at',
+    'returned_reason',
     'title',
     'description',
     'status',
@@ -53,6 +80,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
     'completed_date',
     'progress_percentage',
     'created_by',
+    'copied_from_id',
 ])]
 #[ObservedBy(ScheduleItemObserver::class)]
 #[ScopedBy([TaskVisibilityScope::class])]
@@ -77,6 +105,7 @@ class Task extends Model implements TracksActivity
         'status' => 'todo',
         'priority' => 'medium',
         'progress_percentage' => 0,
+        'kind' => 'general',
     ];
 
     /**
@@ -84,6 +113,15 @@ class Task extends Model implements TracksActivity
      */
     protected static function booted(): void
     {
+        // A user who moves an existing task's dates marks it, so the approval
+        // rebase (RebaseProposalPlan) leaves those dates alone (contracts.md
+        // §12.2). The rebase writes through the query builder and never sets it.
+        static::updating(function (Task $task): void {
+            if ($task->isDirty(['start_date', 'due_date'])) {
+                $task->planned_dates_edited_at = CarbonImmutable::now();
+            }
+        });
+
         static::created(function (Task $task): void {
             $task->activityParentTask()?->recordActivity('task.subtask_added', properties: ['subtask' => $task->activityLabel()]);
         });
@@ -98,6 +136,33 @@ class Task extends Model implements TracksActivity
     public function activityModule(): string
     {
         return 'tasks';
+    }
+
+    /**
+     * A task handed to a department on a proposal's plan is announced as a
+     * department task (EventCatalog `department_task.created`).
+     */
+    protected function activityCreatedEvent(): string
+    {
+        return $this->activityAttribute('department_id') !== null ? 'department_task.created' : 'task.created';
+    }
+
+    /**
+     * The rebase bookkeeping stamp is not news.
+     *
+     * @return list<string>
+     */
+    protected function activityExcludedFields(): array
+    {
+        return ['planned_dates_edited_at'];
+    }
+
+    /**
+     * Whether this task is handed to an HR department (contracts.md §12.2).
+     */
+    public function isDepartmentTask(): bool
+    {
+        return $this->department_id !== null;
     }
 
     public function activityLabel(): string
@@ -243,6 +308,16 @@ class Task extends Model implements TracksActivity
     }
 
     /**
+     * The task this one was copied from when a proposal was renewed.
+     *
+     * @return BelongsTo<Task, $this>
+     */
+    public function copiedFrom(): BelongsTo
+    {
+        return $this->belongsTo(Task::class, 'copied_from_id');
+    }
+
+    /**
      * The files attached to this task.
      *
      * @return HasMany<TaskAttachment, $this>
@@ -290,6 +365,14 @@ class Task extends Model implements TracksActivity
             'due_date' => 'date',
             'completed_date' => 'date',
             'progress_percentage' => 'integer',
+            'department_id' => 'integer',
+            'kind' => TaskKind::class,
+            'media_kinds' => AsEnumCollection::of(DeliverableKind::class),
+            'delivery_state' => DeliveryState::class,
+            'requested_on' => 'date',
+            'delivered_on' => 'date',
+            'accepted_at' => 'datetime',
+            'planned_dates_edited_at' => 'datetime',
         ];
     }
 }

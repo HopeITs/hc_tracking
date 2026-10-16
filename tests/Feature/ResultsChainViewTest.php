@@ -365,3 +365,21 @@ test('a center filter keeps only that center\'s milestones under an activity', f
         ->assertSee('Pump installed')
         ->assertDontSee('Drill well one');
 });
+
+test('a proposal-wide milestone without a center shows in its own group, also under a center filter', function () {
+    $chain = chainProposalFramework($this->proposal, $this->centerA, $this->centerB);
+    chainWeightedMilestone($this->centerA, $chain['activity'], 'Drill well one', MilestoneStatus::Reached, '30');
+    $shared = chainWeightedMilestone($this->centerA, $chain['activity'], 'Final donor report', MilestoneStatus::Planned, '20', $this->proposal);
+    DB::table('milestones')->where('id', $shared->id)->update(['project_id' => null]);
+
+    chainTab($this->viewer, $this->proposal)
+        ->assertSeeInOrder([__('results_framework.chain_proposal_wide'), 'Final donor report', 'Hope Center Sarmada', 'Drill well one'])
+        ->assertSeeHtml('data-chain-milestone-progress="proposal" data-percent="0"')
+        ->set('chainCenter', (string) $this->centerB->id)
+        ->assertDontSee('Drill well one');
+
+    chainTab($this->viewer, $this->proposal)
+        ->set('chainCenter', (string) $this->centerA->id)
+        ->assertSee('Final donor report')
+        ->assertSee('Drill well one');
+});

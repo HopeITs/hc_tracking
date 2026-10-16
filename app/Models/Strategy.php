@@ -45,6 +45,16 @@ class Strategy extends Model implements TracksActivity
     }
 
     /**
+     * The strategic pillars of this strategy (D-35), in display order.
+     *
+     * @return HasMany<StrategicPillar, $this>
+     */
+    public function pillars(): HasMany
+    {
+        return $this->hasMany(StrategicPillar::class)->orderBy('sort_order')->orderBy('id');
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>

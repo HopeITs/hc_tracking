@@ -3,7 +3,7 @@
     use Carbon\CarbonImmutable;
     use Illuminate\Support\Js;
 
-    /** @var \Illuminate\Database\Eloquent\Collection<int, \App\Models\Project> $projects */
+    /** @var \Illuminate\Database\Eloquent\Collection<int, \App\Models\Project|\App\Models\Proposal> $projects */
 
     $today = CarbonImmutable::today();
 
@@ -51,6 +51,10 @@
 
 @foreach ($projects as $projectRow)
     @php
+        // Proposal-level milestones (no project) are grouped under their
+        // proposal; project groups keep their bare id in the data-test hooks.
+        $isProject = $projectRow instanceof \App\Models\Project;
+        $groupKey = $isProject ? (string) $projectRow->id : 'proposal-'.$projectRow->id;
         $milestones = $this->flattenMilestones($projectRow->milestones)->sortBy('planned_start_date')->values();
         $milestonesById = $milestones->keyBy('id');
         $windowStart = $milestones->min('planned_start_date');
@@ -116,9 +120,13 @@
             ->values();
     @endphp
 
-    <x-ui.panel :title="$projectRow->name" :subtitle="$projectRow->city?->name ?? __('common.unknown_city')" :count="$projectRow->milestones->count()" wire:key="milestone-timeline-project-{{ $projectRow->id }}">
+    <x-ui.panel :title="$projectRow->name" :subtitle="$isProject ? ($projectRow->city?->name ?? __('common.unknown_city')) : __('milestones.proposal_plan')" :count="$projectRow->milestones->count()" wire:key="milestone-timeline-{{ $isProject ? 'project' : 'proposal' }}-{{ $projectRow->id }}">
         <x-slot:toolbar>
-            <x-ui.button tone="ghost" size="sm" icon="eye" class="size-9!" :href="route('projects.show', $projectRow)" wire:navigate :aria-label="__('common.view_name', ['name' => $projectRow->name])" />
+            @if ($isProject)
+                <x-ui.button tone="ghost" size="sm" icon="eye" class="size-9!" :href="route('projects.show', $projectRow)" wire:navigate :aria-label="__('common.view_name', ['name' => $projectRow->name])" />
+            @else
+                @can('view', $projectRow)<x-ui.button tone="ghost" size="sm" icon="eye" class="size-9!" :href="route('proposals.show', $projectRow)" wire:navigate :aria-label="__('common.view_name', ['name' => $projectRow->name])" />@endcan
+            @endif
         </x-slot:toolbar>
 
         @if (! $hasWindow)
@@ -208,7 +216,7 @@
                                 step="1"
                                 x-model.number="zoomLevel"
                                 class="accent-primary h-1.5 w-24 cursor-pointer sm:w-32"
-                                data-test="milestone-timeline-zoom-{{ $projectRow->id }}"
+                                data-test="milestone-timeline-zoom-{{ $groupKey }}"
                                 :aria-label="'{{ __('milestones.zoom') }}'"
                             />
                             <button type="button" x-on:click="zoomBy(6)" class="flex size-6 cursor-pointer items-center justify-center rounded text-secondary-medium hover:bg-white hover:text-secondary-dark dark:text-ink-muted dark:hover:bg-white/[0.06] dark:hover:text-ink" :aria-label="'{{ __('common.zoom_in') }}'">
@@ -261,8 +269,8 @@
                             style="height: {{ $riverHeight }}px"
                             x-on:mousemove="hover = $event.target.closest('[data-milestone-marker]') ? null : pointerInfo($event)"
                             x-on:mouseleave="hover = null"
-                            @can('create', App\Models\Milestone::class) x-on:click="if ($event.target.closest('[data-milestone-marker]')) { return; } hover = null; $wire.openCreateModal(pointerInfo($event).iso, null, {{ $projectRow->id }})" @endcan
-                            data-test="milestone-timeline-river-{{ $projectRow->id }}"
+                            @if ($isProject) @can('create', App\Models\Milestone::class) x-on:click="if ($event.target.closest('[data-milestone-marker]')) { return; } hover = null; $wire.openCreateModal(pointerInfo($event).iso, null, {{ $projectRow->id }})" @endcan @endif
+                            data-test="milestone-timeline-river-{{ $groupKey }}"
                         >
                             {{-- main rail --}}
                             <span aria-hidden="true" class="absolute inset-x-0 h-px bg-secondary-soft dark:bg-line" style="top: {{ $topPad }}px"></span>

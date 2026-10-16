@@ -5,6 +5,7 @@ use App\Livewire\Concerns\Milestones\ManagesMilestoneDirectoryForm;
 use App\Livewire\Concerns\NavigatesCalendarPeriods;
 use App\Models\Milestone;
 use App\Models\Project;
+use App\Models\Proposal;
 use App\Models\Scopes\TaskVisibilityScope;
 use App\Notifications\UnreadSubjects;
 use Carbon\CarbonImmutable;
@@ -97,8 +98,8 @@ new #[Title('titles.milestones')] class extends Component {
         }
 
         $milestonesByDay = $this->projectsWithMilestones
-            ->flatMap(fn (Project $projectRow): Collection => $this->flattenMilestones($projectRow->milestones)->map(function (Milestone $milestone) use ($projectRow): Milestone {
-                $milestone->setRelation('project', $projectRow);
+            ->flatMap(fn (Project|Proposal $projectRow): Collection => $this->flattenMilestones($projectRow->milestones)->map(function (Milestone $milestone) use ($projectRow): Milestone {
+                $milestone->setRelation($projectRow instanceof Project ? 'project' : 'proposal', $projectRow);
 
                 return $milestone;
             }))
@@ -149,47 +150,63 @@ new #[Title('titles.milestones')] class extends Component {
     }
 
     /**
-     * Projects carrying matching milestones, with ancestors retained so every
-     * result remains understandable in its hierarchy.
+     * Projects carrying matching milestones, then proposals carrying matching
+     * proposal-level milestones (no project, contracts.md §12.2), with
+     * ancestors retained so every result remains understandable in its
+     * hierarchy. Proposal groups are left out while a project is filtered.
      *
-     * @return Collection<int, Project>
+     * @return Collection<int, Project|Proposal>
      */
     #[Computed]
     public function projectsWithMilestones(): Collection
     {
+        $milestoneColumns = [
+            'id',
+            'project_id',
+            'proposal_id',
+            'name',
+            'description',
+            'planned_start_date',
+            'planned_end_date',
+            'actual_start_date',
+            'actual_end_date',
+            'status',
+            'sequence',
+            'weight_percentage',
+            'responsible_user_id',
+            'parent_milestone_id',
+        ];
+
+        $loadMilestones = fn ($query) => $query
+            ->select($milestoneColumns)
+            ->with(['responsibleUser:id,first_name_en,last_name_en,first_name_ar,last_name_ar'])
+            ->withCount(['children', 'tasks' => fn ($query) => $query->withoutGlobalScope(TaskVisibilityScope::class)])
+            ->orderBy('sequence')
+            ->orderBy('id');
+
         $projects = Project::query()
             ->select(['id', 'name', 'city_id'])
             ->when($this->project !== '', fn (Builder $query) => $query->whereKey((int) $this->project))
             ->with([
                 'city:id,name_en,name_ar',
-                'milestones' => fn ($query) => $query
-                    ->select([
-                        'id',
-                        'project_id',
-                        'name',
-                        'description',
-                        'planned_start_date',
-                        'planned_end_date',
-                        'actual_start_date',
-                        'actual_end_date',
-                        'status',
-                        'sequence',
-                        'weight_percentage',
-                        'responsible_user_id',
-                        'parent_milestone_id',
-                    ])
-                    ->with(['responsibleUser:id,first_name_en,last_name_en,first_name_ar,last_name_ar'])
-                    ->withCount(['children', 'tasks' => fn ($query) => $query->withoutGlobalScope(TaskVisibilityScope::class)])
-                    ->orderBy('sequence')
-                    ->orderBy('id'),
+                'milestones' => $loadMilestones,
             ])
             ->orderBy('name')
             ->orderBy('id')
             ->get();
 
+        $proposals = $this->project !== '' ? new Collection : Proposal::query()
+            ->select(['id', 'name', 'slug'])
+            ->whereHas('milestones', fn (Builder $query) => $query->whereNull('project_id'))
+            ->with(['milestones' => fn ($query) => $loadMilestones($query->whereNull('project_id'))])
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get();
+
         return $projects
-            ->map(function (Project $project): Project {
-                $childrenByParent = $project->milestones->groupBy(
+            ->concat($proposals)
+            ->map(function (Project|Proposal $owner): Project|Proposal {
+                $childrenByParent = $owner->milestones->groupBy(
                     fn (Milestone $milestone): string => $milestone->parent_milestone_id === null
                         ? 'root'
                         : (string) $milestone->parent_milestone_id,
@@ -212,11 +229,11 @@ new #[Title('titles.milestones')] class extends Component {
                         ->values();
                 };
 
-                $project->setRelation('milestones', $buildVisibleBranch(null));
+                $owner->setRelation('milestones', $buildVisibleBranch(null));
 
-                return $project;
+                return $owner;
             })
-            ->filter(fn (Project $project): bool => $project->milestones->isNotEmpty())
+            ->filter(fn (Project|Proposal $owner): bool => $owner->milestones->isNotEmpty())
             ->values();
     }
 
@@ -234,7 +251,7 @@ new #[Title('titles.milestones')] class extends Component {
         $today = CarbonImmutable::today();
 
         $milestones = $this->projectsWithMilestones
-            ->flatMap(fn (Project $project): Collection => $this->flattenMilestones($project->milestones));
+            ->flatMap(fn (Project|Proposal $owner): Collection => $this->flattenMilestones($owner->milestones));
 
         return [
             'total' => $milestones->count(),
