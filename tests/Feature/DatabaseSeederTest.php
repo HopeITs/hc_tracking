@@ -4,6 +4,7 @@ use App\Models\Account;
 use App\Models\AnnualPlan;
 use App\Models\Donor;
 use App\Models\DonorProposal;
+use App\Models\EvidenceType;
 use App\Models\HrEmployee;
 use App\Models\Indicator;
 use App\Models\IndicatorProgress;
@@ -11,6 +12,7 @@ use App\Models\LibraryIndicator;
 use App\Models\MealCoverageAssignment;
 use App\Models\Media;
 use App\Models\Milestone;
+use App\Models\NarrativeQuestion;
 use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
@@ -64,6 +66,8 @@ test('the seeders populate every table in the schema', function () {
         TransfersTracking::class,
         MealCoverageAssignment::class,
         Sector::class,
+        EvidenceType::class,
+        NarrativeQuestion::class,
     ];
 
     foreach ($models as $model) {

@@ -37,6 +37,8 @@ class DatabaseSeeder extends Seeder
                 FinanceSeeder::class,
                 RealDataSeeder::class,
                 SectorSeeder::class,
+                EvidenceTypeSeeder::class,
+                NarrativeQuestionSeeder::class,
             ]);
         }));
 

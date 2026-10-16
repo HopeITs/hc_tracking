@@ -15,6 +15,8 @@ return [
     'guideline' => 'User guideline',
     'indicator_library' => 'Indicator Library',
     'sectors' => 'Sectors',
+    'evidence_types' => 'Evidence types',
+    'narrative_questions' => 'Narrative questions',
     'platform' => 'Platform',
     'primary_navigation' => 'Primary navigation',
     'repository' => 'Repository',

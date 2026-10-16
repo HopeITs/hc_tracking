@@ -42,6 +42,7 @@ test('the sidebar lists every page for a Super Admin with funding in the order m
         'donors.index', 'proposals.index', 'funding-agreements.index', 'transfers.index', 'admin.accounts.index',
         'tasks.index', 'department-tasks.index', 'calendar.index',
         'admin.users.index', 'admin.notification-settings.edit', 'activity.index', 'admin.cities.index', 'admin.sectors.index',
+        'admin.evidence-types.index', 'admin.narrative-questions.index',
     ]);
 });
 

@@ -2,7 +2,7 @@
     $moduleCounts = auth()->check() && ! \App\Http\Middleware\EnsureTwoFactorIsEnabled::mustEnrol(auth()->user())
         ? app(\App\Notifications\UnreadCounts::class)->for(auth()->user())['modules']
         : [];
-    $showsAdministration = auth()->user()?->canAny(['cities.view', 'sectors.view', 'activity-log.view', 'notification-settings.manage'])
+    $showsAdministration = auth()->user()?->canAny(['cities.view', 'sectors.view', 'evidence-types.manage', 'narrative-questions.manage', 'activity-log.view', 'notification-settings.manage'])
         || auth()->user()?->can('viewAny', \App\Models\User::class);
     $reviewerEmployeeId = auth()->user()?->employee_id;
     $hasReviews = $reviewerEmployeeId !== null && \App\Models\ProposalReviewer::query()->forEmployee((int) $reviewerEmployeeId)->exists();
@@ -521,6 +521,30 @@
                         wire:navigate.hover
                     >
                         {{ __('navigation.sectors') }}
+                    </flux:sidebar.item>
+                @endcan
+
+                @can('evidence-types.manage')
+                    <flux:sidebar.item
+                        icon="paper-clip"
+                        :href="route('admin.evidence-types.index')"
+                        :current="request()->routeIs('admin.evidence-types.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate.hover
+                    >
+                        {{ __('navigation.evidence_types') }}
+                    </flux:sidebar.item>
+                @endcan
+
+                @can('narrative-questions.manage')
+                    <flux:sidebar.item
+                        icon="chat-bubble-left-right"
+                        :href="route('admin.narrative-questions.index')"
+                        :current="request()->routeIs('admin.narrative-questions.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate.hover
+                    >
+                        {{ __('navigation.narrative_questions') }}
                     </flux:sidebar.item>
                 @endcan
             </flux:sidebar.group>

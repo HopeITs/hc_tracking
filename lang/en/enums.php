@@ -36,6 +36,10 @@ return [
         'project_team' => 'Project team',
         'meal' => 'MEAL',
     ],
+    'narrative_question_frequency' => [
+        'monthly' => 'Monthly',
+        'quarter_end' => 'Quarter end',
+    ],
     'denominator_basis' => [
         'fixed' => 'Fixed (target beneficiaries)',
         'entered' => 'Entered (numerator and denominator)',

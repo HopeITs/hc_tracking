@@ -36,6 +36,10 @@ return [
         'project_team' => 'فريق المشروع',
         'meal' => 'المتابعة والتقييم',
     ],
+    'narrative_question_frequency' => [
+        'monthly' => 'شهري',
+        'quarter_end' => 'نهاية الربع',
+    ],
     'denominator_basis' => [
         'fixed' => 'ثابت (المستفيدون المستهدفون)',
         'entered' => 'مُدخل (البسط والمقام)',
