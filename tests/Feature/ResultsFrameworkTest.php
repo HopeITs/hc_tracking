@@ -657,3 +657,27 @@ test('the results page holds a flat query count across both kinds of framework',
 
     expect($countQueries())->toBe($small);
 });
+
+describe('the create deep link (T14)', function () {
+    beforeEach(function () {
+        $this->program = Program::factory()->create(['name' => 'Water Security']);
+        $this->deepLink = fn (User $user, array $query) => Livewire::withQueryParams($query)->actingAs($user)->test('pages::results.index');
+    });
+
+    test('?program=&create=1 opens the create form pre-filled with that program at impact level', function () {
+        ($this->deepLink)(userWithRole('MEAL'), ['program' => (string) $this->program->id, 'create' => '1'])
+            ->assertSet('showResultModal', true)
+            ->assertSet('resultProgramId', (string) $this->program->id)
+            ->assertSet('resultType', ResultType::Impact->value);
+    });
+
+    test('the form stays closed without results.create, for an unknown program, or when create is not 1', function (string $role, ?int $programId, string $create) {
+        ($this->deepLink)(userWithRole($role), ['program' => (string) ($programId ?? $this->program->id), 'create' => $create])
+            ->assertSet('showResultModal', false)
+            ->assertSet('resultProgramId', '');
+    })->with([
+        'no results.create' => ['Financial', null, '1'],
+        'unknown program' => ['MEAL', 999999, '1'],
+        'create is not 1' => ['MEAL', null, '2'],
+    ]);
+});

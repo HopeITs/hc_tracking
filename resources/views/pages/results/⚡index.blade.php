@@ -5,9 +5,11 @@ use App\Livewire\Concerns\Results\BuildsResultsFramework;
 use App\Livewire\Concerns\Results\BuildsResultsTree;
 use App\Livewire\Concerns\Results\ManagesResultForm;
 use App\Livewire\Concerns\Results\SummarisesResults;
+use App\Models\Program;
 use App\Models\Proposal;
 use App\Models\Result;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -44,6 +46,25 @@ new #[Title('titles.results_framework')] class extends Component {
     /** 'cascade' draws the chain, 'matrix' lists every statement in one grid. */
     #[Url(except: 'cascade')]
     public string $view = 'cascade';
+
+    /**
+     * `?program=<id>&create=1` (the logframe-missing alert, T14) opens the
+     * create form for that program's framework, starting at impact. Read once
+     * here rather than bound with #[Url], so closing the dialog and refreshing
+     * does not reopen it. Anything else in the link is ignored.
+     */
+    public function mount(): void
+    {
+        $programId = request()->integer('program');
+
+        if (request()->query('create') !== '1' || $programId <= 0 || ! Gate::allows('results.create') || ! Program::query()->whereKey($programId)->exists()) {
+            return;
+        }
+
+        $this->openCreateModal();
+        $this->resultProgramId = (string) $programId;
+        $this->resultType = ResultType::Impact->value;
+    }
 
     public function clearFilters(): void
     {

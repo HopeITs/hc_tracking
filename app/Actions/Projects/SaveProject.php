@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Projects;
 
 use App\Enums\ProjectStatus;
+use App\Jobs\CheckProgramLogframe;
 use App\Models\HrCenter;
 use App\Models\HrEmployee;
 use App\Models\Program;
@@ -104,6 +105,10 @@ final class SaveProject
 
             return $project;
         });
+
+        if ($saved->wasRecentlyCreated || $saved->wasChanged('program_id')) {
+            CheckProgramLogframe::dispatch([(int) $saved->program_id])->afterCommit();
+        }
 
         $existing?->refresh();
 

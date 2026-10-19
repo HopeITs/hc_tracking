@@ -87,16 +87,20 @@ class Program extends Model implements TracksActivity
      * with no such position keeps whatever manager was assigned in tracking.
      * Programs that have disappeared from HR are kept so the projects and plans
      * under them survive. The HR mirror is not somebody's action, so it records
-     * no activity.
+     * no activity and sends nothing: a caller that should alert (the request
+     * middleware) acts on the returned ids.
+     *
+     * @return list<int> ids of the programs this sync newly inserted
      */
-    public static function syncFromHr(): void
+    public static function syncFromHr(): array
     {
-        Activity::withoutRecording(function (): void {
+        return Activity::withoutRecording(function (): array {
             $now = now();
             $managers = HrPosition::programManagerEmployeeIds();
+            $hrIds = HrProgram::query()->pluck('id')->map(fn (mixed $id): int => (int) $id);
+            $known = static::query()->whereKey($hrIds->all())->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
 
-            $rows = HrProgram::query()
-                ->pluck('id')
+            $rows = $hrIds
                 ->map(fn (int $id): array => [
                     'id' => $id,
                     'manager_id' => $managers[$id] ?? null,
@@ -117,6 +121,8 @@ class Program extends Model implements TracksActivity
                         : $query->whereNull('manager_id')->orWhere('manager_id', '!=', $employeeId))
                     ->update(['manager_id' => $employeeId, 'updated_at' => $now]);
             }
+
+            return array_values(array_diff($hrIds->all(), $known));
         });
     }
 

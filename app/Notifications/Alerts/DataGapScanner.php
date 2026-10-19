@@ -16,8 +16,9 @@ use Carbon\CarbonImmutable;
 /**
  * Weekly nudges about missing data: active projects with no milestones or
  * indicators, projects past their end still active, approved reports with no
- * files. Runs on working days only, so each week's nudge lands on its first
- * working day.
+ * files, and (T14) programs with open projects but no program framework,
+ * through LogframeGapAlert. Runs on working days only, so each week's nudge
+ * lands on its first working day.
  */
 final class DataGapScanner implements Scanner
 {
@@ -26,6 +27,7 @@ final class DataGapScanner implements Scanner
         private RecipientResolver $resolver,
         private EmployeeRecipients $employees,
         private WorkingCalendar $calendar,
+        private LogframeGapAlert $logframeGaps,
     ) {}
 
     public function scan(CarbonImmutable $now): int
@@ -66,6 +68,27 @@ final class DataGapScanner implements Scanner
             $sent += $this->dispatcher->send('data_gap', "report_without_files:{$week}", $payload, [$report->user_id]);
         }
 
+        $sent += $this->logframeGaps->notify($this->programsWithOpenProjects());
+
         return $sent;
+    }
+
+    /**
+     * Programs that hold at least one open project (draft, approved or
+     * active), for the logframe rule (T14).
+     *
+     * @return list<int>
+     */
+    private function programsWithOpenProjects(): array
+    {
+        $open = array_values(array_filter(ProjectStatus::cases(), fn (ProjectStatus $status): bool => $status->isOpen()));
+
+        return array_values(Project::query()
+            ->whereIn('status', array_map(fn (ProjectStatus $status): string => $status->value, $open))
+            ->whereNotNull('program_id')
+            ->distinct()
+            ->pluck('program_id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all());
     }
 }
