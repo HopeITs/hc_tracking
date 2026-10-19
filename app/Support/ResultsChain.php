@@ -4,17 +4,21 @@ declare(strict_types=1);
 
 namespace App\Support;
 
+use App\Enums\ActivityStatus;
 use App\Enums\MilestoneStatus;
 use App\Enums\ResultType;
 use App\Models\ActivitySchedule;
 use App\Models\AnnualPlan;
 use App\Models\Donor;
+use App\Models\HrDepartment;
 use App\Models\Indicator;
 use App\Models\Milestone;
 use App\Models\PlanIndicator;
 use App\Models\Project;
+use App\Models\ProjectActivityStatus;
 use App\Models\Proposal;
 use App\Models\Result;
+use App\Models\Task;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -39,12 +43,20 @@ use Illuminate\Validation\Rule;
  * Milestone::weightedProgress() and link flags through
  * Milestone::activityLinkIssuesFor(). No money is read.
  *
+ * Activities also carry each center's confirmed status (T17's
+ * project_activity_statuses, D-51) and the department tasks planned on their
+ * milestones (T31), read through TaskVisibilityScope so financial tasks stay
+ * with the people allowed to see them: title, department, status and due date
+ * only. Both are one query each for the whole chain.
+ *
  * @phpstan-type ChainTarget array{id: int, center: string, centerId: int|null, source: string|null, target: float, achieved: float, percent: float|null, status: string, issues: list<string>}
  * @phpstan-type ChainIndicator array{indicator: Indicator, code: string|null, name: string, linked: bool, inactive: bool, gaps: list<string>, targets: list<ChainTarget>}
  * @phpstan-type ChainProposal array{name: string, url: string|null, donor: string|null, donorUrl: string|null}
  * @phpstan-type ChainMilestone array{milestone: Milestone, issues: list<string>, cancelled: bool}
  * @phpstan-type ChainMilestoneGroup array{centerId: int|null, center: string|null, progress: float|null, hasCancelled: bool, milestones: list<ChainMilestone>}
- * @phpstan-type ChainNode array{result: Result, depth: int, gaps: list<string>, indicators: list<ChainIndicator>, lineage: list<Result>, proposal: ChainProposal|null, milestoneGroups: list<ChainMilestoneGroup>, schedule: array<string, list<int>|null>, children: list<array<string, mixed>>, contributions: list<array<string, mixed>>}
+ * @phpstan-type ChainActivityStatus array{centerId: int, center: string, status: ActivityStatus}
+ * @phpstan-type ChainDepartmentTask array{task: Task, department: string}
+ * @phpstan-type ChainNode array{result: Result, depth: int, gaps: list<string>, indicators: list<ChainIndicator>, lineage: list<Result>, proposal: ChainProposal|null, milestoneGroups: list<ChainMilestoneGroup>, schedule: array<string, list<int>|null>, activityStatuses: list<ChainActivityStatus>, departmentTasks: list<ChainDepartmentTask>, children: list<array<string, mixed>>, contributions: list<array<string, mixed>>}
  * @phpstan-type ChainOption array{value: string, label: string}
  * @phpstan-type ChainFilters array{indicator: string, center: string, donor: string}
  * @phpstan-type Chain array{
@@ -79,6 +91,20 @@ final class ResultsChain
      * @var array<int, list<string>>
      */
     private array $linkIssues = [];
+
+    /**
+     * Confirmed activity statuses, keyed by activity id.
+     *
+     * @var array<int, list<ProjectActivityStatus>>
+     */
+    private array $statusesByActivity = [];
+
+    /**
+     * Visible department tasks, keyed by the id of the milestone they sit on.
+     *
+     * @var array<int, list<Task>>
+     */
+    private array $tasksByMilestone = [];
 
     /**
      * The proposal's own framework, its milestones and those of its centers.
@@ -264,6 +290,7 @@ final class ResultsChain
         $options = $this->options();
         $this->filters = $this->validFilters($options);
         $this->linkIssues = Milestone::activityLinkIssuesFor($this->milestones);
+        $this->loadActivityDelivery();
 
         $resultsById = $this->results->keyBy('id')->all();
         $milestonesByActivity = [];
@@ -464,6 +491,8 @@ final class ResultsChain
             'proposal' => $this->proposalTag($result, $resultsById),
             'milestoneGroups' => $result->type === ResultType::Activity ? $this->milestoneGroups($milestonesByActivity[$result->id] ?? []) : [],
             'schedule' => $result->type === ResultType::Activity ? $this->scheduleOf($result) : [],
+            'activityStatuses' => $result->type === ResultType::Activity ? $this->activityStatuses($result) : [],
+            'departmentTasks' => $result->type === ResultType::Activity ? $this->departmentTasks($milestonesByActivity[$result->id] ?? []) : [],
             'children' => $children,
             'contributions' => $contributions,
         ];
@@ -514,6 +543,101 @@ final class ResultsChain
                 'cancelled' => $milestone->status === MilestoneStatus::Cancelled,
             ], $group['items']),
         ], $groups));
+    }
+
+    /**
+     * One query each for the confirmed statuses of the chain's activities and
+     * the department tasks on its activity milestones. Tasks go through
+     * TaskVisibilityScope (the Task global scope), so a viewer never gets a
+     * financial task they may not see; only the summary columns are read.
+     */
+    private function loadActivityDelivery(): void
+    {
+        $activityIds = $this->results->where('type', ResultType::Activity)->modelKeys();
+        $milestoneIds = $this->milestones->whereNotNull('result_id')->modelKeys();
+
+        if ($activityIds !== []) {
+            $statuses = ProjectActivityStatus::query()
+                ->select(['id', 'project_id', 'result_id', 'status'])
+                ->whereIn('result_id', $activityIds)
+                ->with('project:id,name,center_id')
+                ->orderBy('project_id')
+                ->get();
+
+            foreach ($statuses as $status) {
+                $this->statusesByActivity[$status->result_id][] = $status;
+            }
+        }
+
+        if ($milestoneIds !== []) {
+            $tasks = Task::query()
+                ->select(['id', 'title', 'department_id', 'kind', 'status', 'due_date', 'source_type', 'source_id'])
+                ->where('source_type', 'milestone')
+                ->whereIn('source_id', $milestoneIds)
+                ->whereNotNull('department_id')
+                ->whereNull('parent_task_id')
+                ->orderByRaw('due_date is null, due_date')
+                ->orderBy('id')
+                ->get();
+
+            foreach ($tasks as $task) {
+                $this->tasksByMilestone[$task->source_id][] = $task;
+            }
+        }
+    }
+
+    /**
+     * Each center's confirmed status of the activity (D-51), in center
+     * order; under a center filter only that center's.
+     *
+     * @return list<ChainActivityStatus>
+     */
+    private function activityStatuses(Result $result): array
+    {
+        $center = $this->filters['center'];
+        $rows = [];
+
+        foreach ($this->statusesByActivity[$result->id] ?? [] as $row) {
+            if ($center !== '' && (string) $row->project_id !== $center) {
+                continue;
+            }
+
+            $rows[] = [
+                'centerId' => $row->project_id,
+                'center' => $row->project === null ? '' : ($row->project->center()->name ?? $row->project->name),
+                'status' => $row->status,
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * The department tasks on an activity's milestones, soonest due first,
+     * following the center filter the milestone groups use.
+     *
+     * @param  list<Milestone>  $milestones
+     * @return list<ChainDepartmentTask>
+     */
+    private function departmentTasks(array $milestones): array
+    {
+        $center = $this->filters['center'];
+        $tasks = [];
+
+        foreach ($milestones as $milestone) {
+            if ($center !== '' && $milestone->project_id !== null && (string) $milestone->project_id !== $center) {
+                continue;
+            }
+
+            array_push($tasks, ...($this->tasksByMilestone[$milestone->id] ?? []));
+        }
+
+        usort($tasks, fn (Task $a, Task $b): int => [$a->due_date === null, $a->due_date?->getTimestamp(), $a->id] <=> [$b->due_date === null, $b->due_date?->getTimestamp(), $b->id]);
+
+        return array_map(fn (Task $task): array => [
+            'task' => $task,
+            'department' => HrDepartment::nameOf((int) $task->department_id) ?: __('department_tasks.department_unavailable'),
+        ], $tasks);
     }
 
     /**

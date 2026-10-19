@@ -116,7 +116,7 @@
         @endif
 
         @if ($result->type === ResultType::Activity)
-            <x-ui.logframe-milestones :activity-id="$result->id" :groups="$node['milestoneGroups']" :schedule="$node['schedule']" />
+            <x-ui.logframe-milestones :activity-id="$result->id" :groups="$node['milestoneGroups']" :schedule="$node['schedule']" :statuses="$node['activityStatuses'] ?? []" :tasks="$node['departmentTasks'] ?? []" />
         @endif
     </article>
 
