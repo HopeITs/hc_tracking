@@ -25,4 +25,5 @@ return [
     'toggle_sidebar' => 'Collapse or expand the sidebar',
     'report_a_problem' => 'Report a problem or bug',
     'user_directory' => 'User Directory',
+    'monthly_matrix' => 'Monthly Matrix',
 ];

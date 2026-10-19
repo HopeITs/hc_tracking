@@ -25,4 +25,5 @@ return [
     'toggle_sidebar' => 'طي القائمة الجانبية أو توسيعها',
     'report_a_problem' => 'الإبلاغ عن مشكلة أو خطأ',
     'user_directory' => 'دليل المستخدمين',
+    'monthly_matrix' => 'المصفوفة الشهرية',
 ];

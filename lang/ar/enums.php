@@ -240,4 +240,11 @@ return [
         'management_only' => 'الإدارة العامة فقط',
         'none' => 'بلا رقابة',
     ],
+    'matrix_cell_state' => [
+        'approved' => 'مُتحقَّق منه',
+        'pending' => 'بانتظار التحقق',
+        'not_submitted' => 'غير مُرسَل',
+        'upcoming' => 'قادم',
+        'not_due' => 'غير مستحق',
+    ],
 ];

@@ -179,6 +179,10 @@ Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () 
         ->can('reports.view')
         ->name('reports.index');
 
+    Route::livewire('reports/monthly-matrix', 'pages::reports.monthly-matrix')
+        ->can('reports.view')
+        ->name('reports.monthly-matrix');
+
     Route::livewire('reports/{report}', 'pages::reports.show')
         ->can('reports.view')
         ->name('reports.show');

@@ -44,4 +44,5 @@ return [
     'my_reviews' => 'My Reviews',
     'notification_settings' => 'Notification Settings',
     'department_tasks' => 'Department Tasks',
+    'monthly_matrix' => 'Monthly Matrix',
 ];
