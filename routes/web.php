@@ -183,6 +183,15 @@ Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () 
         ->can('reports.view')
         ->name('reports.show');
 
+    Route::livewire('monthly-reports', 'pages::monthly-reports.index')
+        ->can('reports.view')
+        ->name('monthly-reports.index');
+
+    // The page authorizes MonthlyReportPolicy::view() in mount().
+    Route::livewire('monthly-reports/{monthlyReport}', 'pages::monthly-reports.show')
+        ->can('reports.view')
+        ->name('monthly-reports.show');
+
     Route::get('reports/{report}/files/{reportFile}/download', ReportFileDownloadController::class)
         ->can('reports.view')
         ->middleware('throttle:files')

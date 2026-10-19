@@ -27,6 +27,8 @@ return [
     'proposals' => 'Proposals',
     'report' => 'Report',
     'reports' => 'Reports',
+    'monthly_report' => 'Monthly report',
+    'monthly_reports' => 'Monthly Reports',
     'results_framework' => 'Results Framework',
     'risks' => 'Risks',
     'security_settings' => 'Security Settings',

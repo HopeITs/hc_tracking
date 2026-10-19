@@ -9,6 +9,7 @@ use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\DonorReport;
 use App\Models\Milestone;
+use App\Models\MonthlyReport;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
@@ -66,6 +67,7 @@ final class SubjectLinks
             'strategy' => $this->showRoute('strategies.show', Strategy::class, $id),
             'proposal' => $this->showRoute('proposals.show', Proposal::class, $id),
             'report' => $this->showRoute('reports.show', Report::class, $id),
+            'monthly_report' => $this->showRoute('monthly-reports.show', MonthlyReport::class, $id),
             'donor' => $this->showRoute('donors.show', Donor::class, $id),
             'donor_proposal' => $this->showRoute('funding-agreements.show', DonorProposal::class, $id),
             'donor_report' => $this->donorReportRoute($id),

@@ -64,6 +64,18 @@
             \App\Enums\ReportStatus::Approved => 'solid',
             \App\Enums\ReportStatus::Draft, \App\Enums\ReportStatus::Reviewed => 'outline',
         },
+        $case instanceof \App\Enums\MonthlyReportStatus => match ($case) {
+            \App\Enums\MonthlyReportStatus::Validated => 'good',
+            \App\Enums\MonthlyReportStatus::Submitted => 'solid',
+            \App\Enums\MonthlyReportStatus::Draft => 'outline',
+        },
+        $case instanceof \App\Enums\ActivityStatus => match ($case) {
+            \App\Enums\ActivityStatus::Completed, \App\Enums\ActivityStatus::Conducted => 'good',
+            \App\Enums\ActivityStatus::Started, \App\Enums\ActivityStatus::Ongoing => 'solid',
+            \App\Enums\ActivityStatus::Suspended => 'accent',
+            \App\Enums\ActivityStatus::Cancelled => 'muted',
+            \App\Enums\ActivityStatus::NotStarted => 'outline',
+        },
         default => 'outline',
     };
 
