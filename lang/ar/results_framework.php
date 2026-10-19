@@ -151,7 +151,7 @@ return [
     'chain_milestones_progress' => 'تقدّم المعالم الموزون',
     'chain_milestone_cancelled_excluded' => 'المعالم الملغاة معروضة لكنها لا تُحتسب في التقدّم.',
     'chain_planned_months' => 'الأشهر المخططة',
-    'chain_weeks' => '{1} الأسبوع :weeks|[2,*] الأسابيع :weeks',
+    'chain_weeks' => '{1} الأسبوع :weeks|{2} الأسبوعان :weeks|[3,10] الأسابيع :weeks|[11,*] الأسابيع :weeks',
     'chain_proposal_wide' => 'جميع مراكز المقترح',
     'choose_a_framework_of_this_proposal' => 'اختر إطارًا من برامج مشاريع هذا المقترح',
     'framework_already_imported' => 'هذا الإطار مستورد مسبقًا في المقترح',

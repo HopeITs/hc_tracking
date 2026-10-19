@@ -244,8 +244,6 @@ test('the chain reads a flat number of queries for 3 or 30 nodes', function (str
     $seed(9);
     $large = $countQueries();
 
-    dump($page.': '.count($small).' vs '.count($large).' queries');
-
     expect(count($large))->toBe(count($small))
         ->and(collect($large)->filter(fn (string $sql): bool => str_contains($sql, 'amount') || str_contains($sql, 'budget'))->all())->toBe([]);
 })->with(['proposal', 'program', 'annual plan']);
