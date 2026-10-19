@@ -116,7 +116,8 @@ test('the agreement page lists donor reports as a table with their state and act
         ->assertSee('Inception report')
         ->assertSeeHtml('data-test="submit-report-'.$overdue->id.'"')
         ->assertDontSeeHtml('data-test="submit-report-'.$sent->id.'"')
-        ->assertSeeHtml('data-test="delete-report-'.$sent->id.'"');
+        ->assertSeeHtml('data-test="delete-report-'.$overdue->id.'"')
+        ->assertDontSeeHtml('data-test="delete-report-'.$sent->id.'"');
 });
 
 test('the agreement page exports its tranches', function () {

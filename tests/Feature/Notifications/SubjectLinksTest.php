@@ -38,11 +38,11 @@ test('routeFor returns null for a show-route subject that no longer exists', fun
     expect(app(SubjectLinks::class)->routeFor('report', 999999))->toBeNull();
 });
 
-test('a donor report leads to its funding agreement', function () {
+test('a donor report leads to its own page', function () {
     $donorReport = Activity::withoutRecording(fn () => DonorReport::factory()->create());
 
     expect(app(SubjectLinks::class)->routeFor('donor_report', $donorReport->id))
-        ->toBe(route('funding-agreements.show', $donorReport->donorProposal));
+        ->toBe(route('donor-reports.show', $donorReport));
 });
 
 test('existing() keeps only records that are still there', function () {
