@@ -140,4 +140,8 @@ return [
     'counted_toward_the_target' => 'Counted toward the target',
     'counts_toward_the_target_once_approved' => 'Counts toward the target once approved',
     'achieved_so_far' => 'Achieved so far',
+    'monthly_report_chip' => 'Monthly report',
+    'mirror_read_only' => 'This figure comes from a monthly report; change it there.',
+    'computed_value' => 'Result',
+    'computed_value_help' => 'Calculated from the two figures when you save.',
 ];

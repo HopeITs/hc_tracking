@@ -1,12 +1,10 @@
-{{-- The workflow strip of ⚡show.blade.php: the actions this viewer may take now, why a blocked one is blocked, and the reopen request history. --}}
+{{-- The workflow strip of ⚡show.blade.php: the secondary actions this viewer may take now and the reopen request history. Submit and Validate live in _show-actionbar. --}}
 @use('App\Enums\MonthlyReportStatus')
 @use('App\Enums\ReopenRequestStatus')
 
 @php
-    $submitBlocker = $this->submitBlocker;
-    $validateBlocked = $this->pendingMealLines > 0;
     $hasPendingRequest = $report->reopenRequests->contains('status', ReopenRequestStatus::Pending);
-    $showsActions = $abilities['submit'] || $abilities['validate'] || $abilities['return'] || $abilities['update']
+    $showsActions = $abilities['return'] || $abilities['update']
         || ($abilities['requestReopen'] && ! $hasPendingRequest) || $this->decidableRequest !== null
         || ($abilities['markSeen'] && $report->seen_by_meal_at === null) || $abilities['delete'];
 @endphp
@@ -14,35 +12,6 @@
 @if ($showsActions)
     <div class="flex flex-col gap-3 border-y border-secondary-soft py-4 dark:border-line">
         <div class="flex flex-wrap items-center gap-2">
-            @if ($abilities['submit'])
-                <span data-monthly-report-submit>
-                    <x-ui.button
-                        tone="primary"
-                        icon="paper-airplane"
-                        class="rtl:[&_svg]:-scale-x-100"
-                        wire:click="openSubmitModal"
-                        wire:loading.attr="disabled"
-                        wire:target="figures,openSubmitModal"
-                        :disabled="$submitBlocker !== null"
-                        data-test="submit-button"
-                    >{{ __('monthly_reports.submit') }}</x-ui.button>
-                </span>
-            @endif
-
-            @if ($abilities['validate'])
-                <span data-monthly-report-validate>
-                    <x-ui.button
-                        tone="primary"
-                        icon="check-badge"
-                        wire:click="openValidateModal"
-                        wire:loading.attr="disabled"
-                        wire:target="figures,openValidateModal"
-                        :disabled="$validateBlocked"
-                        data-test="validate-button"
-                    >{{ __('monthly_reports.validate') }}</x-ui.button>
-                </span>
-            @endif
-
             @if ($abilities['return'])
                 <x-ui.button icon="arrow-uturn-left" class="rtl:[&_svg]:-scale-x-100" wire:click="openReturnModal" data-test="return-button">{{ __('monthly_reports.return') }}</x-ui.button>
             @endif
@@ -67,20 +36,6 @@
                 <x-ui.button tone="ghost" icon="trash" class="ms-auto" wire:click="openDeleteModal" data-test="delete-button">{{ __('monthly_reports.delete_draft') }}</x-ui.button>
             @endif
         </div>
-
-        @if ($abilities['submit'] && $submitBlocker !== null)
-            <p class="flex items-center gap-1.5 text-sm text-secondary-medium dark:text-ink-muted" data-submit-blocked>
-                <flux:icon.lock-closed variant="micro" class="size-3.5 shrink-0" aria-hidden="true" />
-                {{ $submitBlocker }}
-            </p>
-        @endif
-
-        @if ($abilities['validate'] && $validateBlocked)
-            <p class="flex items-center gap-1.5 text-sm text-secondary-medium dark:text-ink-muted" data-validate-blocked>
-                <flux:icon.lock-closed variant="micro" class="size-3.5 shrink-0" aria-hidden="true" />
-                {{ __('monthly_reports.meal_lines_pending') }}
-            </p>
-        @endif
 
         @error('workflow')
             <p class="text-sm font-semibold text-status-critical" role="alert">{{ $message }}</p>

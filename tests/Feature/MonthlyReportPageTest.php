@@ -1,30 +1,44 @@
 <?php
 
+use App\Enums\ActivityKind;
+use App\Enums\ActivityStatus;
 use App\Enums\CollectionFrequency;
 use App\Enums\DenominatorBasis;
 use App\Enums\DonorAttribution;
 use App\Enums\IndicatorCollector;
 use App\Enums\IndicatorMeasure;
 use App\Enums\MonthlyReportStatus;
+use App\Enums\NarrativeQuestionFrequency;
 use App\Enums\ProposalStatus;
 use App\Enums\ReopenRequestStatus;
+use App\Enums\ResultType;
 use App\Models\Activity;
+use App\Models\ActivitySchedule;
 use App\Models\Donor;
+use App\Models\EvidenceType;
 use App\Models\Indicator;
 use App\Models\LibraryIndicator;
 use App\Models\MealCoverageAssignment;
 use App\Models\MonthlyReport;
+use App\Models\MonthlyReportActivityEntry;
+use App\Models\MonthlyReportAnswer;
+use App\Models\MonthlyReportFile;
 use App\Models\MonthlyReportLine;
 use App\Models\MonthlyReportLineShare;
 use App\Models\MonthlyReportReopenRequest;
 use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
+use App\Models\ProjectActivityStatus;
 use App\Models\Proposal;
 use App\Models\ReportTemplate;
 use App\Models\ReportTemplateLine;
+use App\Models\ReportTemplateQuestion;
+use App\Models\Result;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 /*
@@ -477,4 +491,219 @@ test('the page renders in Arabic right to left', function () {
         ->assertOk()
         ->assertSee('dir="rtl"', false)
         ->assertSee(trans('monthly_reports.grid_indicator', [], 'ar'));
+});
+
+/*
+| Slice 2: activities this month, answers and typed evidence (contracts §13,
+| §13.1 items 3 and 4, §16; D-42, D-43a, D-49b, D-51).
+*/
+
+/**
+ * An activity of a donor-approved proposal linked to the project.
+ */
+function mrsActivity(Project $project, ActivityKind $kind = ActivityKind::Continuous, string $statement = 'Run parenting sessions'): Result
+{
+    return Activity::withoutRecording(function () use ($project, $kind, $statement): Result {
+        $proposal = $project->proposals()->first();
+
+        if ($proposal === null) {
+            $proposal = Proposal::factory()->create(['status' => ProposalStatus::Approved]);
+            $project->proposals()->attach($proposal->id, ['target_beneficiaries' => 100]);
+        }
+
+        $output = Result::factory()->type(ResultType::Output)->create(['proposal_id' => $proposal->id]);
+
+        return Result::factory()->activity($output)->create(['activity_kind' => $kind, 'statement' => $statement]);
+    });
+}
+
+/**
+ * A fake private disk. The suite travels to November while the temporary
+ * upload is written with today's real time, so Livewire's "older than 24
+ * hours" cleanup would delete it before saveFile reads it.
+ */
+function mrsFakeStorage(): void
+{
+    Storage::fake('local');
+    config(['livewire.temporary_file_upload.cleanup' => false]);
+}
+
+/**
+ * @param  list<int>|null  $weeks
+ */
+function mrsSchedule(Result $activity, string $month, ?array $weeks = null): void
+{
+    ActivitySchedule::query()->create(['result_id' => $activity->id, 'project_id' => null, 'month' => $month, 'weeks' => $weeks]);
+}
+
+test('an activity\'s status select offers only the statuses of its kind', function () {
+    $project = mrsProject();
+    $report = mrsReport($project);
+    $continuous = mrsActivity($project);
+    $event = mrsActivity($project, ActivityKind::Event, 'Open day');
+    mrsSchedule($continuous, '2026-10-01');
+    mrsSchedule($event, '2026-10-01');
+
+    mrsPage($report)
+        ->assertSeeText('Run parenting sessions')
+        ->assertSeeHtml('data-activity-option="'.$continuous->id.'-ongoing"')
+        ->assertDontSeeHtml('data-activity-option="'.$continuous->id.'-conducted"')
+        ->assertSeeHtml('data-activity-option="'.$event->id.'-conducted"')
+        ->assertDontSeeHtml('data-activity-option="'.$event->id.'-ongoing"');
+});
+
+test('each status asks for its own inputs and saves the activity row', function () {
+    $project = mrsProject();
+    $report = mrsReport($project);
+    $activity = mrsActivity($project);
+    mrsSchedule($activity, '2026-10-01');
+    $key = 'activityEntries.'.$activity->id;
+
+    $page = mrsPage($report)
+        ->set($key.'.status', 'started')
+        ->assertHasErrors([$key.'.started_on' => __('monthly_reports.activity_date_required')])
+        ->assertSeeHtml('wire:model.blur="'.$key.'.started_on"')
+        ->assertDontSeeHtml('wire:model.blur="'.$key.'.reason"')
+        ->set($key.'.started_on', '2026-10-12')
+        ->assertHasNoErrors();
+
+    $entry = MonthlyReportActivityEntry::query()->where('monthly_report_id', $report->id)->sole();
+    expect($entry->status)->toBe(ActivityStatus::Started)
+        ->and(CarbonImmutable::parse($entry->started_on)->toDateString())->toBe('2026-10-12');
+
+    $page->set($key.'.status', 'not_started')
+        ->assertSeeHtml('wire:model.blur="'.$key.'.reason"')
+        ->set($key.'.reason', 'Too short')
+        ->assertHasErrors([$key.'.reason' => __('monthly_reports.activity_reason_min')]);
+
+    expect($entry->fresh()->status)->toBe(ActivityStatus::Started);
+});
+
+test('planned weeks and the carry-over badges are shown', function () {
+    $this->travelTo('2026-12-02 10:00:00');
+    $project = mrsProject();
+    $november = mrsReport($project, '2026-11-01', MonthlyReportStatus::Validated);
+    $report = mrsReport($project, '2026-12-01');
+    $scheduled = mrsActivity($project, statement: 'Scheduled activity');
+    mrsSchedule($scheduled, '2026-12-01', [2, 3]);
+    $continuing = mrsActivity($project, statement: 'Continuing activity');
+    $late = mrsActivity($project, statement: 'Late activity');
+    ProjectActivityStatus::query()->create(['project_id' => $project->id, 'result_id' => $continuing->id, 'status' => ActivityStatus::Ongoing, 'monthly_report_id' => $november->id]);
+    ProjectActivityStatus::query()->create(['project_id' => $project->id, 'result_id' => $late->id, 'status' => ActivityStatus::NotStarted, 'monthly_report_id' => $november->id]);
+
+    mrsPage($report)
+        ->assertSeeText(trans_choice('monthly_reports.planned_weeks', 2, ['weeks' => '2'.__('monthly_reports.weeks_and').'3']))
+        ->assertSeeText(__('monthly_reports.continuing_from', ['month' => 'November 2026']))
+        ->assertSeeText(__('monthly_reports.late_from', ['month' => 'November 2026']));
+});
+
+test('answers save with the question text, and quarter-end questions are labelled', function () {
+    $this->travelTo('2026-12-02 10:00:00');
+    $project = mrsProject();
+    $template = Activity::withoutRecording(fn (): ReportTemplate => ReportTemplate::factory()->confirmed()->create(['project_id' => $project->id]));
+    $monthly = ReportTemplateQuestion::factory()->create(['report_template_id' => $template->id, 'text_ar' => 'ما أبرز الإنجازات؟', 'text_en' => 'What went well?']);
+    ReportTemplateQuestion::factory()->create(['report_template_id' => $template->id, 'text_en' => 'Quarter lessons?', 'frequency' => NarrativeQuestionFrequency::QuarterEnd]);
+    $report = mrsReport($project, '2026-12-01');
+
+    mrsPage($report)
+        ->assertSeeText('What went well?')
+        ->assertSeeText('Quarter lessons?')
+        ->assertSeeText(__('monthly_reports.quarter_end_question'))
+        ->set('answers.'.$monthly->id, 'Three new groups started.')
+        ->assertHasNoErrors();
+
+    $answer = MonthlyReportAnswer::query()->sole();
+    expect($answer->answer)->toBe('Three new groups started.')
+        ->and($answer->question_text)->toBe('ما أبرز الإنجازات؟');
+});
+
+test('evidence uploads to a line, downloads through its report only, lists missing required types and deletes', function () {
+    mrsFakeStorage();
+    $project = mrsProject();
+    $report = mrsReport($project);
+    $line = mrsLine($report);
+    $type = EvidenceType::factory()->create(['name_en' => 'Attendance sheet']);
+    $template = Activity::withoutRecording(fn (): ReportTemplate => ReportTemplate::factory()->confirmed()->create(['project_id' => $project->id]));
+    $templateLine = Activity::withoutRecording(fn (): ReportTemplateLine => ReportTemplateLine::factory()->confirmed()->create(['report_template_id' => $template->id, 'plan_indicator_id' => $line->shares->first()->plan_indicator_id]));
+    $templateLine->evidenceTypes()->attach($type->id);
+
+    $page = mrsPage($report)
+        ->assertSeeHtml('data-missing-evidence="'.$line->id.'"')
+        ->assertSeeText('Attendance sheet')
+        ->call('openFileModal', $line->id, null)
+        ->set('newFileTypeId', (string) $type->id)
+        ->set('newFile', validUpload('evidence.pdf'))
+        ->call('saveFile')
+        ->assertHasNoErrors()
+        ->assertDontSeeHtml('data-missing-evidence="'.$line->id.'"');
+
+    $file = MonthlyReportFile::query()->sole();
+    expect($file->monthly_report_line_id)->toBe($line->id)
+        ->and($file->evidence_type_id)->toBe($type->id);
+    $page->assertSeeHtml(route('monthly-reports.files.download', [$report, $file]));
+
+    $this->app['auth']->forgetGuards();
+    $this->get(route('monthly-reports.files.download', [$report, $file]))->assertRedirect(route('login'));
+    $this->actingAs($this->owner)->get(route('monthly-reports.files.download', [$report, $file]))->assertOk();
+    $other = mrsReport(mrsProject(), '2026-11-01');
+    $this->actingAs($this->owner)->get(route('monthly-reports.files.download', [$other, $file]))->assertNotFound();
+
+    $page->call('confirmDeleteFile', $file->id)
+        ->call('deleteFile')
+        ->assertHasNoErrors();
+
+    expect(MonthlyReportFile::query()->count())->toBe(0);
+});
+
+test('evidence attaches to a saved activity entry', function () {
+    mrsFakeStorage();
+    $project = mrsProject();
+    $report = mrsReport($project);
+    $activity = mrsActivity($project);
+    mrsSchedule($activity, '2026-10-01');
+    $type = EvidenceType::factory()->create();
+
+    $page = mrsPage($report)
+        ->set('activityEntries.'.$activity->id.'.status', 'ongoing')
+        ->assertHasNoErrors();
+    $entry = MonthlyReportActivityEntry::query()->sole();
+
+    $page->call('openFileModal', null, $entry->id)
+        ->set('newFileTypeId', (string) $type->id)
+        ->set('newFile', validUpload('photo.png'))
+        ->call('saveFile')
+        ->assertHasNoErrors();
+
+    expect(MonthlyReportFile::query()->sole()->monthly_report_activity_entry_id)->toBe($entry->id);
+});
+
+test('a file of another report cannot be deleted from this page', function () {
+    mrsFakeStorage();
+    $report = mrsReport(mrsProject());
+    $foreign = Activity::withoutRecording(fn (): MonthlyReportFile => MonthlyReportFile::factory()->create(['monthly_report_id' => mrsReport(mrsProject(), '2026-11-01')->id]));
+
+    mrsPage($report)->call('confirmDeleteFile', $foreign->id)->assertNotFound();
+
+    expect($foreign->fresh())->not->toBeNull();
+});
+
+test('the progress line counts what the preparer filled and lists what is still needed', function () {
+    $project = mrsProject();
+    $report = mrsReport($project);
+    $filled = mrsLine($report);
+    $empty = mrsLine($report);
+    mrsLine($report, enteredBy: IndicatorCollector::Meal);
+    $activity = mrsActivity($project);
+    mrsSchedule($activity, '2026-10-01');
+
+    mrsPage($report)
+        ->set('figures.'.$filled->id.'.value', '4')
+        ->assertSeeText(__('monthly_reports.progress_done', ['done' => 1, 'total' => 3]))
+        ->assertSeeHtml('data-still-needed')
+        ->assertSeeText(trans_choice('monthly_reports.meal_lines_group', 1, ['count' => 1]))
+        ->set('figures.'.$empty->id.'.value', '0')
+        ->set('activityEntries.'.$activity->id.'.status', 'ongoing')
+        ->assertSeeText(__('monthly_reports.progress_done', ['done' => 3, 'total' => 3]))
+        ->assertSeeText(__('monthly_reports.all_done'))
+        ->assertDontSeeHtml('data-still-needed');
 });

@@ -8,6 +8,8 @@
     'targetOptions' => [],
     'formTarget' => null,
     'window' => null,
+    'ratio' => null,
+    'ratioPreview' => null,
 ])
 
 @php
@@ -29,7 +31,7 @@
     required-note
 >
     @if ($open)
-        <x-ui.form-section :title="__('common.section_details')" :fields="['reportTargetId', 'plannedDate', 'value']">
+        <x-ui.form-section :title="__('common.section_details')" :fields="['reportTargetId', 'plannedDate', 'value', 'numerator', 'denominator']">
             <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
                 <x-ui.form-select wire:model.live="reportTargetId" :label="__('reports.target')" :placeholder="__('reports.select_a_target')" :help="$targetHelp" required autofocus class="@2xl/modal:col-span-2">
                     @foreach ($targetOptions as $targetOption)
@@ -46,16 +48,26 @@
                     required
                 />
 
-                <x-ui.form-input
-                    wire:model="value"
-                    :label="$unit === null || $unit === '' ? __('reports.reported_value') : __('reports.reported_value_in', ['unit' => $unit])"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    :max="$isPercentage ? 100 : null"
-                    :suffix="$isPercentage ? '%' : null"
-                    required
-                />
+                @if ($ratio === null)
+                    <x-ui.form-input
+                        wire:model="value"
+                        :label="$unit === null || $unit === '' ? __('reports.reported_value') : __('reports.reported_value_in', ['unit' => $unit])"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        :max="$isPercentage ? 100 : null"
+                        :suffix="$isPercentage ? '%' : null"
+                        required
+                    />
+                @else
+                    <x-ui.form-input wire:model.blur="numerator" :label="$ratio['numerator_label']" type="number" step="0.01" min="0" required />
+                    <x-ui.form-input wire:model.blur="denominator" :label="$ratio['denominator_label']" type="number" step="0.01" min="0" required />
+                    <div class="flex flex-col gap-1 @2xl/modal:col-span-2" data-ratio-preview>
+                        <span class="text-sm font-medium">{{ __('reports.computed_value') }}</span>
+                        <bdi dir="ltr" class="text-base font-bold tabular-nums">{{ $ratioPreview ?? '—' }}</bdi>
+                        <span class="text-xs text-secondary-medium dark:text-ink-muted">{{ __('reports.computed_value_help') }}</span>
+                    </div>
+                @endif
             </div>
         </x-ui.form-section>
 

@@ -49,6 +49,7 @@ new #[Title('titles.report')] class extends Component {
                 // Every figure on the target, for its achievement by the shared rule.
                 'planIndicator.reports:id,plan_indicator_id,status,planned_date,value',
                 'user:id,hr_user_id',
+                'monthlyReport:id,slug',
             ])
             ->findOrFail($this->reportId);
     }
@@ -207,6 +208,13 @@ new #[Title('titles.report')] class extends Component {
                     @endif
                 @endif
             </span>
+            @if ($report->monthlyReport !== null)
+                {{-- A mirror is changed only on its monthly report (contracts §13). --}}
+                <a href="{{ route('monthly-reports.show', $report->monthlyReport) }}" wire:navigate class="inline-flex items-center gap-1 rounded-md border border-secondary-light px-2 py-0.5 text-[11px] font-semibold hover:bg-secondary-soft dark:border-line-strong dark:hover:bg-white/[0.06]" data-monthly-report-chip="{{ $report->id }}">
+                    <flux:icon.calendar-days variant="micro" class="size-3" aria-hidden="true" />
+                    {{ __('reports.monthly_report_chip') }}
+                </a>
+            @endif
         </x-slot:meta>
 
         <x-slot:actions>
@@ -325,7 +333,9 @@ new #[Title('titles.report')] class extends Component {
         </div>
     @endif
 
-    @include('pages.reports._show-files')
+    @unless ($report->isMirror())
+        @include('pages.reports._show-files')
+    @endunless
 
     <section aria-labelledby="record-activity-heading" class="grid gap-3" data-record-activity>
         <h2 id="record-activity-heading" class="text-base font-bold">{{ __('activity.title') }}</h2>
@@ -338,6 +348,8 @@ new #[Title('titles.report')] class extends Component {
         :target-options="$showReportModal ? $this->targetOptions : []"
         :form-target="$showReportModal ? $this->formTarget : null"
         :window="$showReportModal ? $this->formWindow() : null"
+        :ratio="$showReportModal ? $this->formRatio() : null"
+        :ratio-preview="$showReportModal ? $this->ratioPreview() : null"
     />
 
     @include('pages.reports._show-file-modal')

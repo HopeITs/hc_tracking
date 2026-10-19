@@ -6,6 +6,7 @@
     'computed' => '—',
     'computedKey',
     'editable' => false,
+    'showComputed' => true,
 ])
 
 @use('App\Enums\Gender')
@@ -36,11 +37,12 @@
     $inputClasses = 'h-8 w-24 rounded-md border bg-white px-2 text-end tabular-nums text-secondary-dark outline-none focus:border-primary focus:ring-2 focus:ring-primary/30 disabled:bg-board disabled:text-secondary-light dark:bg-surface-2 dark:text-ink dark:focus:border-brand dark:disabled:bg-surface-1 dark:disabled:text-ink-faint';
     $readClasses = 'inline-block min-w-12 text-end tabular-nums font-semibold';
     $mutedText = 'text-secondary-medium dark:text-ink-muted';
-    $showsComputed = $kind !== MonthlyReportEntryKind::Count || $row['disaggregated'];
+    $showsComputed = $showComputed && ($kind !== MonthlyReportEntryKind::Count || $row['disaggregated']);
 @endphp
 
 <div class="flex flex-wrap items-start gap-x-4 gap-y-2">
     @if ($row['disaggregated'])
+        <div class="max-w-full overflow-x-auto pb-1">
         <div @class(['grid gap-x-3 gap-y-1.5', 'grid-cols-[auto_repeat(2,auto)]' => count($fields) === 1, 'grid-cols-[auto_repeat(4,auto)]' => count($fields) === 2])>
             <span></span>
             @foreach ($fields as $field)
@@ -80,6 +82,7 @@
                 @endforeach
             @endforeach
         </div>
+        </div>
     @else
         @foreach ($fields as $field)
             @php
@@ -110,7 +113,7 @@
     @endif
 
     @if ($kind === MonthlyReportEntryKind::FixedRatio)
-        <p class="self-end pb-1.5 text-xs {{ $mutedText }}">
+        <p @class(['text-xs', $mutedText, 'self-end pb-1.5' => $showComputed, 'basis-full -mt-1' => ! $showComputed])>
             @if ($fixedDenominator !== null)
                 {{ __('monthly_reports.out_of_beneficiaries', ['count' => number_format($fixedDenominator)]) }}
             @else

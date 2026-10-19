@@ -4,6 +4,7 @@ use App\Http\Controllers\EmailTwoFactorController;
 use App\Http\Controllers\EmployeePickerOptionsController;
 use App\Http\Controllers\MarkNotificationReadController;
 use App\Http\Controllers\MarkTourSeenController;
+use App\Http\Controllers\MonthlyReportFileDownloadController;
 use App\Http\Controllers\OpenNotificationController;
 use App\Http\Controllers\ProjectFileDownloadController;
 use App\Http\Controllers\ProposalFileDownloadController;
@@ -191,6 +192,13 @@ Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () 
     Route::livewire('monthly-reports/{monthlyReport}', 'pages::monthly-reports.show')
         ->can('reports.view')
         ->name('monthly-reports.show');
+
+    // The file loads through $monthlyReport->files() (contracts §13.1 item 4).
+    Route::get('monthly-reports/{monthlyReport}/files/{monthlyReportFile}/download', MonthlyReportFileDownloadController::class)
+        ->whereNumber('monthlyReportFile')
+        ->can('reports.view')
+        ->middleware('throttle:files')
+        ->name('monthly-reports.files.download');
 
     Route::get('reports/{report}/files/{reportFile}/download', ReportFileDownloadController::class)
         ->can('reports.view')

@@ -140,4 +140,8 @@ return [
     'counted_toward_the_target' => 'محتسب ضمن المستهدف',
     'counts_toward_the_target_once_approved' => 'يُحتسب ضمن المستهدف بعد اعتماده',
     'achieved_so_far' => 'المتحقق حتى الآن',
+    'monthly_report_chip' => 'تقرير شهري',
+    'mirror_read_only' => 'هذا الرقم من تقرير شهري؛ عدّله هناك.',
+    'computed_value' => 'النتيجة',
+    'computed_value_help' => 'تُحسب من الرقمين عند الحفظ.',
 ];
