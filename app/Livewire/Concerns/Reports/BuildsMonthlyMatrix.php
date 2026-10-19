@@ -22,6 +22,7 @@ use App\Support\MealCoverage;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Database\Query\Expression;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -50,6 +51,9 @@ use Livewire\Attributes\Computed;
  * @property string $pillar #[Url] filter on the page
  * @property string $year #[Url] filter on the page
  * @property bool $mine #[Url] filter on the page
+ * @property string $view #[Url] mode on the page: rows | grouped
+ * @property string $tab #[Url] tab on the page: matrix | activities
+ * @property bool $pwd #[Url] show the disability rows of a breakdown
  * @property-read array{proposal: ?int, donor: ?int, center: ?int, city: ?int, indicator: ?int, pillar: ?int} $resolvedFilters
  * @property-read array{months: list<CarbonImmutable>, rows: list<array<string, mixed>>, isDonorView: bool} $matrix
  */
@@ -97,6 +101,24 @@ trait BuildsMonthlyMatrix
         $months = (int) $begin->startOfMonth()->diffInMonths($end->startOfMonth()) + 1;
 
         return ['begin' => CarbonImmutable::instance($begin)->startOfMonth(), 'years' => max(1, (int) ceil($months / 12))];
+    }
+
+    /**
+     * The mode the matrix tab shows: rows (default) or grouped by indicator.
+     */
+    #[Computed]
+    public function resolvedView(): string
+    {
+        return $this->view === 'grouped' ? 'grouped' : 'rows';
+    }
+
+    /**
+     * The tab shown: the matrix (default) or the Activities board.
+     */
+    #[Computed]
+    public function resolvedTab(): string
+    {
+        return $this->tab === 'activities' ? 'activities' : 'matrix';
     }
 
     /**
@@ -182,6 +204,11 @@ trait BuildsMonthlyMatrix
         if ($rows !== []) {
             $rows = $this->withCells($rows, $months, $isDonorView);
             $rows = $this->withTotals($rows, $months, $isDonorView);
+            $rows = $this->withBreakdowns($rows, $months, $isDonorView);
+
+            if ($this->resolvedView === 'grouped') {
+                $rows = $this->groupRows($rows, $months, $isDonorView);
+            }
         }
 
         return ['months' => $months, 'rows' => $rows, 'isDonorView' => $isDonorView];
@@ -362,6 +389,13 @@ trait BuildsMonthlyMatrix
                 'measure' => $measure,
                 'unit' => $first->unit,
                 'is_cumulative' => (bool) $first->is_cumulative,
+                'is_disaggregated' => (bool) $first->is_disaggregated,
+                'attribution' => $attribution,
+                'is_group' => false,
+                'centers_count' => 1,
+                'breakdown' => null,
+                'breakdown_kind' => null,
+                'breakdown_raw' => [],
                 'denominator_basis' => $first->denominator_basis === null ? null : DenominatorBasis::from($first->denominator_basis),
                 'center' => $center?->name ?? $first->project_name,
                 'city' => $center === null || $cityId === null ? null : ($cities[$cityId]->name ?? null),
@@ -399,6 +433,30 @@ trait BuildsMonthlyMatrix
     }
 
     /**
+     * The proposal, donor, center, city, pillar and "my projects" filters on
+     * a query that joins `proposals as pp` and `projects as pr`; shared by
+     * the matrix and the Activities tab.
+     */
+    protected function applyMatrixFilters(Builder $query): Builder
+    {
+        $filters = $this->resolvedFilters;
+
+        $query
+            ->when($filters['proposal'] !== null, fn (Builder $q) => $q->where('pp.id', $filters['proposal']))
+            ->when($filters['donor'] !== null, fn (Builder $q) => $q->where('pp.donor_id', $filters['donor']))
+            ->when($filters['center'] !== null, fn (Builder $q) => $q->where('pr.id', $filters['center']))
+            ->when($filters['city'] !== null, fn (Builder $q) => $q->where('pr.city_id', $filters['city']))
+            ->when($filters['pillar'] !== null, fn (Builder $q) => $q->whereIn('pr.program_id', Program::query()->where('strategic_pillar_id', $filters['pillar'])->select('id')));
+
+        if ($this->mine) {
+            $covered = $this->coveredProjectIds();
+            $covered === [] ? $query->whereRaw('1 = 0') : $query->whereIn('pr.id', $covered);
+        }
+
+        return $query;
+    }
+
+    /**
      * Every target the filters select whose source covers the window, with
      * its library entry, project, proposal, donor and program joined in one
      * read. Targets without a library entry carry no lines and so no row.
@@ -424,26 +482,16 @@ trait BuildsMonthlyMatrix
                     $planTargets->whereNotNull('ap.id')->whereBetween('ap.year', [$from->year, $to->year]);
                 });
             })
-            ->when($filters['proposal'] !== null, fn (Builder $q) => $q->where('pp.id', $filters['proposal']))
-            ->when($filters['donor'] !== null, fn (Builder $q) => $q->where('pp.donor_id', $filters['donor']))
-            ->when($filters['center'] !== null, fn (Builder $q) => $q->where('pr.id', $filters['center']))
-            ->when($filters['city'] !== null, fn (Builder $q) => $q->where('pr.city_id', $filters['city']))
-            ->when($filters['indicator'] !== null, fn (Builder $q) => $q->where('li.id', $filters['indicator']))
-            ->when($filters['pillar'] !== null, fn (Builder $q) => $q->whereIn('pr.program_id', Program::query()->where('strategic_pillar_id', $filters['pillar'])->select('id')));
+            ->when($filters['indicator'] !== null, fn (Builder $q) => $q->where('li.id', $filters['indicator']));
 
-        if ($this->mine) {
-            $covered = $this->coveredProjectIds();
-            $covered === [] ? $query->whereRaw('1 = 0') : $query->whereIn('pr.id', $covered);
-        }
-
-        return $query
+        return $this->applyMatrixFilters($query)
             ->orderBy('pr.name')
             ->orderBy('pr.id')
             ->orderBy('li.code')
             ->orderBy('p.id')
             ->select([
                 'p.id as plan_id', 'p.target', 'p.project_id',
-                'li.id as library_id', 'li.code', 'li.name_ar', 'li.name_en', 'li.unit', 'li.is_cumulative', 'li.denominator_basis', 'li.is_active',
+                'li.id as library_id', 'li.code', 'li.name_ar', 'li.name_en', 'li.unit', 'li.is_cumulative', 'li.is_disaggregated', 'li.denominator_basis', 'li.is_active',
                 'ind.measure',
                 'pr.name as project_name', 'pr.slug as project_slug', 'pr.center_id', 'pr.city_id',
                 'pg.donor_attribution',
@@ -578,12 +626,13 @@ trait BuildsMonthlyMatrix
      * The pooled level of every percentage or average row over the window,
      * one aggregate over the rows' targets (contracts §13 Pooling): the
      * representative target in a `shared` center row, every target in a
-     * `split` one, the single target in the donor view.
+     * `split` one, the single target in the donor view. `$byLibrary` pools all
+     * the targets of a library entry together (the grouped mode).
      *
      * @param  list<array<string, mixed>>  $rows
      * @return array<string, array{ratio: ?float, excluded: int}>
      */
-    protected function pooledRatios(array $rows, CarbonImmutable $from, CarbonImmutable $to, bool $isDonorView): array
+    protected function pooledRatios(array $rows, CarbonImmutable $from, CarbonImmutable $to, bool $isDonorView, bool $byLibrary = false): array
     {
         $ratioRows = array_values(array_filter($rows, fn (array $row): bool => $row['measure'] !== IndicatorMeasure::Numeric));
 
@@ -603,7 +652,7 @@ trait BuildsMonthlyMatrix
             ->toBase()
             ->from('plan_indicators')
             ->whereIn('plan_indicators.id', array_keys($rowKeyOfTarget))
-            ->groupBy('plan_indicators.project_id', $isDonorView ? 'plan_indicators.id' : DB::raw('(select i2.library_indicator_id from indicators i2 where i2.id = plan_indicators.indicator_id)'))
+            ->groupBy(...$this->pooledGroupColumns($isDonorView, $byLibrary))
             ->selectRaw('min(plan_indicators.id) as first_target_id, '.PlanIndicator::pooledRatioSql($from, $to)->getValue($grammar).' as ratio, '.PlanIndicator::pooledExcludedCountSql($from, $to)->getValue($grammar).' as excluded')
             ->get();
 
@@ -616,5 +665,22 @@ trait BuildsMonthlyMatrix
         }
 
         return $result;
+    }
+
+    /**
+     * The columns one pooled ratio is grouped by: a target (donor view), a
+     * center's library entry (center view) or a library entry (grouped).
+     *
+     * @return list<Expression|string>
+     */
+    protected function pooledGroupColumns(bool $isDonorView, bool $byLibrary): array
+    {
+        $library = DB::raw('(select i2.library_indicator_id from indicators i2 where i2.id = plan_indicators.indicator_id)');
+
+        return match (true) {
+            $byLibrary => [$library],
+            $isDonorView => ['plan_indicators.project_id', 'plan_indicators.id'],
+            default => ['plan_indicators.project_id', $library],
+        };
     }
 }

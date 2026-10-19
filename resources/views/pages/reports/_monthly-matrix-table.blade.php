@@ -34,26 +34,36 @@
                 </tr>
             </thead>
 
-            <tbody class="bg-white dark:bg-surface-1">
-                @foreach ($paged as $row)
+            @foreach ($paged as $row)
                     @php
                         $unit = $row['measure'] === IndicatorMeasure::Percentage ? '%' : ($row['unit'] ?? '');
                     @endphp
-                    <tr wire:key="{{ $row['key'] }}" data-matrix-row="{{ $row['key'] }}">
+                    <tbody wire:key="{{ $row['key'] }}" class="bg-white dark:bg-surface-1" x-data="{ open: false }">
+                    <tr data-matrix-row="{{ $row['key'] }}">
                         <td class="{{ $bodyCell }} {{ $stickyCode }} bg-white font-mono text-xs dark:bg-surface-1" dir="ltr">{{ $row['code'] }}</td>
                         <td class="{{ $bodyCell }} {{ $stickyName }} bg-white dark:bg-surface-1">
                             <span dir="auto" class="block font-medium">{{ $row['name_en'] }}</span>
+                            @if ($row['breakdown'] !== null)
+                                <button type="button" x-on:click="open = ! open" x-bind:aria-expanded="open.toString()" aria-expanded="false" aria-label="{{ __('reports.matrix.toggle_breakdown') }}" data-matrix-expand class="mt-1 inline-flex min-h-8 touch-manipulation items-center gap-1 text-xs text-secondary-medium underline decoration-secondary-light underline-offset-2 dark:text-ink-muted">
+                                    <flux:icon.chevron-down variant="micro" class="size-3.5 transition-transform" x-bind:class="open ? 'rotate-180' : ''" aria-hidden="true" />
+                                    {{ __('reports.matrix.breakdown') }}
+                                </button>
+                            @endif
                             @unless ($row['is_active'])
                                 <span class="mt-0.5 inline-flex items-center gap-1 text-[11px] text-secondary-medium dark:text-ink-muted"><flux:icon.pause-circle variant="micro" class="size-3.5" aria-hidden="true" />{{ __('reports.matrix.inactive') }}</span>
                             @endunless
                         </td>
                         <td class="{{ $bodyCell }}"><span dir="auto" class="block">{{ $row['name_ar'] }}</span></td>
                         <td class="{{ $bodyCell }}">
-                            @can('projects.view')
-                                <a href="{{ route('projects.show', $row['project_slug']) }}" wire:navigate dir="auto" class="underline decoration-secondary-light underline-offset-2">{{ $row['center'] }}</a>
+                            @if ($row['is_group'])
+                                <span>{{ __('reports.matrix.centers_count', ['count' => $row['centers_count']]) }}</span>
                             @else
-                                <span dir="auto">{{ $row['center'] }}</span>
-                            @endcan
+                                @can('projects.view')
+                                    <a href="{{ route('projects.show', $row['project_slug']) }}" wire:navigate dir="auto" class="underline decoration-secondary-light underline-offset-2">{{ $row['center'] }}</a>
+                                @else
+                                    <span dir="auto">{{ $row['center'] }}</span>
+                                @endcan
+                            @endif
                             @if ($row['city'] !== null)
                                 <span dir="auto" class="block text-xs text-secondary-medium dark:text-ink-muted">{{ $row['city'] }}</span>
                             @endif
@@ -86,9 +96,18 @@
                             {{ $row['measure']->label() }}
                             @if ($row['is_cumulative'])
                                 <span class="block text-secondary-medium dark:text-ink-muted">{{ __('reports.matrix.cumulative') }}</span>
+                                @if ($row['is_group'])
+                                    <span class="block text-[11px] text-secondary-medium dark:text-ink-muted">{{ __('reports.matrix.cumulative_group_note') }}</span>
+                                @endif
                             @endif
                         </td>
-                        <td class="{{ $bodyCell }} text-end tabular-nums" dir="ltr">{{ $this->matrixNumber($row['target']) }}{{ $unit === '%' ? '%' : '' }}</td>
+                        <td class="{{ $bodyCell }} text-end tabular-nums" dir="ltr">
+                            @if ($row['target'] === null)
+                                <span aria-hidden="true">—</span><span class="sr-only">{{ __('reports.matrix.no_target') }}</span>
+                            @else
+                                {{ $this->matrixNumber($row['target']) }}{{ $unit === '%' ? '%' : '' }}
+                            @endif
+                        </td>
 
                         @foreach ($matrix['months'] as $month)
                             @php
@@ -150,8 +169,11 @@
                             @endif
                         </td>
                     </tr>
-                @endforeach
-            </tbody>
+                    @if ($row['breakdown'] !== null)
+                        @include('pages.reports._monthly-matrix-breakdown')
+                    @endif
+                </tbody>
+            @endforeach
         </table>
     </div>
 

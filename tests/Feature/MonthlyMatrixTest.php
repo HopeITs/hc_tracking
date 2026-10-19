@@ -1,22 +1,28 @@
 <?php
 
+use App\Enums\ActivityStatus;
 use App\Enums\DonorAttribution;
 use App\Enums\MatrixCellState;
 use App\Enums\MonthlyReportStatus;
 use App\Enums\ProposalStatus;
+use App\Enums\ResultType;
 use App\Models\Activity;
+use App\Models\ActivitySchedule;
 use App\Models\Donor;
 use App\Models\Indicator;
 use App\Models\LibraryIndicator;
 use App\Models\MealCoverageAssignment;
 use App\Models\MonthlyReport;
+use App\Models\MonthlyReportActivityEntry;
 use App\Models\MonthlyReportLine;
+use App\Models\MonthlyReportLineBreakdown;
 use App\Models\MonthlyReportLineShare;
 use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Report;
+use App\Models\Result;
 use App\Models\StrategicPillar;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -471,4 +477,424 @@ test('Arabic shows Arabic month names in chronological order with numbers kept l
     $page = $this->actingAs($user)->get(route('reports.monthly-matrix'))->assertOk();
 
     $page->assertSeeInOrder(['كانون الثاني 2026', 'شباط 2026', 'آذار 2026'])->assertSee('dir="ltr"', false);
+});
+
+/*
+| Slice 2 (T18): group by indicator, disaggregation rows (D-50), Activities tab (D-51).
+*/
+
+/**
+ * A by-sex breakdown row of a line (line level) or of one of its shares.
+ *
+ * @param  array<string, float|int|string|null>  $figures  value, numerator, denominator and their disabled_ twins
+ */
+function mmBreakdown(MonthlyReportLine $line, string $gender, array $figures, ?MonthlyReportLineShare $share = null): MonthlyReportLineBreakdown
+{
+    return Activity::withoutRecording(fn (): MonthlyReportLineBreakdown => MonthlyReportLineBreakdown::factory()->create([
+        'monthly_report_line_id' => $line->id,
+        'monthly_report_line_share_id' => $share?->id,
+        'gender' => $gender,
+        'value' => null,
+        'disabled_value' => null,
+        ...$figures,
+    ]));
+}
+
+/**
+ * A proposal-framework output with activities under it.
+ *
+ * @return array{output: Result, activities: list<Result>}
+ */
+function mmActivities(Proposal $proposal, Project $project, int $count = 1, string $statement = 'Output A'): array
+{
+    return Activity::withoutRecording(function () use ($proposal, $project, $count, $statement): array {
+        $output = Result::factory()->type(ResultType::Output)->create(['statement' => $statement, 'proposal_id' => $proposal->id, 'program_id' => $project->program_id]);
+        $activities = [];
+
+        foreach (range(1, $count) as $index) {
+            $activities[] = Result::factory()->activity($output)->create(['statement' => "{$statement} activity {$index}"]);
+        }
+
+        return ['output' => $output, 'activities' => $activities];
+    });
+}
+
+function mmEntry(MonthlyReport $report, Result $activity, ActivityStatus $status): MonthlyReportActivityEntry
+{
+    return Activity::withoutRecording(fn (): MonthlyReportActivityEntry => MonthlyReportActivityEntry::factory()->create([
+        'monthly_report_id' => $report->id,
+        'result_id' => $activity->id,
+        'status' => $status,
+    ]));
+}
+
+/**
+ * @param  list<int>|null  $weeks
+ */
+function mmSchedule(Result $activity, string $month, ?array $weeks = null, ?Project $project = null): ActivitySchedule
+{
+    return Activity::withoutRecording(fn (): ActivitySchedule => ActivitySchedule::factory()->create([
+        'result_id' => $activity->id,
+        'project_id' => $project?->id,
+        'month' => $month,
+        'weeks' => $weeks,
+    ]));
+}
+
+test('grouped mode sums counts across centers: target, cells and total', function () {
+    $library = LibraryIndicator::factory()->create();
+    $first = mmProject();
+    $second = mmProject();
+    $firstTarget = mmTarget(mmProposal($first), $first, $library, '60');
+    $secondTarget = mmTarget(mmProposal($second), $second, $library, '40');
+
+    mmLine(mmReport($first, '2026-01-01'), $library, [$firstTarget], 12);
+    mmLine(mmReport($second, '2026-01-01'), $library, [$secondTarget], 8);
+    mmLine(mmReport($first, '2026-02-01', MonthlyReportStatus::Submitted), $library, [$firstTarget], 5);
+
+    $rows = Livewire::actingAs(mmViewer())->withQueryParams(['view' => 'grouped'])->test('pages::reports.monthly-matrix')->instance()->matrix['rows'];
+
+    expect($rows)->toHaveCount(1)
+        ->and($rows[0]['is_group'])->toBeTrue()
+        ->and($rows[0]['centers_count'])->toBe(2)
+        ->and($rows[0]['target'])->toBe(100.0)
+        ->and($rows[0]['cells']['2026-01']['value'])->toBe(20.0)
+        ->and($rows[0]['cells']['2026-01']['state'])->toBe(MatrixCellState::Approved)
+        ->and($rows[0]['cells']['2026-02']['state'])->toBe(MatrixCellState::Pending)
+        ->and($rows[0]['total'])->toBe(20.0) // the pending month never counts
+        ->and($rows[0]['achieved'])->toBe(20.0);
+});
+
+test('a grouped percentage pools numerators over denominators and counts what it left out', function () {
+    $library = LibraryIndicator::factory()->percentage()->create();
+    $projects = [mmProject(), mmProject(), mmProject()];
+    $targets = [];
+
+    foreach ([[$projects[0], '80'], [$projects[1], '60'], [$projects[2], '60']] as $index => [$project, $target]) {
+        $targets[$index] = mmTarget(mmProposal($project), $project, $library, $target);
+    }
+
+    mmLine(mmReport($projects[0], '2026-01-01'), $library, [$targets[0]], 30, ['numerator' => 30, 'denominator' => 100, 'fixed_denominator' => 100]);
+    mmLine(mmReport($projects[1], '2026-01-01'), $library, [$targets[1]], 20, ['numerator' => 10, 'denominator' => 50, 'fixed_denominator' => 50]);
+    mmLine(mmReport($projects[2], '2026-01-01'), $library, [$targets[2]], null, ['not_measured' => true]);
+
+    $page = Livewire::actingAs(mmViewer())->withQueryParams(['view' => 'grouped'])->test('pages::reports.monthly-matrix');
+    $row = $page->instance()->matrix['rows'][0];
+
+    expect($row['total'])->toBe(26.67) // (30 + 10) ÷ (100 + 50), not (30% + 20%) ÷ 2
+        ->and($row['excluded'])->toBe(1)
+        ->and($row['cells']['2026-01']['value'])->toBe(26.67)
+        ->and($row['target'])->toBeNull() // targets differ: never averaged
+        ->and($row['achieved'])->toBeNull();
+
+    $page->assertSee(__('reports.matrix.not_poolable', ['count' => 1]));
+
+    $single = $page->set('center', (string) $projects[0]->id)->instance()->matrix['rows'][0];
+
+    expect($single['target'])->toBe(80.0)->and($single['total'])->toBe(30.0);
+});
+
+test('a shared program counts one target per center in a group and a cumulative group is flagged', function () {
+    $library = LibraryIndicator::factory()->create(['is_cumulative' => true]);
+    $project = mmProject(DonorAttribution::Shared);
+    $first = mmTarget(mmProposal($project, name: 'Shared A'), $project, $library, '30');
+    $second = mmTarget(mmProposal($project, name: 'Shared B'), $project, $library, '30');
+    mmLine(mmReport($project, '2026-01-01'), $library, [$first, $second], 30);
+
+    $page = Livewire::actingAs(mmViewer())->withQueryParams(['view' => 'grouped'])->test('pages::reports.monthly-matrix');
+    $row = $page->instance()->matrix['rows'][0];
+
+    expect($row['total'])->toBe(30.0)->and($row['target'])->toBe(30.0)->and($row['is_cumulative'])->toBeTrue();
+
+    $page->assertSee(__('reports.matrix.cumulative_group_note'));
+});
+
+test('a disaggregated count row breaks down by sex and persons with disability, validated months only', function () {
+    $library = LibraryIndicator::factory()->create(['is_disaggregated' => true]);
+    $project = mmProject();
+    $target = mmTarget(mmProposal($project), $project, $library, '100');
+
+    $january = mmLine(mmReport($project, '2026-01-01'), $library, [$target], 10);
+    mmBreakdown($january, 'male', ['value' => 6, 'disabled_value' => 1]);
+    mmBreakdown($january, 'female', ['value' => 4, 'disabled_value' => 2]);
+    $february = mmLine(mmReport($project, '2026-02-01'), $library, [$target], 7);
+    mmBreakdown($february, 'male', ['value' => 3, 'disabled_value' => 0]);
+    mmBreakdown($february, 'female', ['value' => 4, 'disabled_value' => 1]);
+    $pending = mmLine(mmReport($project, '2026-03-01', MonthlyReportStatus::Submitted), $library, [$target], 9);
+    mmBreakdown($pending, 'male', ['value' => 9, 'disabled_value' => 9]);
+
+    $row = Livewire::actingAs(mmViewer())->test('pages::reports.monthly-matrix')->instance()->matrix['rows'][0];
+    $breakdown = $row['breakdown'];
+
+    expect($row['is_disaggregated'])->toBeTrue()
+        ->and($breakdown['male']['cells']['2026-01'])->toBe(6.0)
+        ->and($breakdown['male']['total'])->toBe(9.0)
+        ->and($breakdown['male']['pwd']['total'])->toBe(1.0)
+        ->and($breakdown['female']['total'])->toBe(8.0)
+        ->and($breakdown['female']['pwd']['cells']['2026-02'])->toBe(1.0)
+        ->and($breakdown['total']['cells']['2026-01'])->toBe(10.0)
+        ->and($breakdown['total']['total'])->toBe(17.0)
+        ->and($breakdown['total']['pwd']['total'])->toBe(4.0)
+        ->and($breakdown['male']['cells']['2026-03'])->toBeNull(); // pending is never summed
+});
+
+test('a split row sums its share breakdowns while a donor filter reads one share', function () {
+    $library = LibraryIndicator::factory()->create(['is_disaggregated' => true]);
+    $split = mmProject(DonorAttribution::Split);
+    $firstProposal = mmProposal($split, name: 'Split A');
+    $first = mmTarget($firstProposal, $split, $library, '6');
+    $second = mmTarget(mmProposal($split, name: 'Split B'), $split, $library, '4');
+    $line = mmLine(mmReport($split, '2026-01-01'), $library, [$first, $second], 10, shareValues: [6, 4]);
+    [$shareA, $shareB] = $line->shares()->orderBy('id')->get()->all();
+    mmBreakdown($line, 'male', ['value' => 4, 'disabled_value' => 1], $shareA);
+    mmBreakdown($line, 'female', ['value' => 2], $shareA);
+    mmBreakdown($line, 'male', ['value' => 1], $shareB);
+    mmBreakdown($line, 'female', ['value' => 3], $shareB);
+
+    $page = Livewire::actingAs(mmViewer())->test('pages::reports.monthly-matrix');
+    $row = $page->instance()->matrix['rows'][0];
+
+    expect($row['breakdown']['male']['total'])->toBe(5.0)
+        ->and($row['breakdown']['female']['total'])->toBe(5.0)
+        ->and($row['breakdown']['total']['total'])->toBe(10.0);
+
+    $donorRow = $page->set('proposal', (string) $firstProposal->id)->instance()->matrix['rows'][0];
+
+    expect($donorRow['breakdown']['male']['total'])->toBe(4.0)->and($donorRow['breakdown']['total']['total'])->toBe(6.0);
+});
+
+test('a ratio category is the sum of numerators over the sum of denominators', function () {
+    $library = LibraryIndicator::factory()->average()->create(['is_disaggregated' => true]);
+    $project = mmProject();
+    $target = mmTarget(mmProposal($project), $project, $library, '4');
+
+    $january = mmLine(mmReport($project, '2026-01-01'), $library, [$target], 5, ['numerator' => 10, 'denominator' => 2]);
+    mmBreakdown($january, 'male', ['numerator' => 10, 'denominator' => 2]);
+    $february = mmLine(mmReport($project, '2026-02-01'), $library, [$target], 3, ['numerator' => 30, 'denominator' => 10]);
+    mmBreakdown($february, 'male', ['numerator' => 30, 'denominator' => 10]);
+
+    $male = Livewire::actingAs(mmViewer())->test('pages::reports.monthly-matrix')->instance()->matrix['rows'][0]['breakdown']['male'];
+
+    expect($male['cells']['2026-01'])->toBe(5.0)
+        ->and($male['cells']['2026-02'])->toBe(3.0)
+        ->and($male['total'])->toBe(3.33); // 40 ÷ 12, not the 4 an average of 5 and 3 gives
+});
+
+test('a fixed-denominator row breaks down into counts only', function () {
+    $library = LibraryIndicator::factory()->percentage()->create(['is_disaggregated' => true]);
+    $project = mmProject();
+    $target = mmTarget(mmProposal($project), $project, $library, '80');
+    $line = mmLine(mmReport($project, '2026-01-01'), $library, [$target], 20, ['numerator' => 20, 'denominator' => 100, 'fixed_denominator' => 100]);
+    mmBreakdown($line, 'male', ['numerator' => 12, 'disabled_numerator' => 1]);
+    mmBreakdown($line, 'female', ['numerator' => 8, 'disabled_numerator' => 0]);
+
+    $row = Livewire::actingAs(mmViewer())->test('pages::reports.monthly-matrix')->instance()->matrix['rows'][0];
+
+    expect($row['breakdown_kind'])->toBe('fixed')
+        ->and($row['breakdown']['male']['cells']['2026-01'])->toBe(12.0)
+        ->and($row['breakdown']['total']['total'])->toBe(20.0);
+});
+
+test('the pwd filter reveals the disability rows and a row without disaggregation has no breakdown', function () {
+    $library = LibraryIndicator::factory()->create(['is_disaggregated' => true]);
+    $plain = LibraryIndicator::factory()->create();
+    $project = mmProject();
+    $proposal = mmProposal($project);
+    $target = mmTarget($proposal, $project, $library);
+    $line = mmLine(mmReport($project, '2026-01-01'), $library, [$target], 10);
+    mmBreakdown($line, 'male', ['value' => 10, 'disabled_value' => 3]);
+    mmTarget($proposal, $project, $plain);
+
+    $page = Livewire::actingAs(mmViewer())->test('pages::reports.monthly-matrix');
+
+    expect(collect($page->instance()->matrix['rows'])->firstWhere('code', $plain->code)['breakdown'])->toBeNull();
+
+    $page->assertSee(__('reports.matrix.sex.male'))->assertDontSee(__('reports.matrix.of_whom_pwd'));
+    $page->set('pwd', true)->assertSee(__('reports.matrix.of_whom_pwd'));
+});
+
+test('grouped mode adds the breakdowns of its rows', function () {
+    $library = LibraryIndicator::factory()->create(['is_disaggregated' => true]);
+    $first = mmProject();
+    $second = mmProject();
+
+    foreach ([[$first, 6], [$second, 4]] as [$project, $male]) {
+        $target = mmTarget(mmProposal($project), $project, $library);
+        $line = mmLine(mmReport($project, '2026-01-01'), $library, [$target], $male + 1);
+        mmBreakdown($line, 'male', ['value' => $male, 'disabled_value' => 1]);
+        mmBreakdown($line, 'female', ['value' => 1]);
+    }
+
+    $row = Livewire::actingAs(mmViewer())->withQueryParams(['view' => 'grouped'])->test('pages::reports.monthly-matrix')->instance()->matrix['rows'][0];
+
+    expect($row['breakdown']['male']['total'])->toBe(10.0)
+        ->and($row['breakdown']['male']['pwd']['total'])->toBe(2.0)
+        ->and($row['breakdown']['total']['total'])->toBe(12.0);
+});
+
+test('the CSV carries the breakdown rows after their indicator, the pwd ones only when asked', function () {
+    $library = LibraryIndicator::factory()->create(['is_disaggregated' => true]);
+    $project = mmProject();
+    $line = mmLine(mmReport($project, '2026-01-01'), $library, [mmTarget(mmProposal($project), $project, $library)], 10);
+    mmBreakdown($line, 'male', ['value' => 6, 'disabled_value' => 1]);
+    mmBreakdown($line, 'female', ['value' => 4, 'disabled_value' => 2]);
+
+    $export = function (bool $pwd) {
+        $page = Livewire::actingAs(mmViewer())->test('pages::reports.monthly-matrix')->set('pwd', $pwd)->call('exportCsv');
+
+        return downloadedCsv($page);
+    };
+
+    $plain = $export(false);
+    $withPwd = $export(true);
+
+    expect($plain)->toHaveCount(5) // heading, indicator, male, female, total
+        ->and($withPwd)->toHaveCount(8) // + one "of whom" row per category
+        ->and(implode(',', $plain[2]))->toContain(__('reports.matrix.sex.male'))->toContain('6')
+        ->and(implode(',', $withPwd[3]))->toContain(__('reports.matrix.of_whom_pwd'))
+        ->and(strtolower(implode(',', $plain[0])))->not->toContain('budget')->not->toContain('currency');
+});
+
+test('the grouped CSV has one row per indicator', function () {
+    $library = LibraryIndicator::factory()->create();
+
+    foreach ([mmProject(), mmProject()] as $project) {
+        mmTarget(mmProposal($project), $project, $library, '10');
+    }
+
+    $page = Livewire::actingAs(mmViewer())->withQueryParams(['view' => 'grouped'])->test('pages::reports.monthly-matrix')->call('exportCsv');
+    $csv = downloadedCsv($page);
+
+    expect($csv)->toHaveCount(2)->and(implode(',', $csv[1]))->toContain($library->code)->toContain('20');
+});
+
+test('the Activities tab shows validated statuses, carries them forward and plans the rest', function () {
+    $project = mmProject();
+    $proposal = mmProposal($project);
+    ['output' => $output, 'activities' => [$activity, $scheduled]] = mmActivities($proposal, $project, 2);
+
+    mmEntry(mmReport($project, '2026-01-01'), $activity, ActivityStatus::Started);
+    mmEntry(mmReport($project, '2026-02-01'), $activity, ActivityStatus::Ongoing);
+    mmEntry(mmReport($project, '2026-04-01', MonthlyReportStatus::Submitted), $activity, ActivityStatus::Completed); // pending: ignored
+    mmSchedule($activity, '2026-05-01', [1, 2]);
+    mmSchedule($scheduled, '2026-06-01');
+    mmSchedule($scheduled, '2026-07-01', [4], $project); // the project's override replaces the proposal calendar
+
+    $page = Livewire::actingAs(mmViewer())->withQueryParams(['tab' => 'activities'])->test('pages::reports.monthly-matrix');
+    $board = $page->instance()->activityBoard;
+    $rows = collect($board['outputs'])->flatMap(fn (array $group): array => $group['activities'])->keyBy('activity_id');
+
+    expect($board['outputs'])->toHaveCount(1)
+        ->and($board['outputs'][0]['output_id'])->toBe($output->id)
+        ->and($rows[$activity->id]['cells']['2026-01']['kind'])->toBe('status')
+        ->and($rows[$activity->id]['cells']['2026-01']['status'])->toBe(ActivityStatus::Started)
+        ->and($rows[$activity->id]['cells']['2026-02']['status'])->toBe(ActivityStatus::Ongoing)
+        ->and($rows[$activity->id]['cells']['2026-03']['kind'])->toBe('carried')
+        ->and($rows[$activity->id]['cells']['2026-03']['status'])->toBe(ActivityStatus::Ongoing)
+        ->and($rows[$activity->id]['cells']['2026-04']['status'])->toBe(ActivityStatus::Ongoing) // not the pending Completed
+        ->and($rows[$activity->id]['cells']['2026-05'])->toMatchArray(['kind' => 'planned', 'weeks' => [1, 2]])
+        ->and($rows[$scheduled->id]['cells']['2026-06']['kind'])->toBe('empty') // the override has rows, the calendar is ignored
+        ->and($rows[$scheduled->id]['cells']['2026-07'])->toMatchArray(['kind' => 'planned', 'weeks' => [4]]);
+
+    $page->assertSee(__('enums.activity_status.ongoing'))->assertSee($output->statement);
+});
+
+test('the Activities tab honours the same filters and the window', function () {
+    $first = mmProject();
+    $second = mmProject();
+    $firstProposal = mmProposal($first);
+    $secondProposal = mmProposal($second, '2027-01-01', '2027-12-31', name: 'Next year');
+    ['activities' => [$firstActivity]] = mmActivities($firstProposal, $first, 1, 'First output');
+    ['activities' => [$secondActivity]] = mmActivities($secondProposal, $second, 1, 'Second output');
+
+    $ids = fn (array $filters): array => collect(Livewire::actingAs(mmViewer())->withQueryParams(['tab' => 'activities', ...$filters])->test('pages::reports.monthly-matrix')->instance()->activityBoard['outputs'])
+        ->flatMap(fn (array $group): array => $group['activities'])->pluck('activity_id')->all();
+
+    expect($ids([]))->toBe([$firstActivity->id]) // the second proposal starts after the 2026 window
+        ->and($ids(['year' => '2027']))->toBe([$secondActivity->id])
+        ->and($ids(['proposal' => (string) $firstProposal->id]))->toBe([$firstActivity->id])
+        ->and($ids(['donor' => (string) $firstProposal->donor_id]))->toBe([$firstActivity->id])
+        ->and($ids(['center' => (string) $second->id, 'year' => '2027']))->toBe([$secondActivity->id])
+        ->and($ids(['center' => (string) $second->id]))->toBe([])
+        ->and($ids(['mine' => '1']))->toBe([]);
+});
+
+test('the Activities export has the same permission, rate limit and no money', function () {
+    $project = mmProject();
+    $proposal = mmProposal($project);
+    ['activities' => [$activity]] = mmActivities($proposal, $project);
+    mmEntry(mmReport($project, '2026-01-01'), $activity, ActivityStatus::Completed);
+    mmSchedule($activity, '2026-05-01', [2, 3]);
+
+    $user = mmViewer();
+    RateLimiter::clear('monthly-matrix-export:'.$user->id);
+    $page = Livewire::actingAs($user)->withQueryParams(['tab' => 'activities'])->test('pages::reports.monthly-matrix')->call('exportCsv');
+    $page->assertFileDownloaded('monthly-matrix-activities-2026-11-13.csv');
+    $csv = downloadedCsv($page);
+
+    expect($csv)->toHaveCount(2)
+        ->and(implode(',', $csv[1]))->toContain($activity->statement)->toContain(__('enums.activity_status.completed'))
+        ->and(strtolower(implode(',', $csv[0])))->not->toContain('budget')->not->toContain('currency');
+
+    foreach (range(1, 9) as $attempt) {
+        $page->call('exportCsv')->assertFileDownloaded();
+    }
+
+    $page->call('exportCsv')->assertNoFileDownloaded();
+    Livewire::actingAs(User::factory()->create())->withQueryParams(['tab' => 'activities'])->test('pages::reports.monthly-matrix')->call('exportCsv')->assertForbidden();
+});
+
+test('the query count stays flat in grouped mode, with breakdowns, and on the Activities tab', function () {
+    $count = function (int $rows, array $query): int {
+        $project = mmProject();
+        $proposal = mmProposal($project);
+        $report = mmReport($project, '2026-01-01');
+        ['activities' => $activities] = mmActivities($proposal, $project, $rows);
+
+        foreach (range(1, $rows) as $index) {
+            $library = LibraryIndicator::factory()->create(['is_disaggregated' => true]);
+            $line = mmLine($report, $library, [mmTarget($proposal, $project, $library)], $index);
+            mmBreakdown($line, 'male', ['value' => $index, 'disabled_value' => 0]);
+            mmEntry($report, $activities[$index - 1], ActivityStatus::Started);
+            mmSchedule($activities[$index - 1], '2026-02-01', [1]);
+        }
+
+        $queries = 0;
+        DB::listen(function () use (&$queries): void {
+            $queries++;
+        });
+        Livewire::actingAs(mmViewer())->withQueryParams($query)->test('pages::reports.monthly-matrix');
+
+        return $queries;
+    };
+
+    foreach ([['view' => 'grouped', 'pwd' => '1'], ['tab' => 'activities'], ['pwd' => '1']] as $query) {
+        $count(1, $query); // warm the per-process caches
+        $small = $count(3, $query);
+        $large = $count(30, $query);
+
+        expect($large)->toBe($small);
+    }
+});
+
+test('Arabic renders the Activities tab with Arabic status labels and the grouped view in order', function () {
+    $project = mmProject();
+    $proposal = mmProposal($project);
+    ['activities' => [$activity]] = mmActivities($proposal, $project);
+    mmEntry(mmReport($project, '2026-01-01'), $activity, ActivityStatus::Started);
+    $user = mmViewer();
+    $user->forceFill(['locale' => 'ar'])->save();
+
+    $this->actingAs($user)->get(route('reports.monthly-matrix', ['tab' => 'activities']))
+        ->assertOk()
+        ->assertSee(trans('enums.activity_status.started', [], 'ar'))
+        ->assertSeeInOrder(['كانون الثاني 2026', 'شباط 2026', 'آذار 2026']);
+
+    $this->actingAs($user)->get(route('reports.monthly-matrix', ['view' => 'grouped']))->assertOk()->assertSee(trans('reports.matrix.view_grouped', [], 'ar'));
+});
+
+test('an unknown view or tab falls back to the rows of the matrix', function () {
+    $page = Livewire::actingAs(mmViewer())->withQueryParams(['view' => 'bogus', 'tab' => 'bogus'])->test('pages::reports.monthly-matrix');
+
+    expect($page->instance()->resolvedView)->toBe('rows')->and($page->instance()->resolvedTab)->toBe('matrix');
 });

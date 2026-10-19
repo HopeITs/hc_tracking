@@ -1,15 +1,21 @@
 <?php
 
+use App\Livewire\Concerns\Reports\BuildsMatrixActivities;
+use App\Livewire\Concerns\Reports\BuildsMatrixBreakdowns;
 use App\Livewire\Concerns\Reports\BuildsMonthlyMatrix;
 use App\Livewire\Concerns\Reports\ExportsMonthlyMatrix;
+use App\Livewire\Concerns\Reports\GroupsMonthlyMatrix;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 new #[Title('titles.monthly_matrix')] class extends Component {
+    use BuildsMatrixActivities;
+    use BuildsMatrixBreakdowns;
     use BuildsMonthlyMatrix;
     use ExportsMonthlyMatrix;
+    use GroupsMonthlyMatrix;
     use WithPagination;
 
     #[Url(except: '')]
@@ -40,11 +46,11 @@ new #[Title('titles.monthly_matrix')] class extends Component {
     #[Url(except: false)]
     public bool $mine = false;
 
-    /** Slice 2 modes, declared so deep links stay stable: 'rows' | 'grouped'. */
+    /** 'rows' (one row per center) or 'grouped' (one row per indicator). */
     #[Url(except: 'rows')]
     public string $view = 'rows';
 
-    /** Slice 2: 'matrix' | 'activities'. */
+    /** 'matrix' or 'activities'. */
     #[Url(except: 'matrix')]
     public string $tab = 'matrix';
 
@@ -71,8 +77,11 @@ new #[Title('titles.monthly_matrix')] class extends Component {
 ?>
 
 @php
-    $matrix = $this->matrix;
-    $paged = $this->pagedRows;
+    $onActivities = $this->resolvedTab === 'activities';
+    $isGrouped = $this->resolvedView === 'grouped';
+    $board = $onActivities ? $this->activityBoard : null;
+    $matrix = $onActivities ? null : $this->matrix;
+    $paged = $onActivities ? null : $this->pagedRows;
     $filtersAreActive = $proposal !== '' || $donor !== '' || $center !== '' || $city !== '' || $indicator !== '' || $pillar !== '' || $year !== '' || $mine;
     $filters = $this->resolvedFilters;
 @endphp
@@ -84,7 +93,7 @@ new #[Title('titles.monthly_matrix')] class extends Component {
     <x-ui.page-header
         heading-id="monthly-matrix-heading"
         :title="__('titles.monthly_matrix')"
-        :count="$paged->total()"
+        :count="$onActivities ? $board['count'] : $paged->total()"
     >
         <x-slot:filters>
             <div class="contents" data-matrix-filters>
@@ -116,12 +125,14 @@ new #[Title('titles.monthly_matrix')] class extends Component {
                     @endforeach
                 </x-ui.header-filter-select>
 
-                <x-ui.header-filter-select :label="__('reports.matrix.indicator')" wire:model.live="indicator" :value="(string) ($filters['indicator'] ?? '')">
-                    <option value="">{{ __('reports.matrix.all_indicators') }}</option>
-                    @foreach ($this->indicatorOptions as $option)
-                        <option value="{{ $option->id }}">{{ $option->code }} · {{ app()->getLocale() === 'ar' ? $option->name_ar : ($option->name_en ?? $option->name_ar) }}</option>
-                    @endforeach
-                </x-ui.header-filter-select>
+                @unless ($onActivities)
+                    <x-ui.header-filter-select :label="__('reports.matrix.indicator')" wire:model.live="indicator" :value="(string) ($filters['indicator'] ?? '')">
+                        <option value="">{{ __('reports.matrix.all_indicators') }}</option>
+                        @foreach ($this->indicatorOptions as $option)
+                            <option value="{{ $option->id }}">{{ $option->code }} · {{ app()->getLocale() === 'ar' ? $option->name_ar : ($option->name_en ?? $option->name_ar) }}</option>
+                        @endforeach
+                    </x-ui.header-filter-select>
+                @endunless
 
                 <x-ui.header-filter-select :label="__('reports.matrix.pillar')" wire:model.live="pillar" :value="(string) ($filters['pillar'] ?? '')">
                     <option value="">{{ __('reports.matrix.all_pillars') }}</option>
@@ -155,7 +166,34 @@ new #[Title('titles.monthly_matrix')] class extends Component {
         </x-slot:actions>
     </x-ui.page-header>
 
-    @if ($paged->isEmpty())
+    <div class="flex flex-wrap items-end justify-between gap-3" data-matrix-modes>
+        <x-ui.relation-tabs
+            wire-target="tab"
+            :active="$this->resolvedTab"
+            :tabs="[
+                ['key' => 'matrix', 'label' => __('reports.matrix.tab_matrix')],
+                ['key' => 'activities', 'label' => __('reports.matrix.tab_activities')],
+            ]"
+        />
+
+        @unless ($onActivities)
+            <div class="flex flex-wrap items-center gap-3">
+                <div class="flex items-center gap-1" role="group" aria-label="{{ __('reports.matrix.view_label') }}">
+                    <x-ui.button tone="secondary" :icon="$isGrouped ? null : 'check'" class="min-h-11 touch-manipulation" wire:click="$set('view', 'rows')" aria-pressed="{{ $isGrouped ? 'false' : 'true' }}" data-test="matrix-view-rows">
+                        {{ __('reports.matrix.view_rows') }}
+                    </x-ui.button>
+                    <x-ui.button tone="secondary" :icon="$isGrouped ? 'check' : null" class="min-h-11 touch-manipulation" wire:click="$set('view', 'grouped')" aria-pressed="{{ $isGrouped ? 'true' : 'false' }}" data-test="matrix-view-grouped">
+                        {{ __('reports.matrix.view_grouped') }}
+                    </x-ui.button>
+                </div>
+                <flux:switch wire:model.live="pwd" :label="__('reports.matrix.show_pwd')" align="left" data-test="matrix-pwd" />
+            </div>
+        @endunless
+    </div>
+
+    @if ($onActivities)
+        @include('pages.reports._monthly-matrix-activities')
+    @elseif ($paged->isEmpty())
         <x-ui.panel>
             <x-ui.empty-state
                 icon="table-cells"
