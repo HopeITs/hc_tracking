@@ -251,4 +251,11 @@ return [
         'management_only' => 'General Management only',
         'none' => 'No oversight',
     ],
+    'matrix_cell_state' => [
+        'approved' => 'Validated',
+        'pending' => 'Awaiting validation',
+        'not_submitted' => 'Not sent',
+        'upcoming' => 'Upcoming',
+        'not_due' => 'Not due',
+    ],
 ];

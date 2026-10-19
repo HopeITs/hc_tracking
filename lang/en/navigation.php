@@ -27,4 +27,5 @@ return [
     'user_directory' => 'User Directory',
     'donor_report_builder' => 'Donor Report Builder',
     'reporting_duties' => 'My Reporting Duties',
+    'monthly_matrix' => 'Monthly Matrix',
 ];

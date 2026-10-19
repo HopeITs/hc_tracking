@@ -317,7 +317,7 @@
                     <flux:sidebar.item
                         icon="document-chart-bar"
                         :href="route('reports.index')"
-                        :current="request()->routeIs('reports.*')"
+                        :current="request()->routeIs('reports.index', 'reports.show')"
                         :class="$navigationItemClasses"
                         wire:navigate.hover
                     >
@@ -325,6 +325,16 @@
                         <x-slot:icon-trailing>
                             <x-notifications.module-badge module="reports" :count="$moduleCounts['reports'] ?? 0" />
                         </x-slot:icon-trailing>
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item
+                        icon="table-cells"
+                        :href="route('reports.monthly-matrix')"
+                        :current="request()->routeIs('reports.monthly-matrix')"
+                        :class="$navigationItemClasses"
+                        wire:navigate.hover
+                    >
+                        {{ __('navigation.monthly_matrix') }}
                     </flux:sidebar.item>
                 @endcan
 

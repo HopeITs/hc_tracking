@@ -19,4 +19,5 @@ test('the browser cannot call a page helper that returns data', function (string
     'donor money' => ['pages::donors.index', 'donorMoney', [1]],
     'portfolio gantt' => ['pages::timeline.index', 'portfolioGanttPayload', []],
     'delete check' => ['pages::milestones.index', 'canDelete', [1]],
+    'matrix figure' => ['pages::reports.monthly-matrix', 'matrixNumber', [1.0]],
 ]);

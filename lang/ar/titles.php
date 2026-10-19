@@ -47,4 +47,5 @@ return [
     'donor_report' => 'تقرير المانح',
     'donor_report_builder' => 'منشئ تقارير المانحين',
     'reporting_duties' => 'مهام التقارير',
+    'monthly_matrix' => 'المصفوفة الشهرية',
 ];
