@@ -334,10 +334,12 @@ class PlanIndicator extends Model implements TracksActivity
 
     /**
      * pooledRatioSql() and pooledExcludedCountSql() in PHP, over targets with
-     * `reports` and `indicator.libraryIndicator` loaded.
+     * `reports` and `indicator.libraryIndicator` loaded. `numerator` and
+     * `denominator` are the pooled sums the ratio divides (null when nothing
+     * was measured), so a snapshot can store them (T19).
      *
      * @param  iterable<self>  $targets
-     * @return array{ratio: ?float, excluded: int}
+     * @return array{ratio: ?float, excluded: int, numerator: ?float, denominator: ?float}
      */
     public static function pooledRatio(iterable $targets, CarbonImmutable $from, CarbonImmutable $to): array
     {
@@ -373,9 +375,13 @@ class PlanIndicator extends Model implements TracksActivity
             $denominators += (float) $latest->denominator;
         }
 
+        $measured = $denominators > 0.0;
+
         return [
-            'ratio' => $denominators > 0.0 ? $numerators / $denominators * ($isPercentage ? 100 : 1) : null,
+            'ratio' => $measured ? $numerators / $denominators * ($isPercentage ? 100 : 1) : null,
             'excluded' => $excluded,
+            'numerator' => $measured ? $numerators : null,
+            'denominator' => $measured ? $denominators : null,
         ];
     }
 

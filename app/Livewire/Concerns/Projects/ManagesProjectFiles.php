@@ -54,19 +54,19 @@ trait ManagesProjectFiles
 
     /**
      * The file collections this viewer may not see: signed agreements and
-     * MOUs are agreement data, so they need funding-agreements.view.
+     * MOUs are agreement data, so they need funding-agreements.view; a donor
+     * report's delivered file never belongs here.
      *
      * @return list<string>
      */
     protected function hiddenCollections(): array
     {
-        if ($this->canViewAgreements()) {
-            return [];
-        }
+        $canViewAgreements = $this->canViewAgreements();
 
         return array_values(array_map(
             fn (MediaCollection $collection): string => $collection->value,
-            array_filter(MediaCollection::cases(), fn (MediaCollection $collection): bool => $collection->isFundingPaper()),
+            array_filter(MediaCollection::cases(), fn (MediaCollection $collection): bool => $collection->isDonorReportOnly()
+                || (! $canViewAgreements && $collection->isFundingPaper())),
         ));
     }
 

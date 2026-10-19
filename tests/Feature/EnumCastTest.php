@@ -17,12 +17,15 @@ use App\Enums\Period;
 use App\Enums\ProjectStatus;
 use App\Enums\ProposalStatus;
 use App\Enums\ReopenRequestStatus;
+use App\Enums\ReportAudience;
+use App\Enums\ReportingPeriod;
 use App\Enums\ReportStatus;
 use App\Enums\ResultType;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Models\Donor;
 use App\Models\DonorProposal;
+use App\Models\DonorReport;
 use App\Models\Indicator;
 use App\Models\LibraryIndicator;
 use App\Models\Media;
@@ -329,6 +332,26 @@ function enumColumns(): array
             'stored' => 'outcome',
             'default' => null,
             'badCasing' => 'Outcome',
+        ]],
+        'donor_reports.audience' => [[
+            'model' => DonorReport::class,
+            'table' => 'donor_reports',
+            'column' => 'audience',
+            'width' => 20,
+            'assign' => ReportAudience::Internal,
+            'stored' => 'internal',
+            'default' => ReportAudience::Donor,
+            'badCasing' => 'Donor',
+        ]],
+        'donor_reports.period_type' => [[
+            'model' => DonorReport::class,
+            'table' => 'donor_reports',
+            'column' => 'period_type',
+            'width' => 20,
+            'assign' => ReportingPeriod::SemiAnnual,
+            'stored' => 'semi-annual',
+            'default' => null,
+            'badCasing' => 'Quarterly',
         ]],
         'monthly_reports.status' => [[
             'model' => MonthlyReport::class,

@@ -29,6 +29,7 @@ enum MediaCollection: string
     case FinalReportAcceptance = 'final_report_acceptance';
     case NeedAssessment = 'need assessment';
     case DonorApproval = 'donor_approval';
+    case ReportSubmission = 'report_submission';
 
     /**
      * Whether this collection holds signed funding paperwork.
@@ -39,6 +40,16 @@ enum MediaCollection: string
     public function isFundingPaper(): bool
     {
         return in_array($this, [self::Agreement, self::Mou], true);
+    }
+
+    /**
+     * Whether only a donor report holds files of this collection (the file
+     * delivered to the donor, contracts §14.2), so project and proposal file
+     * pickers never offer it.
+     */
+    public function isDonorReportOnly(): bool
+    {
+        return $this === self::ReportSubmission;
     }
 
     /**

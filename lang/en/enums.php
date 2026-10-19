@@ -70,6 +70,17 @@ return [
         'final_report_acceptance' => 'Final report acceptance',
         'need_assessment' => 'Need assessment',
         'donor_approval' => 'Donor approval',
+        'report_submission' => 'Delivered report',
+    ],
+    'reporting_period' => [
+        'quarterly' => 'Quarterly',
+        'semi_annual' => 'Semi-annual',
+        'annual' => 'Annual',
+        'custom' => 'Custom',
+    ],
+    'report_audience' => [
+        'donor' => 'Donor',
+        'internal' => 'Internal',
     ],
     'review_stage' => [
         'concept_note' => 'Concept note',

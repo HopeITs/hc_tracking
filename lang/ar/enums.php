@@ -70,6 +70,17 @@ return [
         'final_report_acceptance' => 'موافقة الممول على التقرير الختامي',
         'need_assessment' => 'تقييم الاحتياج',
         'donor_approval' => 'موافقة المانح',
+        'report_submission' => 'التقرير المُسلَّم',
+    ],
+    'reporting_period' => [
+        'quarterly' => 'ربع سنوي',
+        'semi_annual' => 'نصف سنوي',
+        'annual' => 'سنوي',
+        'custom' => 'فترة مخصصة',
+    ],
+    'report_audience' => [
+        'donor' => 'المانح',
+        'internal' => 'داخلي',
     ],
     'review_stage' => [
         'concept_note' => 'المذكرة المفاهيمية',

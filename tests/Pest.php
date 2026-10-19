@@ -1,7 +1,9 @@
 <?php
 
 use App\Enums\Currency;
+use App\Enums\DonorAttribution;
 use App\Enums\FileType;
+use App\Enums\MonthlyReportStatus;
 use App\Enums\ResultType;
 use App\Models\Account;
 use App\Models\Activity;
@@ -9,8 +11,12 @@ use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\Indicator;
 use App\Models\IndicatorProgress;
+use App\Models\LibraryIndicator;
 use App\Models\Media;
 use App\Models\Milestone;
+use App\Models\MonthlyReport;
+use App\Models\MonthlyReportLine;
+use App\Models\MonthlyReportLineShare;
 use App\Models\Permission;
 use App\Models\PlanIndicator;
 use App\Models\Program;
@@ -863,4 +869,143 @@ function runScanner(string $class, string $at): int
     test()->travelTo(CarbonImmutable::parse($at));
 
     return app($class)->scan(CarbonImmutable::now());
+}
+
+/*
+| Donor report fixtures (T19): an approved proposal, its centers, targets and
+| validated monthly figures with their share mirrors, as T17A writes them.
+*/
+
+/**
+ * An approved proposal over 2026, with a funding agreement.
+ *
+ * @param  array<string, mixed>  $attributes
+ */
+function donorReportProposal(array $attributes = [], bool $internal = false, bool $withAgreement = true): Proposal
+{
+    return Activity::withoutRecording(function () use ($attributes, $internal, $withAgreement): Proposal {
+        $donor = Donor::factory()->create(['is_internal' => $internal]);
+        $proposal = Proposal::factory()->running()->create([
+            'donor_id' => $donor->id,
+            'planned_date_begin' => '2026-01-01',
+            'planned_date_end' => '2026-12-31',
+            'actual_date_begin' => '2026-01-01',
+            'actual_date_end' => '2026-12-31',
+            ...$attributes,
+        ]);
+
+        if ($withAgreement) {
+            DonorProposal::factory()->create(['proposal_id' => $proposal->id, 'donor_id' => $donor->id, 'external_project_number' => 'UN-77']);
+        }
+
+        return $proposal->fresh();
+    });
+}
+
+/**
+ * A center (project) linked to the proposal with its beneficiaries.
+ */
+function donorReportCenter(Proposal $proposal, DonorAttribution $attribution = DonorAttribution::Shared, ?int $beneficiaries = 100, ?Program $program = null): Project
+{
+    return Activity::withoutRecording(function () use ($proposal, $attribution, $beneficiaries, $program): Project {
+        $project = Project::factory()->create([
+            'program_id' => ($program ?? Program::factory()->create(['donor_attribution' => $attribution]))->id,
+            'center_id' => null,
+        ]);
+        $proposal->projects()->attach($project->id, ['target_beneficiaries' => $beneficiaries]);
+
+        return $project;
+    });
+}
+
+/**
+ * A target of the proposal on one center for a library indicator. Centers
+ * share the proposal's one indicator instance per library entry (T13).
+ *
+ * @param  array<string, mixed>  $indicator
+ */
+function donorReportTarget(Proposal $proposal, Project $center, LibraryIndicator $library, string $target = '100', array $indicator = []): PlanIndicator
+{
+    return Activity::withoutRecording(function () use ($proposal, $center, $library, $target, $indicator): PlanIndicator {
+        $instance = Indicator::query()
+            ->where('library_indicator_id', $library->id)
+            ->whereHas('result', fn ($query) => $query->where('proposal_id', $proposal->id))
+            ->first()
+            ?? Indicator::factory()->create([
+                'result_id' => Result::factory()->type(ResultType::Output)->create(['proposal_id' => $proposal->id, 'program_id' => null])->id,
+                'library_indicator_id' => $library->id,
+                'measure' => $library->measure,
+                ...$indicator,
+            ]);
+
+        return PlanIndicator::factory()->forProposal($proposal)->create([
+            'indicator_id' => $instance->id,
+            'project_id' => $center->id,
+            'target' => $target,
+        ]);
+    });
+}
+
+function donorReportMonth(Project $center, string $month, MonthlyReportStatus $status = MonthlyReportStatus::Validated): MonthlyReport
+{
+    return Activity::withoutRecording(function () use ($center, $month, $status): MonthlyReport {
+        $existing = MonthlyReport::query()->where('project_id', $center->id)->where('period', $month.'-01')->first();
+
+        if ($existing !== null) {
+            return $existing;
+        }
+
+        $factory = match ($status) {
+            MonthlyReportStatus::Draft => MonthlyReport::factory(),
+            MonthlyReportStatus::Submitted => MonthlyReport::factory()->submitted(),
+            MonthlyReportStatus::Validated => MonthlyReport::factory()->validated(),
+        };
+
+        return $factory->create(['project_id' => $center->id, 'period' => $month.'-01']);
+    });
+}
+
+/**
+ * The figures of one month for one library line on one center: a share and
+ * a mirror per target given, as T17A writes them.
+ *
+ * @param  array<int, array{value?: ?float, numerator?: ?float, denominator?: ?float, fixed?: ?int}>  $figures  keyed by plan indicator id
+ * @return array<int, MonthlyReportLineShare> keyed by plan indicator id
+ */
+function donorReportFigures(Project $center, string $month, LibraryIndicator $library, array $figures, MonthlyReportStatus $status = MonthlyReportStatus::Validated): array
+{
+    return Activity::withoutRecording(function () use ($center, $month, $library, $figures, $status): array {
+        $report = donorReportMonth($center, $month, $status);
+        $line = MonthlyReportLine::query()->firstOrCreate(
+            ['monthly_report_id' => $report->id, 'library_indicator_id' => $library->id],
+            ['entered_by' => 'project_team'],
+        );
+        $shares = [];
+
+        foreach ($figures as $targetId => $figure) {
+            $share = MonthlyReportLineShare::factory()->create([
+                'monthly_report_line_id' => $line->id,
+                'plan_indicator_id' => $targetId,
+                'value' => $figure['value'] ?? null,
+                'numerator' => $figure['numerator'] ?? null,
+                'denominator' => $figure['denominator'] ?? null,
+                'fixed_denominator' => $figure['fixed'] ?? null,
+            ]);
+            Report::factory()->create([
+                'plan_indicator_id' => $targetId,
+                'monthly_report_id' => $report->id,
+                'monthly_report_line_share_id' => $share->id,
+                'status' => $report->status->mirrorStatus(),
+                'planned_date' => CarbonImmutable::parse($month.'-01')->endOfMonth()->toDateString(),
+                'period_start' => $month.'-01',
+                'period_end' => CarbonImmutable::parse($month.'-01')->endOfMonth()->toDateString(),
+                'value' => $figure['value'] ?? null,
+                'numerator' => $figure['numerator'] ?? null,
+                'denominator' => $figure['denominator'] ?? null,
+            ]);
+            $shares[$targetId] = $share;
+        }
+
+        return $shares;
+    });
 }

@@ -4,7 +4,6 @@ use App\Models\Account;
 use App\Models\Activity;
 use App\Models\Donor;
 use App\Models\DonorProposal;
-use App\Models\DonorReport;
 use App\Models\FundingAgreementInstallment;
 use App\Models\HrCenter;
 use App\Models\HrCity;
@@ -70,7 +69,6 @@ function modelsGuardedWithoutPolicy(): array
         Donor::class => ['donors', 'donors.* permissions (ManagesDonorForm).'],
         DonorProposal::class => ['funding-agreements', 'funding-agreements.* permissions (ManagesAgreementForm).'],
         FundingAgreementInstallment::class => ['funding-agreements', 'The payment schedule of an agreement: written only by SaveAgreementInstallments under funding-agreements.update (T09).'],
-        DonorReport::class => ['funding-agreements', 'Edited from the funding agreement page under funding-agreements.update.'],
         HrCenter::class => [null, 'Read-only mirror of the HR database; never written here.'],
         HrCity::class => ['cities', 'cities.* permissions on the admin cities page.'],
         HrContract::class => [null, 'Read-only mirror of the HR database; never written here.'],

@@ -85,6 +85,25 @@ test('fixed basis sums the monthly counts over each target\'s fixed denominator'
         ->and($pooled['php'])->toBe($pooled['sql']);
 });
 
+test('the PHP twin also returns the pooled numerator and denominator', function () {
+    $first = prTarget(['denominator_basis' => DenominatorBasis::Fixed]);
+    $second = prTarget(['denominator_basis' => DenominatorBasis::Entered]);
+    $unmeasured = prTarget(['denominator_basis' => DenominatorBasis::Entered]);
+    prRow($first, '2026-10-01', 36, 180);
+    prRow($first, '2026-11-01', 18, 180);
+    prRow($second, '2026-10-01', 10, 100);
+    prRow($unmeasured, '2026-10-01', null, null);
+
+    $pool = fn (array $targets): array => PlanIndicator::pooledRatio(
+        PlanIndicator::query()->whereKey(array_map(fn (PlanIndicator $target): int => $target->id, $targets))->with(['reports', 'indicator.libraryIndicator'])->get(),
+        CarbonImmutable::parse('2026-10-01'),
+        CarbonImmutable::parse('2026-12-31'),
+    );
+
+    expect($pool([$first, $second]))->toMatchArray(['numerator' => 64.0, 'denominator' => 280.0])
+        ->and($pool([$unmeasured]))->toMatchArray(['ratio' => null, 'excluded' => 1, 'numerator' => null, 'denominator' => null]);
+});
+
 test('a cumulative fixed-basis target takes its latest count', function () {
     $target = prTarget(['denominator_basis' => DenominatorBasis::Fixed, 'is_cumulative' => true]);
     prRow($target, '2026-10-01', 36, 180);

@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\ReportingPeriod;
 use App\Models\DonorProposal;
 use App\Models\DonorReport;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -37,6 +38,20 @@ class DonorReportFactory extends Factory
     {
         return $this->state([
             'submitted_on' => fn (array $attributes): string => (string) $attributes['due_on'],
+        ]);
+    }
+
+    /**
+     * A report composed from validated monthly figures (T19): a quarter, an
+     * empty snapshot and the first version.
+     */
+    public function composed(): static
+    {
+        return $this->state([
+            'period_type' => ReportingPeriod::Quarterly->value,
+            'period_start' => '2026-01-01',
+            'period_end' => '2026-03-31',
+            'snapshot' => ['schema_version' => 1],
         ]);
     }
 }
