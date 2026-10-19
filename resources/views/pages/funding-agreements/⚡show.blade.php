@@ -20,6 +20,7 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 new #[Title('titles.funding_agreement')] class extends Component {
@@ -30,6 +31,7 @@ new #[Title('titles.funding_agreement')] class extends Component {
     use ReadsAgreementAttention;
     use ReadsAgreementConnections;
     use ReadsAgreementMoney;
+    use WithFileUploads;
     use ManagesTransferForm {
         saveTransfer as private saveTransferForAgreement;
     }
@@ -168,7 +170,7 @@ new #[Title('titles.funding_agreement')] class extends Component {
     {
         unset(
             $this->agreement, $this->transfers, $this->money, $this->journeys, $this->arcs,
-            $this->term, $this->attention, $this->projects, $this->relatedAgreements, $this->accounts, $this->paperwork, $this->reports,
+            $this->term, $this->attention, $this->projects, $this->relatedAgreements, $this->accounts, $this->paperwork, $this->reports, $this->reportResponsibles,
         );
     }
 };
@@ -322,6 +324,8 @@ new #[Title('titles.funding_agreement')] class extends Component {
     />
 
     @include('pages.funding-agreements._show-report-modal')
+
+    <x-donor-reports.submit-modal :open="$showSubmitModal" :needs-file="$submissionNeedsFile" :file-count="$submissionFileCount" />
 
     <x-ui.confirm-modal
         wire:model="showReportDeleteModal"

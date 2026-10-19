@@ -24,8 +24,7 @@
                     :options="collect(DonorReportType::cases())->map(fn (DonorReportType $reportTypeCase): array => ['value' => $reportTypeCase->value, 'label' => $reportTypeCase->label()])->all()"
                 />
 
-                <x-ui.form-input wire:model="reportDueOn" :label="__('funding_agreements.due')" type="date" required />
-                <x-ui.form-input wire:model="reportSubmittedOn" :label="__('funding_agreements.submitted')" type="date" />
+                <x-ui.form-input wire:model="reportDueOn" :label="__('funding_agreements.due')" type="date" required class="col-span-2" />
             </div>
         @endif
 

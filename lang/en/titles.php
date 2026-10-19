@@ -44,4 +44,7 @@ return [
     'my_reviews' => 'My Reviews',
     'notification_settings' => 'Notification Settings',
     'department_tasks' => 'Department Tasks',
+    'donor_report' => 'Donor Report',
+    'donor_report_builder' => 'Donor Report Builder',
+    'reporting_duties' => 'My Reporting Duties',
 ];

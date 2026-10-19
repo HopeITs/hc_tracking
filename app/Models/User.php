@@ -552,6 +552,17 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
     }
 
     /**
+     * Whether this user is named responsible on any donor report (contracts
+     * §14.3), for the My Reporting Duties sidebar item. One exists query,
+     * memoized per user instance.
+     */
+    public function hasReportingDuties(): bool
+    {
+        return once(fn (): bool => $this->employee_id !== null
+            && DonorReport::query()->where('responsible_employee_id', $this->employee_id)->exists());
+    }
+
+    /**
      * Programs this user manages (programs.manager_id is their HR employee).
      * Memoized per user instance.
      *

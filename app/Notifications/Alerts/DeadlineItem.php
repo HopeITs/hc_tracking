@@ -18,6 +18,8 @@ final readonly class DeadlineItem
      * @param  list<int>  $overdueUserIds  people who hear only once the item is overdue (a task's requester)
      * @param  list<int>|null  $dueSoonStages  working-day stages of its own; null = the global `due_soon_days`
      * @param  list<int>  $unassignedUserIds  set when nobody carries the item yet: who must name a person (D-33)
+     * @param  list<int>  $exemptUserIds  direct people who hear without the module's view permission (a donor report's responsible person)
+     * @param  array{route?: string, parameters?: array<string, mixed>}  $link  where the alert leads instead of the subject's page
      */
     public function __construct(
         public string $subjectType,
@@ -32,5 +34,7 @@ final readonly class DeadlineItem
         public ?int $projectId = null,
         public ?array $dueSoonStages = null,
         public array $unassignedUserIds = [],
+        public array $exemptUserIds = [],
+        public array $link = [],
     ) {}
 }

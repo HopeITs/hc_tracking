@@ -148,6 +148,7 @@ return [
         'cities' => 'Cities',
         'report-templates' => 'Report templates',
         'monthly-reports' => 'Monthly reports',
+        'donor-reports' => 'Donor reports',
         'system' => 'System',
     ],
 
@@ -604,6 +605,8 @@ return [
         ],
         'donor_report' => [
             'created' => ':actor added the donor report “:subject”',
+            'file_added' => ':actor added :file to the donor report “:subject”',
+            'file_removed' => ':actor removed :file from the donor report “:subject”',
             'submitted' => [
                 'title' => 'Donor report submitted',
                 'body' => ':actor submitted the donor report “:subject”',

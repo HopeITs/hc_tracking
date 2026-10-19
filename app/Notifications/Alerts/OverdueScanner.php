@@ -54,6 +54,7 @@ final class OverdueScanner implements Scanner
                 $item->subjectType,
                 $item->subjectId,
                 [['type' => 'alert.snooze']],
+                $item->link,
             );
 
             $stage = "day{$mark}:{$item->dueDate->toDateString()}";
@@ -71,7 +72,14 @@ final class OverdueScanner implements Scanner
             }
 
             $direct = array_values(array_unique([...$item->directUserIds, ...$item->overdueUserIds]));
-            $sent += $this->dispatcher->send('overdue', $stage, $payload, $direct, $this->oversight->userIdsFor($eventKey, $item->projectId));
+            $others = $this->oversight->userIdsFor($eventKey, $item->projectId);
+
+            // Nobody named: the watcher roles hear it, as sendForItem() does.
+            if ($direct === []) {
+                $others = [...$others, ...$this->dispatcher->watcherUserIds($item)];
+            }
+
+            $sent += $this->dispatcher->send('overdue', $stage, $payload, $direct, $others, $item->exemptUserIds);
         }
 
         return $sent;

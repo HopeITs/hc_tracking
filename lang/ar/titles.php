@@ -44,4 +44,7 @@ return [
     'my_reviews' => 'مراجعاتي',
     'notification_settings' => 'إعدادات الإشعارات',
     'department_tasks' => 'مهام الأقسام',
+    'donor_report' => 'تقرير المانح',
+    'donor_report_builder' => 'منشئ تقارير المانحين',
+    'reporting_duties' => 'مهام التقارير',
 ];

@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\DonorReportExportController;
+use App\Http\Controllers\DonorReportFileDownloadController;
+use App\Http\Controllers\DonorReportPrintController;
 use App\Http\Controllers\EmailTwoFactorController;
 use App\Http\Controllers\EmployeePickerOptionsController;
 use App\Http\Controllers\MarkNotificationReadController;
@@ -170,6 +173,36 @@ Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () 
     Route::livewire('funding-agreements/{donorProposal}', 'pages::funding-agreements.show')
         ->can('funding-agreements.view')
         ->name('funding-agreements.show');
+
+    Route::livewire('donor-reports/compose', 'pages::donor-reports.compose')
+        ->can('reports.aggregate')
+        ->name('donor-reports.compose');
+
+    Route::livewire('donor-reports/{donorReport}', 'pages::donor-reports.show')
+        ->whereNumber('donorReport')
+        ->can('view', 'donorReport')
+        ->name('donor-reports.show');
+
+    Route::get('donor-reports/{donorReport}/print', DonorReportPrintController::class)
+        ->whereNumber('donorReport')
+        ->can('view', 'donorReport')
+        ->middleware('throttle:files')
+        ->name('donor-reports.print');
+
+    Route::get('donor-reports/{donorReport}/export', DonorReportExportController::class)
+        ->whereNumber('donorReport')
+        ->can('view', 'donorReport')
+        ->middleware('throttle:files')
+        ->name('donor-reports.export');
+
+    Route::get('donor-reports/{donorReport}/files/{media}/download', DonorReportFileDownloadController::class)
+        ->whereNumber(['donorReport', 'media'])
+        ->middleware('throttle:files')
+        ->name('donor-reports.files.download');
+
+    // Open to everyone: the page lists only the reports the viewer is responsible for.
+    Route::livewire('reporting-duties', 'pages::reporting-duties.index')
+        ->name('reporting-duties.index');
 
     Route::livewire('transfers', 'pages::transfers.index')
         ->can('transfers.view')

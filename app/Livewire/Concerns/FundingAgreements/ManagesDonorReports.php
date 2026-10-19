@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Livewire\Concerns\FundingAgreements;
 
 use App\Actions\FundingAgreements\DeleteDonorReport;
-use App\Actions\FundingAgreements\MarkDonorReportSubmitted;
 use App\Actions\FundingAgreements\SaveDonorReport;
 use App\Enums\DonorReportType;
+use App\Livewire\Concerns\DonorReports\SubmitsDonorReport;
 use App\Models\DonorReport;
 use Flux\Flux;
 use Illuminate\Support\Facades\Gate;
@@ -15,16 +15,21 @@ use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Locked;
 
 /**
- * The reports a donor expects under an agreement: the add/edit form, marking
- * one submitted, and the delete confirmation, each scoped to the agreement.
+ * The reports a donor expects under an agreement: the add/edit form, the
+ * shared submit dialog (SubmitsDonorReport: date + delivered file, D-21) and
+ * the delete confirmation, each scoped to the agreement. A submitted report
+ * is frozen: it is neither edited nor deleted.
  *
- * Used by funding-agreements/show only. The page provides agreementId and
- * forgetReadings(), which drops its memoised readings after a write.
+ * Used by funding-agreements/show only. The page provides agreementId,
+ * WithFileUploads and forgetReadings(), which drops its memoised readings
+ * after a write.
  *
  * @property int $agreementId
  */
 trait ManagesDonorReports
 {
+    use SubmitsDonorReport;
+
     public bool $showReportModal = false;
 
     #[Locked]
@@ -35,8 +40,6 @@ trait ManagesDonorReports
     public string $reportType = 'narrative';
 
     public string $reportDueOn = '';
-
-    public string $reportSubmittedOn = '';
 
     public bool $showReportDeleteModal = false;
 
@@ -62,7 +65,6 @@ trait ManagesDonorReports
         $this->reportTitle = $report->title;
         $this->reportType = $report->type->value;
         $this->reportDueOn = $report->due_on->toDateString();
-        $this->reportSubmittedOn = $report->submitted_on?->toDateString() ?? '';
         $this->showReportModal = true;
     }
 
@@ -76,11 +78,9 @@ trait ManagesDonorReports
             'reportTitle' => ['required', 'string', 'max:255'],
             'reportType' => ['required', new Enum(DonorReportType::class)],
             'reportDueOn' => ['required', 'date'],
-            'reportSubmittedOn' => ['nullable', 'date', 'before_or_equal:today'],
         ], [
             'reportTitle.required' => __('funding_agreements.name_the_report'),
             'reportDueOn.required' => __('funding_agreements.enter_the_date_the_report_is_due'),
-            'reportSubmittedOn.before_or_equal' => __('funding_agreements.a_report_cannot_be_submitted_in_the_future'),
         ]);
 
         $report = app(SaveDonorReport::class)->handle(
@@ -100,20 +100,6 @@ trait ManagesDonorReports
         );
     }
 
-    /**
-     * Record that a report went out today.
-     */
-    public function markReportSubmitted(int $reportId): void
-    {
-        Gate::authorize('funding-agreements.update');
-
-        app(MarkDonorReportSubmitted::class)->handle($this->scopedReport($reportId));
-
-        $this->forgetReadings();
-
-        Flux::toast(variant: 'success', text: __('funding_agreements.donor_report_marked_submitted'));
-    }
-
     public function closeReportModal(): void
     {
         $this->showReportModal = false;
@@ -122,18 +108,22 @@ trait ManagesDonorReports
 
     public function confirmReportDelete(int $reportId): void
     {
-        Gate::authorize('funding-agreements.update');
+        $report = $this->scopedReport($reportId);
 
-        $this->deletingReportId = $this->scopedReport($reportId)->id;
+        Gate::authorize('delete', $report);
+
+        $this->deletingReportId = $report->id;
         $this->showReportDeleteModal = true;
     }
 
     public function deleteReport(): void
     {
-        Gate::authorize('funding-agreements.update');
-
         if ($this->deletingReportId !== null) {
-            app(DeleteDonorReport::class)->handle($this->scopedReport($this->deletingReportId));
+            $report = $this->scopedReport($this->deletingReportId);
+
+            Gate::authorize('delete', $report);
+
+            app(DeleteDonorReport::class)->handle($report);
         }
 
         $this->closeReportDeleteModal();
@@ -163,7 +153,16 @@ trait ManagesDonorReports
         $this->reportTitle = '';
         $this->reportType = DonorReportType::Narrative->value;
         $this->reportDueOn = '';
-        $this->reportSubmittedOn = '';
+    }
+
+    protected function submittableReport(int $reportId): DonorReport
+    {
+        return $this->scopedReport($reportId);
+    }
+
+    protected function donorReportSubmitted(): void
+    {
+        $this->forgetReadings();
     }
 
     abstract private function forgetReadings(): void;

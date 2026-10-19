@@ -27,8 +27,9 @@ final class AlertDispatcher
     /**
      * @param  array<string, mixed>  $params
      * @param  list<array<string, mixed>>  $actions
+     * @param  array{route?: string, parameters?: array<string, mixed>}  $link
      */
-    public function payload(string $module, NotificationPriority $priority, string $key, array $params, string $subjectType, int $subjectId, array $actions = []): NotificationPayload
+    public function payload(string $module, NotificationPriority $priority, string $key, array $params, string $subjectType, int $subjectId, array $actions = [], array $link = []): NotificationPayload
     {
         return new NotificationPayload(
             kind: NotificationKind::Alert,
@@ -38,6 +39,7 @@ final class AlertDispatcher
             params: $params,
             subjectType: $subjectType,
             subjectId: $subjectId,
+            link: $link,
             actions: $actions,
         );
     }
@@ -65,12 +67,22 @@ final class AlertDispatcher
     }
 
     /**
+     * Holders of the item's watcher roles.
+     *
+     * @return list<int>
+     */
+    public function watcherUserIds(DeadlineItem $item): array
+    {
+        return $this->resolver->usersWithRoles($item->watcherRoles);
+    }
+
+    /**
      * Direct people when the item names any, otherwise its watcher roles.
      */
     public function sendForItem(string $rule, string $stage, NotificationPayload $payload, DeadlineItem $item): int
     {
         return $item->directUserIds !== []
-            ? $this->send($rule, $stage, $payload, $item->directUserIds)
+            ? $this->send($rule, $stage, $payload, $item->directUserIds, [], $item->exemptUserIds)
             : $this->send($rule, $stage, $payload, [], $this->resolver->usersWithRoles($item->watcherRoles));
     }
 }

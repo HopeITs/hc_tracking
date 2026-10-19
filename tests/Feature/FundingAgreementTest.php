@@ -12,6 +12,7 @@ use App\Models\Proposal;
 use App\Models\TransfersTracking;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 use function Livewire\invade;
@@ -682,18 +683,69 @@ test('reports owed to the donor can be added, submitted and deleted on the agree
     expect($report->type)->toBe(DonorReportType::Financial)
         ->and(array_column($component->instance()->attention, 'key'))->toContain('report-'.$report->id);
 
-    $component->call('markReportSubmitted', $report->id);
+    $component
+        ->call('confirmReportDelete', $report->id)
+        ->assertSet('showReportDeleteModal', true)
+        ->call('closeReportDeleteModal');
+
+    Storage::fake('local');
+
+    $component->call('openSubmit', $report->id)
+        ->assertSet('showSubmitModal', true)
+        ->call('submitReport')
+        ->assertHasErrors(['submissionFiles' => __('donor_reports.file_required')]);
+
+    expect($report->fresh()->submitted_on)->toBeNull();
+
+    $component->set('submissionFile', validUpload('interim.pdf'))
+        ->call('submitReport')
+        ->assertHasNoErrors()
+        ->assertSet('showSubmitModal', false);
 
     expect($report->fresh()->submitted_on->isToday())->toBeTrue()
+        ->and($report->media()->count())->toBe(1)
         ->and(array_column($component->instance()->attention, 'key'))->not->toContain('report-'.$report->id);
 
-    $component
+    $component->assertDontSeeHtml('data-test="delete-report-'.$report->id.'"');
+
+    $fresh = fn () => Livewire::actingAs($user)->test('pages::funding-agreements.show', ['donorProposal' => $agreement]);
+    $fresh()->call('confirmReportDelete', $report->id)->assertForbidden();
+    $fresh()->call('openReportEdit', $report->id)->set('reportTitle', 'Changed')->call('saveReport')
+        ->assertHasErrors(['reportTitle' => __('donor_reports.already_submitted')]);
+
+    expect($report->fresh()->title)->toBe('Interim financial report');
+});
+
+test('an unsubmitted donor report is deleted from the agreement', function () {
+    $user = User::factory()->role('Financial')->create();
+    $agreement = DonorProposal::factory()->create();
+    $report = DonorReport::factory()->create(['donor_proposal_id' => $agreement->id]);
+
+    Livewire::actingAs($user)
+        ->test('pages::funding-agreements.show', ['donorProposal' => $agreement])
         ->call('confirmReportDelete', $report->id)
         ->assertSet('showReportDeleteModal', true)
         ->call('deleteReport')
         ->assertSet('showReportDeleteModal', false);
 
     expect(DonorReport::query()->count())->toBe(0);
+});
+
+test('the agreement lists saved reports with their audience, period, version and responsible, and opens the builder', function () {
+    $user = User::factory()->role('Public Relations Manager')->create();
+    $agreement = DonorProposal::factory()->create();
+    $employeeId = insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Writer');
+    $report = DonorReport::factory()->composed()->create(['donor_proposal_id' => $agreement->id, 'version' => 2, 'responsible_employee_id' => $employeeId]);
+
+    Livewire::actingAs($user)
+        ->test('pages::funding-agreements.show', ['donorProposal' => $agreement])
+        ->assertSeeHtml('data-report-version>v2<')
+        ->assertSeeText('2026-01 – 2026-03')
+        ->assertSeeText('Rana Writer')
+        ->assertSeeText('Donor')
+        ->assertSeeHtml('data-responsible-inactive')
+        ->assertSeeHtml(route('donor-reports.show', $report))
+        ->assertSeeHtml(e(route('donor-reports.compose', ['proposal' => $agreement->proposal_id])));
 });
 
 test('a donor report cannot be submitted in the future or reached from another agreement', function () {
@@ -703,15 +755,18 @@ test('a donor report cannot be submitted in the future or reached from another a
 
     $fresh = fn () => Livewire::actingAs($user)->test('pages::funding-agreements.show', ['donorProposal' => $agreement]);
 
-    $fresh()->call('openReportCreate')
-        ->set('reportTitle', 'Final report')
-        ->set('reportDueOn', now()->toDateString())
-        ->set('reportSubmittedOn', now()->addDay()->toDateString())
-        ->call('saveReport')
-        ->assertHasErrors(['reportSubmittedOn' => 'before_or_equal']);
+    $fresh()->call('openSubmit', $foreign->id)->assertNotFound();
+
+    $report = DonorReport::factory()->create(['donor_proposal_id' => $agreement->id, 'audience' => 'internal']);
+
+    $fresh()->call('openSubmit', $report->id)
+        ->set('submittedOn', now()->addDay()->toDateString())
+        ->call('submitReport')
+        ->assertHasErrors(['submittedOn' => __('donor_reports.submitted_in_future')]);
+
+    expect($report->fresh()->submitted_on)->toBeNull();
 
     $fresh()->call('openReportEdit', $foreign->id)->assertNotFound();
-    $fresh()->call('markReportSubmitted', $foreign->id)->assertNotFound();
 
     expect($foreign->fresh()->submitted_on)->toBeNull();
 });
@@ -725,7 +780,7 @@ test('a user who cannot update agreements cannot manage donor reports', function
 
     $fresh()->assertDontSeeHtml('data-test="add-donor-report"')->assertSeeText($report->title);
     $fresh()->call('openReportCreate')->assertForbidden();
-    $fresh()->call('markReportSubmitted', $report->id)->assertForbidden();
+    $fresh()->call('openSubmit', $report->id)->assertForbidden();
     $fresh()->call('confirmReportDelete', $report->id)->assertForbidden();
 
     expect($report->fresh()->submitted_on)->toBeNull();

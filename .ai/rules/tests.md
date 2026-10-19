@@ -22,3 +22,6 @@ Proposal pages authorize through ProposalPolicy (proposals.*), and the shared Ma
 
 ## Every role holds tasks.*: use a roleless user for "no task access"
 config/access-control.php gives every role baseline tasks.view/create/update (youssef merge, 2026-09). A test needing someone who cannot see or act on tasks must use a user with no role (User::factory()->create() / syncRoles([])), not Financial or Media Team. Also: activities.properties is a MySQL JSON column that re-sorts keys, so compare stored assoc arrays with toEqual, not toBe.
+
+## Livewire test uploads fail under travelTo()
+A Livewire::test()->set('someFile', validUpload(...)) upload fails its file rules (mimes/type) while the test has travelTo() active. Tests that upload through a Livewire component call $this->travelBack() first (or never travel); action-level uploads (calling the Action directly with validUpload()) are unaffected. Seen in ReportingDutiesPageTest (T19).

@@ -148,6 +148,7 @@ return [
         'cities' => 'المدن',
         'report-templates' => 'قوالب التقارير',
         'monthly-reports' => 'التقارير الشهرية',
+        'donor-reports' => 'تقارير المانحين',
         'system' => 'النظام',
     ],
 
@@ -604,6 +605,8 @@ return [
         ],
         'donor_report' => [
             'created' => 'أضاف :actor تقرير المانح «:subject»',
+            'file_added' => 'أضاف :actor الملف :file إلى تقرير المانح «:subject»',
+            'file_removed' => 'حذف :actor الملف :file من تقرير المانح «:subject»',
             'submitted' => [
                 'title' => 'تقديم تقرير مانح',
                 'body' => 'قدّم :actor تقرير المانح «:subject»',

@@ -108,13 +108,12 @@ final class SubjectLinks
     }
 
     /**
-     * A donor report leads to the funding agreement it is owed under.
+     * A donor report has its own page, open to its responsible person
+     * without any money permission (DonorReportPolicy::view).
      */
     private function donorReportRoute(int $id): ?string
     {
-        $agreementId = DonorReport::query()->whereKey($id)->value('donor_proposal_id');
-
-        return $agreementId === null ? null : $this->showRoute('funding-agreements.show', DonorProposal::class, $agreementId);
+        return DonorReport::query()->whereKey($id)->exists() ? route('donor-reports.show', $id) : null;
     }
 
     /**

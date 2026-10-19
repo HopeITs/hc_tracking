@@ -13,6 +13,7 @@ use App\Notifications\Alerts\ProjectDatesScanner;
 use App\Notifications\Alerts\StalledScanner;
 use App\Notifications\Recipients\AccountRecipients;
 use App\Notifications\Recipients\DonorRecipients;
+use App\Notifications\Recipients\DonorReportRecipients;
 use App\Notifications\Recipients\FundingAgreementRecipients;
 use App\Notifications\Recipients\IndicatorRecipients;
 use App\Notifications\Recipients\LibraryIndicatorRecipients;
@@ -64,6 +65,7 @@ return [
         'cities' => MealCoverageRecipients::class,
         'report-templates' => ReportTemplateRecipients::class,
         'monthly-reports' => MonthlyReportRecipients::class,
+        'donor-reports' => DonorReportRecipients::class,
     ],
 
     /*
@@ -79,6 +81,8 @@ return [
         // Owners and program managers read the template on the project page.
         'report-templates' => 'projects.view',
         'monthly-reports' => 'reports.view',
+        // Responsible people without it are exempted by DonorReportRecipients.
+        'donor-reports' => 'funding-agreements.view',
     ],
 
     /*
@@ -154,6 +158,7 @@ return [
         'cities' => 'map-pin',
         'report-templates' => 'clipboard-document-list',
         'monthly-reports' => 'document-check',
+        'donor-reports' => 'inbox-stack',
         'system' => 'bell',
     ],
 

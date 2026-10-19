@@ -9,10 +9,12 @@ use App\Enums\MediaCollection;
 use App\Enums\MilestoneStatus;
 use App\Models\DonorProposal;
 use App\Models\DonorReport;
+use App\Models\HrEmployee;
 use App\Models\Media;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\TransfersTracking;
+use App\Support\DonorReportResponsibles;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
@@ -140,11 +142,22 @@ trait ReadsAgreementConnections
     public function reports(): Collection
     {
         return DonorReport::query()
-            ->select(['id', 'donor_proposal_id', 'title', 'type', 'due_on', 'submitted_on'])
+            ->select(['id', 'donor_proposal_id', 'title', 'type', 'audience', 'period_type', 'period_start', 'period_end', 'version', 'responsible_employee_id', 'due_on', 'submitted_on'])
             ->where('donor_proposal_id', $this->agreementId)
             ->orderBy('due_on')
             ->orderBy('id')
             ->get();
+    }
+
+    /**
+     * The people responsible for those reports, read from HR once.
+     *
+     * @return array<int, array{employee: HrEmployee|null, user_id: int|null, reachable: bool}>
+     */
+    #[Computed]
+    public function reportResponsibles(): array
+    {
+        return DonorReportResponsibles::resolve(array_values($this->reports->pluck('responsible_employee_id')->filter()->map(fn ($id): int => (int) $id)->all()));
     }
 
     protected function paperworkUrl(Media $media): string

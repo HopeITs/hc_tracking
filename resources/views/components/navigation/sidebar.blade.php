@@ -243,7 +243,12 @@
             </flux:sidebar.group>
         @endcanany
 
-        @canany(['results.view', 'indicator-library.view', 'indicators.view', 'targets.view', 'reports.view'])
+        @php
+            /* My Reporting Duties: anyone named responsible on a donor report (one memoized exists query), or who manages agreements. */
+            $showReportingDuties = auth()->check() && (auth()->user()->can('funding-agreements.update') || auth()->user()->hasReportingDuties());
+        @endphp
+
+        @if (auth()->user()?->canAny(['results.view', 'indicator-library.view', 'indicators.view', 'targets.view', 'reports.view', 'reports.aggregate']) || $showReportingDuties)
             <flux:sidebar.group
                 :heading="__('navigation.group_monitoring_evaluation')"
                 :class="$navigationGroupClasses"
@@ -322,8 +327,37 @@
                         </x-slot:icon-trailing>
                     </flux:sidebar.item>
                 @endcan
+
+                @can('reports.aggregate')
+                    <flux:sidebar.item
+                        icon="presentation-chart-line"
+                        :href="route('donor-reports.compose')"
+                        :current="request()->routeIs('donor-reports.compose')"
+                        :class="$navigationItemClasses"
+                        wire:navigate.hover
+                        data-test="nav-donor-report-builder"
+                    >
+                        {{ __('navigation.donor_report_builder') }}
+                    </flux:sidebar.item>
+                @endcan
+
+                @if ($showReportingDuties)
+                    <flux:sidebar.item
+                        icon="inbox-stack"
+                        :href="route('reporting-duties.index')"
+                        :current="request()->routeIs('reporting-duties.*', 'donor-reports.show')"
+                        :class="$navigationItemClasses"
+                        wire:navigate.hover
+                        data-test="nav-reporting-duties"
+                    >
+                        {{ __('navigation.reporting_duties') }}
+                        <x-slot:icon-trailing>
+                            <x-notifications.module-badge module="donor-reports" :count="$moduleCounts['donor-reports'] ?? 0" />
+                        </x-slot:icon-trailing>
+                    </flux:sidebar.item>
+                @endif
             </flux:sidebar.group>
-        @endcanany
+        @endif
 
         {{-- In the order money arrives: donor, proposal, agreement, transfer, then the account it lands in. --}}
         @canany(['donors.view', 'proposals.view', 'funding-agreements.view', 'transfers.view', 'accounts.view'])

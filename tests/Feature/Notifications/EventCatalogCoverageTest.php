@@ -50,7 +50,7 @@ const EVENT_CATALOG_IGNORED = [
 /**
  * The modules each owning task adds to config/notifications.php when it lands.
  */
-const EVENT_CATALOG_PENDING_MODULES = ['donor-reports' => 'T19'];
+const EVENT_CATALOG_PENDING_MODULES = [];
 
 /**
  * Every activity event a model can record from its own hooks: created,

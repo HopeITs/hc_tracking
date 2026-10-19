@@ -88,6 +88,7 @@ final class DueSoonScanner implements Scanner
                 ],
                 $item->subjectType,
                 $item->subjectId,
+                link: $item->link,
             );
 
             $sent += $this->dispatcher->sendForItem('due_soon', "d{$stage}:{$item->dueDate->toDateString()}", $payload, $item);

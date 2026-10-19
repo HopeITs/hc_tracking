@@ -25,4 +25,6 @@ return [
     'toggle_sidebar' => 'Collapse or expand the sidebar',
     'report_a_problem' => 'Report a problem or bug',
     'user_directory' => 'User Directory',
+    'donor_report_builder' => 'Donor Report Builder',
+    'reporting_duties' => 'My Reporting Duties',
 ];

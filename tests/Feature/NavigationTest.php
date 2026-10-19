@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\DonorReport;
 use App\Models\Project;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -39,6 +40,7 @@ test('the sidebar lists every page for a Super Admin with funding in the order m
         'strategies.index', 'programs.index', 'annual-plans.index',
         'projects.index', 'milestones.index', 'timeline.index', 'risks.index',
         'results.index', 'indicator-library.index', 'indicators.index', 'targets.index', 'reports.index',
+        'donor-reports.compose', 'reporting-duties.index',
         'donors.index', 'proposals.index', 'funding-agreements.index', 'transfers.index', 'admin.accounts.index',
         'tasks.index', 'department-tasks.index', 'calendar.index',
         'admin.users.index', 'admin.notification-settings.edit', 'activity.index', 'admin.cities.index', 'admin.sectors.index',
@@ -52,6 +54,20 @@ test('the sidebar leaves a Team Member only the read-only cities and sectors und
     $html = $this->actingAs($user)->get(route('dashboard'))->assertOk()->getContent();
 
     expect(array_slice(sidebarRouteNames($html), -5))->toBe(['tasks.index', 'department-tasks.index', 'calendar.index', 'admin.cities.index', 'admin.sectors.index']);
+});
+
+test('the donor report builder shows only to reports.aggregate holders, reporting duties to responsibles and agreement editors', function () {
+    $employeeId = insertHrEmployee();
+    $responsible = User::factory()->role('Team Member')->create(['employee_id' => $employeeId]);
+    $teamMember = User::factory()->role('Team Member')->create();
+    DonorReport::factory()->create(['responsible_employee_id' => $employeeId]);
+
+    $routes = fn (User $user): array => sidebarRouteNames($this->actingAs($user)->get(route('dashboard'))->assertOk()->getContent());
+
+    expect($routes($teamMember))->not->toContain('donor-reports.compose')->not->toContain('reporting-duties.index')
+        ->and($routes($responsible))->toContain('reporting-duties.index')->not->toContain('donor-reports.compose')
+        ->and($routes(User::factory()->role('Financial')->create()))->toContain('reporting-duties.index')->not->toContain('donor-reports.compose')
+        ->and($routes(User::factory()->role('MEAL')->create()))->toContain('donor-reports.compose');
 });
 
 test('the sidebar drops the administration heading for someone who holds none of its pages', function () {

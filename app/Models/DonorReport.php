@@ -134,7 +134,7 @@ class DonorReport extends Model implements TracksActivity
 
     public function activityModule(): string
     {
-        return 'funding-agreements';
+        return 'donor-reports';
     }
 
     public function activityLabel(): string

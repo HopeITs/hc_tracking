@@ -23,7 +23,9 @@ use App\Models\TransfersTracking;
 use App\Notifications\EmployeeRecipients;
 use App\Notifications\Recipients\OversightRecipients;
 use App\Notifications\TracksActivity;
+use App\Support\DonorReportResponsibles;
 use App\Support\MonthlyReportPeriods;
+use App\Support\Slots;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -281,17 +283,53 @@ final class DeadlineCatalog
     }
 
     /**
+     * Unsubmitted donor reports (contracts §14.3, §15.2 `donor_report.due` /
+     * `.overdue`), due on their manual `due_on` (D-32). The responsible
+     * person hears without funding-agreements.view and is sent to My
+     * Reporting Duties. When they are inactive in HR or have no login, the
+     * default slot holder of the report's type hears instead; with neither,
+     * Financial and the Public Relations Manager. Four queries.
+     *
      * @return list<DeadlineItem>
      */
     private function donorReports(string $limit): array
     {
-        return array_values(DonorReport::query()
+        $reports = DonorReport::query()
             ->whereNull('submitted_on')
             ->whereDate('due_on', '<=', $limit)
-            ->get(['id', 'title', 'due_on'])
-            ->map(fn (DonorReport $report): DeadlineItem => new DeadlineItem(
-                'donor_report', $report->id, 'funding-agreements', $report->title, $report->due_on, [], self::FinanceWatchers,
-            ))->all());
+            ->get(['id', 'title', 'type', 'due_on', 'responsible_employee_id']);
+
+        if ($reports->isEmpty()) {
+            return [];
+        }
+
+        $responsibles = DonorReportResponsibles::resolve(array_values($reports->pluck('responsible_employee_id')->filter()->map(fn ($id): int => (int) $id)->all()));
+        $slotUsers = [];
+
+        return array_values($reports->map(function (DonorReport $report) use ($responsibles, &$slotUsers): DeadlineItem {
+            $responsible = $report->responsible_employee_id === null ? null : ($responsibles[$report->responsible_employee_id] ?? null);
+            $reachable = $responsible !== null && $responsible['reachable'];
+
+            if ($reachable) {
+                $direct = [(int) $responsible['user_id']];
+            } else {
+                $slot = DonorReportResponsibles::slotFor($report->type);
+
+                if (! array_key_exists($slot, $slotUsers)) {
+                    $holder = Slots::holderOf($slot);
+                    $slotUsers[$slot] = $holder === null ? null : ($this->employees->usersFor([$holder])[$holder] ?? null);
+                }
+
+                $direct = $this->unique([$slotUsers[$slot]]);
+            }
+
+            return new DeadlineItem(
+                'donor_report', $report->id, 'donor-reports', $report->title, $report->due_on, $direct, self::FinanceWatchers,
+                eventKey: 'donor_report',
+                exemptUserIds: $direct,
+                link: $reachable ? ['route' => 'reporting-duties.index'] : [],
+            );
+        })->all());
     }
 
     /**

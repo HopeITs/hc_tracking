@@ -13,6 +13,7 @@ use App\Models\HrEmployee;
 use App\Models\Proposal;
 use App\Models\User;
 use App\Support\DonorReportPeriods;
+use App\Support\DonorReportResponsibles;
 use App\Support\Slots;
 use Closure;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -73,10 +74,7 @@ final class SaveDonorReportSnapshot
             'period_end' => $window['end']->toDateString(),
             'due_on' => $data['dueOn'],
             'snapshot' => $snapshot,
-            'responsible_employee_id' => $data['responsibleEmployeeId'] ?? Slots::holderOf(match ($type) {
-                DonorReportType::Narrative => 'fundraising_manager',
-                DonorReportType::Financial => 'finance_manager',
-            }),
+            'responsible_employee_id' => $data['responsibleEmployeeId'] ?? Slots::holderOf(DonorReportResponsibles::slotFor($type)),
             'notes' => filled($data['notes'] ?? null) ? $data['notes'] : null,
         ]);
     }
