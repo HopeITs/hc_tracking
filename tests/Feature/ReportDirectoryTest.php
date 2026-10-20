@@ -2,8 +2,11 @@
 
 use App\Enums\IndicatorMeasure;
 use App\Enums\ReportStatus;
+use App\Models\Activity;
 use App\Models\AnnualPlan;
 use App\Models\Indicator;
+use App\Models\LibraryIndicator;
+use App\Models\MonthlyReport;
 use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\Proposal;
@@ -415,4 +418,90 @@ test('the report form is rendered only while its modal is open', function () {
         ->assertDontSeeHtml('wire:model="executiveSummary"')
         ->call('openCreateModal')
         ->assertSeeHtml('wire:model="executiveSummary"');
+});
+
+test('a monthly report mirror row links to its monthly report and offers no edit or delete', function () {
+    $user = User::factory()->role('Media Team')->create();
+    $mirror = Activity::withoutRecording(fn (): Report => Report::factory()->create([
+        'monthly_report_id' => MonthlyReport::factory()->create()->id,
+        'user_id' => $user->id,
+    ]));
+
+    Livewire::actingAs($user)
+        ->test('pages::reports.index')
+        ->assertSeeText(__('reports.monthly_report_chip'))
+        ->assertSeeHtml(route('monthly-reports.show', $mirror->monthlyReport))
+        ->assertDontSeeHtml('wire:click="openEditModal('.$mirror->id.')"')
+        ->assertDontSeeHtml('data-test="delete-report-'.$mirror->id.'"');
+});
+
+/**
+ * A 2026 annual-plan target whose library entry takes numerator and
+ * denominator (contracts §11.1).
+ */
+function ratioTarget(IndicatorMeasure $measure = IndicatorMeasure::Percentage): PlanIndicator
+{
+    $library = LibraryIndicator::factory()->create(['measure' => $measure, 'numerator_label' => 'Passed the test', 'denominator_label' => 'Took the test']);
+
+    return PlanIndicator::factory()
+        ->forAnnualPlan(AnnualPlan::factory()->create(['year' => 2026]))
+        ->for(Indicator::factory()->state(['measure' => $measure, 'library_indicator_id' => $library->id]))
+        ->create(['target' => 80]);
+}
+
+test('a ratio indicator takes numerator and denominator, and the server computes the value', function () {
+    $user = User::factory()->role('Media Team')->create();
+    $target = ratioTarget();
+
+    Livewire::actingAs($user)
+        ->test('pages::reports.index')
+        ->call('openCreateModal', $target->id)
+        ->assertSeeText('Passed the test')
+        ->assertSeeText('Took the test')
+        ->assertDontSeeHtml('wire:model="value"')
+        ->set('plannedDate', '2026-06-30')
+        ->set('numerator', '30')
+        ->set('denominator', '40')
+        ->set('value', '99')
+        ->call('saveReport')
+        ->assertHasNoErrors();
+
+    $report = DB::table('reports')->sole();
+
+    expect((float) $report->value)->toBe(75.0)
+        ->and((float) $report->numerator)->toBe(30.0)
+        ->and((float) $report->denominator)->toBe(40.0);
+});
+
+test('an average indicator stores the plain ratio', function () {
+    $target = ratioTarget(IndicatorMeasure::Average);
+
+    Livewire::actingAs(User::factory()->role('Media Team')->create())
+        ->test('pages::reports.index')
+        ->call('openCreateModal', $target->id)
+        ->set('plannedDate', '2026-06-30')
+        ->set('numerator', '45')
+        ->set('denominator', '10')
+        ->call('saveReport')
+        ->assertHasNoErrors();
+
+    expect((float) DB::table('reports')->sole()->value)->toBe(4.5);
+});
+
+test('a ratio report rejects a zero denominator and a numerator above the denominator', function () {
+    $user = User::factory()->role('Media Team')->create();
+    $target = ratioTarget();
+    $form = fn (string $numerator, string $denominator) => Livewire::actingAs($user)
+        ->test('pages::reports.index')
+        ->call('openCreateModal', $target->id)
+        ->set('plannedDate', '2026-06-30')
+        ->set('numerator', $numerator)
+        ->set('denominator', $denominator)
+        ->call('saveReport');
+
+    $form('5', '0')->assertHasErrors(['denominator' => __('monthly_reports.zero_denominator')]);
+    $form('50', '40')->assertHasErrors(['numerator' => __('monthly_reports.numerator_above_denominator')]);
+    $form('', '40')->assertHasErrors(['numerator' => 'required']);
+
+    expect(Report::query()->exists())->toBeFalse();
 });

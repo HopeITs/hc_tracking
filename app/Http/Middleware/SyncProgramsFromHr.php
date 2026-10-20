@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Jobs\CheckProgramLogframe;
 use App\Models\Program;
 use Closure;
 use Illuminate\Http\Request;
@@ -30,7 +31,11 @@ class SyncProgramsFromHr
     {
         if (Cache::add(self::CacheKey, true, 60)) {
             try {
-                Program::syncFromHr();
+                $newProgramIds = Program::syncFromHr();
+
+                if ($newProgramIds !== []) {
+                    CheckProgramLogframe::dispatch($newProgramIds);
+                }
             } catch (Throwable $exception) {
                 Cache::forget(self::CacheKey);
                 report($exception);

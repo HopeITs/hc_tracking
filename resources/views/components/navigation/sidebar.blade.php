@@ -336,6 +336,19 @@
                     >
                         {{ __('navigation.monthly_matrix') }}
                     </flux:sidebar.item>
+
+                    <flux:sidebar.item
+                        icon="calendar-days"
+                        :href="route('monthly-reports.index')"
+                        :current="request()->routeIs('monthly-reports.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate.hover
+                    >
+                        {{ __('navigation.monthly_reports') }}
+                        <x-slot:icon-trailing>
+                            <x-notifications.module-badge module="monthly-reports" :count="$moduleCounts['monthly-reports'] ?? 0" />
+                        </x-slot:icon-trailing>
+                    </flux:sidebar.item>
                 @endcan
 
                 @can('reports.aggregate')

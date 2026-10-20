@@ -1,7 +1,9 @@
 <?php
 
 use App\Enums\ReportStatus;
+use App\Models\Activity;
 use App\Models\AnnualPlan;
+use App\Models\MonthlyReport;
 use App\Models\PlanIndicator;
 use App\Models\Report;
 use App\Models\ReportFile;
@@ -257,4 +259,52 @@ test('the detail page links back along the chain to the indicator and its target
         ->assertOk()
         ->assertSee(route('indicators.index', ['inspect' => $indicatorId]), false)
         ->assertSee(route('targets.index', ['indicator' => $indicatorId]), false);
+});
+
+/**
+ * A mirror row of a monthly report (contracts §13 "Mirrors in reports").
+ */
+function monthlyMirror(ReportStatus $status, User $author): Report
+{
+    return Activity::withoutRecording(fn (): Report => Report::factory()->create([
+        'monthly_report_id' => MonthlyReport::factory()->create()->id,
+        'user_id' => $author->id,
+        'status' => $status,
+    ]));
+}
+
+test('a monthly report mirror links to its report and offers no edit, delete, submit, approve, return or file controls', function () {
+    $author = User::factory()->role('Media Team')->create();
+    $draft = monthlyMirror(ReportStatus::Draft, $author);
+
+    Livewire::actingAs($author)
+        ->test('pages::reports.show', ['report' => $draft])
+        ->assertSeeText(__('reports.monthly_report_chip'))
+        ->assertSeeHtml(route('monthly-reports.show', $draft->monthlyReport))
+        ->assertDontSeeHtml('data-test="edit-report-button"')
+        ->assertDontSeeHtml('data-test="delete-report-button"')
+        ->assertDontSeeHtml('data-test="submit-for-review-button"')
+        ->assertDontSeeHtml('data-test="create-file-button"');
+
+    $reviewed = monthlyMirror(ReportStatus::Reviewed, $author);
+
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
+        ->test('pages::reports.show', ['report' => $reviewed])
+        ->assertDontSeeHtml('data-test="approve-button"')
+        ->assertDontSeeHtml('data-test="return-to-draft-button"');
+});
+
+test('the report form refuses to open, save or delete a monthly report mirror', function () {
+    $author = User::factory()->role('Media Team')->create();
+    $mirror = monthlyMirror(ReportStatus::Draft, $author);
+    $page = fn () => Livewire::actingAs($author)->test('pages::reports.show', ['report' => $mirror]);
+
+    $page()->call('openEditModal', $mirror->id)
+        ->assertSet('showReportModal', false)
+        ->assertDispatched('toast-show', fn (string $event, array $params): bool => ($params['slots']['text'] ?? null) === __('reports.mirror_read_only'));
+
+    $page()->call('confirmDeleteReport', $mirror->id)
+        ->assertSet('showDeleteReportModal', false);
+
+    expect(DB::table('reports')->find($mirror->id))->not->toBeNull();
 });

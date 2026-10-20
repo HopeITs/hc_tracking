@@ -3,10 +3,12 @@
     months (activity_schedules) and its milestones grouped by center, each
     group with its weighted progress (Milestone::weightedProgress(); cancelled
     milestones listed but not counted). Link flags come from
-    Milestone::activityLinkIssuesFor() and are shown, never hidden. Renders
-    from the ResultsChain node array only, no queries.
+    Milestone::activityLinkIssuesFor() and are shown, never hidden. Also each
+    center's confirmed activity status (D-51) as a text badge, and the
+    department tasks on its milestones (title, department, status, due date;
+    no money). Renders from the ResultsChain node array only, no queries.
 --}}
-@props(['activityId', 'groups', 'schedule'])
+@props(['activityId', 'groups', 'schedule', 'statuses' => [], 'tasks' => []])
 
 @php
     use Carbon\CarbonImmutable;
@@ -15,6 +17,20 @@
     $percent = fn (?float $value): string => $value === null ? '' : rtrim(rtrim(number_format($value, 1, '.', ''), '0'), '.');
     $milestoneCount = array_sum(array_map(fn (array $group): int => count($group['milestones']), $groups));
 @endphp
+
+@if ($statuses !== [])
+    <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5" data-chain-activity-statuses>
+        <span class="inline-flex items-center gap-1 type-meta {{ $muted }}">
+            <flux:icon.signal variant="micro" class="size-3.5" aria-hidden="true" />{{ __('results_framework.chain_activity_status') }}
+        </span>
+        @foreach ($statuses as $status)
+            <span class="inline-flex items-center gap-1.5" data-chain-activity-status="{{ $status['centerId'] }}" wire:key="chain-status-{{ $activityId }}-{{ $status['centerId'] }}">
+                <span class="text-xs font-semibold" dir="auto">{{ $status['center'] }}</span>
+                <x-ui.enum-badge :case="$status['status']" />
+            </span>
+        @endforeach
+    </div>
+@endif
 
 @if ($schedule !== [])
     <div class="mt-3 flex flex-wrap items-center gap-1.5" data-chain-schedule>
@@ -71,7 +87,7 @@
                                     ->implode(' – ');
                             @endphp
                             <li class="flex flex-wrap items-center gap-x-3 gap-y-1 py-2" data-chain-milestone="{{ $milestone->id }}" wire:key="chain-milestone-{{ $milestone->id }}">
-                                <span @class(['min-w-0 flex-1 text-sm font-medium', 'line-through decoration-secondary-light '.$muted => $row['cancelled']]) dir="auto">{{ $milestone->name }}</span>
+                                <span @class(['min-w-0 basis-full text-sm font-medium break-words sm:flex-1 sm:basis-auto', 'line-through decoration-secondary-light '.$muted => $row['cancelled']]) dir="auto">{{ $milestone->name }}</span>
                                 <bdi dir="ltr" class="type-meta tabular-nums {{ $muted }}">{{ $dates }}</bdi>
                                 <x-ui.enum-badge :case="$milestone->status" />
                                 @foreach ($row['issues'] as $issue)
@@ -89,5 +105,26 @@
                 </section>
             @endforeach
         </div>
+    </div>
+@endif
+
+@if ($tasks !== [])
+    <div class="mt-3" data-chain-department-tasks>
+        <p class="inline-flex items-center gap-1 type-meta font-semibold text-secondary-dark dark:text-ink">
+            <flux:icon.briefcase variant="micro" class="size-3.5" aria-hidden="true" />{{ __('results_framework.chain_department_tasks') }}
+            <span class="tabular-nums {{ $muted }}">({{ count($tasks) }})</span>
+        </p>
+        <ul class="mt-1.5 divide-y divide-board-line rounded-md border border-board-line bg-board px-3 dark:divide-line dark:border-line">
+            @foreach ($tasks as $row)
+                <li class="flex flex-wrap items-center gap-x-3 gap-y-1 py-2" data-chain-department-task="{{ $row['task']->id }}" wire:key="chain-task-{{ $activityId }}-{{ $row['task']->id }}">
+                    <span class="min-w-0 basis-full text-sm font-medium break-words sm:flex-1 sm:basis-auto" dir="auto">{{ $row['task']->title }}</span>
+                    <span class="type-meta {{ $muted }}" dir="auto">{{ $row['department'] }}</span>
+                    @if ($row['task']->due_date !== null)
+                        <span class="type-meta {{ $muted }}">{{ __('results_framework.chain_task_due', ['date' => '']) }}<bdi dir="ltr" class="tabular-nums">{{ $row['task']->due_date->format('Y-m-d') }}</bdi></span>
+                    @endif
+                    <x-ui.enum-badge :case="$row['task']->status" />
+                </li>
+            @endforeach
+        </ul>
     </div>
 @endif

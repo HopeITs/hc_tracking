@@ -45,6 +45,10 @@ trait ManagesReportForm
 
     public string $value = '';
 
+    public string $numerator = '';
+
+    public string $denominator = '';
+
     public string $narrativeNotes = '';
 
     public string $executiveSummary = '';
@@ -138,10 +142,76 @@ trait ManagesReportForm
         return PlanIndicator::query()
             ->select(['id', 'indicator_id', 'source_type', 'source_id', 'target', 'period'])
             ->with([
-                'indicator:id,name,measure,unit',
+                'indicator:id,name,measure,unit,library_indicator_id',
+                'indicator.libraryIndicator:id,numerator_label,denominator_label',
                 'source',
             ])
             ->find((int) $this->reportTargetId);
+    }
+
+    /**
+     * Whether the target's figure is entered as numerator and denominator
+     * (contracts §11.1, D-25): a percentage or average indicator whose
+     * library entry names its numerator. The server then computes `value`.
+     */
+    protected function takesRatio(?PlanIndicator $target): bool
+    {
+        $indicator = $target?->indicator;
+
+        return $indicator !== null
+            && in_array($indicator->measure, [IndicatorMeasure::Percentage, IndicatorMeasure::Average], true)
+            && filled($indicator->libraryIndicator?->numerator_label);
+    }
+
+    /**
+     * The value a ratio target's figure computes to (x100 for a
+     * percentage), or null while the inputs are incomplete or invalid.
+     */
+    protected static function ratioValue(IndicatorMeasure $measure, mixed $numerator, mixed $denominator): ?float
+    {
+        if (! is_numeric($numerator) || ! is_numeric($denominator) || (float) $denominator <= 0.0) {
+            return null;
+        }
+
+        $ratio = (float) $numerator / (float) $denominator;
+
+        return round($measure === IndicatorMeasure::Percentage ? $ratio * 100 : $ratio, 2);
+    }
+
+    /**
+     * The input labels of the chosen target when it takes a ratio, else null.
+     *
+     * @return array{numerator_label: string, denominator_label: string}|null
+     */
+    protected function formRatio(): ?array
+    {
+        $target = $this->formTarget;
+
+        if (! $this->takesRatio($target)) {
+            return null;
+        }
+
+        $library = $target->indicator->libraryIndicator;
+
+        return [
+            'numerator_label' => (string) $library->numerator_label,
+            'denominator_label' => filled($library->denominator_label) ? (string) $library->denominator_label : __('monthly_reports.denominator'),
+        ];
+    }
+
+    /**
+     * The read-only result the form shows under a ratio's two inputs.
+     */
+    protected function ratioPreview(): ?string
+    {
+        $measure = $this->formTarget?->indicator?->measure;
+        $value = $measure === null ? null : self::ratioValue($measure, $this->numerator, $this->denominator);
+
+        if ($value === null) {
+            return null;
+        }
+
+        return number_format($value, fmod($value, 1.0) === 0.0 ? 0 : 2).($measure === IndicatorMeasure::Percentage ? '%' : '');
     }
 
     /**
@@ -188,10 +258,16 @@ trait ManagesReportForm
         $report = Report::query()
             ->select([
                 'id', 'user_id', 'status', 'plan_indicator_id', 'planned_date', 'period_start', 'period_end', 'value',
-                'narrative_report_notes', 'executive_summary', 'key_achievements', 'challenges',
-                'lessons_learned', 'next_period_plans',
+                'numerator', 'denominator', 'narrative_report_notes', 'executive_summary', 'key_achievements', 'challenges',
+                'lessons_learned', 'next_period_plans', 'monthly_report_id',
             ])
             ->findOrFail($reportId);
+
+        if ($report->isMirror()) {
+            $this->refuseMirror();
+
+            return;
+        }
 
         if (! $report->isEditable()) {
             Flux::toast(
@@ -211,6 +287,8 @@ trait ManagesReportForm
         $this->periodStart = $report->period_start?->toDateString() ?? '';
         $this->periodEnd = $report->period_end?->toDateString() ?? '';
         $this->value = (string) $report->value;
+        $this->numerator = $report->numerator === null ? '' : (string) $report->numerator;
+        $this->denominator = $report->denominator === null ? '' : (string) $report->denominator;
         $this->narrativeNotes = $report->narrative_report_notes ?? '';
         $this->executiveSummary = $report->executive_summary ?? '';
         $this->keyAchievements = $report->key_achievements ?? '';
@@ -234,7 +312,14 @@ trait ManagesReportForm
 
         $report = $isCreate
             ? new Report
-            : Report::query()->select(['id', 'status', 'user_id'])->findOrFail($this->editingReportId);
+            : Report::query()->select(['id', 'status', 'user_id', 'monthly_report_id'])->findOrFail($this->editingReportId);
+
+        if (! $isCreate && $report->isMirror()) {
+            $this->closeReportModal();
+            $this->refuseMirror();
+
+            return;
+        }
 
         if (! $isCreate && ! $report->isEditable()) {
             $this->closeReportModal();
@@ -254,6 +339,7 @@ trait ManagesReportForm
         unset($this->formTarget);
         $target = $this->formTarget;
         $isPercentage = $target?->indicator?->measure === IndicatorMeasure::Percentage;
+        $takesRatio = $this->takesRatio($target);
 
         // periodEnd's after_or_equal comparison is only meaningful once
         // periodStart is actually set — an empty periodStart cannot be parsed
@@ -270,8 +356,14 @@ trait ManagesReportForm
             'plannedDate' => ['required', 'date'],
             'periodStart' => ['nullable', 'date'],
             'periodEnd' => $periodEndRules,
-            // A percentage indicator reports a level out of 100.
-            'value' => ['required', 'numeric', 'min:0', $isPercentage ? 'max:100' : 'max:9999999999.99'],
+            // A percentage indicator reports a level out of 100; a ratio's
+            // value is computed from its numerator and denominator instead.
+            ...($takesRatio ? [
+                'numerator' => ['required', 'numeric', 'min:0', 'max:9999999999.99'],
+                'denominator' => ['required', 'numeric', 'min:0', 'max:9999999999.99'],
+            ] : [
+                'value' => ['required', 'numeric', 'min:0', $isPercentage ? 'max:100' : 'max:9999999999.99'],
+            ]),
             'narrativeNotes' => ['nullable', 'string'],
             'executiveSummary' => ['nullable', 'string'],
             'keyAchievements' => ['nullable', 'string'],
@@ -286,6 +378,20 @@ trait ManagesReportForm
             'value.max' => $isPercentage ? __('reports.a_percentage_cannot_exceed_100') : __('reports.the_reported_value_is_too_large_to_record'),
             'periodEnd.after_or_equal' => __('reports.the_narrative_window_end_cannot_be_before_its_start'),
         ]);
+
+        if ($takesRatio) {
+            if ((float) $validated['denominator'] === 0.0) {
+                $this->addError('denominator', __('monthly_reports.zero_denominator'));
+
+                return;
+            }
+
+            if ($isPercentage && (float) $validated['numerator'] > (float) $validated['denominator']) {
+                $this->addError('numerator', __('monthly_reports.numerator_above_denominator'));
+
+                return;
+            }
+        }
 
         $window = $this->coverableWindow($target);
 
@@ -312,7 +418,11 @@ trait ManagesReportForm
             'planned_date' => $validated['plannedDate'],
             'period_start' => $validated['periodStart'] === '' ? null : $validated['periodStart'],
             'period_end' => $validated['periodEnd'] === '' ? null : $validated['periodEnd'],
-            'value' => $validated['value'],
+            'value' => $takesRatio
+                ? self::ratioValue($target->indicator->measure, $validated['numerator'], $validated['denominator'])
+                : $validated['value'],
+            'numerator' => $takesRatio ? $validated['numerator'] : null,
+            'denominator' => $takesRatio ? $validated['denominator'] : null,
             'narrative_report_notes' => $validated['narrativeNotes'] === '' ? null : $validated['narrativeNotes'],
             'executive_summary' => $validated['executiveSummary'] === '' ? null : $validated['executiveSummary'],
             'key_achievements' => $validated['keyAchievements'] === '' ? null : $validated['keyAchievements'],
@@ -357,6 +467,8 @@ trait ManagesReportForm
         $this->periodStart = '';
         $this->periodEnd = '';
         $this->value = '';
+        $this->numerator = '';
+        $this->denominator = '';
         $this->narrativeNotes = '';
         $this->executiveSummary = '';
         $this->keyAchievements = '';
@@ -370,12 +482,27 @@ trait ManagesReportForm
     {
         $report = Report::query()->findOrFail($reportId);
 
+        if ($report->isMirror()) {
+            $this->refuseMirror();
+
+            return;
+        }
+
         if ($report->isEditable()) {
             Gate::authorize('delete', $report);
         }
 
         $this->deletingReportId = $reportId;
         $this->showDeleteReportModal = true;
+    }
+
+    /**
+     * A mirror of a monthly report is changed only on its monthly report
+     * (contracts §13 "Mirrors in reports").
+     */
+    protected function refuseMirror(): void
+    {
+        Flux::toast(variant: 'danger', text: __('reports.mirror_read_only'));
     }
 
     public function cancelDeleteReport(): void

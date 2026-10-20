@@ -1,18 +1,24 @@
 <?php
 
+use App\Enums\ActivityStatus;
 use App\Enums\MilestoneStatus;
 use App\Enums\ResultType;
+use App\Enums\TaskKind;
+use App\Enums\TaskStatus;
 use App\Models\ActivitySchedule;
 use App\Models\AnnualPlan;
 use App\Models\Indicator;
 use App\Models\LibraryIndicator;
 use App\Models\Milestone;
+use App\Models\MonthlyReport;
 use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
+use App\Models\ProjectActivityStatus;
 use App\Models\Proposal;
 use App\Models\Report;
 use App\Models\Result;
+use App\Models\Task;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Support\Facades\DB;
@@ -209,14 +215,17 @@ test('the chain reads a flat number of queries for 3 or 30 nodes', function (str
     $proposalImpact = chainNode($this->proposal, ResultType::Impact, programId: $this->program->id);
     $proposalImpact->forceFill(['contributes_to_result_id' => $programImpact->id])->saveQuietly();
 
-    $seed = function (int $branches) use ($plan, $programImpact, $proposalImpact): void {
+    $report = MonthlyReport::factory()->validated()->create(['project_id' => $this->centerA->id]);
+    $seed = function (int $branches) use ($plan, $programImpact, $proposalImpact, $report): void {
         foreach (range(1, $branches) as $index) {
             foreach ([[$this->proposal, $proposalImpact, $this->proposal], [null, $programImpact, $plan]] as [$proposal, $root, $source]) {
                 $outcome = chainNode($proposal, ResultType::Outcome, $root);
                 $activity = chainNode($proposal, ResultType::Activity, chainNode($proposal, ResultType::Output, $outcome));
                 $target = chainTarget(chainIndicator($outcome), $source, $this->centerA, 10);
                 Report::factory()->approved()->create(['plan_indicator_id' => $target->id, 'value' => 4]);
-                chainMilestone($this->centerA, $activity);
+                $milestone = chainMilestone($this->centerA, $activity);
+                Task::factory()->create(['source_type' => 'milestone', 'source_id' => $milestone->id, 'department_id' => 1, 'kind' => TaskKind::General]);
+                ProjectActivityStatus::factory()->create(['project_id' => $this->centerA->id, 'result_id' => $activity->id, 'monthly_report_id' => $report->id]);
                 ActivitySchedule::factory()->create(['result_id' => $activity->id, 'month' => '2026-03-01']);
             }
         }
@@ -243,8 +252,6 @@ test('the chain reads a flat number of queries for 3 or 30 nodes', function (str
     $small = $countQueries();
     $seed(9);
     $large = $countQueries();
-
-    dump($page.': '.count($small).' vs '.count($large).' queries');
 
     expect(count($large))->toBe(count($small))
         ->and(collect($large)->filter(fn (string $sql): bool => str_contains($sql, 'amount') || str_contains($sql, 'budget'))->all())->toBe([]);
@@ -382,4 +389,53 @@ test('a proposal-wide milestone without a center shows in its own group, also un
         ->set('chainCenter', (string) $this->centerA->id)
         ->assertSee('Final donor report')
         ->assertSee('Drill well one');
+});
+
+test('an activity shows each center\'s confirmed status as a text badge, only the selected center under a filter', function () {
+    $chain = chainProposalFramework($this->proposal, $this->centerA, $this->centerB);
+    ProjectActivityStatus::factory()->create(['project_id' => $this->centerA->id, 'result_id' => $chain['activity']->id, 'status' => ActivityStatus::Started]);
+    ProjectActivityStatus::factory()->create(['project_id' => $this->centerB->id, 'result_id' => $chain['activity']->id, 'status' => ActivityStatus::Completed]);
+    chainMilestone($this->centerA, $chain['activity']); // the center filter keeps an activity with work in that center
+
+    chainTab($this->viewer, $this->proposal)
+        ->assertSeeHtml('data-chain-activity-status="'.$this->centerA->id.'"')
+        ->assertSeeHtml('data-chain-activity-status="'.$this->centerB->id.'"')
+        ->assertSeeInOrder(['Hope Center Sarmada', ActivityStatus::Started->label(), 'Unmapped Water Project', ActivityStatus::Completed->label()])
+        ->set('chainCenter', (string) $this->centerA->id)
+        ->assertSeeHtml('data-chain-activity-status="'.$this->centerA->id.'"')
+        ->assertDontSeeHtml('data-chain-activity-status="'.$this->centerB->id.'"');
+});
+
+test('an activity without a confirmed status shows no status badge', function () {
+    chainProposalFramework($this->proposal, $this->centerA, $this->centerB);
+
+    chainTab($this->viewer, $this->proposal)->assertDontSeeHtml('data-chain-activity-status=');
+});
+
+test('the department-tasks summary lists media tasks without money and hides financial tasks from others', function () {
+    $chain = chainProposalFramework($this->proposal, $this->centerA, $this->centerB);
+    $milestone = chainMilestone($this->centerA, $chain['activity'], proposal: $this->proposal);
+    $mediaDepartment = insertHrDepartment('Media');
+    $media = Task::factory()->create([
+        'source_type' => 'milestone', 'source_id' => $milestone->id, 'department_id' => $mediaDepartment,
+        'kind' => TaskKind::MediaDeliverable, 'media_kinds' => ['video'], 'title' => 'Film the well handover',
+        'status' => TaskStatus::Todo, 'due_date' => '2026-03-10',
+    ]);
+    $financial = Task::factory()->create([
+        'source_type' => 'milestone', 'source_id' => $milestone->id, 'department_id' => $mediaDepartment,
+        'kind' => TaskKind::Financial, 'title' => 'Settle the drilling invoice', 'status' => TaskStatus::Todo,
+    ]);
+    $employee = insertHrEmployee(firstNameEn: 'Rami');
+    insertHrContract($employee, insertHrPosition($mediaDepartment, 'Photographer'));
+    $mediaUser = userWithRole('Media Team', $employee);
+
+    chainTab($mediaUser, $this->proposal)
+        ->assertSeeHtml('data-chain-department-task="'.$media->id.'"')
+        ->assertSee(['Film the well handover', 'Media', '2026-03-10', TaskStatus::Todo->label()])
+        ->assertDontSee('Settle the drilling invoice')
+        ->assertDontSeeHtml('data-chain-department-task="'.$financial->id.'"');
+
+    chainTab($this->viewer, $this->proposal)
+        ->assertSeeHtml('data-chain-department-task="'.$financial->id.'"')
+        ->assertDontSee('987,654');
 });

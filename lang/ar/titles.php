@@ -27,6 +27,8 @@ return [
     'proposals' => 'المقترحات',
     'report' => 'التقرير',
     'reports' => 'التقارير',
+    'monthly_report' => 'التقرير الشهري',
+    'monthly_reports' => 'التقارير الشهرية',
     'results_framework' => 'إطار النتائج',
     'risks' => 'المخاطر',
     'security_settings' => 'إعدادات الأمان',

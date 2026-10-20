@@ -205,4 +205,8 @@ return [
         'no_activities_hint' => 'Activities come from the logframe of donor-approved proposals that overlap the months shown.',
         'activities_legend' => 'Validated status, status carried over, planned weeks',
     ],
+    'monthly_report_chip' => 'Monthly report',
+    'mirror_read_only' => 'This figure comes from a monthly report; change it there.',
+    'computed_value' => 'Result',
+    'computed_value_help' => 'Calculated from the two figures when you save.',
 ];

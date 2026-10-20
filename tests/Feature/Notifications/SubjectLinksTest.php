@@ -4,6 +4,7 @@ use App\Models\Activity;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\DonorReport;
+use App\Models\MonthlyReport;
 use App\Models\Report;
 use App\Models\Risk;
 use App\Models\Strategy;
@@ -16,6 +17,7 @@ test('every subject type leads to its page', function (string $type, Closure $re
     expect(app(SubjectLinks::class)->routeFor($type, $model->getKey()))->toBe($expected($model));
 })->with([
     'report' => ['report', fn () => Report::factory()->create(), fn ($report) => route('reports.show', $report)],
+    'monthly report' => ['monthly_report', fn () => MonthlyReport::factory()->create(), fn ($monthlyReport) => route('monthly-reports.show', $monthlyReport)],
     'donor' => ['donor', fn () => Donor::factory()->create(), fn ($donor) => route('donors.show', $donor)],
     'strategy' => ['strategy', fn () => Strategy::factory()->create(), fn ($strategy) => route('strategies.show', $strategy)],
     'funding agreement' => ['donor_proposal', fn () => DonorProposal::factory()->create(), fn ($agreement) => route('funding-agreements.show', $agreement)],

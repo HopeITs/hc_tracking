@@ -16,6 +16,7 @@ return [
     'indicator_library' => 'Indicator Library',
     'sectors' => 'Sectors',
     'evidence_types' => 'Evidence types',
+    'monthly_reports' => 'Monthly Reports',
     'narrative_questions' => 'Narrative questions',
     'platform' => 'Platform',
     'primary_navigation' => 'Primary navigation',

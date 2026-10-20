@@ -187,6 +187,10 @@ return [
         'project_started' => 'The project “:subject” started on :date',
         'project_ended' => 'The project “:subject” ended on :date',
         'on_hold_reminder' => 'The proposal “:subject” is on hold and its review date (:date) has come',
+        'logframe_missing' => [
+            'single' => 'The program “:subject” has no program framework yet — create it',
+            'grouped' => 'Programs without a program framework yet: :count — create them',
+        ],
     ],
 
     'admin' => [
