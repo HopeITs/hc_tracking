@@ -137,6 +137,25 @@
 
     /* Fast start, long soft settle: the sidebar's collapse, expand and mobile drawer motion. */
     --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+    /* Tracking Desk: figures stay in Somar Sans with tabular-nums (no mono face), per the approved font set. */
+
+    /* Tracking Desk surfaces and ink (light). Dark values live in the .dark block. */
+    --color-paper: #ffffff;
+    --color-tint: #f8f8f9;
+    --color-sunk: #ebebed;
+    --color-desk-ink: #232427;
+    --color-desk-ink-2: #58595b;
+    --color-desk-ink-3: #6d6e71;
+    --color-desk-faint: #939598;
+    --color-desk-line: #e1e1e3;
+    --color-desk-line-2: #c6c7c9;
+    --color-brand-soft: #f8e4e4;
+    --color-brand-ink: #be1f24;
+    --color-on-brand: #ffffff;
+    --color-scrim: rgb(24 24 28 / 0.38);
+    --color-header-bg: rgb(243 243 244 / 0.88);
+    --shadow-overlay: 0 1px 2px rgb(24 24 28 / 0.06), 0 16px 40px rgb(24 24 28 / 0.14);
 }
 
 @layer theme {
@@ -161,16 +180,16 @@
         --color-accent-content: var(--color-ink);
         --color-accent-foreground: var(--color-surface-0);
 
-        --color-status-good: #5fd09a;
-        --color-status-good-soft: #14281e;
-        --color-status-warn: #e8b050;
-        --color-status-warn-soft: #2c2313;
-        --color-status-critical: #ff8a86;
-        --color-status-critical-soft: #381a1c;
-        --color-status-active: #7db3ec;
-        --color-status-active-soft: #172637;
-        --color-funding: #7cc3cf;
-        --color-funding-soft: #122629;
+        --color-status-good: #5cc690;
+        --color-status-good-soft: rgb(92 198 144 / 0.13);
+        --color-status-warn: #e3ad52;
+        --color-status-warn-soft: rgb(227 173 82 / 0.13);
+        --color-status-critical: #ff8a8d;
+        --color-status-critical-soft: rgb(255 138 141 / 0.13);
+        --color-status-active: #7cb1ee;
+        --color-status-active-soft: rgb(124 177 238 / 0.13);
+        --color-funding: #79bccb;
+        --color-funding-soft: rgb(121 188 203 / 0.13);
         --color-series-1: #8bb4e8;
         --color-series-2: #c49ad6;
         --color-series-3: #6fd0b8;
@@ -181,5 +200,20 @@
         --color-board: var(--color-surface-1);
         --color-board-line: var(--color-line);
         --color-board-head: var(--color-surface-2);
+
+        --color-paper: #1c1d20;
+        --color-tint: #242528;
+        --color-sunk: #111214;
+        --color-desk-ink: #ececee;
+        --color-desk-ink-2: #c4c6ca;
+        --color-desk-ink-3: #a8aaae;
+        --color-desk-faint: #8a8c93;
+        --color-desk-line: #2e2f34;
+        --color-desk-line-2: #4a4b51;
+        --color-brand-soft: rgb(212 52 58 / 0.16);
+        --color-brand-ink: #ff8a8d;
+        --color-scrim: rgb(0 0 0 / 0.55);
+        --color-header-bg: rgb(21 22 24 / 0.86);
+        --shadow-overlay: 0 1px 2px rgb(0 0 0 / 0.4), 0 16px 40px rgb(0 0 0 / 0.5);
     }
 }
