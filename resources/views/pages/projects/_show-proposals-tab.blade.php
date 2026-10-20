@@ -5,7 +5,7 @@
                         <li class="grid gap-x-4 gap-y-1 px-4 py-3 text-sm @2xl/detail:grid-cols-[minmax(0,2fr)_minmax(0,1.5fr)_auto_auto] @2xl/detail:items-center" wire:key="funding-history-{{ $entry->id }}">
                             <div class="min-w-0">
                                 @if ($this->canViewProposals())
-                                    <a href="{{ route('proposals.show', $entry) }}" wire:navigate class="font-semibold text-secondary-dark hover:underline dark:text-ink" dir="auto">{{ $entry->name }}</a>
+                                    <a href="{{ $this->attachedProposals->contains('id', $entry->id) ? $this->proposalStoryUrl($entry->id) : route('proposals.show', $entry) }}" wire:navigate class="font-semibold text-secondary-dark hover:underline dark:text-ink" dir="auto">{{ $entry->name }}</a>
                                 @else
                                     <span class="font-semibold text-secondary-dark dark:text-ink" dir="auto">{{ $entry->name }}</span>
                                 @endif
@@ -61,7 +61,7 @@
                             <div class="flex items-start justify-between gap-3">
                                 <div class="min-w-0">
                                     @if ($this->canViewProposals())
-                                        <a href="{{ route('proposals.show', $proposal) }}" wire:navigate class="truncate text-base font-bold text-secondary-dark hover:underline dark:text-ink">{{ $proposal->name }}</a>
+                                        <a href="{{ $this->proposalStoryUrl($proposal->id) }}" wire:navigate data-story-proposal-link class="truncate text-base font-bold text-secondary-dark hover:underline dark:text-ink">{{ $proposal->name }}</a>
                                     @else
                                         <p class="truncate text-base font-bold text-secondary-dark dark:text-ink">{{ $proposal->name }}</p>
                                     @endif

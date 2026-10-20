@@ -22,7 +22,7 @@
     };
 @endphp
 
-<x-ui.modal size="sm" :title="$title" :description="$message" :close="$close" :attributes="$attributes">
+<x-ui.modal size="sm" :sheet="false" :title="$title" :description="$message" :close="$close" :attributes="$attributes">
     <x-slot:mark>
         <span class="confirm-mark {{ $markClasses }}" aria-hidden="true">
             <flux:icon.exclamation-triangle variant="mini" class="size-4" />

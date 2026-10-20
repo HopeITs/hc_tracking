@@ -57,12 +57,12 @@
         @elseif ($next['meal'])
             <p class="dk-who">{{ __('story.waiting_on_meal') }}</p>
         @endif
-        @if ($next['href'] !== null || ($next['owner'] !== null && ! $next['mine']))
+        @if ($next['href'] !== null || ($next['nudge'] && $next['ownerName'] !== null))
             <div class="dk-acts">
                 @if ($next['href'] !== null)
                     <a class="dk-btn dk-lg {{ $next['mine'] || $next['owner'] === null ? 'dk-primary' : '' }}" href="{{ $next['href'] }}" wire:navigate data-test="{{ $story['stage'] === 0 ? 'new-concept-note' : 'story-next-go' }}">{{ $next['label'] }}</a>
                 @endif
-                @if ($next['owner'] !== null && ! $next['mine'] && $next['ownerName'] !== null)
+                @if ($next['nudge'] && $next['ownerName'] !== null)
                     <button type="button" class="dk-btn" wire:click="nudgeNextStep" data-test="story-nudge"><x-desk.icon name="bell" />{{ __('desk.nudge_named', ['name' => $next['ownerName']]) }}</button>
                 @endif
             </div>

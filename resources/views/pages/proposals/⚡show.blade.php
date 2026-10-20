@@ -8,8 +8,8 @@ use App\Livewire\Concerns\PreviewsFiles;
 use App\Livewire\Concerns\Proposals\ChartsProposalChronology;
 use App\Livewire\Concerns\Proposals\ManagesProposalApproval;
 use App\Livewire\Concerns\Proposals\ManagesProposalFiles;
-use App\Livewire\Concerns\Proposals\ManagesProposalPlan;
 use App\Livewire\Concerns\Proposals\ManagesProposalForm;
+use App\Livewire\Concerns\Proposals\ManagesProposalPlan;
 use App\Livewire\Concerns\Proposals\ManagesProposalRecord;
 use App\Livewire\Concerns\Proposals\ManagesProposalReviewers;
 use App\Livewire\Concerns\Proposals\ManagesProposalStatus;
@@ -26,24 +26,25 @@ use App\Models\ProposalStatusNote;
 use App\Models\TransfersTracking;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
-new #[Title('titles.proposal')] class extends Component
+new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
 {
     use BuildsProposalPlanGantt;
     use ChartsProposalChronology;
     use ChecksFinanceVisibility;
     use ManagesAgreementForm;
+    use ManagesProposalApproval;
     use ManagesProposalFiles;
-    use ManagesProposalPlan;
     use ManagesProposalForm;
+    use ManagesProposalPlan;
     use ManagesProposalRecord;
     use ManagesProposalReviewers;
-    use ManagesProposalApproval;
     use ManagesProposalStatus;
     use ManagesTransferForm;
     use PreviewsFiles;
@@ -68,11 +69,20 @@ new #[Title('titles.proposal')] class extends Component
     /**
      * Which tab's content is shown beneath the fixed header.
      *
-     * Round-trips through the query string, so an unknown value from a stale
-     * bookmark falls back to the first tab rather than rendering nothing.
+     * Round-trips through the query string as ?ptab= (so it never collides
+     * with the project Story's own ?tab= when embedded there); an unknown
+     * value from a stale bookmark falls back to the first tab.
      */
-    #[Url(except: 'status')]
+    #[Url(as: 'ptab', except: 'status')]
     public string $tab = 'status';
+
+    /**
+     * Rendered inside the project Story's Proposal block (Tracking Desk
+     * stage 4) rather than as its own page: no back link, breadcrumbs or
+     * page title, the actions in a compact head.
+     */
+    #[Locked]
+    public bool $embedded = false;
 
     /**
      * Deep link from the "Record agreement" notification action: opens the
@@ -84,6 +94,13 @@ new #[Title('titles.proposal')] class extends Component
     public function mount(Proposal $proposal): void
     {
         $this->proposalId = $proposal->id;
+
+        $legacyTab = request()->query('tab');
+
+        if (! $this->embedded && $this->tab === 'status' && is_string($legacyTab) && $legacyTab !== '') {
+            $this->tab = $legacyTab;
+        }
+
         $this->updatedTab();
 
         if ($this->recordAgreementLink && $this->canRecordAgreement) {
@@ -294,52 +311,47 @@ new #[Title('titles.proposal')] class extends Component
     $arrivals = $this->arrivals;
 @endphp
 
-<section class="dossier @container/detail flex min-h-full w-full flex-1 flex-col bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink">
-    <x-ui.detail-header
-        :breadcrumbs="[
-            ['label' => __('common.proposals'), 'url' => route('proposals.index')],
-            ['label' => $this->proposal->name],
-        ]"
-        :title="$this->proposal->name"
-        :unread="app(\App\Notifications\UnreadSubjects::class)->has(auth()->user(), 'proposal', $this->proposal->id)"
-        title-class="text-3xl! font-bold! leading-none! tracking-tight! @3xl/detail:text-[2.5rem]!"
-    >
-        <x-slot:meta>
-            <x-ui.project-number :number="$this->proposal->internal_project_number" kind="internal" label />
-            <span class="tabular-nums">{{ __('proposals.planned_range', ['begin' => $this->proposal->planned_date_begin?->translatedFormat(__('formats.date')), 'end' => $this->proposal->planned_date_end?->translatedFormat(__('formats.date'))]) }}</span>
-            @if ($this->proposal->actual_date_begin !== null)
-                <span class="tabular-nums">{{ __('proposals.actual_begin', ['begin' => $this->proposal->actual_date_begin->translatedFormat(__('formats.date'))]) }}</span>
-            @endif
-        </x-slot:meta>
-
-        <x-slot:actions>
-            <div class="flex flex-wrap items-center gap-2 @3xl/detail:shrink-0 @3xl/detail:flex-nowrap">
-                <x-ui.enum-badge :case="$this->proposal->status" />
-                <span class="rounded-md border border-secondary-light px-2 py-0.5 text-[11px] font-semibold text-secondary-medium dark:text-ink-muted">
-                    {{ $this->proposal->phase->label() }}
-                </span>
-                @can('update', $this->proposal)
-                <x-ui.button size="sm" icon="pencil-square" class="min-h-10 touch-manipulation" wire:click="openEditModal({{ $this->proposal->id }})" data-test="open-details-modal">{{ __('proposals.edit_details') }}</x-ui.button>
-                @can('approve', $this->proposal)
-                @if ($this->proposal->canBeApproved())
-                <x-ui.button tone="primary" size="sm" icon="check-badge" class="min-h-10 touch-manipulation" wire:click="openApproveModal({{ $this->proposal->id }})" data-test="open-approve-modal">{{ __('proposals.approve_proposal') }}</x-ui.button>
-                @endif
-                @endcan
-                @if ($this->proposal->transitionTargets() !== [])
-                <x-ui.button tone="primary" size="sm" icon="arrow-path" class="min-h-10 touch-manipulation" wire:click="openStatusModal({{ $this->proposal->id }})" data-test="open-status-modal">{{ __('proposals.change_status') }}</x-ui.button>
-                @endif
-                @endcan
-                @if ($this->canRecordAgreement)
-                <x-ui.button size="sm" icon="banknotes" class="min-h-10 touch-manipulation" wire:click="openAgreementCreate" data-test="record-agreement-button">{{ __('funding_agreements.record_agreement') }}</x-ui.button>
-                @endif
-                @can('correctStatus', $this->proposal)
-                @if ($this->proposal->status->isTerminal())
-                <x-ui.button size="sm" icon="arrow-uturn-left" class="min-h-10 touch-manipulation" wire:click="openCorrectModal({{ $this->proposal->id }})" data-test="open-correct-status-modal">{{ __('proposals.correct_status') }}</x-ui.button>
-                @endif
-                @endcan
+<section @class(['dossier @container/detail flex w-full flex-col text-secondary-dark dark:text-ink', 'min-h-full flex-1 bg-white dark:bg-surface-0' => ! $embedded]) @if ($embedded) data-embedded-proposal @endif>
+    @if ($embedded)
+        <header class="flex flex-col gap-3 @3xl/detail:flex-row @3xl/detail:items-start @3xl/detail:justify-between" data-embedded-proposal-head>
+            <div class="min-w-0">
+                <h4 class="text-xl font-bold leading-tight text-secondary-dark dark:text-ink" dir="auto">
+                    {{ $this->proposal->name }}
+                    @if (app(\App\Notifications\UnreadSubjects::class)->has(auth()->user(), 'proposal', $this->proposal->id))
+                        <span class="inline-block size-2.5 rounded-full bg-primary align-middle dark:bg-ink" data-unread-dot title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
+                    @endif
+                </h4>
+                <p class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs {{ $mutedText }}">
+                    <x-ui.project-number :number="$this->proposal->internal_project_number" kind="internal" label />
+                    <span class="tabular-nums">{{ __('proposals.planned_range', ['begin' => $this->proposal->planned_date_begin?->translatedFormat(__('formats.date')), 'end' => $this->proposal->planned_date_end?->translatedFormat(__('formats.date'))]) }}</span>
+                </p>
             </div>
-        </x-slot:actions>
-    </x-ui.detail-header>
+            @include('pages.proposals._show-actions')
+        </header>
+    @else
+        <a class="dk-back" href="{{ route('dashboard') }}" wire:navigate data-proposal-back><x-desk.icon name="back" class="dk-flip" />{{ __('desk.your_desk') }}</a>
+        <x-ui.detail-header
+            :breadcrumbs="[
+                ['label' => __('common.proposals'), 'url' => route('proposals.index')],
+                ['label' => $this->proposal->name],
+            ]"
+            :title="$this->proposal->name"
+            :unread="app(\App\Notifications\UnreadSubjects::class)->has(auth()->user(), 'proposal', $this->proposal->id)"
+            title-class="text-3xl! font-bold! leading-none! tracking-tight! @3xl/detail:text-[2.5rem]!"
+        >
+            <x-slot:meta>
+                <x-ui.project-number :number="$this->proposal->internal_project_number" kind="internal" label />
+                <span class="tabular-nums">{{ __('proposals.planned_range', ['begin' => $this->proposal->planned_date_begin?->translatedFormat(__('formats.date')), 'end' => $this->proposal->planned_date_end?->translatedFormat(__('formats.date'))]) }}</span>
+                @if ($this->proposal->actual_date_begin !== null)
+                    <span class="tabular-nums">{{ __('proposals.actual_begin', ['begin' => $this->proposal->actual_date_begin->translatedFormat(__('formats.date'))]) }}</span>
+                @endif
+            </x-slot:meta>
+
+            <x-slot:actions>
+                @include('pages.proposals._show-actions')
+            </x-slot:actions>
+        </x-ui.detail-header>
+    @endif
 
     @include('pages.proposals._show-lifecycle')
 

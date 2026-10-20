@@ -7,6 +7,7 @@
     'requiredNote' => false,
     'cancelLabel' => null,
     'flush' => false,
+    'sheet' => true,
 ])
 
 @php
@@ -21,6 +22,11 @@
      * The X, Cancel, Esc and a backdrop click all close the native dialog, so
      * the `close` action runs exactly once, through wire:close, whichever way
      * the user leaves.
+     *
+     * By default it is a Tracking Desk side sheet (Flux's flyout behaviour with the bare variant, so
+     * no physical ml-auto/rtl:mr-auto classes; forms.css docks it to the inline-end edge
+     * with logical margins: right in LTR, left in RTL; width by size in forms.css).
+     * `:sheet="false"` keeps the small centered dialog that confirmations use.
      */
     $maxWidth = match ($size) {
         'sm' => 'max-w-md',
@@ -35,14 +41,14 @@
     $submitAction = $submit === null ? null : Illuminate\Support\Str::before($submit, '(');
     $frameTag = $submit === null ? 'div' : 'form';
 
-    $modalAttributes = $attributes->class([$maxWidth, 'modal-shell', 'modal-shell-'.$size]);
+    $modalAttributes = $attributes->class([$sheet ? null : $maxWidth, 'modal-shell', 'modal-shell-'.$size, $sheet ? 'modal-shell-sheet' : 'modal-shell-centered']);
 
     if ($close !== null) {
         $modalAttributes = $modalAttributes->merge(['wire:close' => $close]);
     }
 @endphp
 
-<flux:modal :closable="false" :attributes="$modalAttributes">
+<flux:modal :closable="false" :flyout="$sheet" :variant="$sheet ? 'bare' : null" :attributes="$modalAttributes">
     <{{ $frameTag }}
         class="modal-shell-frame"
         @if ($submit !== null) wire:submit="{{ $submit }}" novalidate @endif

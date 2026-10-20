@@ -32,9 +32,10 @@
     <flux:modal
         :name="$name"
         :closable="false"
-        class="filter-dialog p-0! w-[calc(100vw-2rem)]! max-w-2xl! overflow-hidden! rounded-2xl! dark:bg-surface-3! dark:ring-line!"
+        variant="flyout"
+        class="filter-dialog modal-shell modal-shell-sheet modal-shell-md"
     >
-        <div class="flex max-h-[min(85dvh,52rem)] flex-col" x-init="$el.closest('dialog')?.setAttribute('aria-labelledby', 'finance-filters-title')">
+        <div class="flex h-full min-h-0 flex-col" x-init="$el.closest('dialog')?.setAttribute('aria-labelledby', 'finance-filters-title')">
             <header class="flex items-start gap-4 border-b border-secondary-soft px-6 pb-4 pt-5 dark:border-line">
                 <span class="mt-0.5 inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-secondary-soft/60 text-secondary-dark dark:bg-surface-2 dark:text-ink" aria-hidden="true">
                     <flux:icon.adjustments-horizontal class="size-5" />

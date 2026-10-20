@@ -18,6 +18,7 @@ use App\Support\Desk\ProjectStage;
 use Flux\Flux;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Url;
 
 /**
  * The project Story (Tracking Desk stage 3): where the project stands on its
@@ -25,23 +26,63 @@ use Livewire\Attributes\Computed;
  * summary line per chapter.
  *
  * Stage and health come from App\Support\Desk\ProjectStage, so the Story and
- * the Desk's Projects panel always agree. Editing stays on the existing
- * screens until the side sheets arrive (stage 4): every next step links to
- * the page that does it.
+ * the Desk's Projects panel always agree. A proposal step links to the
+ * Story's own Proposal block (stage 4: the proposal page is embedded there,
+ * chosen by ?proposal= and opened on ?ptab=).
  *
  * Used by projects/show only. The page provides projectId, the #[Computed]
- * project(), fundingByCurrency() and canViewMoney().
+ * project(), attachedProposals(), fundingByCurrency() and canViewMoney().
  *
  * @property int $projectId
+ * @property-read Collection<int, Proposal> $attachedProposals  #[Computed] attachedProposals()
+ * @property-read int|null $embeddedProposalId  #[Computed] embeddedProposalId()
  * @property-read Project $project  #[Computed] project()
  * @property-read bool $canStartConceptNote  #[Computed] canStartConceptNote()
  * @property-read Collection<string, array{currency: Currency, committed: float, received: float}> $fundingByCurrency  #[Computed] fundingByCurrency()
- * @property-read array{lead: Proposal|null, stage: int, health: string, donor: string, reports: array{validated: int, total: int}, next: array{text: string, owner: int|null, mine: bool, ownerName: string|null, meal: bool, href: string|null, label: string|null}, chapters: list<array{state: string, summary: string, when: string|null}>, lede: string} $story  #[Computed] story()
+ * @property-read array{lead: Proposal|null, stage: int, health: string, donor: string, reports: array{validated: int, total: int}, next: array{text: string, owner: int|null, mine: bool, ownerName: string|null, meal: bool, nudge: bool, href: string|null, label: string|null}, chapters: list<array{state: string, summary: string, when: string|null}>, lede: string} $story  #[Computed] story()
  */
 trait ReadsProjectStory
 {
+    /** The proposal shown in the Story's Proposal block ('' = the lead one). */
+    #[Url(as: 'proposal', except: '')]
+    public string $storyProposal = '';
+
     /**
-     * @return array{lead: Proposal|null, stage: int, health: string, donor: string, reports: array{validated: int, total: int}, next: array{text: string, owner: int|null, mine: bool, ownerName: string|null, meal: bool, href: string|null, label: string|null}, chapters: list<array{state: string, summary: string, when: string|null}>, lede: string}
+     * Which proposal the Proposal block embeds: the one in ?proposal= when it
+     * is linked to this project and the viewer may open it, else the lead
+     * proposal, else the first linked one the viewer may open.
+     */
+    #[Computed]
+    public function embeddedProposalId(): ?int
+    {
+        $viewer = auth()->user();
+        $viewable = $this->attachedProposals
+            ->filter(fn (Proposal $proposal): bool => $viewer?->can('view', $proposal) === true)
+            ->pluck('id');
+        $chosen = ctype_digit($this->storyProposal) ? (int) $this->storyProposal : null;
+        $leadId = $this->story['lead']?->id;
+
+        return match (true) {
+            $chosen !== null && $viewable->contains($chosen) => $chosen,
+            $leadId !== null && $viewable->contains($leadId) => $leadId,
+            default => $viewable->first(),
+        };
+    }
+
+    /**
+     * The Story opened on one proposal (and tab) in its Proposal block.
+     */
+    public function proposalStoryUrl(int $proposalId, ?string $tab = null): string
+    {
+        return route('projects.show', array_filter([
+            'project' => $this->project,
+            'proposal' => $proposalId,
+            'ptab' => $tab,
+        ], fn (mixed $value): bool => $value !== null)).'#proposal';
+    }
+
+    /**
+     * @return array{lead: Proposal|null, stage: int, health: string, donor: string, reports: array{validated: int, total: int}, next: array{text: string, owner: int|null, mine: bool, ownerName: string|null, meal: bool, nudge: bool, href: string|null, label: string|null}, chapters: list<array{state: string, summary: string, when: string|null}>, lede: string}
      */
     #[Computed]
     public function story(): array
@@ -86,7 +127,7 @@ trait ReadsProjectStory
     {
         $next = $this->story['next'];
 
-        if ($next['owner'] === null || $next['mine']) {
+        if ($next['owner'] === null || ! $next['nudge']) {
             return;
         }
 
@@ -99,7 +140,7 @@ trait ReadsProjectStory
      * The one thing that has to happen next, who holds it (an HR employee
      * id, null when it sits with MEAL or nobody) and the page that does it.
      *
-     * @return array{text: string, owner: int|null, mine: bool, ownerName: string|null, meal: bool, href: string|null, label: string|null}
+     * @return array{text: string, owner: int|null, mine: bool, ownerName: string|null, meal: bool, nudge: bool, href: string|null, label: string|null}
      */
     private function nextStep(Project $project, ?Proposal $lead, int $stage, string $donor): array
     {
@@ -107,8 +148,9 @@ trait ReadsProjectStory
         $meal = false;
         $href = null;
         $label = null;
+        $nudge = true;
         $donorName = $donor !== '' ? $donor : (string) __('story.the_donor');
-        $proposalLink = fn (string $tab): ?string => $lead !== null && auth()->user()?->can('view', $lead) ? route('proposals.show', ['proposal' => $lead, 'tab' => $tab]) : null;
+        $proposalLink = fn (string $tab): ?string => $lead !== null && auth()->user()?->can('view', $lead) ? $this->proposalStoryUrl($lead->id, $tab) : null;
 
         switch ($stage) {
             case 0:
@@ -135,6 +177,7 @@ trait ReadsProjectStory
                     $text = (string) __('story.next.acknowledge_dates');
                 } elseif ($lead->status === ProposalStatus::Rejected) {
                     $text = (string) __('story.next.after_rejection');
+                    $nudge = false;
                 } else {
                     $text = (string) __('story.next.record_decision', ['donor' => $donorName]);
                     $href = $proposalLink('status');
@@ -167,6 +210,7 @@ trait ReadsProjectStory
             'mine' => $mine,
             'ownerName' => $owner !== null ? $this->project->user?->name : null,
             'meal' => $meal,
+            'nudge' => $nudge && $owner !== null && ! $mine,
             'href' => $href,
             'label' => $label,
         ];
@@ -222,7 +266,7 @@ trait ReadsProjectStory
         $donorName = $donor !== '' ? $donor : (string) __('story.the_donor');
         $date = fn ($value): ?string => $value?->translatedFormat(__('formats.date'));
         $done = [
-            0 => [(string) __('story.done.project', ['program' => $this->project->program->name, 'owner' => $this->project->user->name ?? '—']), $date($project->created_at)],
+            0 => [(string) __('story.done.project', ['program' => $this->project->program->name ?? '—', 'owner' => $this->project->user->name ?? '—']), $date($project->created_at)],
             1 => [(string) __('story.done.concept_note', ['donor' => $donorName]), null],
             2 => [(string) __('story.done.proposal', ['name' => $lead->name ?? '—']), null],
             3 => [$project->start_date === null
