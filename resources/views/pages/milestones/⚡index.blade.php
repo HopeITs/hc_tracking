@@ -12,11 +12,12 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
-new #[Title('titles.milestones')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.milestones')] class extends Component {
     use ManagesMilestoneDirectoryForm;
     use NavigatesCalendarPeriods;
 
@@ -293,12 +294,34 @@ new #[Title('titles.milestones')] class extends Component {
 
 @php
     $filtersAreActive = $project !== '' || $status !== '' || $responsible !== '';
+    $milestoneViews = [
+        'list' => ['icon' => 'table', 'label' => __('milestones.list_view'), 'test' => 'milestone-view-list'],
+        'timeline' => ['icon' => 'chart', 'label' => __('milestones.timeline_view'), 'test' => 'milestone-view-timeline'],
+        'board' => ['icon' => 'board', 'label' => __('milestones.board_view'), 'test' => 'milestone-view-board'],
+        'calendar' => ['icon' => 'cal', 'label' => __('milestones.calendar_view'), 'test' => 'milestone-view-calendar'],
+    ];
     $totalMilestones = $this->projectsWithMilestones->sum(fn ($projectRow) => $this->flattenMilestones($projectRow->milestones)->count());
 @endphp
 
-<section class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="milestone-directory-heading">
-    <x-ui.page-header heading-id="milestone-directory-heading" :title="__('common.milestones')" :count="$totalMilestones">
-        <x-slot:filters>
+<x-desk.register
+    class="admin-directory @container/directory"
+    heading-id="milestone-directory-heading"
+    :title="__('common.milestones')"
+    :count="$totalMilestones"
+    :view="$view"
+    :views="$milestoneViews"
+>
+    <x-slot:figures>
+        <span class="dk-good" wire:key="milestone-stat-reached"><b>{{ $this->milestoneStats['reached'] }}</b>{{ App\Enums\MilestoneStatus::Reached->label() }}</span>
+        <span class="dk-bad" wire:key="milestone-stat-missed"><b>{{ $this->milestoneStats['missed'] }}</b>{{ __('milestones.missed') }}</span>
+        <span class="dk-warn" wire:key="milestone-stat-due-soon"><b>{{ $this->milestoneStats['due_soon'] }}</b>{{ __('milestones.due_within_7_days') }}</span>
+    </x-slot:figures>
+    <x-slot:actions>
+            @can('create', App\Models\Milestone::class)
+                <button type="button" class="dk-btn dk-primary" wire:click="openCreateModal" data-test="create-milestone-button"><x-desk.icon name="plus" />{{ __('milestones.add_milestone') }}</button>
+            @endcan
+        </x-slot:actions>
+    <x-slot:filters>
             <x-ui.header-filter-select id="milestone-project-filter" :label="__('common.project')" wire:model.live="project" :value="$project">
                 <option value="">{{ __('common.all_projects') }}</option>
                 @foreach ($this->projectOptions as $projectOption)
@@ -316,51 +339,12 @@ new #[Title('titles.milestones')] class extends Component {
             <x-ui.header-filter-select id="milestone-responsible-filter" :label="__('milestones.responsible')" wire:model.live="responsible" :value="$responsible" employees>
                 <option value="">{{ __('common.anyone') }}</option>
             </x-ui.header-filter-select>
+
+            @if ($filtersAreActive)
+                <button type="button" class="dk-btn dk-ghost dk-sm" wire:click="clearFilters"><x-desk.icon name="x" />{{ __('desk.register.clear') }}</button>
+            @endif
         </x-slot:filters>
 
-        <x-slot:actions>
-            @can('create', App\Models\Milestone::class)<x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-milestone-button">{{ __('milestones.add_milestone') }}</x-ui.button>@endcan
-        </x-slot:actions>
-    </x-ui.page-header>
-
-    <div class="grid gap-3 @2xl/directory:grid-cols-2 @5xl/directory:grid-cols-4">
-        <x-ui.stat-tile :label="__('milestones.total_milestones')" :value="$this->milestoneStats['total']" icon="flag" wire:key="milestone-stat-total" />
-        <x-ui.stat-tile :label="MilestoneStatus::Reached->label()" :value="$this->milestoneStats['reached']" icon="check-circle" tone="good" wire:key="milestone-stat-reached" />
-        <x-ui.stat-tile :label="__('milestones.missed')" :value="$this->milestoneStats['missed']" icon="x-circle" tone="critical" wire:key="milestone-stat-missed" />
-        <x-ui.stat-tile :label="__('milestones.due_within_7_days')" :value="$this->milestoneStats['due_soon']" icon="clock" wire:key="milestone-stat-due-soon" />
-    </div>
-
-    <div class="flex flex-wrap items-center justify-between gap-3">
-        <div class="inline-flex flex-wrap gap-1 rounded-lg border border-secondary-soft bg-secondary-soft/40 p-1 dark:border-line dark:bg-surface-2" role="group" aria-label="{{ __('milestones.view') }}">
-            @foreach ([
-                'list' => ['icon' => 'queue-list', 'label' => __('milestones.list_view')],
-                'timeline' => ['icon' => 'chart-bar', 'label' => __('milestones.timeline_view')],
-                'board' => ['icon' => 'view-columns', 'label' => __('milestones.board_view')],
-                'calendar' => ['icon' => 'calendar-days', 'label' => __('milestones.calendar_view')],
-            ] as $viewOption => $viewMeta)
-                <button
-                    type="button"
-                    wire:click="$set('view', '{{ $viewOption }}')"
-                    aria-pressed="{{ $view === $viewOption ? 'true' : 'false' }}"
-                    data-test="milestone-view-{{ $viewOption }}"
-                    @class([
-                        'inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-md px-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
-                        'bg-white text-secondary-dark shadow-sm dark:bg-surface-3 dark:shadow-raised dark:text-ink' => $view === $viewOption,
-                        'text-secondary-medium hover:text-secondary-dark dark:text-ink-muted dark:hover:text-ink' => $view !== $viewOption,
-                    ])
-                >
-                    <flux:icon :name="$viewMeta['icon']" variant="micro" class="size-4" aria-hidden="true" />
-                    {{ $viewMeta['label'] }}
-                </button>
-            @endforeach
-        </div>
-
-        <div class="flex shrink-0 items-center gap-2">
-            @if ($filtersAreActive)
-                <flux:button size="sm" variant="ghost" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
-            @endif
-        </div>
-    </div>
 
     @if ($this->projectsWithMilestones->isEmpty())
         <x-ui.panel>
@@ -406,4 +390,4 @@ new #[Title('titles.milestones')] class extends Component {
         :confirm-label="__('milestones.delete_milestone')"
         confirm-test="confirm-delete-milestone"
     />
-</section>
+</x-desk.register>

@@ -3,12 +3,13 @@
 use App\Livewire\Concerns\AnnualPlans\BuildsPlanMatrix;
 use App\Livewire\Concerns\AnnualPlans\FiltersPlanMatrix;
 use App\Livewire\Concerns\AnnualPlans\ManagesAnnualPlanForm;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('titles.annual_plans')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.annual_plans')] class extends Component {
     use BuildsPlanMatrix;
     use FiltersPlanMatrix;
     use ManagesAnnualPlanForm;
@@ -56,21 +57,22 @@ new #[Title('titles.annual_plans')] class extends Component {
     $filtersAreActive = $years !== [] || $manager !== '' || $programSearch !== '';
 @endphp
 
-<section
-    class="admin-directory @container/matrix flex min-h-full w-full flex-1 flex-col gap-8 bg-white px-1 text-secondary-dark dark:bg-surface-0 dark:text-ink"
-    aria-labelledby="annual-plan-matrix-heading"
+<x-desk.register
+    class="admin-directory @container/matrix"
+    heading-id="annual-plan-matrix-heading"
+    :title="__('common.annual_plans')"
+    :count="array_sum(array_column($yearStats, 'plans'))"
     x-data="{ hoverYear: null, hoverProgram: null, gapsOnly: false }"
 >
-    <x-ui.page-header heading-id="annual-plan-matrix-heading" :title="__('common.annual_plans')" :count="array_sum(array_column($yearStats, 'plans'))">
-        <x-slot:filters>
-            <x-ui.input
-                type="search"
-                icon="magnifying-glass"
-                :label="__('annual_plans.search_programs')"
-                :placeholder="__('annual_plans.search_programs_placeholder')"
-                wire:model.live.debounce.300ms="programSearch"
-                clearable
-            />
+    <x-slot:actions>
+        @can('create', App\Models\AnnualPlan::class)
+            <button type="button" class="dk-btn dk-primary" wire:click="openCreateModal" data-test="create-annual-plan-button"><x-desk.icon name="plus" />{{ __('annual_plans.new_annual_plan') }}</button>
+        @endcan
+    </x-slot:actions>
+    <x-slot:search>
+        <x-desk.register-search :label="__('annual_plans.search_programs')" :placeholder="__('annual_plans.search_programs_placeholder')" wire:model.live.debounce.300ms="programSearch" />
+    </x-slot:search>
+    <x-slot:filters>
 
             <x-ui.header-filter-multiselect
                 id="annual-plan-years"
@@ -95,13 +97,6 @@ new #[Title('titles.annual_plans')] class extends Component {
             </x-ui.header-filter-select>
         </x-slot:filters>
 
-        <x-slot:actions>
-            {{-- Held at 44px, not the usual 40: this button shares a row with the filter controls, which are 2.75rem, and a 4px difference reads as a misalignment. --}}
-            @can('create', App\Models\AnnualPlan::class)<x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation" wire:click="openCreateModal" data-test="create-annual-plan-button">
-                {{ __('annual_plans.new_annual_plan') }}
-            </x-ui.button>@endcan
-        </x-slot:actions>
-    </x-ui.page-header>
 
     <div class="flex justify-end">
         <span wire:loading.delay.flex wire:target="toggleYear,clearYears,manager,programSearch,clearFilters,focusOnYear" class="hidden items-center gap-1.5 text-xs text-secondary-medium dark:text-ink-muted">
@@ -221,4 +216,4 @@ new #[Title('titles.annual_plans')] class extends Component {
         :confirm-label="__('annual_plans.delete_annual_plan')"
         confirm-test="confirm-delete-annual-plan"
     />
-</section>
+</x-desk.register>

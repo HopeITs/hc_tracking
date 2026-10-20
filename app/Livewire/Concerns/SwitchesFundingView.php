@@ -7,7 +7,9 @@ namespace App\Livewire\Concerns;
 use Livewire\Attributes\Url;
 
 /**
- * The Table | Overview switch every Funding page shares. Table is the default.
+ * The view switch every Funding page shares: Table | Overview, plus any view
+ * the page adds by overriding fundingViews() (Board, Calendar). Table is the
+ * default.
  */
 trait SwitchesFundingView
 {
@@ -28,8 +30,16 @@ trait SwitchesFundingView
 
     protected function normaliseFundingView(): void
     {
-        if (! in_array($this->view, ['table', 'overview'], true)) {
+        if (! in_array($this->view, $this->fundingViews(), true)) {
             $this->view = 'table';
         }
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function fundingViews(): array
+    {
+        return ['table', 'overview'];
     }
 }

@@ -18,12 +18,13 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('titles.projects')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.projects')] class extends Component {
     use ArchivesProjects;
     use FiltersProjectDirectory;
     use ManagesProjectForm;
@@ -205,9 +206,9 @@ new #[Title('titles.projects')] class extends Component {
     /* Tabs, tiles, panels and card chrome are lifted from pages/milestones so
        the two directories read as one product. */
     $viewOptions = [
-        'table' => ['icon' => 'queue-list', 'label' => __('projects.view_table')],
-        'timeline' => ['icon' => 'chart-bar', 'label' => __('projects.view_timeline')],
-        'board' => ['icon' => 'view-columns', 'label' => __('projects.view_board')],
+        'table' => ['icon' => 'table', 'label' => __('projects.view_table'), 'test' => 'project-view-table'],
+        'timeline' => ['icon' => 'chart', 'label' => __('projects.view_timeline'), 'test' => 'project-view-timeline'],
+        'board' => ['icon' => 'board', 'label' => __('projects.view_board'), 'test' => 'project-view-board'],
     ];
 
     $sortOptions = [
@@ -275,14 +276,23 @@ new #[Title('titles.projects')] class extends Component {
         ->all();
 @endphp
 
-<section class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="project-directory-heading">
-    <x-ui.page-header
-        heading-id="project-directory-heading"
-        :title="__('common.projects')"
-        :count="$projects->total()"
-    >
-        <x-slot:filters>
-            <x-ui.input type="search" icon="magnifying-glass" :label="__('projects.search_projects')" :placeholder="__('projects.project_city_program_or_owner')" wire:model.live.debounce.300ms="search" clearable />
+<x-desk.register
+    class="admin-directory @container/directory"
+    heading-id="project-directory-heading"
+    :title="__('common.projects')"
+    :count="$projects->total()"
+    :view="$view"
+    :views="$viewOptions"
+>
+    <x-slot:actions>
+        @can('create', App\Models\Project::class)
+            <button type="button" class="dk-btn dk-primary" wire:click="openCreateModal" data-test="create-project-button"><x-desk.icon name="plus" />{{ __('projects.add_project') }}</button>
+        @endcan
+    </x-slot:actions>
+    <x-slot:search>
+        <x-desk.register-search :label="__('projects.search_projects')" :placeholder="__('projects.project_city_program_or_owner')" wire:model.live.debounce.300ms="search" />
+    </x-slot:search>
+    <x-slot:filters>
 
             <x-ui.header-filter-select :label="__('common.city')" wire:model.live="city" :value="$city">
                 <option value="">{{ __('projects.all_cities') }}</option>
@@ -314,14 +324,11 @@ new #[Title('titles.projects')] class extends Component {
                     <option value="{{ $sortValue }}">{{ $sortLabel }}</option>
                 @endforeach
             </x-ui.header-filter-select>
-        </x-slot:filters>
+            @if ($filtersAreActive)
+            <button type="button" class="dk-btn dk-ghost dk-sm" wire:click="clearFilters"><x-desk.icon name="x" />{{ __('desk.register.clear') }}</button>
+        @endif
+    </x-slot:filters>
 
-        <x-slot:actions>
-            @can('create', App\Models\Project::class)<x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-project-button">
-                {{ __('projects.add_project') }}
-            </x-ui.button>@endcan
-        </x-slot:actions>
-    </x-ui.page-header>
 
     @if ($this->projectsWithoutCenterCount > 0)
         <flux:callout variant="warning" icon="building-office" data-test="projects-without-center">
@@ -343,8 +350,6 @@ new #[Title('titles.projects')] class extends Component {
     @endif
 
     @include('pages.projects._index-summary')
-
-    @include('pages.projects._index-toolbar')
 
     @if ($projects->isEmpty())
         <x-ui.panel>
@@ -426,4 +431,4 @@ new #[Title('titles.projects')] class extends Component {
             </div>
         @endif
     </x-ui.confirm-modal>
-</section>
+</x-desk.register>

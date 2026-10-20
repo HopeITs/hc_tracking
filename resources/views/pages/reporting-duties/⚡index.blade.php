@@ -1,11 +1,13 @@
 <?php
 
+use App\Livewire\Concerns\Desk\PagesRegisterCalendar;
 use App\Livewire\Concerns\DonorReports\SubmitsDonorReport;
 use App\Models\DonorReport;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -17,12 +19,57 @@ use Livewire\WithFileUploads;
 | money. Donor and proposal names are plain text; nothing here links to a
 | money page, and no amount, currency or agreement file is ever read.
 */
-new #[Title('titles.reporting_duties')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.reporting_duties')] class extends Component {
+    use PagesRegisterCalendar;
     use SubmitsDonorReport;
     use WithFileUploads;
 
     #[Url(except: 'open')]
     public string $state = 'open';
+
+    /** The register view: table, Board (late, to submit, submitted) or Calendar (due dates). */
+    #[Url(except: 'table')]
+    public string $view = 'table';
+
+    /**
+     * The Board view over the same duties as the table.
+     *
+     * @return list<array{key: string, label: string, count: int, items: EloquentCollection<int, DonorReport>}>
+     */
+    #[Computed]
+    public function boardColumns(): array
+    {
+        $groups = [
+            'late' => [__('desk.register.late'), fn (DonorReport $duty): bool => $duty->submitted_on === null && $duty->isOverdue()],
+            'open' => [__('reporting_duties.state_open'), fn (DonorReport $duty): bool => $duty->submitted_on === null && ! $duty->isOverdue()],
+            'submitted' => [__('desk.register.submitted'), fn (DonorReport $duty): bool => $duty->submitted_on !== null],
+        ];
+        $columns = [];
+
+        foreach ($groups as $key => [$label, $belongs]) {
+            $inColumn = $this->duties->filter($belongs)->values();
+            $columns[] = ['key' => $key, 'label' => $label, 'count' => $inColumn->count(), 'items' => $inColumn->take(40)];
+        }
+
+        return $columns;
+    }
+
+    /**
+     * The Calendar view: each duty on its due date.
+     *
+     * @return list<array{date: string, label: string, href: string}>
+     */
+    #[Computed]
+    public function calendarItems(): array
+    {
+        $start = $this->calendarMonthStart();
+
+        return $this->duties
+            ->filter(fn (DonorReport $duty): bool => $duty->due_on->betweenIncluded($start, $start->endOfMonth()))
+            ->map(fn (DonorReport $duty): array => ['date' => $duty->due_on->toDateString(), 'label' => $duty->title, 'href' => route('donor-reports.show', $duty)])
+            ->values()
+            ->all();
+    }
 
     /**
      * My reports: title, type, audience, period, version, dates and the
@@ -80,15 +127,26 @@ new #[Title('titles.reporting_duties')] class extends Component {
     $today = CarbonImmutable::today();
 @endphp
 
-<section class="@container flex min-h-full w-full flex-1 flex-col gap-8 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" data-reporting-duties>
-    <x-ui.page-header heading-id="reporting-duties-heading" :title="__('titles.reporting_duties')" :count="$this->duties->count()">
-        <x-slot:filters>
+<x-desk.register
+    class="@container"
+    heading-id="reporting-duties-heading"
+    :title="__('titles.reporting_duties')"
+    :count="$this->duties->count()"
+    data-reporting-duties
+    :view="in_array($view, ['board', 'calendar'], true) ? $view : 'table'"
+    :views="[
+        'table' => ['icon' => 'table', 'label' => __('desk.register.table')],
+        'board' => ['icon' => 'board', 'label' => __('desk.register.board')],
+        'calendar' => ['icon' => 'cal', 'label' => __('desk.register.calendar')],
+    ]"
+>
+    <x-slot:filters>
             <x-ui.header-filter-select :label="__('common.state')" wire:model.live="state" :value="$state === 'all' ? 'all' : 'open'">
                 <option value="open">{{ __('reporting_duties.state_open') }}</option>
                 <option value="all">{{ __('reporting_duties.state_all') }}</option>
             </x-ui.header-filter-select>
         </x-slot:filters>
-    </x-ui.page-header>
+
 
     @if ($this->duties->isEmpty())
         <x-ui.empty-state
@@ -96,6 +154,21 @@ new #[Title('titles.reporting_duties')] class extends Component {
             :heading="$state === 'all' ? __('reporting_duties.none') : __('reporting_duties.none_open')"
             :body="__('reporting_duties.empty_body')"
         />
+    @elseif ($view === 'board')
+        <x-desk.board data-test="duty-board">
+            @foreach ($this->boardColumns as $column)
+                <x-desk.board-column :label="$column['label']" :count="$column['count']" :key="$column['key']" wire:key="duty-column-{{ $column['key'] }}">
+                    @foreach ($column['items'] as $boardDuty)
+                        <x-desk.board-card :href="route('donor-reports.show', $boardDuty)" wire:key="duty-card-{{ $boardDuty->id }}" data-test="duty-board-card-{{ $boardDuty->id }}">
+                            <strong dir="auto">{{ $boardDuty->title }}</strong>
+                            <span class="dk-is" dir="auto">{{ $boardDuty->donor_name }} · {{ $boardDuty->due_on->translatedFormat(__('formats.date')) }}</span>
+                        </x-desk.board-card>
+                    @endforeach
+                </x-desk.board-column>
+            @endforeach
+        </x-desk.board>
+    @elseif ($view === 'calendar')
+        <x-desk.month-calendar :month="$this->calendarMonthStart()->toDateString()" :items="$this->calendarItems" />
     @else
         <x-ui.data-table :caption="__('titles.reporting_duties')" data-tour="reporting-duties-list">
             <x-slot:head>
@@ -168,4 +241,4 @@ new #[Title('titles.reporting_duties')] class extends Component {
     @endif
 
     <x-donor-reports.submit-modal :open="$showSubmitModal" :needs-file="$submissionNeedsFile" :file-count="$submissionFileCount" />
-</section>
+</x-desk.register>

@@ -2,6 +2,7 @@
 
 use App\Support\Like;
 use App\Enums\ReportStatus;
+use App\Livewire\Concerns\Desk\PagesRegisterCalendar;
 use App\Livewire\Concerns\ManagesReportForm;
 use App\Livewire\Concerns\Reports\ReadsReportPortfolio;
 use App\Models\AnnualPlan;
@@ -17,13 +18,15 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('titles.reports')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.reports')] class extends Component {
     use ManagesReportForm;
+    use PagesRegisterCalendar;
     use ReadsReportPortfolio;
     use WithPagination;
 
@@ -221,6 +224,51 @@ new #[Title('titles.reports')] class extends Component {
             ->paginate(15);
     }
 
+    /**
+     * The Board view: a column per status, at most 40 cards each (desk.js).
+     *
+     * @return list<array{key: string, label: string, count: int, items: Collection<int, Report>}>
+     */
+    #[Computed]
+    public function boardColumns(): array
+    {
+        $reports = $this->visibleReports()
+            ->select(['id', 'slug', 'plan_indicator_id', 'status', 'planned_date'])
+            ->with(['planIndicator:id,indicator_id,project_id', 'planIndicator.indicator:id,name', 'planIndicator.project:id,name'])
+            ->orderByDesc('planned_date')
+            ->get();
+
+        return array_map(function (ReportStatus $status) use ($reports): array {
+            $inColumn = $reports->filter(fn (Report $report): bool => $report->status === $status)->values();
+
+            return ['key' => $status->value, 'label' => $status->label(), 'count' => $inColumn->count(), 'items' => $inColumn->take(40)];
+        }, ReportStatus::cases());
+    }
+
+    /**
+     * The Calendar view: each report on its planned date.
+     *
+     * @return list<array{date: string, label: string, href: string}>
+     */
+    #[Computed]
+    public function calendarItems(): array
+    {
+        $start = $this->calendarMonthStart();
+
+        return $this->visibleReports()
+            ->select(['id', 'slug', 'plan_indicator_id', 'planned_date'])
+            ->with(['planIndicator:id,indicator_id', 'planIndicator.indicator:id,name'])
+            ->whereBetween('planned_date', [$start->toDateString(), $start->endOfMonth()->toDateString()])
+            ->get()
+            ->map(fn (Report $report): array => [
+                'date' => $report->planned_date->toDateString(),
+                'label' => $report->planIndicator->indicator->name,
+                'href' => route('reports.show', $report),
+            ])
+            ->values()
+            ->all();
+    }
+
     /** @return Collection<int, User> */
     #[Computed]
     public function authorOptions(): Collection
@@ -332,14 +380,28 @@ new #[Title('titles.reports')] class extends Component {
     ];
 @endphp
 
-<section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="report-directory-heading">
-    <x-ui.page-header
-        heading-id="report-directory-heading"
-        :title="__('common.reports')"
-        :count="$insights['total']"
-    >
-        <x-slot:filters>
-            <x-ui.input type="search" icon="magnifying-glass" :label="__('reports.search_reports')" :placeholder="__('reports.indicator_or_narrative')" wire:model.live.debounce.300ms="search" clearable />
+<x-desk.register
+    class="@container/directory"
+    heading-id="report-directory-heading"
+    :title="__('common.reports')"
+    :count="$insights['total']"
+    :view="$view"
+    :views="[
+        'list' => ['icon' => 'table', 'label' => __('desk.register.table')],
+        'board' => ['icon' => 'board', 'label' => __('desk.register.board')],
+        'calendar' => ['icon' => 'cal', 'label' => __('desk.register.calendar')],
+        'portfolio' => ['icon' => 'grid', 'label' => __('reports.portfolio_view')],
+    ]"
+>
+    <x-slot:actions>
+            @can('create', App\Models\Report::class)
+                <button type="button" class="dk-btn dk-primary" wire:click="openCreateModal" data-test="create-report-button"><x-desk.icon name="plus" />{{ __('reports.record_report') }}</button>
+            @endcan
+        </x-slot:actions>
+    <x-slot:search>
+        <x-desk.register-search :label="__('reports.search_reports')" :placeholder="__('reports.indicator_or_narrative')" wire:model.live.debounce.300ms="search" />
+    </x-slot:search>
+    <x-slot:filters>
 
             <x-ui.header-filter-select :label="__('reports.reported_by')" wire:model.live="author" :value="$author">
                 <option value="">{{ __('common.anyone') }}</option>
@@ -357,15 +419,7 @@ new #[Title('titles.reports')] class extends Component {
             </x-ui.header-filter-select>
         </x-slot:filters>
 
-        @can('create', App\Models\Report::class)
-            <x-slot:actions>
-                <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-report-button">
-                    {{ __('reports.record_report') }}
-                </x-ui.button>
-            </x-slot:actions>
-        @endcan
-
-        <x-slot:summary>
+    <div class="dk-reg-summary">
             <div class="flex flex-col gap-6">
                 {{-- The portfolio's figures, set directly on the page rather than boxed into cards: the numbers are the point. Dividers only apply once the grid is a single row — grid-cols-2 wrapping and a manual border produced an orphaned line at in-between widths. --}}
                 <div class="grid grid-cols-2 gap-x-6 gap-y-6 border-y border-secondary-soft py-6 @xl/directory:grid-cols-4 @xl/directory:divide-x @xl/directory:divide-secondary-soft dark:border-line @xl/directory:dark:divide-line">
@@ -418,21 +472,11 @@ new #[Title('titles.reports')] class extends Component {
                                 ['key' => 'unseen', 'label' => __('reports.not_yet_seen'), 'icon' => 'eye-slash'],
                             ]"
                         />
-
-                        <x-ui.view-toggle
-                            :label="__('reports.report_view')"
-                            wire-model="view"
-                            :active="$view"
-                            :options="[
-                                ['key' => 'list', 'label' => __('reports.list_view'), 'icon' => 'queue-list'],
-                                ['key' => 'portfolio', 'label' => __('reports.portfolio_view'), 'icon' => 'rectangle-group'],
-                            ]"
-                        />
                     </div>
                 </div>
             </div>
-        </x-slot:summary>
-    </x-ui.page-header>
+        </div>
+
 
     @if ($this->scopedTargetLabel !== null)
         <div class="flex flex-wrap items-center gap-2">
@@ -450,6 +494,10 @@ new #[Title('titles.reports')] class extends Component {
 
     @if ($view === 'portfolio')
         @include('pages.reports._index-portfolio')
+    @elseif ($view === 'board')
+        @include('pages.reports._index-board')
+    @elseif ($view === 'calendar')
+        <x-desk.month-calendar :month="$this->calendarMonthStart()->toDateString()" :items="$this->calendarItems" />
     @else
         @include('pages.reports._index-list')
     @endif
@@ -463,4 +511,4 @@ new #[Title('titles.reports')] class extends Component {
         :ratio="$showReportModal ? $this->formRatio() : null"
         :ratio-preview="$showReportModal ? $this->ratioPreview() : null"
     />
-</section>
+</x-desk.register>

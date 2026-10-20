@@ -11,6 +11,7 @@ use App\Livewire\Concerns\Proposals\DeletesProposals;
 use App\Livewire\Concerns\Proposals\ExportsProposalRegister;
 use App\Livewire\Concerns\Proposals\ManagesProposalForm;
 use App\Livewire\Concerns\Proposals\ManagesProposalStatus;
+use App\Livewire\Concerns\Proposals\ReadsProposalBoard;
 use App\Livewire\Concerns\Proposals\ReadsProposalRegister;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -32,6 +33,7 @@ abstract class ProposalsIndexPageHost extends Component
     use FiltersFinanceRegister;
     use ManagesProposalForm;
     use ManagesProposalStatus;
+    use ReadsProposalBoard;
     use ReadsProposalRegister;
     use WithPagination;
 

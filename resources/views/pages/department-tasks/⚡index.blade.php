@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -30,7 +31,7 @@ use Livewire\WithFileUploads;
  * never budget, agreement, transfer or currency data, and a proposal name
  * links to its page only for people who may open it.
  */
-new #[Title('titles.department_tasks')] class extends Component
+new #[Layout('layouts::desk'), Title('titles.department_tasks')] class extends Component
 {
     use WithFileUploads;
 
@@ -383,9 +384,14 @@ new #[Title('titles.department_tasks')] class extends Component
     $groups = $this->groups;
 @endphp
 
-<section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="department-tasks-heading" data-tour="department-tasks">
-    <x-ui.page-header heading-id="department-tasks-heading" :title="__('department_tasks.page_title')" :count="$this->departmentTasks->count()">
-        <x-slot:filters>
+<x-desk.register
+    class="@container/directory"
+    heading-id="department-tasks-heading"
+    :title="__('department_tasks.page_title')"
+    :count="$this->departmentTasks->count()"
+    data-tour="department-tasks"
+>
+    <x-slot:filters>
             <x-ui.header-filter-select :label="__('department_tasks.department')" wire:model.live="department" :value="$department">
                 <option value="">{{ __('department_tasks.all_departments') }}</option>
                 @foreach ($this->departmentOptions as $departmentId => $departmentName)
@@ -414,7 +420,7 @@ new #[Title('titles.department_tasks')] class extends Component
                 <option value="unassigned">{{ __('department_tasks.no_person_yet') }}</option>
             </x-ui.header-filter-select>
         </x-slot:filters>
-    </x-ui.page-header>
+
 
     <div class="flex flex-col gap-8" wire:loading.class="opacity-60" wire:target="department, kind, state, due, clearFilters" data-tour="department-tasks-list">
         @if ($groups === [])
@@ -448,4 +454,4 @@ new #[Title('titles.department_tasks')] class extends Component
     </div>
 
     @include('pages.department-tasks._modals')
-</section>
+</x-desk.register>

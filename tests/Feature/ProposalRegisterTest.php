@@ -268,7 +268,7 @@ test('someone who may see agreements but not transfers gets budgets without tran
 test('values typed into the address bar fall back to the defaults', function () {
     registerFundedProposal();
 
-    proposalRegister(['view' => 'board', 'status' => 'lost', 'phase' => 'moon', 'donor' => 'me', 'currency' => 'GBP', 'flag' => 'rich', 'sortBy' => 'notes', 'perPage' => '2'])
+    proposalRegister(['view' => 'gallery', 'status' => 'lost', 'phase' => 'moon', 'donor' => 'me', 'currency' => 'GBP', 'flag' => 'rich', 'sortBy' => 'notes', 'perPage' => '2'])
         ->assertSet('view', 'table')
         ->assertSet('status', '')
         ->assertSet('phase', '')
