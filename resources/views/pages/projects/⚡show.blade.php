@@ -12,6 +12,7 @@ use App\Livewire\Concerns\Projects\ManagesProjectAssignment;
 use App\Livewire\Concerns\Projects\ManagesProjectFiles;
 use App\Livewire\Concerns\Projects\ReadsProjectDelivery;
 use App\Livewire\Concerns\Projects\ReadsProjectFunding;
+use App\Livewire\Concerns\Projects\ReadsProjectStory;
 use App\Enums\AssignmentStatus;
 use App\Models\Project;
 use Flux\Flux;
@@ -20,13 +21,14 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
-new #[Title('titles.project')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.project')] class extends Component {
     use AddsQuickTask;
     use BuildsProjectGantt;
     use ChecksFinanceVisibility;
@@ -35,6 +37,7 @@ new #[Title('titles.project')] class extends Component {
     use ManagesProjectFiles;
     use ReadsProjectDelivery;
     use ReadsProjectFunding;
+    use ReadsProjectStory;
     use WithFileUploads;
 
     #[Locked]
@@ -220,7 +223,12 @@ new #[Title('titles.project')] class extends Component {
         return $this->projectGanttPayload($this->project, $this->ganttBaselineId, $this->planProposal === '' ? null : (int) $this->planProposal);
     }
 
-    /** @return array<int, array{key: string, label: string, count: int|null}> */
+    /**
+     * The delivery chapter's tab strip. Proposals, files and activity sit in
+     * the Story's side column, so an old `?tab=files` link shows milestones here.
+     *
+     * @return array<int, array{key: string, label: string, count: int|null}>
+     */
     #[Computed]
     public function tabs(): array
     {
@@ -230,92 +238,19 @@ new #[Title('titles.project')] class extends Component {
             ['key' => 'plan', 'label' => __('gantt.plan'), 'count' => null],
             ['key' => 'risks', 'label' => __('common.risks'), 'count' => $this->project->risks_count],
             ['key' => 'targets', 'label' => __('common.targets'), 'count' => $this->project->plan_indicators_count],
-            ['key' => 'proposals', 'label' => __('common.proposals'), 'count' => $this->project->proposals_count],
-            ['key' => 'files', 'label' => __('projects.files'), 'count' => $this->project->media_count],
-            ['key' => 'activity', 'label' => __('activity.title'), 'count' => null],
         ];
+    }
+
+    #[Computed]
+    public function deliveryTab(): string
+    {
+        return in_array($this->tab, ['milestones', 'tasks', 'plan', 'risks', 'targets'], true) ? $this->tab : 'milestones';
     }
 };
 ?>
 
-<section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink">
-    <x-ui.detail-header
-        :breadcrumbs="[
-            ['label' => __('common.projects'), 'url' => route('projects.index')],
-            ['label' => $this->project->name],
-        ]"
-        :title="$this->project->name"
-        :unread="app(\App\Notifications\UnreadSubjects::class)->has(auth()->user(), 'project', $this->project->id)"
-        :subtitle="$this->project->city?->name ?? __('common.unknown_city')"
-    >
-        <x-slot:meta>
-            @if ($this->centerSummary !== null)
-                <span class="inline-flex items-center gap-1.5" data-test="project-center">
-                    @if ($this->centerSummary['unavailable'])
-                        <span>#{{ $this->centerSummary['id'] }} · {{ __('common.hr_unavailable') }}</span>
-                    @else
-                        <span>{{ $this->centerSummary['name'] }}</span>
-                    @endif
-                    @if ($this->centerSummary['inactive'])
-                        <span class="inline-flex items-center gap-1 rounded-full bg-status-critical-soft px-2 text-[11px] font-bold text-status-critical">
-                            <flux:icon name="no-symbol" variant="micro" class="size-3 shrink-0" aria-hidden="true" />
-                            {{ __('projects.center_inactive') }}
-                        </span>
-                    @endif
-                </span>
-            @endif
-            <a href="{{ route('programs.show', $this->project->program) }}" wire:navigate class="font-medium hover:underline">{{ $this->project->program->name }}</a>
-            <span>{{ $this->project->program->strategy?->name ?? __('common.strategy_not_assigned') }}</span>
-            <span>{{ __('common.updated_date', ['date' => $this->project->updated_at?->translatedFormat(__('formats.date'))]) }}</span>
-            <x-projects.sector-chips :sectors="$this->project->sectors" data-test="project-sectors" />
-        </x-slot:meta>
-
-        <x-slot:actions>
-            <div class="flex flex-wrap items-center gap-2">
-                <x-ui.enum-badge :case="$this->project->status" />
-                <x-ui.project-funding-badge :project="$this->project" />
-                @if ($this->project->status === ProjectStatus::Draft && ! $this->project->hasActiveProposal())
-                    <span class="inline-flex items-center gap-1 rounded-full bg-status-warn-soft px-2 py-0.5 text-[11px] font-bold text-status-warn" data-test="no-active-proposal">
-                        <flux:icon name="exclamation-circle" variant="micro" class="size-3 shrink-0" aria-hidden="true" />
-                        {{ __('projects.no_active_proposal') }}
-                    </span>
-                @endif
-                @if ($this->project->status === ProjectStatus::Active)
-                    @can('update', $this->project)
-                        <x-ui.button tone="ghost" size="sm" icon="lock-closed" wire:click="confirmClose" data-test="close-project">{{ __('projects.close_project') }}</x-ui.button>
-                    @endcan
-                @endif
-                <x-ui.employee-chip :employee="$this->project->user" class="rounded-lg border border-secondary-soft p-2.5 dark:border-line" />
-                @if ($this->canStartConceptNote)
-                    <x-ui.button tone="primary" size="sm" icon="document-plus" class="min-h-10 touch-manipulation" :href="route('proposals.index', ['for_project' => $this->project->id])" wire:navigate data-test="new-concept-note">{{ __('proposals.new_concept_note') }}</x-ui.button>
-                @endif
-            </div>
-        </x-slot:actions>
-
-        <x-slot:summary>
-            <div class="flex flex-wrap items-center gap-4 rounded-xl border border-secondary-soft bg-board px-4 py-3 dark:border-line">
-                <x-ui.progress-ring
-                    size="lg"
-                    :value="$this->milestoneProgressPercent"
-                    :tone="$this->milestoneProgressPercent === null ? 'neutral' : ($this->milestoneProgressPercent >= 70 ? 'good' : ($this->milestoneProgressPercent >= 30 ? 'warn' : 'critical'))"
-                    :label="__('projects.milestone_progress')"
-                />
-                <div class="min-w-0">
-                    <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('projects.milestone_progress') }}</p>
-                    <p class="mt-0.5 text-sm font-semibold text-secondary-dark dark:text-ink">
-                        {{ $this->milestoneProgressPercent === null ? __('projects.no_weighted_milestones') : __('projects.milestones_reached', ['reached' => $this->project->reached_milestones_count, 'total' => $this->project->milestones_count]) }}
-                    </p>
-                    <div class="mt-1.5">
-                        <x-ui.schedule-status
-                            :planned="$this->project->end_date"
-                            :done="! $this->project->status->isOpen()"
-                        />
-                    </div>
-                </div>
-            </div>
-        </x-slot:summary>
-    </x-ui.detail-header>
-
+<section class="dk-story" data-story>
+    @include('pages.projects._story-header')
     @php
         $ownerAssignment = $this->ownerAssignment;
         $assignmentViewer = auth()->user();
@@ -357,99 +292,7 @@ new #[Title('titles.project')] class extends Component {
         </x-slot:actions>
     </x-ui.modal>
 
-    <div class="grid gap-3 @2xl/detail:grid-cols-2 @5xl/detail:grid-cols-4">
-        <x-ui.stat-tile :label="__('common.start_date')" :value="$this->project->start_date?->translatedFormat(__('formats.date')) ?? '—'" />
-        <x-ui.stat-tile :label="__('projects.end_date')" :value="$this->project->end_date?->translatedFormat(__('formats.date')) ?? '—'" />
-        <x-ui.stat-tile :label="__('projects.headline_target')" :value="$this->project->target_beneficiaries === null ? '—' : number_format($this->project->target_beneficiaries)" />
-        <x-ui.stat-tile :label="__('projects.demographic_total')" :value="$this->project->targetDemographicTotal() === null ? '—' : number_format($this->project->targetDemographicTotal())" />
-    </div>
-
-    <div @class(['grid gap-4', '@5xl/detail:grid-cols-3' => $this->canViewMoney(), '@5xl/detail:grid-cols-2' => ! $this->canViewMoney()])>
-        <x-ui.panel :title="__('common.description')">
-            @if ($this->project->description === null)
-                <p class="p-3.5 text-sm italic text-secondary-medium dark:text-ink-muted">{{ __('projects.no_description_recorded') }}</p>
-            @else
-                <p class="p-3.5 text-sm leading-6 text-secondary-medium dark:text-ink-muted">{{ $this->project->description }}</p>
-            @endif
-        </x-ui.panel>
-
-        <x-ui.panel :title="__('projects.beneficiary_breakdown')" :subtitle="__('projects.reported_separately_from_the_headline_target')">
-            <div class="flex flex-col gap-3 p-3.5">
-                @php $demographicTotal = $this->project->targetDemographicTotal(); @endphp
-                @foreach ([__('projects.men') => $this->project->target_men, __('projects.women') => $this->project->target_women, __('projects.boys') => $this->project->target_boys, __('projects.girls') => $this->project->target_girls] as $label => $value)
-                    <div wire:key="project-demographic-{{ strtolower($label) }}">
-                        <div class="flex items-baseline justify-between gap-2">
-                            <p class="type-meta text-secondary-medium dark:text-ink-muted">{{ $label }}</p>
-                            <p class="text-sm font-semibold tabular-nums text-secondary-dark dark:text-ink">{{ $value === null ? '—' : number_format($value) }}</p>
-                        </div>
-                        <x-ui.progress-bar
-                            class="mt-1"
-                            :value="$value"
-                            :max="$demographicTotal ?: 1"
-                            label-hidden
-                            :label="$label"
-                        />
-                    </div>
-                @endforeach
-            </div>
-        </x-ui.panel>
-
-        @if ($this->canViewMoney())
-            <x-ui.panel :title="__('projects.funding_envelope')">
-                @if ($this->fundingByCurrency->isEmpty())
-                    <x-ui.empty-state icon="banknotes" :heading="__('projects.not_funded_yet')" :body="__('projects.link_a_proposal_to_record_which_funding_covers_this_project')" />
-                @else
-                    <div class="flex flex-col gap-4 p-3.5">
-                        @foreach ($this->fundingByCurrency as $row)
-                            <x-ui.capacity-bar :committed="$row['committed']" :used="$row['received']" :currency="$row['currency']" wire:key="funding-{{ $row['currency']->value }}" />
-                        @endforeach
-                    </div>
-                @endif
-            </x-ui.panel>
-        @endif
-
-        <x-ui.panel :title="__('projects.funding_sources')" :count="$this->fundingSources->count()">
-            @if ($this->fundingSources->isEmpty())
-                <x-ui.empty-state icon="building-library" :heading="__('projects.no_donor_approved_funding_yet')" :body="__('projects.funding_becomes_official_when_a_donor_approves_a_proposal')" />
-            @else
-                <ul class="flex flex-col divide-y divide-secondary-soft dark:divide-line" data-funding-sources>
-                    @foreach ($this->fundingSources as $source)
-                        <li class="flex items-start justify-between gap-3 p-3.5" wire:key="funding-source-{{ $source->id }}">
-                            <div class="min-w-0">
-                                <p class="truncate text-sm font-bold text-secondary-dark dark:text-ink">{{ $source->donor->name }}</p>
-                                <p class="truncate text-xs text-secondary-light">{{ $source->name }} · {{ $source->status->label() }}</p>
-                            </div>
-                            @if ($this->canViewAgreements() && $source->donorProposals->isNotEmpty())
-                                @foreach ($source->donorProposals as $agreement)
-                                    <span class="shrink-0 text-sm font-semibold tabular-nums" dir="ltr">{{ number_format((float) $agreement->budget, 2) }} {{ $agreement->currency->value }}</span>
-                                @endforeach
-                            @endif
-                        </li>
-                    @endforeach
-                </ul>
-            @endif
-        </x-ui.panel>
-    </div>
-
-    <x-ui.relation-tabs :tabs="$this->tabs" :active="$tab" wire-target="tab" />
-
-    @if ($tab === 'milestones')
-        @include('pages.projects._show-milestones-tab')
-    @elseif ($tab === 'tasks')
-        @include('pages.projects._show-tasks-tab')
-    @elseif ($tab === 'plan')
-        @include('pages.projects._show-plan-tab')
-    @elseif ($tab === 'risks')
-        @include('pages.projects._show-risks-tab')
-    @elseif ($tab === 'targets')
-        @include('pages.projects._show-targets-tab')
-    @elseif ($tab === 'files')
-        @include('pages.projects._show-files-tab')
-    @elseif ($tab === 'activity')
-        @include('pages.projects._show-activity-tab')
-    @else
-        @include('pages.projects._show-proposals-tab')
-    @endif
+    @include('pages.projects._story-chapters')
 
     @include('pages.projects._show-modals')
 

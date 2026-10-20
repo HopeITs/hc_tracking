@@ -68,11 +68,10 @@ test('each record page carries its activity', function (string $route, Closure $
     'funding agreement' => ['funding-agreements.show', fn () => DonorProposal::factory()->create()],
 ]);
 
-test('the project page has an activity tab', function () {
+test('the project Story shows its activity timeline in the side column', function () {
     $project = Activity::withoutRecording(fn () => Project::factory()->create());
 
     Livewire::actingAs(Activity::withoutRecording(fn () => User::factory()->create()))->test('pages::projects.show', ['project' => $project])
-        ->set('tab', 'activity')
         ->assertSeeLivewire('activity.timeline');
 });
 

@@ -1,0 +1,17 @@
+/*
+ * The project Story (Tracking Desk stage 3). desk.css is generated from the
+ * artifact, so the few rules the real page needs on top of it live here.
+ */
+@layer components {
+    /* Folded chapter details stay hidden until Alpine starts. */
+    .dk-story [x-cloak] { display: none !important; }
+
+    /* The side column holds the full proposals, files and activity lists: too tall to stick. */
+    .dk-story .dk-story-side { position: static; min-width: 0; grid-template-columns: minmax(0, 1fr); }
+
+    /* Badges inside the facts line keep the line height. */
+    .dk-story .dk-facts dd { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+
+    .dk-story .dk-ch-detail > .dk-acts { margin-top: 12px; }
+    .dk-story .dk-ch-detail > .dk-block:first-child { margin-top: 0; }
+}

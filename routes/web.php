@@ -18,6 +18,7 @@ use App\Http\Controllers\SwitchLocaleController;
 use App\Http\Controllers\TaskFileDownloadController;
 use App\Http\Controllers\TaskFilePreviewController;
 use App\Http\Middleware\EnsureTwoFactorIsEnabled;
+use App\Http\Middleware\RedirectProposalToStory;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -147,6 +148,7 @@ Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () 
 
     Route::livewire('proposals/{proposal}', 'pages::proposals.show')
         ->can('view', 'proposal')
+        ->middleware(RedirectProposalToStory::class)
         ->name('proposals.show');
 
     Route::get('proposals/{proposal}/files/{media}/download', ProposalFileDownloadController::class)

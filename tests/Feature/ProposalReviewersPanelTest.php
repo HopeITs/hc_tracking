@@ -257,7 +257,7 @@ test('a reviewer without proposals.view opens the proposal and its non-funding f
     $agreement = Media::factory()->inCollection(MediaCollection::Agreement)->create(['mediable_type' => 'proposal', 'mediable_id' => $proposal->id]);
     Storage::disk('local')->put($note->path, 'plain');
 
-    $this->actingAs($user)->get(route('proposals.show', $proposal))
+    $this->actingAs($user)->get(route('proposals.show', ['proposal' => $proposal, 'tab' => 'status']))
         ->assertOk()
         ->assertDontSee('987,654')
         ->assertDontSee('120,000');
