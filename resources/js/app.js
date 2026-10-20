@@ -5,6 +5,8 @@ import './task-menu';
 import './list-layout';
 import './charts';
 import './count-up';
+import './desk-ask';
+import './desk-grid';
 import './form-fields';
 import './funding-flow';
 import './gantt';

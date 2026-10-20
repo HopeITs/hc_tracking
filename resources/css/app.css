@@ -16,6 +16,7 @@
 @import './gantt.css';
 @import './data-viz.css';
 @import './notifications.css';
+@import './desk.css';
 
 /* flux.css already scans Flux's own stubs; these are the app's views and Laravel's pagination views. */
 @source '../views';
