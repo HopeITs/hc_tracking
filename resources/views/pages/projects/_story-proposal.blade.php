@@ -29,5 +29,6 @@
         @endif
     </div>
 
-    <livewire:pages::proposals.show :proposal="\App\Models\Proposal::query()->findOrFail($embeddedId)" :embedded="true" :key="'story-proposal-'.$embeddedId" />
+    {{-- The child reads only the id in mount() and loads its own proposal; the already loaded row is enough. --}}
+    <livewire:pages::proposals.show :proposal="$this->attachedProposals->firstWhere('id', $embeddedId)" :embedded="true" :key="'story-proposal-'.$embeddedId" />
 </div>

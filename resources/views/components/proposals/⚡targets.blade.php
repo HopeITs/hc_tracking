@@ -734,7 +734,7 @@ new class extends Component {
         @if ($this->results->isEmpty())
             <x-ui.empty-state icon="squares-2x2" :heading="__('targets.no_framework_heading')" :body="__('targets.no_framework_body')">
                 <x-slot:action>
-                    <flux:button size="sm" variant="ghost" :href="route('proposals.show', ['proposal' => $this->proposal, 'tab' => 'logframe'])" wire:navigate>{{ __('targets.open_logframe') }}</flux:button>
+                    <flux:button size="sm" variant="ghost" type="button" wire:click="$parent.$set('tab', 'logframe')" data-test="open-logframe-tab">{{ __('targets.open_logframe') }}</flux:button>
                 </x-slot:action>
             </x-ui.empty-state>
         @else

@@ -85,4 +85,38 @@ return [
         '6' => 'Final report milestone, the file and the donor\'s acceptance close the proposal and the project.',
     ],
     'proposal_switch' => 'Proposals on this project',
+    'acts' => [
+        'edit' => 'Edit project',
+        'archive' => 'Archive',
+        'restore' => 'Restore',
+        'new_proposal_reopens' => 'New proposal (reopens it as a draft)',
+        'why_update' => 'Only the project owner or a manager allowed to edit projects can do this.',
+        'why_archive' => 'Only a manager allowed to archive projects can do this.',
+    ],
+    'plan' => [
+        'title' => 'The plan',
+        'indicators' => 'Indicators',
+        'targets' => 'Targets set',
+        'budget' => 'Budget',
+        'reviewers' => 'Reviewers',
+        'seen' => 'Opened it',
+        'not_seen' => 'Not opened yet',
+    ],
+    'template' => [
+        'disaggregated' => 'By sex and age',
+        'total_only' => 'Total only',
+    ],
+    'month_state' => [
+        'validated' => 'Validated',
+        'submitted' => 'With MEAL',
+        'returned' => 'Sent back',
+        'late' => 'Late',
+        'open' => 'Open',
+    ],
+    'month_glyph' => [
+        'validated' => '✓',
+        'submitted' => '•',
+        'returned' => '↺',
+        'late' => '!',
+    ],
 ];

@@ -20,6 +20,12 @@ new class extends Component {
     public int $limit = 20;
 
     /**
+     * Plain Desk history list (the project Story side) instead of the boxed timeline.
+     */
+    #[Locked]
+    public bool $compact = false;
+
+    /**
      * One row more than shown, so "load more" needs no count query.
      *
      * @return Collection<int, Activity>
@@ -55,6 +61,26 @@ new class extends Component {
     $presenter = app(ActivityPresenter::class);
 @endphp
 
+@if ($compact)
+    <div data-activity-timeline data-compact>
+        @if ($this->entries->isEmpty())
+            <p class="dk-muted">{{ __('activity.empty') }}</p>
+        @else
+            <ol class="dk-hist">
+                @foreach ($this->entries->take($limit) as $activity)
+                    <li wire:key="activity-{{ $activity->id }}">
+                        <span class="dk-av dk-sm" aria-hidden="true">{{ $activity->actor?->initials() ?? '·' }}</span>
+                        <span>{{ $presenter->sentence($activity) }}<span class="dk-d"> · <time datetime="{{ $activity->created_at?->toIso8601String() }}">{{ $activity->created_at?->translatedFormat(__('formats.date')) }}</time></span></span>
+                    </li>
+                @endforeach
+            </ol>
+
+            @if ($this->entries->count() > $limit)
+                <button type="button" wire:click="loadMore" class="dk-btn dk-ghost dk-sm" data-timeline-more>{{ __('activity.load_more') }}</button>
+            @endif
+        @endif
+    </div>
+@else
 <div data-activity-timeline>
     @if ($this->entries->isEmpty())
         <p class="py-6 text-sm text-secondary-medium dark:text-ink-muted">{{ __('activity.empty') }}</p>
@@ -95,3 +121,4 @@ new class extends Component {
         @endif
     @endif
 </div>
+@endif

@@ -1,4 +1,18 @@
 {{-- The chain of statements, one panel per program and one per proposal framework. Shown when the page's view is cascade. --}}
+@php
+    $proposalStoryHrefs = [];
+    $groupProposalIds = collect($this->groupedRoots)->map(fn (array $nodes): ?int => $nodes[0]['result']->proposal?->id)->filter()->unique()->values();
+    if ($groupProposalIds->isNotEmpty() && auth()->user()?->can('projects.view') === true) {
+        $storyLinks = DB::table('project_proposal')->whereIn('proposal_id', $groupProposalIds)->orderBy('project_id')->get(['proposal_id', 'project_id']);
+        $storyProjects = \App\Models\Project::query()->select(['id', 'slug'])->whereIn('id', $storyLinks->pluck('project_id')->unique())->get()->keyBy('id');
+        foreach ($storyLinks as $storyLink) {
+            $storyProject = $storyProjects->get($storyLink->project_id);
+            if (! isset($proposalStoryHrefs[$storyLink->proposal_id]) && $storyProject !== null && auth()->user()->can('view', $storyProject)) {
+                $proposalStoryHrefs[$storyLink->proposal_id] = route('projects.show', ['project' => $storyProject, 'proposal' => $storyLink->proposal_id, 'ptab' => 'logframe']).'#proposal';
+            }
+        }
+    }
+@endphp
         @foreach ($this->groupedRoots as $programName => $nodes)
             @php
                 $groupStatements = collect($nodes)->sum(fn (array $node): int => $node['rollup']['statements']);
@@ -7,6 +21,7 @@
                 $groupUnmeasured = collect($nodes)->sum(fn (array $node): int => $node['rollup']['unmeasured']);
                 $groupProposal = $nodes[0]['result']->proposal;
                 $groupProgram = $groupProposal === null ? collect($nodes)->map(fn (array $node) => $node['result']->program)->filter()->first() : null;
+                $groupProposalHref = $groupProposal === null ? null : ($proposalStoryHrefs[$groupProposal->id] ?? route('proposals.show', ['proposal' => $groupProposal, 'tab' => 'logframe']));
             @endphp
             <x-ui.panel
                 :title="$programName"
@@ -26,7 +41,7 @@
                         </span>
 
                         @if ($groupProposal !== null)
-                            @can('proposals.view')<a href="{{ route('proposals.show', ['proposal' => $groupProposal, 'tab' => 'logframe']) }}" wire:navigate class="type-meta font-semibold text-secondary-medium hover:text-primary dark:hover:text-brand-text hover:underline dark:text-ink-muted" data-test="proposal-framework-link-{{ $groupProposal->id }}">
+                            @can('proposals.view')<a href="{{ $groupProposalHref }}" wire:navigate class="type-meta font-semibold text-secondary-medium hover:text-primary dark:hover:text-brand-text hover:underline dark:text-ink-muted" data-test="proposal-framework-link-{{ $groupProposal->id }}">
                                 {{ __('common.view_name', ['name' => $groupProposal->name]) }}
                             </a>@endcan
                         @elseif ($groupProgram !== null)

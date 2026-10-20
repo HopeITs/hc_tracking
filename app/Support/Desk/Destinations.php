@@ -24,6 +24,34 @@ final class Destinations
     public const string Settings = 'settings';
 
     /**
+     * The Settings sheet groups, each route with the permission that opens it
+     * (shown in the lock tooltip). The sheet's "You" group also holds Install,
+     * Report a problem and Log out, which are not routes.
+     *
+     * @var array<string, array<string, string|null>>
+     */
+    private const array SettingsGroups = [
+        'you' => ['security.edit' => null, 'notification-settings.edit' => null],
+        'people' => ['admin.users.index' => 'access-management.manage-users'],
+        'meal' => [
+            'indicator-library.index' => 'indicator-library.view',
+            'admin.evidence-types.index' => 'evidence-types.manage',
+            'admin.narrative-questions.index' => 'narrative-questions.manage',
+            'admin.sectors.index' => 'sectors.view',
+        ],
+        'places' => [
+            'admin.cities.index' => 'cities.view',
+            'admin.accounts.index' => 'accounts.view',
+            'strategies.index' => 'strategies.view',
+        ],
+        'system' => [
+            'admin.notification-settings.edit' => 'notification-settings.manage',
+            'executive-summary.index' => 'executive-summary.view',
+            'activity.index' => 'activity-log.view',
+        ],
+    ];
+
+    /**
      * Every destination the given user may open, in display order.
      *
      * @return list<array{route: string, label: string, icon: string, section: string}>
@@ -53,28 +81,37 @@ final class Destinations
     }
 
     /**
-     * Every settings destination with whether the user may open it, so the
-     * Settings sheet can show the locked ones and say why.
+     * Every settings destination with whether the user may open it, grouped as
+     * the Settings sheet shows them, so the locked ones can say why.
      *
-     * @return list<array{route: string, label: string, icon: string, open: bool, hint: string, locked_reason: string}>
+     * @return list<array{route: string, group: string, label: string, icon: string, open: bool, hint: string, locked_reason: string}>
      */
     public function settingsFor(User $user): array
     {
-        $rows = [];
+        $byRoute = [];
 
         foreach ($this->all() as $destination) {
-            if ($destination['section'] !== self::Settings) {
-                continue;
-            }
+            $byRoute[$destination['route']] = $destination;
+        }
 
-            $rows[] = [
-                'route' => $destination['route'],
-                'label' => __($destination['label']),
-                'icon' => $destination['icon'],
-                'open' => ($destination['allows'])($user),
-                'hint' => Lang::has($hintKey = 'desk.settings_hint.'.str_replace(['.', '-'], '_', $destination['route'])) ? __($hintKey) : '',
-                'locked_reason' => __('desk.settings_locked'),
-            ];
+        $rows = [];
+
+        foreach (self::SettingsGroups as $group => $routes) {
+            foreach ($routes as $route => $permission) {
+                $destination = $byRoute[$route];
+
+                $rows[] = [
+                    'route' => $route,
+                    'group' => $group,
+                    'label' => __($destination['label']),
+                    'icon' => $destination['icon'],
+                    'open' => ($destination['allows'])($user),
+                    'hint' => Lang::has($hintKey = 'desk.settings_hint.'.str_replace(['.', '-'], '_', $route)) ? __($hintKey) : '',
+                    'locked_reason' => $permission === null
+                        ? __('desk.settings_locked')
+                        : __('desk.settings_locked_permission', ['permission' => $permission]),
+                ];
+            }
         }
 
         return $rows;

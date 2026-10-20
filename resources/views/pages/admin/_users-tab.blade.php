@@ -5,23 +5,6 @@
 --}}
 @use('Illuminate\Support\Facades\Gate')
 
-        <div class="directory-filters grid min-w-0 gap-3 @sm/directory:grid-cols-2 @3xl/directory:grid-cols-3">
-            <x-ui.input id="access-user-search" type="search" icon="magnifying-glass" :label="__('users.search_users')" :placeholder="__('users.search_users')" wire:model.live.debounce.350ms="search" clearable />
-
-            <x-ui.header-filter-select id="access-role-filter" :label="__('users.all_roles')" wire:model.live="role" :value="$role">
-                <option value="">{{ __('users.all_roles') }}</option>
-                @foreach ($this->roleOptions as $roleOption)
-                    <option value="{{ $roleOption->name }}">{{ $roleOption->name }}</option>
-                @endforeach
-            </x-ui.header-filter-select>
-
-            <x-ui.header-filter-select id="access-status-filter" :label="__('common.status')" wire:model.live="status" :value="$status">
-                <option value="">{{ __('users.all_statuses') }}</option>
-                <option value="active">{{ __('common.active') }}</option>
-                <option value="inactive">{{ __('cities.inactive') }}</option>
-            </x-ui.header-filter-select>
-        </div>
-
         <div class="grid min-w-0 gap-6 xl:grid-cols-[21rem_minmax(0,1fr)]">
             <section class="flex min-w-0 flex-col overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-card dark:border-transparent dark:bg-surface-1 dark:shadow-raised">
                 <div class="max-h-[min(62vh,44rem)] divide-y divide-secondary-soft overflow-y-auto overscroll-contain dark:divide-line">

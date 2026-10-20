@@ -17,7 +17,7 @@ use Livewire\Attributes\Locked;
  * Archiving and restoring projects from the directory: the confirmation
  * dialog's state, the archive and restore actions.
  *
- * Used by projects/index only. The page provides WithPagination's resetPage().
+ * Used by projects/index and projects/show. The page provides WithPagination's resetPage().
  */
 trait ArchivesProjects
 {

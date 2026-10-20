@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
@@ -20,7 +21,7 @@ use Livewire\Component;
  * add, rename, reorder, deactivate and delete. Every write goes through
  * an App\Actions\Sectors action, which authorizes again under lock.
  */
-new #[Title('titles.sectors')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.sectors')] class extends Component {
     public bool $showSectorModal = false;
 
     public ?int $editingSectorId = null;
@@ -240,12 +241,7 @@ new #[Title('titles.sectors')] class extends Component {
     $canManage = auth()->user()->can('sectors.manage');
 @endphp
 
-<section
-    class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink"
-    aria-labelledby="sectors-heading"
-    data-tour="sectors-page"
->
-    <x-ui.page-header heading-id="sectors-heading" :title="__('titles.sectors')" :count="$sectors->count()">
+<x-desk.register class="@container/directory" heading-id="sectors-heading" :title="__('titles.sectors')" :count="$sectors->count()" data-tour="sectors-page">
         @if ($canManage)
             <x-slot:actions>
                 <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-sector" data-tour="sectors-create">
@@ -253,8 +249,7 @@ new #[Title('titles.sectors')] class extends Component {
                 </x-ui.button>
             </x-slot:actions>
         @endif
-    </x-ui.page-header>
-
+    
     @unless ($canManage)
         <p class="type-meta text-secondary-medium dark:text-ink-muted" data-test="sectors-read-only">{{ __('sectors.read_only_note') }}</p>
     @endunless
@@ -276,4 +271,4 @@ new #[Title('titles.sectors')] class extends Component {
     @include('pages.admin._sectors-modal')
 
     @include('pages.admin._sectors-confirm-modals')
-</section>
+</x-desk.register>

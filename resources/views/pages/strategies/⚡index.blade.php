@@ -9,12 +9,13 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('titles.strategies')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.strategies')] class extends Component {
     use WithPagination;
 
     #[Url(except: '')]
@@ -338,27 +339,12 @@ new #[Title('titles.strategies')] class extends Component {
     $timelineTo = $portfolio['last_year'] !== null ? Carbon::create($portfolio['last_year'], 12, 31) : null;
 @endphp
 
-<section
-    class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink"
-    aria-labelledby="strategies-heading"
->
-    <x-ui.page-header
-        :title="__('common.strategies')"
-        :count="$portfolio['total']"
-        headingId="strategies-heading"
-    >
+<x-desk.register class="admin-directory @container/directory" heading-id="strategies-heading" :title="__('common.strategies')" :count="$portfolio['total']">
+    
+        <x-slot:search>
+            <x-desk.register-search id="strategy-search" data-directory-search :label="__('strategies.search_strategies')" :placeholder="__('strategies.search_by_name')" wire:model.live.debounce.300ms="search" />
+        </x-slot:search>
         <x-slot:filters>
-            <x-ui.input
-                id="strategy-search"
-                data-directory-search
-                type="search"
-                icon="magnifying-glass"
-                :label="__('strategies.search_strategies')"
-                :placeholder="__('strategies.search_by_name')"
-                wire:model.live.debounce.300ms="search"
-                clearable
-            />
-
             <x-ui.header-filter-select id="strategy-status" :label="__('strategies.filter_by_status')" wire:model.live="status" :value="$status">
                 <option value="">{{ __('common.all_statuses') }}</option>
                 @foreach ($statusOptions as $statusValue => $statusOptionLabel)
@@ -374,8 +360,7 @@ new #[Title('titles.strategies')] class extends Component {
                 </x-ui.button>
             </x-slot:actions>
         @endif
-    </x-ui.page-header>
-
+    
     <div class="flex items-center justify-between gap-3">
         <div class="min-w-0">
             @if ($portfolio['has_records'] && $portfolio['status_counts']['active'] === 0 && ! $portfolio['filters_active'])
@@ -506,4 +491,4 @@ new #[Title('titles.strategies')] class extends Component {
             confirm-test="confirm-delete-strategy"
         />
     @endif
-</section>
+</x-desk.register>

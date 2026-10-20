@@ -1,87 +1,11 @@
 {{--
-    The overview panel of indicators/index: four headline figures, the
-    rating split and the commitments behind them. Included by
-    ⚡index.blade.php, whose top PHP block defines $overview, $ragSegments
-    and $onTrackShare.
+    The overview of indicators/index: the rating split and the commitments
+    behind it. The four headline figures live in the register figures line of
+    ⚡index.blade.php, whose top PHP block defines $overview and $ragSegments.
 --}}
-    {{-- Measurement at a glance: four figures, then how the ratings split. --}}
-    <x-ui.panel data-test="indicator-overview">
-        <div class="grid gap-px bg-secondary-soft @xl/directory:grid-cols-2 @4xl/directory:grid-cols-4 dark:bg-line">
-            @php
-                $achievementTone = match (true) {
-                    $overview['achieved'] === null => 'neutral',
-                    $overview['achieved'] >= $overview['elapsed'] * 0.9 => 'good',
-                    $overview['achieved'] >= $overview['elapsed'] * 0.7 => 'warn',
-                    default => 'critical',
-                };
-
-                $headline = [
-                    [
-                        'label' => __('common.indicators'),
-                        'value' => number_format($overview['indicators']),
-                        'sub' => __('indicators.measuring_count_of_total_results', ['count' => $overview['results'], 'total' => $this->resultOptions->count()]),
-                        'icon' => 'chart-bar',
-                        'tone' => 'neutral',
-                    ],
-                    [
-                        'label' => __('indicators.readings_logged'),
-                        'value' => number_format($overview['readings']),
-                        'sub' => $overview['lastReading'] === null
-                            ? __('indicators.no_readings_logged_yet')
-                            : __('indicators.last_logged_date', ['date' => $overview['lastReading']->translatedFormat(__('formats.date'))]),
-                        'icon' => 'clipboard-document-check',
-                        'tone' => 'neutral',
-                    ],
-                    [
-                        'label' => __('indicators.average_achievement'),
-                        'value' => $overview['achieved'] === null ? '—' : number_format($overview['achieved'], 0).'%',
-                        'sub' => __('indicators.against_percent_of_the_year_elapsed', ['percent' => number_format($overview['elapsed'], 0)]),
-                        'icon' => 'presentation-chart-line',
-                        'tone' => $achievementTone,
-                    ],
-                    [
-                        'label' => __('indicators.on_track'),
-                        'value' => $onTrackShare === null ? '—' : number_format($onTrackShare, 0).'%',
-                        'sub' => __('indicators.rated_green_of_total', ['count' => $overview['rag']['green'], 'total' => $overview['rated']]),
-                        'icon' => 'signal',
-                        'tone' => match (true) {
-                            $onTrackShare === null => 'neutral',
-                            $onTrackShare >= 80 => 'good',
-                            $onTrackShare >= 50 => 'warn',
-                            default => 'critical',
-                        },
-                    ],
-                ];
-            @endphp
-
-            @foreach ($headline as $cell)
-                <div class="flex items-start justify-between gap-3 bg-white p-4 dark:bg-surface-1" wire:key="indicator-headline-{{ $loop->index }}">
-                    <div class="min-w-0">
-                        <p class="type-label text-secondary-medium dark:text-ink-muted">{{ $cell['label'] }}</p>
-                        <p @class([
-                            'type-figure mt-2',
-                            'text-status-good' => $cell['tone'] === 'good',
-                            'text-status-warn' => $cell['tone'] === 'warn',
-                            'text-primary dark:text-brand-text' => $cell['tone'] === 'critical',
-                            'text-secondary-dark dark:text-ink' => $cell['tone'] === 'neutral',
-                        ])>{{ $cell['value'] }}</p>
-                        <p class="mt-1 type-meta text-secondary-medium dark:text-ink-muted">{{ $cell['sub'] }}</p>
-                    </div>
-                    <div @class([
-                        'flex size-10 shrink-0 items-center justify-center rounded-xl',
-                        'bg-status-good-soft text-status-good' => $cell['tone'] === 'good',
-                        'bg-status-warn-soft text-status-warn' => $cell['tone'] === 'warn',
-                        'bg-status-critical-soft text-primary dark:text-brand-text' => $cell['tone'] === 'critical',
-                        'bg-secondary-soft text-secondary-dark dark:bg-surface-2 dark:text-ink' => $cell['tone'] === 'neutral',
-                    ])>
-                        <flux:icon :name="$cell['icon']" class="size-5" />
-                    </div>
-                </div>
-            @endforeach
-        </div>
-
+    <div class="mb-4 flex min-w-0 flex-col gap-4" data-test="indicator-overview">
         {{-- The rating split, as one bar. Every band is a filter. --}}
-        <div class="flex flex-col gap-3 border-t border-secondary-soft bg-board-head px-4 py-4 @3xl/directory:flex-row @3xl/directory:items-center @3xl/directory:gap-6 dark:border-line">
+        <div class="flex min-w-0 flex-col gap-3 @3xl/directory:flex-row @3xl/directory:items-center @3xl/directory:gap-6 dark:border-line">
             <div class="min-w-0 flex-1">
                 <div class="flex items-baseline justify-between gap-3">
                     <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('indicators.how_the_ratings_split') }}</p>
@@ -131,15 +55,6 @@
                 </div>
             </div>
 
-            {{-- Who is paying for what is being measured. --}}
-            <div class="flex shrink-0 items-center gap-3 border-secondary-soft @3xl/directory:border-s @3xl/directory:ps-6 dark:border-line">
-                <x-ui.progress-ring
-                    size="lg"
-                    :value="$overview['achieved']"
-                    :tone="$achievementTone"
-                    :label="__('indicators.average_achievement')"
-                />
-                <div class="min-w-0">
                     <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('indicators.commitments_behind_these_indicators') }}</p>
                     <p class="mt-1 text-sm font-semibold text-secondary-dark dark:text-ink">
                         {{ trans_choice('common.count_target', $overview['targets'], ['count' => $overview['targets']]) }}
@@ -175,4 +90,4 @@
                 </div>
             </div>
         </div>
-    </x-ui.panel>
+    </div>
