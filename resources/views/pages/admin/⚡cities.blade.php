@@ -8,12 +8,13 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Number;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('titles.city_directory')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.city_directory')] class extends Component {
     use ManagesMealCoverage;
     use WithPagination;
 
@@ -356,21 +357,11 @@ new #[Title('titles.city_directory')] class extends Component {
     $mapFiltersActive = $search !== '' || $status !== '';
 @endphp
 
-<section
-    class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink"
-    aria-labelledby="city-directory-heading"
->
-    <x-ui.page-header heading-id="city-directory-heading" :title="__('common.cities')" :count="$this->cities->total()">
+<x-desk.register class="admin-directory @container/directory" heading-id="city-directory-heading" :title="__('common.cities')" :count="$this->cities->total()">
+        <x-slot:search>
+            <x-desk.register-search :label="__('cities.search_cities')" :placeholder="__('cities.city_name')" wire:model.live.debounce.300ms="search" />
+        </x-slot:search>
         <x-slot:filters>
-            <x-ui.input
-                type="search"
-                icon="magnifying-glass"
-                :label="__('cities.search_cities')"
-                :placeholder="__('cities.city_name')"
-                wire:model.live.debounce.300ms="search"
-                clearable
-            />
-
             <x-ui.header-filter-select :label="__('cities.sort_by')" wire:model.live="sort" :value="$sort">
                 @foreach ($sortOptions as $optionValue => $optionLabel)
                     <option value="{{ $optionValue }}">{{ $optionLabel }}</option>
@@ -399,28 +390,12 @@ new #[Title('titles.city_directory')] class extends Component {
             </div>
         </x-slot:actions>
 
-        <x-slot:summary>
-            {{-- The portfolio's figures, set directly on the page rather than boxed into cards: the numbers are the point (same treatment as reports/⚡index.blade.php). --}}
-            <div class="grid grid-cols-2 gap-x-6 gap-y-6 border-y border-secondary-soft py-6 @xl/directory:grid-cols-4 @xl/directory:divide-x @xl/directory:divide-secondary-soft dark:border-line @xl/directory:dark:divide-line">
-                @foreach ($figures as $index => $figure)
-                    <div
-                        class="logframe-reveal @xl/directory:ps-6 @xl/directory:first:ps-0"
-                        style="--logframe-order: {{ $index }}"
-                        wire:key="figure-{{ $figure['key'] }}"
-                    >
-                        <p class="type-label text-secondary-medium dark:text-ink-muted">{{ $figure['label'] }}</p>
-                        <p
-                            class="mt-1.5 text-4xl leading-none font-extrabold tabular-nums {{ $figure['tone'] }}"
-                            x-data="countUp({{ (int) $figure['value'] }})"
-                            x-text="display + '{{ $figure['suffix'] }}'"
-                        >{{ $figure['value'] }}{{ $figure['suffix'] }}</p>
-                        <p class="mt-1 text-xs text-secondary-medium dark:text-ink-muted">{{ $figure['sub'] }}</p>
-                    </div>
-                @endforeach
-            </div>
-        </x-slot:summary>
-    </x-ui.page-header>
-
+        <x-slot:figures>
+            @foreach ($figures as $figure)
+                <span wire:key="figure-{{ $figure['key'] }}"><b class="dk-num {{ $figure['tone'] }}" x-data="countUp({{ (int) $figure['value'] }})" x-text="display + '{{ $figure['suffix'] }}'">{{ $figure['value'] }}{{ $figure['suffix'] }}</b> {{ $figure['label'] }}</span>@unless ($loop->last) · @endunless
+            @endforeach
+        </x-slot:figures>
+    
     @if ($view === 'map')
         @include('pages.admin._cities-map', [
             'mappedCities' => $mappedCities,
@@ -590,4 +565,4 @@ new #[Title('titles.city_directory')] class extends Component {
     @if ($this->canManageMealCoverage)
         @include('pages.admin._cities-meal-modal', ['mealTarget' => $this->mealTarget])
     @endif
-</section>
+</x-desk.register>

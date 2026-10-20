@@ -44,7 +44,7 @@ new class extends Component {
     public function rows(): Collection
     {
         return $this->visible(AnnualPlan::query(), 'annual-plans')
-            ->with(['program:id,name', 'manager'])
+            ->with(['program:id', 'manager'])
             ->where('year', $this->shownYear())
             ->get()
             ->sortBy(fn (AnnualPlan $plan): string => (string) $plan->program?->name)

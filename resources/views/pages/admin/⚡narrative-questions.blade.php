@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -23,7 +24,7 @@ use Livewire\Component;
  * write goes through an App\Actions\NarrativeQuestions action, which
  * authorizes again under lock. Questions are ordered within their frequency.
  */
-new #[Title('titles.narrative_questions')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.narrative_questions')] class extends Component {
     /** The frequency filter: '' shows both groups; an unknown value reads as ''. */
     #[Url(except: '')]
     public string $frequency = '';
@@ -302,12 +303,8 @@ new #[Title('titles.narrative_questions')] class extends Component {
     $bankIsEmpty = $this->questions->isEmpty();
 @endphp
 
-<section
-    class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink"
-    aria-labelledby="narrative-questions-heading"
-    data-tour="narrative-questions-page"
->
-    <x-ui.page-header heading-id="narrative-questions-heading" :title="__('titles.narrative_questions')" :count="$visibleCount">
+<x-desk.register class="@container/directory" heading-id="narrative-questions-heading" :title="__('titles.narrative_questions')" :count="$visibleCount" data-tour="narrative-questions-page">
+    
         <x-slot:filters>
             <x-ui.header-filter-select :label="__('narrative_questions.filter_label')" wire:model.live="frequency" :value="$this->selectedFrequency?->value ?? ''">
                 <option value="">{{ __('narrative_questions.all_frequencies') }}</option>
@@ -322,8 +319,7 @@ new #[Title('titles.narrative_questions')] class extends Component {
                 {{ __('narrative_questions.add_question') }}
             </x-ui.button>
         </x-slot:actions>
-    </x-ui.page-header>
-
+    
     <p class="sr-only" aria-live="polite" aria-atomic="true">{{ $announcement }}</p>
 
     @if ($bankIsEmpty)
@@ -341,4 +337,4 @@ new #[Title('titles.narrative_questions')] class extends Component {
     @include('pages.admin._narrative-questions-modal')
 
     @include('pages.admin._narrative-questions-confirm-modals')
-</section>
+</x-desk.register>

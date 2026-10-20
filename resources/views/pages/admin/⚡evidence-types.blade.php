@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
@@ -20,7 +21,7 @@ use Livewire\Component;
  * and deletes; there is no read-only view. Every write goes through an
  * App\Actions\EvidenceTypes action, which authorizes again under lock.
  */
-new #[Title('titles.evidence_types')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.evidence_types')] class extends Component {
     public bool $showEvidenceTypeModal = false;
 
     public ?int $editingEvidenceTypeId = null;
@@ -239,19 +240,13 @@ new #[Title('titles.evidence_types')] class extends Component {
     $evidenceTypes = $this->evidenceTypes;
 @endphp
 
-<section
-    class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink"
-    aria-labelledby="evidence-types-heading"
-    data-tour="evidence-types-page"
->
-    <x-ui.page-header heading-id="evidence-types-heading" :title="__('titles.evidence_types')" :count="$evidenceTypes->count()">
+<x-desk.register class="@container/directory" heading-id="evidence-types-heading" :title="__('titles.evidence_types')" :count="$evidenceTypes->count()" data-tour="evidence-types-page">
         <x-slot:actions>
             <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-evidence-type" data-tour="evidence-types-create">
                 {{ __('evidence_types.add_evidence_type') }}
             </x-ui.button>
         </x-slot:actions>
-    </x-ui.page-header>
-
+    
     <p class="sr-only" aria-live="polite" aria-atomic="true">{{ $announcement }}</p>
 
     @if ($evidenceTypes->isEmpty())
@@ -267,4 +262,4 @@ new #[Title('titles.evidence_types')] class extends Component {
     @include('pages.admin._evidence-types-modal')
 
     @include('pages.admin._evidence-types-confirm-modals')
-</section>
+</x-desk.register>

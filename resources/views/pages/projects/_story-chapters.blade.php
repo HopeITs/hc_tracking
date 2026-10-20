@@ -58,7 +58,10 @@
                     <p class="dk-ch-sum">{{ $chapter['summary'] }}</p>
 
                     @php
-                        $hasDetail = $i === 0 || $i === 4 || ($openLead && isset($proposalLinks[$i]));
+                        $hasDetail = $i === 0 || $i === 4 || ($openLead && isset($proposalLinks[$i]))
+                            || ($i === 2 && $lead !== null)
+                            || ($i === 5 && $story['months'] !== [])
+                            || ($state === 'done' && in_array($i, [1, 3, 6], true) && $lead !== null && isset($this->chapterFiles[$i]));
                     @endphp
 
                     @if ($hasDetail && $state === 'done')
@@ -82,6 +85,8 @@
                                     </p>
                                 </div>
                             @endif
+
+                            @include('pages.projects._story-details')
 
                             @if ($i === 4)
                                 <div class="dk-acts dk-start"><a class="dk-btn dk-sm" href="{{ route('reporting-duties.index') }}" wire:navigate>{{ __('story.open.duties') }}</a></div>

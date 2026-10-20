@@ -48,9 +48,9 @@ test('a Super Admin can go to every page, in the order the work flows', function
     ]);
 });
 
-test('a Team Member opens only the indicator library, the read-only cities and sectors and their own settings', function () {
+test('a Team Member opens only the indicator library, the read-only cities, sectors and strategies and their own settings', function () {
     expect(openSettingsRoutes(User::factory()->role('Team Member')->create()))
-        ->toBe(['indicator-library.index', 'admin.sectors.index', 'admin.cities.index', 'notification-settings.edit', 'security.edit']);
+        ->toBe(['security.edit', 'notification-settings.edit', 'indicator-library.index', 'admin.sectors.index', 'admin.cities.index', 'strategies.index']);
 });
 
 test('the donor report builder goes only to reports.aggregate holders, reporting duties to responsibles and agreement editors', function () {

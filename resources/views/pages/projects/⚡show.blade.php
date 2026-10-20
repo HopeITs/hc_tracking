@@ -8,15 +8,20 @@ use App\Livewire\Concerns\AddsQuickTask;
 use App\Livewire\Concerns\BuildsProjectGantt;
 use App\Livewire\Concerns\ChecksFinanceVisibility;
 use App\Livewire\Concerns\EditsProjectGantt;
+use App\Livewire\Concerns\Projects\ArchivesProjects;
 use App\Livewire\Concerns\Projects\ManagesProjectAssignment;
 use App\Livewire\Concerns\Projects\ManagesProjectFiles;
+use App\Livewire\Concerns\Projects\ManagesProjectForm;
 use App\Livewire\Concerns\Projects\ManagesReportTemplate;
 use App\Livewire\Concerns\Projects\ReadsProjectDelivery;
 use App\Livewire\Concerns\Projects\ReadsProjectFunding;
 use App\Livewire\Concerns\Projects\ReadsProjectStory;
 use App\Enums\AssignmentStatus;
+use App\Models\HrEmployee;
+use App\Models\Program;
 use App\Models\Project;
 use Flux\Flux;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -31,10 +36,13 @@ use Livewire\WithFileUploads;
 
 new #[Layout('layouts::desk'), Title('titles.project')] class extends Component {
     use AddsQuickTask;
+    use ArchivesProjects;
     use BuildsProjectGantt;
     use ChecksFinanceVisibility;
     use EditsProjectGantt;
-    use ManagesProjectAssignment;
+    use ManagesProjectAssignment, ManagesProjectForm {
+        ManagesProjectAssignment::refreshFromInbox insteadof ManagesProjectForm;
+    }
     use ManagesProjectFiles;
     use ManagesReportTemplate;
     use ReadsProjectDelivery;
@@ -99,9 +107,41 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
         }
 
         $this->showCloseModal = false;
-        unset($this->project);
+        $this->resetPage();
 
         Flux::toast(variant: 'success', text: __('projects.project_closed'));
+    }
+
+    /**
+     * The project form's program picker (ManagesProjectForm reads it).
+     *
+     * @return Collection<int, Program>
+     */
+    #[Computed]
+    public function programOptions(): Collection
+    {
+        return Program::options();
+    }
+
+    /**
+     * The project form's owner picker (ManagesProjectForm reads it).
+     *
+     * @return Collection<int, HrEmployee>
+     */
+    #[Computed]
+    public function userOptions(): Collection
+    {
+        return HrEmployee::pickerOptions();
+    }
+
+    /**
+     * ArchivesProjects and ManagesProjectForm call this after a save, an
+     * archive or a restore. The Story has no pager, so it re-reads the
+     * project and its story instead.
+     */
+    protected function resetPage(): void
+    {
+        unset($this->project, $this->story, $this->attachedProposals, $this->fundingHistory, $this->planSummary, $this->canStartConceptNote, $this->embeddedProposalId);
     }
 
     /**
@@ -323,4 +363,37 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
         :confirm-label="__('projects.close_project')"
         confirm-test="confirm-close-project"
     />
+
+    @php
+        /* The project form's live duration hint (as on projects/index): plural forms with a count marker and month names in the reader's language. */
+        $durationForms = [
+            1 => trans_choice('projects.duration_days', 1, ['count' => '__N__']),
+            2 => trans_choice('projects.duration_days', 2, ['count' => '__N__']),
+            3 => trans_choice('projects.duration_days', 3, ['count' => '__N__']),
+            11 => trans_choice('projects.duration_days', 11, ['count' => '__N__']),
+        ];
+        $monthNames = collect(range(1, 12))
+            ->map(fn (int $month): string => \Carbon\CarbonImmutable::create(2000, $month, 1)->translatedFormat(__('formats.month_short')))
+            ->all();
+    @endphp
+    @include('pages.projects._index-project-modal')
+
+    <x-ui.confirm-modal
+        wire:model="showArchiveModal"
+        close="cancelArchive"
+        tone="neutral"
+        :title="__('projects.archive_this_project')"
+        :message="$this->archivingProject !== null ? __('projects.archiving_keeps_everything', ['name' => $this->archivingProject['project']->name]) : null"
+        confirm="archiveProject"
+        :confirm-label="__('projects.archive_project')"
+        confirm-test="confirm-archive-project"
+    >
+        @if ($this->archivingProject !== null && $this->archivingProject['carries'] !== [])
+            <p class="dk-muted dk-small">{{ __('projects.kept_with_the_project') }}:
+                @foreach ($this->archivingProject['carries'] as $carriedLabel => $carriedCount)
+                    <span class="dk-num" wire:key="carried-{{ $loop->index }}">{{ $carriedCount }} {{ $carriedLabel }}</span>@if (! $loop->last) · @endif
+                @endforeach
+            </p>
+        @endif
+    </x-ui.confirm-modal>
 </section>

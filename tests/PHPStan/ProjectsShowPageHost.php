@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Tests\PHPStan;
 
 use App\Livewire\Concerns\ChecksFinanceVisibility;
+use App\Livewire\Concerns\Projects\ArchivesProjects;
 use App\Livewire\Concerns\Projects\ManagesProjectAssignment;
 use App\Livewire\Concerns\Projects\ManagesProjectFiles;
+use App\Livewire\Concerns\Projects\ManagesProjectForm;
 use App\Livewire\Concerns\Projects\ManagesReportTemplate;
 use App\Livewire\Concerns\Projects\ReadsProjectDelivery;
 use App\Livewire\Concerns\Projects\ReadsProjectFunding;
@@ -25,8 +27,11 @@ use Livewire\WithFileUploads;
  */
 abstract class ProjectsShowPageHost extends Component
 {
+    use ArchivesProjects;
     use ChecksFinanceVisibility;
-    use ManagesProjectAssignment;
+    use ManagesProjectAssignment, ManagesProjectForm {
+        ManagesProjectAssignment::refreshFromInbox insteadof ManagesProjectForm;
+    }
     use ManagesProjectFiles;
     use ManagesReportTemplate;
     use ReadsProjectDelivery;
@@ -35,4 +40,7 @@ abstract class ProjectsShowPageHost extends Component
     use WithFileUploads;
 
     public int $projectId;
+
+    /** The page re-reads the project and its story here (it has no pager). */
+    abstract protected function resetPage(): void;
 }

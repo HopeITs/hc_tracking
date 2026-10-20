@@ -5,12 +5,13 @@ use App\Livewire\Concerns\Admin\ExportsAccountRegister;
 use App\Livewire\Concerns\Admin\ManagesAccountForm;
 use App\Livewire\Concerns\Admin\ReadsAccountRegister;
 use App\Livewire\Concerns\FiltersFinanceRegister;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('titles.accounts')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.accounts')] class extends Component {
     use ExportsAccountRegister;
     use FiltersFinanceRegister;
     use ManagesAccountForm;
@@ -92,7 +93,7 @@ new #[Title('titles.accounts')] class extends Component {
 
 @php
     $showsOverview = $this->view === 'overview';
-    $activeFilterCount = collect([$this->search, $this->state, $this->currencyFilter, $this->countryFilter, $this->flag, $this->year])
+    $activeFilterCount = collect([$this->state, $this->currencyFilter, $this->countryFilter, $this->flag, $this->year])
         ->filter(fn (string $value): bool => $value !== '')
         ->count();
     $total = $showsOverview ? $this->accounts->total() : $this->rows->total();
@@ -147,19 +148,18 @@ new #[Title('titles.accounts')] class extends Component {
     ];
 @endphp
 
-<section class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="account-directory-heading">
-    <x-ui.page-header
-        heading-id="account-directory-heading"
-        :title="__('common.accounts')"
-        :count="$total"
-    >
+<x-desk.register class="admin-directory @container/directory" heading-id="account-directory-heading" :title="__('common.accounts')" :count="$total">
+    @if ($this->hasAnyAccount)
+        <x-slot:search>
+            <x-desk.register-search :label="__('accounts.search_accounts')" :placeholder="__('accounts.account_name')" wire:model.live.debounce.400ms="search" data-test="account-search" />
+        </x-slot:search>
+    @endif
+
         <x-slot:actions>
             <div class="flex flex-wrap items-center justify-end gap-2">
                 @if ($this->hasAnyAccount)
                     <x-funding.filters :active="$activeFilterCount" :results="$total">
                         <div class="directory-filters grid gap-3 sm:grid-cols-2">
-                            <x-ui.input type="search" icon="magnifying-glass" :label="__('accounts.search_accounts')" :placeholder="__('accounts.account_name')" wire:model="search" clearable />
-
                             <x-ui.header-filter-select deferred :label="__('donors.country')" wire:model="countryFilter" :value="$this->countryFilter">
                                 <flux:select.option value="">{{ __('finance_tables.all_countries') }}</flux:select.option>
                                 @foreach ($this->countryOptions as $countryOption)
@@ -203,8 +203,7 @@ new #[Title('titles.accounts')] class extends Component {
                 @endcan
             </div>
         </x-slot:actions>
-    </x-ui.page-header>
-
+    
     @if (! $this->hasAnyAccount)
         <x-ui.empty-state
             icon="building-library"
@@ -235,4 +234,4 @@ new #[Title('titles.accounts')] class extends Component {
         :confirm-label="__('accounts.close_account')"
         confirm-test="confirm-close-account"
     />
-</section>
+</x-desk.register>

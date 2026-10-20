@@ -11,11 +11,12 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
-new #[Title('titles.programs')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.programs')] class extends Component {
     #[Url(except: '')]
     public string $search = '';
 
@@ -236,13 +237,12 @@ new #[Title('titles.programs')] class extends Component {
     $hasMorePrograms = $this->programs->count() > $visibleProgramCount;
 @endphp
 
-<section class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-8 bg-white px-1 text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="program-directory-heading">
-    <x-ui.page-header heading-id="program-directory-heading" :title="__('common.programs')" :count="$summary['total']">
+<x-desk.register class="admin-directory @container/directory" heading-id="program-directory-heading" :title="__('common.programs')" :count="$summary['total']">
+    
+        <x-slot:search>
+            <x-desk.register-search id="program-search" data-directory-search :label="__('programs.search_programs')" :placeholder="__('programs.program_strategy_or_manager')" wire:model.live.debounce.300ms="search" />
+        </x-slot:search>
         <x-slot:filters>
-            <div class="min-w-0">
-                <label for="program-search" class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-ink-muted">{{ __('programs.search_programs') }}</label>
-                <x-ui.input id="program-search" data-directory-search type="search" icon="magnifying-glass" :aria-label="__('programs.search_programs')" :placeholder="__('programs.program_strategy_or_manager')" wire:model.live.debounce.300ms="search" />
-            </div>
             <x-ui.header-filter-select id="program-strategy" :label="__('common.strategy')" :search-label="__('programs.search_strategies')" wire:model.live="strategy" :value="$strategy">
                 <option value="">{{ __('programs.all_strategies') }}</option>
                 @foreach ($this->strategyOptions as $strategyOption)
@@ -256,8 +256,7 @@ new #[Title('titles.programs')] class extends Component {
                 <option value="">{{ __('common.all_managers') }}</option>
             </x-ui.header-filter-select>
         </x-slot:filters>
-    </x-ui.page-header>
-
+    
     <div class="flex justify-end"><span wire:loading.delay.flex wire:target="search,strategy,manager,gap,clearFilters" class="hidden items-center gap-1.5 text-xs text-secondary-medium dark:text-ink-muted"><flux:icon.arrow-path class="size-3.5 animate-spin" /> {{ __('common.updating') }}</span>@if ($filtersAreActive)<flux:button size="sm" variant="ghost" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>@endif</div>
 
         @if ($visiblePrograms->isEmpty())
@@ -311,4 +310,4 @@ new #[Title('titles.programs')] class extends Component {
             <x-ui.button type="submit" tone="primary" data-test="save-program-button">{{ __('common.save_changes') }}</x-ui.button>
         </x-slot:actions>
     </x-ui.modal>
-</section>
+</x-desk.register>

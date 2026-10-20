@@ -6,16 +6,27 @@ namespace App\Livewire\Concerns\Projects;
 
 use App\Actions\Desk\SendNudge;
 use App\Enums\Currency;
+use App\Enums\MediaCollection;
 use App\Enums\MilestoneStatus;
 use App\Enums\MonthlyReportStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\ProposalStatus;
+use App\Enums\ReviewStage;
+use App\Models\DonorProposal;
+use App\Models\HrEmployee;
+use App\Models\LibraryIndicator;
+use App\Models\Media;
 use App\Models\MonthlyReport;
+use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalReviewer;
+use App\Models\ReportTemplateLine;
+use App\Models\Task;
 use App\Support\Desk\Money;
 use App\Support\Desk\ProjectStage;
 use Flux\Flux;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
@@ -39,7 +50,8 @@ use Livewire\Attributes\Url;
  * @property-read Project $project  #[Computed] project()
  * @property-read bool $canStartConceptNote  #[Computed] canStartConceptNote()
  * @property-read Collection<string, array{currency: Currency, committed: float, received: float}> $fundingByCurrency  #[Computed] fundingByCurrency()
- * @property-read array{lead: Proposal|null, stage: int, health: string, donor: string, reports: array{validated: int, total: int}, next: array{text: string, owner: int|null, mine: bool, ownerName: string|null, meal: bool, nudge: bool, href: string|null, label: string|null}, chapters: list<array{state: string, summary: string, when: string|null}>, lede: string} $story  #[Computed] story()
+ * @property-read Collection<int, Task> $tasks  #[Computed] tasks()
+ * @property-read array{lead: Proposal|null, stage: int, health: string, donor: string, reports: array{validated: int, total: int}, next: array{text: string, owner: int|null, mine: bool, ownerName: string|null, meal: bool, nudge: bool, href: string|null, label: string|null}, chapters: list<array{state: string, summary: string, when: string|null}>, lede: string, months: list<array{label: string, title: string, state: string, href: string|null}>} $story  #[Computed] story()
  */
 trait ReadsProjectStory
 {
@@ -82,7 +94,7 @@ trait ReadsProjectStory
     }
 
     /**
-     * @return array{lead: Proposal|null, stage: int, health: string, donor: string, reports: array{validated: int, total: int}, next: array{text: string, owner: int|null, mine: bool, ownerName: string|null, meal: bool, nudge: bool, href: string|null, label: string|null}, chapters: list<array{state: string, summary: string, when: string|null}>, lede: string}
+     * @return array{lead: Proposal|null, stage: int, health: string, donor: string, reports: array{validated: int, total: int}, next: array{text: string, owner: int|null, mine: bool, ownerName: string|null, meal: bool, nudge: bool, href: string|null, label: string|null}, chapters: list<array{state: string, summary: string, when: string|null}>, lede: string, months: list<array{label: string, title: string, state: string, href: string|null}>}
      */
     #[Computed]
     public function story(): array
@@ -116,6 +128,7 @@ trait ReadsProjectStory
             'next' => $this->nextStep($project, $lead, $stage, $donor),
             'chapters' => $this->chapters($project, $lead, $stage, $donor, $reports),
             'lede' => $this->storyLede($reports),
+            'months' => $this->monthsStrip($project),
         ];
     }
 
@@ -288,6 +301,177 @@ trait ReadsProjectStory
         }
 
         return $chapters;
+    }
+
+    /**
+     * The running chapter's months strip (desk.js monthsStrip): one cell per
+     * monthly report, oldest first, with its state.
+     *
+     * @return list<array{label: string, title: string, state: string, href: string|null}>
+     */
+    private function monthsStrip(Project $project): array
+    {
+        $monthStart = now()->startOfMonth();
+        $viewer = auth()->user();
+
+        return array_values($project->monthlyReports
+            ->sortBy(fn (MonthlyReport $report): string => $report->period->toDateString())
+            ->map(function (MonthlyReport $report) use ($monthStart, $viewer): array {
+                $state = match (true) {
+                    $report->status === MonthlyReportStatus::Validated => 'validated',
+                    $report->status === MonthlyReportStatus::Submitted => 'submitted',
+                    $report->returned_at !== null => 'returned',
+                    $report->period->lt($monthStart) => 'late',
+                    default => 'open',
+                };
+
+                return [
+                    'label' => $report->period->translatedFormat('M'),
+                    'title' => $report->period->translatedFormat('F Y').': '.__('story.month_state.'.$state),
+                    'state' => $state,
+                    'href' => $viewer?->can('view', $report) ? route('monthly-reports.show', $report) : null,
+                ];
+            })
+            ->all());
+    }
+
+    /**
+     * The plan chapter's details (desk.js planBlock, read only): what the
+     * lead proposal plans, its budget for money holders, and its reviewers.
+     *
+     * @return array{indicators: int, targets: int, milestones: int, tasks: int, budget: list<string>|null, reviewers: list<array{name: string, slot: string, seen: bool}>}|null
+     */
+    #[Computed]
+    public function planSummary(): ?array
+    {
+        $lead = $this->story['lead'];
+
+        if ($lead === null) {
+            return null;
+        }
+
+        $targets = PlanIndicator::query()
+            ->where('source_type', $lead->getMorphClass())
+            ->where('source_id', $lead->id)
+            ->get(['id', 'indicator_id', 'target']);
+
+        $budget = null;
+
+        if ($this->canViewMoney() && $lead->relationLoaded('donorProposals')) {
+            $budget = $lead->donorProposals
+                ->groupBy(fn (DonorProposal $agreement): string => $agreement->currency->value)
+                ->map(fn (EloquentCollection $agreements, string $currency): string => Money::format((float) $agreements->sum('budget'), $currency))
+                ->all();
+            $budget = array_values($budget);
+        }
+
+        $rows = ProposalReviewer::query()
+            ->select(['id', 'proposal_id', 'stage', 'employee_id', 'slot', 'seen_at'])
+            ->where('proposal_id', $lead->id)
+            ->where('stage', ReviewStage::Proposal->value)
+            ->orderBy('id')
+            ->get();
+        $employees = $rows->isEmpty()
+            ? collect()
+            : HrEmployee::query()->whereKey($rows->pluck('employee_id')->unique()->values()->all())->get(HrEmployee::NameColumns)->keyBy('id');
+
+        return [
+            'indicators' => $targets->pluck('indicator_id')->unique()->count(),
+            'targets' => $targets->whereNotNull('target')->count(),
+            'milestones' => (int) $this->project->milestones_count,
+            'tasks' => $this->tasks->count(),
+            'budget' => $budget,
+            'reviewers' => array_values($rows->map(fn (ProposalReviewer $row): array => [
+                'name' => $employees->has($row->employee_id) ? (string) $employees[$row->employee_id]->name : '#'.$row->employee_id,
+                'slot' => $row->slot->label(),
+                'seen' => $row->seen_at !== null,
+            ])->all()),
+        ];
+    }
+
+    /**
+     * The template chapter's lines (desk.js templateLines, read only): each
+     * reporting line's indicator code, name and whether it is disaggregated.
+     *
+     * @return list<array{code: string, name: string, disaggregated: bool}>
+     */
+    #[Computed]
+    public function templateLines(): array
+    {
+        return array_values(ReportTemplateLine::query()
+            ->select(['report_template_lines.id', 'report_template_lines.report_template_id', 'report_template_lines.plan_indicator_id'])
+            ->whereHas('template', fn ($query) => $query->where('project_id', $this->projectId))
+            ->with(['planIndicator:id,indicator_id', 'planIndicator.indicator:id,code,name,library_indicator_id', 'planIndicator.indicator.libraryIndicator:id,is_disaggregated'])
+            ->orderBy('report_template_lines.id')
+            ->get()
+            ->map(function (ReportTemplateLine $line): array {
+                $indicator = $line->planIndicator->indicator;
+                $library = $indicator->relationLoaded('libraryIndicator') ? $indicator->getRelation('libraryIndicator') : null;
+
+                return [
+                    'code' => (string) $indicator->code,
+                    'name' => $indicator->name,
+                    'disaggregated' => $library instanceof LibraryIndicator && $library->is_disaggregated,
+                ];
+            })
+            ->all());
+    }
+
+    /**
+     * The lead proposal's files for the concept note, decision and closing
+     * chapters, keyed by chapter. Funding papers stay hidden from those
+     * without funding-agreements.view (hiddenCollections()).
+     *
+     * @return array<int, list<string>>
+     */
+    #[Computed]
+    public function chapterFiles(): array
+    {
+        $lead = $this->story['lead'];
+
+        if ($lead === null) {
+            return [];
+        }
+
+        $chapters = [
+            1 => [MediaCollection::Proposal, MediaCollection::NeedAssessment],
+            3 => [MediaCollection::DonorApproval, MediaCollection::Agreement, MediaCollection::Mou],
+            6 => [MediaCollection::FinalReport, MediaCollection::FinalReportAcceptance],
+        ];
+        $hidden = $this->hiddenCollections();
+        $wanted = [];
+
+        foreach ($chapters as $collections) {
+            foreach ($collections as $collection) {
+                if (! in_array($collection->value, $hidden, true)) {
+                    $wanted[] = $collection->value;
+                }
+            }
+        }
+
+        $media = Media::query()
+            ->select(['id', 'mediable_type', 'mediable_id', 'collection', 'original_name'])
+            ->where('mediable_type', $lead->getMorphClass())
+            ->where('mediable_id', $lead->id)
+            ->whereIn('collection', $wanted)
+            ->orderBy('id')
+            ->get();
+
+        $files = [];
+
+        foreach ($chapters as $chapter => $collections) {
+            $names = $media
+                ->filter(fn (Media $file): bool => in_array($file->collection, $collections, true))
+                ->map(fn (Media $file): string => (string) $file->original_name)
+                ->all();
+            $names = array_values($names);
+
+            if ($names !== []) {
+                $files[$chapter] = $names;
+            }
+        }
+
+        return $files;
     }
 
     /**

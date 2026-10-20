@@ -19,12 +19,13 @@ use Laravel\Fortify\Features;
 use Laravel\Fortify\Fortify;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 use Laravel\Passkeys\Actions\DeletePasskey;
 use Livewire\Attributes\On;
 
-new #[Title('titles.security_settings')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.security_settings')] class extends Component {
     use RequiresConfirmedPassword;
 
     #[Locked]
@@ -376,7 +377,7 @@ new #[Title('titles.security_settings')] class extends Component {
     }
 }; ?>
 
-<section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="security-heading">
+<x-desk.register class="@container/directory" heading-id="security-heading" :title="__('common.security')">
     @php
         $signInCheck = $this->signInCheck;
         $appStepAvailable = $canManageTwoFactor ?? false;
@@ -387,7 +388,7 @@ new #[Title('titles.security_settings')] class extends Component {
         };
     @endphp
 
-    <x-ui.page-header heading-id="security-heading" :title="__('common.security')" />
+    
 
     <div class="grid max-w-2xl gap-12">
         {{-- Sign-in protection: what a new sign-in asks for, then each step as a dot on one thread. --}}
@@ -692,4 +693,4 @@ new #[Title('titles.security_settings')] class extends Component {
             </div>
         </div>
     </flux:modal>
-</section>
+</x-desk.register>

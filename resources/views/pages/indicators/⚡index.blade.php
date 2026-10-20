@@ -10,12 +10,13 @@ use App\Livewire\Concerns\Indicators\SummarisesIndicators;
 use App\Models\Indicator;
 use App\Models\Result;
 use Illuminate\Support\Facades\Gate;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('titles.indicators')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.indicators')] class extends Component {
     use BuildsIndicatorRows;
     use InspectsIndicatorChain;
     use ManagesIndicatorForm;
@@ -183,20 +184,44 @@ new #[Title('titles.indicators')] class extends Component {
     ];
 
     $onTrackShare = $overview['rated'] === 0 ? null : ($overview['rag']['green'] / $overview['rated']) * 100;
+
+    $achievementTone = match (true) {
+        $overview['achieved'] === null => 'neutral',
+        $overview['achieved'] >= $overview['elapsed'] * 0.9 => 'good',
+        $overview['achieved'] >= $overview['elapsed'] * 0.7 => 'warn',
+        default => 'critical',
+    };
+    $onTrackTone = match (true) {
+        $onTrackShare === null => 'neutral',
+        $onTrackShare >= 80 => 'good',
+        $onTrackShare >= 50 => 'warn',
+        default => 'critical',
+    };
+    $toneClass = fn (string $tone): string => match ($tone) {
+        'good' => 'text-status-good',
+        'warn' => 'text-status-warn',
+        'critical' => 'text-primary dark:text-brand-text',
+        default => '',
+    };
+    $headline = [
+        ['label' => __('common.indicators'), 'value' => number_format($overview['indicators']), 'tone' => 'neutral'],
+        ['label' => __('indicators.readings_logged'), 'value' => number_format($overview['readings']), 'tone' => 'neutral'],
+        ['label' => __('indicators.average_achievement'), 'value' => $overview['achieved'] === null ? '—' : number_format($overview['achieved'], 0).'%', 'tone' => $achievementTone],
+        ['label' => __('indicators.on_track'), 'value' => $onTrackShare === null ? '—' : number_format($onTrackShare, 0).'%', 'tone' => $onTrackTone],
+    ];
 @endphp
 
-<section
-    class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink"
-    aria-labelledby="indicator-directory-heading"
->
-    <x-ui.page-header
-        heading-id="indicator-directory-heading"
-        :title="__('common.indicators')"
-        :count="$overview['indicators']"
-    >
+<x-desk.register class="@container/directory" heading-id="indicator-directory-heading" :title="__('common.indicators')" :count="$overview['indicators']">
+    
+        <x-slot:figures>
+            @foreach ($headline as $cell)
+                <span wire:key="indicator-headline-{{ $loop->index }}"><b class="dk-num {{ $toneClass($cell['tone']) }}">{{ $cell['value'] }}</b> {{ $cell['label'] }}</span>@unless ($loop->last) · @endunless
+            @endforeach
+        </x-slot:figures>
+        <x-slot:search>
+            <x-desk.register-search :label="__('indicators.search_indicators')" :placeholder="__('indicators.indicator_or_result_statement')" wire:model.live.debounce.300ms="search" />
+        </x-slot:search>
         <x-slot:filters>
-            <x-ui.input type="search" icon="magnifying-glass" :label="__('indicators.search_indicators')" :placeholder="__('indicators.indicator_or_result_statement')" wire:model.live.debounce.300ms="search" clearable />
-
             <x-ui.header-filter-select :label="__('common.program')" wire:model.live="program" :value="$program">
                 <option value="">{{ __('common.all_programs') }}</option>
                 <option value="none">{{ __('common.unassigned') }}</option>
@@ -225,8 +250,7 @@ new #[Title('titles.indicators')] class extends Component {
                 {{ __('indicators.add_indicator') }}
             </x-ui.button>@endcan
         </x-slot:actions>
-    </x-ui.page-header>
-
+    
     @include('pages.indicators._index-overview')
 
     @include('pages.indicators._index-focus-bar')
@@ -256,4 +280,4 @@ new #[Title('titles.indicators')] class extends Component {
     @include('pages.indicators._index-form-modal')
 
     @include('pages.indicators._index-reading-modal')
-</section>
+</x-desk.register>

@@ -16,10 +16,11 @@ use Illuminate\Support\Facades\Lang;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
-new #[Title('titles.notification_rules')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.notification_rules')] class extends Component {
     /**
      * One row per EventCatalog key, in catalog order (the Event Notifications section).
      *
@@ -429,12 +430,8 @@ new #[Title('titles.notification_rules')] class extends Component {
     }
 }; ?>
 
-<section
-    class="rules-page @container/rules flex min-h-full w-full flex-1 flex-col bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink"
-    aria-labelledby="notification-rules-heading"
-    x-data="notificationRules(@js($this->clientConfig()))"
+<x-desk.register class="rules-page @container/rules" heading-id="notification-rules-heading" :title="__('notifications.admin.title')" x-data="notificationRules(@js($this->clientConfig()))"
 >
-    <x-ui.page-header heading-id="notification-rules-heading" :title="__('notifications.admin.title')" />
 
     <form x-on:submit.prevent="save()" class="flex flex-1 flex-col pt-8" novalidate>
         <div class="grid items-start gap-x-16 gap-y-12 @5xl/rules:grid-cols-2">
@@ -524,4 +521,4 @@ new #[Title('titles.notification_rules')] class extends Component {
     </form>
 
     @include('pages.admin._default-reviewers')
-</section>
+</x-desk.register>

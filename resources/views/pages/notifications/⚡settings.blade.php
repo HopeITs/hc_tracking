@@ -4,10 +4,11 @@ use App\Models\NotificationMute;
 use App\Models\Permission;
 use Flux\Flux;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
-new #[Title('titles.notification_settings')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.notification_settings')] class extends Component {
     public bool $popups = false;
 
     /** @var list<string> */
@@ -72,8 +73,8 @@ new #[Title('titles.notification_settings')] class extends Component {
     }
 }; ?>
 
-<section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="notification-settings-heading">
-    <x-ui.page-header heading-id="notification-settings-heading" :title="__('notifications.settings_link')" />
+<x-desk.register class="@container/directory" heading-id="notification-settings-heading" :title="__('notifications.settings_link')">
+    
 
     <div class="grid max-w-2xl gap-10">
         {{-- The installable app: its own window, Start-menu entry and branded notifications. --}}
@@ -189,4 +190,4 @@ new #[Title('titles.notification_settings')] class extends Component {
             </ul>
         </section>
     </div>
-</section>
+</x-desk.register>

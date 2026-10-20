@@ -31,13 +31,15 @@ use Livewire\Attributes\On;
  * Project::openProjectFor(). A project not yet mapped to a center keeps its
  * city and can still be edited until one is chosen.
  *
- * Used by projects/index only. The page provides the program and user pickers
+ * Used by projects/index and projects/show. The page provides the program and user pickers
  * (`programOptions()`, `userOptions()`), which `ownerOptions()` reads, and
  * WithPagination's resetPage().
  *
  * @property-read Collection<int, HrEmployee> $ownerOptions  #[Computed] ownerOptions() below
  * @property-read Collection<int, Program> $programOptions  #[Computed] programOptions() on the page
  * @property-read Collection<int, HrEmployee> $userOptions  #[Computed] userOptions() on the page
+ * @property-read list<array{id: int, name: string, center: string, program: string, status: string}> $similarProjects  #[Computed] similarProjects() below
+ * @property-read array{id: int, name: string, slug: string, state: string, canRestore: bool}|null $existingPairProject  #[Computed] existingPairProject() below
  */
 trait ManagesProjectForm
 {
@@ -194,13 +196,13 @@ trait ManagesProjectForm
             ctype_digit($this->centerId) ? (int) $this->centerId : null,
         );
 
-        return $matches->map(fn (Project $project): array => [
+        return array_values($matches->map(fn (Project $project): array => [
             'id' => $project->id,
             'name' => $project->name,
             'center' => $project->center_id === null ? __('proposals.no_center') : (HrCenter::remembered($project->center_id)->name ?? '#'.$project->center_id),
             'program' => $this->hrProgramName($project->program_id),
             'status' => $project->status->label(),
-        ])->all();
+        ])->all());
     }
 
     /**
