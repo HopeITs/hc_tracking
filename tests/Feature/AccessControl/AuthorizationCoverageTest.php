@@ -38,6 +38,11 @@ function authorizationCoverageExemptions(): array
         'resources/views/pages/notifications/⚡settings.blade.php:toggleMute' => 'Mutes a module for the signed-in user only, and only one they may already see.',
         'resources/views/pages/settings/⚡security.blade.php:setEmailTwoFactor' => 'Changes the signed-in user\'s own sign-in codes, behind password confirmation.',
         'resources/views/pages/settings/⚡security.blade.php:signOutOtherDevices' => 'Ends only the signed-in user\'s own sessions, behind password confirmation.',
+        'resources/views/pages/desk/⚡index.blade.php:resizePanel' => 'Saves only the signed-in user\'s own Desk layout; Panels::layoutFor() drops any panel they may not see.',
+        'resources/views/pages/desk/⚡index.blade.php:movePanel' => 'Saves only the signed-in user\'s own Desk layout; Panels::layoutFor() drops any panel they may not see.',
+        'resources/views/pages/desk/⚡index.blade.php:removePanel' => 'Saves only the signed-in user\'s own Desk layout.',
+        'resources/views/pages/desk/⚡index.blade.php:addPanel' => 'Saves only the signed-in user\'s own Desk layout, and only a panel from the library they may see.',
+        'resources/views/pages/desk/⚡index.blade.php:resetLayout' => 'Clears only the signed-in user\'s own Desk layout.',
     ];
 }
 

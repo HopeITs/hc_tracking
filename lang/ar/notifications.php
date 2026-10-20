@@ -690,6 +690,13 @@ return [
                 'body' => 'سجّل :actor اتفاقية التمويل للمقترح «:subject»',
             ],
         ],
+        'nudge' => [
+            'sent' => [
+                'title' => 'تذكير',
+                'body' => 'ذكّرك :actor بـ«:subject»',
+            ],
+            'logged' => 'ذكّر :actor :employee بـ«:subject»',
+        ],
         'monthly_reports' => [
             'generated' => [
                 'title' => 'توليد التقارير الشهرية',

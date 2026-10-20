@@ -8,6 +8,7 @@ use App\Livewire\Concerns\Dashboard\ChartsDashboard;
 use App\Livewire\Concerns\Dashboard\ReadsDashboardAttention;
 use App\Livewire\Concerns\Dashboard\ReadsDashboardWork;
 use App\Livewire\Concerns\Desk\IsDeskPanel;
+use App\Livewire\Concerns\Desk\ReadsDeskAgenda;
 use Livewire\Component;
 
 /**
@@ -21,4 +22,5 @@ abstract class DeskPanelHost extends Component
     use IsDeskPanel;
     use ReadsDashboardAttention;
     use ReadsDashboardWork;
+    use ReadsDeskAgenda;
 }

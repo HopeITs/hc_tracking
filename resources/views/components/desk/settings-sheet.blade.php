@@ -40,6 +40,20 @@
                             </li>
                         @endforeach
                     </ul>
+
+                    {{-- The two old top-bar tools (user decision, .ai/rules/desk.md). Install shows only while the browser offers it (window.hcApp, notifications.js). --}}
+                    <ul class="dk-lib" data-settings-extras>
+                        <li x-data="{ state: window.hcApp?.state() ?? 'unavailable' }" x-on:hc-app-install-change.window="state = $event.detail" x-show="state === 'available'" x-cloak data-settings-install>
+                            <span class="dk-li-ic"><x-desk.icon name="download" /></span>
+                            <span class="dk-li-t"><strong>{{ __('desk.install_app') }}</strong><span class="dk-is">{{ __('desk.install_app_hint') }}</span></span>
+                            <button type="button" class="dk-btn dk-sm" x-on:click="open = false; window.hcUnlockPageScroll?.(); $flux.modal('install-app').show()" aria-haspopup="dialog" data-test="settings-install-app">{{ __('desk.install') }}</button>
+                        </li>
+                        <li data-report-bug>
+                            <span class="dk-li-ic"><x-desk.icon name="flag" /></span>
+                            <span class="dk-li-t"><strong>{{ __('navigation.report_a_problem') }}</strong><span class="dk-is">{{ __('desk.report_problem_hint') }}</span></span>
+                            <a href="https://forms.gle/5QfGGarkeejAe3HS6" target="_blank" rel="noopener noreferrer" class="dk-btn dk-sm">{{ __('desk.open') }}</a>
+                        </li>
+                    </ul>
                 </div>
 
                 <div class="dk-sh-f">

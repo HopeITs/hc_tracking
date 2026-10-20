@@ -78,6 +78,31 @@ final class Panels
     }
 
     /**
+     * Every panel the given user may not see, keyed by id, with the reason
+     * the Customize sheet shows (desk.panel.<id>.locked).
+     *
+     * @return array<string, array{id: string, title: string, reason: string}>
+     */
+    public function lockedFor(User $user): array
+    {
+        $panels = [];
+
+        foreach ($this->definitions() as $id => $panel) {
+            if (($panel['allows'])($user)) {
+                continue;
+            }
+
+            $panels[$id] = [
+                'id' => $id,
+                'title' => (string) __("desk.panel.{$id}.title"),
+                'reason' => (string) __("desk.panel.{$id}.locked"),
+            ];
+        }
+
+        return $panels;
+    }
+
+    /**
      * The user's Desk: their own arrangement, or their role's default, with
      * every panel they may not see (and every unknown entry) left out.
      *
@@ -119,10 +144,10 @@ final class Panels
             $role = 'General Manager';
         }
 
-        return array_map(
+        return array_values(array_map(
             fn (array $entry): array => ['panel' => $entry[0], 'size' => $entry[1]],
             self::RoleLayouts[$role ?? self::FallbackRole],
-        );
+        ));
     }
 
     /**

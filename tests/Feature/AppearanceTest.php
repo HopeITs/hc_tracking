@@ -32,7 +32,7 @@ test('error pages leave light or dark to the stored or system appearance', funct
     expect(openingHtmlTag($html))->toBe('<html lang="en" dir="ltr">');
 });
 
-test('the desktop top header switches light and dark from one button, with no menu to choose from', function () {
+test('the top bar switches light and dark from one button, with no menu to choose from', function () {
     $this->actingAs(User::factory()->role('Team Member')->create());
 
     $response = $this->get(route('dashboard'))->assertOk();
@@ -41,14 +41,13 @@ test('the desktop top header switches light and dark from one button, with no me
     $document->loadHTML($response->getContent(), LIBXML_NOERROR | LIBXML_NOWARNING);
     $xpath = new DOMXPath($document);
 
-    $header = $xpath->query('//*[@data-desktop-navigation-header]')->item(0);
+    $header = $xpath->query('//*[@data-desk-top-bar]')->item(0);
     $toggles = $xpath->query('.//*[@data-theme-toggle]', $header);
 
     expect($toggles)->toHaveCount(1)
         ->and($toggles->item(0)->nodeName)->toBe('button')
         ->and($toggles->item(0)->getAttribute('aria-label'))->toBe('Appearance')
         ->and($toggles->item(0)->getAttribute('x-on:click'))->toBe('hcToggleAppearance()')
-        ->and($toggles->item(0)->hasAttribute('data-top-bar-action'))->toBeTrue()
         ->and($xpath->query('ancestor::ui-dropdown', $toggles->item(0)))->toHaveCount(0);
 });
 

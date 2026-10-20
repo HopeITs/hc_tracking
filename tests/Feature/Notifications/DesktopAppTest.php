@@ -112,24 +112,18 @@ test('the settings page offers the desktop app install through the install modal
         ->and($installButton->getAttribute('x-on:click'))->toBe("\$flux.modal('install-app').show()");
 });
 
-test('both top headers offer the desktop app install as an icon with a tooltip, right before the notification bell', function () {
+test('the settings sheet offers the desktop app install while the browser holds an install prompt', function () {
     $xpath = desktopAppPage('dashboard');
 
-    $installButtons = $xpath->query('//*[@data-test="header-install-app-button"]');
+    $rows = $xpath->query('//*[@data-settings-install]');
 
-    expect($installButtons->length)->toBe(2);
+    expect($rows->length)->toBe(1)
+        ->and($rows->item(0)->getAttribute('x-show'))->toBe("state === 'available'");
 
-    foreach ($installButtons as $installButton) {
-        $tooltip = $xpath->query('ancestor::*[@data-flux-tooltip][1]', $installButton)->item(0);
+    $button = $xpath->query('.//*[@data-test="settings-install-app"]', $rows->item(0))->item(0);
 
-        expect(trim($installButton->textContent))->toBe('')
-            ->and($installButton->getAttribute('aria-label'))->toBe(__('notifications.app.tooltip'))
-            ->and($installButton->getAttribute('x-on:click'))->toBe("\$flux.modal('install-app').show()");
-
-        expect(trim($xpath->query('.//*[@data-flux-tooltip-content]', $tooltip)->item(0)->textContent))->toBe(__('notifications.app.tooltip'))
-            ->and($tooltip->getAttribute('x-show'))->toBe("state === 'available'")
-            ->and($xpath->query('following-sibling::*[1][@data-notification-bell]', $tooltip)->length)->toBe(1);
-    }
+    expect(trim($button->textContent))->toBe(__('desk.install'))
+        ->and($button->getAttribute('x-on:click'))->toContain("\$flux.modal('install-app').show()");
 });
 
 test('signed-in pages carry one install modal that explains the app before the browser confirms', function () {

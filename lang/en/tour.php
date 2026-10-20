@@ -16,17 +16,6 @@ return [
         'title' => 'Welcome to HC Tracking',
         'body' => 'A two-minute walk through what is on this screen and how to move around. You can leave at any time with Esc.',
     ],
-    'sidebar' => [
-        'kicker' => 'Navigation',
-        'title' => 'Every module, one sidebar',
-        'body' => 'Strategy, delivery, results and funding all live here, in the order the work flows. The highlighted row is the page you are on.',
-        'body_mobile' => 'Tap the menu button to open every module — strategy, delivery, results and funding — in the order the work flows.',
-    ],
-    'collapse' => [
-        'kicker' => 'Navigation',
-        'title' => 'Need more room?',
-        'body' => 'Collapse the sidebar down to icons and give tables and timelines the full width. Your choice is one click away.',
-    ],
     'page' => [
         'kicker' => 'This page',
         'title' => 'Where you are',
@@ -42,25 +31,35 @@ return [
         'title' => 'Start something new',
         'body' => 'Create records and run the main actions for this page from here.',
     ],
-    'bell' => [
-        'kicker' => 'Stay informed',
-        'title' => 'Your inbox',
-        'body' => 'Assignments, deadlines and risk alerts land here as they happen. The red badge counts what you have not read.',
+    'logo' => [
+        'kicker' => 'The top',
+        'title' => 'The logo takes you home',
+        'body' => 'From anywhere — a project, a list, a form — the Hope Center logo brings you back to your desk.',
     ],
-    'theme' => [
-        'kicker' => 'Make it yours',
-        'title' => 'Light or dark',
-        'body' => 'Switch the look to suit your room and your eyes. HC Tracking remembers your choice.',
+    'ask' => [
+        'kicker' => 'The top',
+        'title' => 'The Ask bar replaces the menu',
+        'body' => 'Click it or press /. Type a center, program, donor, proposal title or the name of a list. Use ↑ ↓ to move and Enter to open.',
+    ],
+    'ask_answers' => [
+        'kicker' => 'The top',
+        'title' => 'It answers questions',
+        'body' => '“what is late?” lists everything late that you may see, worst first. “money” shows what has arrived against what was committed. A donor or proposal name takes you straight to it.',
+    ],
+    'tools' => [
+        'kicker' => 'The top',
+        'title' => 'Guide and tour',
+        'body' => 'The book opens the written guide. The sparkle replays this tour on any page.',
     ],
     'locale' => [
-        'kicker' => 'Make it yours',
-        'title' => 'English or Arabic',
-        'body' => 'The whole interface flips language and reading direction in one tap.',
+        'kicker' => 'The top',
+        'title' => 'Language and theme',
+        'body' => 'ع switches everything to Arabic, right to left; EN switches back. The sun or moon switches light and dark. Both are remembered.',
     ],
     'profile' => [
-        'kicker' => 'Your account',
-        'title' => 'Security and sign out',
-        'body' => 'Manage your sign-in codes and trusted devices, or log out when you are done.',
+        'kicker' => 'The top',
+        'title' => 'Your initials open settings',
+        'body' => 'Security, notifications and the admin pages your role may open. Log out is at the bottom.',
     ],
     'help' => [
         'kicker' => 'All done',

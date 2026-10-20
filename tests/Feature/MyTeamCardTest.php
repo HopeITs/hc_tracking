@@ -5,6 +5,7 @@ use App\Models\Activity;
 use App\Models\Supervision;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\Desk\Panels;
 use App\Support\SupervisionMap;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
@@ -37,21 +38,21 @@ function supervisedTaskAssignedTo(int $employeeId, string $dueDate, TaskStatus $
 }
 
 /**
- * The My Team rows a user sees on Home.
+ * The My team rows a user sees on the Desk.
  *
  * @return list<array{employeeId: int, name: string, overdue: int}>
  */
 function myTeamFor(User $user): array
 {
-    return Livewire::actingAs($user)->test('pages::dashboard.index')->instance()->myTeam;
+    return Livewire::actingAs($user)->test('desk.panels.myteam', ['size' => 'M'])->instance()->myTeam;
 }
 
 test('the card is hidden from someone who supervises nobody', function () {
     $user = userWithRole('Managers', insertHrEmployee());
     $unlinked = userWithRole('Managers');
 
-    Livewire::actingAs($user)->test('pages::dashboard.index')->assertDontSeeHtml('data-my-team');
-    Livewire::actingAs($unlinked)->test('pages::dashboard.index')->assertDontSeeHtml('data-my-team');
+    expect(app(Panels::class)->availableTo($user))->not->toHaveKey('myteam')
+        ->and(app(Panels::class)->availableTo($unlinked))->not->toHaveKey('myteam');
 
     expect(myTeamFor($user))->toBe([])
         ->and(myTeamFor($unlinked))->toBe([]);
@@ -78,11 +79,9 @@ test('it counts each supervisee\'s overdue open tasks, from HR and local supervi
         ['employeeId' => $localReport, 'name' => 'Lina Haddad', 'overdue' => 0],
     ]);
 
-    Livewire::actingAs($supervisor)->test('pages::dashboard.index')
-        ->assertSeeHtml('data-my-team')
-        ->assertSeeHtml('data-my-team-person')
-        ->assertSee('Omar Khalil')
-        ->assertSeeHtml(e(route('tasks.index', ['assignee' => $hrReport])));
+    Livewire::actingAs($supervisor)->test('desk.panels.myteam', ['size' => 'M'])
+        ->assertSeeHtml('data-panel="myteam"')
+        ->assertSeeInOrder(['Omar Khalil', __('desk.team_behind', ['tasks' => 2, 'reports' => 0]), 'Lina Haddad', __('desk.nothing_overdue')]);
 });
 
 test('tasks the supervisor cannot see are not counted', function () {
@@ -107,8 +106,8 @@ test('an inactive supervisee is not listed', function () {
     teamSupervision($supervisor->employee_id, $inactive);
     supervisedTaskAssignedTo($inactive, '2026-09-01');
 
-    expect(myTeamFor($supervisor))->toBe([]);
-    Livewire::actingAs($supervisor)->test('pages::dashboard.index')->assertDontSeeHtml('data-my-team');
+    expect(myTeamFor($supervisor))->toBe([])
+        ->and(app(Panels::class)->availableTo($supervisor))->not->toHaveKey('myteam');
 });
 
 test('the card costs the same queries for one or ten supervisees', function () {
@@ -124,7 +123,7 @@ test('the card costs the same queries for one or ten supervisees', function () {
         // A new request: forget the previous run's map, then render once so the
         // HR lookup is warm and only the card's own queries are counted.
         SupervisionMap::flush();
-        $component = Livewire::actingAs($supervisor)->test('pages::dashboard.index')->instance();
+        $component = Livewire::actingAs($supervisor)->test('desk.panels.myteam', ['size' => 'M'])->instance();
         expect($component->myTeam)->toHaveCount($superviseeCount);
         SupervisionMap::flush();
         unset($component->myTeam);

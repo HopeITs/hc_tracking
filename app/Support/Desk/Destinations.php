@@ -103,6 +103,7 @@ final class Destinations
             ['route' => 'reports.index', 'label' => 'common.reports', 'icon' => 'file', 'section' => self::Pages, 'allows' => $can('reports.view')],
             ['route' => 'reports.monthly-matrix', 'label' => 'navigation.monthly_matrix', 'icon' => 'table', 'section' => self::Pages, 'allows' => $can('reports.view')],
             ['route' => 'monthly-reports.index', 'label' => 'navigation.monthly_reports', 'icon' => 'cal', 'section' => self::Pages, 'allows' => $can('reports.view')],
+            ['route' => 'report-templates.index', 'label' => 'navigation.report_templates', 'icon' => 'file', 'section' => self::Pages, 'allows' => $can('report-templates.manage')],
             ['route' => 'donor-reports.compose', 'label' => 'navigation.donor_report_builder', 'icon' => 'file', 'section' => self::Pages, 'allows' => $can('reports.aggregate')],
             ['route' => 'reporting-duties.index', 'label' => 'navigation.reporting_duties', 'icon' => 'file', 'section' => self::Pages, 'allows' => fn (User $user): bool => $user->can('funding-agreements.update') || $user->hasReportingDuties()],
             ['route' => 'donors.index', 'label' => 'common.donors', 'icon' => 'users', 'section' => self::Pages, 'allows' => $can('donors.view')],

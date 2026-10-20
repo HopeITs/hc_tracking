@@ -690,6 +690,13 @@ return [
                 'body' => ':actor recorded the funding agreement of “:subject”',
             ],
         ],
+        'nudge' => [
+            'sent' => [
+                'title' => 'Nudge',
+                'body' => ':actor nudged you about “:subject”',
+            ],
+            'logged' => ':actor nudged :employee about “:subject”',
+        ],
         'monthly_reports' => [
             'generated' => [
                 'title' => 'Monthly reports generated',

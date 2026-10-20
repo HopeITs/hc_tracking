@@ -12,7 +12,7 @@
 {{-- The Desk header: logo, the Ask bar, and four tools. There is no menu; every page opens from the Ask bar or a Desk panel. --}}
 <header class="dk-top dk-scope" data-desk-top-bar>
     <div class="dk-wrap" id="top">
-        <a class="dk-logo" href="{{ route('dashboard') }}" wire:navigate aria-label="{{ __('desk.logo_label') }}">
+        <a class="dk-logo" href="{{ route('dashboard') }}" wire:navigate aria-label="{{ __('desk.logo_label') }}" data-desk-logo>
             <img class="dk-logo-img dk-logo-light" src="{{ asset('logo-tracking.svg') }}" alt="{{ config('app.name') }}" data-no-dim />
             <img class="dk-logo-img dk-logo-dark" src="{{ asset('logo-tracking-white.svg') }}" alt="{{ config('app.name') }}" data-no-dim />
         </a>
@@ -25,7 +25,7 @@
             </span>
         </button>
 
-        <div class="dk-tools">
+        <div class="dk-tools" data-desk-tools>
             <a class="dk-iconbtn" href="https://docs.google.com/document/d/1-cQQQrmqRirFbkwU22RL9YkpIY1_D8n8/edit" target="_blank" rel="noopener noreferrer" aria-label="{{ __('navigation.guideline') }}" title="{{ __('navigation.guideline') }}" data-guideline>
                 <svg class="dk-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5M8 7h7M8 11h7"/></svg>
             </a>

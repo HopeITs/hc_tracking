@@ -181,7 +181,7 @@ new class extends Component {
                         x-on:keydown.arrow-up.prevent="move(-1)"
                         x-on:keydown.enter.prevent="choose()"
                     >
-                    <kbd>Esc</kbd>
+                    <kbd>{{ __('desk.key_esc') }}</kbd>
                 </div>
 
                 <div class="dk-pal-list" x-ref="list">
@@ -209,7 +209,7 @@ new class extends Component {
 
                 <div class="dk-pal-foot">
                     <span><kbd>↑</kbd> <kbd>↓</kbd> {{ __('desk.ask_move') }}</span>
-                    <span><kbd>Enter</kbd> {{ __('desk.ask_open') }}</span>
+                    <span><kbd>{{ __('desk.key_enter') }}</kbd> {{ __('desk.ask_open') }}</span>
                 </div>
             </div>
         </div>

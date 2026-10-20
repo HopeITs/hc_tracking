@@ -27,6 +27,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/css/*.css | .ai/rules/css.md |
 | database/migrations/** | .ai/rules/database-migrations.md |
 | database/seeders/** | .ai/rules/database-seeders.md |
+| resources/views/components/desk/** | .ai/rules/desk.md |
 | {database/migrations/**,app/Models/DonorReport.php,resources/views/pages/funding-agreements/**,resources/views/pages/donor-reports/**} | .ai/rules/donor-reports.md |
 | {app/Livewire/Concerns/ManagesDonorForm.php,resources/views/components/donors/**,resources/views/pages/donors/**} | .ai/rules/donors.md |
 | {config/fortify.php,app/Console/Commands/**,app/Enums/**} | .ai/rules/enums.md |

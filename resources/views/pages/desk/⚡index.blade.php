@@ -21,21 +21,12 @@ new #[Layout('layouts::desk'), Title('titles.dashboard')] class extends Componen
     use ReadsDashboardWork;
 
     /**
-     * Panels that have a component yet; the rest stay out of the grid and
-     * the library until they are built.
-     */
-    private const Built = ['needs'];
-
-    /**
      * @return list<array{panel: string, size: string}>
      */
     #[Computed]
     public function layout(): array
     {
-        return array_values(array_filter(
-            app(Panels::class)->layoutFor(auth()->user()),
-            fn (array $entry): bool => in_array($entry['panel'], self::Built, true),
-        ));
+        return app(Panels::class)->layoutFor(auth()->user());
     }
 
     /**
@@ -44,7 +35,18 @@ new #[Layout('layouts::desk'), Title('titles.dashboard')] class extends Componen
     #[Computed]
     public function library(): array
     {
-        return array_intersect_key(app(Panels::class)->availableTo(auth()->user()), array_flip(self::Built));
+        return app(Panels::class)->availableTo(auth()->user());
+    }
+
+    /**
+     * Panels the viewer's role does not open, with the reason, for the Customize sheet.
+     *
+     * @return array<string, array{id: string, title: string, reason: string}>
+     */
+    #[Computed]
+    public function locked(): array
+    {
+        return app(Panels::class)->lockedFor(auth()->user());
     }
 
     /**
@@ -153,14 +155,14 @@ new #[Layout('layouts::desk'), Title('titles.dashboard')] class extends Componen
 @endphp
 
 <div data-desk>
-    <section class="dk-hello">
+    <section class="dk-hello" data-desk-hello>
         <div>
             <p class="dk-eyebrow">{{ now()->translatedFormat(__('formats.date_long')) }} · {{ auth()->user()->name }}</p>
             <h1>{{ rtrim($this->greeting(), '.!') }}{{ __('desk.sentence_end') }} {!! $n === 0 ? e(__('desk.hello_none')) : trans_choice('desk.hello_count', $n, ['count' => $n]) !!}</h1>
             <p class="dk-lede">{{ $n === 0 ? __('desk.lede_done') : ($needs['late'] > 0 ? trans_choice('desk.lede_late', $needs['late'], ['count' => $needs['late']]) : __('desk.lede_none_late')) }}</p>
         </div>
         <div class="dk-hello-tools">
-            <button type="button" class="dk-btn" x-on:click="$dispatch('dk-customize-open')"><x-desk.icon name="grid" />{{ __('desk.customize') }}</button>
+            <button type="button" class="dk-btn" x-on:click="$dispatch('dk-customize-open')" data-desk-customize-trigger><x-desk.icon name="grid" />{{ __('desk.customize') }}</button>
         </div>
     </section>
 
@@ -169,7 +171,7 @@ new #[Layout('layouts::desk'), Title('titles.dashboard')] class extends Componen
             <livewire:is :component="'desk.panels.'.$entry['panel']" :size="$entry['size']" :index="$i" :total="count($layout)" :wire:key="'panel-'.$entry['panel']" />
         @endforeach
 
-        <button type="button" class="dk-addtile" x-on:click="$dispatch('dk-customize-open')">
+        <button type="button" class="dk-addtile" x-on:click="$dispatch('dk-customize-open')" data-desk-add>
             <x-desk.icon name="plus" />
             <span>{{ __('desk.add_panel') }}</span>
             <small>{{ trans_choice('desk.more_available', $more, ['count' => $more]) }}</small>

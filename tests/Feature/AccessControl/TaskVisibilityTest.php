@@ -43,13 +43,9 @@ test('a hidden task file cannot be downloaded', function () {
     $this->actingAs($this->member)->get(route('tasks.files.download', [$this->financeTask, $attachment]))->assertNotFound();
 });
 
-test('the dashboard lists no hidden task but still counts it', function () {
+test('the desk lists no hidden task', function () {
     $this->actingAs($this->member)->get(route('dashboard'))->assertOk()->assertDontSee('Finance-only task');
     $this->actingAs(userWithRole('Managers'))->get(route('dashboard'))->assertOk()->assertSee('Finance-only task');
-
-    $counts = Livewire::actingAs($this->member)->test('pages::dashboard.index')->instance()->attentionCounts;
-
-    expect($counts['delivery'])->toBeGreaterThanOrEqual(1);
 });
 
 test('the calendar never shows another department\'s tasks, whoever is picked', function () {

@@ -12,6 +12,8 @@ use App\Models\ProposalStatusNote;
 use App\Models\Report;
 use App\Models\Task;
 use App\Models\TransfersTracking;
+use App\Models\User;
+use Illuminate\Testing\TestResponse;
 use Livewire\Livewire;
 
 /**
@@ -168,77 +170,65 @@ function seedDashboardMoney(): array
     return compact('proposal', 'agreement');
 }
 
-test('Team Member and Managers see no funding, proposal or transfer section, tile or link on the dashboard', function (string $role) {
+/**
+ * The Desk with every panel the role may add placed on it, rendered as the given role.
+ */
+function fullDeskAs(string|User $role): TestResponse
+{
+    $user = $role instanceof User ? $role : userWithRole($role);
+    $user->forceFill(['desk_layout' => array_map(fn (string $panel): array => ['panel' => $panel, 'size' => 'L'], ['glance', 'needs', 'waiting', 'coming', 'projects', 'pipeline', 'money', 'transfers', 'matrix', 'validate', 'templates', 'reviews', 'tasks', 'deliverables', 'myteam', 'risks', 'targets', 'duties', 'activity', 'inbox', 'milestones', 'plans', 'donors'])])->save();
+
+    return test()->actingAs($user)->get(route('dashboard'))->assertOk();
+}
+
+test('Team Member and Managers see no funding, proposal or transfer panel, figure or link on the desk', function (string $role) {
     $this->travelTo('2026-09-15 09:00:00');
     ['proposal' => $proposal, 'agreement' => $agreement] = seedDashboardMoney();
 
-    $page = Livewire::actingAs(userWithRole($role))->test('pages::dashboard.index');
-
-    $page->assertOk()
-        ->assertDontSeeHtml('data-funding-position')
-        ->assertDontSeeHtml('data-attention-group="funding"')
-        ->assertDontSeeHtml('wire:key="focus-funding"')
-        ->assertDontSeeHtml('wire:key="pulse-open-proposals"')
-        ->assertDontSee(__('dashboard.funding_position'))
-        ->assertDontSee(__('dashboard.proposals_in_pipeline'))
-        ->assertDontSee(__('dashboard.proposal_pipeline'))
-        ->assertDontSee(__('dashboard.received_per_month'))
-        ->assertDontSee(__('dashboard.view_proposals'))
+    fullDeskAs($role)
+        ->assertDontSee('data-panel="money"', false)
+        ->assertDontSee('data-panel="transfers"', false)
+        ->assertDontSee('data-panel="pipeline"', false)
+        ->assertDontSee('data-panel="donors"', false)
         ->assertDontSee('Harbour Clean Water')
         ->assertDontSee('Aurora Foundation')
         ->assertDontSee('731,942')
         ->assertDontSee('123,457')
         ->assertDontSee('55,555')
-        ->assertDontSeeHtml(route('proposals.index'))
-        ->assertDontSeeHtml(route('proposals.show', $proposal))
-        ->assertDontSeeHtml(route('funding-agreements.index'))
-        ->assertDontSeeHtml(route('funding-agreements.show', $agreement))
-        ->assertDontSeeHtml(route('transfers.index'));
-
-    $dashboard = $page->instance();
-    expect($dashboard->fundingPosition)->toBeEmpty()
-        ->and($dashboard->pipelineChart['series'])->toBe([])
-        ->and($dashboard->receiptsChart['currencies'])->toBe([])
-        ->and($dashboard->attentionItems->where('group', 'funding'))->toBeEmpty()
-        ->and($dashboard->upcoming->pluck('tone')->all())->not->toContain('funding')
-        ->and($dashboard->activity->pluck('sentence')->implode(' '))->not->toContain('Harbour Clean Water');
+        ->assertDontSee(route('proposals.index'), false)
+        ->assertDontSee(route('proposals.show', $proposal), false)
+        ->assertDontSee(route('funding-agreements.index'), false)
+        ->assertDontSee(route('funding-agreements.show', $agreement), false)
+        ->assertDontSee(route('transfers.index'), false);
 })->with(['Team Member', 'Managers']);
 
-test('Financial sees the funding position, the pipeline, the receipts and every link on the dashboard', function () {
+test('Financial sees the funding position, the pipeline, the transfers and their links on the desk', function () {
     $this->travelTo('2026-09-15 09:00:00');
     ['proposal' => $proposal, 'agreement' => $agreement] = seedDashboardMoney();
 
-    Livewire::actingAs(userWithRole('Financial'))->test('pages::dashboard.index')
-        ->assertOk()
-        ->assertSeeHtml('data-funding-position')
-        ->assertSeeHtml('data-attention-group="funding"')
-        ->assertSeeHtml('wire:key="pulse-open-proposals"')
-        ->assertSee(__('dashboard.funding_position'))
-        ->assertSee(__('dashboard.proposal_pipeline'))
-        ->assertSee(__('dashboard.received_per_month'))
-        ->assertSee('731,942')
+    fullDeskAs('Financial')
+        ->assertSee('data-panel="money"', false)
+        ->assertSee('data-panel="pipeline"', false)
+        ->assertSee('$731,942')
         ->assertSee('123,457 USD from Aurora Foundation')
-        ->assertSeeHtml(route('proposals.index'))
-        ->assertSeeHtml(route('proposals.show', $proposal))
-        ->assertSeeHtml(route('funding-agreements.index'))
-        ->assertSeeHtml(route('funding-agreements.show', $agreement));
+        ->assertSee(route('proposals.index'), false)
+        ->assertSee(route('proposals.show', $proposal), false)
+        ->assertSee(route('funding-agreements.index'), false)
+        ->assertSee(route('funding-agreements.show', $agreement), false);
 });
 
-test('a fundraiser without agreements sees the proposal pipeline on the dashboard but nothing from agreements or transfers', function () {
+test('a fundraiser without agreements sees the proposal pipeline on the desk but nothing from agreements or transfers', function () {
     $this->travelTo('2026-09-15 09:00:00');
     ['proposal' => $proposal, 'agreement' => $agreement] = seedDashboardMoney();
 
-    Livewire::actingAs(userWithRole(fundraiserWithoutAgreements()))->test('pages::dashboard.index')
-        ->assertOk()
-        ->assertSeeHtml('wire:key="pulse-open-proposals"')
-        ->assertSee(__('dashboard.proposal_pipeline'))
-        ->assertSeeHtml(route('proposals.show', $proposal))
-        ->assertDontSeeHtml('data-funding-position')
-        ->assertDontSeeHtml('data-attention-group="funding"')
-        ->assertDontSee(__('dashboard.received_per_month'))
+    fullDeskAs(fundraiserWithoutAgreements())
+        ->assertSee('data-panel="pipeline"', false)
+        ->assertSee(route('proposals.show', $proposal), false)
+        ->assertDontSee('data-panel="money"', false)
+        ->assertDontSee('data-panel="transfers"', false)
         ->assertDontSee('731,942')
         ->assertDontSee('123,457')
-        ->assertDontSeeHtml(route('funding-agreements.index'))
-        ->assertDontSeeHtml(route('funding-agreements.show', $agreement))
-        ->assertDontSeeHtml(route('transfers.index'));
+        ->assertDontSee(route('funding-agreements.index'), false)
+        ->assertDontSee(route('funding-agreements.show', $agreement), false)
+        ->assertDontSee(route('transfers.index'), false);
 });

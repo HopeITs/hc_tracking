@@ -11,6 +11,7 @@ use App\Models\Proposal;
 use App\Models\ScheduleDependency;
 use App\Models\TransfersTracking;
 use App\Models\User;
+use App\Support\Desk\Destinations;
 use Livewire\Livewire;
 
 /**
@@ -26,14 +27,17 @@ test('guests are redirected from the timeline', function () {
     $this->get(route('timeline.index'))->assertRedirect(route('login'));
 });
 
-test('the timeline is in the sidebar and renders the portfolio gantt', function () {
+test('the timeline can be reached from the Ask bar and renders the portfolio gantt', function () {
     $project = Project::factory()->create(['name' => 'Aleppo Wells', 'start_date' => '2026-10-01', 'end_date' => '2027-03-31']);
     Milestone::factory()->create(['project_id' => $project->id, 'name' => 'Drilling', 'planned_start_date' => '2026-11-01', 'planned_end_date' => '2026-12-15']);
 
-    $this->actingAs(User::factory()->role('General Manager')->create())
+    $manager = User::factory()->role('General Manager')->create();
+
+    expect(array_column(app(Destinations::class)->for($manager), 'route'))->toContain('timeline.index');
+
+    $this->actingAs($manager)
         ->get(route('timeline.index'))
         ->assertOk()
-        ->assertSee('href="'.route('timeline.index').'"', false)
         ->assertSeeHtml('data-gantt')
         ->assertSee('Aleppo Wells')
         ->assertSee('Drilling');

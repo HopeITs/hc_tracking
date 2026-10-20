@@ -10,7 +10,6 @@ use App\Enums\ReportStatus;
 use App\Enums\TaskStatus;
 use App\Models\HrEmployee;
 use App\Models\Milestone;
-use App\Models\ProposalStatusNote;
 use App\Models\Report;
 use App\Models\Task;
 use App\Models\TaskAssignee;
@@ -23,42 +22,17 @@ use Illuminate\Support\Number;
 use Livewire\Attributes\Computed;
 
 /**
- * The dashboard's own-work and timeline sections: the signed-in person's
- * workload, their team's overdue tasks, what falls due in the next thirty
- * days, the recent activity feed and the time-of-day greeting.
+ * The signed-in person's team and timeline: their supervisees' overdue
+ * tasks, what falls due in the next thirty days and the time-of-day
+ * greeting.
  *
- * Used by dashboard/index only. The page provides visible() and canView().
+ * Used by the Desk page and its Needs you and My team panels. The host
+ * provides visible() and canView() (IsDeskPanel).
  * upcoming() also calls transferHref() and taskParentName() from
  * ReadsDashboardAttention.
  */
 trait ReadsDashboardWork
 {
-    /**
-     * The signed-in person's own workload.
-     *
-     * Tasks are assigned to HR employees, so a user with no linked employee has
-     * no task figures, only their own draft reports.
-     *
-     * @return array{employeeId: int|null, overdue: int, dueThisWeek: int, draftReports: int}
-     */
-    #[Computed]
-    public function myWork(): array
-    {
-        $user = auth()->user();
-        $employeeId = $user->employee_id;
-        $today = CarbonImmutable::today();
-        $openTasks = fn () => $this->visible(Task::query(), 'tasks')
-            ->whereHas('taskAssignees', fn ($query) => $query->where('employee_id', $employeeId))
-            ->where('status', '!=', TaskStatus::Done);
-
-        return [
-            'employeeId' => $employeeId,
-            'overdue' => $employeeId === null ? 0 : $openTasks()->whereDate('due_date', '<', $today)->count(),
-            'dueThisWeek' => $employeeId === null ? 0 : $openTasks()->whereBetween('due_date', [$today->toDateString(), $today->addDays(7)->toDateString()])->count(),
-            'draftReports' => $this->visible(Report::query(), 'reports')->where('user_id', $user->id)->where('status', ReportStatus::Draft)->count(),
-        ];
-    }
-
     /**
      * The people the signed-in person supervises (SupervisionMap: HR direct
      * reports plus local supervisions, active employees only) and how many
@@ -202,52 +176,6 @@ trait ReadsDashboardWork
             ->concat($reports)
             ->sortBy(fn (array $item): string => $item['date']->toDateString())
             ->take(8)
-            ->values();
-    }
-
-    /**
-     * The latest changes across proposals, tasks and reports.
-     *
-     * @return Collection<int, array{key: string, at: CarbonImmutable, dateOnly: bool, icon: string, sentence: string, href: string}>
-     */
-    #[Computed]
-    public function activity(): Collection
-    {
-        $notes = ! $this->canView('proposals') ? new Collection : ProposalStatusNote::query()
-            ->select(['id', 'proposal_id', 'status', 'date'])
-            ->with('proposal:id,name')
-            ->latest('date')
-            ->limit(6)
-            ->get()
-            ->map(fn (ProposalStatusNote $note): array => [
-                'key' => 'note-'.$note->id,
-                'at' => $note->date,
-                'dateOnly' => true,
-                'icon' => 'arrows-right-left',
-                'sentence' => __('dashboard.proposal_moved', ['proposal' => $note->proposal?->name ?? '—', 'status' => $note->status->label()]),
-                'href' => route('proposals.show', $note->proposal),
-            ]);
-
-        $reports = $this->visible(Report::query(), 'reports')
-            ->select(['id', 'plan_indicator_id', 'user_id', 'submit_date'])
-            ->with(['user:id,hr_user_id', 'planIndicator:id,indicator_id', 'planIndicator.indicator:id,name'])
-            ->whereNotNull('submit_date')
-            ->latest('submit_date')
-            ->limit(6)
-            ->get()
-            ->map(fn (Report $report): array => [
-                'key' => 'report-'.$report->id,
-                'at' => $report->submit_date,
-                'dateOnly' => true,
-                'icon' => 'document-check',
-                'sentence' => __('dashboard.report_submitted', ['user' => $report->user?->name ?? '—', 'indicator' => $report->planIndicator?->indicator?->name ?? '—']),
-                'href' => route('reports.show', $report),
-            ]);
-
-        return $notes
-            ->concat($reports)
-            ->sortByDesc(fn (array $item): int => $item['at']->getTimestamp())
-            ->take(7)
             ->values();
     }
 
