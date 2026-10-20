@@ -48,6 +48,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property int|null $employee_id
  * @property int|null $active_role_id
  * @property string|null $locale
+ * @property list<array{panel: string, size: string}>|null $desk_layout
  * @property bool $notification_popups
  * @property CarbonImmutable|null $tour_seen_at
  * @property CarbonImmutable|null $email_verified_at
@@ -76,6 +77,7 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
     protected $attributes = [
         'employee_id' => null,
         'locale' => null,
+        'desk_layout' => null,
         'notification_popups' => false,
         'tour_seen_at' => null,
         'email_two_factor_enabled' => false,
@@ -651,6 +653,7 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
             'email_two_factor_enabled' => 'boolean',
             'notification_popups' => 'boolean',
             'tour_seen_at' => 'datetime',
+            'desk_layout' => 'array',
         ];
     }
 

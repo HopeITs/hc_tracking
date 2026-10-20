@@ -37,7 +37,7 @@ Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () 
     Route::get('employees/picker-options', EmployeePickerOptionsController::class)->name('employees.picker-options');
     Route::post('tour/seen', MarkTourSeenController::class)->middleware('throttle:locale')->name('tour.seen');
 
-    Route::livewire('home', 'pages::dashboard.index')->name('dashboard');
+    Route::livewire('home', 'pages::desk.index')->name('dashboard');
 
     // Open to everyone: the page lists only the viewer's own reviewer rows.
     Route::livewire('my-reviews', 'pages::reviews.index')->name('reviews.index');
