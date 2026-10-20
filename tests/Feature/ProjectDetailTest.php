@@ -65,7 +65,7 @@ test('project detail preserves lifecycle and disagreement between headline and d
         ->assertSeeText('Aug 31, 2027')
         ->assertSeeText('Restores safe household water access.')
         ->assertSeeTextInOrder(['Headline target', '1,000', 'Demographic total', '700'])
-        ->assertSeeTextInOrder(['Men', '180', 'Women', '220', 'Boys', '140', 'Girls', '160']);
+        ->assertSeeTextInOrder(['180', 'Men', '220', 'Women', '140', 'Boys', '160', 'Girls']);
 });
 
 test('project detail displays an em dash when no demographic breakdown exists', function () {

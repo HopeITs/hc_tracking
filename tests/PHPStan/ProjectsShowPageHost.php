@@ -10,6 +10,7 @@ use App\Livewire\Concerns\Projects\ManagesProjectFiles;
 use App\Livewire\Concerns\Projects\ManagesReportTemplate;
 use App\Livewire\Concerns\Projects\ReadsProjectDelivery;
 use App\Livewire\Concerns\Projects\ReadsProjectFunding;
+use App\Livewire\Concerns\Projects\ReadsProjectStory;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
@@ -30,6 +31,7 @@ abstract class ProjectsShowPageHost extends Component
     use ManagesReportTemplate;
     use ReadsProjectDelivery;
     use ReadsProjectFunding;
+    use ReadsProjectStory;
     use WithFileUploads;
 
     public int $projectId;

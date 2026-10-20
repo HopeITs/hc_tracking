@@ -3,11 +3,11 @@
 use App\Enums\MilestoneStatus;
 use App\Enums\MonthlyReportStatus;
 use App\Enums\ProjectStatus;
-use App\Enums\ProposalStatus;
 use App\Livewire\Concerns\Desk\IsDeskPanel;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\TransfersTracking;
+use App\Support\Desk\ProjectStage;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
@@ -16,21 +16,10 @@ use Livewire\Component;
 /**
  * Every project: one line per project through its seven stages, a health
  * word and one of five lenses (stage, money, results, dates, risks).
- *
- * The stage comes from the project's leading proposal and its own status,
- * following the artifact's stageOf(). Health is derived (user decision,
- * .ai/rules/desk.md): off track when something is late (a past month's
- * monthly report still open, an overdue milestone, a late transfer),
- * needs a look when something falls due within seven days or a report
- * waits for MEAL, otherwise on track. Closed projects are on track.
+ * Stage and health come from App\Support\Desk\ProjectStage.
  */
 new class extends Component {
     use IsDeskPanel;
-
-    /**
-     * Which proposal leads a project, most advanced first (artifact PRIORITY_ORDER).
-     */
-    private const array Priority = ['active', 'final reports', 'approved', 'submitted', 'on hold', 'proposal review', 'proposal draft', 'concept note submitted', 'concept note review', 'concept note', 'completed', 'rejected'];
 
     public string $lens = 'stage';
 
@@ -79,25 +68,13 @@ new class extends Component {
     #[Computed]
     public function lines(): array
     {
-        $today = CarbonImmutable::today();
-        $monthStart = $today->startOfMonth();
-        $weekEnd = $today->addDays(7);
         $lines = [];
 
         foreach ($this->projects as $project) {
-            $lead = $project->proposals->sortBy(fn (Proposal $proposal): int => (int) array_search($proposal->status->value, self::Priority, true))->first();
-            $stage = $this->stageOf($project, $lead);
-
-            $lateReports = $project->monthlyReports->filter(fn ($report): bool => $report->status === MonthlyReportStatus::Draft && $report->period->lt($monthStart))->count();
-            $waitingReports = $project->monthlyReports->where('status', MonthlyReportStatus::Submitted)->count();
-            $overdueMilestones = $project->milestones->filter(fn ($milestone): bool => $milestone->planned_end_date !== null && $milestone->planned_end_date->lt($today))->count();
-            $soonMilestones = $project->milestones->filter(fn ($milestone): bool => $milestone->planned_end_date !== null && $milestone->planned_end_date->betweenIncluded($today, $weekEnd))->count();
-
-            $transfers = $project->proposals->flatMap(fn (Proposal $proposal) => $proposal->relationLoaded('donorProposals') ? $proposal->donorProposals->flatMap->transfers : collect());
-            $lateTransfers = $transfers->filter(fn (TransfersTracking $transfer): bool => $transfer->state() === 'late')->count();
-
-            $late = $lateReports + $overdueMilestones + $lateTransfers;
-            $soon = $soonMilestones + $waitingReports;
+            $lead = ProjectStage::lead($project->proposals);
+            $stage = ProjectStage::stage($project, $lead);
+            $signals = ProjectStage::signals($project);
+            $transfers = ProjectStage::transfers($project);
 
             $money = null;
             $agreement = $lead?->relationLoaded('donorProposals') ? $project->proposals->flatMap->donorProposals->first() : null;
@@ -115,8 +92,8 @@ new class extends Component {
 
             $lines[$project->id] = [
                 'stage' => $stage,
-                'health' => $stage === 7 ? 'good' : ($late > 0 ? 'bad' : ($soon > 0 ? 'warn' : 'good')),
-                'attention' => $late + $soon,
+                'health' => ProjectStage::health($stage, $signals),
+                'attention' => $signals['late'] + $signals['soon'],
                 'lead' => $lead,
                 'donor' => $lead?->donorNames->pluck('name')->implode(', ') ?? '',
                 'money' => $money,
@@ -125,24 +102,6 @@ new class extends Component {
         }
 
         return $lines;
-    }
-
-    private function stageOf(Project $project, ?Proposal $lead): int
-    {
-        if (in_array($project->status, [ProjectStatus::Closed, ProjectStatus::Archived], true)) {
-            return 7;
-        }
-
-        return match ($lead?->status) {
-            null => 0,
-            ProposalStatus::ConceptNote, ProposalStatus::ConceptNoteReview, ProposalStatus::ConceptNoteSubmitted => 1,
-            ProposalStatus::ProposalDraft, ProposalStatus::ProposalReview => 2,
-            ProposalStatus::Submitted, ProposalStatus::OnHold, ProposalStatus::Rejected => 3,
-            ProposalStatus::Approved => $project->status === ProjectStatus::Draft ? 3 : 4,
-            ProposalStatus::Active => $project->end_date !== null && $project->end_date->lt(CarbonImmutable::today()) ? 6 : 5,
-            ProposalStatus::FinalReports => 6,
-            ProposalStatus::Completed => 7,
-        };
     }
 };
 ?>
