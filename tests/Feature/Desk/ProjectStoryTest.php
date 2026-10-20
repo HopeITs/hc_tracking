@@ -84,20 +84,77 @@ test('the Story shows money received only to viewers who may see money', functio
         ->assertDontSeeHtml('data-test="story-received"');
 });
 
-test('opening a proposal with no tab lands on its project Story at the chapter it is in', function () {
+test('every proposal link lands on its project Story with the proposal, tab and agreement deep link carried over', function (array $query, array $expected) {
     $project = storyProject(ProposalStatus::Submitted);
     $proposal = $project->proposals()->first();
 
     $this->actingAs(userWithRole('General Manager'))
-        ->get(route('proposals.show', $proposal))
-        ->assertRedirect(route('projects.show', $project).'#dk-ch-3');
-});
+        ->get(route('proposals.show', ['proposal' => $proposal, ...$query]))
+        ->assertRedirect(route('projects.show', ['project' => $project, 'proposal' => $proposal->id, ...$expected]).'#proposal');
+})->with([
+    'bare' => [[], []],
+    'a tab' => [['tab' => 'plan'], ['ptab' => 'plan']],
+    'the record-agreement link' => [['record_agreement' => '1'], ['record_agreement' => 1]],
+]);
 
-test('a proposal link with a tab, or a proposal on no project, still opens the proposal page', function () {
-    $user = userWithRole('General Manager');
-    $project = storyProject(ProposalStatus::Submitted);
+test('a proposal on no project still opens its own page on the desk', function () {
     $loose = Activity::withoutRecording(fn () => Proposal::factory()->create());
 
-    $this->actingAs($user)->get(route('proposals.show', ['proposal' => $project->proposals()->first(), 'tab' => 'status']))->assertOk();
-    $this->actingAs($user)->get(route('proposals.show', $loose))->assertOk();
+    $this->actingAs(userWithRole('General Manager'))
+        ->get(route('proposals.show', ['proposal' => $loose, 'tab' => 'plan']))
+        ->assertOk()
+        ->assertSeeHtml('data-proposal-back')
+        ->assertSeeHtml('data-tab-panel="plan"');
+});
+
+test('the Story embeds the chosen proposal on the asked tab and ignores a proposal from another project', function () {
+    $project = storyProject(ProposalStatus::Submitted);
+    $lead = $project->proposals()->first();
+    $second = Activity::withoutRecording(fn () => Proposal::factory()->create(['status' => ProposalStatus::ConceptNote]));
+    $project->proposals()->attach($second->id);
+    $stranger = Activity::withoutRecording(fn () => Proposal::factory()->create());
+    $viewer = userWithRole('General Manager');
+
+    Livewire::actingAs($viewer)->withQueryParams(['proposal' => (string) $second->id, 'ptab' => 'deadlines'])
+        ->test('pages::projects.show', ['project' => $project])
+        ->assertSet('embeddedProposalId', $second->id)
+        ->assertSeeHtml('data-test="story-proposal-switch"')
+        ->assertSeeHtml('data-proposal-id="'.$second->id.'"');
+
+    Livewire::actingAs($viewer)->withQueryParams(['ptab' => 'deadlines'])
+        ->test('pages::proposals.show', ['proposal' => $second, 'embedded' => true])
+        ->assertSet('tab', 'deadlines')
+        ->assertSeeHtml('data-tab-panel="deadlines"')
+        ->assertSeeHtml('data-embedded-proposal-head')
+        ->assertDontSeeHtml('data-proposal-back');
+
+    Livewire::actingAs($viewer)->withQueryParams(['proposal' => (string) $stranger->id])
+        ->test('pages::projects.show', ['project' => $project])
+        ->assertSet('embeddedProposalId', $lead->id);
+});
+
+test('the embedded proposal keeps money from a viewer without money permission', function () {
+    $project = storyProject(ProposalStatus::Active, projectStatus: ProjectStatus::Active);
+    $proposal = $project->proposals()->first();
+    Activity::withoutRecording(fn () => DonorProposal::factory()->create(['proposal_id' => $proposal->id, 'budget' => 987654]));
+
+    Livewire::actingAs(userWithRole('General Manager'))->withQueryParams(['ptab' => 'funding'])
+        ->test('pages::proposals.show', ['proposal' => $proposal, 'embedded' => true])
+        ->assertSet('tab', 'funding')
+        ->assertSee('987,654');
+
+    Livewire::actingAs(userWithRole('Team Member'))->withQueryParams(['ptab' => 'funding'])
+        ->test('pages::proposals.show', ['proposal' => $proposal, 'embedded' => true])
+        ->assertSet('tab', 'status')
+        ->assertDontSee('987,654');
+});
+
+test('a rejected proposal keeps its owner on the next step but offers no nudge', function () {
+    $owner = userWithRole('Managers', insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Darwish'));
+    $project = storyProject(ProposalStatus::Rejected, $owner->employee_id);
+
+    Livewire::actingAs(userWithRole('General Manager'))
+        ->test('pages::projects.show', ['project' => $project])
+        ->assertSee('Waiting on Rana Darwish.')
+        ->assertDontSeeHtml('data-test="story-nudge"');
 });

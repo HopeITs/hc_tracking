@@ -90,11 +90,15 @@
                             @if ($openLead && isset($proposalLinks[$i]))
                                 <div class="dk-acts dk-start" data-test="story-proposal-links">
                                     @foreach ($proposalLinks[$i] as $tabKey)
-                                        <a class="dk-btn dk-sm" href="{{ route('proposals.show', ['proposal' => $lead, 'tab' => $tabKey]) }}" wire:navigate>{{ __('story.open.'.$tabKey) }}</a>
+                                        <a class="dk-btn dk-sm" href="{{ $this->proposalStoryUrl($lead->id, $tabKey) }}" wire:navigate data-proposal-tab-link="{{ $tabKey }}">{{ __('story.open.'.$tabKey) }}</a>
                                     @endforeach
                                 </div>
                             @endif
                         </div>
+                    @endif
+
+                    @if ($i === 2 && $this->embeddedProposalId !== null)
+                        @include('pages.projects._story-proposal')
                     @endif
 
                     @if ($i === 5)

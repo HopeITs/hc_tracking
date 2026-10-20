@@ -495,7 +495,7 @@ test('the modal shell pins a titled header and a footer with cancel around a sub
     BLADE));
     $dialog = '//dialog[contains(@class, "modal-shell")]';
 
-    expect($xpath->query($dialog.'[contains(@class, "modal-shell-xl") and contains(@class, "max-w-5xl")]')->length)->toBe(1)
+    expect($xpath->query($dialog.'[contains(@class, "modal-shell-xl") and contains(@class, "modal-shell-sheet") and @data-flux-flyout]')->length)->toBe(1)
         ->and($xpath->query($dialog.'[@*[name()="wire:close"]="closeProjectModal"]')->length)->toBe(1)
         ->and($xpath->query($dialog.'//form[@*[name()="wire:submit"]="saveProject" and @novalidate]')->length)->toBe(1)
         ->and(trim($xpath->query($dialog.'//h2')->item(0)->textContent))->toBe('Add project')
@@ -515,7 +515,7 @@ test('the modal shell leaves out the body when there is nothing to put in it', f
 
     expect($xpath->query('//*[contains(@class, "modal-shell-body")]')->length)->toBe(0)
         ->and($xpath->query('//dialog//form')->length)->toBe(0)
-        ->and($xpath->query('//dialog[contains(@class, "max-w-md")]')->length)->toBe(1);
+        ->and($xpath->query('//dialog[contains(@class, "modal-shell-sheet")]')->length)->toBe(1);
 });
 
 test('the modal shell rejects an unknown size', function () {

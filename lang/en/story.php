@@ -84,4 +84,5 @@ return [
         '5' => 'A report opens every month. The center manager submits, MEAL validates. Only validated numbers count.',
         '6' => 'Final report milestone, the file and the donor\'s acceptance close the proposal and the project.',
     ],
+    'proposal_switch' => 'Proposals on this project',
 ];

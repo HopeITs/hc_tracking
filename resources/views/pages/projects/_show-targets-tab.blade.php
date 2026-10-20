@@ -11,7 +11,7 @@
                                 @if ($group['proposal'] === null)
                                     {{ __('projects.program_framework') }}
                                 @else
-                                    <a href="{{ route('proposals.show', ['proposal' => $group['proposal'], 'tab' => 'targets']) }}" wire:navigate class="normal-case underline-offset-2 hover:underline" dir="auto">{{ $group['proposal']->name }}</a>
+                                    <a href="{{ $this->attachedProposals->contains('id', $group['proposal']->id) ? $this->proposalStoryUrl($group['proposal']->id, 'targets') : route('proposals.show', ['proposal' => $group['proposal'], 'tab' => 'targets']) }}" wire:navigate class="normal-case underline-offset-2 hover:underline" dir="auto">{{ $group['proposal']->name }}</a>
                                 @endif
                             </p>
 

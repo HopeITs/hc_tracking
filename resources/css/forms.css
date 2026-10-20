@@ -970,3 +970,63 @@
         .filter-pill { transition: none; }
     }
 }
+
+/*
+ * Tracking Desk side sheet: the modal shell's default look. Flux's flyout dialog is docked
+ * to the inline-end edge here with logical margins (the bare variant avoids Flux's physical ml-auto/rtl:mr-auto), so the size,
+ * surface and motion are set here. Unlayered to out-rank flux.css and Flux's p-8 / min-w
+ * utilities. Header and footer stay pinned; .modal-shell-body is the only scroller.
+ */
+[data-flux-modal] > dialog.modal-shell-sheet[data-flux-flyout] {
+    width: min(600px, 100%);
+    max-width: 100%;
+    min-width: 0 !important;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin-block: 0;
+    margin-inline: auto 0;
+    padding: 0;
+    /* dk-slide is the only mover: neutralise Flux's own 50px flyout translate transition. */
+    --flux-flyout-translate: translateX(0);
+    overflow: hidden;
+    border: 0;
+    border-radius: 0;
+    background-color: var(--color-paper);
+    color: var(--color-secondary-dark);
+    box-shadow: var(--shadow-overlay);
+}
+
+[data-flux-modal] > dialog.modal-shell-sheet[data-flux-flyout][open] {
+    display: flex;
+    flex-direction: column;
+    animation: dk-slide 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+[dir="rtl"] [data-flux-modal] > dialog.modal-shell-sheet[data-flux-flyout][open] {
+    animation-name: dk-slide-rtl;
+}
+
+[data-flux-modal] > dialog.modal-shell-sheet.modal-shell-lg[data-flux-flyout] {
+    width: min(760px, 100%);
+}
+
+[data-flux-modal] > dialog.modal-shell-sheet.modal-shell-xl[data-flux-flyout] {
+    width: min(1020px, 100%);
+}
+
+/* Background is var(--color-paper) in both themes (it has a .dark value), matching .dk-sheet. */
+.dark [data-flux-modal] > dialog.modal-shell-sheet[data-flux-flyout] {
+    color: var(--color-ink);
+}
+
+[data-flux-modal] > dialog.modal-shell-sheet[data-flux-flyout] > .modal-shell-frame {
+    height: 100%;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    [data-flux-modal] > dialog.modal-shell-sheet[data-flux-flyout][open] {
+        animation: none;
+    }
+}

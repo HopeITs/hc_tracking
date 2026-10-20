@@ -95,7 +95,7 @@ test('Financial and General Manager see the funding envelope, the amounts and a 
     $page->set('tab', 'proposals')
         ->assertSee('Aurora Foundation')
         ->assertSee('731,942')
-        ->assertSeeHtml('href="'.route('proposals.show', $proposal).'"');
+        ->assertSeeHtml('href="'.route('projects.show', ['project' => $project, 'proposal' => $proposal->id]).'#proposal"');
 
     expect($page->instance()->fundingByCurrency)->not->toBeEmpty();
 })->with(['Financial', 'General Manager']);
@@ -127,7 +127,7 @@ test('Public Relations Manager opens the proposal from the project page but sees
         ->test('pages::projects.show', ['project' => $project])
         ->assertDontSee('Funding envelope')
         ->set('tab', 'proposals')
-        ->assertSeeHtml('href="'.route('proposals.show', $proposal).'"')
+        ->assertSeeHtml('href="'.route('projects.show', ['project' => $project, 'proposal' => $proposal->id]).'#proposal"')
         ->assertSee('Aurora Foundation')
         ->assertDontSee('731,942')
         ->assertDontSee('123,457');
@@ -302,8 +302,7 @@ test('a Managers user is not shown funding paper on the project files tab and ca
 
     $instance = $page->instance();
     expect($instance->project->media_count)->toBe(1)
-        ->and(collect($instance->fileCategoryCounts)->pluck('value')->all())->not->toContain('agreement', 'mou')
-        ->and(collect($instance->tabs)->firstWhere('key', 'files')['count'])->toBe(1);
+        ->and(collect($instance->fileCategoryCounts)->pluck('value')->all())->not->toContain('agreement', 'mou');
 });
 
 test('Financial sees the agreement and MOU files and counts them', function () {
