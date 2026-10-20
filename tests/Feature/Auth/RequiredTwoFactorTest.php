@@ -154,7 +154,7 @@ test('a livewire update from a guarded page sends a super admin without email or
 
     $snapshot = renderedLivewireSnapshot(
         $this->actingAs($superAdmin)->get(route('dashboard'))->assertOk()->getContent(),
-        'pages::dashboard.index',
+        'pages::desk.index',
     );
 
     $superAdmin->forceFill(['two_factor_secret' => null, 'two_factor_recovery_codes' => null, 'two_factor_confirmed_at' => null])->save();
@@ -180,7 +180,7 @@ test('the security page two factor set-up still runs for a super admin without e
     expect($superAdmin->fresh()->two_factor_secret)->not->toBeNull();
 });
 
-test('the notification bell on the security page cannot be driven by a super admin without email or app', function () {
+test('the Ask bar on the security page cannot be driven by a super admin without email or app', function () {
     $superAdmin = User::factory()->role('Super Admin')->withTwoFactor()->create(['email' => '']);
 
     $snapshot = renderedLivewireSnapshot(
@@ -189,7 +189,7 @@ test('the notification bell on the security page cannot be driven by a super adm
             ->get(route('security.edit'))
             ->assertOk()
             ->getContent(),
-        'notifications.bell',
+        'desk.ask',
     );
 
     sendLivewireCall($snapshot, '$refresh')->assertOk();
@@ -199,7 +199,7 @@ test('the notification bell on the security page cannot be driven by a super adm
     sendLivewireCall($snapshot, '$refresh')->assertRedirect(route('security.edit'));
 });
 
-test('the bell is hidden while a super admin still has to turn on the app', function () {
+test('the Ask bar is hidden while a super admin still has to turn on the app', function () {
     $html = $this->actingAs(requiredRoleWithoutEmail())
         ->withSession(['auth.password_confirmed_at' => time()])
         ->get(route('security.edit'))
@@ -207,7 +207,7 @@ test('the bell is hidden while a super admin still has to turn on the app', func
         ->assertDontSee('data-user-id=', false)
         ->getContent();
 
-    expect(fn () => renderedLivewireSnapshot($html, 'notifications.bell'))->toThrow(RuntimeException::class);
+    expect(fn () => renderedLivewireSnapshot($html, 'desk.ask'))->toThrow(RuntimeException::class);
 });
 
 test('a required role with email codes can remove the authenticator app', function () {

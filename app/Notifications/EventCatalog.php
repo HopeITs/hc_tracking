@@ -189,6 +189,10 @@ final class EventCatalog
                 'transfer.received' => self::entry('transfers', $now, 'module_map', OversightMode::ManagementOnly, activity: 'transfer.received'),
                 'transfer.late' => self::entry('transfers', $now, 'scanner', OversightMode::ManagementOnly),
             ],
+            // desk: a person asks someone holding their work to move it
+            [
+                'nudge.sent' => self::entry('tasks', $now, 'listener', OversightMode::None),
+            ],
             // monthly-reports
             [
                 'monthly_reports.generated' => self::entry('monthly-reports', $now, 'listener', $all),

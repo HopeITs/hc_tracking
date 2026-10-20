@@ -147,11 +147,11 @@ test('expired trust is pruned', function () {
     expect(TrustedDevice::query()->pluck('id')->all())->toBe([$live->id]);
 });
 
-test('the user menu links to the security page', function () {
+test('the settings sheet links to the security page', function () {
     $this->actingAs(User::factory()->create())
         ->get(route('dashboard'))
         ->assertOk()
-        ->assertSee('data-test="security-menu-item"', false)
+        ->assertSee('data-settings-row="security.edit"', false)
         ->assertSee(route('security.edit'));
 });
 

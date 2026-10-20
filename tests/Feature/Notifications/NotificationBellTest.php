@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\UserNotification;
 use App\Notifications\AppNotification;
 use App\Notifications\NotificationPayload;
+use App\Support\Desk\Panels;
 use Livewire\Livewire;
 
 function bellNotify(User $user, NotificationPriority $priority = NotificationPriority::Info, NotificationKind $kind = NotificationKind::Action, string $subject = 'Plan'): string
@@ -116,13 +117,14 @@ test('a refresh tells the page the new counts', function () {
         ->assertDispatched('notification-counts', counts: ['total' => 1, 'critical' => 0, 'modules' => ['tasks' => 1]]);
 });
 
-test('every authenticated page shows the bell and tells the script who is listening', function () {
+test('every authenticated page tells the script who is listening, and the desk carries the notifications panel', function () {
     $user = Activity::withoutRecording(fn () => User::factory()->create());
 
     $this->actingAs($user)->get(route('dashboard'))
         ->assertOk()
-        ->assertSeeHtml('data-notification-bell')
         ->assertSeeHtml('data-user-id="'.$user->id.'"');
+
+    expect(app(Panels::class)->availableTo($user))->toHaveKey('inbox');
 });
 
 test('the bell renders in arabic for arabic readers', function () {

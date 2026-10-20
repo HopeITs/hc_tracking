@@ -19,3 +19,6 @@ Dark mode uses the Graphite tokens (`surface-0..3`, `ink`/`ink-muted`/`ink-faint
 
 ## Flux dark overrides sit in @layer utilities
 Flux colours itself with its own `dark:` utilities, which a `@layer components` rule can never beat and an unlayered rule would beat app-wide. So the Graphite Flux overrides (modals, menus, tooltips, fields, table columns/cells, invalid fields) sit in an `@layer utilities` block after Tailwind's, using `:where(.dark)` selectors at the specificity of the Flux class they replace. Side effect: they also beat any non-`!` page `dark:` utility on those Flux parts — use `!` in a view only when a page must differ.
+
+## Light mode may change for the Desk redesign (supersedes "pixel-identical")
+The "light mode must stay pixel-identical when restyling dark" notes in css.md and views.md predate the Tracking Desk redesign (branch tracking-desk-ux-update), which intentionally changes light mode to match the artifact. Desk styles live in resources/css/desk.css: every class is prefixed dk-, element selectors are scoped under .dk-scope, and artifact variables are aliases of tokens.css tokens so Graphite .dark works without a second block. Pages not yet redesigned keep their old light look until their stage replaces them.

@@ -13,8 +13,8 @@ test('the header carries a tour button and the tour overlay with translated step
         ->assertOk()
         ->assertSee('data-test="tour-start-button"', false)
         ->assertSee('data-tour-root', false)
-        ->assertSee('Your dashboard')
-        ->assertSee('Every module, one sidebar');
+        ->assertSee('Your desk')
+        ->assertSee('The Ask bar replaces the menu');
 });
 
 test('a page tour opens with its own introduction and only lists the blocks the page renders', function () {
@@ -119,11 +119,13 @@ test('a page tour opens with its Arabic introduction', function (string $route, 
     tourPage($this, $route, $role, $query, 'ar')->assertSee($arabicIntro);
 })->with('page tours');
 
-test('the dashboard tour carries the My Team step', function () {
+test('the desk tour walks the top bar, then the desk and its panels', function () {
     $this->actingAs(User::factory()->role('Team Member')->create())
         ->get(route('dashboard'))
         ->assertOk()
-        ->assertSee('Your team');
+        ->assertSeeInOrder(['The logo takes you home', 'It answers questions', 'Your initials open settings', 'Customize desk', 'The dots move it', 'Add a panel', 'Come back any time'])
+        ->assertSee('data-desk-customize-trigger', false)
+        ->assertSee('data-desk-add', false);
 });
 
 test('a tour step never points a user without money permissions at a money reading', function () {

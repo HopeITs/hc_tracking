@@ -48,7 +48,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property int|null $employee_id
  * @property int|null $active_role_id
  * @property string|null $locale
- * @property list<array{panel: string, size: string}>|null $desk_layout
+ * @property array<mixed>|null $desk_layout the saved Desk arrangement, list<array{panel: string, size: string}> as written; read through Panels::layoutFor(), which drops anything malformed
  * @property bool $notification_popups
  * @property CarbonImmutable|null $tour_seen_at
  * @property CarbonImmutable|null $email_verified_at

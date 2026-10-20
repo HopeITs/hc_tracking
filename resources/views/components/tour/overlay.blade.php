@@ -48,14 +48,16 @@
     $welcome['body'] = $copy('intro', 'body', ["tour_pages.pages.{$routeKey}"]) ?? __('tour.welcome.body');
     $welcome['key'] = 'welcome';
 
-    /* The shell (sidebar, header tools) is explained once, on the dashboard, not repeated on every page. */
+    /* The top bar is explained once, on the Desk, not repeated on every page; the Desk steps come from config/tour.php. */
     $shellSteps = [
-        $step('sidebar', ['[data-navigation-sidebar]', '[data-mobile-navigation-toggle]'], mobileBody: true),
-        $step('collapse', ['[data-desktop-navigation-collapse]']),
-        $step('bell', ['[data-notification-bell]']),
-        $step('theme', ['[data-desktop-navigation-header] [data-theme-toggle]']),
-        $step('locale', ['[data-desktop-navigation-header] [data-locale-toggle]']),
+        $step('logo', ['[data-desk-logo]']),
+        $step('ask', ['[data-desk-ask]']),
+        $step('ask_answers', ['[data-desk-ask]']),
+        $step('tools', ['[data-desk-tools]']),
+        $step('locale', ['[data-desk-top-bar] [data-locale-toggle]']),
         $step('profile', ['[data-tour="profile"]']),
+    ];
+    $closingSteps = [
         $step('help', ['[data-tour="help"]']),
     ];
 
@@ -70,7 +72,7 @@
     ];
 
     if (request()->routeIs('dashboard')) {
-        $steps = [...$steps, ...$shellSteps];
+        $steps = [$welcome, ...$shellSteps, ...$extraSteps->all(), ...$closingSteps];
     }
 
     /* Opens by itself once, on someone's first visit to the dashboard; after that only the header button starts it. */

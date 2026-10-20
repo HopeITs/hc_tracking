@@ -10,7 +10,6 @@ use App\Enums\TaskStatus;
 use App\Models\Milestone;
 use App\Models\ProposalReviewer;
 use App\Models\Risk;
-use App\Models\Scopes\TaskVisibilityScope;
 use App\Models\Task;
 use App\Models\TransfersTracking;
 use Carbon\CarbonImmutable;
@@ -23,12 +22,12 @@ use Livewire\Attributes\Computed;
 /**
  * The dashboard's "Needs attention" queue: the proposal reviews waiting on
  * the viewer, every late task, milestone and pending transfer plus every
- * materialised risk, the counts behind its filter, and the row shaping and links the "Coming up" list shares.
+ * materialised risk, and the row shaping and links the "Coming up" list shares.
  *
- * Used by dashboard/index only. The page provides visible() and canView()
- * (the viewer's module access). transferHref() and taskParentName() are also
- * called by ReadsDashboardWork::upcoming(); attentionCounts() is also read by
- * ChartsDashboard::pulse().
+ * Used by the Desk page (its greeting), the Desk panels and the Ask bar. The
+ * host provides visible() and canView() (IsDeskPanel). transferHref() and
+ * taskParentName() are also called by ReadsDashboardWork::upcoming() and
+ * ReadsDeskAgenda.
  *
  * @property-read Collection<int, array{key: string, group: string, icon: string, tone: string, title: string, context: string, badge: string, daysLate: int|null, href: string, allRank: int|null, groupRank: int}> $attentionItems  #[Computed] attentionItems()
  */
@@ -180,54 +179,6 @@ trait ReadsDashboardAttention
                 return [...$item, 'groupRank' => $groupRanks[$item['group']]];
             })
             ->values();
-    }
-
-    /**
-     * How many rows each view of the attention queue actually shows.
-     *
-     * @return array<string, int>
-     */
-    #[Computed]
-    public function attentionShown(): array
-    {
-        $items = $this->attentionItems;
-
-        return [
-            'all' => $items->whereNotNull('allRank')->count(),
-            'delivery' => min(self::AttentionLimit, $items->where('group', 'delivery')->count()),
-            'funding' => min(self::AttentionLimit, $items->where('group', 'funding')->count()),
-            'risks' => min(self::AttentionLimit, $items->where('group', 'risks')->count()),
-            'reviews' => min(self::AttentionLimit, $items->where('group', 'reviews')->count()),
-        ];
-    }
-
-    /**
-     * How many attention items each group holds, for the queue's filter.
-     *
-     * @return array<string, int>
-     */
-    #[Computed]
-    public function attentionCounts(): array
-    {
-        $today = CarbonImmutable::today();
-
-        // Organisation-wide: a count on the dashboard is the same for everyone,
-        // except the reviews, which are asked of the viewer alone.
-        $delivery = $this->visible(Task::query(), 'tasks')->withoutGlobalScope(TaskVisibilityScope::class)->where('status', '!=', TaskStatus::Done)->whereDate('due_date', '<', $today)->count()
-            + $this->visible(Milestone::query(), 'milestones')->where('status', MilestoneStatus::Planned)->whereDate('planned_end_date', '<', $today)->count();
-        $funding = $this->canView('transfers')
-            ? TransfersTracking::query()->where('ar_status', ArStatus::Pending)->whereDate('scheduled_date', '<', $today)->count()
-            : 0;
-        $risks = $this->visible(Risk::query(), 'risks')->where('happened', true)->count();
-        $reviews = $this->awaitingReviews()->count();
-
-        return [
-            'all' => $delivery + $funding + $risks + $reviews,
-            'delivery' => $delivery,
-            'funding' => $funding,
-            'risks' => $risks,
-            'reviews' => $reviews,
-        ];
     }
 
     /**

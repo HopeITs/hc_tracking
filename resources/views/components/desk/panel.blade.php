@@ -25,15 +25,15 @@
         </button>
         <h2 id="dk-ph-{{ $id }}">{{ $title }}</h2>
         @if ($count !== null && $count !== '')
-            <span class="dk-pc dk-num">{{ $count }}</span>
+            <span class="dk-pc dk-num" data-panel-count>{{ $count }}</span>
         @endif
         <span class="dk-pspace"></span>
         @if ($register !== null)
-            <a href="{{ route($register) }}" wire:navigate class="dk-iconbtn dk-sm" aria-label="{{ __('desk.panel_open_full', ['panel' => $title]) }}" title="{{ __('desk.panel_open_full_short') }}">
+            <a href="{{ route($register) }}" wire:navigate class="dk-iconbtn dk-sm" data-panel-register aria-label="{{ __('desk.panel_open_full', ['panel' => $title]) }}" title="{{ __('desk.panel_open_full_short') }}">
                 <x-desk.icon name="expand" />
             </a>
         @endif
-        <span class="dk-pmenu" x-on:click.outside="menu = false">
+        <span class="dk-pmenu" x-on:click.outside="menu = false" data-panel-menu>
             <button type="button" class="dk-iconbtn dk-sm" x-on:click="menu = ! menu" x-bind:aria-expanded="menu" aria-label="{{ __('desk.panel_options') }}">
                 <x-desk.icon name="more" />
             </button>
@@ -56,12 +56,12 @@
     </header>
 
     @isset($tools)
-        <div class="dk-ptools">{{ $tools }}</div>
+        <div class="dk-ptools" data-panel-tools>{{ $tools }}</div>
     @endisset
 
     <div class="dk-pb">{{ $slot }}</div>
 
     @isset($foot)
-        <footer class="dk-pf">{{ $foot }}</footer>
+        <footer class="dk-pf" data-panel-foot>{{ $foot }}</footer>
     @endisset
 </section>

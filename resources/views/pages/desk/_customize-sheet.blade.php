@@ -47,8 +47,16 @@
                                     <button type="button" class="dk-btn dk-sm" wire:click="addPanel('{{ $panel['id'] }}')"><x-desk.icon name="plus" />{{ __('desk.add') }}</button>
                                 </li>
                             @empty
-                                <li><span class="dk-li-t"><span class="dk-is">{{ __('desk.nothing_to_add') }}</span></span></li>
+                                @if ($this->locked === [])
+                                    <li><span class="dk-li-t"><span class="dk-is">{{ __('desk.nothing_to_add') }}</span></span></li>
+                                @endif
                             @endforelse
+                            @foreach ($this->locked as $panel)
+                                <li wire:key="cz-lock-{{ $panel['id'] }}" class="dk-lockd" data-locked-panel="{{ $panel['id'] }}">
+                                    <span class="dk-li-ic"><x-desk.icon name="lock" /></span>
+                                    <span class="dk-li-t"><strong>{{ $panel['title'] }}</strong><span class="dk-is">{{ $panel['reason'] }}</span></span>
+                                </li>
+                            @endforeach
                         </ul>
                     </section>
                 </div>

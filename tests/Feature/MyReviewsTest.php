@@ -5,6 +5,7 @@ use App\Enums\ReviewStage;
 use App\Models\Proposal;
 use App\Models\ProposalReviewer;
 use App\Models\User;
+use App\Support\Desk\Destinations;
 use Livewire\Livewire;
 
 /**
@@ -32,7 +33,7 @@ function reviewerLogin(): array
 
 beforeEach(fn () => $this->travelTo('2026-10-15 10:00:00'));
 
-test('a reviewer without proposals.view gets a My reviews link counting what waits on them', function () {
+test('a reviewer without proposals.view can go to My reviews and the panel counts what waits on them', function () {
     [$employeeId, $user] = reviewerLogin();
     myReview($employeeId, 'Water Access', ProposalStatus::ConceptNoteReview);
     myReview($employeeId, 'School Meals', ProposalStatus::ProposalReview, ReviewStage::Proposal);
@@ -40,23 +41,18 @@ test('a reviewer without proposals.view gets a My reviews link counting what wai
 
     expect($user->can('proposals.view'))->toBeFalse();
 
-    $html = $this->actingAs($user)
-        ->get(route('dashboard'))
-        ->assertOk()
-        ->assertSeeHtml('href="'.route('reviews.index').'"')
-        ->getContent();
+    expect(array_column(app(Destinations::class)->for($user), 'route'))->toContain('reviews.index');
 
-    expect($html)->toMatch('/data-my-reviews-badge\s*>2</');
+    Livewire::actingAs($user)->test('desk.panels.reviews', ['size' => 'M'])
+        ->assertSeeHtml(route('reviews.index'))
+        ->assertSeeHtml('<span class="dk-pc dk-num" data-panel-count>2</span>');
 });
 
 test('someone never asked to review sees no My reviews link', function () {
     [, $user] = reviewerLogin();
     myReview(insertHrEmployee(), 'Someone Else', ProposalStatus::ConceptNoteReview);
 
-    $this->actingAs($user)
-        ->get(route('dashboard'))
-        ->assertOk()
-        ->assertDontSeeHtml('data-my-reviews-link');
+    expect(array_column(app(Destinations::class)->for($user), 'route'))->not->toContain('reviews.index');
 });
 
 test('the page lists only the viewer\'s reviews still waiting on them, and every one of theirs on All', function () {
@@ -92,15 +88,15 @@ test('the page shows an empty state to someone with no reviews', function () {
         ->assertSee(__('proposals.my_reviews_none_awaiting'));
 });
 
-test('the dashboard leads Needs attention with the reviews waiting on the viewer', function () {
+test('needs you leads with the reviews waiting on the viewer', function () {
     [$employeeId, $user] = reviewerLogin();
     $waiting = myReview($employeeId, 'Water Access', ProposalStatus::ConceptNoteReview);
     $waiting->forceFill(['created_at' => now()->subDays(3)])->save();
     myReview($employeeId, 'Already Read', ProposalStatus::ConceptNoteReview, seen: true);
 
-    $dashboard = Livewire::actingAs($user)->test('pages::dashboard.index');
+    $dashboard = Livewire::actingAs($user)->test('desk.panels.needs', ['size' => 'L']);
 
-    expect($dashboard->get('attentionCounts')['reviews'])->toBe(1)
+    expect($dashboard->get('attentionItems')->where('group', 'reviews'))->toHaveCount(1)
         ->and($dashboard->get('attentionItems')->first())->toMatchArray([
             'key' => 'review-'.$waiting->id,
             'group' => 'reviews',
@@ -110,17 +106,17 @@ test('the dashboard leads Needs attention with the reviews waiting on the viewer
         ]);
 
     $dashboard
-        ->assertSee(__('dashboard.reviews'))
+        ->assertSee('Water Access')
         ->assertSee(trans_choice('dashboard.review_asked_days', 3, ['count' => 3]))
         ->assertDontSee('Already Read');
 });
 
-test('the dashboard has no reviews tab for someone nothing waits on', function () {
+test('needs you holds no review for someone nothing waits on', function () {
     [$employeeId, $user] = reviewerLogin();
     myReview($employeeId, 'Already Read', ProposalStatus::ConceptNoteReview, seen: true);
 
-    $dashboard = Livewire::actingAs($user)->test('pages::dashboard.index');
+    $dashboard = Livewire::actingAs($user)->test('desk.panels.needs', ['size' => 'L']);
 
-    expect($dashboard->get('attentionCounts')['reviews'])->toBe(0);
-    $dashboard->assertDontSee(__('dashboard.reviews'));
+    expect($dashboard->get('attentionItems')->where('group', 'reviews'))->toHaveCount(0);
+    $dashboard->assertDontSee('Already Read');
 });

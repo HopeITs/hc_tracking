@@ -28,13 +28,15 @@ return [
 
     'pages' => [
         'dashboard' => [
-            ['id' => 'my_work', 'targets' => ['[data-my-work]']],
-            ['id' => 'my_team', 'targets' => ['[data-my-team]']],
-            ['id' => 'attention', 'targets' => ['[data-attention]']],
-            ['id' => 'pulse', 'targets' => ['[data-pulse]']],
-            ['id' => 'funding', 'targets' => ['[data-funding-position]']],
-            ['id' => 'upcoming', 'targets' => ['[data-upcoming]']],
-            ['id' => 'activity', 'targets' => ['[data-activity]']],
+            ['id' => 'hello', 'targets' => ['[data-desk-hello]']],
+            ['id' => 'customize', 'targets' => ['[data-desk-customize-trigger]']],
+            ['id' => 'grip', 'targets' => ['[data-desk-grid] [data-drag]']],
+            ['id' => 'count', 'targets' => ['[data-desk-grid] [data-panel-count]']],
+            ['id' => 'register', 'targets' => ['[data-desk-grid] [data-panel-register]']],
+            ['id' => 'menu', 'targets' => ['[data-desk-grid] [data-panel-menu]']],
+            ['id' => 'panel_tools', 'targets' => ['[data-desk-grid] [data-panel-tools]']],
+            ['id' => 'panel_foot', 'targets' => ['[data-desk-grid] [data-panel-foot]']],
+            ['id' => 'add', 'targets' => ['[data-desk-add]']],
         ],
         'programs.show' => [
             ['id' => 'loose_tasks', 'targets' => ['[data-loose-tasks]']],

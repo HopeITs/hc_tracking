@@ -95,6 +95,14 @@ parameters:
             identifier: argument.type
             path: app/Livewire/Concerns/Proposals/ReadsProposalDelivery.php
             count: 1
+        -
+            # agendaBetween() eager-loads a task's `source` with a callback typed
+            # for the MorphTo it receives (it calls morphWith()); Larastan types
+            # every with() callback as taking any Relation.
+            message: '#MorphTo#'
+            identifier: argument.type
+            path: app/Livewire/Concerns/Desk/ReadsDeskAgenda.php
+            count: 1
 
         # The calendar/index traits below hold code moved unchanged from the
         # page, which PHPStan could not read before. Changing any of it is a
@@ -567,14 +575,13 @@ parameters:
             path: app/Livewire/Concerns/Dashboard/ReadsDashboardAttention.php
             count: 1
         -
-            # Five redundant `?->`, each the last one on the left of a `??`, which
-            # already covers null: `donorProposal?->donor?->name`, `report->
-            # planIndicator?->indicator?->name` (in upcoming() and activity()),
-            # `note->proposal?->name` and `report->user?->name`. The '—' fallback
+            # Two redundant `?->`, each the last one on the left of a `??`, which
+            # already covers null: `donorProposal?->donor?->name` and `report->
+            # planIndicator?->indicator?->name` in upcoming(). The '—' fallback
             # is a defensive label for a dangling reference: keep it.
             identifier: nullsafe.neverNull
             path: app/Livewire/Concerns/Dashboard/ReadsDashboardWork.php
-            count: 5
+            count: 2
         -
             # upcoming() eager-loads `source` with a callback typed for the MorphTo
             # it receives (it calls morphWith()); same as attentionItems().
@@ -591,15 +598,14 @@ parameters:
             path: app/Livewire/Concerns/Dashboard/ReadsDashboardWork.php
             count: 1
         -
-            # upcoming() and activity() document title/context/sentence as string
-            # and date/at as non-null. The rows put __() (string|array to PHPStan)
-            # in those fields and read milestones.planned_end_date, transfers_
-            # tracking.scheduled_date, tasks.due_date and reports.submit_date,
-            # which are nullable casts the queries already filter with
-            # whereBetween() / whereNotNull().
+            # upcoming() documents title/context as string and date as non-null.
+            # The rows put __() (string|array to PHPStan) in those fields and read
+            # milestones.planned_end_date, transfers_tracking.scheduled_date,
+            # tasks.due_date and reports.planned_date, which are nullable casts
+            # the queries already filter with whereBetween().
             identifier: return.type
             path: app/Livewire/Concerns/Dashboard/ReadsDashboardWork.php
-            count: 2
+            count: 1
 
         # The funding-agreements/index traits hold code moved unchanged from the
         # page, which PHPStan could not read before. Changing any of it is a
