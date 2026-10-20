@@ -186,7 +186,9 @@ new #[Title('titles.monthly_matrix')] class extends Component {
                         {{ __('reports.matrix.view_grouped') }}
                     </x-ui.button>
                 </div>
-                <flux:switch wire:model.live="pwd" :label="__('reports.matrix.show_pwd')" align="left" data-test="matrix-pwd" />
+                <x-ui.button tone="secondary" :icon="$pwd ? 'check' : null" class="min-h-11 touch-manipulation" wire:click="$toggle('pwd')" aria-pressed="{{ $pwd ? 'true' : 'false' }}" data-test="matrix-pwd">
+                    {{ __('reports.matrix.show_pwd') }}
+                </x-ui.button>
             </div>
         @endunless
     </div>

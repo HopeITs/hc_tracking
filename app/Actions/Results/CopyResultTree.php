@@ -18,7 +18,8 @@ use Illuminate\Validation\ValidationException;
 /**
  * Copy a program-framework root and its whole subtree into a proposal's own
  * framework (contracts §11.2, T32): "Start from Program Framework", and T10's
- * renewal copy. There is no second copy routine.
+ * renewal copy, whose source is a root of the proposal's previous proposal.
+ * There is no second copy routine.
  *
  * Results and their indicators are copied with `copied_from_id` set on every
  * row; targets (`plan_indicators`), reports, schedules and milestone links
@@ -34,8 +35,9 @@ use Illuminate\Validation\ValidationException;
 final class CopyResultTree
 {
     /**
-     * @throws ValidationException when the root is not a program-framework root of
-     *                             the proposal's programs, was already imported, or
+     * @throws ValidationException when the root is neither a program-framework root
+     *                             of the proposal's programs nor a root of its
+     *                             previous proposal, was already imported, or
      *                             the framework is locked for this user
      */
     public function handle(Result $sourceRoot, Proposal $proposal): Result
@@ -53,10 +55,12 @@ final class CopyResultTree
             $programIds = ProposalFramework::programIds($lockedProposal);
 
             $source = Result::query()
-                ->programFramework()
                 ->whereNull('parent_id')
                 ->where('type', '!=', ResultType::Activity->value)
-                ->whereIn('program_id', $programIds)
+                ->where(fn ($sources) => $sources
+                    ->where(fn ($programRoots) => $programRoots->programFramework()->whereIn('program_id', $programIds))
+                    ->when($lockedProposal->previous_proposal_id !== null, fn ($renewalRoots) => $renewalRoots
+                        ->orWhere('proposal_id', $lockedProposal->previous_proposal_id)))
                 ->whereKey($sourceRoot->getKey())
                 ->first();
 
@@ -74,6 +78,19 @@ final class CopyResultTree
         $root->recordActivity('created');
 
         return $root;
+    }
+
+    /**
+     * The program-framework result the copied root contributes to: the source
+     * itself for a program root, or the source's own link for a renewal root.
+     */
+    private function contributesTo(Result $source): ?int
+    {
+        if ($source->proposal_id !== null) {
+            return $source->contributes_to_result_id;
+        }
+
+        return $source->type === ResultType::CrossCutting ? null : $source->id;
     }
 
     /**
@@ -95,7 +112,7 @@ final class CopyResultTree
                 'program_id' => $programId,
                 'proposal_id' => $proposal->id,
                 'parent_id' => $result->parent_id === null || $result->is($source) ? null : $copyIdOf[$result->parent_id],
-                'contributes_to_result_id' => $result->is($source) && $result->type !== ResultType::CrossCutting ? $source->id : null,
+                'contributes_to_result_id' => $result->is($source) ? $this->contributesTo($source) : null,
                 'copied_from_id' => $result->id,
                 'created_at' => $now,
                 'updated_at' => $now,
@@ -107,7 +124,7 @@ final class CopyResultTree
                 ->map(fn (int|string $id): int => (int) $id)
                 ->all();
 
-            $level = $this->childrenOf($level);
+            $level = $this->childrenOf($level, $source->proposal_id);
         }
 
         $this->copyIndicators(array_keys($copyIdOf), $copyIdOf, $now);
@@ -121,10 +138,10 @@ final class CopyResultTree
      * @param  Collection<int, Result>  $level
      * @return Collection<int, Result>
      */
-    private function childrenOf(Collection $level): Collection
+    private function childrenOf(Collection $level, ?int $sourceProposalId): Collection
     {
         return Result::query()
-            ->programFramework()
+            ->where('proposal_id', $sourceProposalId)
             ->whereIn('parent_id', $level->modelKeys())
             ->orderBy('id')
             ->get(['id', 'parent_id', 'statement', 'type', 'activity_kind', 'checkout_period']);
